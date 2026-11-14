@@ -1,9 +1,20 @@
 import type { TrajectoryCell, TrajectoryRecord } from "./contract";
 
-const searchText = (record: TrajectoryRecord) => JSON.stringify({
-  eventType: record.eventType, kind: record.kind, state: record.state, summary: record.summary, preview: record.preview, result: record.result,
-  raw: record.raw, request: record.requestDetail, schema: record.schemaDetail, input: record.inputDetail, output: record.outputDetail, sourceBlocks: record.sourceBlocks,
-}).toLocaleLowerCase();
+const searchText = (record: TrajectoryRecord) =>
+  JSON.stringify({
+    eventType: record.eventType,
+    kind: record.kind,
+    state: record.state,
+    summary: record.summary,
+    preview: record.preview,
+    result: record.result,
+    raw: record.raw,
+    request: record.requestDetail,
+    schema: record.schemaDetail,
+    input: record.inputDetail,
+    output: record.outputDetail,
+    sourceBlocks: record.sourceBlocks,
+  }).toLocaleLowerCase();
 
 /** DSH TrajectorySearchIndex: one entry per record id; a record whose object is unchanged keeps its text. */
 export class TrajectorySearchIndex {
@@ -36,7 +47,7 @@ export class TrajectorySearchIndex {
     const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     if (terms.length === 0) return null;
     const result = new Set<string>();
-    for (const [id, entry] of this.entries) if (terms.every(term => entry.text.includes(term))) result.add(id);
+    for (const [id, entry] of this.entries) if (terms.every((term) => entry.text.includes(term))) result.add(id);
     return result;
   }
 }

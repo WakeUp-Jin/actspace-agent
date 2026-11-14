@@ -30,12 +30,23 @@ function BrowserPluginDetail() {
 }
 
 /** 插件自己的设置：只在插件开启时显示；改动写进 settings，下次启动生效。 */
-function PluginSettingsPanel({ item, pending, onChange }: { item: PluginListItem; pending: boolean; onChange: (patch: Partial<SettingsV4Tools>) => void }) {
+function PluginSettingsPanel({
+  item,
+  pending,
+  onChange,
+}: {
+  item: PluginListItem;
+  pending: boolean;
+  onChange: (patch: Partial<SettingsV4Tools>) => void;
+}) {
   const spec = PLUGIN_SETTINGS[item.id];
   if (!spec || !item.settings) return null;
   return (
     <section aria-label={`${item.title}设置`} className="overflow-hidden rounded-act-lg bg-surface-subtle">
-      <p className="px-4 pt-3 text-act-xs text-text-faint">{spec.note}{item.settingsPendingRestart ? "设置已更改，重启后生效。" : ""}</p>
+      <p className="px-4 pt-3 text-act-xs text-text-faint">
+        {spec.note}
+        {item.settingsPendingRestart ? "设置已更改，重启后生效。" : ""}
+      </p>
       <div className="divide-y divide-line/60">
         {spec.fields.map((field) => (
           <SettingRow
@@ -43,7 +54,7 @@ function PluginSettingsPanel({ item, pending, onChange }: { item: PluginListItem
             tight
             title={field.title}
             description={field.description}
-            control={(
+            control={
               <SettingsSelect
                 ariaLabel={`${item.title}${field.title}`}
                 value={item.settings![field.key] ?? ""}
@@ -51,7 +62,7 @@ function PluginSettingsPanel({ item, pending, onChange }: { item: PluginListItem
                 disabled={pending}
                 onChange={(value) => onChange(field.patch(value))}
               />
-            )}
+            }
           />
         ))}
       </div>
@@ -59,14 +70,21 @@ function PluginSettingsPanel({ item, pending, onChange }: { item: PluginListItem
   );
 }
 
-function PluginRow({ item, pending, onToggle, onSettingsChange, onConfigureSpeech }: {
+function PluginRow({
+  item,
+  pending,
+  onToggle,
+  onSettingsChange,
+  onConfigureSpeech,
+}: {
   item: PluginListItem;
   pending: boolean;
   onToggle: (item: PluginListItem, next: boolean) => void;
   onSettingsChange: (item: PluginListItem, patch: Partial<SettingsV4Tools>) => void;
   onConfigureSpeech?: () => void;
 }) {
-  const restartHint = item.canDisable && item.enabled !== item.loaded ? (item.enabled ? "重启后开启" : "重启后关闭") : null;
+  const restartHint =
+    item.canDisable && item.enabled !== item.loaded ? (item.enabled ? "重启后开启" : "重启后关闭") : null;
   const showDetail = (item.canDisable && item.loaded && item.enabled) || item.id === "shell-tools";
   return (
     <div>
@@ -74,26 +92,47 @@ function PluginRow({ item, pending, onToggle, onSettingsChange, onConfigureSpeec
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-act-sm font-medium text-text-main">
             <span>{item.title}</span>
-            <span className="rounded-full bg-surface-subtle px-2 py-px font-mono text-act-xxs font-normal text-text-subtle">{item.directory}/</span>
+            <span className="rounded-full bg-surface-subtle px-2 py-px font-mono text-act-xxs font-normal text-text-subtle">
+              {item.directory}/
+            </span>
           </div>
           <p className="mt-px text-act-xs text-text-faint">{item.description}</p>
-          {item.unavailableReason ? <p className="mt-px text-act-xs text-on-warning">不可用：{item.unavailableReason}</p> : null}
+          {item.unavailableReason ? (
+            <p className="mt-px text-act-xs text-on-warning">不可用：{item.unavailableReason}</p>
+          ) : null}
         </div>
         {item.canDisable ? (
           <>
-            {restartHint ? <span className="whitespace-nowrap rounded-full bg-warning-soft px-2 py-px text-act-xxs text-on-warning">{restartHint}</span> : null}
-            <Toggle checked={item.enabled} disabled={pending} onChange={(next) => onToggle(item, next)} ariaLabel={item.title} />
+            {restartHint ? (
+              <span className="whitespace-nowrap rounded-full bg-warning-soft px-2 py-px text-act-xxs text-on-warning">
+                {restartHint}
+              </span>
+            ) : null}
+            <Toggle
+              checked={item.enabled}
+              disabled={pending}
+              onChange={(next) => onToggle(item, next)}
+              ariaLabel={item.title}
+            />
           </>
-        ) : <span className="whitespace-nowrap text-act-xxs text-text-faint">内置</span>}
+        ) : (
+          <span className="whitespace-nowrap text-act-xxs text-text-faint">内置</span>
+        )}
       </div>
       {item.canDisable && item.enabled && item.settings ? (
-        <div className="mx-3.5 mb-3"><PluginSettingsPanel item={item} pending={pending} onChange={(patch) => onSettingsChange(item, patch)} /></div>
+        <div className="mx-3.5 mb-3">
+          <PluginSettingsPanel item={item} pending={pending} onChange={(patch) => onSettingsChange(item, patch)} />
+        </div>
       ) : null}
       {showDetail ? (
         <div className="mx-3.5 mb-3">
-          {item.id === "browser-tools" ? <BrowserPluginDetail />
-            : item.id === "english-learning" ? <EnglishLearningCapability onConfigure={onConfigureSpeech} />
-            : item.id === "shell-tools" ? <PythonRuntimePanel /> : null}
+          {item.id === "browser-tools" ? (
+            <BrowserPluginDetail />
+          ) : item.id === "english-learning" ? (
+            <EnglishLearningCapability onConfigure={onConfigureSpeech} />
+          ) : item.id === "shell-tools" ? (
+            <PythonRuntimePanel />
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -115,7 +154,9 @@ export function PluginsSection({ query = "", onConfigureSpeech }: { query?: stri
       setError("读取插件列表失败，请重试。");
     }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const saveTools = async (item: PluginListItem, patch: Partial<SettingsV4Tools>, failure: string) => {
     setPendingId(item.id);
@@ -135,23 +176,36 @@ export function PluginsSection({ query = "", onConfigureSpeech }: { query?: stri
       setPendingId(null);
     }
   };
-  const toggle = (item: PluginListItem, next: boolean) => saveTools(item, { plugins: { [item.id]: next } }, "保存失败，请重试。开关状态未更改。");
-  const changeSettings = (item: PluginListItem, patch: Partial<SettingsV4Tools>) => saveTools(item, patch, "保存失败，请重试。设置未更改。");
+  const toggle = (item: PluginListItem, next: boolean) =>
+    saveTools(item, { plugins: { [item.id]: next } }, "保存失败，请重试。开关状态未更改。");
+  const changeSettings = (item: PluginListItem, patch: Partial<SettingsV4Tools>) =>
+    saveTools(item, patch, "保存失败，请重试。设置未更改。");
 
   const needle = query.trim().toLowerCase();
-  const visible = (items ?? []).filter((item) => !needle || `${item.title} ${item.description} ${item.directory} ${item.id}`.toLowerCase().includes(needle));
+  const visible = (items ?? []).filter(
+    (item) =>
+      !needle || `${item.title} ${item.description} ${item.directory} ${item.id}`.toLowerCase().includes(needle),
+  );
 
   return (
     <SectionShell>
       <p className="text-act-xs text-text-faint">插件 · {visible.length}</p>
-      {message ? <p role="alert" className="text-act-xs text-on-danger">{message}</p> : null}
+      {message ? (
+        <p role="alert" className="text-act-xs text-on-danger">
+          {message}
+        </p>
+      ) : null}
       {error ? (
         <div role="alert" className="flex items-center gap-3 py-8 text-act-sm text-text-faint">
           {error}
-          <Button size="xs" onClick={() => void load()}>重试</Button>
+          <Button size="xs" onClick={() => void load()}>
+            重试
+          </Button>
         </div>
       ) : items === null ? (
-        <p role="status" className="py-8 text-act-sm text-text-faint">加载插件中…</p>
+        <p role="status" className="py-8 text-act-sm text-text-faint">
+          加载插件中…
+        </p>
       ) : visible.length === 0 ? (
         <p className="py-10 text-center text-act-sm text-text-faint">没有找到匹配的插件。</p>
       ) : (
@@ -163,7 +217,14 @@ export function PluginsSection({ query = "", onConfigureSpeech }: { query?: stri
             const builtin = list.filter((item) => !item.canDisable);
             const expanded = needle !== "" || open[group.scope] === true;
             const renderRow = (item: PluginListItem) => (
-              <PluginRow key={item.id} item={item} pending={pendingId === item.id} onToggle={(row, next) => void toggle(row, next)} onSettingsChange={(row, patch) => void changeSettings(row, patch)} onConfigureSpeech={onConfigureSpeech} />
+              <PluginRow
+                key={item.id}
+                item={item}
+                pending={pendingId === item.id}
+                onToggle={(row, next) => void toggle(row, next)}
+                onSettingsChange={(row, patch) => void changeSettings(row, patch)}
+                onConfigureSpeech={onConfigureSpeech}
+              />
             );
             return (
               <section key={group.scope} aria-label={group.title} className="flex flex-col gap-2">
@@ -182,7 +243,11 @@ export function PluginsSection({ query = "", onConfigureSpeech }: { query?: stri
                       onClick={() => setOpen((current) => ({ ...current, [group.scope]: !expanded }))}
                       className="flex w-full items-center gap-2 px-3.5 py-[11px] text-left text-act-sm text-text-muted transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
                     >
-                      <ChevronRight size={14} aria-hidden="true" className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`} />
+                      <ChevronRight
+                        size={14}
+                        aria-hidden="true"
+                        className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+                      />
                       内置插件 {builtin.length} 个，不能关闭
                     </button>
                   ) : null}

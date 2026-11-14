@@ -1,4 +1,9 @@
-import type { RuntimeEventWindow, RuntimeJsonValue, RuntimeSessionSnapshot, RuntimeReadModelWatermarks } from "@actspace/shared/runtime-v2";
+import type {
+  RuntimeEventWindow,
+  RuntimeJsonValue,
+  RuntimeSessionSnapshot,
+  RuntimeReadModelWatermarks,
+} from "@actspace/shared/runtime-v2";
 
 export type ClientSessionSnapshot = RuntimeSessionSnapshot;
 

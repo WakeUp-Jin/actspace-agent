@@ -6,11 +6,15 @@ import { SANDBOX_HOST_PORT_ID, SANDBOX_SERVICE_ID, type SandboxService } from ".
 
 describe("sandbox plugin lifecycle", () => {
   it("provides the service from the Host port and retracts it on dispose", async () => {
-    expect(manifest.behaviors[0]).toMatchObject({ entryId: "sandbox", provides: ["sandbox"], injects: [SANDBOX_HOST_PORT_ID] });
+    expect(manifest.behaviors[0]).toMatchObject({
+      entryId: "sandbox",
+      provides: ["sandbox"],
+      injects: [SANDBOX_HOST_PORT_ID],
+    });
     const ctx = new CordisContextClass();
     expect(() => apply(ctx as never)).toThrow(SANDBOX_HOST_PORT_ID);
     ctx.provide(SANDBOX_HOST_PORT_ID, createNodeSandboxHostPort());
-    await ctx.plugin({ inject: [SANDBOX_HOST_PORT_ID], apply: inner => apply(inner as never) });
+    await ctx.plugin({ inject: [SANDBOX_HOST_PORT_ID], apply: (inner) => apply(inner as never) });
     const service = ctx.get(SANDBOX_SERVICE_ID) as SandboxService;
     // No backend plugin is loaded, so the manager refuses rather than running unsandboxed.
     expect(await service.status("tool")).toMatchObject({ available: false, isolation: "sandboxed" });

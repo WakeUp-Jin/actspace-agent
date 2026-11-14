@@ -10,7 +10,14 @@ import type {
 } from "@actspace/shared";
 import { writeBackupOnce, writeJsonAtomic, writeSettingsV2Backup, writeSettingsV3Backup } from "./atomic-io";
 import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
-import { ALL_SETTINGS_V4_NAMESPACES, SECRETS_FILE, SETTINGS_FILE, SETTINGS_PRE_MODEL_LAYERS_BACKUP_FILE, SETTINGS_PRE_MODEL_LIST_BACKUP_FILE, SETTINGS_V1_BACKUP_FILE } from "./constants";
+import {
+  ALL_SETTINGS_V4_NAMESPACES,
+  SECRETS_FILE,
+  SETTINGS_FILE,
+  SETTINGS_PRE_MODEL_LAYERS_BACKUP_FILE,
+  SETTINGS_PRE_MODEL_LIST_BACKUP_FILE,
+  SETTINGS_V1_BACKUP_FILE,
+} from "./constants";
 import { legacyModelHints, migrateModelLayers } from "./model-layers-migration";
 import { blockingSettings, defaultSettingsFromEnv, defaultSettingsV4Metadata } from "./defaults";
 import { applyToEnv as applySettingsToEnv } from "./env";
@@ -98,7 +105,11 @@ export class SettingsStore {
     this.lastLoadError = loaded.warning;
     if (loaded.blockingError !== undefined) throw new Error(loaded.blockingError);
     const beforeLayers = toSettingsV4(this.settings, this.v4Metadata);
-    const layered = migrateModelLayers(beforeLayers, BUILTIN_MODEL_CATALOG, legacyModelHints(loaded.rawV4 ?? loaded.rawV3 ?? loaded.rawV2 ?? loaded.rawV1));
+    const layered = migrateModelLayers(
+      beforeLayers,
+      BUILTIN_MODEL_CATALOG,
+      legacyModelHints(loaded.rawV4 ?? loaded.rawV3 ?? loaded.rawV2 ?? loaded.rawV1),
+    );
     if (layered) {
       this.settings = legacySettingsFromV4(layered, this.dataRoot);
       this.v4Metadata = metadataFromSettingsV4(layered);
@@ -118,8 +129,14 @@ export class SettingsStore {
       } else if (loaded.source === "missing" || loaded.source === "legacy-removed") {
         await this.writeSettingsFile();
       } else if (layered) {
-        const backup = (beforeLayers.models.layersVersion ?? 0) >= 1 ? SETTINGS_PRE_MODEL_LIST_BACKUP_FILE : SETTINGS_PRE_MODEL_LAYERS_BACKUP_FILE;
-        await writeBackupOnce(join(this.dataRoot, backup), loaded.rawV4 ?? `${JSON.stringify(beforeLayers, null, 2)}\n`);
+        const backup =
+          (beforeLayers.models.layersVersion ?? 0) >= 1
+            ? SETTINGS_PRE_MODEL_LIST_BACKUP_FILE
+            : SETTINGS_PRE_MODEL_LAYERS_BACKUP_FILE;
+        await writeBackupOnce(
+          join(this.dataRoot, backup),
+          loaded.rawV4 ?? `${JSON.stringify(beforeLayers, null, 2)}\n`,
+        );
         await this.writeSettingsFile();
       }
     } catch {
@@ -132,7 +149,8 @@ export class SettingsStore {
       } catch {
         // Prompt creation failure remains non-fatal for settings load.
       }
-      if (loaded.source === "v2") throw new Error("Settings v2 to v4 migration failed; the original settings file was preserved.");
+      if (loaded.source === "v2")
+        throw new Error("Settings v2 to v4 migration failed; the original settings file was preserved.");
       if (loaded.source === "v3" || loaded.source === "legacy-removed") {
         throw new Error("Settings v3 to v4 migration failed; the original settings file was preserved.");
       }
@@ -192,7 +210,8 @@ export class SettingsStore {
       return { ...migrated, v4Metadata: metadataFromSettingsV3(migrated.settings), source: "v1", rawV1: raw };
     }
     if (parsed.version === 2) {
-      if (!hasRequiredSettingsSections(parsed)) return blockingSettings(this.dataRoot, "Settings v2 is incomplete and cannot be migrated safely.");
+      if (!hasRequiredSettingsSections(parsed))
+        return blockingSettings(this.dataRoot, "Settings v2 is incomplete and cannot be migrated safely.");
       const settings = mergePersistedSettingsV3(parsed, this.dataRoot);
       return {
         settings,
@@ -202,7 +221,8 @@ export class SettingsStore {
       };
     }
     if (parsed.version === 3) {
-      if (!hasRequiredSettingsSections(parsed)) return blockingSettings(this.dataRoot, "Settings v3 is incomplete and cannot be used safely.");
+      if (!hasRequiredSettingsSections(parsed))
+        return blockingSettings(this.dataRoot, "Settings v3 is incomplete and cannot be used safely.");
       const settings = mergePersistedSettingsV3(parsed, this.dataRoot);
       return {
         settings,
@@ -255,11 +275,17 @@ export class SettingsStore {
     if (parsed.version === 1) {
       const legacy = parseSecretsV1(parsed);
       if (!legacy) {
-        return unavailableSecrets("invalid_format", "旧版凭据文件字段无效。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
+        return unavailableSecrets(
+          "invalid_format",
+          "旧版凭据文件字段无效。为避免覆盖现有 Key，Actspace 已暂停凭据修改。",
+        );
       }
       const migrated = await this.decryptLegacySecrets(legacy.secrets);
       if (!migrated) {
-        return unavailableSecrets("migration_failed", "旧版凭据无法解密。请使用最后一次能读取这些 Key 的 Actspace 版本启动后再迁移。");
+        return unavailableSecrets(
+          "migration_failed",
+          "旧版凭据无法解密。请使用最后一次能读取这些 Key 的 Actspace 版本启动后再迁移。",
+        );
       }
       return { secrets: migrated, source: legacy.legacyProviderRemoved ? "legacy-removed" : "v1" };
     }
@@ -329,7 +355,10 @@ export class SettingsStore {
 
   enqueueMutation<T>(operation: () => Promise<T>): Promise<T> {
     const run = this.mutationTail.then(operation, operation);
-    this.mutationTail = run.then(() => undefined, () => undefined);
+    this.mutationTail = run.then(
+      () => undefined,
+      () => undefined,
+    );
     return run;
   }
 }

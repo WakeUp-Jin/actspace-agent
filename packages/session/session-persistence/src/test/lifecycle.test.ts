@@ -7,13 +7,16 @@ import { SessionStoreService } from "../session-store.js";
 
 describe("Session business plugin", () => {
   it("uses the injected storage and withdraws its store on disposal", async () => {
-    const ctx = new CordisContextClass(); const registry = createCoreCodecRegistry();
+    const ctx = new CordisContextClass();
+    const registry = createCoreCodecRegistry();
     const storage = new MemorySessionStorage(registry);
-    ctx.provide("session.journal", { registry }); ctx.provide("session.storage", storage);
-    await ctx.plugin({ inject, apply: inner => apply(inner as never) });
+    ctx.provide("session.journal", { registry });
+    ctx.provide("session.storage", storage);
+    await ctx.plugin({ inject, apply: (inner) => apply(inner as never) });
     expect(ctx.get("session.store")).toBeInstanceOf(SessionStoreService);
     expect((ctx.get("session.store") as SessionStoreService).store.storage).toBe(storage);
-    await ctx.fiber.dispose(); expect(ctx.get("session.store")).toBeUndefined();
+    await ctx.fiber.dispose();
+    expect(ctx.get("session.store")).toBeUndefined();
     await storage.close();
   });
 });

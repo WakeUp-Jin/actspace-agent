@@ -13,7 +13,21 @@ function setupRegisteringPicker() {
       if (input?.registerWorkspace) {
         const now = new Date().toISOString();
         const items = bridge.db.workspaces.items;
-        bridge.db.workspaces = { ...bridge.db.workspaces, items: [...items, { id: "ws_new", kind: "folder", label: "new-project", path: NEW_ROOT, order: items.length, createdAt: now, updatedAt: now }] };
+        bridge.db.workspaces = {
+          ...bridge.db.workspaces,
+          items: [
+            ...items,
+            {
+              id: "ws_new",
+              kind: "folder",
+              label: "new-project",
+              path: NEW_ROOT,
+              order: items.length,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        };
       }
       return { canceled: false, workspaceRoot: NEW_ROOT };
     },

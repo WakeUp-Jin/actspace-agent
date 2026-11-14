@@ -24,7 +24,8 @@ export const BUTTON_VARIANT_CLASS: Record<ButtonVariant, string> = {
   accent: "border-transparent bg-accent text-on-accent enabled:hover:bg-accent-hover",
   secondary: "border-line bg-surface text-text-main enabled:hover:border-line-strong enabled:hover:bg-surface-subtle",
   tonal: "border-transparent bg-text-main/7 text-text-main enabled:hover:bg-text-main/11",
-  ghost: "border-transparent bg-transparent text-text-muted enabled:hover:bg-hover-overlay enabled:hover:text-text-main",
+  ghost:
+    "border-transparent bg-transparent text-text-muted enabled:hover:bg-hover-overlay enabled:hover:text-text-main",
   danger: "border-line bg-surface text-on-danger enabled:hover:border-danger/50 enabled:hover:bg-danger-soft",
   "danger-solid": "border-transparent bg-danger text-on-danger-solid enabled:hover:bg-danger-hover",
 };
@@ -45,7 +46,11 @@ export function buttonClass({
   variant = "secondary",
   size = "sm",
   shape = "default",
-}: { variant?: ButtonVariant; size?: ButtonSize; shape?: ButtonShape } = {}): string {
+}: {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  shape?: ButtonShape;
+} = {}): string {
   return cx(BUTTON_BASE_CLASS, BUTTON_VARIANT_CLASS[variant], BUTTON_SIZE_CLASS[size], BUTTON_SHAPE_CLASS[shape]);
 }
 

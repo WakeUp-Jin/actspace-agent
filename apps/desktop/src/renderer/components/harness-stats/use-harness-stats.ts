@@ -85,7 +85,13 @@ function keyOf(kind: HarnessStatsQueryKind, filterKey: string, compareKey: strin
  * 刷新：会话日志更新（流式文本增量除外）后 2 秒防抖，全部重查；
  * 同步在补历史（`phase === "syncing"`）时每秒轮询 getStatus，dataVersion 变了就把过期的块重查。
  */
-export function useHarnessStats({ filter, compare }: { filter: HarnessStatsFilter; compare?: HarnessStatsCompare }): HarnessStatsController {
+export function useHarnessStats({
+  filter,
+  compare,
+}: {
+  filter: HarnessStatsFilter;
+  compare?: HarnessStatsCompare;
+}): HarnessStatsController {
   const filterKey = JSON.stringify(filter);
   const compareKey = compare ? `${compare.from}>${compare.to}` : "";
   const filterRef = useRef(filter);
@@ -103,7 +109,8 @@ export function useHarnessStats({ filter, compare }: { filter: HarnessStatsFilte
 
   const commit = useCallback((kind: HarnessStatsQueryKind, entry: Entry | null) => {
     const next = { ...entriesRef.current };
-    if (entry) next[kind] = entry; else delete next[kind];
+    if (entry) next[kind] = entry;
+    else delete next[kind];
     entriesRef.current = next;
     setEntries(next);
   }, []);
@@ -132,48 +139,57 @@ export function useHarnessStats({ filter, compare }: { filter: HarnessStatsFilte
     if (known !== null) for (const kind of HARNESS_STATS_QUERY_KINDS) ensureRef.current(kind);
   }, []);
 
-  const ensure = useCallback((kind: HarnessStatsQueryKind, force = false) => {
-    const key = keyFor(kind);
-    const current = entriesRef.current[kind];
-    const fresh = current?.key === key && current.result && !current.error && current.result.dataVersion >= (latestVersionRef.current ?? 0);
-    if (fresh && !force) return;
-    const inflight = inflightRef.current[kind];
-    if (inflight && inflight.key === key && !force) return;
-    abandon(kind);
-    const requestId = nextRequestId();
-    inflightRef.current[kind] = { requestId, key };
-    const previous = current?.key === key ? current.result : null;
-    commit(kind, { key, result: previous, error: null, loading: true });
-    const superseded = () => inflightRef.current[kind]?.requestId !== requestId;
-    const queryFilter = kind === "options" ? OPTIONS_FILTER : filterRef.current;
-    const queryCompare = kind === "versions" ? compareRef.current : undefined;
-    harnessStatsApi.query({ requestId, kind, filter: queryFilter, ...(queryCompare ? { compare: queryCompare } : {}) }).then(
-      (result) => {
-        if (superseded()) return;
-        delete inflightRef.current[kind];
-        if (!result || result.data.kind !== kind) {
-          commit(kind, { key, result: previous, error: QUERY_FAILED, loading: false });
-          return;
-        }
-        commit(kind, { key, result, error: null, loading: false });
-        setSync(result.sync);
-        const behind = latestVersionRef.current !== null && result.dataVersion < latestVersionRef.current;
-        noteVersion(result.dataVersion);
-        if (behind) {
-          const retries = staleRetriesRef.current[kind] ?? 0;
-          if (retries < MAX_STALE_RETRIES) {
-            staleRetriesRef.current[kind] = retries + 1;
-            ensureRef.current(kind);
-          }
-        }
-      },
-      (error: unknown) => {
-        if (superseded()) return;
-        delete inflightRef.current[kind];
-        commit(kind, { key, result: previous, error: errorMessage(error), loading: false });
-      },
-    );
-  }, [abandon, commit, keyFor, noteVersion]);
+  const ensure = useCallback(
+    (kind: HarnessStatsQueryKind, force = false) => {
+      const key = keyFor(kind);
+      const current = entriesRef.current[kind];
+      const fresh =
+        current?.key === key &&
+        current.result &&
+        !current.error &&
+        current.result.dataVersion >= (latestVersionRef.current ?? 0);
+      if (fresh && !force) return;
+      const inflight = inflightRef.current[kind];
+      if (inflight && inflight.key === key && !force) return;
+      abandon(kind);
+      const requestId = nextRequestId();
+      inflightRef.current[kind] = { requestId, key };
+      const previous = current?.key === key ? current.result : null;
+      commit(kind, { key, result: previous, error: null, loading: true });
+      const superseded = () => inflightRef.current[kind]?.requestId !== requestId;
+      const queryFilter = kind === "options" ? OPTIONS_FILTER : filterRef.current;
+      const queryCompare = kind === "versions" ? compareRef.current : undefined;
+      harnessStatsApi
+        .query({ requestId, kind, filter: queryFilter, ...(queryCompare ? { compare: queryCompare } : {}) })
+        .then(
+          (result) => {
+            if (superseded()) return;
+            delete inflightRef.current[kind];
+            if (!result || result.data.kind !== kind) {
+              commit(kind, { key, result: previous, error: QUERY_FAILED, loading: false });
+              return;
+            }
+            commit(kind, { key, result, error: null, loading: false });
+            setSync(result.sync);
+            const behind = latestVersionRef.current !== null && result.dataVersion < latestVersionRef.current;
+            noteVersion(result.dataVersion);
+            if (behind) {
+              const retries = staleRetriesRef.current[kind] ?? 0;
+              if (retries < MAX_STALE_RETRIES) {
+                staleRetriesRef.current[kind] = retries + 1;
+                ensureRef.current(kind);
+              }
+            }
+          },
+          (error: unknown) => {
+            if (superseded()) return;
+            delete inflightRef.current[kind];
+            commit(kind, { key, result: previous, error: errorMessage(error), loading: false });
+          },
+        );
+    },
+    [abandon, commit, keyFor, noteVersion],
+  );
   ensureRef.current = ensure;
 
   // 首屏与筛选 / 对比变化：键变了的块丢掉缓存，7 块并行查（键没变且新鲜的跳过）。
@@ -189,9 +205,12 @@ export function useHarnessStats({ filter, compare }: { filter: HarnessStatsFilte
   }, [filterKey, compareKey, ensure, abandon, commit, keyFor]);
 
   // 离开页面：取消还在飞的请求。
-  useEffect(() => () => {
-    for (const kind of Object.keys(inflightRef.current) as HarnessStatsQueryKind[]) abandon(kind);
-  }, [abandon]);
+  useEffect(
+    () => () => {
+      for (const kind of Object.keys(inflightRef.current) as HarnessStatsQueryKind[]) abandon(kind);
+    },
+    [abandon],
+  );
 
   // 会话日志更新：流式文本增量（assistant-delta 等）不算，只看 journal-update；2 秒防抖后除选项外全部重查。
   useEffect(() => {
@@ -240,7 +259,8 @@ export function useHarnessStats({ filter, compare }: { filter: HarnessStatsFilte
   return useMemo(() => {
     const view = <K extends HarnessStatsQueryKind>(kind: K): StatsView<ValueOf<K>> => {
       const entry = entries[kind];
-      if (!entry || entry.key !== keyOf(kind, filterKey, compareKey)) return { status: "loading", data: null, error: null, refreshing: false };
+      if (!entry || entry.key !== keyOf(kind, filterKey, compareKey))
+        return { status: "loading", data: null, error: null, refreshing: false };
       const data = entry.result?.data.kind === kind ? (entry.result.data.value as ValueOf<K>) : null;
       if (entry.error && !data) return { status: "error", data: null, error: entry.error, refreshing: false };
       if (!data) return { status: "loading", data: null, error: null, refreshing: false };

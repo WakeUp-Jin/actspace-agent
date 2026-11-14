@@ -38,20 +38,55 @@ export class SessionHandle {
     private readonly onClose: ((throughSeq: number) => void | Promise<void>) | undefined,
     private readonly readDurableSeq: (() => number | null) | undefined,
     private readonly readDurabilityBlocked: (() => boolean) | undefined,
-  ) {
-  }
+  ) {}
 
   static async create(options: CreatePersistentSessionOptions): Promise<SessionHandle> {
-    const journal = new SessionJournal({ registry: options.registry, now: options.now, seed: options.seed, history: options.driver.history });
+    const journal = new SessionJournal({
+      registry: options.registry,
+      now: options.now,
+      seed: options.seed,
+      history: options.driver.history,
+    });
     journal.releaseDurable(options.durableSeq?.() ?? -1);
-    return new SessionHandle(options.header, journal, options.driver, options.onEvent, options.onEvents, options.onFlush, options.onClose, options.durableSeq, options.durabilityBlocked);
+    return new SessionHandle(
+      options.header,
+      journal,
+      options.driver,
+      options.onEvent,
+      options.onEvents,
+      options.onFlush,
+      options.onClose,
+      options.durableSeq,
+      options.durabilityBlocked,
+    );
   }
 
-  static createEphemeral(options: { readonly header: SessionHeaderV1; readonly registry: EventCodecRegistry; readonly now?: () => string; readonly onEvent?: (event: SessionEventEnvelopeV1) => void | Promise<void>; readonly onFlush?: (throughSeq: number) => void | Promise<void> }): SessionHandle {
+  static createEphemeral(options: {
+    readonly header: SessionHeaderV1;
+    readonly registry: EventCodecRegistry;
+    readonly now?: () => string;
+    readonly onEvent?: (event: SessionEventEnvelopeV1) => void | Promise<void>;
+    readonly onFlush?: (throughSeq: number) => void | Promise<void>;
+  }): SessionHandle {
     const journal = new SessionJournal({ registry: options.registry, now: options.now });
     const writer = Object.freeze({ append: async () => undefined, close: async () => undefined });
-    const driver = Object.freeze({ assertOwned: async () => undefined, append: writer.append, flush: async () => undefined, close: writer.close });
-    return new SessionHandle(options.header, journal, driver, options.onEvent, undefined, options.onFlush, undefined, () => null, () => false);
+    const driver = Object.freeze({
+      assertOwned: async () => undefined,
+      append: writer.append,
+      flush: async () => undefined,
+      close: writer.close,
+    });
+    return new SessionHandle(
+      options.header,
+      journal,
+      driver,
+      options.onEvent,
+      undefined,
+      options.onFlush,
+      undefined,
+      () => null,
+      () => false,
+    );
   }
 
   append(candidate: SessionEventCandidateV1): Promise<SessionEventEnvelopeV1> {
@@ -93,7 +128,8 @@ export class SessionHandle {
     return this.#serialize(async () => {
       this.#assertOpen();
       this.#assertWritable();
-      if (this.journal.lastSeq < throughSeq) throw new SessionError("INVALID_EVENT", `Cannot flush unknown seq ${throughSeq}.`);
+      if (this.journal.lastSeq < throughSeq)
+        throw new SessionError("INVALID_EVENT", `Cannot flush unknown seq ${throughSeq}.`);
       await this.onFlush?.(throughSeq);
       this.journal.releaseDurable(this.durableSeq ?? -1);
     });
@@ -103,8 +139,12 @@ export class SessionHandle {
     return this.journal.lastSeq;
   }
 
-  get acceptedSeq(): number { return this.journal.lastSeq; }
-  get durableSeq(): number | null { return this.readDurableSeq?.() ?? null; }
+  get acceptedSeq(): number {
+    return this.journal.lastSeq;
+  }
+  get durableSeq(): number | null {
+    return this.readDurableSeq?.() ?? null;
+  }
 
   /** Durable write state used by hosts to distinguish runtime failure from persistence failure. */
   get durabilityState(): "healthy" | "blocked" | "closed" {
@@ -136,7 +176,10 @@ export class SessionHandle {
 
   #serialize<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.#mutation.then(operation, operation);
-    this.#mutation = result.then(() => undefined, () => undefined);
+    this.#mutation = result.then(
+      () => undefined,
+      () => undefined,
+    );
     return result;
   }
 
@@ -146,7 +189,11 @@ export class SessionHandle {
 
   #assertWritable(): void {
     if (this.#blocked !== undefined || this.readDurabilityBlocked?.() === true) {
-      throw new SessionError("SESSION_DURABILITY_FAILED", "Session writer is blocked after an event consumer failure.", this.#blocked);
+      throw new SessionError(
+        "SESSION_DURABILITY_FAILED",
+        "Session writer is blocked after an event consumer failure.",
+        this.#blocked,
+      );
     }
   }
 }

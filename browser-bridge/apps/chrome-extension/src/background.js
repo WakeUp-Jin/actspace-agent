@@ -81,7 +81,7 @@ function ok(id, result) {
     protocolVersion: PROTOCOL_VERSION,
     id,
     ok: true,
-    result
+    result,
   };
 }
 
@@ -90,7 +90,7 @@ function fail(id, code, message) {
     protocolVersion: PROTOCOL_VERSION,
     id,
     ok: false,
-    error: { code, message }
+    error: { code, message },
   };
 }
 
@@ -120,7 +120,7 @@ function normalizeTab(tab, session = null) {
     active: Boolean(tab.active),
     status: tab.status ?? "",
     claimed: Boolean(session?.claimedTabIds.has(tab.id)),
-    owned: Boolean(session?.ownedTabIds.has(tab.id))
+    owned: Boolean(session?.ownedTabIds.has(tab.id)),
   };
 }
 
@@ -134,12 +134,12 @@ function getInfo() {
     nativeMessaging: {
       hostName: HOST_NAME,
       connected: state.nativeConnected,
-      lastError: state.nativeLastError
+      lastError: state.nativeLastError,
     },
     session: {
       sessionIds: sessions.map((session) => session.id),
       claimedTabIds: sessions.flatMap((session) => Array.from(session.claimedTabIds)),
-      ownedTabIds: sessions.flatMap((session) => Array.from(session.ownedTabIds))
+      ownedTabIds: sessions.flatMap((session) => Array.from(session.ownedTabIds)),
     },
     methods: [
       "agent_browser_bridge.ping",
@@ -165,7 +165,7 @@ function getInfo() {
       "agent_browser_bridge.backend.history.search",
       "agent_browser_bridge.backend.session.name",
       "agent_browser_bridge.backend.session.finalize",
-      "agent_browser_bridge.backend.cursor.move"
+      "agent_browser_bridge.backend.cursor.move",
     ],
     capabilities: {
       tabs: true,
@@ -178,8 +178,8 @@ function getInfo() {
       file_chooser_events: Boolean(chrome.debugger),
       clipboard: Boolean(chrome.debugger),
       timer: true,
-      debugger: Boolean(chrome.debugger)
-    }
+      debugger: Boolean(chrome.debugger),
+    },
   };
 }
 
@@ -192,19 +192,21 @@ function connectNativeHost() {
     state.nativePort = port;
     state.nativeConnected = false;
     state.nativeLastError = null;
-    void getOrCreateInstanceId().then((instanceId) => {
-      if (state.nativePort === port) {
-        state.instanceId = instanceId;
-        postNativeEvent("agent_browser_bridge.event.instance_ready", {
-          instanceId,
-          extensionVersion: state.version,
-          protocolVersion: PROTOCOL_VERSION
-        });
-      }
-    }).catch((error) => {
-      state.nativeLastError = error instanceof Error ? error.message : String(error);
-      port.disconnect();
-    });
+    void getOrCreateInstanceId()
+      .then((instanceId) => {
+        if (state.nativePort === port) {
+          state.instanceId = instanceId;
+          postNativeEvent("agent_browser_bridge.event.instance_ready", {
+            instanceId,
+            extensionVersion: state.version,
+            protocolVersion: PROTOCOL_VERSION,
+          });
+        }
+      })
+      .catch((error) => {
+        state.nativeLastError = error instanceof Error ? error.message : String(error);
+        port.disconnect();
+      });
 
     port.onDisconnect.addListener(() => {
       if (state.nativePort !== port) return;
@@ -212,7 +214,9 @@ function connectNativeHost() {
       state.nativeConnected = false;
       state.nativeLastError = lastErrorMessage("Native host disconnected.");
       console.warn("[agent-browser-bridge] native host disconnected", state.nativeLastError);
-      setTimeout(() => { if (!state.nativePort) connectNativeHost(); }, 2_000);
+      setTimeout(() => {
+        if (!state.nativePort) connectNativeHost();
+      }, 2_000);
     });
 
     port.onMessage.addListener((message) => {
@@ -221,15 +225,17 @@ function connectNativeHost() {
         state.nativeConnected = true;
         console.info("[agent-browser-bridge] native host connected", { hostName: HOST_NAME });
       }
-      handleNativeRequest(message).then((response) => {
-        try {
-          port.postMessage(response);
-        } catch (error) {
-          console.error("[agent-browser-bridge] failed to post native response", error);
-        }
-      }).catch((error) => {
-        console.error("[agent-browser-bridge] native request failed", error);
-      });
+      handleNativeRequest(message)
+        .then((response) => {
+          try {
+            port.postMessage(response);
+          } catch (error) {
+            console.error("[agent-browser-bridge] failed to post native response", error);
+          }
+        })
+        .catch((error) => {
+          console.error("[agent-browser-bridge] native request failed", error);
+        });
     });
 
     console.info("[agent-browser-bridge] native host connecting", { hostName: HOST_NAME });
@@ -238,14 +244,19 @@ function connectNativeHost() {
     state.nativePort = null;
     state.nativeConnected = false;
     state.nativeLastError = error instanceof Error ? error.message : String(error);
-    setTimeout(() => { if (!state.nativePort) connectNativeHost(); }, 5_000);
+    setTimeout(() => {
+      if (!state.nativePort) connectNativeHost();
+    }, 5_000);
     return null;
   }
 }
 
 async function getOrCreateInstanceId() {
   const stored = await chrome.storage.local.get("actspaceInstanceId");
-  if (typeof stored.actspaceInstanceId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(stored.actspaceInstanceId)) {
+  if (
+    typeof stored.actspaceInstanceId === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(stored.actspaceInstanceId)
+  ) {
     return stored.actspaceInstanceId;
   }
   const instanceId = crypto.randomUUID();
@@ -259,7 +270,7 @@ function postNativeEvent(method, params) {
     state.nativePort.postMessage({
       protocolVersion: PROTOCOL_VERSION,
       method,
-      params
+      params,
     });
   } catch (error) {
     console.warn("[agent-browser-bridge] failed to post native event", method, error);
@@ -267,7 +278,8 @@ function postNativeEvent(method, params) {
 }
 
 chrome.action.onClicked.addListener(() => {
-  if (state.instanceId) postNativeEvent("agent_browser_bridge.event.instance_selected", { instanceId: state.instanceId });
+  if (state.instanceId)
+    postNativeEvent("agent_browser_bridge.event.instance_selected", { instanceId: state.instanceId });
 });
 
 chrome.alarms.create("actspace-native-reconnect", { periodInMinutes: 1 });
@@ -289,7 +301,7 @@ async function handleNativeRequest(message) {
         return ok(id, {
           pong: true,
           protocolVersion: PROTOCOL_VERSION,
-          extensionConnected: true
+          extensionConnected: true,
         });
       case "agent_browser_bridge.info":
       case "agent_browser_bridge.native.connect":
@@ -384,7 +396,7 @@ async function searchHistory(params) {
     title: item.title ?? "",
     lastVisitTime: Math.trunc(item.lastVisitTime ?? 0),
     visitCount: item.visitCount ?? 0,
-    typedCount: item.typedCount ?? 0
+    typedCount: item.typedCount ?? 0,
   }));
 }
 
@@ -393,9 +405,7 @@ async function openTab(params) {
   if (params.url) validateUrl(params.url);
   const createProperties = { active: Boolean(params.active) };
   if (params.url) createProperties.url = params.url;
-  const tab = await promisifyChrome((done) =>
-    chrome.tabs.create(createProperties, done)
-  );
+  const tab = await promisifyChrome((done) => chrome.tabs.create(createProperties, done));
   if (tab.id) {
     session.ownedTabIds.add(tab.id);
     session.claimedTabId = tab.id;
@@ -453,7 +463,7 @@ async function pageInfo(params) {
     url: tab.url ?? "",
     status: tab.status ?? "",
     active: Boolean(tab.active),
-    summary: `${tab.title ?? ""} ${tab.url ?? ""}`.trim()
+    summary: `${tab.title ?? ""} ${tab.url ?? ""}`.trim(),
   };
 }
 
@@ -485,9 +495,7 @@ async function finalizeTabs(params) {
     }
   }
 
-  const deliverableIds = keep
-    .filter((entry) => entry.status === "deliverable")
-    .map((entry) => Number(entry.tabId));
+  const deliverableIds = keep.filter((entry) => entry.status === "deliverable").map((entry) => Number(entry.tabId));
   await moveTabsToDeliverableGroup(deliverableIds);
   for (const tabId of deliverableIds) {
     session.ownedTabIds.delete(tabId);
@@ -509,7 +517,7 @@ async function executeCdp(params) {
   await attachDebugger(target);
   try {
     return await promisifyChrome((done) =>
-      chrome.debugger.sendCommand(target, params.method, params.commandParams ?? {}, done)
+      chrome.debugger.sendCommand(target, params.method, params.commandParams ?? {}, done),
     );
   } finally {
     await detachDebugger(target);
@@ -601,12 +609,19 @@ async function detachDebugger(target) {
 
 async function configureAutoAttach(target) {
   try {
-    await promisifyChrome((done) => chrome.debugger.sendCommand(target, "Target.setAutoAttach", {
-      autoAttach: true,
-      waitForDebuggerOnStart: false,
-      flatten: true,
-      filter: [{ type: "iframe", exclude: false }]
-    }, done));
+    await promisifyChrome((done) =>
+      chrome.debugger.sendCommand(
+        target,
+        "Target.setAutoAttach",
+        {
+          autoAttach: true,
+          waitForDebuggerOnStart: false,
+          flatten: true,
+          filter: [{ type: "iframe", exclude: false }],
+        },
+        done,
+      ),
+    );
   } catch (error) {
     console.warn("[agent-browser-bridge] OOPIF auto-attach unavailable", error);
   }
@@ -641,7 +656,9 @@ async function rememberChildSession(source, params) {
   await configureAutoAttach(childTarget);
   let frameId = params.targetInfo?.targetId;
   try {
-    const tree = await promisifyChrome((done) => chrome.debugger.sendCommand(childTarget, "Page.getFrameTree", {}, done));
+    const tree = await promisifyChrome((done) =>
+      chrome.debugger.sendCommand(childTarget, "Page.getFrameTree", {}, done),
+    );
     frameId = tree?.frameTree?.frame?.id ?? frameId;
   } catch (error) {
     console.warn("[agent-browser-bridge] failed to resolve OOPIF frame id", error);
@@ -768,7 +785,9 @@ async function nameSession(params) {
   if (session.tabGroupId && chrome.tabGroups) {
     try {
       await chrome.tabGroups.update(session.tabGroupId, { title: session.sessionName });
-    } catch { /* group may have been removed */ }
+    } catch {
+      /* group may have been removed */
+    }
   }
   return {};
 }
@@ -778,23 +797,35 @@ async function injectCursorOverlay(tabId) {
   try {
     await attachDebugger(target);
     const check = await promisifyChrome((done) =>
-      chrome.debugger.sendCommand(target, "Runtime.evaluate", {
-        expression: "window.__actspaceCursor?.version === 2",
-        returnByValue: true
-      }, done)
+      chrome.debugger.sendCommand(
+        target,
+        "Runtime.evaluate",
+        {
+          expression: "window.__actspaceCursor?.version === 2",
+          returnByValue: true,
+        },
+        done,
+      ),
     );
     if (check?.result?.value !== true) {
-      const script = await fetch(chrome.runtime.getURL("src/cursor-overlay.js")).then(r => r.text());
+      const script = await fetch(chrome.runtime.getURL("src/cursor-overlay.js")).then((r) => r.text());
       await promisifyChrome((done) =>
-        chrome.debugger.sendCommand(target, "Runtime.evaluate", {
-          expression: script,
-          returnByValue: true
-        }, done)
+        chrome.debugger.sendCommand(
+          target,
+          "Runtime.evaluate",
+          {
+            expression: script,
+            returnByValue: true,
+          },
+          done,
+        ),
       );
     }
     await detachDebugger(target);
   } catch {
-    try { await detachDebugger(target); } catch {}
+    try {
+      await detachDebugger(target);
+    } catch {}
   }
 }
 
@@ -802,19 +833,26 @@ async function showCursorAt(target, x, y, isClick = false) {
   try {
     const method = isClick ? "click" : "moveTo";
     await promisifyChrome((done) =>
-      chrome.debugger.sendCommand(target, "Runtime.evaluate", {
-        expression: `(async function(){ if(window.__actspaceCursor){await window.__actspaceCursor.${method}(${x},${y})} })()`,
-        returnByValue: true,
-        awaitPromise: true
-      }, done)
+      chrome.debugger.sendCommand(
+        target,
+        "Runtime.evaluate",
+        {
+          expression: `(async function(){ if(window.__actspaceCursor){await window.__actspaceCursor.${method}(${x},${y})} })()`,
+          returnByValue: true,
+          awaitPromise: true,
+        },
+        done,
+      ),
     );
-  } catch { /* cursor overlay not injected yet, non-fatal */ }
+  } catch {
+    /* cursor overlay not injected yet, non-fatal */
+  }
 }
 
 chrome.runtime.onInstalled.addListener((details) => {
   console.info("[agent-browser-bridge] extension installed", {
     reason: details.reason,
-    version: state.version
+    version: state.version,
   });
 });
 
@@ -831,7 +869,7 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
     tabId: source.tabId,
     sessionId: source.sessionId,
     method,
-    params: params ?? {}
+    params: params ?? {},
   });
 });
 
@@ -841,7 +879,7 @@ chrome.debugger.onDetach.addListener((source, reason) => {
   state.childSessions.delete(source.tabId);
   postNativeEvent("agent_browser_bridge.event.debugger_detach", {
     tabId: source.tabId,
-    reason
+    reason,
   });
 });
 
@@ -856,7 +894,7 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
   postNativeEvent("agent_browser_bridge.event.tab_closed", {
     tabId,
     windowId: removeInfo.windowId,
-    isWindowClosing: removeInfo.isWindowClosing
+    isWindowClosing: removeInfo.isWindowClosing,
   });
 });
 
@@ -882,17 +920,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.type === "agent_browser_bridge.native.connect") {
     const port = connectNativeHost();
-    sendResponse(port ? ok("runtime_connect", getInfo()) : fail("runtime_connect", "native_host_unavailable", state.nativeLastError ?? "Native host unavailable."));
+    sendResponse(
+      port
+        ? ok("runtime_connect", getInfo())
+        : fail("runtime_connect", "native_host_unavailable", state.nativeLastError ?? "Native host unavailable."),
+    );
     return false;
   }
   handleNativeRequest({
     protocolVersion: PROTOCOL_VERSION,
     id: "runtime_message",
     method: message.type,
-    params: message.params ?? {}
-  }).then(sendResponse).catch((error) => {
-    sendResponse(fail("runtime_message", "internal_error", error instanceof Error ? error.message : String(error)));
-  });
+    params: message.params ?? {},
+  })
+    .then(sendResponse)
+    .catch((error) => {
+      sendResponse(fail("runtime_message", "internal_error", error instanceof Error ? error.message : String(error)));
+    });
   return true;
 });
 

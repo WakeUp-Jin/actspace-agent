@@ -22,8 +22,7 @@ const SPLIT_SEPARATOR_CLASS =
   "group absolute bottom-0 top-0 z-(--act-z-pane) grid w-[14px] -translate-x-1/2 cursor-col-resize touch-none place-items-center focus-visible:outline-offset-[-2px]";
 const SPLIT_SEPARATOR_LINE_BASE_CLASS =
   "h-full w-px bg-line transition-colors duration-(--motion-base) ease-in-out group-hover:bg-line-strong group-active:bg-focus-ring group-focus-visible:bg-focus-ring";
-const SPLIT_SEPARATOR_LINE_RESIZING_CLASS =
-  "bg-focus-ring";
+const SPLIT_SEPARATOR_LINE_RESIZING_CLASS = "bg-focus-ring";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -50,7 +49,7 @@ export function SplitView({
   onLeftResizeEnd,
   onRightResizeEnd,
   onLeftSeparatorDoubleClick,
-  onRightSeparatorDoubleClick
+  onRightSeparatorDoubleClick,
 }: {
   left: ReactNode;
   main: ReactNode;
@@ -81,27 +80,37 @@ export function SplitView({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const rightOpen = right !== undefined;
 
-  const getAvailableMaxWidth = useCallback((side: SplitSide): number => {
-    const otherPanelWidth = side === "left" ? (rightOpen ? rightWidth : 0) : leftWidth;
-    const containerLimit = containerWidth > 0 ? containerWidth - otherPanelWidth - minMainWidth : Number.POSITIVE_INFINITY;
-    const bounds = side === "left" ? leftBounds : rightBounds;
-    return Math.max(bounds.minWidth, Math.min(bounds.maxWidth, containerLimit));
-  }, [containerWidth, leftBounds, leftWidth, minMainWidth, rightBounds, rightOpen, rightWidth]);
+  const getAvailableMaxWidth = useCallback(
+    (side: SplitSide): number => {
+      const otherPanelWidth = side === "left" ? (rightOpen ? rightWidth : 0) : leftWidth;
+      const containerLimit =
+        containerWidth > 0 ? containerWidth - otherPanelWidth - minMainWidth : Number.POSITIVE_INFINITY;
+      const bounds = side === "left" ? leftBounds : rightBounds;
+      return Math.max(bounds.minWidth, Math.min(bounds.maxWidth, containerLimit));
+    },
+    [containerWidth, leftBounds, leftWidth, minMainWidth, rightBounds, rightOpen, rightWidth],
+  );
 
-  const getBoundedWidth = useCallback((side: SplitSide, width: number): number => {
-    const bounds = side === "left" ? leftBounds : rightBounds;
-    return clamp(width, bounds.minWidth, getAvailableMaxWidth(side));
-  }, [getAvailableMaxWidth, leftBounds, rightBounds]);
+  const getBoundedWidth = useCallback(
+    (side: SplitSide, width: number): number => {
+      const bounds = side === "left" ? leftBounds : rightBounds;
+      return clamp(width, bounds.minWidth, getAvailableMaxWidth(side));
+    },
+    [getAvailableMaxWidth, leftBounds, rightBounds],
+  );
 
-  const resizeSide = useCallback((side: SplitSide, width: number) => {
-    const nextWidth = getBoundedWidth(side, width);
-    if (side === "left") {
-      onLeftResize(nextWidth);
-      return;
-    }
+  const resizeSide = useCallback(
+    (side: SplitSide, width: number) => {
+      const nextWidth = getBoundedWidth(side, width);
+      if (side === "left") {
+        onLeftResize(nextWidth);
+        return;
+      }
 
-    onRightResize(nextWidth);
-  }, [getBoundedWidth, onLeftResize, onRightResize]);
+      onRightResize(nextWidth);
+    },
+    [getBoundedWidth, onLeftResize, onRightResize],
+  );
 
   function handleSeparatorKeyDown(side: SplitSide, event: KeyboardEvent<HTMLDivElement>) {
     const step = event.shiftKey ? 40 : 16;
@@ -149,7 +158,7 @@ export function SplitView({
       pointerId: event.pointerId,
       side,
       startWidth: side === "left" ? leftWidth : rightWidth,
-      startX: event.clientX
+      startX: event.clientX,
     });
   }
 
@@ -230,16 +239,14 @@ export function SplitView({
   } else if (leftHidden) {
     columns = rightOpen ? `minmax(0, 1fr) ${rightWidth}px` : `minmax(0, 1fr)`;
   } else {
-    columns = rightOpen
-      ? `${leftWidth}px minmax(0, 1fr) ${rightWidth}px`
-      : `${leftWidth}px minmax(0, 1fr)`;
+    columns = rightOpen ? `${leftWidth}px minmax(0, 1fr) ${rightWidth}px` : `${leftWidth}px minmax(0, 1fr)`;
   }
   const leftMaxWidth = getAvailableMaxWidth("left");
   const rightMaxWidth = getAvailableMaxWidth("right");
   const style = {
     "--split-left-width": `${effectiveLeftWidth}px`,
     "--split-right-width": `${rightWidth}px`,
-    gridTemplateColumns: columns
+    gridTemplateColumns: columns,
   } as CSSProperties;
   const separatorLineClass = `${SPLIT_SEPARATOR_LINE_BASE_CLASS}${
     dragState ? ` ${SPLIT_SEPARATOR_LINE_RESIZING_CLASS}` : ""
@@ -271,24 +278,28 @@ export function SplitView({
           </div>
         </>
       )}
-      <div className={`${SPLIT_VIEW_PANE_CLASS}${expanded ? " invisible" : ""}`} aria-hidden={expanded || undefined}>{main}</div>
+      <div className={`${SPLIT_VIEW_PANE_CLASS}${expanded ? " invisible" : ""}`} aria-hidden={expanded || undefined}>
+        {main}
+      </div>
       {rightOpen ? (
         <>
-          {expanded ? null : <div
-            className={`${SPLIT_SEPARATOR_CLASS} left-[calc(100%_-_var(--split-right-width))]`}
-            role="separator"
-            tabIndex={0}
-            aria-label={rightSeparatorLabel}
-            aria-orientation="vertical"
-            aria-valuemin={rightBounds.minWidth}
-            aria-valuemax={Math.round(rightMaxWidth)}
-            aria-valuenow={Math.round(rightWidth)}
-            onDoubleClick={onRightSeparatorDoubleClick}
-            onKeyDown={(event) => handleSeparatorKeyDown("right", event)}
-            onPointerDown={(event) => handlePointerDown("right", event)}
-          >
-            <span aria-hidden="true" className={separatorLineClass} />
-          </div>}
+          {expanded ? null : (
+            <div
+              className={`${SPLIT_SEPARATOR_CLASS} left-[calc(100%_-_var(--split-right-width))]`}
+              role="separator"
+              tabIndex={0}
+              aria-label={rightSeparatorLabel}
+              aria-orientation="vertical"
+              aria-valuemin={rightBounds.minWidth}
+              aria-valuemax={Math.round(rightMaxWidth)}
+              aria-valuenow={Math.round(rightWidth)}
+              onDoubleClick={onRightSeparatorDoubleClick}
+              onKeyDown={(event) => handleSeparatorKeyDown("right", event)}
+              onPointerDown={(event) => handlePointerDown("right", event)}
+            >
+              <span aria-hidden="true" className={separatorLineClass} />
+            </div>
+          )}
           <div className={SPLIT_VIEW_PANE_CLASS}>{right}</div>
         </>
       ) : null}

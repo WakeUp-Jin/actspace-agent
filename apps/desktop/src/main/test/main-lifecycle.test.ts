@@ -20,15 +20,44 @@ describe("shutdown steps", () => {
   it("keeps running later steps when one throws, and logs the failure", async () => {
     const log = vi.fn();
     const order: string[] = [];
-    await runShutdownSteps([
-      ["first", () => { order.push("first"); }],
-      ["destroyed window", () => { throw new TypeError("Object has been destroyed"); }],
-      ["async reject", async () => { throw new Error("rejected"); }],
-      ["last", async () => { order.push("last"); }],
-    ], log);
+    await runShutdownSteps(
+      [
+        [
+          "first",
+          () => {
+            order.push("first");
+          },
+        ],
+        [
+          "destroyed window",
+          () => {
+            throw new TypeError("Object has been destroyed");
+          },
+        ],
+        [
+          "async reject",
+          async () => {
+            throw new Error("rejected");
+          },
+        ],
+        [
+          "last",
+          async () => {
+            order.push("last");
+          },
+        ],
+      ],
+      log,
+    );
     expect(order).toEqual(["first", "last"]);
-    expect(log).toHaveBeenCalledWith("shutdown step failed", expect.objectContaining({ step: "destroyed window", error: "Object has been destroyed" }));
-    expect(log).toHaveBeenCalledWith("shutdown step failed", expect.objectContaining({ step: "async reject", error: "rejected" }));
+    expect(log).toHaveBeenCalledWith(
+      "shutdown step failed",
+      expect.objectContaining({ step: "destroyed window", error: "Object has been destroyed" }),
+    );
+    expect(log).toHaveBeenCalledWith(
+      "shutdown step failed",
+      expect.objectContaining({ step: "async reject", error: "rejected" }),
+    );
   });
 });
 
@@ -41,8 +70,14 @@ describe("main process error logging", () => {
     target.emit("unhandledRejection", new Error("lost promise"));
     target.emit("uncaughtExceptionMonitor", new Error("boom"), "uncaughtException");
 
-    expect(log).toHaveBeenCalledWith("main process unhandled rejection", expect.objectContaining({ error: "lost promise" }));
-    expect(log).toHaveBeenCalledWith("main process uncaught exception", expect.objectContaining({ error: "boom", origin: "uncaughtException" }));
+    expect(log).toHaveBeenCalledWith(
+      "main process unhandled rejection",
+      expect.objectContaining({ error: "lost promise" }),
+    );
+    expect(log).toHaveBeenCalledWith(
+      "main process uncaught exception",
+      expect.objectContaining({ error: "boom", origin: "uncaughtException" }),
+    );
 
     dispose();
     target.emit("unhandledRejection", "ignored");

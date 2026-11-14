@@ -43,6 +43,13 @@ export {
 } from "./config";
 export { clearImageCache } from "./widgets/image-cache";
 export { flushPendingChange, type EditorCallbacks } from "./callbacks";
-export { getOutline, sameOutline, collectHeadings, findHeadingBySlug, type OutlineItem, type HeadingInfo } from "./outline";
+export {
+  getOutline,
+  sameOutline,
+  collectHeadings,
+  findHeadingBySlug,
+  type OutlineItem,
+  type HeadingInfo,
+} from "./outline";
 export { scrollToLine, scrollToPos } from "./scroll";
 export { githubSlug } from "./slug";

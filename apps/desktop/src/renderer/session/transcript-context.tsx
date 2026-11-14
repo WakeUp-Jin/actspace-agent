@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import type { MessageBlock, SessionRecord } from "@actspace/shared";
 import type { LiveRunStore } from "./live-runs/live-run-store";
 import { useLiveRunView } from "./live-runs/live-run-store";
@@ -33,9 +41,13 @@ export function createTranscriptStore(initial: MessageBlock[] = EMPTY_MESSAGES):
     get: () => messages,
     subscribe(listener) {
       listeners.add(listener);
-      return () => { listeners.delete(listener); };
+      return () => {
+        listeners.delete(listener);
+      };
     },
-    setSilently(next) { messages = next; },
+    setSilently(next) {
+      messages = next;
+    },
     notify() {
       if (notified === messages) return;
       notified = messages;
@@ -51,7 +63,13 @@ export function createTranscriptStore(initial: MessageBlock[] = EMPTY_MESSAGES):
 const TranscriptContext = createContext<TranscriptStore | null>(null);
 
 /** 直接提供一个现成的 store（测试和没有 live run 的场景）。 */
-export function TranscriptStoreProvider({ store, children }: { readonly store: TranscriptStore; readonly children: ReactNode }) {
+export function TranscriptStoreProvider({
+  store,
+  children,
+}: {
+  readonly store: TranscriptStore;
+  readonly children: ReactNode;
+}) {
   return <TranscriptContext.Provider value={store}>{children}</TranscriptContext.Provider>;
 }
 
@@ -81,7 +99,9 @@ export function SessionTranscriptProvider({
   const rewindFromSeq = useSessionLocalState(localStore, sessionId, selectRewindFromSeq);
   const messages = useMergedMessages(sessionRecord, live, compactionFailure, rewindFromSeq);
   store.setSilently(messages);
-  useLayoutEffect(() => { store.notify(); });
+  useLayoutEffect(() => {
+    store.notify();
+  });
   return <TranscriptContext.Provider value={store}>{children}</TranscriptContext.Provider>;
 }
 
@@ -89,10 +109,16 @@ export function SessionTranscriptProvider({
  * 订阅消息序列的一部分。`selector` 每次序列变化都会重算，结果按 `isEqual` 判等，
  * 相等就沿用上一次的引用，组件只在派生值真的变了才重渲染。没有 Provider 时 selector 收到空序列。
  */
-export function useTranscriptSelect<T>(selector: (messages: MessageBlock[]) => T, isEqual: (left: T, right: T) => boolean = Object.is): T {
+export function useTranscriptSelect<T>(
+  selector: (messages: MessageBlock[]) => T,
+  isEqual: (left: T, right: T) => boolean = Object.is,
+): T {
   const store = useContext(TranscriptContext);
   const cache = useRef<{ messages: MessageBlock[]; selector: typeof selector; value: T } | null>(null);
-  const subscribe = useCallback((onChange: () => void) => (store ? store.subscribe(onChange) : () => undefined), [store]);
+  const subscribe = useCallback(
+    (onChange: () => void) => (store ? store.subscribe(onChange) : () => undefined),
+    [store],
+  );
   const getSnapshot = useCallback((): T => {
     const messages = store ? store.get() : EMPTY_MESSAGES;
     const cached = cache.current;

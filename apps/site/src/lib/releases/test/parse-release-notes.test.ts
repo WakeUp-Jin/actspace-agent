@@ -5,7 +5,8 @@ const source = "docs/releases/feature-release-notes.md";
 
 describe("parseReleaseNotes", () => {
   it("parses categorized releases, groups sections, and sorts newest first", () => {
-    const result = parseReleaseNotes(`
+    const result = parseReleaseNotes(
+      `
 ## 2026-06
 
 ### 2026-06-30 — 较早更新
@@ -26,7 +27,9 @@ describe("parseReleaseNotes", () => {
 #### 问题修复
 
 - 修复空白面板。
-`, source);
+`,
+      source,
+    );
 
     expect(result.map((entry) => entry.title)).toEqual(["图片与任务体验", "较早更新"]);
     expect(result[0]?.anchor).toBe("release-2026-07-27");
@@ -35,7 +38,8 @@ describe("parseReleaseNotes", () => {
   });
 
   it("preserves supported inline markdown and sanitizes dangerous URLs and raw HTML", () => {
-    const [entry] = parseReleaseNotes(`
+    const [entry] = parseReleaseNotes(
+      `
 ## 2026-07
 
 ### 2026-07-27 — Context 更新
@@ -44,7 +48,9 @@ describe("parseReleaseNotes", () => {
 
 - 支持 **强调**、\`代码\` 和 [文档](https://example.com)。
 - 原始 HTML <script>alert(1)</script> [危险](javascript:alert(1))
-`, source);
+`,
+      source,
+    );
 
     const [safe, dangerous] = entry?.sections[0]?.itemsHtml ?? [];
     expect(safe).toContain("<strong>强调</strong>");
@@ -55,14 +61,17 @@ describe("parseReleaseNotes", () => {
   });
 
   it("spaces CJK next to Latin text without touching inline code", () => {
-    const [entry] = parseReleaseNotes(`## 2026-07
+    const [entry] = parseReleaseNotes(
+      `## 2026-07
 
 ### 2026-07-27 — Context 更新
 
 #### 改进
 
 - 修复Bash工具在\`中文cwd\`下的问题。
-`, source);
+`,
+      source,
+    );
 
     expect(entry?.sections[0]?.itemsHtml).toEqual(["修复 Bash 工具在 <code>中文cwd</code> 下的问题。"]);
   });
@@ -99,17 +108,24 @@ describe("parseReleaseNotes", () => {
       message: "至少需要一个列表项",
     },
   ])("reports source and line for $name", ({ release, body, message }) => {
-    expect(() => parseReleaseNotes(`
+    expect(() =>
+      parseReleaseNotes(
+        `
 ## 2026-07
 
 ${release}
 
 ${body}
-`, source)).toThrow(new RegExp(`${source}.*第 \\d+ 行.*${message}`));
+`,
+        source,
+      ),
+    ).toThrow(new RegExp(`${source}.*第 \\d+ 行.*${message}`));
   });
 
   it("rejects duplicate release dates", () => {
-    expect(() => parseReleaseNotes(`
+    expect(() =>
+      parseReleaseNotes(
+        `
 ## 2026-07
 
 ### 2026-07-27 — 第一条
@@ -123,11 +139,16 @@ ${body}
 #### 改进
 
 - 更新二。
-`, source)).toThrow("只能对应一次发布");
+`,
+        source,
+      ),
+    ).toThrow("只能对应一次发布");
   });
 
   it("rejects nested list content", () => {
-    expect(() => parseReleaseNotes(`
+    expect(() =>
+      parseReleaseNotes(
+        `
 ## 2026-07
 
 ### 2026-07-27 — Context
@@ -136,7 +157,10 @@ ${body}
 
 - 一级
   - 二级
-`, source)).toThrow(ReleaseParseError);
+`,
+        source,
+      ),
+    ).toThrow(ReleaseParseError);
   });
 
   it("fails when no release entry exists", () => {

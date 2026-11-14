@@ -20,7 +20,12 @@ export type DescribedSupplement = {
 const DETAIL_LIMIT = 160;
 const NAME_LIMIT = 3;
 
-export function describeSupplementEvent(owner: string, id: string, text: string, previous: SupplementMemory | undefined): DescribedSupplement {
+export function describeSupplementEvent(
+  owner: string,
+  id: string,
+  text: string,
+  previous: SupplementMemory | undefined,
+): DescribedSupplement {
   if (owner === "actspace.context-disclosure" && id === "navigation") return describeFiles(text, previous);
   if (owner === "actspace.context-runtime" && id === "runtime-state") {
     const runtime = describeRuntime(text, previous);
@@ -29,21 +34,37 @@ export function describeSupplementEvent(owner: string, id: string, text: string,
   // 旧会话：子智能体清单曾经由单独的 context-subagents 写；现在并进后台任务清单。
   if (owner === "actspace.context-subagents" && id === "subagents") {
     const items = listItems(text, "Running subagents");
-    if (items) return described("subagents", "子 Agent 清单更新", running(items.map(item => field(item, 1))), `${items.length} 个运行中`, {});
+    if (items)
+      return described(
+        "subagents",
+        "子 Agent 清单更新",
+        running(items.map((item) => field(item, 1))),
+        `${items.length} 个运行中`,
+        {},
+      );
   }
   if (owner === "actspace.context-background-tasks" && id === "background-tasks") {
-    if (text.trim() === "No background tasks are running.") return described("background", "后台任务清单更新", "全部结束", "全部结束", {});
+    if (text.trim() === "No background tasks are running.")
+      return described("background", "后台任务清单更新", "全部结束", "全部结束", {});
     const items = listItems(text, "Background tasks still running");
-    if (items) return described("background", "后台任务清单更新", running(items.map(item => field(item, 2))), `${items.length} 个运行中`, {});
+    if (items)
+      return described(
+        "background",
+        "后台任务清单更新",
+        running(items.map((item) => field(item, 2))),
+        `${items.length} 个运行中`,
+        {},
+      );
   }
   return described("inject", `上下文补充 · ${id.slice(0, 48)}`, owner, owner, {});
 }
 
 /** 工具清单前后两份名单的差异。 */
 export function describeToolChange(before: readonly string[], after: readonly string[]): string {
-  const old = new Set(before); const now = new Set(after);
-  const added = after.filter(name => !old.has(name));
-  const removed = before.filter(name => !now.has(name));
+  const old = new Set(before);
+  const now = new Set(after);
+  const added = after.filter((name) => !old.has(name));
+  const removed = before.filter((name) => !now.has(name));
   const parts = [
     ...(added.length ? [`新增 ${added.length} 个：${names(added)}`] : []),
     ...(removed.length ? [`移除 ${removed.length} 个：${names(removed)}`] : []),
@@ -61,14 +82,20 @@ export function switchDetail(before: string | undefined, after: string): string 
 }
 
 function describeFiles(text: string, previous: SupplementMemory | undefined): DescribedSupplement {
-  const paths = text.split("\n").flatMap(line => {
+  const paths = text.split("\n").flatMap((line) => {
     const match = /^- ("(?:[^"\\]|\\.)*")/.exec(line);
     if (!match) return [];
-    try { const path = JSON.parse(match[1]) as unknown; return typeof path === "string" ? [path] : []; } catch { return []; }
+    try {
+      const path = JSON.parse(match[1]) as unknown;
+      return typeof path === "string" ? [path] : [];
+    } catch {
+      return [];
+    }
   });
-  const old = new Set(previous?.paths ?? []); const now = new Set(paths);
-  const added = paths.filter(path => !old.has(path));
-  const removed = (previous?.paths ?? []).filter(path => !now.has(path));
+  const old = new Set(previous?.paths ?? []);
+  const now = new Set(paths);
+  const added = paths.filter((path) => !old.has(path));
+  const removed = (previous?.paths ?? []).filter((path) => !now.has(path));
   const total = `共 ${paths.length} 个`;
   const parts = [
     ...(added.length ? [changed("新增", added)] : []),
@@ -83,7 +110,10 @@ function describeRuntime(text: string, previous: SupplementMemory | undefined): 
   const mode = /\bmode=([^;.\s]+)/.exec(text)?.[1];
   if (!mode) return null;
   const date = /\bdate=([^;\s]+?)[;.]/.exec(text)?.[1];
-  const detail = previous?.mode && previous.mode !== mode ? `模式 ${previous.mode} → ${mode}` : `模式 ${mode}${date ? ` · 日期 ${date}` : ""}`;
+  const detail =
+    previous?.mode && previous.mode !== mode
+      ? `模式 ${previous.mode} → ${mode}`
+      : `模式 ${mode}${date ? ` · 日期 ${date}` : ""}`;
   return described("runtime", "运行状态更新", detail, `模式 ${mode}`, { mode });
 }
 
@@ -91,7 +121,10 @@ function describeRuntime(text: string, previous: SupplementMemory | undefined): 
 function listItems(text: string, heading: string): string[] | null {
   const lines = text.split("\n");
   if (!lines[0]?.startsWith(heading)) return null;
-  return lines.slice(1).filter(line => line.startsWith("- ")).map(line => line.slice(2));
+  return lines
+    .slice(1)
+    .filter((line) => line.startsWith("- "))
+    .map((line) => line.slice(2));
 }
 
 function field(item: string, index: number): string {
@@ -121,6 +154,12 @@ function clip(value: string): string {
   return value.length > DETAIL_LIMIT ? `${value.slice(0, DETAIL_LIMIT - 1)}…` : value;
 }
 
-function described(kind: ContextPanelEventKind, label: string, detail: string, tail: string, memory: SupplementMemory): DescribedSupplement {
+function described(
+  kind: ContextPanelEventKind,
+  label: string,
+  detail: string,
+  tail: string,
+  memory: SupplementMemory,
+): DescribedSupplement {
   return { kind, label, detail: clip(detail), tail: clip(tail), memory };
 }

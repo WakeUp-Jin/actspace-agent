@@ -2,7 +2,18 @@
 import { Decoration } from "@codemirror/view";
 import type { SyntaxNode } from "./lezer-types";
 import { CALLOUT_COLOR_VAR, parseCalloutMarker } from "../../markdown-common/callouts";
-import { forEachLine, hide, isLineRevealed, isRevealed, lineClass, mark, replaceWith, trailingBlank, type InlineCtx, type InlineHandler } from "./inline-context";
+import {
+  forEachLine,
+  hide,
+  isLineRevealed,
+  isRevealed,
+  lineClass,
+  mark,
+  replaceWith,
+  trailingBlank,
+  type InlineCtx,
+  type InlineHandler,
+} from "./inline-context";
 import { BulletWidget } from "./widgets/bullet";
 import { CalloutLabelWidget } from "./widgets/callout-label";
 import { CheckboxWidget } from "./widgets/checkbox";
@@ -69,7 +80,12 @@ export const listMark: InlineHandler = (ctx, n) => {
     return false;
   }
   if (bulletList?.name === "BulletList" && !isRevealed(ctx, n.from, n.to)) {
-    replaceWith(ctx, n.from, n.to, Decoration.replace({ widget: new BulletWidget(countAncestors(bulletList, "BulletList")) }));
+    replaceWith(
+      ctx,
+      n.from,
+      n.to,
+      Decoration.replace({ widget: new BulletWidget(countAncestors(bulletList, "BulletList")) }),
+    );
     lineClass(ctx, line.from, "md-li-hang");
   } else {
     mark(ctx, n.from, n.to, "md-list-mark");
@@ -107,11 +123,13 @@ export const tableRow: InlineHandler = (ctx, n) => {
   let start = row.from;
   let left = -1;
   delimiters.forEach((delimiter, index) => {
-    if (delimiter.from > start && ctx.state.sliceDoc(start, delimiter.from).trim()) cells.push({ from: start, to: delimiter.from, left, right: index });
+    if (delimiter.from > start && ctx.state.sliceDoc(start, delimiter.from).trim())
+      cells.push({ from: start, to: delimiter.from, left, right: index });
     start = delimiter.to;
     left = index;
   });
-  if (row.to > start && ctx.state.sliceDoc(start, row.to).trim()) cells.push({ from: start, to: row.to, left, right: -1 });
+  if (row.to > start && ctx.state.sliceDoc(start, row.to).trim())
+    cells.push({ from: start, to: row.to, left, right: -1 });
   const shown = new Set<number>();
   for (const cell of cells) {
     mark(ctx, cell.from, cell.to, "md-td");

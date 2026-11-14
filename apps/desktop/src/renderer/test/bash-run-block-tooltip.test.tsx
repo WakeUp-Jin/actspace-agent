@@ -54,16 +54,15 @@ describe("BashRunBlock tooltips", () => {
       createdAt: "2026-07-09T00:00:00.000Z",
       title: "Bash command",
       status: "success",
-      command: "\"/Users/wakeup-jin/Library/Application Support/actspace/browser-bridge/bin/abb\" doctor --json",
-      commandPreview:
-        "\"/Users/wakeup-jin/Library/Application Support/actspace/browser-bridge/bin/abb\" doctor",
+      command: '"/Users/wakeup-jin/Library/Application Support/actspace/browser-bridge/bin/abb" doctor --json',
+      commandPreview: '"/Users/wakeup-jin/Library/Application Support/actspace/browser-bridge/bin/abb" doctor',
       exitCode: 0,
       sandboxed: true,
     });
 
     const summary = screen.getByText("Ran");
     const preview = screen.getByText(
-      "\"/Users/wakeup-jin/Library/Application Support/actspace/browser-bridge/bin/abb\" doctor",
+      '"/Users/wakeup-jin/Library/Application Support/actspace/browser-bridge/bin/abb" doctor',
     );
     const trailing = screen.getByRole("button", { name: /Ran/ }).querySelector(".bash-run-trailing");
     const toggle = summary.closest("button");
@@ -178,7 +177,14 @@ describe("BashRunBlock tooltips", () => {
   });
 
   it("shows the real-environment badge only while an unsandboxed command runs", () => {
-    const base = { id: "bash-sbx-2", kind: "bash", createdAt: "2026-07-04T00:00:00.000Z", title: "Bash command", command: "npm i -g foo", sandboxed: false } as const;
+    const base = {
+      id: "bash-sbx-2",
+      kind: "bash",
+      createdAt: "2026-07-04T00:00:00.000Z",
+      title: "Bash command",
+      command: "npm i -g foo",
+      sandboxed: false,
+    } as const;
     const view = renderBash({ ...base, status: "running" });
 
     const badge = screen.getByRole("img", { name: "真实环境" });
@@ -286,7 +292,9 @@ describe("BashRunBlock tooltips", () => {
     expect(card.querySelector(".approval-card-head")).toHaveTextContent("构建桌面端pnpm");
     expect(card.querySelector(".bash-approval-command")).toHaveTextContent("$ pnpm build");
     // 命令名单独着色。
-    expect(screen.getByText("pnpm", { selector: ".bash-approval-command span" })).toHaveClass("text-(--md-hl-variable)");
+    expect(screen.getByText("pnpm", { selector: ".bash-approval-command span" })).toHaveClass(
+      "text-(--md-hl-variable)",
+    );
     expect(screen.getByText("/workspace/actspace-agent")).toBeInTheDocument();
     const footer = card.querySelector(".approval-card-footer");
     expect(footer).toContainElement(screen.getByRole("button", { name: "运行" }));
@@ -311,10 +319,15 @@ describe("BashRunBlock tooltips", () => {
     };
     const { unmount } = renderBash(pending);
     const card = screen.getByRole("article");
-    expect(card.querySelector(".bash-approval-command + .bash-approval-justification")).toHaveTextContent("Pushing over HTTPS needs the keychain.");
+    expect(card.querySelector(".bash-approval-command + .bash-approval-justification")).toHaveTextContent(
+      "Pushing over HTTPS needs the keychain.",
+    );
     expect(screen.getByRole("img", { name: "真实环境" })).toBeInTheDocument();
     unmount();
-    for (const message of [{ ...pending, justification: undefined }, { ...pending, status: "running" as const, approvalRequestId: undefined }]) {
+    for (const message of [
+      { ...pending, justification: undefined },
+      { ...pending, status: "running" as const, approvalRequestId: undefined },
+    ]) {
       const view = renderBash(message);
       expect(document.querySelector(".bash-approval-justification")).toBeNull();
       expect(document.body).not.toHaveTextContent("needs the keychain");

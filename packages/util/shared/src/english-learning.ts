@@ -1,6 +1,12 @@
 export const SPEECH_MODELS = Object.freeze([
-  "speech-2.8-hd", "speech-2.8-turbo", "speech-2.6-hd", "speech-2.6-turbo",
-  "speech-02-hd", "speech-02-turbo", "speech-01-hd", "speech-01-turbo",
+  "speech-2.8-hd",
+  "speech-2.8-turbo",
+  "speech-2.6-hd",
+  "speech-2.6-turbo",
+  "speech-02-hd",
+  "speech-02-turbo",
+  "speech-01-hd",
+  "speech-01-turbo",
 ] as const);
 export type SpeechModel = (typeof SPEECH_MODELS)[number];
 export function isSpeechModel(value: unknown): value is SpeechModel {
@@ -16,7 +22,10 @@ export interface SpeechSettings {
 }
 
 export const DEFAULT_SPEECH_SETTINGS: Readonly<SpeechSettings> = Object.freeze({
-  provider: "minimax", model: "speech-2.8-turbo", voiceId: "English_Insightful_Speaker", speed: 1,
+  provider: "minimax",
+  model: "speech-2.8-turbo",
+  voiceId: "English_Insightful_Speaker",
+  speed: 1,
 });
 
 export interface EnglishLearningState {
@@ -31,7 +40,10 @@ export interface EnglishLearningState {
   error: { code: string; message: string } | null;
 }
 
-export interface EnglishLearningTargetInput { enabled: boolean; sessionId: string | null }
+export interface EnglishLearningTargetInput {
+  enabled: boolean;
+  sessionId: string | null;
+}
 
 export const ENGLISH_LEARNING_CHANNELS = Object.freeze({
   getState: "english-learning:get-state",

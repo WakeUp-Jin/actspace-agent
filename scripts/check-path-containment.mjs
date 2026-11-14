@@ -14,7 +14,18 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ROOTS = ["packages", "apps", "scripts"];
-const SKIP_DIRS = new Set(["node_modules", "dist", "dist-electron", "build", "out", "coverage", "test", "tests", "__tests__", "fixtures"]);
+const SKIP_DIRS = new Set([
+  "node_modules",
+  "dist",
+  "dist-electron",
+  "build",
+  "out",
+  "coverage",
+  "test",
+  "tests",
+  "__tests__",
+  "fixtures",
+]);
 
 export const ALLOWED = [
   { file: "packages/util/shared/src/path-containment.ts", count: 1, reason: "唯一的实现。" },
@@ -56,7 +67,10 @@ const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*)/;
 /** 返回源码里对「..」开头做前缀判断的行号，一处一个，同一行出现几次就有几个。 */
 export function findPrefixChecks(text) {
   // 整行注释换成空行，行号不变。
-  const code = text.split("\n").map((line) => (COMMENT_LINE.test(line) ? "" : line)).join("\n");
+  const code = text
+    .split("\n")
+    .map((line) => (COMMENT_LINE.test(line) ? "" : line))
+    .join("\n");
   return [...code.matchAll(PREFIX_CHECK)].map((match) => code.slice(0, match.index).split("\n").length);
 }
 
@@ -78,7 +92,9 @@ export function auditPathContainment(sources, allowed = ALLOWED) {
     if (limit === undefined) {
       for (const line of lines) errors.push(`${file}:${line} 对「..」开头做了前缀判断`);
     } else if (lines.length > limit) {
-      errors.push(`${file}：对「..」开头做前缀判断的有 ${lines.length} 处（第 ${lines.join("、")} 行），清单只允许 ${limit} 处`);
+      errors.push(
+        `${file}：对「..」开头做前缀判断的有 ${lines.length} 处（第 ${lines.join("、")} 行），清单只允许 ${limit} 处`,
+      );
     } else if (lines.length < limit) {
       errors.push(`${file}：清单记了 ${limit} 处，现在只有 ${lines.length} 处，请同步修改 ALLOWED`);
     }
@@ -87,7 +103,11 @@ export function auditPathContainment(sources, allowed = ALLOWED) {
 }
 
 function isSourceFile(name) {
-  return /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/.test(name) && !/\.d\.[cm]?ts$/.test(name) && !/\.(test|spec|bench|perf)\.[cm]?[jt]sx?$/.test(name);
+  return (
+    /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/.test(name) &&
+    !/\.d\.[cm]?ts$/.test(name) &&
+    !/\.(test|spec|bench|perf)\.[cm]?[jt]sx?$/.test(name)
+  );
 }
 
 function readSources(root) {
@@ -96,7 +116,10 @@ function readSources(root) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.name.startsWith(".")) continue;
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) { if (!SKIP_DIRS.has(entry.name)) walk(full); continue; }
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name)) walk(full);
+        continue;
+      }
       if (!entry.isFile() || !isSourceFile(entry.name)) continue;
       out.push({ path: path.relative(root, full).split(path.sep).join("/"), text: fs.readFileSync(full, "utf8") });
     }
@@ -115,7 +138,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (errors.length > 0) {
     console.error(`路径包含检查失败（${errors.length} 处）：`);
     for (const error of errors) console.error(`  - ${error}`);
-    console.error("判断路径在不在某个目录里，用 packages/util/shared/src/path-containment.ts 里的 isLexicallyInside / relativePathInside（从 @actspace/shared 引入）。");
+    console.error(
+      "判断路径在不在某个目录里，用 packages/util/shared/src/path-containment.ts 里的 isLexicallyInside / relativePathInside（从 @actspace/shared 引入）。",
+    );
     console.error("不是在判断路径包含的，把文件记进 scripts/check-path-containment.mjs 的 ALLOWED，写明理由。");
     process.exit(1);
   }

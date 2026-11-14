@@ -44,9 +44,14 @@ export class ContextAssembler {
     for (const contribution of this.#contributors) {
       try {
         values.push(await contribution.resolve(input));
-        provenance.push({ contributorId: contribution.id, ownerPluginId: contribution.ownerPluginId, order: contribution.order });
+        provenance.push({
+          contributorId: contribution.id,
+          ownerPluginId: contribution.ownerPluginId,
+          order: contribution.order,
+        });
       } catch (error) {
-        if (contribution.criticality === "required") throw new Error(`Required context contribution ${contribution.id} failed.`, { cause: error });
+        if (contribution.criticality === "required")
+          throw new Error(`Required context contribution ${contribution.id} failed.`, { cause: error });
         provenance.push({ contributorId: contribution.id, ownerPluginId: contribution.ownerPluginId, skipped: true });
       }
     }
@@ -63,6 +68,10 @@ export class ContextAssemblerService extends Service {
     this.assembler = new ContextAssembler();
   }
 
-  register(contribution: ContextContribution): () => void { return this.assembler.register(contribution); }
-  assemble(input: ContextAssemblyInput): Promise<ContextAssemblyResult> { return this.assembler.assemble(input); }
+  register(contribution: ContextContribution): () => void {
+    return this.assembler.register(contribution);
+  }
+  assemble(input: ContextAssemblyInput): Promise<ContextAssemblyResult> {
+    return this.assembler.assemble(input);
+  }
 }

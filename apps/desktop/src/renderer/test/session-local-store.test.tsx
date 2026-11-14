@@ -24,7 +24,8 @@ describe("SessionLocalStore", () => {
 
   it("evictWhere drops every matching session and keeps the rest", () => {
     const store = createSessionLocalStore();
-    for (const id of ["host:a", "host:b", "local-1"]) store.update(id, (state) => ({ ...state, approvalPending: true }));
+    for (const id of ["host:a", "host:b", "local-1"])
+      store.update(id, (state) => ({ ...state, approvalPending: true }));
     store.evictWhere((id) => id.startsWith("host:"));
     expect(store.ids()).toEqual(["local-1"]);
     expect(store.get("host:a")).toBe(DEFAULT_SESSION_LOCAL_STATE);
@@ -58,21 +59,37 @@ describe("SessionLocalStore", () => {
       renders(failed);
       return <span data-testid="failed">{String(failed)}</span>;
     }
-    const view = render(<SessionLocalStoreContext.Provider value={store}><Probe sessionId="s-1" /></SessionLocalStoreContext.Provider>);
+    const view = render(
+      <SessionLocalStoreContext.Provider value={store}>
+        <Probe sessionId="s-1" />
+      </SessionLocalStoreContext.Provider>,
+    );
     expect(renders).toHaveBeenCalledTimes(1);
 
-    act(() => { store.update("s-1", (state) => ({ ...state, approvalPending: true })); });
-    act(() => { store.update("s-2", (state) => ({ ...state, failed: true })); });
+    act(() => {
+      store.update("s-1", (state) => ({ ...state, approvalPending: true }));
+    });
+    act(() => {
+      store.update("s-2", (state) => ({ ...state, failed: true }));
+    });
     expect(renders).toHaveBeenCalledTimes(1);
 
-    act(() => { store.update("s-1", (state) => ({ ...state, failed: true })); });
+    act(() => {
+      store.update("s-1", (state) => ({ ...state, failed: true }));
+    });
     expect(renders).toHaveBeenCalledTimes(2);
     expect(view.getByTestId("failed").textContent).toBe("true");
 
-    act(() => { store.evict("s-1"); });
+    act(() => {
+      store.evict("s-1");
+    });
     expect(view.getByTestId("failed").textContent).toBe("false");
 
-    view.rerender(<SessionLocalStoreContext.Provider value={store}><Probe sessionId={null} /></SessionLocalStoreContext.Provider>);
+    view.rerender(
+      <SessionLocalStoreContext.Provider value={store}>
+        <Probe sessionId={null} />
+      </SessionLocalStoreContext.Provider>,
+    );
     expect(view.getByTestId("failed").textContent).toBe("false");
   });
 
@@ -80,24 +97,40 @@ describe("SessionLocalStore", () => {
     const store = createSessionLocalStore();
     const seen: ReadonlySet<string>[] = [];
     const isFailed = (state: SessionLocalState) => state.failed;
-    function Probe() { seen.push(useSessionLocalIds(store, isFailed)); return null; }
+    function Probe() {
+      seen.push(useSessionLocalIds(store, isFailed));
+      return null;
+    }
     render(<Probe />);
-    act(() => { store.update("s-1", (state) => ({ ...state, failed: true })); });
+    act(() => {
+      store.update("s-1", (state) => ({ ...state, failed: true }));
+    });
     expect([...seen.at(-1)!]).toEqual(["s-1"]);
     const afterFirst = seen.length;
 
-    act(() => { store.update("s-1", (state) => ({ ...state, approvalPending: true })); });
-    act(() => { store.update("s-2", (state) => ({ ...state, approvalPending: true })); });
+    act(() => {
+      store.update("s-1", (state) => ({ ...state, approvalPending: true }));
+    });
+    act(() => {
+      store.update("s-2", (state) => ({ ...state, approvalPending: true }));
+    });
     expect(seen.length).toBe(afterFirst);
 
-    act(() => { store.update("s-2", (state) => ({ ...state, failed: true })); });
+    act(() => {
+      store.update("s-2", (state) => ({ ...state, failed: true }));
+    });
     expect([...seen.at(-1)!].sort()).toEqual(["s-1", "s-2"]);
-    act(() => { store.evict("s-1"); });
+    act(() => {
+      store.evict("s-1");
+    });
     expect([...seen.at(-1)!]).toEqual(["s-2"]);
   });
 
   it("requires a provider", () => {
-    function Bare() { useSessionLocal("s-1", (state) => state.failed); return null; }
+    function Bare() {
+      useSessionLocal("s-1", (state) => state.failed);
+      return null;
+    }
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => render(<Bare />)).toThrow(/SessionLocalStoreContext/);
     vi.mocked(console.error).mockRestore();

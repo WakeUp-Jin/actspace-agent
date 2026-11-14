@@ -6,7 +6,9 @@ import type { AppDataRoots } from "../app-paths";
 
 vi.mock("electron", () => ({
   clipboard: { write: vi.fn(async () => undefined), writeText: vi.fn(async () => undefined) },
-  ClipboardItem: class { constructor(public readonly items: Record<string, unknown>) {} },
+  ClipboardItem: class {
+    constructor(public readonly items: Record<string, unknown>) {}
+  },
   Menu: { buildFromTemplate: vi.fn() },
   nativeImage: { createFromDataURL: vi.fn(() => ({ isEmpty: () => false })) },
   shell: { openExternal: vi.fn(), openPath: vi.fn(), showItemInFolder: vi.fn() },

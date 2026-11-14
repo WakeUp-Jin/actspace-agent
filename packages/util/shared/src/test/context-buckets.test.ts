@@ -36,8 +36,6 @@ describe("context bucket registry", () => {
     const display = getContextBucketDisplay("brandNewBucket");
     expect(display.label).toBe("brandNewBucket");
     expect(display.colorVar).toBe(CONTEXT_BUCKET_FALLBACK_COLOR_VAR);
-    expect(display.order).toBeGreaterThan(
-      Math.max(...CONTEXT_BUCKET_REGISTRY.map((bucket) => bucket.order)),
-    );
+    expect(display.order).toBeGreaterThan(Math.max(...CONTEXT_BUCKET_REGISTRY.map((bucket) => bucket.order)));
   });
 });

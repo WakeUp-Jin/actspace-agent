@@ -11,7 +11,8 @@ export type ChildEnvSource = Readonly<Record<string, string | undefined>>;
  * 名字里出现这些片段就视为凭据。`KEY` 单独不算（`XDG_SESSION_KEY` 之类太多误伤）。
  * `PWD` 和 `DSN` 要求前面是下划线并且在结尾：`PWD`、`OLDPWD` 是 shell 的当前目录，不能剥。
  */
-const CREDENTIAL_NAME_PATTERN = /API_?KEY|ACCESS_KEY|PRIVATE_KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL|DATABASE_URL|_PWD$|_DSN$/i;
+const CREDENTIAL_NAME_PATTERN =
+  /API_?KEY|ACCESS_KEY|PRIVATE_KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL|DATABASE_URL|_PWD$|_DSN$/i;
 
 /** `user:password@` 里不会出现的字符：在 `@` 之前遇到，说明 `://` 后面这一段不带账号密码。 */
 const USERINFO_END = /[\s/?#]/;
@@ -49,8 +50,9 @@ function startsWithPasswordUserinfo(value: string, start: number): boolean {
   for (let at = start; at < value.length; at += 1) {
     const char = value[at];
     if (char === "@") return colon !== -1 && at > colon + 1;
-    if (char === ":") { if (colon === -1) colon = at; }
-    else if (USERINFO_END.test(char)) return false;
+    if (char === ":") {
+      if (colon === -1) colon = at;
+    } else if (USERINFO_END.test(char)) return false;
   }
   return false;
 }
@@ -65,15 +67,44 @@ export function toolChildEnv(source: ChildEnvSource): Record<string, string> {
 }
 
 const HOST_ENV_NAMES = new Set([
-  "PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "TMP", "TEMP", "TERM", "TZ", "LANG",
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "TERM",
+  "TZ",
+  "LANG",
   // git 走 ssh 远端时要找 agent；代理变量让 git / ssh 在公司网络里也能出去。
-  "SSH_AUTH_SOCK", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy",
+  "SSH_AUTH_SOCK",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+  "no_proxy",
   // Windows 上没有这些 git 起不来。
-  "SYSTEMROOT", "SystemRoot", "COMSPEC", "ComSpec", "PATHEXT", "APPDATA", "LOCALAPPDATA", "USERPROFILE", "PROGRAMDATA",
+  "SYSTEMROOT",
+  "SystemRoot",
+  "COMSPEC",
+  "ComSpec",
+  "PATHEXT",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "USERPROFILE",
+  "PROGRAMDATA",
 ]);
 const HOST_ENV_PREFIXES = ["LC_", "XDG_"];
 
-export function hostChildEnv(source: ChildEnvSource, extra: Readonly<Record<string, string>> = {}): Record<string, string> {
+export function hostChildEnv(
+  source: ChildEnvSource,
+  extra: Readonly<Record<string, string>> = {},
+): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [name, value] of Object.entries(source)) {
     if (value === undefined) continue;

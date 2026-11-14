@@ -5,7 +5,10 @@ import type { MdastNode } from "./hast-types";
 export function parseCodeTitle(meta: string | undefined): string | undefined {
   if (!meta) return undefined;
   const match = /(?:^|\s)title=(?:"([^"]*)"|'([^']*)'|(\S+))/.exec(meta);
-  const title = match?.slice(1).find((part) => part !== undefined)?.trim();
+  const title = match
+    ?.slice(1)
+    .find((part) => part !== undefined)
+    ?.trim();
   return title || undefined;
 }
 
@@ -14,7 +17,10 @@ export function remarkCodeMeta() {
   return (tree: MdastNode) => {
     visit(tree, "code", (node: MdastNode & { meta?: string | null }) => {
       if (!node.meta) return;
-      node.data = { ...node.data, hProperties: { ...((node.data as { hProperties?: object } | undefined)?.hProperties), dataMeta: node.meta } };
+      node.data = {
+        ...node.data,
+        hProperties: { ...(node.data as { hProperties?: object } | undefined)?.hProperties, dataMeta: node.meta },
+      };
     });
   };
 }

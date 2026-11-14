@@ -7,7 +7,8 @@ import { getLatestTodoMessage, type ConversationTurn } from "./turns";
 const PINNED_LAYER_CLASS = "pointer-events-none absolute inset-x-0 top-0 z-12";
 const PINNED_WRAP_CLASS =
   "pointer-events-auto mx-auto bg-[image:var(--act-gradient-surface-fade)] pb-3 pt-2 animate-[fade-in_140ms_ease-out_both]";
-const PINNED_CARD_CLASS = "overflow-hidden rounded-act-lg border border-line bg-surface shadow-act-popover hover:border-line-strong";
+const PINNED_CARD_CLASS =
+  "overflow-hidden rounded-act-lg border border-line bg-surface shadow-act-popover hover:border-line-strong";
 // 整行是一个按钮，左侧文字截断、右侧进度，ui/Button 的固定内边距和居中排版放不下这种布局。
 const PINNED_ROW_CLASS =
   "flex w-full min-w-0 cursor-text items-center gap-2.5 py-2 pl-[var(--conversation-card-padding)] pr-3 text-left transition-[border-color] duration-(--motion-fast) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring/30";
@@ -102,25 +103,24 @@ export function PinnedTurnPrompt({
       onJump(turn.id);
       return;
     }
-    scrollRef.current?.querySelector(`[data-conversation-turn-id="${CSS.escape(turn.id)}"]`)?.scrollIntoView({ block: "start" });
+    scrollRef.current
+      ?.querySelector(`[data-conversation-turn-id="${CSS.escape(turn.id)}"]`)
+      ?.scrollIntoView({ block: "start" });
   };
 
   return (
     <div className={PINNED_LAYER_CLASS}>
       <div className={cx(PINNED_WRAP_CLASS, className)}>
         <div className={PINNED_CARD_CLASS} data-testid="pinned-turn-prompt">
-          <button
-            type="button"
-            className={PINNED_ROW_CLASS}
-            aria-label={`回到提问：${oneLine(text)}`}
-            onClick={jump}
-          >
+          <button type="button" className={PINNED_ROW_CLASS} aria-label={`回到提问：${oneLine(text)}`} onClick={jump}>
             <span className={PINNED_TEXT_CLASS}>{oneLine(text)}</span>
             {showTodo && todo ? (
               <span className={PINNED_PROGRESS_CLASS} aria-label={`任务 ${todo.completedCount}/${todo.totalCount}`}>
                 <span
                   className="size-3 rounded-full"
-                  style={{ background: `conic-gradient(var(--color-success) ${todo.totalCount ? (todo.completedCount / todo.totalCount) * 100 : 0}%, var(--color-border) 0)` }}
+                  style={{
+                    background: `conic-gradient(var(--color-success) ${todo.totalCount ? (todo.completedCount / todo.totalCount) * 100 : 0}%, var(--color-border) 0)`,
+                  }}
                   aria-hidden="true"
                 />
                 {todo.completedCount}/{todo.totalCount}

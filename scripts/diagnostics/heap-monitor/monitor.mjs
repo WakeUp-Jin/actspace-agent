@@ -10,7 +10,9 @@ import { join } from "node:path";
 
 const outDir = process.argv.slice(2).find((arg) => !arg.startsWith("--")) ?? `tmp/heap/run-${Date.now()}`;
 mkdirSync(outDir, { recursive: true });
-const MAIN_PORT = Number(process.env.ACTSPACE_INSPECT_MAIN ?? 9229), RENDERER_PORT = MAIN_PORT + 1, INTERVAL = 500;
+const MAIN_PORT = Number(process.env.ACTSPACE_INSPECT_MAIN ?? 9229),
+  RENDERER_PORT = MAIN_PORT + 1,
+  INTERVAL = 500;
 const samples = createWriteStream(join(outDir, "samples.jsonl"));
 const log = (...args) => console.log(new Date().toISOString().slice(11, 19), ...args);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -22,29 +24,64 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const WebSocket = createRequire(new URL("../../../apps/desktop/package.json", import.meta.url))("ws");
 
 class Cdp {
-  constructor(url) { this.url = url; this.nextId = 1; this.pending = new Map(); this.closed = false; }
+  constructor(url) {
+    this.url = url;
+    this.nextId = 1;
+    this.pending = new Map();
+    this.closed = false;
+  }
   async open() {
     this.ws = new WebSocket(this.url, { perMessageDeflate: false, maxPayload: 0 });
-    await new Promise((resolve, reject) => { this.ws.onopen = resolve; this.ws.onerror = reject; });
-    this.ws.onmessage = (message) => { const data = JSON.parse(String(message.data)); const done = this.pending.get(data.id); if (done) { this.pending.delete(data.id); done(data); } };
-    this.ws.onclose = (event) => { this.closed = true; this.closeInfo = `code ${event.code} ${String(event.reason ?? "")}`.trim(); if (!stopping) log(`连接断开（${this.closeInfo}）`); for (const done of this.pending.values()) done({ error: { message: "closed" } }); this.pending.clear(); };
+    await new Promise((resolve, reject) => {
+      this.ws.onopen = resolve;
+      this.ws.onerror = reject;
+    });
+    this.ws.onmessage = (message) => {
+      const data = JSON.parse(String(message.data));
+      const done = this.pending.get(data.id);
+      if (done) {
+        this.pending.delete(data.id);
+        done(data);
+      }
+    };
+    this.ws.onclose = (event) => {
+      this.closed = true;
+      this.closeInfo = `code ${event.code} ${String(event.reason ?? "")}`.trim();
+      if (!stopping) log(`连接断开（${this.closeInfo}）`);
+      for (const done of this.pending.values()) done({ error: { message: "closed" } });
+      this.pending.clear();
+    };
     return this;
   }
   send(method, params = {}, timeoutMs = 60_000) {
     if (this.closed) return Promise.resolve({ error: { message: "closed" } });
     return new Promise((resolve) => {
       const id = this.nextId++;
-      const timer = setTimeout(() => { this.pending.delete(id); resolve({ error: { message: "timeout" } }); }, timeoutMs);
-      this.pending.set(id, (data) => { clearTimeout(timer); resolve(data); });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        resolve({ error: { message: "timeout" } });
+      }, timeoutMs);
+      this.pending.set(id, (data) => {
+        clearTimeout(timer);
+        resolve(data);
+      });
       this.ws.send(JSON.stringify({ id, method, params }));
     });
   }
 }
 
 async function targets(port) {
-  try { return await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(1000) })).json(); } catch { return null; }
+  try {
+    return await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(1000) })).json();
+  } catch {
+    return null;
+  }
 }
-const SAMPLING = { samplingInterval: 32768, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true };
+const SAMPLING = {
+  samplingInterval: 32768,
+  includeObjectsCollectedByMajorGC: true,
+  includeObjectsCollectedByMinorGC: true,
+};
 
 // 主进程里执行：所有 Electron 进程的内存 / CPU + 主进程 V8 堆。includeCommandLineAPI 让表达式里能用 require。
 const MAIN_PROBE = `(() => {
@@ -56,7 +93,9 @@ const MAIN_PROBE = `(() => {
   });
 })()`;
 
-let main, renderer, stopping = false;
+let main,
+  renderer,
+  stopping = false;
 const startedAt = Date.now();
 
 async function connectRenderer() {
@@ -78,17 +117,29 @@ async function saveChunk(name, cdp, restart) {
   if (!cdp || cdp.closed) return false;
   const result = await cdp.send("HeapProfiler.stopSampling", {}, 120_000);
   if (restart && !cdp.closed) await cdp.send("HeapProfiler.startSampling", SAMPLING);
-  if (!result.result?.profile) { log(`${name}：第 ${chunkIndex[name] + 1} 段采样失败 ${JSON.stringify(result.error)}${cdp.closeInfo ? `（${cdp.closeInfo}）` : ""}`); return false; }
+  if (!result.result?.profile) {
+    log(
+      `${name}：第 ${chunkIndex[name] + 1} 段采样失败 ${JSON.stringify(result.error)}${cdp.closeInfo ? `（${cdp.closeInfo}）` : ""}`,
+    );
+    return false;
+  }
   const file = `${name}-${String(++chunkIndex[name]).padStart(3, "0")}.heapprofile`;
   writeFileSync(join(outDir, file), JSON.stringify(result.result.profile));
   return true;
 }
 
 async function finish(reason) {
-  if (stopping) return; stopping = true;
+  if (stopping) return;
+  stopping = true;
   log(`停止记录（${reason}），保存最后一段分配采样…`);
-  for (const [name, cdp] of [["main", main], ["renderer", renderer]]) {
-    if (!cdp || cdp.closed) { log(`${name}：连接已断开，最后一段拿不到（已存 ${chunkIndex[name]} 段）`); continue; }
+  for (const [name, cdp] of [
+    ["main", main],
+    ["renderer", renderer],
+  ]) {
+    if (!cdp || cdp.closed) {
+      log(`${name}：连接已断开，最后一段拿不到（已存 ${chunkIndex[name]} 段）`);
+      continue;
+    }
     if (await saveChunk(name, cdp, false)) log(`${name}：分配采样已保存，共 ${chunkIndex[name]} 段`);
   }
   await new Promise((resolve) => samples.end(resolve));
@@ -103,14 +154,18 @@ const existing = process.argv.includes("--wait-new") ? (await targets(MAIN_PORT)
 log(existing ? `忽略当前正在运行的 app，等你重启…` : `等待主进程 inspector 127.0.0.1:${MAIN_PORT} …`);
 for (;;) {
   const list = await targets(MAIN_PORT);
-  if (list?.[0]?.webSocketDebuggerUrl && list[0].id !== existing) { main = await new Cdp(list[0].webSocketDebuggerUrl).open(); break; }
+  if (list?.[0]?.webSocketDebuggerUrl && list[0].id !== existing) {
+    main = await new Cdp(list[0].webSocketDebuggerUrl).open();
+    break;
+  }
   await sleep(300);
 }
 await main.send("HeapProfiler.enable");
 await main.send("HeapProfiler.startSampling", SAMPLING);
 log("主进程已连接，开始记录");
 
-let lastPrint = 0, lastChunk = Date.now();
+let lastPrint = 0,
+  lastChunk = Date.now();
 while (!stopping) {
   const tick = Date.now();
   if (tick - lastChunk >= CHUNK_MS) {
@@ -120,12 +175,23 @@ while (!stopping) {
   }
   if ((!renderer || renderer.closed) && tick - startedAt > 0) await connectRenderer().catch(() => undefined);
   const evalStart = Date.now();
-  const probe = await main.send("Runtime.evaluate", { expression: MAIN_PROBE, includeCommandLineAPI: true, returnByValue: true }, 30_000);
+  const probe = await main.send(
+    "Runtime.evaluate",
+    { expression: MAIN_PROBE, includeCommandLineAPI: true, returnByValue: true },
+    30_000,
+  );
   // 主线程忙的时候这个往返会变长：它近似「主进程事件循环被占住多久」。
   const mainLagMs = Date.now() - evalStart;
-  if (main.closed) { await finish("app 已退出"); break; }
+  if (main.closed) {
+    await finish("app 已退出");
+    break;
+  }
   const value = probe.result?.result?.value;
-  const row = { t: tick - startedAt, mainLagMs, ...(value ? JSON.parse(value) : { error: JSON.stringify(probe.error ?? probe.result?.exceptionDetails?.text) }) };
+  const row = {
+    t: tick - startedAt,
+    mainLagMs,
+    ...(value ? JSON.parse(value) : { error: JSON.stringify(probe.error ?? probe.result?.exceptionDetails?.text) }),
+  };
   if (renderer && !renderer.closed) {
     const usage = await renderer.send("Runtime.getHeapUsage", {}, 5_000);
     if (usage.result) row.renderer = { heapUsed: usage.result.usedSize, heapTotal: usage.result.totalSize };
@@ -134,7 +200,9 @@ while (!stopping) {
   if (tick - lastPrint > 10_000 && row.processes) {
     lastPrint = tick;
     const total = row.processes.reduce((sum, p) => sum + p.workingSetKB, 0) / 1024;
-    log(`总 ${total.toFixed(0)}MB · 主进程堆 ${(row.main.heapUsed / 1048576).toFixed(0)}MB · 界面堆 ${row.renderer ? (row.renderer.heapUsed / 1048576).toFixed(0) + "MB" : "—"} · 主线程延迟 ${mainLagMs}ms`);
+    log(
+      `总 ${total.toFixed(0)}MB · 主进程堆 ${(row.main.heapUsed / 1048576).toFixed(0)}MB · 界面堆 ${row.renderer ? (row.renderer.heapUsed / 1048576).toFixed(0) + "MB" : "—"} · 主线程延迟 ${mainLagMs}ms`,
+    );
   }
   await sleep(Math.max(0, INTERVAL - (Date.now() - tick)));
 }

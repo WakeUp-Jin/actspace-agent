@@ -56,7 +56,7 @@ describe("QuickOpenShortcutController", () => {
     const controller = new QuickOpenShortcutController(registrar, vi.fn(), automatic.accelerator);
     controller.activate(automatic);
     const next = { ...automatic, accelerator: "CommandOrControl+Alt+A" };
-    const persist = vi.fn(async () => ({ shortcuts: { quickOpen: next } } as AppSettings));
+    const persist = vi.fn(async () => ({ shortcuts: { quickOpen: next } }) as AppSettings);
 
     const result = await controller.update(automatic, next, persist);
 
@@ -74,7 +74,7 @@ describe("QuickOpenShortcutController", () => {
     const result = await controller.update(
       automatic,
       next,
-      async () => ({ shortcuts: { quickOpen: next } } as AppSettings),
+      async () => ({ shortcuts: { quickOpen: next } }) as AppSettings,
     );
 
     expect(result.ok).toBe(true);

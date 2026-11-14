@@ -4,7 +4,9 @@ import { BASH_COMMAND_PARSE_LIMIT, parseBashPrograms } from "../runtime-v2/bash-
 
 /** `"pnpm test"` 表示程序 + 子命令，`"cat"` 表示没有子命令，`""` 表示「其他」。 */
 function names(command: string): string[] {
-  return parseBashPrograms(command).map(item => (item.subcommand ? `${item.program} ${item.subcommand}` : item.program));
+  return parseBashPrograms(command).map((item) =>
+    item.subcommand ? `${item.program} ${item.subcommand}` : item.program,
+  );
 }
 
 describe("parseBashPrograms", () => {
@@ -15,11 +17,11 @@ describe("parseBashPrograms", () => {
     ["FOO=1 timeout 30 node build.js > out.log 2>&1", ["node"]],
     ["if [ -f x ]; then cat x; fi", ["cat"]],
     ["git -C pkg status && git diff", ["git status", "git diff"]],
-    ["echo \"$(date)\"", ["echo"]],
+    ['echo "$(date)"', ["echo"]],
     ["python3 - <<'EOF'\nimport os\nprint(os.getcwd()); rm -rf x | cat\nEOF", ["python3"]],
     // 引号与转义
     ["echo 'a && b | c' && ls", ["echo", "ls"]],
-    ["grep \"x | y; z\" file.txt", ["grep"]],
+    ['grep "x | y; z" file.txt', ["grep"]],
     ["ls a\\ b", ["ls"]],
     ["echo `date` && pwd", ["echo", "pwd"]],
     // 包装命令
@@ -30,7 +32,7 @@ describe("parseBashPrograms", () => {
     ["command -v git", []],
     // 子 shell、循环、分组
     ["( cd x && make )", ["make"]],
-    ["for f in *.ts; do wc -l \"$f\"; done", ["wc"]],
+    ['for f in *.ts; do wc -l "$f"; done', ["wc"]],
     ["{ echo a; echo b; } > out.txt", ["echo", "echo"]],
     ["(( i++ )) && echo done", ["echo"]],
     ["arr=(a b c) && echo ok", ["echo"]],

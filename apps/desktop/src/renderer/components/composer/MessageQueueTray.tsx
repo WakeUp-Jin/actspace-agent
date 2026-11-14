@@ -58,16 +58,25 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
   const counts = [
     queue.items.length > 0 ? `${queue.items.length} 条排队` : null,
     queue.steering.length > 0 ? `${queue.steering.length} 条已引导` : null,
-  ].filter(Boolean).join(" · ");
+  ]
+    .filter(Boolean)
+    .join(" · ");
   // 原来的标题行去掉了，计数和发送时机放进第一行图标的提示里。
   const hint = queue.paused || queue.items.length === 0 ? null : running ? "当前运行结束后依次发送" : "即将发送";
   const summary = hint ? `${counts}，${hint}` : counts;
   const renderLead = (index: number, icon: ReactNode) => {
-    if (index !== 0) return <span className={ROW_LEAD_CLASS} aria-hidden="true">{icon}</span>;
+    if (index !== 0)
+      return (
+        <span className={ROW_LEAD_CLASS} aria-hidden="true">
+          {icon}
+        </span>
+      );
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className={ROW_LEAD_CLASS} tabIndex={0} role="img" aria-label={summary}>{icon}</span>
+          <span className={ROW_LEAD_CLASS} tabIndex={0} role="img" aria-label={summary}>
+            {icon}
+          </span>
         </TooltipTrigger>
         <TooltipContent>{summary}</TooltipContent>
       </Tooltip>
@@ -77,7 +86,12 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
   const renderSteerButton = (item: QueuedComposerMessage) => {
     if (!running || item.kind !== "message") return null;
     const button = (
-      <Button variant="ghost" size="xs" disabled={steerBlockedReason !== null} onClick={() => controls.onSteer(item.id)}>
+      <Button
+        variant="ghost"
+        size="xs"
+        disabled={steerBlockedReason !== null}
+        onClick={() => controls.onSteer(item.id)}
+      >
         ↳ 引导
       </Button>
     );
@@ -85,7 +99,13 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
       <Tooltip>
         <TooltipTrigger asChild>
           {/* 禁用的按钮收不到悬停事件，外包一层让原因提示仍然可见。 */}
-          {steerBlockedReason ? <span className="inline-flex" tabIndex={0}>{button}</span> : button}
+          {steerBlockedReason ? (
+            <span className="inline-flex" tabIndex={0}>
+              {button}
+            </span>
+          ) : (
+            button
+          )}
         </TooltipTrigger>
         <TooltipContent>{steerBlockedReason ?? STEER_TIP}</TooltipContent>
       </Tooltip>
@@ -98,7 +118,9 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
         {queue.steering.map((item, index) => (
           <li className={ROW_CLASS} key={item.id} data-state="steering">
             {renderLead(index, <i className="size-1.5 rounded-act-pill bg-operational motion-safe:animate-pulse" />)}
-            <span className="min-w-0 flex-1 truncate text-text-muted" title={item.text}>{rowText(item)}</span>
+            <span className="min-w-0 flex-1 truncate text-text-muted" title={item.text}>
+              {rowText(item)}
+            </span>
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="inline-flex shrink-0 whitespace-nowrap px-1 text-act-xs text-operational" tabIndex={0}>
@@ -109,7 +131,9 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="xs" onClick={() => controls.onUnsteer(item.id)}>撤回</Button>
+                <Button variant="ghost" size="xs" onClick={() => controls.onUnsteer(item.id)}>
+                  撤回
+                </Button>
               </TooltipTrigger>
               <TooltipContent>读到之前可以撤回，撤回后回到队列</TooltipContent>
             </Tooltip>
@@ -121,7 +145,10 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
             <li className={ROW_CLASS} key={item.id} data-state="queued">
               {renderLead(queue.steering.length + index, <ListOrdered size={14} />)}
               <span
-                className={cx("min-w-0 flex-1 truncate text-text-main", item.kind === "compact" && "font-mono text-act-xs")}
+                className={cx(
+                  "min-w-0 flex-1 truncate text-text-main",
+                  item.kind === "compact" && "font-mono text-act-xs",
+                )}
                 title={item.text}
               >
                 {rowText(item)}
@@ -129,7 +156,12 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
               {meta ? <span className={META_CLASS}>{meta}</span> : null}
               <span className={ROW_ACTIONS_CLASS}>
                 {renderSteerButton(item)}
-                <IconButton label={`删除排队消息 ${index + 1}`} tooltip="删除" size="xs" onClick={() => controls.onRemove(item.id)}>
+                <IconButton
+                  label={`删除排队消息 ${index + 1}`}
+                  tooltip="删除"
+                  size="xs"
+                  onClick={() => controls.onRemove(item.id)}
+                >
                   <Trash size={13} aria-hidden="true" />
                 </IconButton>
                 <Menu>
@@ -143,7 +175,9 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
                       编辑
                       {inputEmpty ? null : <small className="ml-auto text-act-xxs text-text-faint">先清空输入框</small>}
                     </MenuItem>
-                    <MenuItem disabled={index === 0} onSelect={() => controls.onMoveUp(item.id)}>上移</MenuItem>
+                    <MenuItem disabled={index === 0} onSelect={() => controls.onMoveUp(item.id)}>
+                      上移
+                    </MenuItem>
                   </MenuContent>
                 </Menu>
               </span>
@@ -153,8 +187,12 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
       </ul>
       {queue.paused ? (
         <div className={PAUSED_ROW_CLASS}>
-          <span className="min-w-0 flex-1 truncate" role="status">已暂停</span>
-          <Button variant="ghost" size="xs" onClick={controls.onResume}>继续发送</Button>
+          <span className="min-w-0 flex-1 truncate" role="status">
+            已暂停
+          </span>
+          <Button variant="ghost" size="xs" onClick={controls.onResume}>
+            继续发送
+          </Button>
         </div>
       ) : null}
     </section>

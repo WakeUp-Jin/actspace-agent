@@ -15,112 +15,263 @@ import { AgentLoop, type AgentLoopLiveEvent } from "./loop.js";
  */
 function passThroughSources(): ContextSourceRegistry {
   const registry = new ContextSourceRegistry();
-  registry.register({ id: "context-conversation", owner: "actspace.context-conversation", order: 40, criticality: "required", fields: ["conversation"], get: (context, write) => write({ conversation: context.content.conversation }) });
-  registry.register({ id: "context-tools", owner: "actspace.context-tools", order: 50, criticality: "required", fields: ["tools"], get: (context, write) => write({ tools: context.content.tools }) });
+  registry.register({
+    id: "context-conversation",
+    owner: "actspace.context-conversation",
+    order: 40,
+    criticality: "required",
+    fields: ["conversation"],
+    get: (context, write) => write({ conversation: context.content.conversation }),
+  });
+  registry.register({
+    id: "context-tools",
+    owner: "actspace.context-tools",
+    order: 50,
+    criticality: "required",
+    fields: ["tools"],
+    get: (context, write) => write({ tools: context.content.tools }),
+  });
   return registry;
 }
 
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
-export async function runToolStreamFixture(options: {
-  toolEnvironment?: Partial<import("@actspace/tool-runtime").ToolPreparedEnvironment>;
-  stream?: () => AsyncIterable<LlmStreamEvent>;
-  retryPolicy?: import("@actspace/llm-service").LlmRetryPolicy;
-  credential?: import("@actspace/llm-service").LlmCredential;
-  subagent?: boolean;
-  /** Override the descriptor step budget (subagent defaults to 2). */
-  maxSteps?: number;
-  createContextEngine?: import("./loop.js").AgentLoopOptions["createContextEngine"];
-  contextSources?: import("@actspace/context-engine").ContextSourceRegistry;
-  inputSource?: import("./loop.js").LoopInputSource;
-  seedSession?: (session: SessionHandle) => Promise<void>;
-  /** 用调用方准备好的会话（例如带归档历史的长会话）代替默认的内存会话；fixture 结束时同样关闭它。 */
-  session?: SessionHandle;
-  followup?: boolean;
-  extraToolCall?: boolean;
-  onTools?: (tools: readonly import("@actspace/llm-service").LlmToolDefinition[]) => void;
-  deltas?: boolean;
-  resolveArtifact?: import("@actspace/tool-runtime").SessionArtifactResolver;
-  thinkingEnabled?: boolean;
-  reasoningEffort?: import("@actspace/shared").ModelReasoningEffort;
-  onRequest?: (options: import("@actspace/llm-service").LlmRequestOptions) => void;
-  onMessages?: (messages: readonly import("@actspace/llm-service").LlmMessage[]) => void;
-  onJournal?: (events: readonly import("@actspace/session-journal").SessionEventEnvelopeV1[]) => void;
-  args?: string;
-  sessionId?: string;
-  agentRunId?: string;
-  onLiveEvent?: (event: AgentLoopLiveEvent) => void;
-  execute?: () => Promise<ToolBodyResult>;
-  permission?: ToolPermissionContract;
-  beforeFinalText?: () => Promise<void>;
-  context?: CordisContext;
-  mode?: import("@actspace/shared/runtime-v2").RuntimeAgentMode;
-  terminalOnly?: boolean;
-  content?: import("@actspace/shared/runtime-v2").RuntimeJsonValue;
-  compaction?: import("@actspace/context-compaction").CompactionPlugin;
-  usage?: import("@actspace/llm-service").LlmUsage;
-  contextWindow?: number;
-  /** 在 fixture 自己的回合开始前调用；返回 Promise 时会等它结束，可以用来先跑一个回合。 */
-  onLoop?: (loop: AgentLoop, inbox: MainAgentInbox) => void | Promise<void>;
-  /** 交出路由表和 fixture 注册的那条路由，测试可以在回合进行中把它换掉。 */
-  onRoute?: (routes: LlmRouteRegistry, handle: import("@actspace/llm-service").LlmRouteRegistrationHandle) => void;
-  wake?: boolean;
-} = {}) {
+export async function runToolStreamFixture(
+  options: {
+    toolEnvironment?: Partial<import("@actspace/tool-runtime").ToolPreparedEnvironment>;
+    stream?: () => AsyncIterable<LlmStreamEvent>;
+    retryPolicy?: import("@actspace/llm-service").LlmRetryPolicy;
+    credential?: import("@actspace/llm-service").LlmCredential;
+    subagent?: boolean;
+    /** Override the descriptor step budget (subagent defaults to 2). */
+    maxSteps?: number;
+    createContextEngine?: import("./loop.js").AgentLoopOptions["createContextEngine"];
+    contextSources?: import("@actspace/context-engine").ContextSourceRegistry;
+    inputSource?: import("./loop.js").LoopInputSource;
+    seedSession?: (session: SessionHandle) => Promise<void>;
+    /** 用调用方准备好的会话（例如带归档历史的长会话）代替默认的内存会话；fixture 结束时同样关闭它。 */
+    session?: SessionHandle;
+    followup?: boolean;
+    extraToolCall?: boolean;
+    onTools?: (tools: readonly import("@actspace/llm-service").LlmToolDefinition[]) => void;
+    deltas?: boolean;
+    resolveArtifact?: import("@actspace/tool-runtime").SessionArtifactResolver;
+    thinkingEnabled?: boolean;
+    reasoningEffort?: import("@actspace/shared").ModelReasoningEffort;
+    onRequest?: (options: import("@actspace/llm-service").LlmRequestOptions) => void;
+    onMessages?: (messages: readonly import("@actspace/llm-service").LlmMessage[]) => void;
+    onJournal?: (events: readonly import("@actspace/session-journal").SessionEventEnvelopeV1[]) => void;
+    args?: string;
+    sessionId?: string;
+    agentRunId?: string;
+    onLiveEvent?: (event: AgentLoopLiveEvent) => void;
+    execute?: () => Promise<ToolBodyResult>;
+    permission?: ToolPermissionContract;
+    beforeFinalText?: () => Promise<void>;
+    context?: CordisContext;
+    mode?: import("@actspace/shared/runtime-v2").RuntimeAgentMode;
+    terminalOnly?: boolean;
+    content?: import("@actspace/shared/runtime-v2").RuntimeJsonValue;
+    compaction?: import("@actspace/context-compaction").CompactionPlugin;
+    usage?: import("@actspace/llm-service").LlmUsage;
+    contextWindow?: number;
+    /** 在 fixture 自己的回合开始前调用；返回 Promise 时会等它结束，可以用来先跑一个回合。 */
+    onLoop?: (loop: AgentLoop, inbox: MainAgentInbox) => void | Promise<void>;
+    /** 交出路由表和 fixture 注册的那条路由，测试可以在回合进行中把它换掉。 */
+    onRoute?: (routes: LlmRouteRegistry, handle: import("@actspace/llm-service").LlmRouteRegistrationHandle) => void;
+    wake?: boolean;
+  } = {},
+) {
   const registry = createCoreCodecRegistry();
   for (const codec of contextCodecs) registry.register(codec);
-  const session = options.session ?? SessionHandle.createEphemeral({ registry, header: createSessionHeader({
-    sessionId: options.sessionId ?? "tool-stream-test", createdAt: "2026-09-06T00:00:00.000Z", lineage: options.subagent ? { origin: "delegation", parentSessionId: "parent", parentCallId: "delegate", parentBoundarySeq: 0, seedDigest: "fixture", delegationDepth: 1 } : null,
-    createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest },
-  }) });
+  const session =
+    options.session ??
+    SessionHandle.createEphemeral({
+      registry,
+      header: createSessionHeader({
+        sessionId: options.sessionId ?? "tool-stream-test",
+        createdAt: "2026-09-06T00:00:00.000Z",
+        lineage: options.subagent
+          ? {
+              origin: "delegation",
+              parentSessionId: "parent",
+              parentCallId: "delegate",
+              parentBoundarySeq: 0,
+              seedDigest: "fixture",
+              delegationDepth: 1,
+            }
+          : null,
+        createdWith: {
+          profileId: "test",
+          runtimeContractVersion: "1",
+          manifestDigest: "test",
+          plugins: [],
+          codecSetDigest: registry.digest,
+        },
+      }),
+    });
   await options.seedSession?.(session);
   const tools = new ToolRuntime();
-  tools.register({ definition: { abiVersion: 2, pluginId: "test.tools", name: "read_file", definitionVersion: 1,
-    description: "Read fixture", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false },
-    effects: [], modes: ["plan", "agent"], concurrency: "read-only", sensitiveArgumentPaths: [], resultSchemaVersion: 1 },
+  tools.register({
+    definition: {
+      abiVersion: 2,
+      pluginId: "test.tools",
+      name: "read_file",
+      definitionVersion: 1,
+      description: "Read fixture",
+      inputSchema: {
+        type: "object",
+        properties: { path: { type: "string" } },
+        required: ["path"],
+        additionalProperties: false,
+      },
+      effects: [],
+      modes: ["plan", "agent"],
+      concurrency: "read-only",
+      sensitiveArgumentPaths: [],
+      resultSchemaVersion: 1,
+    },
     permission: options.permission,
-    executor: { concurrencySafe: true, execute: options.execute ?? (async () => ({ status: "completed", summary: "Read fixture.txt", modelOutput: [{ type: "text", text: "fixture content" }] })) } });
+    executor: {
+      concurrencySafe: true,
+      execute:
+        options.execute ??
+        (async () => ({
+          status: "completed",
+          summary: "Read fixture.txt",
+          modelOutput: [{ type: "text", text: "fixture content" }],
+        })),
+    },
+  });
   let requests = 0;
   const args = options.args ?? '{"path":"fixture.txt"}';
   const routes = new LlmRouteRegistry();
-  const handle = routes.register({ routeId: "test", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, retryPolicy: options.retryPolicy, adapter: {
-    adapterVersion: "test", resolveModelFacts: () => ({ contextWindow: options.contextWindow ?? null }), dispatch: async (input) => (async function* (): AsyncGenerator<LlmStreamEvent> {
-      options.onRequest?.(input.request.options);
-      options.onTools?.(input.request.tools);
-      options.onMessages?.(input.request.messages);
-      if (options.stream) { yield* options.stream(); return; }
-      if (options.terminalOnly) {
-        requests += 1;
-        yield { type: "text-delta", text: "Done." };
-        yield { type: "done", stopReason: "stop", usage: options.usage ?? EMPTY_LLM_USAGE, content: [{ type: "text", text: "Done." }] };
-      } else if (requests++ === 0) {
-        yield { type: "text-delta", text: "Read now. " };
-        if (options.deltas !== false) {
-          yield { type: "tool-call-delta", callId: "read-1", name: "read_file", argumentsDelta: args.slice(0, 8) };
-          yield { type: "tool-call-delta", callId: "read-1", name: "read_file", argumentsDelta: args.slice(8) };
-        }
-        yield { type: "done", stopReason: "tool-use", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text: "Read now. " }, { type: "tool-call", callId: "read-1", name: "read_file", arguments: args }, ...(options.extraToolCall ? [{ type: "tool-call" as const, callId: "unknown-2", name: "missing_tool", arguments: "{}" }] : [])] };
-      } else {
-        await options.beforeFinalText?.();
-        yield { type: "text-delta", text: 'Done. {"valid":"body JSON"}' };
-        yield { type: "done", stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text: 'Done. {"valid":"body JSON"}' }] };
-      }
-    })(),
-  } });
+  const handle = routes.register({
+    routeId: "test",
+    providerId: "test",
+    modelPattern: "*",
+    credentialRef: "test",
+    defaults: {},
+    retryPolicy: options.retryPolicy,
+    adapter: {
+      adapterVersion: "test",
+      resolveModelFacts: () => ({ contextWindow: options.contextWindow ?? null }),
+      dispatch: async (input) =>
+        (async function* (): AsyncGenerator<LlmStreamEvent> {
+          options.onRequest?.(input.request.options);
+          options.onTools?.(input.request.tools);
+          options.onMessages?.(input.request.messages);
+          if (options.stream) {
+            yield* options.stream();
+            return;
+          }
+          if (options.terminalOnly) {
+            requests += 1;
+            yield { type: "text-delta", text: "Done." };
+            yield {
+              type: "done",
+              stopReason: "stop",
+              usage: options.usage ?? EMPTY_LLM_USAGE,
+              content: [{ type: "text", text: "Done." }],
+            };
+          } else if (requests++ === 0) {
+            yield { type: "text-delta", text: "Read now. " };
+            if (options.deltas !== false) {
+              yield { type: "tool-call-delta", callId: "read-1", name: "read_file", argumentsDelta: args.slice(0, 8) };
+              yield { type: "tool-call-delta", callId: "read-1", name: "read_file", argumentsDelta: args.slice(8) };
+            }
+            yield {
+              type: "done",
+              stopReason: "tool-use",
+              usage: EMPTY_LLM_USAGE,
+              content: [
+                { type: "text", text: "Read now. " },
+                { type: "tool-call", callId: "read-1", name: "read_file", arguments: args },
+                ...(options.extraToolCall
+                  ? [{ type: "tool-call" as const, callId: "unknown-2", name: "missing_tool", arguments: "{}" }]
+                  : []),
+              ],
+            };
+          } else {
+            await options.beforeFinalText?.();
+            yield { type: "text-delta", text: 'Done. {"valid":"body JSON"}' };
+            yield {
+              type: "done",
+              stopReason: "stop",
+              usage: EMPTY_LLM_USAGE,
+              content: [{ type: "text", text: 'Done. {"valid":"body JSON"}' }],
+            };
+          }
+        })(),
+    },
+  });
   options.onRoute?.(routes, handle);
   const events: AgentLoopLiveEvent[] = [];
   const inbox = new MainAgentInbox(session);
-  const loop = new AgentLoop({ createContextEngine: options.createContextEngine, contextSources: options.contextSources ?? passThroughSources(), session, tools, inbox, inputSource: options.inputSource,
-    descriptor: { ...MAIN_AGENT_DESCRIPTOR, ...(options.subagent ? { kind: "subagent" as const, maxSteps: 2 } : {}), ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }), routeId: "test", model: "test" }, scope: new AgentScope("main:test", undefined, "main:test"),
-    llm: new LlmService(routes, { resolve: async () => options.credential ?? ({ apiKey: "fixture" }) }),
-    compositionDigest: "test", hostCapabilityDigest: "test", host: { hostKind: "desktop", capabilityCeiling: [], runtimeContract: "actspace.runtime.v2", invocationId: "test", workspaceRef: "/fixture" },
-    toolEnvironment: () => ({ ...options.toolEnvironment, resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: options.toolEnvironment?.createArtifact ?? (async () => { throw new Error("not used"); }) }),
-    onLiveEvent: (event) => { events.push(event); options.onLiveEvent?.(event); },
+  const loop = new AgentLoop({
+    createContextEngine: options.createContextEngine,
+    contextSources: options.contextSources ?? passThroughSources(),
+    session,
+    tools,
+    inbox,
+    inputSource: options.inputSource,
+    descriptor: {
+      ...MAIN_AGENT_DESCRIPTOR,
+      ...(options.subagent ? { kind: "subagent" as const, maxSteps: 2 } : {}),
+      ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
+      routeId: "test",
+      model: "test",
+    },
+    scope: new AgentScope("main:test", undefined, "main:test"),
+    llm: new LlmService(routes, { resolve: async () => options.credential ?? { apiKey: "fixture" } }),
+    compositionDigest: "test",
+    hostCapabilityDigest: "test",
+    host: {
+      hostKind: "desktop",
+      capabilityCeiling: [],
+      runtimeContract: "actspace.runtime.v2",
+      invocationId: "test",
+      workspaceRef: "/fixture",
+    },
+    toolEnvironment: () => ({
+      ...options.toolEnvironment,
+      resolveArtifact: options.resolveArtifact,
+      workspaceRoot: "/fixture",
+      hostCapabilities: new Set(),
+      capabilitySet: {
+        ids: [],
+        has: () => false,
+        get: () => {
+          throw new Error("not used");
+        },
+      },
+      createArtifact:
+        options.toolEnvironment?.createArtifact ??
+        (async () => {
+          throw new Error("not used");
+        }),
+    }),
+    onLiveEvent: (event) => {
+      events.push(event);
+      options.onLiveEvent?.(event);
+    },
     context: options.context,
     compaction: options.compaction,
   });
   try {
     await options.onLoop?.(loop, inbox);
-    const result = await loop.runTurn({ content: options.content ?? "Read fixture", mode: options.mode, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test", ...(options.wake ? { wake: true } : {}) });
+    const result = await loop.runTurn({
+      content: options.content ?? "Read fixture",
+      mode: options.mode,
+      thinkingEnabled: options.thinkingEnabled,
+      reasoningEffort: options.reasoningEffort,
+      agentRunId: options.agentRunId ?? "run-test",
+      ...(options.wake ? { wake: true } : {}),
+    });
     if (options.followup) await loop.runTurn({ content: "Continue without tools", mode: options.mode });
     return { result, events, journal: [...session.journal.events], header: session.header, registry };
-  } finally { options.onJournal?.([...session.journal.events]); await session.close(); await handle.dispose(100); }
+  } finally {
+    options.onJournal?.([...session.journal.events]);
+    await session.close();
+    await handle.dispose(100);
+  }
 }

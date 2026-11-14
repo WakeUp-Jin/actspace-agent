@@ -42,7 +42,8 @@ for (const [domain, members] of Object.entries(contractDomains)) {
 
 function mergeHandlers(target: HandlerTable, ...layers: (MockHandlers | void | undefined)[]): HandlerTable {
   for (const layer of layers) {
-    for (const [domain, members] of Object.entries((layer ?? {}) as HandlerTable)) target[domain] = { ...target[domain], ...members };
+    for (const [domain, members] of Object.entries((layer ?? {}) as HandlerTable))
+      target[domain] = { ...target[domain], ...members };
   }
   return target;
 }
@@ -68,9 +69,15 @@ export function createMockBridge(options: CreateMockBridgeOptions = {}): MockBri
       for (const listener of [...(listeners.get(channelOf(event)) ?? [])]) listener(payload);
     },
     schedule: (callback, delayMs) => {
-      const timer = setTimeout(() => { timers.delete(timer); callback(); }, delayMs);
+      const timer = setTimeout(() => {
+        timers.delete(timer);
+        callback();
+      }, delayMs);
       timers.add(timer);
-      return () => { clearTimeout(timer); timers.delete(timer); };
+      return () => {
+        clearTimeout(timer);
+        timers.delete(timer);
+      };
     },
   };
 
@@ -78,13 +85,19 @@ export function createMockBridge(options: CreateMockBridgeOptions = {}): MockBri
   const handlers = mergeHandlers({}, defaultHandlers(clock), scenario(clock), options.handlers);
   const handlerFor = (channel: string) => {
     const route = routes.get(channel);
-    return { route, handler: route ? handlers[route.domain]?.[route.member] as ((...args: unknown[]) => unknown) | undefined : undefined };
+    return {
+      route,
+      handler: route
+        ? (handlers[route.domain]?.[route.member] as ((...args: unknown[]) => unknown) | undefined)
+        : undefined,
+    };
   };
 
   const transport: BridgeTransport = {
     invoke: async (channel, input) => {
       const { route, handler } = handlerFor(channel);
-      if (!handler) throw new Error(`Mock bridge does not implement ${route ? `${route.domain}.${route.member}` : channel}`);
+      if (!handler)
+        throw new Error(`Mock bridge does not implement ${route ? `${route.domain}.${route.member}` : channel}`);
       return handler(input);
     },
     send: (channel, input) => {
@@ -96,7 +109,9 @@ export function createMockBridge(options: CreateMockBridgeOptions = {}): MockBri
       const set = listeners.get(channel) ?? new Set();
       set.add(listener);
       listeners.set(channel, set);
-      return () => { set.delete(listener); };
+      return () => {
+        set.delete(listener);
+      };
     },
   };
 
@@ -114,7 +129,9 @@ export function createMockBridge(options: CreateMockBridgeOptions = {}): MockBri
     bridge: built,
     db,
     emit: clock.emit,
-    override: (layer) => { mergeHandlers(handlers, layer); },
+    override: (layer) => {
+      mergeHandlers(handlers, layer);
+    },
     dispose: () => {
       for (const timer of timers) clearTimeout(timer);
       timers.clear();

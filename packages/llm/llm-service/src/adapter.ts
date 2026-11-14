@@ -61,7 +61,10 @@ export type LlmRouteRegistration = {
   readonly retryPolicy?: LlmRetryPolicy;
 };
 
-export type LlmRouteDescriptor = Pick<LlmRouteRegistration, "routeId" | "providerId" | "modelPattern" | "credentialRef" | "defaults">;
+export type LlmRouteDescriptor = Pick<
+  LlmRouteRegistration,
+  "routeId" | "providerId" | "modelPattern" | "credentialRef" | "defaults"
+>;
 
 export function matchesModel(pattern: string, model: string): boolean {
   return pattern === "*" || pattern === model || (pattern.endsWith("/*") && model.startsWith(pattern.slice(0, -1)));

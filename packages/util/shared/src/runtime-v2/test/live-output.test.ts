@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { LiveOutputBuffer, mergePieces } from "../live-output";
 
-const delta = (sessionId: string, agentRunId: string, messageId: string, message: string, kind: "assistant-delta" | "reasoning-delta" = "assistant-delta") =>
-  ({ kind, sessionId, agentRunId, messageId, message, requestId: "q", turnId: "t" });
+const delta = (
+  sessionId: string,
+  agentRunId: string,
+  messageId: string,
+  message: string,
+  kind: "assistant-delta" | "reasoning-delta" = "assistant-delta",
+) => ({ kind, sessionId, agentRunId, messageId, message, requestId: "q", turnId: "t" });
 
 describe("live output buffer", () => {
   it("accumulates text and thinking per message, merging consecutive pieces into one segment", () => {
@@ -11,16 +16,22 @@ describe("live output buffer", () => {
     expect(buffer.accept(delta("s", "r", "m1", "一想", "reasoning-delta"))).toBe(2);
     expect(buffer.accept(delta("s", "r", "m1", "你好"))).toBe(3);
     expect(buffer.accept(delta("s", "r", "m1", "，世界"))).toBe(4);
-    expect(buffer.baseline("s")).toEqual({ runId: "r", revision: 4, segments: [
-      { kind: "thinking", messageId: "m1", requestId: "q", text: "想一想" },
-      { kind: "text", messageId: "m1", requestId: "q", text: "你好，世界" },
-    ] });
+    expect(buffer.baseline("s")).toEqual({
+      runId: "r",
+      revision: 4,
+      segments: [
+        { kind: "thinking", messageId: "m1", requestId: "q", text: "想一想" },
+        { kind: "text", messageId: "m1", requestId: "q", text: "你好，世界" },
+      ],
+    });
   });
 
   it("ignores everything except non-empty text and reasoning deltas", () => {
     const buffer = new LiveOutputBuffer();
     expect(buffer.accept({ kind: "run-state", sessionId: "s", agentRunId: "r", message: "running" })).toBeNull();
-    expect(buffer.accept({ kind: "tool-call-delta", sessionId: "s", agentRunId: "r", messageId: "m", argumentsDelta: "{}" })).toBeNull();
+    expect(
+      buffer.accept({ kind: "tool-call-delta", sessionId: "s", agentRunId: "r", messageId: "m", argumentsDelta: "{}" }),
+    ).toBeNull();
     expect(buffer.accept(delta("s", "r", "m", ""))).toBeNull();
     expect(buffer.accept(null)).toBeNull();
     expect(buffer.revision).toBe(0);
@@ -32,7 +43,11 @@ describe("live output buffer", () => {
     buffer.accept(delta("s", "r", "m1", "first"));
     buffer.accept(delta("s", "r", "m2", "second"));
     buffer.settle("s", "m1");
-    expect(buffer.baseline("s")).toEqual({ runId: "r", revision: 2, segments: [{ kind: "text", messageId: "m2", requestId: "q", text: "second" }] });
+    expect(buffer.baseline("s")).toEqual({
+      runId: "r",
+      revision: 2,
+      segments: [{ kind: "text", messageId: "m2", requestId: "q", text: "second" }],
+    });
     buffer.settle("s", "m2");
     expect(buffer.baseline("s")).toEqual({ runId: "r", revision: 2, segments: [] });
   });
@@ -41,7 +56,11 @@ describe("live output buffer", () => {
     const buffer = new LiveOutputBuffer();
     buffer.accept(delta("s", "r1", "m1", "old"));
     buffer.accept(delta("s", "r2", "m2", "new"));
-    expect(buffer.baseline("s")).toEqual({ runId: "r2", revision: 2, segments: [{ kind: "text", messageId: "m2", requestId: "q", text: "new" }] });
+    expect(buffer.baseline("s")).toEqual({
+      runId: "r2",
+      revision: 2,
+      segments: [{ kind: "text", messageId: "m2", requestId: "q", text: "new" }],
+    });
     buffer.clear("s", "r1");
     expect(buffer.baseline("s").runId).toBe("r2");
     buffer.clear("s", "r2");
@@ -68,7 +87,9 @@ describe("live output buffer", () => {
     const second = buffer.page("s", "r", first.next)!;
     expect(second.chunks.map((piece) => piece.revision)).toEqual([5, 6]);
     expect(buffer.page("s", "r", second.next)!.chunks).toEqual([]);
-    expect(mergePieces([...first.chunks, ...second.chunks])).toEqual([{ kind: "text", messageId: "m", requestId: "q", text: long }]);
+    expect(mergePieces([...first.chunks, ...second.chunks])).toEqual([
+      { kind: "text", messageId: "m", requestId: "q", text: long },
+    ]);
     expect(buffer.page("s", "other-run", 0)).toBeNull();
     expect(buffer.page("missing", "r", 0)).toBeNull();
   });

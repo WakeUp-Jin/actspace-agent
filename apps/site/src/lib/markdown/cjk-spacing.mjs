@@ -40,12 +40,20 @@ export function spacedTextValue(value, previous, next) {
   if (previous?.type === "element" && previous.tagName !== "br" && out) {
     const before = plainText(previous).slice(-1);
     const first = out[0];
-    if ((isCjk.test(first) && (previous.tagName === "code" || isLatinEnd.test(before))) || (isLatinStart.test(first) && isCjk.test(before))) out = ` ${out}`;
+    if (
+      (isCjk.test(first) && (previous.tagName === "code" || isLatinEnd.test(before))) ||
+      (isLatinStart.test(first) && isCjk.test(before))
+    )
+      out = ` ${out}`;
   }
   if (next?.type === "element" && next.tagName !== "br" && out) {
     const after = plainText(next)[0] ?? "";
     const last = out.slice(-1);
-    if ((isCjk.test(last) && (next.tagName === "code" || isLatinStart.test(after))) || (isLatinEnd.test(last) && isCjk.test(after))) out = `${out} `;
+    if (
+      (isCjk.test(last) && (next.tagName === "code" || isLatinStart.test(after))) ||
+      (isLatinEnd.test(last) && isCjk.test(after))
+    )
+      out = `${out} `;
   }
   return out;
 }
@@ -58,7 +66,8 @@ export function spaceHastTree(node) {
   if (!Array.isArray(node.children)) return;
   if (node.type === "element" && SKIP_TAGS.has(node.tagName)) return;
   node.children.forEach((child, index) => {
-    if (child.type === "text") child.value = spacedTextValue(child.value, node.children[index - 1], node.children[index + 1]);
+    if (child.type === "text")
+      child.value = spacedTextValue(child.value, node.children[index - 1], node.children[index + 1]);
     else spaceHastTree(child);
   });
 }

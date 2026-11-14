@@ -1,4 +1,10 @@
-import { HARNESS_DURATION_BASE_MS, emptyHarnessHistogram, harnessHistogramIndex, type HarnessRevisionKey, type HarnessRuntimeStatLine } from "@actspace/shared";
+import {
+  HARNESS_DURATION_BASE_MS,
+  emptyHarnessHistogram,
+  harnessHistogramIndex,
+  type HarnessRevisionKey,
+  type HarnessRuntimeStatLine,
+} from "@actspace/shared";
 
 /** In-memory key limit; reaching it asks the owner to flush immediately. */
 export const HARNESS_STATS_MAX_KEYS = 20_000;
@@ -39,14 +45,28 @@ export class HarnessStatsRecorder {
     this.#maxKeys = options.maxKeys ?? HARNESS_STATS_MAX_KEYS;
     this.#onFull = options.onFull ?? (() => undefined);
   }
-  get size(): number { return this.#cells.size; }
+  get size(): number {
+    return this.#cells.size;
+  }
 
   record(sample: HarnessStatSample): void {
     const hour = Math.floor(this.#now() / HOUR_MS) * HOUR_MS;
     const key = `${hour}\u0000${sample.revision}\u0000${sample.kind}\u0000${sample.plugin}\u0000${sample.name}\u0000${sample.method}`;
     let cell = this.#cells.get(key);
     if (!cell) {
-      cell = { hour, revision: sample.revision, kind: sample.kind, plugin: sample.plugin, name: sample.name, method: sample.method, provider: sample.provider, calls: 0, errors: 0, totalMs: 0, histogram: emptyHarnessHistogram() };
+      cell = {
+        hour,
+        revision: sample.revision,
+        kind: sample.kind,
+        plugin: sample.plugin,
+        name: sample.name,
+        method: sample.method,
+        provider: sample.provider,
+        calls: 0,
+        errors: 0,
+        totalMs: 0,
+        histogram: emptyHarnessHistogram(),
+      };
       this.#cells.set(key, cell);
     }
     cell.calls++;
@@ -68,15 +88,33 @@ export class HarnessStatsRecorder {
     for (const cell of cells) {
       const key = `${cell.hour}\u0000${cell.revision}\u0000${cell.kind}\u0000${cell.plugin}\u0000${cell.name}\u0000${cell.method}`;
       const current = this.#cells.get(key);
-      if (!current) { this.#cells.set(key, cell); continue; }
+      if (!current) {
+        this.#cells.set(key, cell);
+        continue;
+      }
       current.calls += cell.calls;
       current.errors += cell.errors;
       current.totalMs += cell.totalMs;
-      for (let index = 0; index < current.histogram.length; index++) current.histogram[index] += cell.histogram[index] ?? 0;
+      for (let index = 0; index < current.histogram.length; index++)
+        current.histogram[index] += cell.histogram[index] ?? 0;
     }
   }
 }
 
 export function cellToLine(cell: HarnessStatCell): HarnessRuntimeStatLine {
-  return { v: 1, t: "runtime", hour: new Date(cell.hour).toISOString(), revision: cell.revision, kind: cell.kind, plugin: cell.plugin, name: cell.name, method: cell.method, provider: cell.provider, calls: cell.calls, errors: cell.errors, totalMs: Math.round(cell.totalMs * 1000) / 1000, histogram: cell.histogram };
+  return {
+    v: 1,
+    t: "runtime",
+    hour: new Date(cell.hour).toISOString(),
+    revision: cell.revision,
+    kind: cell.kind,
+    plugin: cell.plugin,
+    name: cell.name,
+    method: cell.method,
+    provider: cell.provider,
+    calls: cell.calls,
+    errors: cell.errors,
+    totalMs: Math.round(cell.totalMs * 1000) / 1000,
+    histogram: cell.histogram,
+  };
 }

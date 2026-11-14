@@ -29,8 +29,21 @@ afterEach(() => {
   Reflect.deleteProperty(URL, "revokeObjectURL");
 });
 
-function SessionComposer({ store, sessionId, onSend, draftRestore }: { store: SessionLocalStore; sessionId: string; onSend: () => Promise<void>; draftRestore?: ComposerDraftRestore }) {
-  const { draftKey, readDraft, writeDraft, readAttachmentDraft, writeAttachmentDraft } = useSessionDrafts(store, sessionId);
+function SessionComposer({
+  store,
+  sessionId,
+  onSend,
+  draftRestore,
+}: {
+  store: SessionLocalStore;
+  sessionId: string;
+  onSend: () => Promise<void>;
+  draftRestore?: ComposerDraftRestore;
+}) {
+  const { draftKey, readDraft, writeDraft, readAttachmentDraft, writeAttachmentDraft } = useSessionDrafts(
+    store,
+    sessionId,
+  );
   return (
     <TooltipProvider delayDuration={0}>
       <Composer
@@ -82,10 +95,15 @@ describe("Composer attachment drafts", () => {
     const onSend = vi.fn(async () => {});
     render(<SessionComposer store={store} sessionId="session-a" onSend={onSend} />);
     dropImage("photo.png");
-    expect(store.get("session-a").attachments).toEqual([expect.objectContaining({ name: "photo.png", previewUrl: "blob:photo.png" })]);
+    expect(store.get("session-a").attachments).toEqual([
+      expect.objectContaining({ name: "photo.png", previewUrl: "blob:photo.png" }),
+    ]);
 
     await userEvent.setup().click(screen.getByRole("button", { name: "发送消息" }));
-    expect(onSend).toHaveBeenCalledWith("", expect.objectContaining({ attachments: [expect.objectContaining({ name: "photo.png" })] }));
+    expect(onSend).toHaveBeenCalledWith(
+      "",
+      expect.objectContaining({ attachments: [expect.objectContaining({ name: "photo.png" })] }),
+    );
     expect(screen.queryByLabelText("已附加的图片 photo.png")).toBeNull();
     expect(store.get("session-a").attachments).toBeUndefined();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:photo.png");
@@ -107,7 +125,14 @@ describe("Composer attachment drafts", () => {
     dropImage("photo.png");
     dropImage("other.png");
     const [photo] = store.get("session-a").attachments!;
-    view.rerender(<SessionComposer store={store} sessionId="session-a" onSend={onSend} draftRestore={{ id: 1, sessionId: "session-a", text: "重试", attachments: [photo] }} />);
+    view.rerender(
+      <SessionComposer
+        store={store}
+        sessionId="session-a"
+        onSend={onSend}
+        draftRestore={{ id: 1, sessionId: "session-a", text: "重试", attachments: [photo] }}
+      />,
+    );
     expect(screen.getByLabelText("已附加的图片 photo.png")).toBeInTheDocument();
     expect(screen.queryByLabelText("已附加的图片 other.png")).toBeNull();
     expect(revokeObjectURL).toHaveBeenCalledTimes(1);
@@ -135,7 +160,12 @@ describe("Composer attachment drafts", () => {
     const store = createSessionLocalStore();
     store.update("session-a", (state) => ({
       ...state,
-      draft: { id: 1, sessionId: "session-a", text: "", attachments: [{ id: "att", kind: "image", name: "photo.png", previewUrl: "blob:photo.png" }] },
+      draft: {
+        id: 1,
+        sessionId: "session-a",
+        text: "",
+        attachments: [{ id: "att", kind: "image", name: "photo.png", previewUrl: "blob:photo.png" }],
+      },
     }));
     store.evict("session-a");
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:photo.png");
@@ -144,7 +174,12 @@ describe("Composer attachment drafts", () => {
 
 describe("ConversationView composer mount", () => {
   it("keeps the same Composer when the conversation leaves the blank state", () => {
-    const firstMessage: MessageBlock = { kind: "user", id: "user-1", content: "你好", createdAt: "2026-06-02T00:00:00.000Z" };
+    const firstMessage: MessageBlock = {
+      kind: "user",
+      id: "user-1",
+      content: "你好",
+      createdAt: "2026-06-02T00:00:00.000Z",
+    };
     const view = (messages: MessageBlock[]) => (
       <TooltipProvider delayDuration={0}>
         <RightPanelProvider>

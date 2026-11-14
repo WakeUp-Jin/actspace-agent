@@ -6,9 +6,23 @@ import { EnglishLearningCapability } from "../components/extensions/EnglishLearn
 import { SpeechSettingsSection } from "../components/settings/SpeechSettingsSection";
 import { setupBridge } from "./helpers/bridge";
 
-const initial: EnglishLearningState = { enabled: false, targetSessionId: null, revision: 0, promptStatus: "off", speechStatus: "unconfigured", queuedSegments: 0, hasApiKey: false, error: null, notice: null };
+const initial: EnglishLearningState = {
+  enabled: false,
+  targetSessionId: null,
+  revision: 0,
+  promptStatus: "off",
+  speechStatus: "unconfigured",
+  queuedSegments: 0,
+  hasApiKey: false,
+  error: null,
+  notice: null,
+};
 function bridge() {
-  const snapshot = { version: 4, revision: "one", settings: { general: {}, media: { speech: { ...DEFAULT_SPEECH_SETTINGS } } } };
+  const snapshot = {
+    version: 4,
+    revision: "one",
+    settings: { general: {}, media: { speech: { ...DEFAULT_SPEECH_SETTINGS } } },
+  };
   const api = {
     "englishLearning.getState": vi.fn(async () => initial),
     "settings.getV4": vi.fn(async () => snapshot),
@@ -18,9 +32,16 @@ function bridge() {
       { id: "child", title: "Child", updatedAt: "2026-09-07", isChildSession: true, agentRunCount: 0 },
     ]),
     "events.englishLearningStateChanged": vi.fn(() => () => {}),
-    "englishLearning.setTarget": vi.fn(async (input) => ({ ...initial, enabled: input.enabled, targetSessionId: input.enabled ? input.sessionId : null, revision: 1, promptStatus: input.enabled ? "active" : "off" })),
+    "englishLearning.setTarget": vi.fn(async (input) => ({
+      ...initial,
+      enabled: input.enabled,
+      targetSessionId: input.enabled ? input.sessionId : null,
+      revision: 1,
+      promptStatus: input.enabled ? "active" : "off",
+    })),
     "settings.updateV4": vi.fn(async () => ({ ok: true, snapshot })),
-    "providers.setKey": vi.fn(async () => ({ ok: true })), "providers.clearKey": vi.fn(async () => ({ ok: true })),
+    "providers.setKey": vi.fn(async () => ({ ok: true })),
+    "providers.clearKey": vi.fn(async () => ({ ok: true })),
   };
   setupBridge(api);
   return api;
@@ -28,7 +49,9 @@ function bridge() {
 
 describe("English learning controls", () => {
   it("chooses the latest main session, enables it, and preserves state on failure", async () => {
-    const api = bridge(); const user = userEvent.setup(); render(<EnglishLearningCapability />);
+    const api = bridge();
+    const user = userEvent.setup();
+    render(<EnglishLearningCapability />);
     const toggle = screen.getByRole("switch", { name: "开启英语辅助学习" });
     await waitFor(() => expect(toggle).toBeEnabled());
     await user.click(toggle);
@@ -45,17 +68,44 @@ describe("English learning controls", () => {
     expect(screen.getByRole("combobox", { name: "英语学习目标会话" })).toHaveTextContent("New");
   });
   it("saves speech preferences as they change and saves the key from its own editor", async () => {
-    const api = bridge(); const user = userEvent.setup(); render(<SpeechSettingsSection />);
+    const api = bridge();
+    const user = userEvent.setup();
+    render(<SpeechSettingsSection />);
     const voice = screen.getByLabelText("语音音色");
     await waitFor(() => expect(voice).toBeEnabled());
     const modelSelect = screen.getByRole("combobox", { name: "语音模型" });
     expect(modelSelect).toHaveTextContent("speech-2.8-turbo");
     await user.click(modelSelect);
-    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["speech-2.8-hd", "speech-2.8-turbo", "speech-2.6-hd", "speech-2.6-turbo", "speech-02-hd", "speech-02-turbo", "speech-01-hd", "speech-01-turbo"]);
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "speech-2.8-hd",
+      "speech-2.8-turbo",
+      "speech-2.6-hd",
+      "speech-2.6-turbo",
+      "speech-02-hd",
+      "speech-02-turbo",
+      "speech-01-hd",
+      "speech-01-turbo",
+    ]);
     await user.click(screen.getByRole("option", { name: "speech-2.8-hd" }));
-    await waitFor(() => expect(api["settings.updateV4"]).toHaveBeenCalledWith(expect.objectContaining({ namespace: "media", patch: { speech: { ...DEFAULT_SPEECH_SETTINGS, model: "speech-2.8-hd" } } })));
-    await user.clear(voice); await user.type(voice, "my-voice"); await user.tab();
-    await waitFor(() => expect(api["settings.updateV4"]).toHaveBeenLastCalledWith(expect.objectContaining({ namespace: "media", patch: { speech: { ...DEFAULT_SPEECH_SETTINGS, model: "speech-2.8-hd", voiceId: "my-voice" } } })));
+    await waitFor(() =>
+      expect(api["settings.updateV4"]).toHaveBeenCalledWith(
+        expect.objectContaining({
+          namespace: "media",
+          patch: { speech: { ...DEFAULT_SPEECH_SETTINGS, model: "speech-2.8-hd" } },
+        }),
+      ),
+    );
+    await user.clear(voice);
+    await user.type(voice, "my-voice");
+    await user.tab();
+    await waitFor(() =>
+      expect(api["settings.updateV4"]).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          namespace: "media",
+          patch: { speech: { ...DEFAULT_SPEECH_SETTINGS, model: "speech-2.8-hd", voiceId: "my-voice" } },
+        }),
+      ),
+    );
     await user.click(screen.getByRole("button", { name: "设置 MiniMax Key" }));
     await user.type(screen.getByLabelText("MiniMax 语音 API Key"), "speech-canary");
     await user.click(screen.getByRole("button", { name: "保存 Key" }));

@@ -1,5 +1,13 @@
 import { Download, Maximize, Minus, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { IconButton } from "../ui/IconButton";
 import {
@@ -14,9 +22,16 @@ const ZOOM_MAX = 5;
 const VIEWPORT_PADDING = 48;
 
 /** Fit never upscales: small diagrams open at 100%, large ones shrink to the viewport. */
-export function fitZoom(viewport: { width: number; height: number }, diagram: { width: number; height: number }): number {
+export function fitZoom(
+  viewport: { width: number; height: number },
+  diagram: { width: number; height: number },
+): number {
   if (viewport.width <= 0 || viewport.height <= 0 || diagram.width <= 0 || diagram.height <= 0) return 1;
-  const fit = Math.min(1, (viewport.width - VIEWPORT_PADDING) / diagram.width, (viewport.height - VIEWPORT_PADDING) / diagram.height);
+  const fit = Math.min(
+    1,
+    (viewport.width - VIEWPORT_PADDING) / diagram.width,
+    (viewport.height - VIEWPORT_PADDING) / diagram.height,
+  );
   return Math.max(0.05, fit);
 }
 
@@ -24,9 +39,10 @@ export function fitZoom(viewport: { width: number; height: number }, diagram: { 
 export function stepZoom(current: number, direction: 1 | -1, fit: number): number {
   const minimum = Math.min(ZOOM_STEPS[0], fit);
   const steps = [...new Set([...ZOOM_STEPS, fit])].sort((a, b) => a - b);
-  const next = direction > 0
-    ? steps.find((step) => step > current + 0.001)
-    : [...steps].reverse().find((step) => step < current - 0.001);
+  const next =
+    direction > 0
+      ? steps.find((step) => step > current + 0.001)
+      : [...steps].reverse().find((step) => step < current - 0.001);
   return Math.min(ZOOM_MAX, Math.max(minimum, next ?? current));
 }
 
@@ -37,7 +53,12 @@ type ZoomAnchor = { x: number; y: number; from: number };
  * buttons, keyboard (+ / - / 0) or Ctrl/⌘ + wheel around the cursor, and pans
  * by dragging or with the scrollbars.
  */
-export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
+export function MermaidPreviewDialog({
+  result,
+  theme,
+  onClose,
+  onDownload,
+}: {
   result: MermaidRenderResult;
   theme: MermaidThemePreset;
   onClose: () => void;
@@ -92,9 +113,20 @@ export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
 
   // Esc、Tab 循环、焦点归还由 Dialog 负责；焦点始终在对话框内，缩放快捷键挂在对话框上即可。
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "+" || event.key === "=") { event.preventDefault(); zoomTo(stepZoom(zoomRef.current, 1, fit)); return; }
-    if (event.key === "-" || event.key === "_") { event.preventDefault(); zoomTo(stepZoom(zoomRef.current, -1, fit)); return; }
-    if (event.key === "0") { event.preventDefault(); resetToFit(); }
+    if (event.key === "+" || event.key === "=") {
+      event.preventDefault();
+      zoomTo(stepZoom(zoomRef.current, 1, fit));
+      return;
+    }
+    if (event.key === "-" || event.key === "_") {
+      event.preventDefault();
+      zoomTo(stepZoom(zoomRef.current, -1, fit));
+      return;
+    }
+    if (event.key === "0") {
+      event.preventDefault();
+      resetToFit();
+    }
   };
 
   // React's wheel listener is passive; Ctrl/⌘ + wheel must preventDefault to stop page zoom.
@@ -106,7 +138,10 @@ export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
       event.preventDefault();
       const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 800 : 1;
       const rect = viewport.getBoundingClientRect();
-      zoomTo(zoomRef.current * Math.exp((-event.deltaY * unit) / 200), { x: event.clientX - rect.left, y: event.clientY - rect.top });
+      zoomTo(zoomRef.current * Math.exp((-event.deltaY * unit) / 200), {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      });
     };
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", onWheel);
@@ -115,7 +150,13 @@ export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const viewport = viewportRef.current;
     if (!viewport || event.button !== 0) return;
-    dragRef.current = { x: event.clientX, y: event.clientY, left: viewport.scrollLeft, top: viewport.scrollTop, pointerId: event.pointerId };
+    dragRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      left: viewport.scrollLeft,
+      top: viewport.scrollTop,
+      pointerId: event.pointerId,
+    };
     viewport.setPointerCapture?.(event.pointerId);
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -136,7 +177,12 @@ export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
   const height = Math.max(1, result.height * zoom);
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent
         size="full"
         backdrop="overlay"
@@ -152,18 +198,37 @@ export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
             <span className="ml-2 font-mono text-act-xs font-normal text-text-muted">{result.diagramType}</span>
           </div>
           <div className="flex items-center gap-1">
-            <IconButton size="sm" label="缩小" tooltip="缩小（-）" onClick={() => zoomTo(stepZoom(zoom, -1, fit))} disabled={zoom <= Math.min(ZOOM_STEPS[0], fit) + 0.001}>
+            <IconButton
+              size="sm"
+              label="缩小"
+              tooltip="缩小（-）"
+              onClick={() => zoomTo(stepZoom(zoom, -1, fit))}
+              disabled={zoom <= Math.min(ZOOM_STEPS[0], fit) + 0.001}
+            >
               <Minus size={15} aria-hidden="true" />
             </IconButton>
-            <span className="min-w-[46px] text-center font-mono text-act-xs tabular-nums text-text-muted" aria-live="polite">{percent}%</span>
-            <IconButton size="sm" label="放大" tooltip="放大（+）" onClick={() => zoomTo(stepZoom(zoom, 1, fit))} disabled={zoom >= ZOOM_MAX - 0.001}>
+            <span
+              className="min-w-[46px] text-center font-mono text-act-xs tabular-nums text-text-muted"
+              aria-live="polite"
+            >
+              {percent}%
+            </span>
+            <IconButton
+              size="sm"
+              label="放大"
+              tooltip="放大（+）"
+              onClick={() => zoomTo(stepZoom(zoom, 1, fit))}
+              disabled={zoom >= ZOOM_MAX - 0.001}
+            >
               <Plus size={15} aria-hidden="true" />
             </IconButton>
             <IconButton size="sm" label="适应窗口" tooltip="适应窗口（0）" onClick={resetToFit}>
               <Maximize size={15} aria-hidden="true" />
             </IconButton>
             <IconButton size="sm" label="实际大小" onClick={() => zoomTo(1)}>
-              <span aria-hidden="true" className="font-mono text-act-xxs font-semibold">1:1</span>
+              <span aria-hidden="true" className="font-mono text-act-xxs font-semibold">
+                1:1
+              </span>
             </IconButton>
             <span className="mx-1 h-4 w-px bg-line" aria-hidden="true" />
             <IconButton size="sm" label="下载 PNG" onClick={onDownload}>

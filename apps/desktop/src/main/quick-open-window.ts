@@ -1,8 +1,21 @@
 import type { BrowserWindow, Rectangle } from "electron";
 
-type QuickOpenWindow = Pick<BrowserWindow,
-  "isDestroyed" | "isMinimized" | "restore" | "isMaximized" | "unmaximize" |
-  "isFullScreen" | "setFullScreen" | "once" | "removeListener" | "getBounds" | "setBounds" | "show" | "focus">;
+type QuickOpenWindow = Pick<
+  BrowserWindow,
+  | "isDestroyed"
+  | "isMinimized"
+  | "restore"
+  | "isMaximized"
+  | "unmaximize"
+  | "isFullScreen"
+  | "setFullScreen"
+  | "once"
+  | "removeListener"
+  | "getBounds"
+  | "setBounds"
+  | "show"
+  | "focus"
+>;
 
 /** Main owns presentation; the renderer receives its existing routing intent afterwards. */
 export async function presentQuickOpenWindow(window: QuickOpenWindow, workArea: Rectangle): Promise<boolean> {

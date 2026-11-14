@@ -5,7 +5,7 @@ import type {
   ContextUsageSnapshot,
   MessageBlock,
   SessionListItem,
-  SessionRecord
+  SessionRecord,
 } from "@actspace/shared";
 
 const now = new Date().toISOString();
@@ -17,13 +17,31 @@ export const mockContextSnapshot: ContextUsageSnapshot = {
   compressionCount: 2,
   cumulativeTokens: 184_200,
   buckets: [
-    { key: "systemPrompt", name: "systemPrompt", label: "System prompt", tokens: 3200, colorToken: "--act-context-system" },
+    {
+      key: "systemPrompt",
+      name: "systemPrompt",
+      label: "System prompt",
+      tokens: 3200,
+      colorToken: "--act-context-system",
+    },
     { key: "tools", name: "tools", label: "Tools", tokens: 15_000, colorToken: "--act-context-tools" },
     { key: "rules", name: "rules", label: "Rules", tokens: 681, colorToken: "--act-context-rules" },
     { key: "skills", name: "skills", label: "Skills", tokens: 1900, colorToken: "--act-context-skills" },
-    { key: "summarizedConversation", name: "summarizedConversation", label: "Summarized conversation", tokens: 4200, colorToken: "--act-context-summarized" },
-    { key: "conversation", name: "conversation", label: "Conversation", tokens: 46_800, colorToken: "--act-context-conversation" }
-  ]
+    {
+      key: "summarizedConversation",
+      name: "summarizedConversation",
+      label: "Summarized conversation",
+      tokens: 4200,
+      colorToken: "--act-context-summarized",
+    },
+    {
+      key: "conversation",
+      name: "conversation",
+      label: "Conversation",
+      tokens: 46_800,
+      colorToken: "--act-context-conversation",
+    },
+  ],
 };
 
 export const mockContextState: ContextState = {
@@ -43,7 +61,8 @@ export const mockContextState: ContextState = {
       estimatedTokens: 3200,
       included: true,
       pinned: true,
-      preview: "You are actspace, an agent-first coding assistant. Follow AGENTS.md navigation and repo collaboration rules…",
+      preview:
+        "You are actspace, an agent-first coding assistant. Follow AGENTS.md navigation and repo collaboration rules…",
     },
     {
       id: "ctx-tools-1",
@@ -80,7 +99,10 @@ export const mockContextState: ContextState = {
     ...Array.from({ length: 28 }, (_, index) => ({
       id: `ctx-conv-${index + 1}`,
       kind: "conversation" as const,
-      title: index % 2 === 0 ? `User · 第 ${Math.floor(index / 2) + 1} 轮` : `Assistant · 第 ${Math.floor(index / 2) + 1} 轮`,
+      title:
+        index % 2 === 0
+          ? `User · 第 ${Math.floor(index / 2) + 1} 轮`
+          : `Assistant · 第 ${Math.floor(index / 2) + 1} 轮`,
       estimatedTokens: 900 + index * 110,
       included: true,
       preview:
@@ -109,7 +131,7 @@ export const mockSessions: SessionListItem[] = [
     updatedAt: now,
     agentRunCount: 4,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY,
-    pinned: true
+    pinned: true,
   },
   {
     id: "session-bash-pipeline",
@@ -117,99 +139,99 @@ export const mockSessions: SessionListItem[] = [
     updatedAt: hoursAgo(2),
     agentRunCount: 8,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY,
-    pinned: true
+    pinned: true,
   },
   {
     id: "session-tool-naming",
     title: "工具定义格式和命名规范",
     updatedAt: daysAgo(3),
     agentRunCount: 3,
-    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
   },
   {
     id: "session-tool-addition-doc",
     title: "Tool addition and documentation",
     updatedAt: daysAgo(1),
     agentRunCount: 5,
-    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
   },
   {
     id: "session-context-lookup",
     title: "Conversation context lookup",
     updatedAt: daysAgo(1),
     agentRunCount: 2,
-    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
   },
   {
     id: "session-key-sandtrigger",
     title: "Enter key sand trigger behavior",
     updatedAt: daysAgo(2),
     agentRunCount: 2,
-    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
   },
   {
     id: "session-stats-prototype",
     title: "统计页面设计",
     updatedAt: daysAgo(2),
     agentRunCount: 4,
-    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
   },
   {
     id: "session-search-tool",
     title: "Search tool parameter handling",
     updatedAt: daysAgo(4),
     agentRunCount: 1,
-    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
   },
   {
     id: "session-agent-tool-bugs",
     title: "Agent tool bugs and fixes",
     updatedAt: daysAgo(5),
     agentRunCount: 6,
-    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
   },
   {
     id: "session-frontend-llm-init",
     title: "Front-end LLM initialization",
     updatedAt: daysAgo(6),
     agentRunCount: 3,
-    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
   },
   {
     id: "session-harness-readme",
     title: "README file improvement",
     updatedAt: hoursAgo(5),
     agentRunCount: 3,
-    workspaceRoot: MOCK_WORKSPACE_HARNESS
+    workspaceRoot: MOCK_WORKSPACE_HARNESS,
   },
   {
     id: "session-harness-skill",
     title: "Skill usage and installation",
     updatedAt: hoursAgo(8),
     agentRunCount: 7,
-    workspaceRoot: MOCK_WORKSPACE_HARNESS
+    workspaceRoot: MOCK_WORKSPACE_HARNESS,
   },
   {
     id: "session-harness-review",
     title: "Project review and documentation",
     updatedAt: daysAgo(2),
     agentRunCount: 2,
-    workspaceRoot: MOCK_WORKSPACE_HARNESS
+    workspaceRoot: MOCK_WORKSPACE_HARNESS,
   },
   {
     id: "session-auth-refactor",
     title: "Authentication flow refactor",
     updatedAt: daysAgo(1),
     agentRunCount: 2,
-    workspaceRoot: MOCK_WORKSPACE_HARNESS
+    workspaceRoot: MOCK_WORKSPACE_HARNESS,
   },
   {
     id: "session-ci-design",
     title: "CI/CD pipeline design",
     updatedAt: daysAgo(2),
     agentRunCount: 1,
-    workspaceRoot: MOCK_WORKSPACE_HARNESS
-  }
+    workspaceRoot: MOCK_WORKSPACE_HARNESS,
+  },
 ];
 
 export const mockArchivedSessions: SessionListItem[] = [
@@ -219,7 +241,7 @@ export const mockArchivedSessions: SessionListItem[] = [
     updatedAt: daysAgo(9),
     agentRunCount: 3,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY,
-    archived: true
+    archived: true,
   },
   {
     id: "session-archived-old-review",
@@ -227,8 +249,8 @@ export const mockArchivedSessions: SessionListItem[] = [
     updatedAt: daysAgo(18),
     agentRunCount: 6,
     workspaceRoot: MOCK_WORKSPACE_HARNESS,
-    archived: true
-  }
+    archived: true,
+  },
 ];
 
 export const mockMessages: MessageBlock[] = [
@@ -237,7 +259,7 @@ export const mockMessages: MessageBlock[] = [
     id: "mock-user-1",
     content:
       "I want to add a templates folder and organize the learning docs by templates. Update the docs structure and create a plan. Then modify AGENTS.md to reflect this change.",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "assistant",
@@ -246,7 +268,7 @@ export const mockMessages: MessageBlock[] = [
       "Sure. I will review the current docs structure, design the templates-based organization, create an implementation plan, and update AGENTS.md accordingly.",
     createdAt: now,
     model: "actspace-4.1",
-    provider: "deepseek"
+    provider: "deepseek",
   },
   {
     kind: "thinking",
@@ -255,7 +277,7 @@ export const mockMessages: MessageBlock[] = [
     content:
       "Goal: Introduce templates for reusable learning document templates and update navigation.\nApproach: Inspect current docs, propose new structure, write plan, update AGENTS.md.\nKey files: docs/** structure, README.md, LEARNINGS_GUIDE.md, AGENTS.md.",
     createdAt: now,
-    collapsedByDefault: true
+    collapsedByDefault: true,
   },
   {
     kind: "read",
@@ -263,7 +285,7 @@ export const mockMessages: MessageBlock[] = [
     filePath: "AGENTS.md",
     range: "L1-62",
     displayText: "Read AGENTS.md L1-62",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "read",
@@ -271,7 +293,7 @@ export const mockMessages: MessageBlock[] = [
     filePath: "docs/README.md",
     range: "L1-80",
     displayText: "Read docs/README.md L1-80",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "grep",
@@ -282,7 +304,7 @@ export const mockMessages: MessageBlock[] = [
     displayText:
       "Grep react|React|useState|useEffect|useCallback|useMemo|useRef|createContext|useContext|useReducer|useLayoutEffect|useImperativeHandle|useDebugValue|useTransition|useDeferredValue|createElement|jsx|JSX in /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/packages",
     resultCount: 4,
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "glob",
@@ -291,7 +313,7 @@ export const mockMessages: MessageBlock[] = [
     scope: "packages/agent-core",
     displayText: "Glob src/**/*.ts in packages/agent-core",
     resultCount: 12,
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "edit_diff",
@@ -300,9 +322,8 @@ export const mockMessages: MessageBlock[] = [
     additions: 12,
     deletions: 4,
     collapsedLines: 5,
-    diff:
-      "@@ -42,7 +42,13 @@\n- ## Docs structure\n- - docs/learning/* - individual learning notes\n+ ## Docs structure\n+ - docs/templates/ - reusable learning doc templates\n+ - docs/learnings/ - finalized learning notes\n+ - docs/exec-plans/ - execution plans and active work\n+\n+ ## Agent route\n+ - Read AGENTS.md before changing repository conventions\n+ - Keep durable learning criteria beside the learning docs README",
-    createdAt: now
+    diff: "@@ -42,7 +42,13 @@\n- ## Docs structure\n- - docs/learning/* - individual learning notes\n+ ## Docs structure\n+ - docs/templates/ - reusable learning doc templates\n+ - docs/learnings/ - finalized learning notes\n+ - docs/exec-plans/ - execution plans and active work\n+\n+ ## Agent route\n+ - Read AGENTS.md before changing repository conventions\n+ - Keep durable learning criteria beside the learning docs README",
+    createdAt: now,
   },
   {
     kind: "assistant",
@@ -311,14 +332,14 @@ export const mockMessages: MessageBlock[] = [
       "All set. I added the templates folder, updated the docs structure in AGENTS.md, and prepared the migration plan.",
     createdAt: now,
     model: "actspace-4.1",
-    provider: "deepseek"
+    provider: "deepseek",
   },
   {
     kind: "user",
     id: "mock-user-2",
     content:
       "I do not think we need a templates folder yet. Keep the route in AGENTS.md, and put the actual learning documentation guidance in one README instead.",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "assistant",
@@ -327,7 +348,7 @@ export const mockMessages: MessageBlock[] = [
       "That is cleaner for the current stage. I will simplify the plan so AGENTS.md only points to the learning documentation entry, while the README owns the judgment criteria and writing flow.",
     createdAt: now,
     model: "actspace-4.1",
-    provider: "deepseek"
+    provider: "deepseek",
   },
   {
     kind: "context_compaction",
@@ -339,14 +360,14 @@ export const mockMessages: MessageBlock[] = [
     trigger: "manual",
     beforeTokens: 182_400,
     afterTokens: 9_100,
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "context_compaction",
     id: "mock-compact-running",
     status: "running",
     startedAt: now,
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "thinking",
@@ -355,7 +376,7 @@ export const mockMessages: MessageBlock[] = [
     content:
       "Revise the proposed docs flow: avoid template churn, keep a single documented entry point, and make the trigger criteria explicit enough for agents to use.",
     createdAt: now,
-    collapsedByDefault: true
+    collapsedByDefault: true,
   },
   {
     kind: "edit_diff",
@@ -364,9 +385,8 @@ export const mockMessages: MessageBlock[] = [
     additions: 18,
     deletions: 6,
     collapsedLines: 5,
-    diff:
-      "@@ -1,6 +1,14 @@\n+ # Learning docs\n+ Use this folder for durable, transferable lessons from completed work.\n- Templates live in docs/templates.\n+ Keep the format lightweight; agents can choose structure based on the lesson.\n+\n+ ## When to write\n+ - Capture concepts that are transferable or surprisingly easy to get wrong.\n+ - Prefer one clear note over many thin templates.",
-    createdAt: now
+    diff: "@@ -1,6 +1,14 @@\n+ # Learning docs\n+ Use this folder for durable, transferable lessons from completed work.\n- Templates live in docs/templates.\n+ Keep the format lightweight; agents can choose structure based on the lesson.\n+\n+ ## When to write\n+ - Capture concepts that are transferable or surprisingly easy to get wrong.\n+ - Prefer one clear note over many thin templates.",
+    createdAt: now,
   },
   {
     kind: "read",
@@ -374,7 +394,7 @@ export const mockMessages: MessageBlock[] = [
     filePath: "AGENTS.md",
     range: "L1-69",
     displayText: "Read AGENTS.md L1-69",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "read",
@@ -382,21 +402,21 @@ export const mockMessages: MessageBlock[] = [
     filePath: "docs/learnings/README.md",
     range: "L1-44",
     displayText: "Read docs/learnings/README.md L1-44",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "tool",
     id: "mock-tool-1",
     title: "Updated plan",
     content: "Removed the template folder from scope and kept learning docs as a lightweight README-driven workflow.",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "tool",
     id: "mock-tool-2",
     title: "Checked docs",
     content: "Confirmed the route stays in AGENTS.md while the detailed criteria live beside the learning docs.",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "bash",
@@ -413,7 +433,7 @@ export const mockMessages: MessageBlock[] = [
     stderr: "",
     exitCode: 0,
     durationMs: 1284,
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "bash",
@@ -421,12 +441,12 @@ export const mockMessages: MessageBlock[] = [
     status: "pending",
     title: "Test shell with permissions echo",
     commandPreview: "echo",
-    command: "echo \"测试需要额外权限的命令\"",
+    command: 'echo "测试需要额外权限的命令"',
     cwd: "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent",
     intent: "在终端打印一条提示，用于验证审核流程",
-    reason: "Not in allowlist: echo \"测试需要额外权限的命令\"",
+    reason: 'Not in allowlist: echo "测试需要额外权限的命令"',
     policyLabel: "Allowlist (with Sandbox)",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "bash",
@@ -437,7 +457,7 @@ export const mockMessages: MessageBlock[] = [
     command: "pnpm build",
     cwd: "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent",
     stdout: "Building shared...\nBuilding agent-core...",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "bash",
@@ -450,7 +470,7 @@ export const mockMessages: MessageBlock[] = [
     stderr: "src/env.ts(229,10): error TS2352: Conversion may be a mistake.",
     exitCode: 2,
     durationMs: 842,
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "bash",
@@ -460,7 +480,7 @@ export const mockMessages: MessageBlock[] = [
     commandPreview: "rm",
     command: "rm -rf /",
     reason: "Command contains dangerous delete operation",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "bash",
@@ -470,7 +490,7 @@ export const mockMessages: MessageBlock[] = [
     commandPreview: "pnpm",
     command: "pnpm install",
     reason: "Approval expired before the command was allowed.",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "bash",
@@ -480,7 +500,7 @@ export const mockMessages: MessageBlock[] = [
     commandPreview: "pnpm",
     command: "pnpm run seed",
     reason: "User skipped this command.",
-    createdAt: now
+    createdAt: now,
   },
   {
     kind: "assistant",
@@ -489,8 +509,8 @@ export const mockMessages: MessageBlock[] = [
       "Updated the plan. The learning docs now stay lightweight, with AGENTS.md acting as the route and the README carrying the actual writing guidance.",
     createdAt: now,
     model: "actspace-4.1",
-    provider: "deepseek"
-  }
+    provider: "deepseek",
+  },
 ];
 
 export const mockBootstrapState: BootstrapState = {
@@ -499,7 +519,7 @@ export const mockBootstrapState: BootstrapState = {
   sessionRoot: "Mock data root/sessions",
   logRoot: "Mock data root/logs",
   tmpRoot: "Mock data root/tmp",
-  workspaceRoot: "Mock workspace root"
+  workspaceRoot: "Mock workspace root",
 };
 
 export const mockSessionRecord: SessionRecord = {
@@ -511,12 +531,12 @@ export const mockSessionRecord: SessionRecord = {
     updatedAt: now,
     agentRunCount: 4,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY,
-    pinned: true
+    pinned: true,
   },
   events: [],
   messageBlocks: mockMessages,
   contextSnapshot: mockContextSnapshot,
-  contextState: mockContextState
+  contextState: mockContextState,
 };
 
 export const mockTurnResult: AgentRunResult = {
@@ -524,5 +544,5 @@ export const mockTurnResult: AgentRunResult = {
   agentRunId: "mock-turn-1",
   events: [],
   contextSnapshot: mockContextSnapshot,
-  status: "completed"
+  status: "completed",
 };

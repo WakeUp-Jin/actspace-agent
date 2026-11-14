@@ -35,7 +35,13 @@ export type ContextPanelView = {
   history?: ContextPanelHistory;
   /** Live disclosure only; absence means an older backend. */
   disclosure?: ContextDisclosureSummary;
-  entriesPage?: { revision?: string; total: number; nextCursor?: string; truncated: boolean; bucketCounts?: Partial<Record<ContextPanelBucketKey, number>> };
+  entriesPage?: {
+    revision?: string;
+    total: number;
+    nextCursor?: string;
+    truncated: boolean;
+    bucketCounts?: Partial<Record<ContextPanelBucketKey, number>>;
+  };
   limits?: { trend: ContextPanelTruncation; events: ContextPanelTruncation };
   /** 对比基准：最近已持久化的请求输入；还没发过请求时为 null。 */
   previous: ContextPanelManifest | null;
@@ -93,7 +99,8 @@ export type ContextPanelManifest = {
   sentAt: string;
   totalEstimatedTokens: number;
   buckets: ContextPanelBucketTokens;
-  entries: (Pick<ContextPanelEntry, "key" | "bucket" | "estimatedTokens"> & Partial<Pick<ContextPanelEntry, "title" | "kind" | "trajectoryRef">>)[];
+  entries: (Pick<ContextPanelEntry, "key" | "bucket" | "estimatedTokens"> &
+    Partial<Pick<ContextPanelEntry, "title" | "kind" | "trajectoryRef">>)[];
 };
 
 export type ContextPanelUsage = {
@@ -160,7 +167,16 @@ export type ContextPanelTrendPoint = {
  * 上下文事件（规范 §2 第 6 块）。补充上下文按来源分成文件、运行、子 Agent、后台，其他补充是 `inject`。
  * 同一轮同一来源连续更新合成一行：`count` 是合并的次数，`stepIndex` 为 null，`tokenDelta` 是增减之和。
  */
-export type ContextPanelEventKind = "files" | "runtime" | "subagents" | "background" | "inject" | "compact" | "tools-changed" | "model-switch" | "mode-switch";
+export type ContextPanelEventKind =
+  | "files"
+  | "runtime"
+  | "subagents"
+  | "background"
+  | "inject"
+  | "compact"
+  | "tools-changed"
+  | "model-switch"
+  | "mode-switch";
 export type ContextPanelEvent = {
   /** 由相邻请求推导（工具、模型）。 */
   inferred?: boolean;
@@ -180,17 +196,51 @@ export type ContextPanelEvent = {
   at: string;
 };
 
-export type ContextPanelHistory = { status: "ready" | "syncing" | "rebuilding" | "fallback" | "unavailable"; indexedThroughSeq: number; targetThroughSeq: number; indexGeneration: string; error?: string };
-export type ContextPanelTruncation = { truncated: boolean; returnedCount: number; total: number; fromSeq: number | null; throughSeq: number | null };
-export type ContextPanelResponse = ContextPanelView | { notModified: true; versionToken: string; history: ContextPanelHistory };
-export type ContextEntriesInput = { sessionId: string; revision: string; cursor?: string; bucket?: ContextPanelBucketKey; limit?: number };
+export type ContextPanelHistory = {
+  status: "ready" | "syncing" | "rebuilding" | "fallback" | "unavailable";
+  indexedThroughSeq: number;
+  targetThroughSeq: number;
+  indexGeneration: string;
+  error?: string;
+};
+export type ContextPanelTruncation = {
+  truncated: boolean;
+  returnedCount: number;
+  total: number;
+  fromSeq: number | null;
+  throughSeq: number | null;
+};
+export type ContextPanelResponse =
+  | ContextPanelView
+  | { notModified: true; versionToken: string; history: ContextPanelHistory };
+export type ContextEntriesInput = {
+  sessionId: string;
+  revision: string;
+  cursor?: string;
+  bucket?: ContextPanelBucketKey;
+  limit?: number;
+};
 /** `bucketCounts`：每类条目总数（含未读到的页），分类行的「N 项」用它。 */
-export type ContextEntriesPage = { revision: string; entries: ContextPanelEntry[]; previous: ContextPanelManifest["entries"]; total: number; nextCursor?: string; bucketCounts?: Partial<Record<ContextPanelBucketKey, number>> };
+export type ContextEntriesPage = {
+  revision: string;
+  entries: ContextPanelEntry[];
+  previous: ContextPanelManifest["entries"];
+  total: number;
+  nextCursor?: string;
+  bucketCounts?: Partial<Record<ContextPanelBucketKey, number>>;
+};
 export type ContextEntryInput = { sessionId: string; revision: string; key: string; offset?: number };
 export type ContextEntryText = { revision: string; key: string; text: string; nextOffset?: number };
 /** Persisted request metadata. Contains identities/estimates, never body text. */
-export type ContextContentManifest = { schemaVersion: 1; estimatorVersion: string; comparable: boolean; comparisonUnavailableReason?: string; totalEstimatedTokens: number; buckets: ContextPanelBucketTokens; entries: ContextPanelEntry[] };
-
+export type ContextContentManifest = {
+  schemaVersion: 1;
+  estimatorVersion: string;
+  comparable: boolean;
+  comparisonUnavailableReason?: string;
+  totalEstimatedTokens: number;
+  buckets: ContextPanelBucketTokens;
+  entries: ContextPanelEntry[];
+};
 
 export const CONTEXT_ACTIVE_PATH_LIMIT = 100;
 
@@ -211,14 +261,21 @@ export type ContextPathEntry = {
 };
 
 /** 路径排序与下次活跃集合只需要的字段；引擎状态和面板条目都满足。 */
-export type ContextPathRank = { readonly id: string; readonly readsInCycle: number; readonly addedCycle: number; readonly lastReadAt?: string };
+export type ContextPathRank = {
+  readonly id: string;
+  readonly readsInCycle: number;
+  readonly addedCycle: number;
+  readonly lastReadAt?: string;
+};
 
 /** 活跃路径的优先级：本周期读得多、最近读过、加入得晚的在前。 */
 export function compareContextPaths(a: ContextPathRank, b: ContextPathRank): number {
-  return b.readsInCycle - a.readsInCycle
-    || (b.lastReadAt ?? "").localeCompare(a.lastReadAt ?? "")
-    || b.addedCycle - a.addedCycle
-    || a.id.localeCompare(b.id);
+  return (
+    b.readsInCycle - a.readsInCycle ||
+    (b.lastReadAt ?? "").localeCompare(a.lastReadAt ?? "") ||
+    b.addedCycle - a.addedCycle ||
+    a.id.localeCompare(b.id)
+  );
 }
 
 /**
@@ -226,10 +283,33 @@ export function compareContextPaths(a: ContextPathRank, b: ContextPathRank): num
  * 引擎 disclosure 的 `selectActive` 和面板的 `nextCompaction` 预判都调用这里，规则只有这一份。
  */
 export function selectNextActivePathIds(paths: readonly ContextPathRank[], cycle: number): string[] {
-  return paths.filter(path => path.readsInCycle > 0 || path.addedCycle === cycle).sort(compareContextPaths).slice(0, CONTEXT_ACTIVE_PATH_LIMIT).map(path => path.id);
+  return paths
+    .filter((path) => path.readsInCycle > 0 || path.addedCycle === cycle)
+    .sort(compareContextPaths)
+    .slice(0, CONTEXT_ACTIVE_PATH_LIMIT)
+    .map((path) => path.id);
 }
 export type ContextDisclosureSummary =
   | { status: "unavailable" }
-  | { status: "ready"; revision: string; cycle: number; activeLimit: number; activeCount: number; sleepingCount: number };
-export type ContextPathsInput = { sessionId: string; revision: string; visibility: "active" | "sleeping"; cursor?: string; limit?: number };
-export type ContextPathsPage = { revision: string; visibility: "active" | "sleeping"; total: number; paths: ContextPathEntry[]; nextCursor?: string };
+  | {
+      status: "ready";
+      revision: string;
+      cycle: number;
+      activeLimit: number;
+      activeCount: number;
+      sleepingCount: number;
+    };
+export type ContextPathsInput = {
+  sessionId: string;
+  revision: string;
+  visibility: "active" | "sleeping";
+  cursor?: string;
+  limit?: number;
+};
+export type ContextPathsPage = {
+  revision: string;
+  visibility: "active" | "sleeping";
+  total: number;
+  paths: ContextPathEntry[];
+  nextCursor?: string;
+};

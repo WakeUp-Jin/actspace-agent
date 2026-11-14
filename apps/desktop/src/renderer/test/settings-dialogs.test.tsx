@@ -9,18 +9,35 @@ import { ProviderKeyModal } from "../components/settings/dialogs/ProviderKeyModa
 import { setupBridge } from "./helpers/bridge";
 
 // Radix 在 setTimeout(0) 里还焦点。
-const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+const settle = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 const overlay = () => document.querySelector<HTMLElement>("[data-state=open].fixed")!;
 
 function Opener({ label, children }: { label: string; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false);
-  return <><button type="button" onClick={() => setOpen(true)}>{label}</button>{open ? children(() => setOpen(false)) : null}</>;
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        {label}
+      </button>
+      {open ? children(() => setOpen(false)) : null}
+    </>
+  );
 }
 
 function localUpdateState(phase: LocalUpdateState["progress"]["phase"]): LocalUpdateState {
   return {
-    sourceRoot: "/repo", sourceValid: true, appExecutablePath: "/A.app/Contents/MacOS/A", appIsPackaged: true, appPath: "/A.app",
-    installParent: "/", canUpdate: true, logPath: "/tmp/update.log", running: phase === "building",
+    sourceRoot: "/repo",
+    sourceValid: true,
+    appExecutablePath: "/A.app/Contents/MacOS/A",
+    appIsPackaged: true,
+    appPath: "/A.app",
+    installParent: "/",
+    canUpdate: true,
+    logPath: "/tmp/update.log",
+    running: phase === "building",
     progress: { phase, message: phase === "building" ? "正在构建" : "构建失败" },
   };
 }
@@ -28,7 +45,14 @@ function localUpdateState(phase: LocalUpdateState["progress"]["phase"]): LocalUp
 describe("ImageGenerationSettingsDialog", () => {
   it("keeps Tab inside, ignores outside clicks and Escape while saving, and returns focus", async () => {
     let finish!: () => void;
-    setupBridge({ "settings.updateImageGeneration": vi.fn(() => new Promise<{ ok: true }>((resolve) => { finish = () => resolve({ ok: true }); })) });
+    setupBridge({
+      "settings.updateImageGeneration": vi.fn(
+        () =>
+          new Promise<{ ok: true }>((resolve) => {
+            finish = () => resolve({ ok: true });
+          }),
+      ),
+    });
     const user = userEvent.setup();
     const onClose = vi.fn();
     render(
@@ -36,7 +60,10 @@ describe("ImageGenerationSettingsDialog", () => {
         {(close) => (
           <ImageGenerationSettingsDialog
             current={{ hasApiKey: false, baseUrl: "https://example.com/v1", model: "image-1" }}
-            onClose={() => { onClose(); close(); }}
+            onClose={() => {
+              onClose();
+              close();
+            }}
             onClear={async () => undefined}
             onRefresh={async () => undefined}
           />
@@ -57,7 +84,9 @@ describe("ImageGenerationSettingsDialog", () => {
     expect(screen.getByRole("button", { name: "保存中…" })).toBeDisabled();
     await user.keyboard("{Escape}");
     expect(onClose).not.toHaveBeenCalled();
-    await act(async () => { finish(); });
+    await act(async () => {
+      finish();
+    });
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     await settle();
     expect(screen.getByRole("button", { name: "配置" })).toHaveFocus();
@@ -106,7 +135,11 @@ describe("LocalUpdateProgressDialog", () => {
 
   it("closes on Escape or an outside click once finished, returning focus to the opener", async () => {
     const user = userEvent.setup();
-    render(<Opener label="查看进度">{(close) => <LocalUpdateProgressDialog state={localUpdateState("failed")} onClose={close} />}</Opener>);
+    render(
+      <Opener label="查看进度">
+        {(close) => <LocalUpdateProgressDialog state={localUpdateState("failed")} onClose={close} />}
+      </Opener>,
+    );
     await user.click(screen.getByRole("button", { name: "查看进度" }));
     const dialog = screen.getByRole("dialog", { name: "本地更新进度" });
     await user.tab();
@@ -128,7 +161,9 @@ describe("ProviderKeyModal", () => {
   it("keeps its h3 title, traps Tab, closes on Escape or an outside click and returns focus", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn(async () => ({ ok: true as const }));
-    render(<Opener label="连接">{(close) => <ProviderKeyModal provider="tavily" onClose={close} onSave={onSave} />}</Opener>);
+    render(
+      <Opener label="连接">{(close) => <ProviderKeyModal provider="tavily" onClose={close} onSave={onSave} />}</Opener>,
+    );
     await user.click(screen.getByRole("button", { name: "连接" }));
     const dialog = screen.getByRole("dialog", { name: "连接 Tavily" });
     expect(screen.getByRole("heading", { name: "连接 Tavily", level: 3 })).toBeInTheDocument();

@@ -23,7 +23,13 @@ describe("groupMessagesIntoTurns", () => {
     const turns = groupMessagesIntoTurns([
       msg("user", "u1"),
       msg("assistant", "a1"),
-      msg("background_notice", "n1", { renderKey: "n1-key", taskId: "bash_1", taskKind: "bash", title: "pnpm test", status: "completed" }),
+      msg("background_notice", "n1", {
+        renderKey: "n1-key",
+        taskId: "bash_1",
+        taskKind: "bash",
+        title: "pnpm test",
+        status: "completed",
+      }),
       msg("bash", "b1"),
       msg("assistant", "a2"),
     ]);
@@ -101,7 +107,11 @@ describe("splitTurnMessages", () => {
   });
 
   it("takes run failures out of the process so a partial reply before them stays the final reply", () => {
-    const { workItems, finalReply, failures } = splitTurnMessages([msg("tool", "t"), msg("assistant", "partial"), msg("error", "failed")]);
+    const { workItems, finalReply, failures } = splitTurnMessages([
+      msg("tool", "t"),
+      msg("assistant", "partial"),
+      msg("error", "failed"),
+    ]);
     expect(ids(workItems)).toEqual(["t"]);
     expect(ids(finalReply)).toEqual(["partial"]);
     expect(ids(failures)).toEqual(["failed"]);
@@ -118,7 +128,15 @@ describe("hasToolLikeItem", () => {
     for (const kind of ["thinking", "bash", "read", "agent", "edit_diff", "write_diff"] as const) {
       expect(hasToolLikeItem([msg(kind, kind)])).toBe(true);
     }
-    expect(hasToolLikeItem([msg("assistant", "a"), msg("todo", "todo"), msg("status", "s"), msg("error", "e"), msg("user", "u")])).toBe(false);
+    expect(
+      hasToolLikeItem([
+        msg("assistant", "a"),
+        msg("todo", "todo"),
+        msg("status", "s"),
+        msg("error", "e"),
+        msg("user", "u"),
+      ]),
+    ).toBe(false);
   });
 });
 
@@ -158,19 +176,23 @@ describe("workDurationMs", () => {
 
 describe("getLatestTodoMessage", () => {
   it("returns the last todo list in the turn", () => {
-    expect(getLatestTodoMessage([msg("todo", "old"), msg("tool", "t"), msg("todo", "new"), msg("assistant", "a")])?.id).toBe("new");
+    expect(
+      getLatestTodoMessage([msg("todo", "old"), msg("tool", "t"), msg("todo", "new"), msg("assistant", "a")])?.id,
+    ).toBe("new");
     expect(getLatestTodoMessage([msg("assistant", "a")])).toBeUndefined();
   });
 });
 
 describe("userInputHistory", () => {
   it("keeps non-empty user inputs in order", () => {
-    expect(userInputHistory([
-      msg("user", "u1", { content: "first" }),
-      msg("assistant", "a", { content: "reply" }),
-      msg("user", "u2", { content: "" }),
-      msg("user", "u3", { content: "second" }),
-    ])).toEqual(["first", "second"]);
+    expect(
+      userInputHistory([
+        msg("user", "u1", { content: "first" }),
+        msg("assistant", "a", { content: "reply" }),
+        msg("user", "u2", { content: "" }),
+        msg("user", "u3", { content: "second" }),
+      ]),
+    ).toEqual(["first", "second"]);
   });
 });
 
@@ -194,7 +216,14 @@ describe("pickActiveTurnId", () => {
 describe("isSafeWorkspaceRelativePath", () => {
   it("accepts plain relative paths and rejects absolute, drive-letter and parent paths", async () => {
     const { isSafeWorkspaceRelativePath } = await import("../components/conversation/use-workspace-file-links");
-    expect(["src/a.ts", "a.ts", "dir\\file.ts", "..hidden/x"].map(isSafeWorkspaceRelativePath)).toEqual([true, true, true, true]);
-    expect(["", ".", "/etc/passwd", "C:\\x", "c:/x", "../x", "a/../../x", "a\\..\\x"].map(isSafeWorkspaceRelativePath)).toEqual(Array(8).fill(false));
+    expect(["src/a.ts", "a.ts", "dir\\file.ts", "..hidden/x"].map(isSafeWorkspaceRelativePath)).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(
+      ["", ".", "/etc/passwd", "C:\\x", "c:/x", "../x", "a/../../x", "a\\..\\x"].map(isSafeWorkspaceRelativePath),
+    ).toEqual(Array(8).fill(false));
   });
 });

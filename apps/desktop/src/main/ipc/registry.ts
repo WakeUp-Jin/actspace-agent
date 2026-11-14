@@ -6,7 +6,10 @@ import { assertTrustedSender, isTrustedSender } from "./trusted-sender";
 /** guard 拒绝时抛出；消息里带 channel，方便在 renderer 的报错里定位。 */
 export class IpcInputError extends Error {
   override readonly name = "IpcInputError";
-  constructor(readonly channel: string, reason: string) {
+  constructor(
+    readonly channel: string,
+    reason: string,
+  ) {
     super(`${reason} (${channel})`);
   }
 }

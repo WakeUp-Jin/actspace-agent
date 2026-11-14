@@ -12,9 +12,15 @@ type GuardedContents = {
 type GuardedWindow = { readonly webContents: GuardedContents };
 
 type WebviewSource = {
-  on(event: "web-contents-created", listener: (event: unknown, contents: {
-    on(event: "will-attach-webview", listener: (event: { preventDefault(): void }) => void): unknown;
-  }) => void): unknown;
+  on(
+    event: "web-contents-created",
+    listener: (
+      event: unknown,
+      contents: {
+        on(event: "will-attach-webview", listener: (event: { preventDefault(): void }) => void): unknown;
+      },
+    ) => void,
+  ): unknown;
 };
 
 export function createMainWindowOptions(input: { preload: string; title: string }): BrowserWindowConstructorOptions {
@@ -62,7 +68,10 @@ export function attachNavigationGuards(
   openExternal: OpenExternal = openExternalSafely,
 ): void {
   // 系统打不开（例如没有关联程序）时只是没反应，不让 rejection 冒到全局。
-  const openQuietly = (url: string) => void Promise.resolve().then(() => openExternal(url)).catch(() => undefined);
+  const openQuietly = (url: string) =>
+    void Promise.resolve()
+      .then(() => openExternal(url))
+      .catch(() => undefined);
   win.webContents.setWindowOpenHandler(({ url }) => {
     openQuietly(url);
     return { action: "deny" };

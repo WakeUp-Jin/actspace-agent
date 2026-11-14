@@ -3,13 +3,16 @@ import type { ToolUiPreview } from "@actspace/shared";
 import type { StreamingSegment, StreamingState } from "./run-state.js";
 
 export function hasFinishedAllActiveTools(state: StreamingState): boolean {
-  return state.activeTools.size > 0 && [...state.activeTools.values()].every(
-    (tool) => tool.finished && !tool.approvalPending,
+  return (
+    state.activeTools.size > 0 &&
+    [...state.activeTools.values()].every((tool) => tool.finished && !tool.approvalPending)
   );
 }
 
 export function isEmptyTodoPreview(preview: Extract<ToolUiPreview, { kind: "todo" }>): boolean {
-  return preview.todos.length === 0 && preview.totalCount === 0 && preview.completedCount === 0 && preview.revision === 0;
+  return (
+    preview.todos.length === 0 && preview.totalCount === 0 && preview.completedCount === 0 && preview.revision === 0
+  );
 }
 
 export function upsertStreamingTool(
@@ -76,7 +79,11 @@ export function appendOrMergeSegment(
   nowMs: number = Date.now(),
 ): void {
   const last = segments[segments.length - 1];
-  if (last && last.type === segType && (last.messageId === undefined || source.messageId === undefined || last.messageId === source.messageId)) {
+  if (
+    last &&
+    last.type === segType &&
+    (last.messageId === undefined || source.messageId === undefined || last.messageId === source.messageId)
+  ) {
     last.text += delta;
     if (last.llmCallId === undefined && source.llmCallId !== undefined) last.llmCallId = source.llmCallId;
     if (last.messageId === undefined && source.messageId !== undefined) last.messageId = source.messageId;
@@ -85,10 +92,15 @@ export function appendOrMergeSegment(
       last.lastDeltaAtMs = nowMs;
     }
   } else {
-    const identity = { ...(source.llmCallId === undefined ? {} : { llmCallId: source.llmCallId }), ...(source.messageId === undefined ? {} : { messageId: source.messageId }) };
-    segments.push(segType === "thinking"
-      ? { type: "thinking", text: delta, ...identity, startedAtMs: nowMs, lastDeltaAtMs: nowMs }
-      : { type: "text", text: delta, ...identity });
+    const identity = {
+      ...(source.llmCallId === undefined ? {} : { llmCallId: source.llmCallId }),
+      ...(source.messageId === undefined ? {} : { messageId: source.messageId }),
+    };
+    segments.push(
+      segType === "thinking"
+        ? { type: "thinking", text: delta, ...identity, startedAtMs: nowMs, lastDeltaAtMs: nowMs }
+        : { type: "text", text: delta, ...identity },
+    );
   }
 }
 
@@ -111,7 +123,9 @@ export function upsertCompactionSegment(state: StreamingState, agentRunId: strin
 }
 
 export function upsertWorkspacePreparationSegment(state: StreamingState, agentRunId: string): void {
-  if (!state.segments.some((segment) => segment.type === "workspace_preparation" && segment.agentRunId === agentRunId)) {
+  if (
+    !state.segments.some((segment) => segment.type === "workspace_preparation" && segment.agentRunId === agentRunId)
+  ) {
     state.segments.push({ type: "workspace_preparation", agentRunId });
   }
 }

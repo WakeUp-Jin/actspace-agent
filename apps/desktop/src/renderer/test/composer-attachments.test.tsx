@@ -5,14 +5,16 @@ import { useComposerAttachments, type ComposerAttachmentsOptions } from "../comp
 import { setupBridge } from "./helpers/bridge";
 
 function renderAttachments(overrides: Partial<ComposerAttachmentsOptions> = {}) {
-  return renderHook(() => useComposerAttachments({
-    isChatForm: false,
-    isRemoteTarget: false,
-    inputLocked: false,
-    onBeforePick: () => {},
-    onRemoved: () => {},
-    ...overrides,
-  }));
+  return renderHook(() =>
+    useComposerAttachments({
+      isChatForm: false,
+      isRemoteTarget: false,
+      inputLocked: false,
+      onBeforePick: () => {},
+      onRemoved: () => {},
+      ...overrides,
+    }),
+  );
 }
 
 function dropEvent(files: File[]) {

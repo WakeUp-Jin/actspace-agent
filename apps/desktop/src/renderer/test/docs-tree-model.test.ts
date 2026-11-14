@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ancestorDirs, buildDocsTree, editedMarkdownPaths, nameMatchRange, pruneDocsTree, type DocsDirNode } from "../components/right-panel/docs/docs-tree-model";
+import {
+  ancestorDirs,
+  buildDocsTree,
+  editedMarkdownPaths,
+  nameMatchRange,
+  pruneDocsTree,
+  type DocsDirNode,
+} from "../components/right-panel/docs/docs-tree-model";
 
 const FILES = [
   "README.md",
@@ -45,7 +52,11 @@ describe("pruneDocsTree", () => {
   });
 
   it("「本会话改过」只留改过的文件并展开祖先", () => {
-    const result = pruneDocsTree(tree, { filter: "session", query: "", editedPaths: new Set(["docs/a.md", "README.md"]) });
+    const result = pruneDocsTree(tree, {
+      filter: "session",
+      query: "",
+      editedPaths: new Set(["docs/a.md", "README.md"]),
+    });
     expect(result.matchedFiles).toBe(2);
     expect(result.nodes.map((node) => node.name)).toEqual(["docs", "README.md"]);
     expect([...result.autoExpand]).toEqual(["docs"]);
@@ -74,7 +85,15 @@ describe("nameMatchRange / ancestorDirs", () => {
 describe("editedMarkdownPaths", () => {
   it("绝对路径转工作区相对路径，只保留工作区内的 Markdown", () => {
     const result = editedMarkdownPaths(
-      ["/ws/docs/a.md", "/ws/docs/b.MARKDOWN", "/ws/src/app.ts", "/other/c.md", "docs/d.md", "./e.md", "file:///ws/f.md"],
+      [
+        "/ws/docs/a.md",
+        "/ws/docs/b.MARKDOWN",
+        "/ws/src/app.ts",
+        "/other/c.md",
+        "docs/d.md",
+        "./e.md",
+        "file:///ws/f.md",
+      ],
       "/ws/",
     );
     expect([...result].sort()).toEqual(["docs/a.md", "docs/b.MARKDOWN", "docs/d.md", "e.md", "f.md"]);

@@ -25,25 +25,134 @@ export interface ProviderTemplate {
 }
 
 export const PROVIDER_TEMPLATES: readonly ProviderTemplate[] = [
-  { id: "anthropic", label: "Anthropic", group: "official", logoKey: "anthropic", protocol: "anthropic-messages", defaultBaseUrl: "https://api.anthropic.com", catalogProvider: "anthropic" },
-  { id: "openai", label: "OpenAI", group: "official", logoKey: "openai", protocol: "openai-responses", defaultBaseUrl: "https://api.openai.com/v1", catalogProvider: "openai" },
-  { id: "deepseek", label: "DeepSeek", group: "official", logoKey: "deepseek", protocol: "openai-completions", defaultBaseUrl: "https://api.deepseek.com", catalogProvider: "deepseek", balance: "deepseek", legacyProviderId: "deepseek" },
-  { id: "kimi", label: "Kimi", group: "official", logoKey: "moonshot", protocol: "openai-completions", defaultBaseUrl: "https://api.moonshot.cn/v1", catalogProvider: "moonshotai-cn", balance: "kimi", legacyProviderId: "kimi" },
-  { id: "zai", label: "智谱 Z.AI", group: "official", logoKey: "zai", protocol: "openai-completions", defaultBaseUrl: "https://api.z.ai/api/paas/v4", catalogProvider: "zhipuai" },
-  { id: "minimax", label: "MiniMax", group: "official", logoKey: "minimax", protocol: "openai-completions", defaultBaseUrl: "https://api.minimax.io/v1", catalogProvider: "minimax" },
-  { id: "volcengine-coding-plan", label: "火山方舟 Coding Plan", group: "official", logoKey: "volcengine", protocol: "openai-completions", defaultBaseUrl: "https://ark.cn-beijing.volces.com/api/coding/v3" },
-  { id: "xiaomi", label: "小米 MiMo", group: "official", logoKey: "xiaomi", protocol: "openai-completions", defaultBaseUrl: "https://api.xiaomimimo.com/v1" },
-  { id: "openrouter", label: "OpenRouter", group: "aggregator", logoKey: "openrouter", protocol: "openai-completions", defaultBaseUrl: "https://openrouter.ai/api/v1", catalogProvider: "openrouter", balance: "openrouter", legacyProviderId: "openrouter" },
-  { id: "opencode-go", label: "OpenCode Go", group: "aggregator", logoKey: "opencode", protocol: "openai-completions", defaultBaseUrl: "https://opencode.ai/inference/go/openai/v1", catalogProvider: "opencode-go" },
+  {
+    id: "anthropic",
+    label: "Anthropic",
+    group: "official",
+    logoKey: "anthropic",
+    protocol: "anthropic-messages",
+    defaultBaseUrl: "https://api.anthropic.com",
+    catalogProvider: "anthropic",
+  },
+  {
+    id: "openai",
+    label: "OpenAI",
+    group: "official",
+    logoKey: "openai",
+    protocol: "openai-responses",
+    defaultBaseUrl: "https://api.openai.com/v1",
+    catalogProvider: "openai",
+  },
+  {
+    id: "deepseek",
+    label: "DeepSeek",
+    group: "official",
+    logoKey: "deepseek",
+    protocol: "openai-completions",
+    defaultBaseUrl: "https://api.deepseek.com",
+    catalogProvider: "deepseek",
+    balance: "deepseek",
+    legacyProviderId: "deepseek",
+  },
+  {
+    id: "kimi",
+    label: "Kimi",
+    group: "official",
+    logoKey: "moonshot",
+    protocol: "openai-completions",
+    defaultBaseUrl: "https://api.moonshot.cn/v1",
+    catalogProvider: "moonshotai-cn",
+    balance: "kimi",
+    legacyProviderId: "kimi",
+  },
+  {
+    id: "zai",
+    label: "智谱 Z.AI",
+    group: "official",
+    logoKey: "zai",
+    protocol: "openai-completions",
+    defaultBaseUrl: "https://api.z.ai/api/paas/v4",
+    catalogProvider: "zhipuai",
+  },
+  {
+    id: "minimax",
+    label: "MiniMax",
+    group: "official",
+    logoKey: "minimax",
+    protocol: "openai-completions",
+    defaultBaseUrl: "https://api.minimax.io/v1",
+    catalogProvider: "minimax",
+  },
+  {
+    id: "volcengine-coding-plan",
+    label: "火山方舟 Coding Plan",
+    group: "official",
+    logoKey: "volcengine",
+    protocol: "openai-completions",
+    defaultBaseUrl: "https://ark.cn-beijing.volces.com/api/coding/v3",
+  },
+  {
+    id: "xiaomi",
+    label: "小米 MiMo",
+    group: "official",
+    logoKey: "xiaomi",
+    protocol: "openai-completions",
+    defaultBaseUrl: "https://api.xiaomimimo.com/v1",
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    group: "aggregator",
+    logoKey: "openrouter",
+    protocol: "openai-completions",
+    defaultBaseUrl: "https://openrouter.ai/api/v1",
+    catalogProvider: "openrouter",
+    balance: "openrouter",
+    legacyProviderId: "openrouter",
+  },
+  {
+    id: "opencode-go",
+    label: "OpenCode Go",
+    group: "aggregator",
+    logoKey: "opencode",
+    protocol: "openai-completions",
+    defaultBaseUrl: "https://opencode.ai/inference/go/openai/v1",
+    catalogProvider: "opencode-go",
+  },
   { id: "custom", label: "自定义中转", group: "custom", logoKey: "generic" },
   // 旧版「自定义服务」按协议拆成的三个入口：不再出现在添加列表里，旧连接按自定义中转显示。
-  { id: "openai-compatible", label: "自定义中转", group: "custom", logoKey: "generic", protocol: "openai-completions", hidden: true },
-  { id: "openai-responses-compatible", label: "自定义中转", group: "custom", logoKey: "generic", protocol: "openai-responses", hidden: true },
-  { id: "anthropic-compatible", label: "自定义中转", group: "custom", logoKey: "generic", protocol: "anthropic-messages", hidden: true },
+  {
+    id: "openai-compatible",
+    label: "自定义中转",
+    group: "custom",
+    logoKey: "generic",
+    protocol: "openai-completions",
+    hidden: true,
+  },
+  {
+    id: "openai-responses-compatible",
+    label: "自定义中转",
+    group: "custom",
+    logoKey: "generic",
+    protocol: "openai-responses",
+    hidden: true,
+  },
+  {
+    id: "anthropic-compatible",
+    label: "自定义中转",
+    group: "custom",
+    logoKey: "generic",
+    protocol: "anthropic-messages",
+    hidden: true,
+  },
 ];
 
 export const CUSTOM_TEMPLATE_ID = "custom";
-export const PROVIDER_TEMPLATE_GROUP_LABELS: Record<ProviderTemplateGroup, string> = { official: "官方", aggregator: "聚合平台", custom: "自定义" };
+export const PROVIDER_TEMPLATE_GROUP_LABELS: Record<ProviderTemplateGroup, string> = {
+  official: "官方",
+  aggregator: "聚合平台",
+  custom: "自定义",
+};
 export const PROTOCOL_LABELS: Record<ModelApi, string> = {
   "anthropic-messages": "Anthropic Messages",
   "openai-completions": "OpenAI Chat",
@@ -60,7 +169,11 @@ export function isRelayTemplate(template: ProviderTemplate | undefined): boolean
 }
 
 /** 没有模板 id 的旧连接，按内置 provider 或「自定义中转」归类。 */
-export function templateForConnection(input: { catalogId?: string | null; connectionId: string; providerId: string }): ProviderTemplate {
+export function templateForConnection(input: {
+  catalogId?: string | null;
+  connectionId: string;
+  providerId: string;
+}): ProviderTemplate {
   const byId = findProviderTemplate(input.catalogId);
   if (byId) return byId;
   if (input.connectionId === `${input.providerId}:default`) {

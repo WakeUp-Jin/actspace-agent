@@ -10,7 +10,10 @@ export function useVisualViewportOffset(): number {
     update();
     viewport.addEventListener("resize", update);
     viewport.addEventListener("scroll", update);
-    return () => { viewport.removeEventListener("resize", update); viewport.removeEventListener("scroll", update); };
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+    };
   }, []);
   return offset;
 }

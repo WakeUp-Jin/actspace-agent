@@ -29,7 +29,11 @@ describe("mergeHtmlBlocks（T22）", () => {
   });
 
   it("嵌套的 <details> 要数到配平为止", () => {
-    const merged = mergeHtmlBlocks(blocksOf("<details>\n<summary>外</summary>\n\n<details>\n<summary>内</summary>\n\n里面\n\n</details>\n\n外层还有\n\n</details>\n\n尾"));
+    const merged = mergeHtmlBlocks(
+      blocksOf(
+        "<details>\n<summary>外</summary>\n\n<details>\n<summary>内</summary>\n\n里面\n\n</details>\n\n外层还有\n\n</details>\n\n尾",
+      ),
+    );
     expect(merged).toHaveLength(2);
     expect(merged[1].source.trim()).toBe("尾");
   });
@@ -73,7 +77,10 @@ describe("collectDefinitions（T22）", () => {
   it("脚注编号按全文第一次被引用的顺序，不按定义的顺序", () => {
     const blocks = blocksOf("先用[^b]\n\n再用[^a]\n\n[^a]: 甲\n\n[^b]: 乙");
     const index = collectDefinitions(blocks);
-    expect([...index.footnoteNumbers.entries()]).toEqual([["b", 1], ["a", 2]]);
+    expect([...index.footnoteNumbers.entries()]).toEqual([
+      ["b", 1],
+      ["a", 2],
+    ]);
     expect(index.footnotes?.labels).toEqual(["b", "a"]);
   });
 
@@ -85,7 +92,9 @@ describe("collectDefinitions（T22）", () => {
   });
 
   it("围栏代码块和行内代码里的 [^x]、[label] 不算引用", () => {
-    const index = collectDefinitions(blocksOf("```\n[^a] [doc]\n```\n\n行内 `[^a]` 和 `[doc]`\n\n[doc]: https://example.com\n\n[^a]: 注释"));
+    const index = collectDefinitions(
+      blocksOf("```\n[^a] [doc]\n```\n\n行内 `[^a]` 和 `[doc]`\n\n[doc]: https://example.com\n\n[^a]: 注释"),
+    );
     expect(index.blockDefs.every((defs) => defs === "")).toBe(true);
     expect(index.footnotes).toBeNull();
   });
@@ -109,7 +118,8 @@ describe("collectDefinitions（T22）", () => {
 });
 
 describe("脚注和引用式链接的渲染（T22）", () => {
-  const CONTENT = "先说 A[^b]，再说 B[^a]，还有 [文档][doc]。\n\n中间一段\n\n又提到 B[^a]\n\n[doc]: https://example.com/doc\n\n[^a]: 甲的注释\n\n[^b]: 乙的注释";
+  const CONTENT =
+    "先说 A[^b]，再说 B[^a]，还有 [文档][doc]。\n\n中间一段\n\n又提到 B[^a]\n\n[doc]: https://example.com/doc\n\n[^a]: 甲的注释\n\n[^b]: 乙的注释";
 
   it("整条回复只有一个脚注区，放在最后，定义块不单独显示", () => {
     const { container } = render(<MarkdownProse content={CONTENT} />);
@@ -124,8 +134,13 @@ describe("脚注和引用式链接的渲染（T22）", () => {
     const { container } = render(<MarkdownProse content={CONTENT} />);
     const section = container.querySelector<HTMLElement>("section[data-footnotes]")!;
     const items = within(section).getAllByRole("listitem");
-    expect(items.map((item) => item.textContent)).toEqual([expect.stringContaining("乙的注释"), expect.stringContaining("甲的注释")]);
-    const refs = Array.from(container.querySelectorAll<HTMLAnchorElement>("a")).filter((a) => a.getAttribute("href")?.includes("-fn-"));
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringContaining("乙的注释"),
+      expect.stringContaining("甲的注释"),
+    ]);
+    const refs = Array.from(container.querySelectorAll<HTMLAnchorElement>("a")).filter((a) =>
+      a.getAttribute("href")?.includes("-fn-"),
+    );
     expect(refs.map((a) => a.textContent)).toEqual(["1", "2", "2"]);
   });
 
@@ -137,7 +152,12 @@ describe("脚注和引用式链接的渲染（T22）", () => {
   });
 
   it("脚注 id 带本回复的前缀，两条回复不会串跳", () => {
-    const { container } = render(<><MarkdownProse content={CONTENT} /><MarkdownProse content={CONTENT} /></>);
+    const { container } = render(
+      <>
+        <MarkdownProse content={CONTENT} />
+        <MarkdownProse content={CONTENT} />
+      </>,
+    );
     const [one, two] = Array.from(container.querySelectorAll("section[data-footnotes]"));
     const ids = (root: Element) => Array.from(root.querySelectorAll("[id]")).map((node) => node.id);
     expect(ids(one).length).toBeGreaterThan(0);

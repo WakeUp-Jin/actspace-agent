@@ -5,15 +5,20 @@ export type CodeSource = ReturnType<typeof createCodeSource>;
 export function createCodeSource(lines: readonly string[]) {
   const starts: number[] = [];
   let length = 0;
-  for (const line of lines) { starts.push(length); length += line.length + 1; }
+  for (const line of lines) {
+    starts.push(length);
+    length += line.length + 1;
+  }
   const text = lines.join("\n");
   const clamp = (offset: number) => Math.max(0, Math.min(text.length, offset));
   const position = (offset: number) => {
     offset = clamp(offset);
-    let low = 0; let high = starts.length;
+    let low = 0;
+    let high = starts.length;
     while (low + 1 < high) {
       const middle = (low + high) >>> 1;
-      if (starts[middle] <= offset) low = middle; else high = middle;
+      if (starts[middle] <= offset) low = middle;
+      else high = middle;
     }
     return { line: low, column: offset - starts[low] };
   };
@@ -30,7 +35,7 @@ export function selectedCode(source: CodeSource, selection: CodeSelection): stri
 
 /** DOM token spans do not own selection; empty-line placeholders are not source text. */
 export function sourceOffsetAt(source: CodeSource, node: Node, offset: number): number | null {
-  const element = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement;
+  const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
   const code = element?.closest<HTMLElement>("[data-line-index]");
   if (!code) return null;
   const index = Number(code.dataset.lineIndex);
@@ -38,7 +43,8 @@ export function sourceOffsetAt(source: CodeSource, node: Node, offset: number): 
     return source.lines[index] === "" ? source.starts[index] : null;
   }
   const range = code.ownerDocument.createRange();
-  range.setStart(code, 0); range.setEnd(node, offset);
+  range.setStart(code, 0);
+  range.setEnd(node, offset);
   return source.offset(index, range.toString().length);
 }
 
@@ -56,7 +62,13 @@ export function caretInCode(code: HTMLElement, column: number): { node: Node; of
   return { node: code, offset: 0 };
 }
 
-export function moveCodeCaret(source: CodeSource, from: number, key: string, documentEdge = false, pageLines = 20): number {
+export function moveCodeCaret(
+  source: CodeSource,
+  from: number,
+  key: string,
+  documentEdge = false,
+  pageLines = 20,
+): number {
   const { line, column } = source.position(from);
   if (key === "Home") return documentEdge ? 0 : source.offset(line, 0);
   if (key === "End") return documentEdge ? source.text.length : source.offset(line, Infinity);

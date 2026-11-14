@@ -9,7 +9,9 @@ import { resetMockDocs } from "../mock/docs-fixture";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
 import { findEditorView, polyfillLayout, typeSynced } from "./markdown-editor-helpers";
 
-vi.mock("mermaid", () => ({ default: { initialize: vi.fn(), render: vi.fn(async () => ({ svg: "<svg></svg>", diagramType: "flowchart-v2" })) } }));
+vi.mock("mermaid", () => ({
+  default: { initialize: vi.fn(), render: vi.fn(async () => ({ svg: "<svg></svg>", diagramType: "flowchart-v2" })) },
+}));
 
 /** 文档第 N 行的内容就是「第 N 行」，一共 30 行。 */
 const LINES = Array.from({ length: 30 }, (_, index) => `第 ${index + 1} 行`);
@@ -19,8 +21,12 @@ function Probe({ path, line }: { path: string; line?: number }) {
   const { openTab, docsPendingLine } = useRightPanel();
   return (
     <>
-      <button type="button" onClick={() => openTab({ id: "docs", kind: "docs", title: "MD 文档", select: path, line })}>probe-open</button>
-      <output data-testid="pending-line">{docsPendingLine ? `${docsPendingLine.path}:${docsPendingLine.line}` : "none"}</output>
+      <button type="button" onClick={() => openTab({ id: "docs", kind: "docs", title: "MD 文档", select: path, line })}>
+        probe-open
+      </button>
+      <output data-testid="pending-line">
+        {docsPendingLine ? `${docsPendingLine.path}:${docsPendingLine.line}` : "none"}
+      </output>
     </>
   );
 }
@@ -50,9 +56,17 @@ beforeEach(() => {
   resetDocsDraftStoreForTests();
   setupBridge({
     "workspaces.readFile": async ({ relativePath }: { relativePath: string }) => ({
-      relativePath, renderKind: "markdown" as const, size: 100, mtimeMs: 1, content: LINES.join("\n"),
+      relativePath,
+      renderKind: "markdown" as const,
+      size: 100,
+      mtimeMs: 1,
+      content: LINES.join("\n"),
     }),
-    "workspaces.statFile": async ({ relativePath }: { relativePath: string }) => ({ relativePath, size: 100, mtimeMs: 1 }),
+    "workspaces.statFile": async ({ relativePath }: { relativePath: string }) => ({
+      relativePath,
+      size: 100,
+      mtimeMs: 1,
+    }),
     "workspaces.listMarkdownFiles": async () => ({ ok: true, files: [NOTE], truncated: false, source: "git" }),
   });
 });
@@ -96,7 +110,11 @@ describe("文档面板：带行号打开", () => {
 
   it("有未保存草稿时再带行号打开同一篇：不弹确认、不重读、草稿保留，只滚到那一行", async () => {
     const reads = vi.fn(async ({ relativePath }: { relativePath: string }) => ({
-      relativePath, renderKind: "markdown" as const, size: 100, mtimeMs: 1, content: LINES.join("\n"),
+      relativePath,
+      renderKind: "markdown" as const,
+      size: 100,
+      mtimeMs: 1,
+      content: LINES.join("\n"),
     }));
     overrideBridge({ "workspaces.readFile": reads });
     await openDocs(NOTE, 3);
@@ -117,7 +135,12 @@ describe("文档面板：带行号打开", () => {
   it("换到别的文档时，上一篇没消费的行号不会带过去", async () => {
     // 读取失败的文档不会挂编辑器，行号请求留在 context 里；从树里选另一篇（不带行号）会把它清掉。
     overrideBridge({
-      "workspaces.listMarkdownFiles": async () => ({ ok: true, files: [NOTE, "docs/other.md"], truncated: false, source: "git" }),
+      "workspaces.listMarkdownFiles": async () => ({
+        ok: true,
+        files: [NOTE, "docs/other.md"],
+        truncated: false,
+        source: "git",
+      }),
       "workspaces.readFile": async ({ relativePath }: { relativePath: string }) =>
         relativePath === NOTE
           ? { relativePath, renderKind: "markdown" as const, size: 1, mtimeMs: 1, error: "not_found" as const }

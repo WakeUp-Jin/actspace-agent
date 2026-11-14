@@ -10,7 +10,13 @@ import {
   type ResourceSample,
   type ResourceWatchState,
 } from "@actspace/shared";
-import { buildGroups, CpuDeltaTracker, descendantsOf, parsePsOutput, type ElectronProcessReading } from "./process-table";
+import {
+  buildGroups,
+  CpuDeltaTracker,
+  descendantsOf,
+  parsePsOutput,
+  type ElectronProcessReading,
+} from "./process-table";
 
 /** `app.getAppMetrics()` 一行里用到的字段。 */
 export interface AppMetricLike {
@@ -79,12 +85,14 @@ export class ResourceCollector {
   constructor(private readonly deps: ResourceCollectorDeps) {
     this.now = deps.now ?? Date.now;
     this.cpuClock = deps.cpuClock ?? (() => performance.now());
-    this.setTimer = deps.setInterval ?? ((callback, ms) => {
-      const handle = setInterval(callback, ms);
-      handle.unref?.();
-      return handle;
-    });
-    this.clearTimer = deps.clearInterval ?? (handle => clearInterval(handle as NodeJS.Timeout));
+    this.setTimer =
+      deps.setInterval ??
+      ((callback, ms) => {
+        const handle = setInterval(callback, ms);
+        handle.unref?.();
+        return handle;
+      });
+    this.clearTimer = deps.clearInterval ?? ((handle) => clearInterval(handle as NodeJS.Timeout));
   }
 
   get active(): boolean {
@@ -120,7 +128,8 @@ export class ResourceCollector {
     const startedAt = this.now();
     // 先记一次基准，第一个采样就能算出 CPU。
     for (const metric of this.deps.getAppMetrics()) {
-      if (metric.cpu.cumulativeCPUUsage !== undefined) electronCpu.percent(metric.pid, metric.cpu.cumulativeCPUUsage, startedAt);
+      if (metric.cpu.cumulativeCPUUsage !== undefined)
+        electronCpu.percent(metric.pid, metric.cpu.cumulativeCPUUsage, startedAt);
     }
     electronCpu.commit();
     this.running = {
@@ -162,13 +171,28 @@ export class ResourceCollector {
       let cpuPercent = cumulative === undefined ? null : running.electronCpu.percent(metric.pid, cumulative, at);
       // 采集器自己的耗时记在「监控自身」，从主进程那一行扣掉。
       if (metric.type === "Browser" && cpuPercent !== null) cpuPercent = Math.max(0, cpuPercent - selfPercent);
-      electron.push({ pid: metric.pid, type: metric.type, name: metric.name, cpuPercent, rssKiB: metric.memory.workingSetSize });
+      electron.push({
+        pid: metric.pid,
+        type: metric.type,
+        name: metric.name,
+        cpuPercent,
+        rssKiB: metric.memory.workingSetSize,
+      });
     }
     running.electronCpu.commit();
     const mainThreadDelayMs = Math.max(0, running.histogram.max / 1e6 - LOOP_RESOLUTION_MS);
     running.histogram.reset();
-    const selfRow: ResourceProcessRow = { pid: this.deps.mainPid, label: "采集器", count: 1, cpuPercent: selfPercent, rssKiB: 0 };
-    const monitorRows = running.psPercent === null ? [selfRow] : [selfRow, { pid: 0, label: "ps", count: 1, cpuPercent: running.psPercent, rssKiB: 0 }];
+    const selfRow: ResourceProcessRow = {
+      pid: this.deps.mainPid,
+      label: "采集器",
+      count: 1,
+      cpuPercent: selfPercent,
+      rssKiB: 0,
+    };
+    const monitorRows =
+      running.psPercent === null
+        ? [selfRow]
+        : [selfRow, { pid: 0, label: "ps", count: 1, cpuPercent: running.psPercent, rssKiB: 0 }];
     const groups = buildGroups({ electron, monitorPids, agent: running.agentRows, monitorChildren: monitorRows });
     let cpuPercent = 0;
     let rssKiB = 0;
@@ -181,16 +205,17 @@ export class ResourceCollector {
       sampledAt: at,
       cpuPercent,
       rssKiB,
-      mainCpuPercent: groups.find(group => group.id === "main")?.cpuPercent ?? 0,
+      mainCpuPercent: groups.find((group) => group.id === "main")?.cpuPercent ?? 0,
       mainThreadDelayMs,
       groups,
       agentProcessesAvailable: this.deps.runPs !== null,
     };
     const point: ResourceHistoryPoint = { at, cpuPercent, rssKiB, mainThreadDelayMs };
     this.latest = sample;
-    this.history = this.history.length >= RESOURCE_HISTORY_LENGTH
-      ? [...this.history.slice(this.history.length - RESOURCE_HISTORY_LENGTH + 1), point]
-      : [...this.history, point];
+    this.history =
+      this.history.length >= RESOURCE_HISTORY_LENGTH
+        ? [...this.history.slice(this.history.length - RESOURCE_HISTORY_LENGTH + 1), point]
+        : [...this.history, point];
     running.tick += 1;
     if (running.tick % PS_EVERY_TICKS === 0) this.scanAgentProcesses(running);
     running.lastAt = at;
@@ -204,31 +229,40 @@ export class ResourceCollector {
     if (!runPs || running.psInFlight) return;
     running.psInFlight = true;
     const { pid: psPid, output } = runPs();
-    output.then((stdout) => {
-      if (this.running !== running) return;
-      const started = this.cpuClock();
-      const at = this.now();
-      const rows = parsePsOutput(stdout);
-      const skip = new Set<number>(this.deps.getAppMetrics().map(metric => metric.pid));
-      if (psPid !== undefined) {
-        skip.add(psPid);
-        // ps 输出里有它自己这一行；它的累计 CPU 就是这次扫描的成本。
-        const own = rows.find(row => row.pid === psPid);
-        running.psPercent = own ? (own.cpuSeconds / ((PS_EVERY_TICKS * RESOURCE_SAMPLE_INTERVAL_MS) / 1000)) * 100 : null;
-      }
-      running.agentRows = descendantsOf(rows, this.deps.mainPid, skip).map(row => ({
-        pid: row.pid,
-        label: row.name,
-        count: 1,
-        cpuPercent: running.agentCpu.percent(row.pid, row.cpuSeconds, at),
-        rssKiB: row.rssKiB,
-      }));
-      running.agentCpu.commit();
-      running.selfMs += this.cpuClock() - started;
-    }, (error: unknown) => {
-      this.deps.log?.("resource monitor ps failed", { error: error instanceof Error ? error.message : String(error) });
-    }).finally(() => {
-      running.psInFlight = false;
-    });
+    output
+      .then(
+        (stdout) => {
+          if (this.running !== running) return;
+          const started = this.cpuClock();
+          const at = this.now();
+          const rows = parsePsOutput(stdout);
+          const skip = new Set<number>(this.deps.getAppMetrics().map((metric) => metric.pid));
+          if (psPid !== undefined) {
+            skip.add(psPid);
+            // ps 输出里有它自己这一行；它的累计 CPU 就是这次扫描的成本。
+            const own = rows.find((row) => row.pid === psPid);
+            running.psPercent = own
+              ? (own.cpuSeconds / ((PS_EVERY_TICKS * RESOURCE_SAMPLE_INTERVAL_MS) / 1000)) * 100
+              : null;
+          }
+          running.agentRows = descendantsOf(rows, this.deps.mainPid, skip).map((row) => ({
+            pid: row.pid,
+            label: row.name,
+            count: 1,
+            cpuPercent: running.agentCpu.percent(row.pid, row.cpuSeconds, at),
+            rssKiB: row.rssKiB,
+          }));
+          running.agentCpu.commit();
+          running.selfMs += this.cpuClock() - started;
+        },
+        (error: unknown) => {
+          this.deps.log?.("resource monitor ps failed", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        },
+      )
+      .finally(() => {
+        running.psInFlight = false;
+      });
   }
 }

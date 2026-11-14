@@ -42,30 +42,29 @@ function loadStoredLayout(): ResolvedLayout {
     return {
       leftMode: "expanded",
       leftWidth: LEFT_DEFAULT_WIDTH,
-      rightWidth: RIGHT_DEFAULT_WIDTH
+      rightWidth: RIGHT_DEFAULT_WIDTH,
     };
   }
 
   try {
-    const stored = JSON.parse(window.localStorage.getItem(WORKBENCH_LAYOUT_STORAGE_KEY) ?? "{}") as StoredWorkbenchLayout;
+    const stored = JSON.parse(
+      window.localStorage.getItem(WORKBENCH_LAYOUT_STORAGE_KEY) ?? "{}",
+    ) as StoredWorkbenchLayout;
     // 老版本可能落了 leftMode: "rail"，rail 已退役，统一映射成 hidden。
     const resolvedMode: SidebarMode =
       stored.leftMode === "hidden" || stored.leftMode === "rail" ? "hidden" : "expanded";
     const resolvedLeftWidth = clamp(stored.leftWidth ?? LEFT_DEFAULT_WIDTH, LEFT_MIN_WIDTH, LEFT_MAX_WIDTH);
-    const initialRightMaxWidth = getRightMaxWidth(
-      window.innerWidth,
-      resolvedMode === "hidden" ? 0 : resolvedLeftWidth,
-    );
+    const initialRightMaxWidth = getRightMaxWidth(window.innerWidth, resolvedMode === "hidden" ? 0 : resolvedLeftWidth);
     return {
       leftMode: resolvedMode,
       leftWidth: resolvedLeftWidth,
-      rightWidth: clamp(stored.rightWidth ?? RIGHT_DEFAULT_WIDTH, RIGHT_MIN_WIDTH, initialRightMaxWidth)
+      rightWidth: clamp(stored.rightWidth ?? RIGHT_DEFAULT_WIDTH, RIGHT_MIN_WIDTH, initialRightMaxWidth),
     };
   } catch {
     return {
       leftMode: "expanded",
       leftWidth: LEFT_DEFAULT_WIDTH,
-      rightWidth: RIGHT_DEFAULT_WIDTH
+      rightWidth: RIGHT_DEFAULT_WIDTH,
     };
   }
 }
@@ -80,11 +79,13 @@ export type PanelLayoutRightPanel = {
  * 工作台左右面板的布局（16 T15，从 WorkbenchLayout 搬出）：宽度与收起状态的持久化、窄窗口自动收起、
  * 紧凑布局（< 880px）下的覆盖层和 Esc 关闭，以及分隔条拖拽 / 键盘调整。右侧面板的开关状态由 RightPanelContext 持有。
  */
-export function usePanelLayout({ isOpen: isRightPanelOpen, openPanel: openRightPanel, closePanel: closeRightPanel }: PanelLayoutRightPanel) {
+export function usePanelLayout({
+  isOpen: isRightPanelOpen,
+  openPanel: openRightPanel,
+  closePanel: closeRightPanel,
+}: PanelLayoutRightPanel) {
   const [storedLayout] = useState(loadStoredLayout);
-  const [containerWidth, setContainerWidth] = useState(() =>
-    typeof window === "undefined" ? 0 : window.innerWidth,
-  );
+  const [containerWidth, setContainerWidth] = useState(() => (typeof window === "undefined" ? 0 : window.innerWidth));
   const [leftMode, setLeftMode] = useState<SidebarMode>(storedLayout.leftMode);
   const [leftWidth, setLeftWidth] = useState(storedLayout.leftWidth);
   const [rightWidth, setRightWidth] = useState(storedLayout.rightWidth);
@@ -109,8 +110,8 @@ export function usePanelLayout({ isOpen: isRightPanelOpen, openPanel: openRightP
       JSON.stringify({
         leftMode,
         leftWidth,
-        rightWidth
-      })
+        rightWidth,
+      }),
     );
   }, [leftMode, leftWidth, rightWidth]);
 
@@ -147,7 +148,17 @@ export function usePanelLayout({ isOpen: isRightPanelOpen, openPanel: openRightP
     if (rightWidth > allowedRightWidth) {
       setRightWidth(clamp(allowedRightWidth, RIGHT_MIN_WIDTH, rightMaxWidth));
     }
-  }, [containerWidth, isCompactLayout, isRightPanelOpen, isSidebarHidden, leftMode, leftWidth, rightMaxWidth, rightWidth, closeRightPanel]);
+  }, [
+    containerWidth,
+    isCompactLayout,
+    isRightPanelOpen,
+    isSidebarHidden,
+    leftMode,
+    leftWidth,
+    rightMaxWidth,
+    rightWidth,
+    closeRightPanel,
+  ]);
 
   useEffect(() => {
     if (!isCompactLayout) {
@@ -234,9 +245,7 @@ export function usePanelLayout({ isOpen: isRightPanelOpen, openPanel: openRightP
     openRightPanel();
   }
 
-  const chromeLeftMode: SidebarMode = isCompactLayout
-    ? compactSidebarOpen ? "expanded" : "hidden"
-    : leftMode;
+  const chromeLeftMode: SidebarMode = isCompactLayout ? (compactSidebarOpen ? "expanded" : "hidden") : leftMode;
 
   return {
     isCompactLayout,

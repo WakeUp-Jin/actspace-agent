@@ -1,5 +1,9 @@
 import { MainAgentInbox } from "@actspace/agent";
-import { BackgroundTaskRegistry, type BackgroundTaskSource, type BackgroundTaskTerminal } from "@actspace/background-tasks";
+import {
+  BackgroundTaskRegistry,
+  type BackgroundTaskSource,
+  type BackgroundTaskTerminal,
+} from "@actspace/background-tasks";
 import { createCoreCodecRegistry, createSessionHeader } from "@actspace/session-journal";
 import { SessionHandle } from "@actspace/session-persistence";
 import { ToolRuntime, type ToolPreparedEnvironment } from "@actspace/tool-runtime";
@@ -7,31 +11,87 @@ import { apply } from "../plugin.js";
 
 function session(sessionId: string): SessionHandle {
   const registry = createCoreCodecRegistry();
-  return SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId, createdAt: "2026-10-22T00:00:00.000Z", lineage: null,
-    createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
+  return SessionHandle.createEphemeral({
+    registry,
+    header: createSessionHeader({
+      sessionId,
+      createdAt: "2026-10-22T00:00:00.000Z",
+      lineage: null,
+      createdWith: {
+        profileId: "test",
+        runtimeContractVersion: "1",
+        manifestDigest: "test",
+        plugins: [],
+        codecSetDigest: registry.digest,
+      },
+    }),
+  });
 }
 
 function source(taskId: string, sessionId = "parent"): BackgroundTaskSource & { finish(): void } {
   let finish!: (terminal: BackgroundTaskTerminal) => void;
-  const done = new Promise<BackgroundTaskTerminal>(resolve => { finish = resolve; });
-  return { taskId, kind: "bash", sessionId, callId: `call-${taskId}`, description: `run ${taskId}`, done,
+  const done = new Promise<BackgroundTaskTerminal>((resolve) => {
+    finish = resolve;
+  });
+  return {
+    taskId,
+    kind: "bash",
+    sessionId,
+    callId: `call-${taskId}`,
+    description: `run ${taskId}`,
+    done,
     output: async () => ({ text: `tail of ${taskId}`, outputPath: `/tmp/${taskId}.log` }),
     stop: async () => finish({ status: "stopped", summary: "stopped", body: "" }),
-    finish: () => finish({ status: "completed", summary: "done", body: "ok", exitCode: 0 }) };
+    finish: () => finish({ status: "completed", summary: "done", body: "ok", exitCode: 0 }),
+  };
 }
 
 function setup(host?: unknown) {
-  const sessions = new Map(["parent", "other"].map(id => [id, session(id)]));
-  const registry = new BackgroundTaskRegistry({ openSession: async id => sessions.get(id)!, wake: () => undefined, now: () => Date.parse("2026-10-22T06:00:00.000Z") });
+  const sessions = new Map(["parent", "other"].map((id) => [id, session(id)]));
+  const registry = new BackgroundTaskRegistry({
+    openSession: async (id) => sessions.get(id)!,
+    wake: () => undefined,
+    now: () => Date.parse("2026-10-22T06:00:00.000Z"),
+  });
   const tools = new ToolRuntime();
   let cleanup: (() => Promise<void>) | undefined;
-  apply({ get: (id: string) => ({ "tools.runtime": tools, "actspace.host.background-tasks": host ?? registry })[id], provide: () => undefined, effect: (factory: () => () => Promise<void>) => { cleanup = factory(); } } as never);
+  apply({
+    get: (id: string) => ({ "tools.runtime": tools, "actspace.host.background-tasks": host ?? registry })[id],
+    provide: () => undefined,
+    effect: (factory: () => () => Promise<void>) => {
+      cleanup = factory();
+    },
+  } as never);
   const env: ToolPreparedEnvironment = {
-    workspaceRoot: "/workspace", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw Error("unused"); } },
-    journal: { recordDispatch: async () => {}, checkpointBeforeBody: async () => {}, commitResult: async () => {} }, createArtifact: async () => { throw Error("unused"); },
+    workspaceRoot: "/workspace",
+    hostCapabilities: new Set(),
+    capabilitySet: {
+      ids: [],
+      has: () => false,
+      get: () => {
+        throw Error("unused");
+      },
+    },
+    journal: { recordDispatch: async () => {}, checkpointBeforeBody: async () => {}, commitResult: async () => {} },
+    createArtifact: async () => {
+      throw Error("unused");
+    },
   };
   const run = async (name: string, args: unknown, sessionId = "parent") => {
-    const [result] = await tools.executeBatch([{ name, callId: `${name}-${Math.random()}`, arguments: args, sessionId, agentRunId: "run", turnId: "turn", stepId: "step" }], env);
+    const [result] = await tools.executeBatch(
+      [
+        {
+          name,
+          callId: `${name}-${Math.random()}`,
+          arguments: args,
+          sessionId,
+          agentRunId: "run",
+          turnId: "turn",
+          stepId: "step",
+        },
+      ],
+      env,
+    );
     return { status: result.status, text: JSON.stringify(result) };
   };
   return { registry, sessions, run, cleanup: () => cleanup!() };
@@ -52,7 +112,12 @@ describe("background task tools", () => {
     expect((await run("task_stop", { taskId: "bash_1" })).text).toContain("status: stopped");
     expect(new MainAgentInbox(sessions.get("parent")!).pending()).toEqual([]);
     expect((await run("task_list", { activeOnly: false })).text).toContain("background_tasks: 1");
-    await registry.register({ ...source("agent-1"), kind: "agent", description: "review auth", agent: { transcriptPath: "/t/agent-1.md", label: "explore" } });
+    await registry.register({
+      ...source("agent-1"),
+      kind: "agent",
+      description: "review auth",
+      agent: { transcriptPath: "/t/agent-1.md", label: "explore" },
+    });
     const agents = await run("task_list", {});
     expect(agents.text).toContain("kind: agent");
     expect(agents.text).toContain("transcript: /t/agent-1.md");
@@ -64,7 +129,14 @@ describe("background task tools", () => {
   it("reads Bash output from an offset and reports the log size, the next offset and a pruned log", async () => {
     const { registry, run } = setup();
     const reads: (number | undefined)[] = [];
-    await registry.register({ ...source("bash_1"), bash: { command: "make", cwd: "/w", sandboxed: true, outputPath: "/tmp/bash_1.log" }, output: async (options?: { since?: number }) => { reads.push(options?.since); return { text: "fresh lines", outputPath: "/tmp/bash_1.log", logSize: 120, nextOffset: 120 }; } });
+    await registry.register({
+      ...source("bash_1"),
+      bash: { command: "make", cwd: "/w", sandboxed: true, outputPath: "/tmp/bash_1.log" },
+      output: async (options?: { since?: number }) => {
+        reads.push(options?.since);
+        return { text: "fresh lines", outputPath: "/tmp/bash_1.log", logSize: 120, nextOffset: 120 };
+      },
+    });
     const read = await run("task_output", { taskId: "bash_1", since: 100 });
     expect(reads).toEqual([100]);
     expect(read.text).toContain("fresh lines\\n\\nlog_size: 120\\nnext_offset: 120");
@@ -78,18 +150,50 @@ describe("background task tools", () => {
   it("keeps Host error codes across a copied error class", async () => {
     // A Harness artifact inlines its own BackgroundTaskError, so the Host's class is a different constructor.
     class CopiedBackgroundTaskError extends Error {
-      constructor(readonly code: string, message: string) { super(message); this.name = "BackgroundTaskError"; }
+      constructor(
+        readonly code: string,
+        message: string,
+      ) {
+        super(message);
+        this.name = "BackgroundTaskError";
+      }
     }
-    const throwing = (error: unknown) => async () => { throw error; };
-    const host = (error: unknown) => ({ list: throwing(error), output: throwing(error), stop: throwing(error), register: throwing(error), notifyOutputMatch: throwing(error), hasRunning: () => false });
-    const notFound = setup(host(new CopiedBackgroundTaskError("TASK_NOT_FOUND", "Background task bash_x was not found.")));
-    for (const [name, args] of [["task_output", { taskId: "bash_x" }], ["task_stop", { taskId: "bash_x" }]] as const) {
+    const throwing = (error: unknown) => async () => {
+      throw error;
+    };
+    const host = (error: unknown) => ({
+      list: throwing(error),
+      output: throwing(error),
+      stop: throwing(error),
+      register: throwing(error),
+      notifyOutputMatch: throwing(error),
+      hasRunning: () => false,
+    });
+    const notFound = setup(
+      host(new CopiedBackgroundTaskError("TASK_NOT_FOUND", "Background task bash_x was not found.")),
+    );
+    for (const [name, args] of [
+      ["task_output", { taskId: "bash_x" }],
+      ["task_stop", { taskId: "bash_x" }],
+    ] as const) {
       const result = await notFound.run(name, args);
       expect(result.status).toBe("failed");
       expect(result.text).toContain('"code":"TASK_NOT_FOUND"');
     }
-    expect((await setup(host(Object.assign(new Error("boom"), { code: "TASK_NOT_FOUND" }))).run("task_output", { taskId: "bash_x" })).text).toContain('"code":"BACKGROUND_TASK_FAILED"');
-    expect((await setup(host(new CopiedBackgroundTaskError("SOMETHING_ELSE", "odd"))).run("task_output", { taskId: "bash_x" })).text).toContain('"code":"BACKGROUND_TASK_FAILED"');
+    expect(
+      (
+        await setup(host(Object.assign(new Error("boom"), { code: "TASK_NOT_FOUND" }))).run("task_output", {
+          taskId: "bash_x",
+        })
+      ).text,
+    ).toContain('"code":"BACKGROUND_TASK_FAILED"');
+    expect(
+      (
+        await setup(host(new CopiedBackgroundTaskError("SOMETHING_ELSE", "odd"))).run("task_output", {
+          taskId: "bash_x",
+        })
+      ).text,
+    ).toContain('"code":"BACKGROUND_TASK_FAILED"');
     expect((await notFound.run("task_output", { taskId: " " })).text).toContain('"code":"INVALID_ARGUMENTS"');
   });
 });

@@ -7,6 +7,8 @@ export function OpenerCapture({ target }: { target: React.MutableRefObject<HTMLE
     const active = document.activeElement;
     return active instanceof HTMLElement && active !== document.body ? active : null;
   });
-  React.useLayoutEffect(() => { target.current = origin; }, [origin, target]);
+  React.useLayoutEffect(() => {
+    target.current = origin;
+  }, [origin, target]);
   return null;
 }

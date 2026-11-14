@@ -25,7 +25,10 @@ import { CommitInput, FieldRow, SavedMark, UnitBox } from "./model-fields";
 import { PURPOSES, formatMultiplier } from "./model-view";
 import { ModelsError, useModelsPage } from "./ModelsPage";
 
-const PROTOCOL_OPTIONS = (Object.keys(PROTOCOL_LABELS) as ModelApi[]).map((value) => ({ value, label: PROTOCOL_LABELS[value] }));
+const PROTOCOL_OPTIONS = (Object.keys(PROTOCOL_LABELS) as ModelApi[]).map((value) => ({
+  value,
+  label: PROTOCOL_LABELS[value],
+}));
 const CURRENCY_SYMBOL: Record<string, string> = { CNY: "¥", USD: "$" };
 /** 移除后撤销条停留多久，到点才真正移除。 */
 const UNDO_MS = 8000;
@@ -44,12 +47,26 @@ function failReason(probe: ConnectionProbeResult): string {
  * 移除模型先在原位给撤销条，8 秒后（或离开页面、又移除了别的模型时）才真正移除。
  * 新建的连接带着这次的探测结果进来，直接弹出选择窗口。
  */
-export function ConnectionDetailPage({ connectionId, initialExpanded, initialProbe }: { connectionId: string; initialExpanded: string | null; initialProbe: ConnectionProbeResult | null }) {
+export function ConnectionDetailPage({
+  connectionId,
+  initialExpanded,
+  initialProbe,
+}: {
+  connectionId: string;
+  initialExpanded: string | null;
+  initialProbe: ConnectionProbeResult | null;
+}) {
   const { controller, go } = useModelsPage();
   const connection = controller.view!.connections.find((item) => item.connectionId === connectionId)!;
-  const [levels, setLevels] = useState<Record<string, CardLevel>>(() => (initialExpanded ? { [initialExpanded]: 1 } : {}));
-  const [pick, setPick] = useState<ConnectionProbeResult | null>(() => (initialProbe && hasList(initialProbe) ? initialProbe : null));
-  const [fail, setFail] = useState<string | null>(() => (initialProbe && !hasList(initialProbe) ? failReason(initialProbe) : null));
+  const [levels, setLevels] = useState<Record<string, CardLevel>>(() =>
+    initialExpanded ? { [initialExpanded]: 1 } : {},
+  );
+  const [pick, setPick] = useState<ConnectionProbeResult | null>(() =>
+    initialProbe && hasList(initialProbe) ? initialProbe : null,
+  );
+  const [fail, setFail] = useState<string | null>(() =>
+    initialProbe && !hasList(initialProbe) ? failReason(initialProbe) : null,
+  );
   const [drafting, setDrafting] = useState(() => Boolean(initialProbe && !hasList(initialProbe)));
   const [fetching, setFetching] = useState(false);
   const fetchTriggerRef = useRef<HTMLButtonElement>(null);
@@ -64,12 +81,18 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
   runRef.current = controller.run;
   const undoTimer = useRef<number | undefined>(undefined);
   const flashTimer = useRef<number | undefined>(undefined);
-  const commitRemoval = useCallback((item: PendingRemoval) => void runRef.current(() => modelConnectionsApi.removeModel({ key: item.model.key }), null), []);
-  useEffect(() => () => {
-    window.clearTimeout(undoTimer.current);
-    window.clearTimeout(flashTimer.current);
-    if (pendingRef.current) commitRemoval(pendingRef.current);
-  }, [commitRemoval]);
+  const commitRemoval = useCallback(
+    (item: PendingRemoval) => void runRef.current(() => modelConnectionsApi.removeModel({ key: item.model.key }), null),
+    [],
+  );
+  useEffect(
+    () => () => {
+      window.clearTimeout(undoTimer.current);
+      window.clearTimeout(flashTimer.current);
+      if (pendingRef.current) commitRemoval(pendingRef.current);
+    },
+    [commitRemoval],
+  );
 
   const flash = (keys: string[]) => {
     window.clearTimeout(flashTimer.current);
@@ -124,13 +147,19 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
     }
   };
   const addModels = async (inputs: ConnectionModelInput[], savedText: string) => {
-    const result = await controller.run(() => modelConnectionsApi.addModels({ connectionId, models: inputs }), savedText);
+    const result = await controller.run(
+      () => modelConnectionsApi.addModels({ connectionId, models: inputs }),
+      savedText,
+    );
     if (!result.ok) return false;
     flash(addedKeys(result.view, connectionId, inputs));
     return true;
   };
   const addPicked = (picked: ProbedModel[]) =>
-    addModels(picked.map((model) => ({ apiModel: model.apiModel, providerFacts: model.providerFacts })), `已添加 ${picked.length} 个模型`);
+    addModels(
+      picked.map((model) => ({ apiModel: model.apiModel, providerFacts: model.providerFacts })),
+      `已添加 ${picked.length} 个模型`,
+    );
 
   const cards = models.map((model) => (
     <ModelCard
@@ -143,7 +172,12 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
       onRemove={() => remove(model)}
     />
   ));
-  if (pending) cards.splice(Math.min(pending.index, cards.length), 0, <UndoBar key="undo" model={pending.model} onUndo={undo} onDismiss={dismissUndo} />);
+  if (pending)
+    cards.splice(
+      Math.min(pending.index, cards.length),
+      0,
+      <UndoBar key="undo" model={pending.model} onUndo={undo} onDismiss={dismissUndo} />,
+    );
   const empty = models.length === 0 && !pending && !drafting && !fail;
 
   return (
@@ -153,14 +187,14 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
         leading={<ConnectionLogo connection={connection} />}
         onBack={() => go({ name: "list" })}
         backLabel="模型"
-        description={(
+        description={
           <>
             <span>{connection.relay ? "自定义中转" : "官方"}</span>
             <span aria-hidden="true">·</span>
             <StatusDot tone={status.tone}>{status.label}</StatusDot>
             {connection.balance && connection.hasApiKey ? <BalanceNote connection={connection} /> : null}
           </>
-        )}
+        }
       />
       <ModelsError />
 
@@ -171,18 +205,23 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
         title="模型"
         headingLevel={3}
         description={models.length > 0 ? `${models.length} 个` : undefined}
-        action={(
+        action={
           <Button ref={fetchTriggerRef} busy={fetching} disabled={fetching} onClick={() => void fetchModels()}>
             {fetching ? null : <Download size={13} aria-hidden="true" />}
             {fetching ? "正在获取…" : "获取可用模型"}
           </Button>
-        )}
+        }
       >
         <div className="flex flex-col gap-2">
           {fail ? (
-            <div role="alert" className="flex items-start gap-2 rounded-act-md bg-warning-soft py-2.5 pl-3 pr-1.5 text-act-xs leading-relaxed text-on-warning">
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-act-md bg-warning-soft py-2.5 pl-3 pr-1.5 text-act-xs leading-relaxed text-on-warning"
+            >
               <span className="min-w-0 flex-1">没拿到模型列表：{fail}</span>
-              <IconButton label="关闭提示" tooltip={false} variant="inherit" size="xs" onClick={() => setFail(null)}><X size={13} aria-hidden="true" /></IconButton>
+              <IconButton label="关闭提示" tooltip={false} variant="inherit" size="xs" onClick={() => setFail(null)}>
+                <X size={13} aria-hidden="true" />
+              </IconButton>
             </div>
           ) : null}
           {cards}
@@ -228,10 +267,12 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
             {saved.field === "multiplier" ? <SavedMark key={saved.tick} /> : null}
           </FieldRow>
         ) : null}
-        <DeleteRow onDelete={async () => {
-          const result = await controller.run(() => modelConnectionsApi.remove({ connectionId }), "连接已删除");
-          if (result.ok) go({ name: "list" });
-        }} />
+        <DeleteRow
+          onDelete={async () => {
+            const result = await controller.run(() => modelConnectionsApi.remove({ connectionId }), "连接已删除");
+            if (result.ok) go({ name: "list" });
+          }}
+        />
       </SettingGroup>
 
       {pick ? (
@@ -247,9 +288,18 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
   );
 }
 
-function addedKeys(view: ModelConnectionsView, connectionId: string, inputs: readonly ConnectionModelInput[]): string[] {
+function addedKeys(
+  view: ModelConnectionsView,
+  connectionId: string,
+  inputs: readonly ConnectionModelInput[],
+): string[] {
   const ids = new Set(inputs.map((input) => input.apiModel));
-  return view.connections.find((item) => item.connectionId === connectionId)?.models.filter((model) => ids.has(model.apiModel)).map((model) => model.key) ?? [];
+  return (
+    view.connections
+      .find((item) => item.connectionId === connectionId)
+      ?.models.filter((model) => ids.has(model.apiModel))
+      .map((model) => model.key) ?? []
+  );
 }
 
 type SavedFlash = { field: string | null; tick: number; flash: (field: string) => void };
@@ -270,20 +320,45 @@ function useSavedFlash(): SavedFlash {
 }
 
 /** 连接分组：每个字段都是输入框，失焦保存，框内短暂显示「已保存」。内置连接的名称来自模板，只读。 */
-function ConnectionGroup({ connection, saved, update }: { connection: ConnectionView; saved: SavedFlash; update: (field: string, patch: Omit<ConnectionUpdateInput, "connectionId">) => Promise<boolean> }) {
+function ConnectionGroup({
+  connection,
+  saved,
+  update,
+}: {
+  connection: ConnectionView;
+  saved: SavedFlash;
+  update: (field: string, patch: Omit<ConnectionUpdateInput, "connectionId">) => Promise<boolean>;
+}) {
   const builtin = connection.connectionId.endsWith(":default");
-  const mark = (field: string, offset?: string) => (saved.field === field ? <SavedMark key={saved.tick} offset={offset} /> : null);
+  const mark = (field: string, offset?: string) =>
+    saved.field === field ? <SavedMark key={saved.tick} offset={offset} /> : null;
   return (
     <SettingGroup title="连接" headingLevel={3}>
       <FieldRow label="名称">
-        {builtin
-          ? <SettingsInput width="full" value={connection.label} disabled aria-label="名称" />
-          : <CommitInput width="full" value={connection.label} aria-label="名称" onCommit={(text) => { if (!text.trim()) return false; void update("label", { label: text.trim() }); }} />}
+        {builtin ? (
+          <SettingsInput width="full" value={connection.label} disabled aria-label="名称" />
+        ) : (
+          <CommitInput
+            width="full"
+            value={connection.label}
+            aria-label="名称"
+            onCommit={(text) => {
+              if (!text.trim()) return false;
+              void update("label", { label: text.trim() });
+            }}
+          />
+        )}
         {mark("label")}
       </FieldRow>
       {connection.relay ? (
         <FieldRow label="协议">
-          <Select value={connection.protocol} options={PROTOCOL_OPTIONS} ariaLabel="协议" className="w-full" onValueChange={(protocol) => void update("protocol", { protocol: protocol as ModelApi })} />
+          <Select
+            value={connection.protocol}
+            options={PROTOCOL_OPTIONS}
+            ariaLabel="协议"
+            className="w-full"
+            onValueChange={(protocol) => void update("protocol", { protocol: protocol as ModelApi })}
+          />
           {mark("protocol", "right-8")}
         </FieldRow>
       ) : null}
@@ -303,7 +378,13 @@ function ConnectionGroup({ connection, saved, update }: { connection: Connection
         {mark("baseUrl")}
       </FieldRow>
       <FieldRow label="API Key">
-        <KeyInput label="API Key" saved={connection.hasApiKey} justSaved={saved.field === "apiKey"} savedTick={saved.tick} onSave={(apiKey) => update("apiKey", { apiKey })} />
+        <KeyInput
+          label="API Key"
+          saved={connection.hasApiKey}
+          justSaved={saved.field === "apiKey"}
+          savedTick={saved.tick}
+          onSave={(apiKey) => update("apiKey", { apiKey })}
+        />
       </FieldRow>
       {connection.hasManagementKey !== undefined ? (
         <FieldRow label="管理 Key">
@@ -322,10 +403,14 @@ function ConnectionGroup({ connection, saved, update }: { connection: Connection
         <CommitInput
           width="full"
           mono
-          value={connection.proxy.enabled ? connection.proxy.url ?? "" : ""}
+          value={connection.proxy.enabled ? (connection.proxy.url ?? "") : ""}
           placeholder="留空走系统代理"
           aria-label="代理"
-          onCommit={(text) => void update("proxy", { proxy: text.trim() ? { enabled: true, url: text.trim() } : { enabled: false, url: null } })}
+          onCommit={(text) =>
+            void update("proxy", {
+              proxy: text.trim() ? { enabled: true, url: text.trim() } : { enabled: false, url: null },
+            })
+          }
         />
         {mark("proxy")}
       </FieldRow>
@@ -334,7 +419,15 @@ function ConnectionGroup({ connection, saved, update }: { connection: Connection
 }
 
 /** Key 不回显：已保存时占位写「已保存在本机」，粘贴新的 Key 后框内出现「取消 / 保存」。 */
-function KeyInput({ label, saved, emptyPlaceholder = "粘贴 Key", justSaved, savedTick, onSave, onClear }: {
+function KeyInput({
+  label,
+  saved,
+  emptyPlaceholder = "粘贴 Key",
+  justSaved,
+  savedTick,
+  onSave,
+  onClear,
+}: {
   label: string;
   saved: boolean;
   emptyPlaceholder?: string;
@@ -364,7 +457,10 @@ function KeyInput({ label, saved, emptyPlaceholder = "粘贴 Key", justSaved, sa
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") void save();
-          if (event.key === "Escape") { event.stopPropagation(); setValue(""); }
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            setValue("");
+          }
         }}
         placeholder={saved ? "•••••••••••• 已保存在本机，粘贴新的 Key 可替换" : emptyPlaceholder}
         aria-label={label}
@@ -372,14 +468,20 @@ function KeyInput({ label, saved, emptyPlaceholder = "粘贴 Key", justSaved, sa
       />
       {dirty ? (
         <span className="absolute inset-y-0 right-1 flex items-center gap-1">
-          <Button variant="ghost" size="xs" onClick={() => setValue("")}>取消</Button>
-          <Button variant="primary" size="xs" busy={busy} disabled={busy} onClick={() => void save()}>保存</Button>
+          <Button variant="ghost" size="xs" onClick={() => setValue("")}>
+            取消
+          </Button>
+          <Button variant="primary" size="xs" busy={busy} disabled={busy} onClick={() => void save()}>
+            保存
+          </Button>
         </span>
       ) : justSaved ? (
         <SavedMark key={savedTick} />
       ) : saved && onClear ? (
         <span className="absolute inset-y-0 right-1 flex items-center">
-          <Button variant="ghost" size="xs" onClick={onClear}>清除</Button>
+          <Button variant="ghost" size="xs" onClick={onClear}>
+            清除
+          </Button>
         </span>
       ) : null}
     </span>
@@ -387,15 +489,37 @@ function KeyInput({ label, saved, emptyPlaceholder = "粘贴 Key", justSaved, sa
 }
 
 /** 移除后占在原位的撤销条。 */
-function UndoBar({ model, onUndo, onDismiss }: { model: ConnectionModelView; onUndo: () => void; onDismiss: () => void }) {
+function UndoBar({
+  model,
+  onUndo,
+  onDismiss,
+}: {
+  model: ConnectionModelView;
+  onUndo: () => void;
+  onDismiss: () => void;
+}) {
   const chat = model.usedBy.includes("chat");
-  const others = PURPOSES.filter((purpose) => purpose.id !== "chat" && model.usedBy.includes(purpose.id)).map((purpose) => `「${purpose.label}」`);
-  const effect = chat ? "，「会话默认」需要重新选一个模型" : others.length > 0 ? `，${others.join("")}改为跟随会话默认` : "";
+  const others = PURPOSES.filter((purpose) => purpose.id !== "chat" && model.usedBy.includes(purpose.id)).map(
+    (purpose) => `「${purpose.label}」`,
+  );
+  const effect = chat
+    ? "，「会话默认」需要重新选一个模型"
+    : others.length > 0
+      ? `，${others.join("")}改为跟随会话默认`
+      : "";
   return (
-    <div role="status" className="flex min-h-12 items-center gap-2 rounded-act-lg border border-dashed border-line-strong pl-3.5 pr-2 text-act-xs text-text-muted">
-      <span className="min-w-0 flex-1">已移除 <b className="font-medium text-text-main">{model.effective.label}</b>{effect}。</span>
+    <div
+      role="status"
+      className="flex min-h-12 items-center gap-2 rounded-act-lg border border-dashed border-line-strong pl-3.5 pr-2 text-act-xs text-text-muted"
+    >
+      <span className="min-w-0 flex-1">
+        已移除 <b className="font-medium text-text-main">{model.effective.label}</b>
+        {effect}。
+      </span>
       <Button onClick={onUndo}>撤销</Button>
-      <IconButton label="关闭" tooltip={false} onClick={onDismiss}><X size={14} aria-hidden="true" /></IconButton>
+      <IconButton label="关闭" tooltip={false} onClick={onDismiss}>
+        <X size={14} aria-hidden="true" />
+      </IconButton>
     </div>
   );
 }
@@ -407,7 +531,9 @@ function DeleteRow({ onDelete }: { onDelete: () => Promise<void> }) {
   useEffect(() => () => window.clearTimeout(timer.current), []);
   return (
     <FieldRow label="删除连接">
-      <span className="min-w-0 flex-1 text-act-xs text-text-faint">{armed ? "再点一次确认，历史会话保留" : "连接及其模型都会移除"}</span>
+      <span className="min-w-0 flex-1 text-act-xs text-text-faint">
+        {armed ? "再点一次确认，历史会话保留" : "连接及其模型都会移除"}
+      </span>
       <Button
         variant={armed ? "danger-solid" : "danger"}
         onClick={() => {
@@ -437,19 +563,41 @@ function BalanceNote({ connection }: { connection: ConnectionView }) {
     setLoading(true);
     setError(false);
     setBalance(null);
-    void modelConnectionsApi.getBalance({ connectionId: connection.connectionId })
-      .then((result) => { if (!cancelled) setBalance(result); })
-      .catch(() => { if (!cancelled) setError(true); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    void modelConnectionsApi
+      .getBalance({ connectionId: connection.connectionId })
+      .then((result) => {
+        if (!cancelled) setBalance(result);
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [connection.connectionId, connection.hasApiKey, connection.hasManagementKey, attempt]);
   if (loading || error) {
     return (
       <>
         <span aria-hidden="true">·</span>
-        {error ? <span role="alert" className="text-on-danger">余额读取失败</span> : <span role="status">余额读取中…</span>}
+        {error ? (
+          <span role="alert" className="text-on-danger">
+            余额读取失败
+          </span>
+        ) : (
+          <span role="status">余额读取中…</span>
+        )}
         {error || attempt > 0 ? (
-          <Button variant="ghost" size="xs" aria-label="重试余额" busy={loading} disabled={loading} onClick={() => setAttempt((value) => value + 1)}>
+          <Button
+            variant="ghost"
+            size="xs"
+            aria-label="重试余额"
+            busy={loading}
+            disabled={loading}
+            onClick={() => setAttempt((value) => value + 1)}
+          >
             重试
           </Button>
         ) : null}
@@ -461,7 +609,10 @@ function BalanceNote({ connection }: { connection: ConnectionView }) {
   return (
     <>
       <span aria-hidden="true">·</span>
-      <span className="tabular-nums">余额 {CURRENCY_SYMBOL[display.currency] ?? ""}{display.amount}</span>
+      <span className="tabular-nums">
+        余额 {CURRENCY_SYMBOL[display.currency] ?? ""}
+        {display.amount}
+      </span>
     </>
   );
 }

@@ -17,12 +17,19 @@ const isHostId = (value: unknown): value is string => typeof value === "string" 
 export function createSessionGateway(remote: SessionGatewayRemote | undefined): IpcMiddleware {
   return async ({ channel, input: raw }, next) => {
     if (!remote) return next();
-    const input = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
-    if (channel === RUNTIME_FIXED_RENDERER_CHANNELS.listSessionPage && typeof input.search === "string" && input.search.trim()) return next();
+    const input = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    if (
+      channel === RUNTIME_FIXED_RENDERER_CHANNELS.listSessionPage &&
+      typeof input.search === "string" &&
+      input.search.trim()
+    )
+      return next();
     if (channel === RUNTIME_FIXED_RENDERER_CHANNELS.createSession && input.hostId) return remote.create(input);
     // 审批按 hostId 路由（15 T10/T11），不看 requestId 的格式。
-    if (channel === RUNTIME_FIXED_RENDERER_CHANNELS.submitApproval && isHostId(input.hostId)) return remote.decide(input);
-    const ref: SessionLocatorRef | null = typeof input.sessionId === "string" ? decodeSessionLocator(input.sessionId) : null;
+    if (channel === RUNTIME_FIXED_RENDERER_CHANNELS.submitApproval && isHostId(input.hostId))
+      return remote.decide(input);
+    const ref: SessionLocatorRef | null =
+      typeof input.sessionId === "string" ? decodeSessionLocator(input.sessionId) : null;
     if (ref) return remote.handle(channel, input, ref);
     return remote.mergeList(channel, input, await next());
   };

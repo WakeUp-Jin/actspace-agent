@@ -29,7 +29,12 @@ export function decodeSessionLocator(key: string): SessionLocatorRef | null {
   if (!hasSessionLocatorPrefix(key)) return null;
   try {
     const value: unknown = JSON.parse(utf8Decode(base64UrlDecode(key.slice(REMOTE_SESSION_KEY_PREFIX.length))));
-    if (!Array.isArray(value) || value.length !== 2 || value.some(item => typeof item !== "string" || !item.length || item.length > MAX_PART_LENGTH)) throw new Error();
+    if (
+      !Array.isArray(value) ||
+      value.length !== 2 ||
+      value.some((item) => typeof item !== "string" || !item.length || item.length > MAX_PART_LENGTH)
+    )
+      throw new Error();
     const ref = { hostId: value[0] as string, sessionId: value[1] as string };
     if (encodeSessionLocator(ref) !== key) throw new Error();
     return ref;
@@ -43,7 +48,9 @@ const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
 function base64UrlEncode(bytes: readonly number[]): string {
   let out = "";
   for (let index = 0; index < bytes.length; index += 3) {
-    const a = bytes[index], b = bytes[index + 1], c = bytes[index + 2];
+    const a = bytes[index],
+      b = bytes[index + 1],
+      c = bytes[index + 2];
     out += ALPHABET[a >> 2] + ALPHABET[((a & 3) << 4) | ((b ?? 0) >> 4)];
     if (b !== undefined) out += ALPHABET[((b & 15) << 2) | ((c ?? 0) >> 6)];
     if (c !== undefined) out += ALPHABET[c & 63];
@@ -55,12 +62,17 @@ function base64UrlEncode(bytes: readonly number[]): string {
 function base64UrlDecode(text: string): number[] {
   if (text.length % 4 === 1) throw new Error();
   const bytes: number[] = [];
-  let buffer = 0, bits = 0;
+  let buffer = 0,
+    bits = 0;
   for (const char of text) {
     const value = ALPHABET.indexOf(char);
     if (value < 0) throw new Error();
-    buffer = (buffer << 6) | value; bits += 6;
-    if (bits >= 8) { bits -= 8; bytes.push((buffer >> bits) & 0xff); }
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 0xff);
+    }
   }
   return bytes;
 }
@@ -79,7 +91,7 @@ function utf8Encode(text: string): number[] {
 
 function utf8Decode(bytes: readonly number[]): string {
   let out = "";
-  for (let index = 0; index < bytes.length;) {
+  for (let index = 0; index < bytes.length; ) {
     const first = bytes[index];
     const length = first < 0x80 ? 1 : first >= 0xf0 && first < 0xf8 ? 4 : first >= 0xe0 ? 3 : first >= 0xc0 ? 2 : 0;
     if (!length || index + length > bytes.length) throw new Error();

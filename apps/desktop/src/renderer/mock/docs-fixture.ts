@@ -188,10 +188,10 @@ const SHOWCASE_BODY = [
   "## 代码块",
   "",
   "```ts",
-  "import { EditorState, Compartment } from \"@codemirror/state\";",
-  "import { EditorView, keymap, lineNumbers } from \"@codemirror/view\";",
-  "import { markdown, markdownKeymap } from \"@codemirror/lang-markdown\";",
-  "import { history, historyKeymap, defaultKeymap } from \"@codemirror/commands\";",
+  'import { EditorState, Compartment } from "@codemirror/state";',
+  'import { EditorView, keymap, lineNumbers } from "@codemirror/view";',
+  'import { markdown, markdownKeymap } from "@codemirror/lang-markdown";',
+  'import { history, historyKeymap, defaultKeymap } from "@codemirror/commands";',
   "",
   "/** 预览和源码是同一个 view 上的两套扩展，切换时只重新配置 Compartment。 */",
   "const mode = new Compartment();",
@@ -269,7 +269,11 @@ const SHOWCASE_BODY = [
 ].join("\n");
 
 function genericBody(path: string): string {
-  const name = path.split("/").pop()?.replace(/\.(md|markdown)$/i, "") ?? path;
+  const name =
+    path
+      .split("/")
+      .pop()
+      ?.replace(/\.(md|markdown)$/i, "") ?? path;
   return [
     `# ${name}`,
     "",
@@ -294,7 +298,12 @@ function ensure(path: string): MockDoc | null {
   if (!MOCK_DOCS_FILES.includes(path)) return null;
   let doc = docs.get(path);
   if (!doc) {
-    const content = path === "docs/design-docs/自进化的方案设计/README.md" ? README_BODY : path === MOCK_DOCS_SHOWCASE_PATH ? SHOWCASE_BODY : genericBody(path);
+    const content =
+      path === "docs/design-docs/自进化的方案设计/README.md"
+        ? README_BODY
+        : path === MOCK_DOCS_SHOWCASE_PATH
+          ? SHOWCASE_BODY
+          : genericBody(path);
     doc = { content, mtimeMs: BASE_MTIME };
     docs.set(path, doc);
   }
@@ -313,11 +322,23 @@ export function mockListMarkdownFiles(): WorkspaceListMarkdownFilesResult {
 
 export function mockReadMarkdown(relativePath: string): WorkspaceReadFileResult {
   if (relativePath === MARKDOWN_SHOWCASE_IMAGE_PATH) {
-    return { relativePath, renderKind: "image", size: MARKDOWN_SHOWCASE_IMAGE_DATA_URL.length, mtimeMs: BASE_MTIME, dataUrl: MARKDOWN_SHOWCASE_IMAGE_DATA_URL };
+    return {
+      relativePath,
+      renderKind: "image",
+      size: MARKDOWN_SHOWCASE_IMAGE_DATA_URL.length,
+      mtimeMs: BASE_MTIME,
+      dataUrl: MARKDOWN_SHOWCASE_IMAGE_DATA_URL,
+    };
   }
   const doc = ensure(relativePath);
   if (!doc) return { relativePath, renderKind: "external", size: 0, mtimeMs: 0, error: "not_found" };
-  return { relativePath, renderKind: "markdown", size: byteLength(doc.content), mtimeMs: doc.mtimeMs, content: doc.content };
+  return {
+    relativePath,
+    renderKind: "markdown",
+    size: byteLength(doc.content),
+    mtimeMs: doc.mtimeMs,
+    content: doc.content,
+  };
 }
 
 export function mockStatMarkdown(relativePath: string): WorkspaceStatFileResult {

@@ -21,7 +21,10 @@ export const CHANNEL_SOURCES = [
   { file: "packages/util/shared/src/host-protocol/connections.ts", constant: "HOST_IPC" },
 ];
 
-export const CONTRACT_SOURCE = { file: "packages/util/shared/src/desktop-bridge/contract.ts", constant: "desktopBridgeContract" };
+export const CONTRACT_SOURCE = {
+  file: "packages/util/shared/src/desktop-bridge/contract.ts",
+  constant: "desktopBridgeContract",
+};
 
 const MAIN_ROOT = "apps/desktop/src/main";
 const PRELOAD_ROOT = "apps/desktop/src/preload";
@@ -53,8 +56,15 @@ function tokenize(source) {
   let at = 0;
   while (at < source.length) {
     const ch = source[at];
-    if (ch === "\n") { line += 1; at += 1; continue; }
-    if (/\s/.test(ch)) { at += 1; continue; }
+    if (ch === "\n") {
+      line += 1;
+      at += 1;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      at += 1;
+      continue;
+    }
     if (ch === "/" && (source[at + 1] === "/" || source[at + 1] === "*")) {
       const found = source[at + 1] === "/" ? source.indexOf("\n", at) : source.indexOf("*/", at + 2);
       const end = found === -1 ? source.length : found + (source[at + 1] === "/" ? 0 : 2);
@@ -91,15 +101,21 @@ function tokenize(source) {
  */
 export function parseContract(source, constants) {
   const aliases = new Map(constants.map(({ constant }) => [constant, constant]));
-  for (const match of source.matchAll(/\b([A-Z][A-Z0-9_]*)\s+as\s+([A-Za-z_$][\w$]*)/g)) aliases.set(match[2], match[1]);
+  for (const match of source.matchAll(/\b([A-Z][A-Z0-9_]*)\s+as\s+([A-Za-z_$][\w$]*)/g))
+    aliases.set(match[2], match[1]);
   const byConstant = new Map(constants.map(({ constant, channels }) => [constant, channels]));
   const tokens = tokenize(source);
-  const start = tokens.findIndex((token, index) => token.text === CONTRACT_SOURCE.constant && tokens[index + 1]?.text === "=" && tokens[index + 2]?.text === "{");
+  const start = tokens.findIndex(
+    (token, index) =>
+      token.text === CONTRACT_SOURCE.constant && tokens[index + 1]?.text === "=" && tokens[index + 2]?.text === "{",
+  );
   if (start === -1) throw new Error(`契约源码里没有找到 ${CONTRACT_SOURCE.constant} = { … }`);
   let at = start + 3;
   const fail = (what) => {
     const token = tokens[at];
-    throw new Error(`契约源码${token ? `第 ${token.line} 行的 ${token.text}` : "末尾"} 认不出来：${what}。成员要写成 域: { 成员: 构造函数<类型>(常量.key) }`);
+    throw new Error(
+      `契约源码${token ? `第 ${token.line} 行的 ${token.text}` : "末尾"} 认不出来：${what}。成员要写成 域: { 成员: 构造函数<类型>(常量.key) }`,
+    );
   };
   const expect = (text) => {
     if (tokens[at]?.text !== text) fail(`这里应该是 ${text}`);
@@ -147,7 +163,10 @@ export function parseContract(source, constants) {
         expect(".");
         const key = name("常量的 key");
         const channel = byConstant.get(aliases.get(constantName))?.get(key);
-        if (!channel) throw new Error(`契约成员 ${domain}.${member} 引用了未知的 channel 常量 ${aliases.get(constantName) ?? constantName}.${key}`);
+        if (!channel)
+          throw new Error(
+            `契约成员 ${domain}.${member} 引用了未知的 channel 常量 ${aliases.get(constantName) ?? constantName}.${key}`,
+          );
         members.set(`${domain}.${member}`, { channel, kind });
       }
       at = open;
@@ -167,7 +186,9 @@ function escapeRegExp(value) {
 /** 源码中指向某个常量的名字：常量本身，加上 `const alias = CONSTANT` 形式的别名。 */
 function namesFor(source, constant) {
   const names = new Set([constant]);
-  for (const match of source.matchAll(new RegExp(`(?:const|let)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*${constant}\\s*;`, "g"))) {
+  for (const match of source.matchAll(
+    new RegExp(`(?:const|let)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*${constant}\\s*;`, "g"),
+  )) {
     names.add(match[1]);
   }
   return names;
@@ -176,7 +197,8 @@ function namesFor(source, constant) {
 /** 源码中指向契约的名字：`desktopBridgeContract` 本身，加上 import 时起的别名。 */
 function contractNames(source) {
   const names = new Set([CONTRACT_SOURCE.constant]);
-  for (const match of source.matchAll(new RegExp(`${CONTRACT_SOURCE.constant}\\s+as\\s+([A-Za-z_$][\\w$]*)`, "g"))) names.add(match[1]);
+  for (const match of source.matchAll(new RegExp(`${CONTRACT_SOURCE.constant}\\s+as\\s+([A-Za-z_$][\\w$]*)`, "g")))
+    names.add(match[1]);
   return names;
 }
 
@@ -184,7 +206,10 @@ function contractNames(source) {
 function channelsInCalls(source, calleePattern, constants, contract, contractCallee = calleePattern) {
   const found = new Set();
   for (const name of contractNames(source)) {
-    const pattern = new RegExp(`${contractCallee}\\(\\s*${escapeRegExp(name)}\\.([A-Za-z_$][\\w$]*)\\.([A-Za-z_$][\\w$]*)`, "g");
+    const pattern = new RegExp(
+      `${contractCallee}\\(\\s*${escapeRegExp(name)}\\.([A-Za-z_$][\\w$]*)\\.([A-Za-z_$][\\w$]*)`,
+      "g",
+    );
     for (const match of source.matchAll(pattern)) {
       const spec = contract.get(`${match[1]}.${match[2]}`);
       if (spec) found.add(spec.channel);
@@ -216,7 +241,8 @@ function referencedChannels(source, constants) {
       }
     }
     for (const value of channels.values()) {
-      if (source.includes(`"${value}"`) || source.includes(`'${value}'`) || source.includes(`\`${value}\``)) found.add(value);
+      if (source.includes(`"${value}"`) || source.includes(`'${value}'`) || source.includes(`\`${value}\``))
+        found.add(value);
     }
   }
   return found;
@@ -253,20 +279,26 @@ export function auditIpcChannels({ constants, contract, mainSources, preloadSour
   for (const { path: file, text } of mainSources) {
     if (file !== registrarPath) {
       for (const match of text.matchAll(RAW_IPC_MAIN_REGISTER)) {
-        errors.push(`main 绕过统一注册器直接调用了 ipcMain.${match[1]}（${file}），请改用 ipc.${match[1] === "on" || match[1] === "once" ? "on" : "handle"}(contract.…)`);
+        errors.push(
+          `main 绕过统一注册器直接调用了 ipcMain.${match[1]}（${file}），请改用 ipc.${match[1] === "on" || match[1] === "once" ? "on" : "handle"}(contract.…)`,
+        );
       }
     }
     for (const value of channelsInCalls(text, REGISTER_CALL, constants, contract, CONTRACT_REGISTER_CALL)) {
       registered.add(value);
       const spec = byChannel.get(value);
       if (!spec) errors.push(`main 注册了契约之外的 channel "${value}"（${file}）`);
-      else if (spec.kind === "event") errors.push(`main 注册了契约中的事件 ${spec.member}（"${value}"），事件只能由 main 发送（${file}）`);
+      else if (spec.kind === "event")
+        errors.push(`main 注册了契约中的事件 ${spec.member}（"${value}"），事件只能由 main 发送（${file}）`);
     }
     for (const value of channelsInCalls(text, SEND_CALL, constants, contract)) {
       sent.add(value);
       const spec = byChannel.get(value);
       if (!spec) errors.push(`main 发送了契约之外的 channel "${value}"（${file}）`);
-      else if (spec.kind !== "event") errors.push(`main 发送了契约中的 ${spec.kind} 成员 ${spec.member}（"${value}"），只有事件由 main 发送（${file}）`);
+      else if (spec.kind !== "event")
+        errors.push(
+          `main 发送了契约中的 ${spec.kind} 成员 ${spec.member}（"${value}"），只有事件由 main 发送（${file}）`,
+        );
     }
   }
 
@@ -337,5 +369,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   const counts = { invoke: 0, send: 0, event: 0 };
   for (const { kind } of contract.values()) counts[kind] += 1;
-  console.log(`IPC channel 审计通过：契约 ${contract.size} 个 channel（invoke ${counts.invoke} / send ${counts.send} / event ${counts.event}）。`);
+  console.log(
+    `IPC channel 审计通过：契约 ${contract.size} 个 channel（invoke ${counts.invoke} / send ${counts.send} / event ${counts.event}）。`,
+  );
 }

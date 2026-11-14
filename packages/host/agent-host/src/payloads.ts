@@ -12,7 +12,8 @@ export class HostPayloads {
     this.#expire();
     const bytes = Buffer.byteLength(json);
     const retained = [...this.#values.values()].reduce((total, item) => total + item.bytes, 0);
-    if (bytes + retained > MAX_BYTES) throw new HostError("LIMIT_EXCEEDED", "Response exceeds connection paging budget", true);
+    if (bytes + retained > MAX_BYTES)
+      throw new HostError("LIMIT_EXCEEDED", "Response exceeds connection paging budget", true);
     const id = randomUUID();
     this.#values.set(id, { json, bytes, expires: this.now() + 30_000 });
     return { id, parts: Math.ceil(json.length / PART_CHARACTERS), characters: json.length };
@@ -29,6 +30,10 @@ export class HostPayloads {
     if (part === parts - 1) this.#values.delete(id);
     return { id, part, parts, text };
   }
-  clear() { this.#values.clear(); }
-  #expire() { for (const [id, value] of this.#values) if (value.expires <= this.now()) this.#values.delete(id); }
+  clear() {
+    this.#values.clear();
+  }
+  #expire() {
+    for (const [id, value] of this.#values) if (value.expires <= this.now()) this.#values.delete(id);
+  }
 }

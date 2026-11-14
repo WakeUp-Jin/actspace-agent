@@ -149,9 +149,7 @@ describe("WorkspaceChromeControls", () => {
         })),
       },
     };
-    const getWorkspaceEnvironment = vi.fn()
-      .mockResolvedValueOnce(environment)
-      .mockResolvedValueOnce(nextEnvironment);
+    const getWorkspaceEnvironment = vi.fn().mockResolvedValueOnce(environment).mockResolvedValueOnce(nextEnvironment);
     const bridge = installBridge({ "workspaces.getEnvironment": getWorkspaceEnvironment });
     const user = userEvent.setup();
     renderControls();
@@ -236,10 +234,13 @@ describe("WorkspaceChromeControls", () => {
 
   it("keeps the branch menu usable during a dev IPC snapshot version mismatch", async () => {
     installBridge({
-      "workspaces.getEnvironment": vi.fn(async () => ({
-        ...environment,
-        git: { ...environment.git, branches: undefined },
-      } as unknown as WorkspaceEnvironmentSnapshot)),
+      "workspaces.getEnvironment": vi.fn(
+        async () =>
+          ({
+            ...environment,
+            git: { ...environment.git, branches: undefined },
+          }) as unknown as WorkspaceEnvironmentSnapshot,
+      ),
     });
     const user = userEvent.setup();
     renderControls();
@@ -271,7 +272,10 @@ describe("WorkspaceChromeControls", () => {
     await user.type(input, "actspace/new-branch");
     await user.click(within(dialog).getByRole("button", { name: "创建并切换" }));
 
-    expect(bridge["workspaces.createBranch"]).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", branchName: "actspace/new-branch" });
+    expect(bridge["workspaces.createBranch"]).toHaveBeenCalledWith({
+      workspaceRoot: "/tmp/workspace",
+      branchName: "actspace/new-branch",
+    });
   });
 
   it("starts the unified Git panel on New branch for detached HEAD", async () => {
@@ -323,9 +327,21 @@ describe("WorkspaceChromeControls", () => {
   it("keeps Tab inside the Git panel, commits on Cmd+Enter, ignores Escape while busy and returns focus", async () => {
     let finish!: () => void;
     const bridge = installBridge({
-      "workspaces.commit": vi.fn(() => new Promise((resolve) => {
-        finish = () => resolve({ ok: true, action: "commit", phase: "commit", workspaceRoot: "/tmp/workspace", branch: "main", commitCreated: true, commitHash: "abc1234" });
-      })),
+      "workspaces.commit": vi.fn(
+        () =>
+          new Promise((resolve) => {
+            finish = () =>
+              resolve({
+                ok: true,
+                action: "commit",
+                phase: "commit",
+                workspaceRoot: "/tmp/workspace",
+                branch: "main",
+                commitCreated: true,
+                commitHash: "abc1234",
+              });
+          }),
+      ),
     });
     const user = userEvent.setup();
     renderControls();
@@ -400,7 +416,12 @@ describe("WorkspaceChromeControls", () => {
     const remoteDialog = await screen.findByRole("dialog", { name: "选择远程仓库" });
     await user.click(within(remoteDialog).getByRole("button", { name: "backup" }));
 
-    const input = { workspaceRoot: "/tmp/workspace", message: "push this", includeUnstagedChanges: true, branchName: undefined };
+    const input = {
+      workspaceRoot: "/tmp/workspace",
+      message: "push this",
+      includeUnstagedChanges: true,
+      branchName: undefined,
+    };
     expect(commitAndPushWorkspaceChanges).toHaveBeenNthCalledWith(1, input);
     expect(commitAndPushWorkspaceChanges).toHaveBeenNthCalledWith(2, { ...input, remote: "backup" });
   });

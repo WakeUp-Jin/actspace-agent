@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { entryId, eventTypeId, pluginId, serviceId, validatePluginManifest, type PluginManifest } from "../src/index.js";
+import {
+  entryId,
+  eventTypeId,
+  pluginId,
+  serviceId,
+  validatePluginManifest,
+  type PluginManifest,
+} from "../src/index.js";
 
 const manifest = (overrides: Partial<PluginManifest> = {}): PluginManifest => ({
   schemaVersion: 1,
@@ -9,18 +16,53 @@ const manifest = (overrides: Partial<PluginManifest> = {}): PluginManifest => ({
   runtimeContract: "actspace.runtime.v2",
   source: { kind: "builtin", reference: "builtin:example" },
   codecs: [{ module: "./codec.js", eventTypes: [eventTypeId("plugin/example.plugin/state")] }],
-  behaviors: [{ entryId: entryId("example.entry"), module: "./plugin.js", required: true, enabled: true, config: {}, host: { required: [], optional: [] }, frontend: null, provides: [serviceId("example.service")], injects: [] }],
-  contributions: { services: ["example.service"], events: [eventTypeId("plugin/example.plugin/state")], contributions: [] },
+  behaviors: [
+    {
+      entryId: entryId("example.entry"),
+      module: "./plugin.js",
+      required: true,
+      enabled: true,
+      config: {},
+      host: { required: [], optional: [] },
+      frontend: null,
+      provides: [serviceId("example.service")],
+      injects: [],
+    },
+  ],
+  contributions: {
+    services: ["example.service"],
+    events: [eventTypeId("plugin/example.plugin/state")],
+    contributions: [],
+  },
   ...overrides,
 });
 
 describe("package-level Plugin ABI", () => {
-  it("validates a JSON-safe trusted static manifest", () => expect(validatePluginManifest(manifest()).pluginId).toBe("example.plugin"));
+  it("validates a JSON-safe trusted static manifest", () =>
+    expect(validatePluginManifest(manifest()).pluginId).toBe("example.plugin"));
   it("fails closed for URL sources, plaintext secrets and duplicate entries", () => {
-    expect(() => validatePluginManifest(manifest({ source: { kind: "local-path", reference: "https://example.test/plugin" } }))).toThrow("untrusted source");
-    expect(() => validatePluginManifest(manifest({ behaviors: [{ ...manifest().behaviors[0], config: { apiKey: "secret" } }] }))).toThrow("credentialRef");
-    expect(() => validatePluginManifest(manifest({ behaviors: [manifest().behaviors[0], manifest().behaviors[0]] }))).toThrow("Duplicate Entry");
-    expect(() => validatePluginManifest(manifest({ behaviors: [{ ...manifest().behaviors[0], injects: [serviceId("store")], optionalInjects: [serviceId("store")] }] }))).toThrow("repeats inject");
-    expect(() => validatePluginManifest(manifest({ behaviors: [{ ...manifest().behaviors[0], optionalInjects: ["Not A Service" as never] }] }))).toThrow();
+    expect(() =>
+      validatePluginManifest(manifest({ source: { kind: "local-path", reference: "https://example.test/plugin" } })),
+    ).toThrow("untrusted source");
+    expect(() =>
+      validatePluginManifest(manifest({ behaviors: [{ ...manifest().behaviors[0], config: { apiKey: "secret" } }] })),
+    ).toThrow("credentialRef");
+    expect(() =>
+      validatePluginManifest(manifest({ behaviors: [manifest().behaviors[0], manifest().behaviors[0]] })),
+    ).toThrow("Duplicate Entry");
+    expect(() =>
+      validatePluginManifest(
+        manifest({
+          behaviors: [
+            { ...manifest().behaviors[0], injects: [serviceId("store")], optionalInjects: [serviceId("store")] },
+          ],
+        }),
+      ),
+    ).toThrow("repeats inject");
+    expect(() =>
+      validatePluginManifest(
+        manifest({ behaviors: [{ ...manifest().behaviors[0], optionalInjects: ["Not A Service" as never] }] }),
+      ),
+    ).toThrow();
   });
 });

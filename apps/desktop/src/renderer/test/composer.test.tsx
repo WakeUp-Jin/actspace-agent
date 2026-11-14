@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ComposerAttachment, ResponseAnnotationReference, SkillCatalogItem, UsableModelView } from "@actspace/shared";
+import type {
+  ComposerAttachment,
+  ResponseAnnotationReference,
+  SkillCatalogItem,
+  UsableModelView,
+} from "@actspace/shared";
 import { mockContextSnapshot, mockContextState } from "./fixtures/workbenchFixture";
 import { Composer } from "../components/Composer";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -25,20 +30,30 @@ function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {})
 
   // 与 App 相同：本机能力（新建工作树等）按 executionContext 的 Git 状态算。rerender 也包同一个 Provider，Composer 不会重新挂载。
   const runTarget = legacyRunTarget({ executionContext: overrides.executionContext });
-  const withRunTarget = (ui: ReactElement) => <RunTargetContext.Provider value={runTarget}>{ui}</RunTargetContext.Provider>;
-  const result = render(withRunTarget(
-    <TooltipProvider delayDuration={0}>
-      <Composer
-        contextSnapshot={mockContextSnapshot}
-        onSend={onSend}
-        onAbort={onAbort}
-        onOpenAttachmentPreview={onOpenAttachmentPreview}
-        {...overrides}
-      />
-    </TooltipProvider>,
-  ));
+  const withRunTarget = (ui: ReactElement) => (
+    <RunTargetContext.Provider value={runTarget}>{ui}</RunTargetContext.Provider>
+  );
+  const result = render(
+    withRunTarget(
+      <TooltipProvider delayDuration={0}>
+        <Composer
+          contextSnapshot={mockContextSnapshot}
+          onSend={onSend}
+          onAbort={onAbort}
+          onOpenAttachmentPreview={onOpenAttachmentPreview}
+          {...overrides}
+        />
+      </TooltipProvider>,
+    ),
+  );
 
-  return { onSend, onAbort, onOpenAttachmentPreview, ...result, rerender: (ui: ReactElement) => result.rerender(withRunTarget(ui)) };
+  return {
+    onSend,
+    onAbort,
+    onOpenAttachmentPreview,
+    ...result,
+    rerender: (ui: ReactElement) => result.rerender(withRunTarget(ui)),
+  };
 }
 
 function createSkill(overrides: Partial<SkillCatalogItem> = {}): SkillCatalogItem {
@@ -61,27 +76,44 @@ describe("Composer Git status evidence", () => {
   it.each(["not_repository", "failed", "git_not_found", "loading"] as const)(
     "does not claim detached HEAD for a locked session with %s context",
     (status) => {
-      renderComposer({ surface: "followup", executionContext: {
-        runLocation: "this_mac",
-        gitContext: status === "loading" ? null : { status, workspaceRoot: "/work/notes", branches: [] },
-      } });
+      renderComposer({
+        surface: "followup",
+        executionContext: {
+          runLocation: "this_mac",
+          gitContext: status === "loading" ? null : { status, workspaceRoot: "/work/notes", branches: [] },
+        },
+      });
       expect(screen.getByText("本机")).toBeVisible();
       expect(screen.queryByText("分离的 HEAD")).not.toBeInTheDocument();
     },
   );
 
   it("shows detached HEAD only with confirmed commit evidence", () => {
-    renderComposer({ surface: "followup", executionContext: {
-      runLocation: "this_mac",
-      gitContext: { status: "ready", workspaceRoot: "/work/repo", branches: [], detachedCommit: "01234567", headCommit: "0123456789abcdef" },
-    } });
+    renderComposer({
+      surface: "followup",
+      executionContext: {
+        runLocation: "this_mac",
+        gitContext: {
+          status: "ready",
+          workspaceRoot: "/work/repo",
+          branches: [],
+          detachedCommit: "01234567",
+          headCommit: "0123456789abcdef",
+        },
+      },
+    });
     expect(screen.getByText("分离的 HEAD")).toBeVisible();
   });
 
   it("keeps the known worktree branch while Git context is absent", () => {
-    renderComposer({ surface: "followup", executionContext: {
-      runLocation: "worktree", selectedBranch: "actspace/12345678", gitContext: null,
-    } });
+    renderComposer({
+      surface: "followup",
+      executionContext: {
+        runLocation: "worktree",
+        selectedBranch: "actspace/12345678",
+        gitContext: null,
+      },
+    });
     expect(screen.getByText("actspace/12345678")).toBeVisible();
   });
 });
@@ -194,22 +226,45 @@ describe("Composer follow-up bar", () => {
 
   it("writes a restored draft back to its session", async () => {
     const writeDraft = vi.fn();
-    renderComposer({ draftKey: "session-a", readDraft: () => "", writeDraft, draftRestore: { id: 1, sessionId: "session-a", text: "retry me", error: "failed" } });
+    renderComposer({
+      draftKey: "session-a",
+      readDraft: () => "",
+      writeDraft,
+      draftRestore: { id: 1, sessionId: "session-a", text: "retry me", error: "failed" },
+    });
 
     await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("retry me"));
     expect(writeDraft).toHaveBeenCalledWith("session-a", "retry me");
   });
 
   it("prefers the restored draft when the session and the restore arrive together", async () => {
-    const readDraft = (key: string) => key === "session-b" ? "stale draft for B" : "";
+    const readDraft = (key: string) => (key === "session-b" ? "stale draft for B" : "");
     const readAttachmentDraft = () => [];
     const photo: ComposerAttachment = { id: "photo", kind: "file", name: "notes.txt", path: "/tmp/notes.txt" };
     const view = (draftKey: string, draftRestore?: Parameters<typeof Composer>[0]["draftRestore"]) => (
-      <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} draftKey={draftKey} readDraft={readDraft} writeDraft={vi.fn()} readAttachmentDraft={readAttachmentDraft} writeAttachmentDraft={vi.fn()} draftRestore={draftRestore} onSend={vi.fn()} /></TooltipProvider>
+      <TooltipProvider>
+        <Composer
+          contextSnapshot={mockContextSnapshot}
+          draftKey={draftKey}
+          readDraft={readDraft}
+          writeDraft={vi.fn()}
+          readAttachmentDraft={readAttachmentDraft}
+          writeAttachmentDraft={vi.fn()}
+          draftRestore={draftRestore}
+          onSend={vi.fn()}
+        />
+      </TooltipProvider>
     );
-    const { rerender } = renderComposer({ draftKey: "session-a", readDraft, readAttachmentDraft, writeAttachmentDraft: vi.fn() });
+    const { rerender } = renderComposer({
+      draftKey: "session-a",
+      readDraft,
+      readAttachmentDraft,
+      writeAttachmentDraft: vi.fn(),
+    });
 
-    rerender(view("session-b", { id: 1, sessionId: "session-b", text: "restored B", error: "上传失败", attachments: [photo] }));
+    rerender(
+      view("session-b", { id: 1, sessionId: "session-b", text: "restored B", error: "上传失败", attachments: [photo] }),
+    );
 
     await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("restored B"));
     expect(screen.getByLabelText("已附加的文件 notes.txt")).toBeInTheDocument();
@@ -236,7 +291,17 @@ describe("Composer follow-up bar", () => {
     const drafts: Record<string, string> = { "session-a": "line 1\nline 2", "session-b": "hi" };
     const readDraft = (key: string) => drafts[key] ?? "";
     const writeDraft = vi.fn();
-    const view = (draftKey: string) => <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} draftKey={draftKey} readDraft={readDraft} writeDraft={writeDraft} onSend={vi.fn()} /></TooltipProvider>;
+    const view = (draftKey: string) => (
+      <TooltipProvider>
+        <Composer
+          contextSnapshot={mockContextSnapshot}
+          draftKey={draftKey}
+          readDraft={readDraft}
+          writeDraft={writeDraft}
+          onSend={vi.fn()}
+        />
+      </TooltipProvider>
+    );
     const { container, rerender } = renderComposer({ draftKey: "session-a", readDraft, writeDraft });
     expect(container.querySelector("[data-layout]")).toHaveAttribute("data-layout", "stacked");
 
@@ -246,10 +311,25 @@ describe("Composer follow-up bar", () => {
 
   it("does not leak an asynchronous send failure into the newly selected session", async () => {
     let rejectSend!: (error: Error) => void;
-    const onSend = vi.fn(() => new Promise<void>((_resolve, reject) => { rejectSend = reject; }));
-    const readDraft = (key: string) => key === "session-a" ? "message for A" : "";
+    const onSend = vi.fn(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectSend = reject;
+        }),
+    );
+    const readDraft = (key: string) => (key === "session-a" ? "message for A" : "");
     const writeDraft = vi.fn();
-    const view = (draftKey: string) => <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} draftKey={draftKey} readDraft={readDraft} writeDraft={writeDraft} onSend={onSend} /></TooltipProvider>;
+    const view = (draftKey: string) => (
+      <TooltipProvider>
+        <Composer
+          contextSnapshot={mockContextSnapshot}
+          draftKey={draftKey}
+          readDraft={readDraft}
+          writeDraft={writeDraft}
+          onSend={onSend}
+        />
+      </TooltipProvider>
+    );
     const { rerender } = render(view("session-a"));
     await userEvent.click(screen.getByRole("button", { name: "发送消息" }));
     expect(onSend).toHaveBeenCalledOnce();
@@ -264,7 +344,17 @@ describe("Composer follow-up bar", () => {
     // Composer 只挂一次（16 T14），换会话不再重挂；开着的菜单和上下文用量不能带到下一个会话。
     const user = userEvent.setup();
     const readDraft = () => "";
-    const view = (draftKey: string) => <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} draftKey={draftKey} readDraft={readDraft} writeDraft={vi.fn()} onSend={vi.fn()} /></TooltipProvider>;
+    const view = (draftKey: string) => (
+      <TooltipProvider>
+        <Composer
+          contextSnapshot={mockContextSnapshot}
+          draftKey={draftKey}
+          readDraft={readDraft}
+          writeDraft={vi.fn()}
+          onSend={vi.fn()}
+        />
+      </TooltipProvider>
+    );
     const { rerender } = render(view("session-a"));
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
     expect(screen.getByRole("listbox", { name: "添加上下文或工具" })).toBeInTheDocument();
@@ -280,7 +370,16 @@ describe("Composer follow-up bar", () => {
   it("allows removing a rejected attachment and retrying the retained text", async () => {
     const user = userEvent.setup();
     const onSend = vi.fn().mockRejectedValueOnce(new Error("单个文件不能超过 20 MiB。"));
-    renderComposer({ draftKey: "remote", onSend, draftRestore: { id: 1, sessionId: "remote", text: "keep this", attachments: [{ id: "large", kind: "file", name: "too-large.txt", path: "/tmp/too-large.txt" }] } });
+    renderComposer({
+      draftKey: "remote",
+      onSend,
+      draftRestore: {
+        id: 1,
+        sessionId: "remote",
+        text: "keep this",
+        attachments: [{ id: "large", kind: "file", name: "too-large.txt", path: "/tmp/too-large.txt" }],
+      },
+    });
     await user.click(screen.getByRole("button", { name: "发送消息" }));
     await screen.findByText("单个文件不能超过 20 MiB。");
     await user.click(screen.getByRole("button", { name: "移除 too-large.txt" }));
@@ -302,8 +401,16 @@ describe("Composer follow-up bar", () => {
     const reviewButton = screen.getByRole("button", { name: /审查待处理变更/ });
     const reviewOverflowButton = screen.getByRole("button", { name: "更多审查操作" });
     expect(reviewButton).toHaveTextContent("Review+4253-5");
-    expect(reviewButton).toHaveClass("rounded-act-pill", "enabled:hover:bg-surface-subtle", "enabled:hover:border-line-strong");
-    expect(reviewOverflowButton).toHaveClass("rounded-act-pill", "enabled:hover:bg-surface-subtle", "enabled:hover:border-line-strong");
+    expect(reviewButton).toHaveClass(
+      "rounded-act-pill",
+      "enabled:hover:bg-surface-subtle",
+      "enabled:hover:border-line-strong",
+    );
+    expect(reviewOverflowButton).toHaveClass(
+      "rounded-act-pill",
+      "enabled:hover:bg-surface-subtle",
+      "enabled:hover:border-line-strong",
+    );
     expect(screen.getByPlaceholderText("继续追问…")).toBeInTheDocument();
     expect(screen.queryByText("main")).not.toBeInTheDocument();
     expect(screen.getByText("本机")).toBeInTheDocument();
@@ -323,14 +430,18 @@ describe("Composer follow-up bar", () => {
 
   it("explains the context ring on hover as the current window estimate, not the session total", async () => {
     const user = userEvent.setup();
-    renderComposer({ contextSnapshot: { ...mockContextSnapshot, totalTokens: 32_400, maxTokens: 1_000_000, percentUsed: 3.24 } });
+    renderComposer({
+      contextSnapshot: { ...mockContextSnapshot, totalTokens: 32_400, maxTokens: 1_000_000, percentUsed: 3.24 },
+    });
     await user.hover(screen.getByRole("button", { name: "上下文用量 3%" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("当前上下文窗口占用 ≈32.4K / 1M（估算）");
   });
 
   it("shows a fractional context estimate as <1% in the footer and popup", async () => {
     const user = userEvent.setup();
-    renderComposer({ contextState: { ...mockContextState, totalEstimatedTokens: 4_200, maxTokens: 1_000_000, percentUsed: 0.42 } });
+    renderComposer({
+      contextState: { ...mockContextState, totalEstimatedTokens: 4_200, maxTokens: 1_000_000, percentUsed: 0.42 },
+    });
     await user.click(screen.getByRole("button", { name: "上下文用量 <1%" }));
     expect(screen.getByText("<1% 已用")).toBeVisible();
   });
@@ -354,7 +465,9 @@ describe("Composer follow-up bar", () => {
   });
 
   it("shows zero for an empty context with known capacity", () => {
-    renderComposer({ contextSnapshot: { ...mockContextSnapshot, totalTokens: 0, maxTokens: 1_000_000, percentUsed: 0 } });
+    renderComposer({
+      contextSnapshot: { ...mockContextSnapshot, totalTokens: 0, maxTokens: 1_000_000, percentUsed: 0 },
+    });
     expect(screen.getByRole("button", { name: "上下文用量 0%" })).toBeInTheDocument();
   });
 
@@ -391,8 +504,9 @@ describe("Composer follow-up bar", () => {
     const input = screen.getByLabelText("消息输入框");
     const toolbarButtons = within(toolbar).getAllByRole("button");
     expect(within(attachmentList).getByLabelText("已附加的图片 screenshot.png")).toBeInTheDocument();
-    expect(within(attachmentList).getByRole("button", { name: "预览附加图片 screenshot.png" }))
-      .toHaveStyle({ backgroundImage: 'url("data:image/png;base64,preview")' });
+    expect(within(attachmentList).getByRole("button", { name: "预览附加图片 screenshot.png" })).toHaveStyle({
+      backgroundImage: 'url("data:image/png;base64,preview")',
+    });
     expect(panel).toContainElement(attachmentList);
     expect(panel).toContainElement(input);
     expect(toolbar).not.toContainElement(input);
@@ -446,31 +560,36 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByLabelText("消息输入框")).toBe(input);
   });
 
-  it.each(["agent", "plan", "chat"] as const)("keeps wrapped content stacked when the wider stacked layout would fit on one line (%s)", async (mode) => {
-    const user = userEvent.setup();
-    renderComposer({ mode });
+  it.each(["agent", "plan", "chat"] as const)(
+    "keeps wrapped content stacked when the wider stacked layout would fit on one line (%s)",
+    async (mode) => {
+      const user = userEvent.setup();
+      renderComposer({ mode });
 
-    const panel = screen.getByLabelText("消息输入面板");
-    const body = panel.querySelector(".composer-body") as HTMLElement;
-    const input = screen.getByLabelText("消息输入框") as HTMLTextAreaElement;
+      const panel = screen.getByLabelText("消息输入面板");
+      const body = panel.querySelector(".composer-body") as HTMLElement;
+      const input = screen.getByLabelText("消息输入框") as HTMLTextAreaElement;
 
-    vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLTextAreaElement) {
-      // 同一个固定 inline 网格决定折行，不能随真实布局的判定结果变化。
-      const measuredBody = this.parentElement!;
-      if (this.style.width) return body.dataset.layout === "stacked" ? 34 : 74;
-      return /\[grid-template-areas:'plus_(?:mode_)?input_model_send'\]/.test(measuredBody.className) ? 74 : 34;
-    });
+      vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockImplementation(function (
+        this: HTMLTextAreaElement,
+      ) {
+        // 同一个固定 inline 网格决定折行，不能随真实布局的判定结果变化。
+        const measuredBody = this.parentElement!;
+        if (this.style.width) return body.dataset.layout === "stacked" ? 34 : 74;
+        return /\[grid-template-areas:'plus_(?:mode_)?input_model_send'\]/.test(measuredBody.className) ? 74 : 34;
+      });
 
-    await user.click(input);
-    await user.paste("这段文字在宽的 stacked 输入框里只有一行，但在带模型和发送按钮的 inline 输入框里会折行");
+      await user.click(input);
+      await user.paste("这段文字在宽的 stacked 输入框里只有一行，但在带模型和发送按钮的 inline 输入框里会折行");
 
-    expect(body.dataset.layout).toBe("stacked");
-    expect(input.style.height).toBe("34px");
+      expect(body.dataset.layout).toBe("stacked");
+      expect(input.style.height).toBe("34px");
 
-    // 模拟中文输入法按 Enter 确认候选后 message 再次变化：仍应按 inline 宽度判定，不能缩回 inline。
-    await user.type(input, "啦");
-    expect(body.dataset.layout).toBe("stacked");
-  });
+      // 模拟中文输入法按 Enter 确认候选后 message 再次变化：仍应按 inline 宽度判定，不能缩回 inline。
+      await user.type(input, "啦");
+      expect(body.dataset.layout).toBe("stacked");
+    },
+  );
 
   it("does not resize the editing textarea temporarily during IME commit", async () => {
     vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockReturnValue(314);
@@ -507,9 +626,7 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     const selectImages = vi.fn(async () => ({
       canceled: false,
-      attachments: [
-        { id: "att-1", kind: "image" as const, name: "notes.png", path: "/Users/test/notes.png" },
-      ],
+      attachments: [{ id: "att-1", kind: "image" as const, name: "notes.png", path: "/Users/test/notes.png" }],
     }));
     setupBridge({ "dialogs.selectImages": selectImages });
     renderComposer();
@@ -574,16 +691,22 @@ describe("Composer follow-up bar", () => {
 
   it("always stacks in a narrow window", () => {
     // jsdom 没有 matchMedia，vitest 4 的 spyOn 不再接受 undefined 属性，改为 stub 全局。
-    vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
-      matches: query === "(max-width: 600px)",
-      media: query,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as MediaQueryList));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(
+        (query: string) =>
+          ({
+            matches: query === "(max-width: 600px)",
+            media: query,
+            onchange: null,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            addListener: () => {},
+            removeListener: () => {},
+            dispatchEvent: () => false,
+          }) as MediaQueryList,
+      ),
+    );
     renderComposer();
     const body = screen.getByLabelText("消息输入面板").querySelector(".composer-body") as HTMLElement;
     expect(body.dataset.layout).toBe("stacked");
@@ -704,10 +827,7 @@ describe("Composer follow-up bar", () => {
     await user.type(screen.getByLabelText("消息输入框"), "/");
 
     const menu = await screen.findByRole("listbox", { name: "斜杠命令" });
-    expect(menu).toHaveClass(
-      "top-[calc(100%_+_8px)]",
-      "max-h-[min(280px,calc(50vh_-_90px))]",
-    );
+    expect(menu).toHaveClass("top-[calc(100%_+_8px)]", "max-h-[min(280px,calc(50vh_-_90px))]");
     expect(menu).not.toHaveClass("bottom-[calc(100%_+_8px)]");
   });
 
@@ -721,7 +841,9 @@ describe("Composer follow-up bar", () => {
         });
       }
       return Promise.resolve({
-        items: [createSkill({ name: "workspace-b-skill", location: "/work/b/.agents/skills/workspace-b-skill/SKILL.md" })],
+        items: [
+          createSkill({ name: "workspace-b-skill", location: "/work/b/.agents/skills/workspace-b-skill/SKILL.md" }),
+        ],
         warnings: [],
       });
     });
@@ -763,14 +885,16 @@ describe("Composer follow-up bar", () => {
 
   it("runs compact immediately without consuming attachments or selected Skills", async () => {
     const user = userEvent.setup();
-    const attachments: ComposerAttachment[] = [{
-      id: "selected-image",
-      kind: "image",
-      name: "screenshot.png",
-      path: "/Users/test/screenshot.png",
-      mimeType: "image/png",
-      previewUrl: "file:///Users/test/screenshot.png",
-    }];
+    const attachments: ComposerAttachment[] = [
+      {
+        id: "selected-image",
+        kind: "image",
+        name: "screenshot.png",
+        path: "/Users/test/screenshot.png",
+        mimeType: "image/png",
+        previewUrl: "file:///Users/test/screenshot.png",
+      },
+    ];
     setupBridge({
       "skills.list": vi.fn(async () => ({ items: [], warnings: [] })),
       "dialogs.selectImages": vi.fn(async () => ({ canceled: false, attachments })),
@@ -830,7 +954,9 @@ describe("Composer follow-up bar", () => {
   it("puts the /side draft back when the side chat does not open", async () => {
     const user = userEvent.setup();
     setupBridge({ "skills.list": vi.fn(async () => ({ items: [], warnings: [] })) });
-    const onOpenSideChat = vi.fn(async () => { throw new Error("主会话还没有完成的一轮，暂时不能开侧边对话。"); });
+    const onOpenSideChat = vi.fn(async () => {
+      throw new Error("主会话还没有完成的一轮，暂时不能开侧边对话。");
+    });
     renderComposer({ onOpenSideChat });
     const input = screen.getByLabelText("消息输入框");
 
@@ -850,7 +976,16 @@ describe("Composer follow-up bar", () => {
     await user.type(input, "/si");
     expect(screen.queryByRole("option", { name: /^side:/ })).not.toBeInTheDocument();
 
-    rerender(<TooltipProvider delayDuration={0}><Composer contextSnapshot={mockContextSnapshot} onSend={onSend} mode="chat" onOpenSideChat={vi.fn(async () => {})} /></TooltipProvider>);
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <Composer
+          contextSnapshot={mockContextSnapshot}
+          onSend={onSend}
+          mode="chat"
+          onOpenSideChat={vi.fn(async () => {})}
+        />
+      </TooltipProvider>,
+    );
     expect(screen.queryByRole("option", { name: /^side:/ })).not.toBeInTheDocument();
   });
 
@@ -938,7 +1073,12 @@ describe("Composer follow-up bar", () => {
               queue: { paused: false, steering: [], items: [] },
               running: true,
               steerBlockedReason: null,
-              onSteer: vi.fn(), onUnsteer: vi.fn(), onRemove: vi.fn(), onMoveUp: vi.fn(), onEdit: vi.fn(), onResume: vi.fn(),
+              onSteer: vi.fn(),
+              onUnsteer: vi.fn(),
+              onRemove: vi.fn(),
+              onMoveUp: vi.fn(),
+              onEdit: vi.fn(),
+              onResume: vi.fn(),
             },
           }
         : {}),
@@ -1111,17 +1251,22 @@ describe("Composer follow-up bar", () => {
     await userEvent.type(input, "看看这张图");
     await userEvent.click(screen.getByRole("button", { name: "发送消息" }));
 
-    expect(onSend).toHaveBeenCalledWith("看看这张图", expect.objectContaining({
-      model: "deepseek-v4-flash",
-      attachments: [{
-        id: "pasted-image",
-        kind: "image",
-        name: "pasted-image.png",
-        path: "/tmp/composer-attachments/pasted-image.png",
-        mimeType: "image/png",
-        previewUrl: "data:image/png;base64,preview",
-      }],
-    }));
+    expect(onSend).toHaveBeenCalledWith(
+      "看看这张图",
+      expect.objectContaining({
+        model: "deepseek-v4-flash",
+        attachments: [
+          {
+            id: "pasted-image",
+            kind: "image",
+            name: "pasted-image.png",
+            path: "/tmp/composer-attachments/pasted-image.png",
+            mimeType: "image/png",
+            previewUrl: "data:image/png;base64,preview",
+          },
+        ],
+      }),
+    );
   });
 
   it("does not add fake attachments when the Electron file bridge is unavailable", async () => {
@@ -1137,7 +1282,9 @@ describe("Composer follow-up bar", () => {
 
   it("adds dropped files, removes attachments, and sends only remaining attachments", async () => {
     const user = userEvent.setup();
-    const getPathForFile = vi.fn((file: File) => file.name === "photo.png" ? "/Users/test/photo.png" : "/Users/test/report.pdf");
+    const getPathForFile = vi.fn((file: File) =>
+      file.name === "photo.png" ? "/Users/test/photo.png" : "/Users/test/report.pdf",
+    );
     setupBridge({ "dialogs.getPathForFile": getPathForFile });
     const { onSend } = renderComposer();
 
@@ -1260,13 +1407,17 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByRole("listbox", { name: "添加上下文或工具" })).toBeInTheDocument();
     // 点模型按钮：模型菜单先打开，`+` 面板的点外关闭随后才到，不能把模型菜单一起关掉。
     await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(screen.queryByRole("listbox", { name: "添加上下文或工具" })).not.toBeInTheDocument();
     expect(screen.getByRole("menu", { name: "模型" })).toBeInTheDocument();
 
     // 反过来：模型菜单开着时点 `+`，模型菜单关闭时不把焦点抢回模型按钮，面板留着。
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(screen.queryByRole("menu", { name: "模型" })).not.toBeInTheDocument();
     expect(screen.getByRole("listbox", { name: "添加上下文或工具" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "搜索" })).toHaveFocus();
@@ -1296,7 +1447,9 @@ describe("Composer follow-up bar", () => {
     expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
 
     await user.click(toggle);
-    await user.click(screen.getByRole("dialog", { name: "上下文用量" }).querySelector<HTMLButtonElement>(".context-bucket")!);
+    await user.click(
+      screen.getByRole("dialog", { name: "上下文用量" }).querySelector<HTMLButtonElement>(".context-bucket")!,
+    );
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
     await waitFor(() => expect(toggle).toHaveFocus());
@@ -1306,7 +1459,9 @@ describe("Composer follow-up bar", () => {
     await user.click(outside);
     expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
     // 点外部关闭不还焦点。Radix 在 setTimeout(0) 里处理关闭后的焦点。
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(outside).toHaveFocus();
     outside.remove();
   });
@@ -1371,7 +1526,9 @@ describe("Composer follow-up bar", () => {
     await waitFor(() => expect(modelButton).toHaveFocus());
 
     await user.click(modelButton);
-    expect(within(screen.getByRole("menu", { name: "模型" })).getByRole("searchbox", { name: "搜索模型" })).toHaveValue("");
+    expect(within(screen.getByRole("menu", { name: "模型" })).getByRole("searchbox", { name: "搜索模型" })).toHaveValue(
+      "",
+    );
     expect(document.querySelector(".model-options-menu")).not.toBeInTheDocument();
   });
 
@@ -1436,7 +1593,12 @@ describe("Composer follow-up bar", () => {
     renderComposer({
       models: [
         { ...reasoningModels[1], key: "openrouter:openai/gpt-5" },
-        { ...reasoningModels[1], key: "openrouter:connection/relay/gpt-5", connectionId: "relay", connectionLabel: "Team Relay" },
+        {
+          ...reasoningModels[1],
+          key: "openrouter:connection/relay/gpt-5",
+          connectionId: "relay",
+          connectionLabel: "Team Relay",
+        },
       ],
       defaultModelId: "openrouter:openai/gpt-5",
     });
@@ -1615,7 +1777,9 @@ describe("Composer follow-up bar", () => {
     const workspaceMenu = screen.getByRole("menu", { name: "选择工作区" });
     expect(within(workspaceMenu).getByRole("menuitemradio", { name: /^wakeup-Jin-wiki/ })).toBeInTheDocument();
     // 名称在第一行，路径是第二行的 faint 小字。
-    expect(within(workspaceMenu).getByRole("menuitemradio", { name: /^code-tool-work/ })).toHaveTextContent("/work/code-tool-work");
+    expect(within(workspaceMenu).getByRole("menuitemradio", { name: /^code-tool-work/ })).toHaveTextContent(
+      "/work/code-tool-work",
+    );
     await user.click(within(workspaceMenu).getByRole("menuitemradio", { name: /^code-tool-work/ }));
     expect(onSelectWorkspace).toHaveBeenCalledWith("/work/code-tool-work");
     expect(onSend).not.toHaveBeenCalled();
@@ -1628,7 +1792,9 @@ describe("Composer follow-up bar", () => {
     await user.click(screen.getByRole("button", { name: "选择运行位置" }));
     const runtimeMenu = screen.getByRole("menu", { name: "选择运行位置" });
     expect(within(runtimeMenu).getByRole("menuitemradio", { name: "本机" })).toHaveAttribute("aria-checked", "true");
-    expect(within(runtimeMenu).getByRole("menuitemradio", { name: /^新建工作树/ })).toHaveTextContent("从 main 创建隔离分支");
+    expect(within(runtimeMenu).getByRole("menuitemradio", { name: /^新建工作树/ })).toHaveTextContent(
+      "从 main 创建隔离分支",
+    );
     expect(within(runtimeMenu).queryByText("即将推出")).not.toBeInTheDocument();
     await user.keyboard("{Escape}");
 
@@ -1675,7 +1841,18 @@ describe("Composer follow-up bar", () => {
 
 it.each([false, true])("sends the configured custom-model default or explicit Auto (auto=%s)", async (auto) => {
   const user = userEvent.setup();
-  const model: UsableModelView = { ...reasoningModels[1], key: "openrouter:connection/relay/gpt-model", label: "Relay GPT", capabilities: { ...reasoningModels[1].capabilities, reasoningEfforts: ["low", "high"], reasoningDefaultEffort: "high", reasoningMandatory: true, thinkingToggle: false } };
+  const model: UsableModelView = {
+    ...reasoningModels[1],
+    key: "openrouter:connection/relay/gpt-model",
+    label: "Relay GPT",
+    capabilities: {
+      ...reasoningModels[1].capabilities,
+      reasoningEfforts: ["low", "high"],
+      reasoningDefaultEffort: "high",
+      reasoningMandatory: true,
+      thinkingToggle: false,
+    },
+  };
   const { onSend } = renderComposer({ models: [model], defaultModelId: model.key });
   if (auto) {
     await user.click(screen.getByRole("button", { name: /Relay GPT/ }));
@@ -1692,11 +1869,28 @@ it.each([false, true])("sends the configured custom-model default or explicit Au
 });
 
 describe("Composer response annotation pill", () => {
-  const first = { annotationId: "ann_1", assistantMessageId: "v2-3", selectedText: "第一段被引用的原文", startOffset: 0, endOffset: 9, prefixContext: "", suffixContext: "" };
-  const second = { ...first, annotationId: "ann_2", selectedText: "第二段", startOffset: 20, endOffset: 23, comment: "这里要展开" };
+  const first = {
+    annotationId: "ann_1",
+    assistantMessageId: "v2-3",
+    selectedText: "第一段被引用的原文",
+    startOffset: 0,
+    endOffset: 9,
+    prefixContext: "",
+    suffixContext: "",
+  };
+  const second = {
+    ...first,
+    annotationId: "ann_2",
+    selectedText: "第二段",
+    startOffset: 20,
+    endOffset: 23,
+    comment: "这里要展开",
+  };
 
   function renderWithAnnotations(overrides: Partial<Parameters<typeof Composer>[0]> = {}) {
-    const context = createAnnotationContextValue({ drafts: (overrides.responseAnnotations ?? []) as ResponseAnnotationReference[] });
+    const context = createAnnotationContextValue({
+      drafts: (overrides.responseAnnotations ?? []) as ResponseAnnotationReference[],
+    });
     const onSend = vi.fn();
     const result = render(
       <TooltipProvider delayDuration={0}>
@@ -1718,7 +1912,10 @@ describe("Composer response annotation pill", () => {
 
   it("opens a card listing selected text and comments, with edit and delete per item", async () => {
     const user = userEvent.setup();
-    const { context } = renderWithAnnotations({ responseAnnotations: [first, second], onResponseAnnotationsChange: vi.fn() });
+    const { context } = renderWithAnnotations({
+      responseAnnotations: [first, second],
+      onResponseAnnotationsChange: vi.fn(),
+    });
     await user.click(screen.getByRole("button", { name: "2 条批注" }));
     const card = await screen.findByRole("dialog", { name: "草稿批注" });
     expect(within(card).getAllByRole("listitem")).toHaveLength(2);
@@ -1734,7 +1931,10 @@ describe("Composer response annotation pill", () => {
 
   it("marks the hovered item active and clears it when the pointer leaves the card", async () => {
     const user = userEvent.setup();
-    const { context } = renderWithAnnotations({ responseAnnotations: [first, second], onResponseAnnotationsChange: vi.fn() });
+    const { context } = renderWithAnnotations({
+      responseAnnotations: [first, second],
+      onResponseAnnotationsChange: vi.fn(),
+    });
     await user.click(screen.getByRole("button", { name: "2 条批注" }));
     const card = await screen.findByRole("dialog", { name: "草稿批注" });
     fireEvent.pointerEnter(within(card).getAllByRole("listitem")[1]);
@@ -1762,17 +1962,41 @@ describe("Composer response annotation pill", () => {
   });
 
   it("shows the limit notice next to the pill", () => {
-    renderWithAnnotations({ responseAnnotations: [first], onResponseAnnotationsChange: vi.fn(), responseAnnotationNotice: "最多引用 20 段回复" });
+    renderWithAnnotations({
+      responseAnnotations: [first],
+      onResponseAnnotationsChange: vi.fn(),
+      responseAnnotationNotice: "最多引用 20 段回复",
+    });
     expect(screen.getByRole("status")).toHaveTextContent("最多引用 20 段回复");
   });
 });
 
 it("shows no run-target selectors in a locked remote conversation", () => {
   // 09 T18：对话中运行目标已锁定，不再显示运行位置和工作区的 select（T19 换成只读状态行）。
-  const choices = { hosts: [], description: undefined, modelId: "fixture", selectHost: vi.fn(), selectWorkspace: vi.fn(), selectModel: vi.fn() };
+  const choices = {
+    hosts: [],
+    description: undefined,
+    modelId: "fixture",
+    selectHost: vi.fn(),
+    selectWorkspace: vi.fn(),
+    selectModel: vi.fn(),
+  };
   render(
-    <RunTargetContext.Provider value={legacyRunTarget({ runTarget: { kind: "remote", hostId: "removed", hostName: "removed", workspaceId: "workspace" }, targetLocked: true, readiness: { state: "removed" }, choices })}>
-      <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="followup" executionContext={{ gitContext: null, runLocation: "this_mac" }} /></TooltipProvider>
+    <RunTargetContext.Provider
+      value={legacyRunTarget({
+        runTarget: { kind: "remote", hostId: "removed", hostName: "removed", workspaceId: "workspace" },
+        targetLocked: true,
+        readiness: { state: "removed" },
+        choices,
+      })}
+    >
+      <TooltipProvider>
+        <Composer
+          contextSnapshot={mockContextSnapshot}
+          surface="followup"
+          executionContext={{ gitContext: null, runLocation: "this_mac" }}
+        />
+      </TooltipProvider>
     </RunTargetContext.Provider>,
   );
   expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
@@ -1783,25 +2007,71 @@ it("shows no run-target selectors in a locked remote conversation", () => {
 
 describe("Composer follow-up status row", () => {
   // 09 T19：对话中运行目标已锁定，状态行只读：没有下拉，只有 context 入口和权限控件可点。
-  const devbox = { id: "dev", hostId: "dev", name: "dev-box", state: "connected" as const, endpoint: { kind: "wss" as const, url: "wss://dev" } };
-  const description = { state: "ready", workspaces: [{ id: "api", name: "api-server", path: "/srv/api-server" }], models: [], defaultModel: "m" };
-  const choices = { hosts: [devbox], description, modelId: "m", selectHost: vi.fn(), selectWorkspace: vi.fn(), selectModel: vi.fn() };
-  const permission = <button type="button" aria-haspopup="menu">请求批准</button>;
+  const devbox = {
+    id: "dev",
+    hostId: "dev",
+    name: "dev-box",
+    state: "connected" as const,
+    endpoint: { kind: "wss" as const, url: "wss://dev" },
+  };
+  const description = {
+    state: "ready",
+    workspaces: [{ id: "api", name: "api-server", path: "/srv/api-server" }],
+    models: [],
+    defaultModel: "m",
+  };
+  const choices = {
+    hosts: [devbox],
+    description,
+    modelId: "m",
+    selectHost: vi.fn(),
+    selectWorkspace: vi.fn(),
+    selectModel: vi.fn(),
+  };
+  const permission = (
+    <button type="button" aria-haspopup="menu">
+      请求批准
+    </button>
+  );
 
   function popupTriggers(row: HTMLElement) {
     return Array.from(row.querySelectorAll("button[aria-haspopup]")).map((button) => button.textContent);
   }
 
   it("shows branch and 本机 locally, read-only apart from the permission control and context usage", () => {
-    renderComposer({ surface: "followup", permissionControl: permission, executionContext: { gitContext: { status: "ready", workspaceRoot: "/work/repo", currentBranch: "main", branches: [{ name: "main", current: true }] }, selectedBranch: "main", runLocation: "this_mac" } });
+    renderComposer({
+      surface: "followup",
+      permissionControl: permission,
+      executionContext: {
+        gitContext: {
+          status: "ready",
+          workspaceRoot: "/work/repo",
+          currentBranch: "main",
+          branches: [{ name: "main", current: true }],
+        },
+        selectedBranch: "main",
+        runLocation: "this_mac",
+      },
+    });
     const row = screen.getByLabelText("运行位置");
     expect(row).toHaveTextContent(/^main·本机请求批准36%$/);
     expect(popupTriggers(row)).toEqual(["请求批准"]);
-    expect(within(row).getAllByRole("button").map((button) => button.getAttribute("aria-label") ?? button.textContent)).toEqual(["请求批准", "上下文用量 36%"]);
+    expect(
+      within(row)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label") ?? button.textContent),
+    ).toEqual(["请求批准", "上下文用量 36%"]);
   });
 
   it("shows 工作树 for a worktree session", () => {
-    renderComposer({ surface: "followup", executionContext: { gitContext: { status: "ready", workspaceRoot: "/work/repo", currentBranch: "actspace/92803054", branches: [] }, selectedBranch: "actspace/92803054", runLocation: "worktree" } });
+    renderComposer({
+      surface: "followup",
+      executionContext: {
+        gitContext: { status: "ready", workspaceRoot: "/work/repo", currentBranch: "actspace/92803054", branches: [] },
+        selectedBranch: "actspace/92803054",
+        runLocation: "worktree",
+      },
+    });
     expect(screen.getByLabelText("运行位置")).toHaveTextContent(/^actspace\/92803054·工作树36%$/);
   });
 
@@ -1867,8 +2137,28 @@ describe("Composer follow-up status row", () => {
   it("shows the Host and workspace names remotely, with status and path in the Host tooltip", async () => {
     const user = userEvent.setup();
     render(
-      <RunTargetContext.Provider value={legacyRunTarget({ runTarget: { kind: "remote", hostId: "dev", hostName: "dev-box", workspaceId: "api", workspaceName: "api-server" }, targetLocked: true, readiness: { state: "ready" }, choices })}>
-        <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="followup" permissionControl={permission} executionContext={{ gitContext: null, runLocation: "this_mac" }} /></TooltipProvider>
+      <RunTargetContext.Provider
+        value={legacyRunTarget({
+          runTarget: {
+            kind: "remote",
+            hostId: "dev",
+            hostName: "dev-box",
+            workspaceId: "api",
+            workspaceName: "api-server",
+          },
+          targetLocked: true,
+          readiness: { state: "ready" },
+          choices,
+        })}
+      >
+        <TooltipProvider>
+          <Composer
+            contextSnapshot={mockContextSnapshot}
+            surface="followup"
+            permissionControl={permission}
+            executionContext={{ gitContext: null, runLocation: "this_mac" }}
+          />
+        </TooltipProvider>
       </RunTargetContext.Provider>,
     );
     const row = screen.getByLabelText("运行位置");
@@ -1880,8 +2170,27 @@ describe("Composer follow-up status row", () => {
 
   it("replaces the workspace with the readiness label and shows — for context usage while the Host is connecting", () => {
     render(
-      <RunTargetContext.Provider value={legacyRunTarget({ runTarget: { kind: "remote", hostId: "dev", hostName: "dev-box", workspaceId: "api", workspaceName: "api-server" }, targetLocked: true, readiness: { state: "connecting" }, choices: { ...choices, hosts: [{ ...devbox, state: "connecting" as const }] } })}>
-        <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="followup" executionContext={{ gitContext: null, runLocation: "this_mac" }} /></TooltipProvider>
+      <RunTargetContext.Provider
+        value={legacyRunTarget({
+          runTarget: {
+            kind: "remote",
+            hostId: "dev",
+            hostName: "dev-box",
+            workspaceId: "api",
+            workspaceName: "api-server",
+          },
+          targetLocked: true,
+          readiness: { state: "connecting" },
+          choices: { ...choices, hosts: [{ ...devbox, state: "connecting" as const }] },
+        })}
+      >
+        <TooltipProvider>
+          <Composer
+            contextSnapshot={mockContextSnapshot}
+            surface="followup"
+            executionContext={{ gitContext: null, runLocation: "this_mac" }}
+          />
+        </TooltipProvider>
       </RunTargetContext.Provider>,
     );
     const row = screen.getByLabelText("运行位置");
@@ -1902,11 +2211,32 @@ describe("Composer follow-up status row", () => {
 
 describe("Composer on a remote run target", () => {
   // 15 T6：Composer 按 RunTargetContext 的 target / capabilities 判断，不再读 executionContext.remote。
-  const choices = { hosts: [], description: undefined, modelId: "m", selectHost: vi.fn(), selectWorkspace: vi.fn(), selectModel: vi.fn() };
+  const choices = {
+    hosts: [],
+    description: undefined,
+    modelId: "m",
+    selectHost: vi.fn(),
+    selectWorkspace: vi.fn(),
+    selectModel: vi.fn(),
+  };
   function renderRemote(props: Partial<Parameters<typeof Composer>[0]> = {}, readiness?: RunTargetReadiness) {
     return render(
-      <RunTargetContext.Provider value={legacyRunTarget({ runTarget: { kind: "remote", hostId: "server", hostName: "Cloud" }, targetLocked: true, readiness, choices })}>
-        <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="followup" executionContext={{ gitContext: null, runLocation: "this_mac" }} {...props} /></TooltipProvider>
+      <RunTargetContext.Provider
+        value={legacyRunTarget({
+          runTarget: { kind: "remote", hostId: "server", hostName: "Cloud" },
+          targetLocked: true,
+          readiness,
+          choices,
+        })}
+      >
+        <TooltipProvider>
+          <Composer
+            contextSnapshot={mockContextSnapshot}
+            surface="followup"
+            executionContext={{ gitContext: null, runLocation: "this_mac" }}
+            {...props}
+          />
+        </TooltipProvider>
       </RunTargetContext.Provider>,
     );
   }
@@ -1915,7 +2245,9 @@ describe("Composer on a remote run target", () => {
     const user = userEvent.setup();
     renderRemote();
     await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
-    expect(within(screen.getByRole("listbox", { name: "添加上下文或工具" })).getByRole("option", { name: "图片与文件" })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("listbox", { name: "添加上下文或工具" })).getByRole("option", { name: "图片与文件" }),
+    ).toBeInTheDocument();
   });
 
   // 09 T13：远端模型也走 ModelPicker；Host 没连上时按钮禁用，描述没回来时显示「等待 Host 模型」。
@@ -1925,10 +2257,34 @@ describe("Composer on a remote run target", () => {
     expect(screen.getByRole("button", { name: "等待 Host 模型" })).toBeDisabled();
     unmount();
 
-    const connected = { ...choices, hosts: [{ id: "server", hostId: "server", name: "Cloud", state: "connected" as const, endpoint: { kind: "wss" as const, url: "wss://cloud" } }] };
+    const connected = {
+      ...choices,
+      hosts: [
+        {
+          id: "server",
+          hostId: "server",
+          name: "Cloud",
+          state: "connected" as const,
+          endpoint: { kind: "wss" as const, url: "wss://cloud" },
+        },
+      ],
+    };
     render(
-      <RunTargetContext.Provider value={legacyRunTarget({ runTarget: { kind: "remote", hostId: "server", hostName: "Cloud" }, targetLocked: true, readiness: { state: "describing" }, choices: connected })}>
-        <TooltipProvider><Composer contextSnapshot={mockContextSnapshot} surface="followup" executionContext={{ gitContext: null, runLocation: "this_mac" }} /></TooltipProvider>
+      <RunTargetContext.Provider
+        value={legacyRunTarget({
+          runTarget: { kind: "remote", hostId: "server", hostName: "Cloud" },
+          targetLocked: true,
+          readiness: { state: "describing" },
+          choices: connected,
+        })}
+      >
+        <TooltipProvider>
+          <Composer
+            contextSnapshot={mockContextSnapshot}
+            surface="followup"
+            executionContext={{ gitContext: null, runLocation: "this_mac" }}
+          />
+        </TooltipProvider>
       </RunTargetContext.Provider>,
     );
     const button = screen.getByRole("button", { name: "等待 Host 模型" });
@@ -1977,7 +2333,10 @@ describe("Composer on a remote run target", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Cloud 离线。前往设置重新连接");
     unmount();
 
-    renderRemote({}, { state: "describe-failed", error: "Error invoking remote method 'host:describe': Error: socket hang up" });
+    renderRemote(
+      {},
+      { state: "describe-failed", error: "Error invoking remote method 'host:describe': Error: socket hang up" },
+    );
     fireEvent.change(screen.getByLabelText("消息输入框"), { target: { value: "hi" } });
     const failed = screen.getByRole("button", { name: "无法读取机器信息：socket hang up" });
     expect(failed).toHaveAttribute("aria-disabled", "true");
@@ -2003,13 +2362,17 @@ describe("Composer on a remote run target", () => {
   });
 
   it("pushes the execution configuration to a remote Session only when it is ready", async () => {
-    const command = vi.fn(async () => ({ snapshot: { sessionId: "s", revision: 1, paused: false, queue: [], tasks: [], runs: [] } }));
+    const command = vi.fn(async () => ({
+      snapshot: { sessionId: "s", revision: 1, paused: false, queue: [], tasks: [], runs: [] },
+    }));
     setupBridge({ "tasks.command": command, "events.hostUploadProgress": () => () => {} });
     const { unmount } = renderRemote({ sessionId: "s" }, { state: "describing" });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(command).not.toHaveBeenCalled();
     unmount();
     renderRemote({ sessionId: "s" }, { state: "ready" });
-    await waitFor(() => expect(command).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "s", op: "configure" })));
+    await waitFor(() =>
+      expect(command).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "s", op: "configure" })),
+    );
   });
 });

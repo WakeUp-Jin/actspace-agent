@@ -56,7 +56,16 @@ function docFromRead(relativePath: string, result: WorkspaceReadFileResult): Doc
 }
 
 function loadingDoc(relativePath: string): DocsDocState {
-  return { relativePath, status: "loading", original: "", draft: "", mtimeMs: 0, size: 0, truncated: false, isStale: false };
+  return {
+    relativePath,
+    status: "loading",
+    original: "",
+    draft: "",
+    mtimeMs: 0,
+    size: 0,
+    truncated: false,
+    isStale: false,
+  };
 }
 
 /**
@@ -112,7 +121,16 @@ export function useDocsDraft({
       try {
         next = docFromRead(relativePath, await workspacesApi.readFile({ workspaceRoot: root, relativePath }));
       } catch {
-        next = { ...docFromRead(relativePath, { relativePath, renderKind: "markdown", size: 0, mtimeMs: 0, error: "not_found" }), message: "文件读取失败。" };
+        next = {
+          ...docFromRead(relativePath, {
+            relativePath,
+            renderKind: "markdown",
+            size: 0,
+            mtimeMs: 0,
+            error: "not_found",
+          }),
+          message: "文件读取失败。",
+        };
       }
       if (live.current.path !== relativePath || live.current.root !== root) return;
       // 换根前暂存的未保存草稿：套回去并带上未保存圆点；磁盘上的文件变过就同时提示已变化。不自动写盘。
@@ -185,7 +203,9 @@ export function useDocsDraft({
     const previous = edited.current;
     edited.current = { path: readyPath, has };
     if (readyPath === null || previous.path !== readyPath || previous.has || !has) return;
-    setDocsDoc((value) => (value && value.relativePath === readyPath && !value.isStale ? { ...value, isStale: true } : value));
+    setDocsDoc((value) =>
+      value && value.relativePath === readyPath && !value.isStale ? { ...value, isStale: true } : value,
+    );
   }, [editedPaths, readyPath, setDocsDoc]);
 
   const setDraft = useCallback(

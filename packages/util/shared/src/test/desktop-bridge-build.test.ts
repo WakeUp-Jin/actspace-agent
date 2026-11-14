@@ -12,19 +12,27 @@ function fakeTransport() {
   const transport = {
     invoke: vi.fn(async (channel: string, input?: unknown) => ({ channel, input })),
     send: vi.fn(),
-    on: vi.fn((channel: string, listener: (payload: unknown) => void) => { listeners.set(channel, listener); return unsubscribe; }),
+    on: vi.fn((channel: string, listener: (payload: unknown) => void) => {
+      listeners.set(channel, listener);
+      return unsubscribe;
+    }),
   } satisfies BridgeTransport;
   return { transport, listeners, unsubscribe };
 }
 
 const locals = { "dialogs.getPathForFile": vi.fn(() => "/tmp/a.txt"), "appearance.setUiZoom": vi.fn() };
-const specs = Object.entries(contract as unknown as Record<string, Record<string, BridgeSpec>>)
-  .flatMap(([domain, members]) => Object.entries(members).map(([member, spec]) => ({ domain, member, spec })));
+const specs = Object.entries(contract as unknown as Record<string, Record<string, BridgeSpec>>).flatMap(
+  ([domain, members]) => Object.entries(members).map(([member, spec]) => ({ domain, member, spec })),
+);
 
 describe("buildBridge", () => {
   it("exposes every contract member as a function", () => {
-    const bridge = buildBridge(contract, fakeTransport().transport, locals) as unknown as Record<string, Record<string, unknown>>;
-    for (const { domain, member } of specs) expect(typeof bridge[domain]?.[member], `${domain}.${member}`).toBe("function");
+    const bridge = buildBridge(contract, fakeTransport().transport, locals) as unknown as Record<
+      string,
+      Record<string, unknown>
+    >;
+    for (const { domain, member } of specs)
+      expect(typeof bridge[domain]?.[member], `${domain}.${member}`).toBe("function");
   });
 
   it("forwards invoke input and fills the contract default only when input is missing", async () => {
@@ -32,7 +40,10 @@ describe("buildBridge", () => {
     const bridge = buildBridge(contract, transport, locals);
 
     await bridge.tasks.abort({ sessionId: "s", agentRunId: "r" });
-    expect(transport.invoke).toHaveBeenLastCalledWith(contract.tasks.abort.channel, { sessionId: "s", agentRunId: "r" });
+    expect(transport.invoke).toHaveBeenLastCalledWith(contract.tasks.abort.channel, {
+      sessionId: "s",
+      agentRunId: "r",
+    });
     await bridge.app.getBootstrapState();
     expect(transport.invoke).toHaveBeenLastCalledWith(contract.app.getBootstrapState.channel, undefined);
     await bridge.sessions.create();
@@ -67,7 +78,9 @@ describe("buildBridge", () => {
   });
 
   it("fails fast when a local member has no implementation", () => {
-    expect(() => buildBridge(contract, fakeTransport().transport, { "dialogs.getPathForFile": () => "" })).toThrow("appearance.setUiZoom");
+    expect(() => buildBridge(contract, fakeTransport().transport, { "dialogs.getPathForFile": () => "" })).toThrow(
+      "appearance.setUiZoom",
+    );
   });
 });
 
@@ -77,6 +90,10 @@ describe("hosts domain", () => {
     const bridge = buildBridge(contract, transport, locals);
 
     await bridge.hosts.call({ hostId: "h", method: "host.describe", params: { verbose: true } });
-    expect(transport.invoke).toHaveBeenLastCalledWith(contract.hosts.call.channel, { hostId: "h", method: "host.describe", params: { verbose: true } });
+    expect(transport.invoke).toHaveBeenLastCalledWith(contract.hosts.call.channel, {
+      hostId: "h",
+      method: "host.describe",
+      params: { verbose: true },
+    });
   });
 });

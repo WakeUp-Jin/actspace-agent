@@ -1,4 +1,11 @@
-import type { UsageActivityAggregate, UsageActivityRow, UsageActivitySnapshot, UsageAuxiliaryPurpose, UsageSeries, UsageStatisticsRange } from "@actspace/shared";
+import type {
+  UsageActivityAggregate,
+  UsageActivityRow,
+  UsageActivitySnapshot,
+  UsageAuxiliaryPurpose,
+  UsageSeries,
+  UsageStatisticsRange,
+} from "@actspace/shared";
 import type { DonutSegment, HoverDetail } from "../stats/stats-ui";
 import { DASH, average, fmtDuration, fmtInt, fmtTokens, fmtUsd, ratio } from "../stats/stats-format";
 import { billedInputTokens, formatCacheHitPercent } from "../composer/composer-stats";
@@ -43,7 +50,11 @@ export function fmtCacheHit(tokens: CacheTokens): string {
 }
 
 /** 「全部」的天数：最早一条记录到现在，至少 1 天。 */
-export function rangeDays(range: UsageStatisticsRange, firstAt: string | null | undefined, now: Date = new Date()): number | null {
+export function rangeDays(
+  range: UsageStatisticsRange,
+  firstAt: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
   if (range !== "total") return RANGE_DAYS[range];
   if (!firstAt) return null;
   const first = Date.parse(firstAt);
@@ -65,7 +76,13 @@ export function gapNote(data: UsageActivitySnapshot | null): { text: string; rea
   ].filter(Boolean);
   if (reasons.length === 0) return null;
   const gap = failed + unpriced;
-  return { text: gap > 0 ? `有 ${fmtInt(gap)} 次请求缺少用量或定价，数值为已知部分的合计` : "部分请求的服务商未返回缓存字段，数值为已知部分的合计", reasons };
+  return {
+    text:
+      gap > 0
+        ? `有 ${fmtInt(gap)} 次请求缺少用量或定价，数值为已知部分的合计`
+        : "部分请求的服务商未返回缓存字段，数值为已知部分的合计",
+    reasons,
+  };
 }
 
 // ---------------------------------------------------------------- 环形图
@@ -82,16 +99,27 @@ export function tokenTypeSegments(summary: Summary): DonutSegment[] {
 }
 
 export function tokenModelSegments(models: readonly UsageActivityAggregate[]): DonutSegment[] {
-  return modelsWithLabels(models).filter((model) => model.totalTokens > 0).map((model, index) => ({
-    key: model.key, label: model.displayLabel, value: model.totalTokens, color: SERIES_COLORS[index % SERIES_COLORS.length], valueLabel: fmtTokens(model.totalTokens),
-  }));
+  return modelsWithLabels(models)
+    .filter((model) => model.totalTokens > 0)
+    .map((model, index) => ({
+      key: model.key,
+      label: model.displayLabel,
+      value: model.totalTokens,
+      color: SERIES_COLORS[index % SERIES_COLORS.length],
+      valueLabel: fmtTokens(model.totalTokens),
+    }));
 }
 
 /** 同名模型挂在多个提供商下时，图例里带上提供商以免混淆。 */
-export function modelsWithLabels(models: readonly UsageActivityAggregate[]): (UsageActivityAggregate & { displayLabel: string })[] {
+export function modelsWithLabels(
+  models: readonly UsageActivityAggregate[],
+): (UsageActivityAggregate & { displayLabel: string })[] {
   const counts = new Map<string, number>();
   for (const model of models) counts.set(model.label, (counts.get(model.label) ?? 0) + 1);
-  return models.map((model) => ({ ...model, displayLabel: (counts.get(model.label) ?? 0) > 1 ? `${model.label} · ${model.providerId ?? "未知"}` : model.label }));
+  return models.map((model) => ({
+    ...model,
+    displayLabel: (counts.get(model.label) ?? 0) > 1 ? `${model.label} · ${model.providerId ?? "未知"}` : model.label,
+  }));
 }
 
 const timeValue = (ms: number, count: number) => `${fmtDuration(ms)} · ${fmtInt(count)} 次`;
@@ -102,26 +130,62 @@ export function phaseSegments(data: UsageActivitySnapshot): DonutSegment[] {
   const harness = !data.harnessUnavailable;
   return [
     { key: "ttft", label: "首字等待", value: timing.ttftMs, count: timing.ttftSamples, color: "var(--act-color-info)" },
-    { key: "decode", label: "模型输出", value: timing.decodeMs, count: timing.ttftSamples, color: "var(--act-context-tools)" },
-    ...(harness ? [
-      { key: "tool", label: "工具执行", value: timing.toolMs, count: timing.toolSamples, color: "var(--act-context-rules)" },
-      { key: "approval", label: "等待审批", value: timing.approvalWaitMs, count: timing.approvalSamples, color: "var(--act-context-skills)" },
-    ] : []),
-    { key: "aux", label: "辅助模型", value: timing.auxiliaryMs, count: timing.auxiliaryCount, color: "var(--act-context-system)" },
+    {
+      key: "decode",
+      label: "模型输出",
+      value: timing.decodeMs,
+      count: timing.ttftSamples,
+      color: "var(--act-context-tools)",
+    },
+    ...(harness
+      ? [
+          {
+            key: "tool",
+            label: "工具执行",
+            value: timing.toolMs,
+            count: timing.toolSamples,
+            color: "var(--act-context-rules)",
+          },
+          {
+            key: "approval",
+            label: "等待审批",
+            value: timing.approvalWaitMs,
+            count: timing.approvalSamples,
+            color: "var(--act-context-skills)",
+          },
+        ]
+      : []),
+    {
+      key: "aux",
+      label: "辅助模型",
+      value: timing.auxiliaryMs,
+      count: timing.auxiliaryCount,
+      color: "var(--act-context-system)",
+    },
   ].map(({ count, ...segment }) => ({ ...segment, valueLabel: timeValue(segment.value, count) }));
 }
 
 export function toolTimeSegments(data: UsageActivitySnapshot): DonutSegment[] {
-  return [...(data.tools ?? [])].sort((a, b) => b.durationMs - a.durationMs).slice(0, 7).filter((tool) => tool.durationMs > 0).map((tool, index) => ({
-    key: tool.name, label: tool.name, value: tool.durationMs, color: SERIES_COLORS[index % SERIES_COLORS.length], valueLabel: timeValue(tool.durationMs, tool.durationSamples),
-  }));
+  return [...(data.tools ?? [])]
+    .sort((a, b) => b.durationMs - a.durationMs)
+    .slice(0, 7)
+    .filter((tool) => tool.durationMs > 0)
+    .map((tool, index) => ({
+      key: tool.name,
+      label: tool.name,
+      value: tool.durationMs,
+      color: SERIES_COLORS[index % SERIES_COLORS.length],
+      valueLabel: timeValue(tool.durationMs, tool.durationSamples),
+    }));
 }
 
 // ---------------------------------------------------------------- 用量趋势
 
 export type TrendMetric = "tokens" | "cost" | "requests";
-export const fmtTrend = (metric: TrendMetric, value: number) => (metric === "tokens" ? fmtTokens(value) : metric === "cost" ? fmtUsd(value) : `${fmtInt(value)} 次`);
-const bucketValue = (metric: TrendMetric, bucket: UsageSeries["buckets"][number]) => (metric === "tokens" ? bucket.tokens : metric === "cost" ? bucket.costUsd : bucket.requests);
+export const fmtTrend = (metric: TrendMetric, value: number) =>
+  metric === "tokens" ? fmtTokens(value) : metric === "cost" ? fmtUsd(value) : `${fmtInt(value)} 次`;
+const bucketValue = (metric: TrendMetric, bucket: UsageSeries["buckets"][number]) =>
+  metric === "tokens" ? bucket.tokens : metric === "cost" ? bucket.costUsd : bucket.requests;
 
 export function bucketLabel(unit: UsageSeries["unit"], start: string): string {
   if (unit === "hour") return `${Number(start.slice(11, 13))}:00`;
@@ -134,10 +198,26 @@ export function trendModel(series: UsageSeries, metric: TrendMetric) {
   const values = series.buckets.map((bucket) => bucketValue(metric, bucket));
   const unitWord = series.unit === "hour" ? "每小时" : series.unit === "week" ? "每周" : "每天";
   const total = values.reduce((sum, value) => sum + value, 0);
-  const bars = series.buckets.map((bucket, index) => ({ key: bucket.start, value: values[index], tip: `${bucketLabel(series.unit, bucket.start)}\n${fmtTrend(metric, values[index])}` }));
+  const bars = series.buckets.map((bucket, index) => ({
+    key: bucket.start,
+    value: values[index],
+    tip: `${bucketLabel(series.unit, bucket.start)}\n${fmtTrend(metric, values[index])}`,
+  }));
   const n = series.buckets.length;
-  const short = (start: string) => (series.unit === "hour" ? `${Number(start.slice(11, 13))}:00` : `${Number(start.slice(5, 7))}月${Number(start.slice(8, 10))}日`);
-  const xLabels = n === 0 ? [] : n < 3 ? series.buckets.map((bucket) => short(bucket.start)) : [short(series.buckets[0].start), short(series.buckets[Math.floor((n - 1) / 2)].start), short(series.buckets[n - 1].start)];
+  const short = (start: string) =>
+    series.unit === "hour"
+      ? `${Number(start.slice(11, 13))}:00`
+      : `${Number(start.slice(5, 7))}月${Number(start.slice(8, 10))}日`;
+  const xLabels =
+    n === 0
+      ? []
+      : n < 3
+        ? series.buckets.map((bucket) => short(bucket.start))
+        : [
+            short(series.buckets[0].start),
+            short(series.buckets[Math.floor((n - 1) / 2)].start),
+            short(series.buckets[n - 1].start),
+          ];
   return { bars, xLabels, max: n ? Math.max(...values) : 0, average: n ? total / n : 0, unitWord };
 }
 
@@ -149,25 +229,45 @@ export function priceDetail(row: UsageActivityRow): HoverDetail | null {
   const pricing = row.costProvenance?.pricingSnapshot;
   if (!pricing) return { title: row.model ?? "未知模型", mono: true, rows: [], note: "暂无单价" };
   return {
-    title: row.model ?? pricing.apiModel, mono: true,
-    rows: [["缓存读取", per1M(pricing.rates.cacheRead)], ...(pricing.rates.cacheWrite != null ? [["缓存写入", per1M(pricing.rates.cacheWrite)] as const] : []), ["输入", per1M(pricing.rates.input)], ["输出", per1M(pricing.rates.output)]],
+    title: row.model ?? pricing.apiModel,
+    mono: true,
+    rows: [
+      ["缓存读取", per1M(pricing.rates.cacheRead)],
+      ...(pricing.rates.cacheWrite != null ? [["缓存写入", per1M(pricing.rates.cacheWrite)] as const] : []),
+      ["输入", per1M(pricing.rates.input)],
+      ["输出", per1M(pricing.rates.output)],
+    ],
     note: "单价来自模型配置；费用按请求发生时的单价算。",
   };
 }
 
 export function timeDetail(row: UsageActivityRow): HoverDetail | null {
   if (row.durationMs == null) return null;
-  const speed = row.decodeMs && row.decodeMs > 0 && row.tokens.outputTokens != null ? row.tokens.outputTokens / (row.decodeMs / 1000) : null;
+  const speed =
+    row.decodeMs && row.decodeMs > 0 && row.tokens.outputTokens != null
+      ? row.tokens.outputTokens / (row.decodeMs / 1000)
+      : null;
   return {
     title: "耗时明细",
-    rows: [["首字等待", fmtDuration(row.ttftMs)], ["模型输出", fmtDuration(row.decodeMs)], ["输出速度", speed == null ? DASH : `${Math.round(speed)} tok/s`]],
+    rows: [
+      ["首字等待", fmtDuration(row.ttftMs)],
+      ["模型输出", fmtDuration(row.decodeMs)],
+      ["输出速度", speed == null ? DASH : `${Math.round(speed)} tok/s`],
+    ],
     total: ["合计", fmtDuration(row.durationMs)],
   };
 }
 
 const count = (value: number | null | undefined) => (value == null ? DASH : value.toLocaleString("zh-CN"));
 
-export function tokenDetail(tokens: { inputTokens: number | null; outputTokens: number | null; cacheReadTokens: number | null; cacheWriteTokens: number | null; reasoningTokens: number | null; totalTokens: number | null }): HoverDetail | null {
+export function tokenDetail(tokens: {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  reasoningTokens: number | null;
+  totalTokens: number | null;
+}): HoverDetail | null {
   if (tokens.totalTokens == null) return null;
   return {
     title: "Token 明细",
@@ -185,9 +285,12 @@ export function tokenDetail(tokens: { inputTokens: number | null; outputTokens: 
 export function costDetail(row: UsageActivityRow): HoverDetail | null {
   const pricing = row.costProvenance?.pricingSnapshot;
   if (row.costAmount == null || row.costCurrency !== "USD") return null;
-  if (!pricing || row.costProvenance?.basis === "provider-reported") return { title: "费用明细", rows: [], total: ["合计", fmtUsd(row.costAmount, true)], note: "费用由服务商返回。" };
+  if (!pricing || row.costProvenance?.basis === "provider-reported")
+    return { title: "费用明细", rows: [], total: ["合计", fmtUsd(row.costAmount, true)], note: "费用由服务商返回。" };
   const parts: (readonly [string, string])[] = [];
-  const add = (label: string, tokens: number | null, rate: number | null) => { if (tokens && rate != null) parts.push([label, `$${((tokens * rate) / 1e6).toFixed(4)}`]); };
+  const add = (label: string, tokens: number | null, rate: number | null) => {
+    if (tokens && rate != null) parts.push([label, `$${((tokens * rate) / 1e6).toFixed(4)}`]);
+  };
   add("缓存读取", row.tokens.cacheReadTokens, pricing.rates.cacheRead);
   add("缓存写入", row.tokens.cacheWriteTokens, pricing.rates.cacheWrite);
   add("输入", row.tokens.inputTokens, pricing.rates.input);
@@ -204,7 +307,11 @@ export function modelCostDetail(model: UsageActivityAggregate): HoverDetail | nu
   if (cost.knownCostRequestCount === 0) return null;
   return {
     title: "费用明细",
-    rows: [["已知费用的请求", `${fmtInt(cost.knownCostRequestCount)} 次`], ["费用未知的请求", `${fmtInt(cost.unknownCostRequestCount)} 次`], ["平均每次", fmtUsd(average(cost.costUsd, cost.knownCostRequestCount), true)]],
+    rows: [
+      ["已知费用的请求", `${fmtInt(cost.knownCostRequestCount)} 次`],
+      ["费用未知的请求", `${fmtInt(cost.unknownCostRequestCount)} 次`],
+      ["平均每次", fmtUsd(average(cost.costUsd, cost.knownCostRequestCount), true)],
+    ],
     total: ["合计", fmtUsd(cost.costUsd)],
     note: cost.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录。" : undefined,
   };

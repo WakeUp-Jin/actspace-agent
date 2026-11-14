@@ -4,7 +4,12 @@ import { open, type FileHandle } from "node:fs/promises";
 import type { EventCodecRegistry } from "@actspace/session-journal";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { validateSessionHeader, type SessionHeaderV1 } from "@actspace/session-journal";
-import { SessionEventValidator, type SessionAccessState, type SessionValidationDiagnostic, type SessionValidationResult } from "@actspace/session-journal";
+import {
+  SessionEventValidator,
+  type SessionAccessState,
+  type SessionValidationDiagnostic,
+  type SessionValidationResult,
+} from "@actspace/session-journal";
 import { queryStamp } from "./query-stamp.js";
 
 export type SessionInspection = {
@@ -65,14 +70,17 @@ export async function readJsonlSession(
     // Stat before reading: bytes appended during the read make the next stamp differ instead of hiding.
     stat = await handle.stat();
     bytes = await handle.readFile();
-  } finally { await handle.close(); }
+  } finally {
+    await handle.close();
+  }
   const hash = createHash("sha256").update(bytes);
   const diagnostics: SessionValidationDiagnostic[] = [];
   let header: SessionHeaderV1 | null = null;
   const events: SessionEventEnvelopeV1[] = [];
   let tornTail: SessionInspection["tornTail"] = null;
   try {
-    if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) throw new Error("Journal must not contain a UTF-8 BOM.");
+    if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf)
+      throw new Error("Journal must not contain a UTF-8 BOM.");
     const hasFinalLf = bytes.length > 0 && bytes[bytes.length - 1] === 0x0a;
     let parseBytes = bytes;
     if (!hasFinalLf) {
@@ -81,7 +89,10 @@ export async function readJsonlSession(
       tornTail = Object.freeze({ offset, bytes: Buffer.from(bytes.subarray(offset)) });
       parseBytes = bytes.subarray(0, offset);
     }
-    const lines = parseBytes.toString("utf8").split("\n").filter((line) => line.length > 0);
+    const lines = parseBytes
+      .toString("utf8")
+      .split("\n")
+      .filter((line) => line.length > 0);
     if (lines.length === 0) throw new Error("Journal has no Header.");
     const headerValue = JSON.parse(lines[0] as string) as unknown;
     validateSessionHeader(headerValue, expectedSessionId);
@@ -92,29 +103,86 @@ export async function readJsonlSession(
     const validator = new SessionEventValidator(registry);
     const validation = validator.append(events);
     if (tornTail !== null) {
-      diagnostics.push({ code: "INVALID_EVENT", seq: events.length, type: "physical/torn-tail", message: "Journal has a torn final line; explicit repair is required." });
-      const inspection = freezeInspection({ journalPath, header, events, accessState: "corrupt", diagnostics: [...validation.diagnostics, ...diagnostics], validation, tornTail, contentDigest: hash.copy().digest("hex"), bytes: bytes.length });
+      diagnostics.push({
+        code: "INVALID_EVENT",
+        seq: events.length,
+        type: "physical/torn-tail",
+        message: "Journal has a torn final line; explicit repair is required.",
+      });
+      const inspection = freezeInspection({
+        journalPath,
+        header,
+        events,
+        accessState: "corrupt",
+        diagnostics: [...validation.diagnostics, ...diagnostics],
+        validation,
+        tornTail,
+        contentDigest: hash.copy().digest("hex"),
+        bytes: bytes.length,
+      });
       return { inspection, resume: null };
     }
     // Resume is only sound when the stamp describes exactly the bytes consumed.
     const extensible = bytes.length === stat.size && bytes.length > 0;
-    const resume: JournalResume | null = extensible ? {
-      identity: identityOf(stat), stamp: queryStamp(stat), size: bytes.length, tail: Buffer.from(bytes.subarray(Math.max(0, bytes.length - TAIL_BYTES))),
-      hash, validator, header, events, registry,
-    } : null;
+    const resume: JournalResume | null = extensible
+      ? {
+          identity: identityOf(stat),
+          stamp: queryStamp(stat),
+          size: bytes.length,
+          tail: Buffer.from(bytes.subarray(Math.max(0, bytes.length - TAIL_BYTES))),
+          hash,
+          validator,
+          header,
+          events,
+          registry,
+        }
+      : null;
     const contentDigest = hash.copy().digest("hex");
-    const inspection = freezeInspection({ journalPath, header, events, accessState: validation.accessState, diagnostics: validation.diagnostics, validation, tornTail: null, contentDigest, bytes: bytes.length });
+    const inspection = freezeInspection({
+      journalPath,
+      header,
+      events,
+      accessState: validation.accessState,
+      diagnostics: validation.diagnostics,
+      validation,
+      tornTail: null,
+      contentDigest,
+      bytes: bytes.length,
+    });
     // The state refers to the frozen array, not the builder array.
     return { inspection, resume: resume ? { ...resume, events: inspection.events } : null };
   } catch (error) {
-    diagnostics.push({ code: "INVALID_EVENT", seq: events.length, type: "physical/invalid", message: error instanceof Error ? error.message : String(error) });
-    return { inspection: freezeInspection({ journalPath, header, events, accessState: "corrupt", diagnostics, validation: null, tornTail, contentDigest: hash.copy().digest("hex"), bytes: bytes.length }), resume: null };
+    diagnostics.push({
+      code: "INVALID_EVENT",
+      seq: events.length,
+      type: "physical/invalid",
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return {
+      inspection: freezeInspection({
+        journalPath,
+        header,
+        events,
+        accessState: "corrupt",
+        diagnostics,
+        validation: null,
+        tornTail,
+        contentDigest: hash.copy().digest("hex"),
+        bytes: bytes.length,
+      }),
+      resume: null,
+    };
   }
 }
 
 export type JournalRefresh =
   | { readonly kind: "unchanged" }
-  | { readonly kind: "appended"; readonly inspection: SessionInspection; readonly resume: JournalResume; readonly fromEvent: number }
+  | {
+      readonly kind: "appended";
+      readonly inspection: SessionInspection;
+      readonly resume: JournalResume;
+      readonly fromEvent: number;
+    }
   /** Not provably append-only (or anything unexpected): the caller must do a full read. */
   | { readonly kind: "full" };
 
@@ -142,8 +210,12 @@ export async function refreshJsonlSession(journalPath: string, resume: JournalRe
       // Compare the same overlap the append path compares; the cost is one bounded read, whatever the file size.
       const tail = await readRange(handle, resume.size - resume.tail.length, resume.tail.length);
       return tail?.equals(resume.tail) ? { kind: "unchanged" } : { kind: "full" };
-    } catch { return { kind: "full" }; }
-  } finally { await handle.close(); }
+    } catch {
+      return { kind: "full" };
+    }
+  } finally {
+    await handle.close();
+  }
 }
 
 /** Exactly the bytes [from, from + length), or null when the file ends before that (it shrank after the stat). */
@@ -158,7 +230,12 @@ async function readRange(handle: FileHandle, from: number, length: number): Prom
   return buffer;
 }
 
-async function extend(handle: FileHandle, stat: Stats, journalPath: string, resume: JournalResume): Promise<JournalRefresh> {
+async function extend(
+  handle: FileHandle,
+  stat: Stats,
+  journalPath: string,
+  resume: JournalResume,
+): Promise<JournalRefresh> {
   const from = resume.size - resume.tail.length;
   const buffer = await readRange(handle, from, stat.size - from);
   if (buffer === null) return { kind: "full" };
@@ -167,18 +244,34 @@ async function extend(handle: FileHandle, stat: Stats, journalPath: string, resu
   // A partial last line is the torn-tail case; let the full reader report it with its exact diagnostics.
   if (added[added.length - 1] !== 0x0a) return { kind: "full" };
   const next: SessionEventEnvelopeV1[] = [];
-  for (const line of added.toString("utf8").split("\n")) if (line.length > 0) next.push(JSON.parse(line) as SessionEventEnvelopeV1);
+  for (const line of added.toString("utf8").split("\n"))
+    if (line.length > 0) next.push(JSON.parse(line) as SessionEventEnvelopeV1);
   const validation = resume.validator.append(next, () => resume.events);
   resume.hash.update(added);
   const events = Object.freeze([...resume.events, ...next]);
   const inspection: SessionInspection = Object.freeze({
-    journalPath, header: resume.header, events, accessState: validation.accessState, diagnostics: validation.diagnostics,
-    validation, tornTail: null, contentDigest: resume.hash.copy().digest("hex"), bytes: stat.size,
+    journalPath,
+    header: resume.header,
+    events,
+    accessState: validation.accessState,
+    diagnostics: validation.diagnostics,
+    validation,
+    tornTail: null,
+    contentDigest: resume.hash.copy().digest("hex"),
+    bytes: stat.size,
   });
   const tail = Buffer.concat([resume.tail, added]);
   return {
-    kind: "appended", inspection, fromEvent: resume.events.length,
-    resume: { ...resume, stamp: queryStamp(stat), size: stat.size, tail: tail.subarray(Math.max(0, tail.length - TAIL_BYTES)), events },
+    kind: "appended",
+    inspection,
+    fromEvent: resume.events.length,
+    resume: {
+      ...resume,
+      stamp: queryStamp(stat),
+      size: stat.size,
+      tail: tail.subarray(Math.max(0, tail.length - TAIL_BYTES)),
+      events,
+    },
   };
 }
 
@@ -187,5 +280,9 @@ function identityOf(stat: Stats): string {
 }
 
 function freezeInspection(value: SessionInspection): SessionInspection {
-  return Object.freeze({ ...value, events: Object.freeze(value.events as SessionEventEnvelopeV1[]), diagnostics: Object.freeze([...value.diagnostics]) });
+  return Object.freeze({
+    ...value,
+    events: Object.freeze(value.events as SessionEventEnvelopeV1[]),
+    diagnostics: Object.freeze([...value.diagnostics]),
+  });
 }

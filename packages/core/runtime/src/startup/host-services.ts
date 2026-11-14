@@ -45,12 +45,17 @@ function freezeSet(values: Iterable<string>): ReadonlySet<string> {
   const source = new Set(values);
   let view: ReadonlySet<string>;
   view = Object.freeze({
-    get size() { return source.size; },
+    get size() {
+      return source.size;
+    },
     has: (value: string) => source.has(value),
     entries: () => source.entries(),
     keys: () => source.keys(),
     values: () => source.values(),
-    forEach: (callback: (value: string, value2: string, set: ReadonlySet<string>) => void, thisArg?: unknown) => source.forEach((value) => { callback.call(thisArg, value, value, view); }),
+    forEach: (callback: (value: string, value2: string, set: ReadonlySet<string>) => void, thisArg?: unknown) =>
+      source.forEach((value) => {
+        callback.call(thisArg, value, value, view);
+      }),
     [Symbol.iterator]: () => source[Symbol.iterator](),
   } as ReadonlySet<string>);
   return view;

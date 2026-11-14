@@ -5,7 +5,12 @@ import { eventsApi } from "../api/events";
 import { hostsApi } from "../api/hosts";
 
 /** `host.describe` 的结果：Host 上的工作区和模型。 */
-export type HostDescription = { state: string; workspaces: { id: string; name: string; path: string }[]; models: { id: string; name: string }[]; defaultModel: string };
+export type HostDescription = {
+  state: string;
+  workspaces: { id: string; name: string; path: string }[];
+  models: { id: string; name: string }[];
+  defaultModel: string;
+};
 
 export type HostDirectorySnapshot = {
   /** 第一次 list 已返回（成功或失败）。在此之前 `hosts` 为空不代表没有 Host。 */
@@ -38,7 +43,14 @@ export interface HostDirectory {
   refresh(): Promise<readonly HostConnection[]>;
 }
 
-const EMPTY: HostDirectorySnapshot = { loaded: false, hosts: [], listError: null, descriptions: {}, describeErrors: {}, describing: {} };
+const EMPTY: HostDirectorySnapshot = {
+  loaded: false,
+  hosts: [],
+  listError: null,
+  descriptions: {},
+  describeErrors: {},
+  describing: {},
+};
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -69,42 +81,63 @@ export function createHostDirectory(source: HostDirectorySource): HostDirectory 
   const describeTokens = new Map<string, number>();
   let nextToken = 0;
 
-  const emit = () => { for (const listener of [...listeners]) listener(); };
-  const set = (patch: Partial<HostDirectorySnapshot>) => { snapshot = { ...snapshot, ...patch }; emit(); };
+  const emit = () => {
+    for (const listener of [...listeners]) listener();
+  };
+  const set = (patch: Partial<HostDirectorySnapshot>) => {
+    snapshot = { ...snapshot, ...patch };
+    emit();
+  };
 
   const describe = (hostId: string) => {
-    const token = ++nextToken, startedIn = epoch;
+    const token = ++nextToken,
+      startedIn = epoch;
     describeTokens.set(hostId, token);
     // 上一次失败的原因在新的结果回来之前清掉，此间显示「正在读取」。
-    set({ describing: { ...snapshot.describing, [hostId]: true }, describeErrors: without(snapshot.describeErrors, hostId) });
+    set({
+      describing: { ...snapshot.describing, [hostId]: true },
+      describeErrors: without(snapshot.describeErrors, hostId),
+    });
     const current = () => startedIn === epoch && describeTokens.get(hostId) === token;
     source.describe(hostId).then(
       (description) => {
         if (!current()) return;
         describeTokens.delete(hostId);
-        set({ descriptions: { ...snapshot.descriptions, [hostId]: description }, describeErrors: without(snapshot.describeErrors, hostId), describing: without(snapshot.describing, hostId) });
+        set({
+          descriptions: { ...snapshot.descriptions, [hostId]: description },
+          describeErrors: without(snapshot.describeErrors, hostId),
+          describing: without(snapshot.describing, hostId),
+        });
       },
       (error: unknown) => {
         if (!current()) return;
         describeTokens.delete(hostId);
-        set({ describeErrors: { ...snapshot.describeErrors, [hostId]: errorText(error) }, describing: without(snapshot.describing, hostId) });
+        set({
+          describeErrors: { ...snapshot.describeErrors, [hostId]: errorText(error) },
+          describing: without(snapshot.describing, hostId),
+        });
       },
     );
   };
 
   const applyHosts = (hosts: HostConnection[], fromEvent: boolean) => {
     const previous = new Map(snapshot.hosts.map((host) => [host.hostId, host]));
-    const removed = snapshot.loaded ? [...previous.keys()].filter((hostId) => !hosts.some((host) => host.hostId === hostId)) : [];
+    const removed = snapshot.loaded
+      ? [...previous.keys()].filter((hostId) => !hosts.some((host) => host.hostId === hostId))
+      : [];
     let { descriptions, describeErrors, describing } = snapshot;
     for (const hostId of removed) {
       describeTokens.delete(hostId);
-      descriptions = without(descriptions, hostId); describeErrors = without(describeErrors, hostId); describing = without(describing, hostId);
+      descriptions = without(descriptions, hostId);
+      describeErrors = without(describeErrors, hostId);
+      describing = without(describing, hostId);
     }
     // 断开的 Host 作废在途的 describe，重连时重新 describe。
-    for (const host of hosts) if (host.state !== "connected" && describeTokens.has(host.hostId)) {
-      describeTokens.delete(host.hostId);
-      describing = without(describing, host.hostId);
-    }
+    for (const host of hosts)
+      if (host.state !== "connected" && describeTokens.has(host.hostId)) {
+        describeTokens.delete(host.hostId);
+        describing = without(describing, host.hostId);
+      }
     snapshot = { ...snapshot, loaded: true, listError: null, hosts, descriptions, describeErrors, describing };
     emit();
     for (const host of hosts) {
@@ -121,7 +154,8 @@ export function createHostDirectory(source: HostDirectorySource): HostDirectory 
   // list 进行中收到了 `hostsChanged`：事件更新，list 的结果作废，不能把事件里新出现的 Host 当成被移除。
   let changes = 0;
   const list = async (): Promise<readonly HostConnection[]> => {
-    const startedIn = epoch, changesBefore = changes;
+    const startedIn = epoch,
+      changesBefore = changes;
     try {
       const hosts = await source.list();
       if (startedIn !== epoch || !release) return hosts;
@@ -135,14 +169,23 @@ export function createHostDirectory(source: HostDirectorySource): HostDirectory 
   };
 
   const start = () => {
-    const unchanged = source.onChanged((hosts) => { changes += 1; applyHosts(hosts, true); });
+    const unchanged = source.onChanged((hosts) => {
+      changes += 1;
+      applyHosts(hosts, true);
+    });
     const unevent = source.onEvent(({ hostId, event }) => {
       const value = event.value as { kind?: string; state?: string } | undefined;
       const description = snapshot.descriptions[hostId];
-      if (value?.kind === "state" && value.state && description) set({ descriptions: { ...snapshot.descriptions, [hostId]: { ...description, state: value.state } } });
+      if (value?.kind === "state" && value.state && description)
+        set({ descriptions: { ...snapshot.descriptions, [hostId]: { ...description, state: value.state } } });
     });
-    release = () => { unchanged(); unevent(); };
-    void list().catch((error: unknown) => { console.error("Failed to list Host connections", error); });
+    release = () => {
+      unchanged();
+      unevent();
+    };
+    void list().catch((error: unknown) => {
+      console.error("Failed to list Host connections", error);
+    });
   };
 
   const retain = () => {
@@ -166,7 +209,10 @@ export function createHostDirectory(source: HostDirectorySource): HostDirectory 
   const register = <T>(target: Set<T>, listener: T) => {
     target.add(listener);
     const done = retain();
-    return () => { target.delete(listener); done(); };
+    return () => {
+      target.delete(listener);
+      done();
+    };
   };
 
   return {
@@ -182,7 +228,7 @@ export const hostDirectory = createHostDirectory({
   list: () => hostsApi.list(),
   onChanged: (listener) => eventsApi.hostsChanged(listener),
   onEvent: (listener) => eventsApi.hostEvent(listener),
-  describe: async (hostId) => await hostsApi.call({ hostId, method: "host.describe", params: {} }) as HostDescription,
+  describe: async (hostId) => (await hostsApi.call({ hostId, method: "host.describe", params: {} })) as HostDescription,
 });
 
 const subscribe = (listener: () => void) => hostDirectory.subscribe(listener);

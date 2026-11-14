@@ -6,7 +6,10 @@ import { createAgentEventDispatcher, type AgentSubject } from "../dispatch.js";
 // Loop 的契约在 agent-loop 里，而 agent-loop 依赖这个包，这里引不到。测试给两个名字声明自己的契约。
 declare module "@actspace/cordis-adapter" {
   interface DomainEvents {
-    "agent/request": WaterfallHook<{ readonly agent: AgentSubject; readonly value: string }, Readonly<Record<string, unknown>>>;
+    "agent/request": WaterfallHook<
+      { readonly agent: AgentSubject; readonly value: string },
+      Readonly<Record<string, unknown>>
+    >;
     "agent/turn-stopping": SerialHook<{ readonly agent: AgentSubject; readonly reason: string }>;
   }
 }
@@ -26,14 +29,20 @@ describe("Agent event dispatcher", () => {
   it("rejects a payload carrying a different Agent subject", async () => {
     const scope = new AgentScope("agent-a", undefined, "scope-a");
     const dispatcher = createAgentEventDispatcher(undefined, scope);
-    expect(() => dispatcher.emit("agent/status", { agent: { agentId: "agent-b" }, status: "started" })).toThrow("does not match");
+    expect(() => dispatcher.emit("agent/status", { agent: { agentId: "agent-b" }, status: "started" })).toThrow(
+      "does not match",
+    );
     await scope.dispose();
   });
 
   it("rejects a subject whose diagnostic identity belongs to another Scope", async () => {
     const scope = new AgentScope("agent-a", undefined, "scope-a");
-    expect(() => createAgentEventDispatcher(undefined, scope, Object.freeze({ agentId: "agent-b", scopeId: "scope-a" }))).toThrow("does not match");
-    expect(() => createAgentEventDispatcher(undefined, scope, Object.freeze({ agentId: "agent-a", scopeId: "scope-b" }))).toThrow("does not match");
+    expect(() =>
+      createAgentEventDispatcher(undefined, scope, Object.freeze({ agentId: "agent-b", scopeId: "scope-a" })),
+    ).toThrow("does not match");
+    expect(() =>
+      createAgentEventDispatcher(undefined, scope, Object.freeze({ agentId: "agent-a", scopeId: "scope-b" })),
+    ).toThrow("does not match");
     await scope.dispose();
   });
 
@@ -51,11 +60,23 @@ describe("Agent event dispatcher", () => {
     const child = parent.child("child");
     const sibling = parent.child("sibling");
     const seen: string[] = [];
-    root.context.on?.("agent/status", () => { seen.push("global"); });
-    scopeContext(root.context, parent.scopeKey).on?.("agent/status", (payload) => { if ((payload as { agent?: { agentId?: string } }).agent?.agentId === "child") seen.push("parent"); });
-    scopeContext(root.context, child.scopeKey).on?.("agent/status", () => { seen.push("child"); });
-    scopeContext(root.context, sibling.scopeKey).on?.("agent/status", () => { seen.push("sibling"); });
-    const dispatcher = createAgentEventDispatcher(root.context, child, Object.freeze({ agentId: "child", scopeId: child.identity.scopeId }));
+    root.context.on?.("agent/status", () => {
+      seen.push("global");
+    });
+    scopeContext(root.context, parent.scopeKey).on?.("agent/status", (payload) => {
+      if ((payload as { agent?: { agentId?: string } }).agent?.agentId === "child") seen.push("parent");
+    });
+    scopeContext(root.context, child.scopeKey).on?.("agent/status", () => {
+      seen.push("child");
+    });
+    scopeContext(root.context, sibling.scopeKey).on?.("agent/status", () => {
+      seen.push("sibling");
+    });
+    const dispatcher = createAgentEventDispatcher(
+      root.context,
+      child,
+      Object.freeze({ agentId: "child", scopeId: child.identity.scopeId }),
+    );
     await dispatcher.emit("agent/status", { status: "started" });
     expect(seen.sort()).toEqual(["child", "global", "parent"]);
     await root.dispose();
@@ -67,10 +88,22 @@ describe("Agent event dispatcher", () => {
     const first = new AgentScope("main:first");
     const second = new AgentScope("main:second");
     const seen: string[] = [];
-    scopeContext(root.context, first.scopeKey).on?.("agent/status", (payload) => { seen.push(`first:${(payload as { agent: { agentId: string } }).agent.agentId}`); });
-    scopeContext(root.context, second.scopeKey).on?.("agent/status", (payload) => { seen.push(`second:${(payload as { agent: { agentId: string } }).agent.agentId}`); });
-    await createAgentEventDispatcher(root.context, first, Object.freeze({ agentId: "main:first", scopeId: first.identity.scopeId })).emit("agent/status", { status: "started" });
-    await createAgentEventDispatcher(root.context, second, Object.freeze({ agentId: "main:second", scopeId: second.identity.scopeId })).emit("agent/status", { status: "started" });
+    scopeContext(root.context, first.scopeKey).on?.("agent/status", (payload) => {
+      seen.push(`first:${(payload as { agent: { agentId: string } }).agent.agentId}`);
+    });
+    scopeContext(root.context, second.scopeKey).on?.("agent/status", (payload) => {
+      seen.push(`second:${(payload as { agent: { agentId: string } }).agent.agentId}`);
+    });
+    await createAgentEventDispatcher(
+      root.context,
+      first,
+      Object.freeze({ agentId: "main:first", scopeId: first.identity.scopeId }),
+    ).emit("agent/status", { status: "started" });
+    await createAgentEventDispatcher(
+      root.context,
+      second,
+      Object.freeze({ agentId: "main:second", scopeId: second.identity.scopeId }),
+    ).emit("agent/status", { status: "started" });
     expect(seen).toEqual(["first:main:first", "second:main:second"]);
     await root.dispose();
     await Promise.all([first.dispose(), second.dispose()]);
@@ -80,7 +113,9 @@ describe("Agent event dispatcher", () => {
     const root = await createCordisRoot();
     const scope = new AgentScope("agent-a");
     let release!: () => void;
-    const listenerDone = new Promise<void>((resolve) => { release = resolve; });
+    const listenerDone = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     scopeContext(root.context, scope.scopeKey).on?.("agent/status", () => listenerDone);
     try {
       const dispatch = createAgentEventDispatcher(root.context, scope);
@@ -117,5 +152,4 @@ describe("Agent event dispatcher", () => {
     await scope.dispose();
     await root.dispose();
   });
-
 });

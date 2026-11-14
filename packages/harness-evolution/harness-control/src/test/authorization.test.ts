@@ -4,7 +4,8 @@ const request = { activationId: "a", harnessId: "main", candidateId: "c", execut
 const decision = { ...request, actor: "host", decisionId: "approved", expiresAt: 100 };
 it("requires Host decision bound to every activation field", () => {
   expect(() => checkAuthorization(request, null, 0)).toThrow("denied");
-  for (const field of ["activationId", "harnessId", "candidateId", "executionDigest"] as const) expect(() => checkAuthorization(request, { ...decision, [field]: "other" }, 0)).toThrow("mismatch");
+  for (const field of ["activationId", "harnessId", "candidateId", "executionDigest"] as const)
+    expect(() => checkAuthorization(request, { ...decision, [field]: "other" }, 0)).toThrow("mismatch");
   expect(() => checkAuthorization(request, { ...decision, expectedRevision: 2 }, 0)).toThrow("mismatch");
   expect(() => checkAuthorization(request, decision, 100)).toThrow("expired");
   expect(() => checkAuthorization(request, decision, 99)).not.toThrow();

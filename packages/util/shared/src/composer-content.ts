@@ -59,9 +59,7 @@ export type ComposerReferenceIssue = {
   limit?: number;
 };
 
-export type ComposerReferenceValidation<T> =
-  | { ok: true; value: T[] }
-  | { ok: false; issue: ComposerReferenceIssue };
+export type ComposerReferenceValidation<T> = { ok: true; value: T[] } | { ok: false; issue: ComposerReferenceIssue };
 
 export function normalizeWorkspaceRelativePath(path: string): string | null {
   if (typeof path !== "string" || path.includes("\0")) return null;
@@ -85,14 +83,22 @@ export function validateFileReferences(input: unknown): ComposerReferenceValidat
       return { ok: false, issue: { code: "invalid_reference", kind: "file", index } };
     }
     const relativePath = normalizeWorkspaceRelativePath(item.relativePath);
-    if (!relativePath) return { ok: false, issue: { code: "invalid_reference", kind: "file", index, relativePath: item.relativePath.slice(0, 200) } };
+    if (!relativePath)
+      return {
+        ok: false,
+        issue: { code: "invalid_reference", kind: "file", index, relativePath: item.relativePath.slice(0, 200) },
+      };
     if (seen.has(relativePath)) continue;
     seen.add(relativePath);
-    const displayName = item.displayName.trim().slice(0, COMPOSER_REFERENCE_LIMITS.maxDisplayNameLength) || basename(relativePath);
+    const displayName =
+      item.displayName.trim().slice(0, COMPOSER_REFERENCE_LIMITS.maxDisplayNameLength) || basename(relativePath);
     value.push({ relativePath, displayName });
   }
   if (value.length > COMPOSER_REFERENCE_LIMITS.maxFileReferences) {
-    return { ok: false, issue: { code: "too_many_references", kind: "file", limit: COMPOSER_REFERENCE_LIMITS.maxFileReferences } };
+    return {
+      ok: false,
+      issue: { code: "too_many_references", kind: "file", limit: COMPOSER_REFERENCE_LIMITS.maxFileReferences },
+    };
   }
   return { ok: true, value };
 }
@@ -104,21 +110,40 @@ export function validateResponseAnnotations(input: unknown): ComposerReferenceVa
   const value: ResponseAnnotationReference[] = [];
   const seen = new Set<string>();
   for (const [index, item] of input.entries()) {
-    const invalid = { ok: false as const, issue: { code: "invalid_reference" as const, kind: "annotation" as const, index } };
+    const invalid = {
+      ok: false as const,
+      issue: { code: "invalid_reference" as const, kind: "annotation" as const, index },
+    };
     if (!isRecord(item)) return invalid;
-    const { annotationId, assistantMessageId, selectedText, startOffset, endOffset, prefixContext, suffixContext, comment } = item;
+    const {
+      annotationId,
+      assistantMessageId,
+      selectedText,
+      startOffset,
+      endOffset,
+      prefixContext,
+      suffixContext,
+      comment,
+    } = item;
     if (!isBoundedId(annotationId) || !isBoundedId(assistantMessageId)) return invalid;
     if (typeof selectedText !== "string" || !selectedText.trim()) return invalid;
     if (!Number.isSafeInteger(startOffset) || !Number.isSafeInteger(endOffset)) return invalid;
     if ((startOffset as number) < 0 || (startOffset as number) >= (endOffset as number)) return invalid;
     if (typeof prefixContext !== "string" || typeof suffixContext !== "string") return invalid;
-    if (prefixContext.length > limits.maxContextCodeUnits || suffixContext.length > limits.maxContextCodeUnits) return invalid;
+    if (prefixContext.length > limits.maxContextCodeUnits || suffixContext.length > limits.maxContextCodeUnits)
+      return invalid;
     if (comment !== undefined && typeof comment !== "string") return invalid;
     if (codePointLength(selectedText) > limits.maxSelectedTextCodePoints) {
-      return { ok: false, issue: { code: "annotation_text_too_long", kind: "annotation", index, limit: limits.maxSelectedTextCodePoints } };
+      return {
+        ok: false,
+        issue: { code: "annotation_text_too_long", kind: "annotation", index, limit: limits.maxSelectedTextCodePoints },
+      };
     }
     if (comment !== undefined && codePointLength(comment) > limits.maxCommentCodePoints) {
-      return { ok: false, issue: { code: "annotation_comment_too_long", kind: "annotation", index, limit: limits.maxCommentCodePoints } };
+      return {
+        ok: false,
+        issue: { code: "annotation_comment_too_long", kind: "annotation", index, limit: limits.maxCommentCodePoints },
+      };
     }
     const key = responseAnnotationKey({ assistantMessageId, startOffset, endOffset } as ResponseAnnotationReference);
     if (seen.has(key)) continue;
@@ -136,21 +161,32 @@ export function validateResponseAnnotations(input: unknown): ComposerReferenceVa
     });
   }
   if (value.length > limits.maxResponseAnnotations) {
-    return { ok: false, issue: { code: "too_many_references", kind: "annotation", limit: limits.maxResponseAnnotations } };
+    return {
+      ok: false,
+      issue: { code: "too_many_references", kind: "annotation", limit: limits.maxResponseAnnotations },
+    };
   }
   return { ok: true, value };
 }
 
 /** 同一条回复的同一段范围视为同一条引用。 */
-export function responseAnnotationKey(annotation: Pick<ResponseAnnotationReference, "assistantMessageId" | "startOffset" | "endOffset">): string {
+export function responseAnnotationKey(
+  annotation: Pick<ResponseAnnotationReference, "assistantMessageId" | "startOffset" | "endOffset">,
+): string {
   return `${annotation.assistantMessageId}:${annotation.startOffset}:${annotation.endOffset}`;
 }
 
 export function fileReferenceBlocks(references: readonly FileReference[]): FileReferenceContentBlock[] {
-  return references.map((reference) => ({ type: "file-reference", relativePath: reference.relativePath, displayName: reference.displayName }));
+  return references.map((reference) => ({
+    type: "file-reference",
+    relativePath: reference.relativePath,
+    displayName: reference.displayName,
+  }));
 }
 
-export function responseExcerptBlocks(annotations: readonly ResponseAnnotationReference[]): ResponseExcerptContentBlock[] {
+export function responseExcerptBlocks(
+  annotations: readonly ResponseAnnotationReference[],
+): ResponseExcerptContentBlock[] {
   return annotations.map((annotation) => ({ type: "response-excerpt", ...annotation }));
 }
 
@@ -168,19 +204,31 @@ export function readResponseExcerptBlocks(content: unknown): ResponseAnnotationR
   if (!Array.isArray(content)) return [];
   return content.flatMap((block): ResponseAnnotationReference[] => {
     if (!isRecord(block) || block.type !== "response-excerpt") return [];
-    const { annotationId, assistantMessageId, selectedText, startOffset, endOffset, prefixContext, suffixContext, comment } = block;
-    if (typeof annotationId !== "string" || typeof assistantMessageId !== "string" || typeof selectedText !== "string") return [];
-    if (typeof startOffset !== "number" || typeof endOffset !== "number") return [];
-    return [{
+    const {
       annotationId,
       assistantMessageId,
       selectedText,
       startOffset,
       endOffset,
-      prefixContext: typeof prefixContext === "string" ? prefixContext : "",
-      suffixContext: typeof suffixContext === "string" ? suffixContext : "",
-      ...(typeof comment === "string" && comment ? { comment } : {}),
-    }];
+      prefixContext,
+      suffixContext,
+      comment,
+    } = block;
+    if (typeof annotationId !== "string" || typeof assistantMessageId !== "string" || typeof selectedText !== "string")
+      return [];
+    if (typeof startOffset !== "number" || typeof endOffset !== "number") return [];
+    return [
+      {
+        annotationId,
+        assistantMessageId,
+        selectedText,
+        startOffset,
+        endOffset,
+        prefixContext: typeof prefixContext === "string" ? prefixContext : "",
+        suffixContext: typeof suffixContext === "string" ? suffixContext : "",
+        ...(typeof comment === "string" && comment ? { comment } : {}),
+      },
+    ];
   });
 }
 
@@ -190,12 +238,16 @@ const FILE_REFERENCE_MODEL_NOTE =
 /** 模型只看到路径和一句说明；不读文件、不带 UI 文案。 */
 export function renderFileReferencesForModel(references: readonly Pick<FileReference, "relativePath">[]): string {
   if (references.length === 0) return "";
-  const tags = references.map((reference) => `<workspace_file_reference path=${JSON.stringify(reference.relativePath)} />`);
+  const tags = references.map(
+    (reference) => `<workspace_file_reference path=${JSON.stringify(reference.relativePath)} />`,
+  );
   return [...tags, FILE_REFERENCE_MODEL_NOTE].join("\n");
 }
 
 /** 模型只看到选中原文和用户评论；不暴露 message id、编号或偏移。 */
-export function renderResponseExcerptForModel(annotation: Pick<ResponseAnnotationReference, "selectedText" | "comment">): string {
+export function renderResponseExcerptForModel(
+  annotation: Pick<ResponseAnnotationReference, "selectedText" | "comment">,
+): string {
   const lines = [`<quoted_assistant_excerpt>\n${annotation.selectedText}\n</quoted_assistant_excerpt>`];
   if (annotation.comment) lines.push(`<user_comment>${annotation.comment}</user_comment>`);
   return lines.join("\n");
@@ -204,17 +256,26 @@ export function renderResponseExcerptForModel(annotation: Pick<ResponseAnnotatio
 export function formatComposerReferenceIssue(issue: ComposerReferenceIssue): string {
   const file = issue.relativePath ? `“${issue.relativePath}”` : "引用的文件";
   switch (issue.code) {
-    case "invalid_reference": return issue.kind === "file" ? `${file}不是有效的工作区路径。` : "回复引用的数据无效，请移除后重新添加。";
-    case "too_many_references": return issue.kind === "file"
-      ? `一次最多引用 ${issue.limit ?? COMPOSER_REFERENCE_LIMITS.maxFileReferences} 个文件。`
-      : `一次最多引用 ${issue.limit ?? COMPOSER_REFERENCE_LIMITS.maxResponseAnnotations} 段回复。`;
-    case "file_references_not_allowed": return "Chat 会话不能引用工作区文件。";
-    case "file_not_found": return `文件${file}不存在或已被移动，请移除后重试。`;
-    case "file_outside_workspace": return `${file}不在当前工作区内。`;
-    case "not_a_file": return `${file}不是普通文件。`;
-    case "annotation_source_missing": return "引用的回复已不在当前会话中，请移除该引用后重试。";
-    case "annotation_text_too_long": return `引用的回复片段超过 ${(issue.limit ?? COMPOSER_REFERENCE_LIMITS.maxSelectedTextCodePoints).toLocaleString("en-US")} 个字符。`;
-    case "annotation_comment_too_long": return `引用评论超过 ${(issue.limit ?? COMPOSER_REFERENCE_LIMITS.maxCommentCodePoints).toLocaleString("en-US")} 个字符。`;
+    case "invalid_reference":
+      return issue.kind === "file" ? `${file}不是有效的工作区路径。` : "回复引用的数据无效，请移除后重新添加。";
+    case "too_many_references":
+      return issue.kind === "file"
+        ? `一次最多引用 ${issue.limit ?? COMPOSER_REFERENCE_LIMITS.maxFileReferences} 个文件。`
+        : `一次最多引用 ${issue.limit ?? COMPOSER_REFERENCE_LIMITS.maxResponseAnnotations} 段回复。`;
+    case "file_references_not_allowed":
+      return "Chat 会话不能引用工作区文件。";
+    case "file_not_found":
+      return `文件${file}不存在或已被移动，请移除后重试。`;
+    case "file_outside_workspace":
+      return `${file}不在当前工作区内。`;
+    case "not_a_file":
+      return `${file}不是普通文件。`;
+    case "annotation_source_missing":
+      return "引用的回复已不在当前会话中，请移除该引用后重试。";
+    case "annotation_text_too_long":
+      return `引用的回复片段超过 ${(issue.limit ?? COMPOSER_REFERENCE_LIMITS.maxSelectedTextCodePoints).toLocaleString("en-US")} 个字符。`;
+    case "annotation_comment_too_long":
+      return `引用评论超过 ${(issue.limit ?? COMPOSER_REFERENCE_LIMITS.maxCommentCodePoints).toLocaleString("en-US")} 个字符。`;
   }
 }
 

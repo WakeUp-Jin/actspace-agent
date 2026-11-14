@@ -11,13 +11,29 @@ export function taskAttachments(sessionId: string, envelope: TaskContentEnvelope
   if (isLocalSession(sessionId)) return original.attachments;
   if (!Array.isArray(original.uploadIds) || !Array.isArray(envelope.prepared)) return undefined;
   const prepared = envelope.prepared;
-  return original.uploadIds.flatMap(artifactId => {
-    const block = prepared.find(value => value && typeof value === "object" && !Array.isArray(value) && value.type === "artifact" && value.artifact && typeof value.artifact === "object" && !Array.isArray(value.artifact) && value.artifact.artifactId === artifactId);
+  return original.uploadIds.flatMap((artifactId) => {
+    const block = prepared.find(
+      (value) =>
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        value.type === "artifact" &&
+        value.artifact &&
+        typeof value.artifact === "object" &&
+        !Array.isArray(value.artifact) &&
+        value.artifact.artifactId === artifactId,
+    );
     if (!block || typeof block !== "object" || Array.isArray(block)) return [];
     const artifact = block.artifact as { mediaType?: string };
-    return [{ id: artifactId, kind: artifact.mediaType?.startsWith("image/") ? "image" as const : "file" as const,
-      name: typeof block.label === "string" ? block.label : artifactId, mimeType: artifact.mediaType,
-      remoteArtifact: { sessionId, artifactId } }];
+    return [
+      {
+        id: artifactId,
+        kind: artifact.mediaType?.startsWith("image/") ? ("image" as const) : ("file" as const),
+        name: typeof block.label === "string" ? block.label : artifactId,
+        mimeType: artifact.mediaType,
+        remoteArtifact: { sessionId, artifactId },
+      },
+    ];
   });
 }
 
@@ -44,23 +60,42 @@ export function isQueueEmpty(queue: SessionMessageQueue): boolean {
   return queue.items.length === 0 && queue.steering.length === 0;
 }
 
-export function takeSteering(queue: SessionMessageQueue, id: string): { queue: SessionMessageQueue; item?: QueuedComposerMessage } {
+export function takeSteering(
+  queue: SessionMessageQueue,
+  id: string,
+): { queue: SessionMessageQueue; item?: QueuedComposerMessage } {
   const item = queue.steering.find((candidate) => candidate.id === id);
   if (!item) return { queue };
   return { queue: { ...queue, steering: queue.steering.filter((candidate) => candidate !== item) }, item };
 }
 
 /** `starting`：空闲发送时正在开始的那条任务，它已作为乐观消息显示在消息流里，不进托盘。 */
-export function projectTaskQueue(snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot, starting?: (task: import("@actspace/shared/runtime-v2").TaskRecord) => boolean): SessionMessageQueue {
-  const items: QueuedComposerMessage[] = []; const steering: QueuedComposerMessage[] = [];
+export function projectTaskQueue(
+  snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot,
+  starting?: (task: import("@actspace/shared/runtime-v2").TaskRecord) => boolean,
+): SessionMessageQueue {
+  const items: QueuedComposerMessage[] = [];
+  const steering: QueuedComposerMessage[] = [];
   for (const id of snapshot.queue) {
-    const task = snapshot.tasks.find(task => task.taskId === id);
+    const task = snapshot.tasks.find((task) => task.taskId === id);
     // 后台任务唤醒不是用户消息，不进排队列表。
     if (task?.state !== "pending" || isBackgroundWake(task.content) || starting?.(task)) continue;
     const envelope = task.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
-    const original = envelope?.kind === "composer-task" ? envelope.original as unknown as import("@actspace/shared/runtime-v2").SubmitTaskInput : null;
+    const original =
+      envelope?.kind === "composer-task"
+        ? (envelope.original as unknown as import("@actspace/shared/runtime-v2").SubmitTaskInput)
+        : null;
     const text = original?.userInput ?? (typeof task.content === "string" ? task.content : "待执行消息");
-    const item: QueuedComposerMessage = { id, text, kind: text.trim() === "/compact" ? "compact" : "message", options: { attachments: taskAttachments(snapshot.sessionId, envelope), fileReferences: original?.fileReferences, responseAnnotations: original?.responseAnnotations } };
+    const item: QueuedComposerMessage = {
+      id,
+      text,
+      kind: text.trim() === "/compact" ? "compact" : "message",
+      options: {
+        attachments: taskAttachments(snapshot.sessionId, envelope),
+        fileReferences: original?.fileReferences,
+        responseAnnotations: original?.responseAnnotations,
+      },
+    };
     (task.targetRunId ? steering : items).push(item);
   }
   return { items, steering, paused: snapshot.paused };

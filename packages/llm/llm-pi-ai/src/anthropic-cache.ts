@@ -4,7 +4,7 @@ type AnthropicParams = Record<string, RuntimeJsonValue>;
 type JsonRecord = Record<string, RuntimeJsonValue>;
 
 export function anthropicCacheControl(retention: "short" | "long" | "none" | undefined) {
-  return retention === "none" ? undefined : { type: "ephemeral", ttl: retention === "long" ? "1h" : "5m" } as const;
+  return retention === "none" ? undefined : ({ type: "ephemeral", ttl: retention === "long" ? "1h" : "5m" } as const);
 }
 
 export function applyAnthropicPromptCache(
@@ -23,18 +23,21 @@ export function applyAnthropicPromptCache(
 
   if (Array.isArray(params.tools) && params.tools.length > 0) {
     const lastToolIndex = params.tools.length - 1;
-    next.tools = params.tools.map((tool, index) => index === lastToolIndex && isRecord(tool)
-      ? { ...tool, cache_control: cacheControl }
-      : tool);
+    next.tools = params.tools.map((tool, index) =>
+      index === lastToolIndex && isRecord(tool) ? { ...tool, cache_control: cacheControl } : tool,
+    );
   }
 
   if (Array.isArray(params.messages)) {
-    const messages = params.messages.map((message) => isRecord(message) ? { ...message } : message);
+    const messages = params.messages.map((message) => (isRecord(message) ? { ...message } : message));
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index];
       if (!isRecord(message) || message.role !== "user") continue;
       if (typeof message.content === "string") {
-        messages[index] = { ...message, content: [{ type: "text", text: message.content, cache_control: cacheControl }] };
+        messages[index] = {
+          ...message,
+          content: [{ type: "text", text: message.content, cache_control: cacheControl }],
+        };
       } else if (Array.isArray(message.content)) {
         messages[index] = { ...message, content: markLastEligibleBlock(message.content, cacheControl) };
       }
@@ -45,8 +48,11 @@ export function applyAnthropicPromptCache(
   return next;
 }
 
-function markLastEligibleBlock(blocks: RuntimeJsonValue[], cacheControl: NonNullable<ReturnType<typeof anthropicCacheControl>>): RuntimeJsonValue[] {
-  const next = blocks.map((block) => isRecord(block) ? { ...block } : block);
+function markLastEligibleBlock(
+  blocks: RuntimeJsonValue[],
+  cacheControl: NonNullable<ReturnType<typeof anthropicCacheControl>>,
+): RuntimeJsonValue[] {
+  const next = blocks.map((block) => (isRecord(block) ? { ...block } : block));
   for (let index = next.length - 1; index >= 0; index -= 1) {
     const block = next[index];
     if (!isRecord(block) || !["text", "image", "tool_result"].includes(String(block.type ?? ""))) continue;

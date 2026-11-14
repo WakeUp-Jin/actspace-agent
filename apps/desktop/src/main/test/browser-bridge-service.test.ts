@@ -29,24 +29,46 @@ describe("BrowserBridgeService", () => {
     await new Promise<void>((resolve) => server.listen(socketPath, resolve));
     servers.push(server);
     await chmod(socketPath, 0o600);
-    await writeFile(join(support, "instances", "s-0000000000000001.sock.json"), JSON.stringify({
-      hostId: "s-0000000000000001.sock", extensionInstanceId: instanceId, socketPath,
-      hostVersion: "0.1.0-dev", extensionVersion: "0.2.2", protocolVersion: "0.2.0",
-    }), { mode: 0o600 });
+    await writeFile(
+      join(support, "instances", "s-0000000000000001.sock.json"),
+      JSON.stringify({
+        hostId: "s-0000000000000001.sock",
+        extensionInstanceId: instanceId,
+        socketPath,
+        hostVersion: "0.1.0-dev",
+        extensionVersion: "0.2.2",
+        protocolVersion: "0.2.0",
+      }),
+      { mode: 0o600 },
+    );
     const source = join(root, "source-abb");
-    await writeFile(source, ["#!/bin/sh", "case \"$1\" in",
-      "help) echo 'Agent Browser Bridge fixture' ;;",
-      "doctor) echo '{\"checks\":[{\"name\":\"local_rpc_socket\",\"status\":\"offline\",\"detail\":\"ambiguous default socket\"}]}' ;;",
-      `info) echo '{"ok":true,"result":{"instanceId":"${instanceId}","version":"0.2.2","protocolVersion":"0.2.0","hostId":"s-0000000000000001.sock","hostVersion":"0.1.0-dev"}}' ;;`,
-      "tabs) echo '[]' ;;", "capabilities) echo '{}' ;;", "esac", ""].join("\n"));
+    await writeFile(
+      source,
+      [
+        "#!/bin/sh",
+        'case "$1" in',
+        "help) echo 'Agent Browser Bridge fixture' ;;",
+        'doctor) echo \'{"checks":[{"name":"local_rpc_socket","status":"offline","detail":"ambiguous default socket"}]}\' ;;',
+        `info) echo '{"ok":true,"result":{"instanceId":"${instanceId}","version":"0.2.2","protocolVersion":"0.2.0","hostId":"s-0000000000000001.sock","hostVersion":"0.1.0-dev"}}' ;;`,
+        "tabs) echo '[]' ;;",
+        "capabilities) echo '{}' ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
     await chmod(source, 0o755);
     const service = new BrowserBridgeService({ dataRoot: join(root, "data") });
     await service.installFromFile(source);
     await writeFile(join(service.pluginRoot, "connection.json"), '{"schemaVersion":1,"enabled":true}');
     const connected = await service.getStatus();
-    expect(connected).toMatchObject({ runState: "waiting_for_runtime", bridgeReady: true, selectedInstanceId: instanceId });
+    expect(connected).toMatchObject({
+      runState: "waiting_for_runtime",
+      bridgeReady: true,
+      selectedInstanceId: instanceId,
+    });
     expect(connected.doctorChecks.find((check) => check.name === "local_rpc_socket")).toMatchObject({
-      status: "ok", detail: `Local bridge socket is accepting requests at ${socketPath}.`,
+      status: "ok",
+      detail: `Local bridge socket is accepting requests at ${socketPath}.`,
     });
     expect(service.socketPath).toBe(socketPath);
     expect(service.isBrowserAllowed()).toBe(true);
@@ -54,16 +76,28 @@ describe("BrowserBridgeService", () => {
     expect((await service.getStatus()).runState).toBe("ready");
     const dispose = vi.fn(async () => {});
     service.setBrowserDisposer(dispose);
-    await writeFile(join(support, "instances", "s-0000000000000001.sock.json"), JSON.stringify({
-      hostId: "s-0000000000000001.sock", extensionInstanceId: instanceId, socketPath,
-      hostVersion: "unverified-host", extensionVersion: "0.2.2", protocolVersion: "0.2.0",
-    }), { mode: 0o600 });
+    await writeFile(
+      join(support, "instances", "s-0000000000000001.sock.json"),
+      JSON.stringify({
+        hostId: "s-0000000000000001.sock",
+        extensionInstanceId: instanceId,
+        socketPath,
+        hostVersion: "unverified-host",
+        extensionVersion: "0.2.2",
+        protocolVersion: "0.2.0",
+      }),
+      { mode: 0o600 },
+    );
     expect((await service.getStatus()).bridgeReady).toBe(false);
     expect(service.isBrowserAllowed()).toBe(false);
     expect(dispose).toHaveBeenCalledOnce();
     await service.disconnect();
     const reopened = new BrowserBridgeService({ dataRoot: join(root, "data") });
-    expect(await reopened.getStatus()).toMatchObject({ enabled: false, runState: "disconnected", selectedInstanceId: instanceId });
+    expect(await reopened.getStatus()).toMatchObject({
+      enabled: false,
+      runState: "disconnected",
+      selectedInstanceId: instanceId,
+    });
     expect(reopened.isBrowserAllowed()).toBe(false);
   });
 
@@ -74,9 +108,18 @@ describe("BrowserBridgeService", () => {
     await mkdir(join(bundle, "bin"), { recursive: true });
     const host = "#!/bin/sh\necho 'Agent Browser Bridge fixture'\n";
     await writeFile(join(bundle, "bin", "abb"), host);
-    await writeFile(join(bundle, "manifest.json"), JSON.stringify({ schemaVersion: 1, platform: process.platform, arch: process.arch,
-      hostVersion: "0.1.0-dev", extensionVersion: "0.2.2", protocolVersion: "0.2.0",
-      files: { "bin/abb": createHash("sha256").update("different").digest("hex") } }));
+    await writeFile(
+      join(bundle, "manifest.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        platform: process.platform,
+        arch: process.arch,
+        hostVersion: "0.1.0-dev",
+        extensionVersion: "0.2.2",
+        protocolVersion: "0.2.0",
+        files: { "bin/abb": createHash("sha256").update("different").digest("hex") },
+      }),
+    );
     const service = new BrowserBridgeService({ dataRoot: join(root, "data"), bundledRoot: bundle });
     expect(await service.installBundled()).toMatchObject({ ok: false, error: "Chrome 连接组件校验失败：bin/abb" });
     expect((await service.getStatus()).installed).toBe(false);
@@ -91,15 +134,31 @@ describe("BrowserBridgeService", () => {
     await mkdir(join(bundle, "bin"), { recursive: true });
     await mkdir(join(bundle, "extension", "src"), { recursive: true });
     const previous = "#!/bin/sh\necho 'Agent Browser Bridge previous'\n";
-    const replacement = "#!/bin/sh\nif [ \"$1\" = install-native-host ]; then exit 1; fi\necho 'Agent Browser Bridge replacement'\n";
-    const extensionManifest = await readFile(join(process.cwd(), "../../browser-bridge/apps/chrome-extension/manifest.json"), "utf8");
+    const replacement =
+      "#!/bin/sh\nif [ \"$1\" = install-native-host ]; then exit 1; fi\necho 'Agent Browser Bridge replacement'\n";
+    const extensionManifest = await readFile(
+      join(process.cwd(), "../../browser-bridge/apps/chrome-extension/manifest.json"),
+      "utf8",
+    );
     const background = "// browser fixture\n";
     await writeFile(join(bundle, "bin", "abb"), replacement);
     await writeFile(join(bundle, "extension", "manifest.json"), extensionManifest);
     await writeFile(join(bundle, "extension", "src", "background.js"), background);
-    await writeFile(join(bundle, "manifest.json"), JSON.stringify({ schemaVersion: 1, platform: process.platform, arch: process.arch,
-      files: Object.fromEntries(Object.entries({ "bin/abb": replacement, "extension/manifest.json": extensionManifest, "extension/src/background.js": background })
-        .map(([path, content]) => [path, createHash("sha256").update(content).digest("hex")])) }));
+    await writeFile(
+      join(bundle, "manifest.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        platform: process.platform,
+        arch: process.arch,
+        files: Object.fromEntries(
+          Object.entries({
+            "bin/abb": replacement,
+            "extension/manifest.json": extensionManifest,
+            "extension/src/background.js": background,
+          }).map(([path, content]) => [path, createHash("sha256").update(content).digest("hex")]),
+        ),
+      }),
+    );
     const service = new BrowserBridgeService({ dataRoot, bundledRoot: bundle });
     await mkdir(join(service.pluginRoot, "bin"), { recursive: true });
     await mkdir(service.extensionDir, { recursive: true });
@@ -128,7 +187,9 @@ describe("BrowserBridgeService", () => {
     expect(skill).toContain("doctor --json");
     expect(skill).toContain("standard `browser_*` tools");
     expect(skill).toContain("Do not invoke `abb` through Bash for tabs");
-    expect(service.socketPath).toContain(join("Application Support", "AgentBrowserBridge", "agent-browser-bridge.sock"));
+    expect(service.socketPath).toContain(
+      join("Application Support", "AgentBrowserBridge", "agent-browser-bridge.sock"),
+    );
   });
 
   it("atomically replaces abb without mutating an already-open executable inode", async () => {
@@ -192,10 +253,10 @@ describe("BrowserBridgeService", () => {
       [
         "#!/bin/sh",
         `echo \"$1\" >> \"${callsPath}\"`,
-        "case \"$1\" in",
+        'case "$1" in',
         "  help) echo 'Agent Browser Bridge test help' ;;",
-        "  doctor) sleep 0.05; echo '{\"summary\":\"ok\",\"checks\":[]}' ;;",
-        "  capabilities) echo '{\"phase\":\"test\"}' ;;",
+        '  doctor) sleep 0.05; echo \'{"summary":"ok","checks":[]}\' ;;',
+        '  capabilities) echo \'{"phase":"test"}\' ;;',
         "esac",
         "",
       ].join("\n"),
@@ -208,10 +269,7 @@ describe("BrowserBridgeService", () => {
     await writeFile(callsPath, "", "utf8");
     await writeFile(join(service.pluginRoot, "connection.json"), '{"schemaVersion":1,"enabled":true}');
 
-    const [first, second] = await Promise.all([
-      service.getStatus("/repo"),
-      service.getStatus("/repo"),
-    ]);
+    const [first, second] = await Promise.all([service.getStatus("/repo"), service.getStatus("/repo")]);
     const calls = (await readFile(callsPath, "utf8")).trim().split("\n");
 
     expect(first).toEqual(second);
@@ -261,13 +319,21 @@ describe("BrowserBridgeService", () => {
     await symlink(repoRoot, link);
     const service = new BrowserBridgeService({ dataRoot });
 
-    expect(await service.buildAndInstall()).toMatchObject({ ok: false, error: expect.stringContaining("请先选择源码扩展目录") });
+    expect(await service.buildAndInstall()).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("请先选择源码扩展目录"),
+    });
     expect(await service.setSourceExtension("relative/path")).toMatchObject({ ok: false });
-    expect(await service.setSourceExtension(join(linkRoot, "missing"))).toMatchObject({ ok: false, error: "该目录缺少有效的 ActSpace Chrome 扩展。" });
+    expect(await service.setSourceExtension(join(linkRoot, "missing"))).toMatchObject({
+      ok: false,
+      error: "该目录缺少有效的 ActSpace Chrome 扩展。",
+    });
 
     expect(await service.setSourceExtension(link)).toEqual({ ok: true });
     expect((await service.getStatus()).sourceRoot).toBe(repoRoot);
-    expect(JSON.parse(await readFile(join(service.pluginRoot, "connection.json"), "utf8"))).toMatchObject({ sourceRoot: repoRoot });
+    expect(JSON.parse(await readFile(join(service.pluginRoot, "connection.json"), "utf8"))).toMatchObject({
+      sourceRoot: repoRoot,
+    });
 
     expect(await service.setSourceExtension(null)).toEqual({ ok: true });
     expect((await service.getStatus()).sourceRoot).toBeUndefined();
@@ -284,11 +350,14 @@ describe("BrowserBridgeService", () => {
 
     const service = new BrowserBridgeService({ dataRoot });
     const pending = service.installFromFile(source);
-    const pid = await vi.waitFor(async () => {
-      const text = (await readFile(pidFile, "utf8")).trim();
-      expect(text).toMatch(/^\d+$/);
-      return Number(text);
-    }, { timeout: 5_000 });
+    const pid = await vi.waitFor(
+      async () => {
+        const text = (await readFile(pidFile, "utf8")).trim();
+        expect(text).toMatch(/^\d+$/);
+        return Number(text);
+      },
+      { timeout: 5_000 },
+    );
 
     service.dispose();
     service.dispose();

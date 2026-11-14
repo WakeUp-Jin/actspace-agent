@@ -26,7 +26,11 @@ export function resolveCodePath(text: string, ctx: PathContext): ResolvedPath | 
   // 工作区内的绝对路径也认（去掉根目录前缀）；没有工作区根时绝对路径无从判断，不认。
   const ref = parseInlinePath(text, { absolute: Boolean(ctx.workspaceRoot) });
   if (!ref) return null;
-  const relativePath = resolveWorkspacePath(ref.path, { baseDir: ctx.baseDir, workspaceRoot: ctx.workspaceRoot, plainRelativeToBase: false });
+  const relativePath = resolveWorkspacePath(ref.path, {
+    baseDir: ctx.baseDir,
+    workspaceRoot: ctx.workspaceRoot,
+    plainRelativeToBase: false,
+  });
   if (!relativePath) return null;
   return ref.line ? { relativePath, line: ref.line } : { relativePath };
 }
@@ -40,7 +44,11 @@ export function routeHref(href: string, ctx: PathContext): LinkRoute {
     case "external":
       return { kind: "external", url: target.url };
     case "local": {
-      const relativePath = resolveWorkspacePath(target.path, { baseDir: ctx.baseDir, workspaceRoot: ctx.workspaceRoot, plainRelativeToBase: true });
+      const relativePath = resolveWorkspacePath(target.path, {
+        baseDir: ctx.baseDir,
+        workspaceRoot: ctx.workspaceRoot,
+        plainRelativeToBase: true,
+      });
       if (!relativePath) return { kind: "none" };
       return target.line ? { kind: "path", relativePath, line: target.line } : { kind: "path", relativePath };
     }

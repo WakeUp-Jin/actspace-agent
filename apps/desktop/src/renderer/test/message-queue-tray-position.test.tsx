@@ -7,8 +7,15 @@ import type { SessionMessageQueue } from "../session/message-queue";
 
 function controls(queue: SessionMessageQueue): MessageQueueControls {
   return {
-    queue, running: true, steerBlockedReason: null,
-    onSteer: vi.fn(), onUnsteer: vi.fn(), onRemove: vi.fn(), onMoveUp: vi.fn(), onEdit: vi.fn(), onResume: vi.fn(),
+    queue,
+    running: true,
+    steerBlockedReason: null,
+    onSteer: vi.fn(),
+    onUnsteer: vi.fn(),
+    onRemove: vi.fn(),
+    onMoveUp: vi.fn(),
+    onEdit: vi.fn(),
+    onResume: vi.fn(),
   };
 }
 

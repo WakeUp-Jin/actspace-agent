@@ -38,17 +38,32 @@ const VISIBLE = [
   "相邻两个块之间插入一个虚拟换行，所以跨段选择也能稳定还原。",
   "Mixed 中英文 like inline code 和 emoji 😀 都按 UTF-16 计数。",
   "定位失败时宁可显示「原回复不可用」，也不要猜位置。",
-  "场景", "处理", "偏移仍然对得上", "直接使用", "回复被压缩改写", "按前后文找唯一位置",
+  "场景",
+  "处理",
+  "偏移仍然对得上",
+  "直接使用",
+  "回复被压缩改写",
+  "按前后文找唯一位置",
   "最后一段用来观察 marker 碰撞：同一行上的两个批注会被错开 16px，而不是叠在一起。",
 ].join("\n");
 
-function annotationFor(id: string, selectedText: string, comment?: string, occurrence = 0): ResponseAnnotationReference {
+function annotationFor(
+  id: string,
+  selectedText: string,
+  comment?: string,
+  occurrence = 0,
+): ResponseAnnotationReference {
   let start = -1;
   for (let index = 0; index <= occurrence; index += 1) start = VISIBLE.indexOf(selectedText, start + 1);
   const end = start + selectedText.length;
   return {
-    annotationId: id, assistantMessageId: "v2-1", selectedText, startOffset: start, endOffset: end,
-    prefixContext: VISIBLE.slice(Math.max(0, start - 64), start), suffixContext: VISIBLE.slice(end, end + 64),
+    annotationId: id,
+    assistantMessageId: "v2-1",
+    selectedText,
+    startOffset: start,
+    endOffset: end,
+    prefixContext: VISIBLE.slice(Math.max(0, start - 64), start),
+    suffixContext: VISIBLE.slice(end, end + 64),
     ...(comment ? { comment } : {}),
   };
 }
@@ -57,13 +72,27 @@ const sent: ResponseAnnotationReference[] = [
   annotationFor("sent-1", "可批注的可见文本", "这里的「可见」具体排除了哪些节点？"),
   annotationFor("sent-2", "marker 碰撞"),
   annotationFor("sent-3", "同一行上的两个批注", "和上一个批注在同一行"),
-  { ...annotationFor("sent-gone", "定位失败"), selectedText: "这段原文已经不在回复里了", prefixContext: "", suffixContext: "", startOffset: 0, endOffset: 12 },
+  {
+    ...annotationFor("sent-gone", "定位失败"),
+    selectedText: "这段原文已经不在回复里了",
+    prefixContext: "",
+    suffixContext: "",
+    startOffset: 0,
+    endOffset: 12,
+  },
 ];
 
-const drafts: ResponseAnnotationReference[] = params.get("drafts") === "0" ? [] : [
-  annotationFor("draft-1", "相邻两个块之间插入一个虚拟换行，所以跨段选择也能稳定还原。", "能不能举一个跨段选择的例子？"),
-  annotationFor("draft-2", "按前后文找唯一位置"),
-];
+const drafts: ResponseAnnotationReference[] =
+  params.get("drafts") === "0"
+    ? []
+    : [
+        annotationFor(
+          "draft-1",
+          "相邻两个块之间插入一个虚拟换行，所以跨段选择也能稳定还原。",
+          "能不能举一个跨段选择的例子？",
+        ),
+        annotationFor("draft-2", "按前后文找唯一位置"),
+      ];
 
 const messages: MessageBlock[] = [
   { kind: "user", id: "v2-0", createdAt, content: "解释一下回复批注怎么定位。" },
@@ -73,14 +102,29 @@ const messages: MessageBlock[] = [
 ];
 
 function Preview() {
-  return <TooltipProvider><RightPanelProvider>
-    <div className="flex h-screen flex-col bg-app-bg text-text-main">
-      <TestConversationView messages={messages} contextSnapshot={null} sessionId="visual-fixture" draftKey="visual-fixture"
-        isStreaming={false} composerPhase="active" composerMode={params.get("mode") === "chat" ? "chat" : "agent"}
-        readAnnotationDraft={() => drafts} writeAnnotationDraft={() => {}}
-        executionContext={{ runLocation: "this_mac", gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] } }} />
-    </div>
-  </RightPanelProvider></TooltipProvider>;
+  return (
+    <TooltipProvider>
+      <RightPanelProvider>
+        <div className="flex h-screen flex-col bg-app-bg text-text-main">
+          <TestConversationView
+            messages={messages}
+            contextSnapshot={null}
+            sessionId="visual-fixture"
+            draftKey="visual-fixture"
+            isStreaming={false}
+            composerPhase="active"
+            composerMode={params.get("mode") === "chat" ? "chat" : "agent"}
+            readAnnotationDraft={() => drafts}
+            writeAnnotationDraft={() => {}}
+            executionContext={{
+              runLocation: "this_mac",
+              gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] },
+            }}
+          />
+        </div>
+      </RightPanelProvider>
+    </TooltipProvider>
+  );
 }
 
 createRoot(document.getElementById("root")!).render(<Preview />);

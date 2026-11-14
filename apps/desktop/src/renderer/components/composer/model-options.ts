@@ -43,10 +43,20 @@ export function modelDefaultRuntimeOptions(model: ComposerModelOption | undefine
   };
 }
 
-export function currentModelRuntimeOptions(model: ComposerModelOption | undefined, saved?: ComposerModelRuntimeOptions): ComposerModelRuntimeOptions {
+export function currentModelRuntimeOptions(
+  model: ComposerModelOption | undefined,
+  saved?: ComposerModelRuntimeOptions,
+): ComposerModelRuntimeOptions {
   if (!saved) return modelDefaultRuntimeOptions(model);
-  const thinkingEnabled = Boolean(model?.reasoningMandatory || ((model && isModelEditable(model)) && saved.thinkingEnabled));
-  return { thinkingEnabled, ...(thinkingEnabled && saved.reasoningEffort && modelReasoningEfforts(model).includes(saved.reasoningEffort) ? { reasoningEffort: saved.reasoningEffort } : {}) };
+  const thinkingEnabled = Boolean(
+    model?.reasoningMandatory || (model && isModelEditable(model) && saved.thinkingEnabled),
+  );
+  return {
+    thinkingEnabled,
+    ...(thinkingEnabled && saved.reasoningEffort && modelReasoningEfforts(model).includes(saved.reasoningEffort)
+      ? { reasoningEffort: saved.reasoningEffort }
+      : {}),
+  };
 }
 
 export function reasoningEffortLabel(effort: ModelReasoningEffort): string {

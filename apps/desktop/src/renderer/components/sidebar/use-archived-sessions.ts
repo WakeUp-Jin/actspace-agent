@@ -11,13 +11,23 @@ const EMPTY: SessionListItem[] = [];
 export function useArchivedSessions(enabled: boolean, refreshKey: unknown): SessionListItem[] {
   const [archived, setArchived] = useState<SessionListItem[]>(EMPTY);
   useEffect(() => {
-    if (!enabled) { setArchived(EMPTY); return; }
+    if (!enabled) {
+      setArchived(EMPTY);
+      return;
+    }
     let disposed = false;
     sessionsApi.list({ archived: true }).then(
-      (items) => { if (!disposed) setArchived(items.filter((item) => item.archived !== false).map((item) => ({ ...item, archived: true }))); },
-      (error: unknown) => { console.error("Failed to list archived sessions", error); },
+      (items) => {
+        if (!disposed)
+          setArchived(items.filter((item) => item.archived !== false).map((item) => ({ ...item, archived: true })));
+      },
+      (error: unknown) => {
+        console.error("Failed to list archived sessions", error);
+      },
     );
-    return () => { disposed = true; };
+    return () => {
+      disposed = true;
+    };
   }, [enabled, refreshKey]);
   return enabled ? archived : EMPTY;
 }

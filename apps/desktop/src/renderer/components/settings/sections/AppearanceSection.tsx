@@ -1,10 +1,30 @@
 import { useRef, useState, type KeyboardEvent } from "react";
-import { SectionShell, SettingGroup, SettingRow, SettingsSelect, Stepper, type SelectOption } from "../SettingsPrimitives";
+import {
+  SectionShell,
+  SettingGroup,
+  SettingRow,
+  SettingsSelect,
+  Stepper,
+  type SelectOption,
+} from "../SettingsPrimitives";
 import { ACCENT_PALETTES } from "../../../appearance/accents";
 import { CODE_FONT_PRESETS, UI_FONT_PRESETS } from "../../../appearance/fonts";
 import { applyAppearance } from "../../../appearance/apply";
 import { loadAppearance, saveAppearance } from "../../../appearance/storage";
-import { CODE_FONT_SIZE_MAX, CODE_FONT_SIZE_MIN, CODE_FONT_SIZE_STEP, DEFAULT_APPEARANCE, UI_FONT_SIZE_MAX, UI_FONT_SIZE_MIN, UI_FONT_SIZE_STEP, type AccentPaletteId, type AppearancePrefs, type CodeFontId, type ThemeMode, type UiFontId } from "../../../appearance/types";
+import {
+  CODE_FONT_SIZE_MAX,
+  CODE_FONT_SIZE_MIN,
+  CODE_FONT_SIZE_STEP,
+  DEFAULT_APPEARANCE,
+  UI_FONT_SIZE_MAX,
+  UI_FONT_SIZE_MIN,
+  UI_FONT_SIZE_STEP,
+  type AccentPaletteId,
+  type AppearancePrefs,
+  type CodeFontId,
+  type ThemeMode,
+  type UiFontId,
+} from "../../../appearance/types";
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: "light", label: "浅色" },
@@ -74,7 +94,9 @@ function ThemeTiles({ value, onChange }: { value: ThemeMode; onChange: (value: T
                 <ThemeMiniWindow tone={optionValue} />
               )}
             </span>
-            <span className={`mt-2 block text-act-xs font-medium ${selected ? "text-text-main" : "text-text-muted"}`}>{label}</span>
+            <span className={`mt-2 block text-act-xs font-medium ${selected ? "text-text-main" : "text-text-muted"}`}>
+              {label}
+            </span>
           </button>
         );
       })}
@@ -136,7 +158,10 @@ function AccentPicker({ value, onChange }: { value: AccentPaletteId; onChange: (
                 : "border-line text-text-muted hover:border-line-strong hover:text-text-main"
             }`}
           >
-            <span aria-hidden="true" className={`size-5 shrink-0 rounded-full ring-1 ring-line ring-inset ${ACCENT_SWATCH[palette.id]}`} />
+            <span
+              aria-hidden="true"
+              className={`size-5 shrink-0 rounded-full ring-1 ring-line ring-inset ${ACCENT_SWATCH[palette.id]}`}
+            />
             {palette.label}
           </button>
         );
@@ -235,7 +260,10 @@ export function AppearanceSection() {
           <p className="leading-relaxed text-text-main" style={{ fontSize: prefs.uiFontSize }}>
             让想法清晰呈现。The quick brown fox jumps over the lazy dog. 0123456789
           </p>
-          <pre className="mt-2.5 overflow-x-auto rounded-act-sm bg-surface-subtle px-3 py-2.5 font-mono text-text-muted" style={{ fontSize: prefs.codeFontSize }}>
+          <pre
+            className="mt-2.5 overflow-x-auto rounded-act-sm bg-surface-subtle px-3 py-2.5 font-mono text-text-muted"
+            style={{ fontSize: prefs.codeFontSize }}
+          >
             {'const greeting = "你好，ActSpace";'}
           </pre>
         </div>

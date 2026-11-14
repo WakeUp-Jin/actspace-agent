@@ -32,12 +32,7 @@ test("counts physical lines and non-whitespace Unicode characters", () => {
 
 test("collects deterministic repository statistics from a tracked-file list", async () => {
   const repoRoot = await mkdtemp(resolve(tmpdir(), "actspace-repo-stats-"));
-  const files = [
-    "packages/app/src/index.ts",
-    "packages/app/src/index.test.ts",
-    "docs/guide.md",
-    "README.md",
-  ];
+  const files = ["packages/app/src/index.ts", "packages/app/src/index.test.ts", "docs/guide.md", "README.md"];
 
   try {
     await mkdir(resolve(repoRoot, "packages/app/src"), { recursive: true });

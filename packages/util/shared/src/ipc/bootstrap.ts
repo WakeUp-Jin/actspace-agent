@@ -25,7 +25,7 @@ export function createBootstrapState(input: AppBootstrapStateInput): BootstrapSt
     sessionRoot: input.sessionRoot ?? `${input.dataRoot}/sessions`,
     logRoot: input.logRoot ?? `${input.dataRoot}/logs`,
     tmpRoot: input.tmpRoot ?? `${input.dataRoot}/tmp`,
-    workspaceRoot: input.workspaceRoot ?? input.dataRoot
+    workspaceRoot: input.workspaceRoot ?? input.dataRoot,
   };
 }
 

@@ -18,7 +18,17 @@ describe("Review diff virtualization", () => {
       generation: 1,
       fileId: file.id,
       path: file.path,
-      hunks: [{ id: "hunk", header: "@@ -1,4500 +1,4500 @@", oldStart: 1, oldLines: 4_500, newStart: 1, newLines: 4_500, lines }],
+      hunks: [
+        {
+          id: "hunk",
+          header: "@@ -1,4500 +1,4500 @@",
+          oldStart: 1,
+          oldLines: 4_500,
+          newStart: 1,
+          newLines: 4_500,
+          lines,
+        },
+      ],
       oldContentAvailable: true,
       newContentAvailable: true,
       partial: false,
@@ -47,8 +57,14 @@ describe("Review diff virtualization", () => {
       />,
     );
 
-    await waitFor(() => expect(Number(container.querySelector("[data-review-total-row-count]")?.getAttribute("data-review-total-row-count"))).toBe(9_002));
-    const virtualRowCount = Number(container.querySelector("[data-review-virtual-row-count]")?.getAttribute("data-review-virtual-row-count"));
+    await waitFor(() =>
+      expect(
+        Number(container.querySelector("[data-review-total-row-count]")?.getAttribute("data-review-total-row-count")),
+      ).toBe(9_002),
+    );
+    const virtualRowCount = Number(
+      container.querySelector("[data-review-virtual-row-count]")?.getAttribute("data-review-virtual-row-count"),
+    );
     expect(virtualRowCount).toBeGreaterThan(0);
     expect(virtualRowCount).toBeLessThan(1_000);
     expect(container.querySelectorAll("[data-review-row]").length).toBe(virtualRowCount);
@@ -100,35 +116,66 @@ describe("Review diff virtualization", () => {
         ? new DOMRect(0, 0, viewportWidth, 800)
         : originalBounds.call(this);
     });
-    vi.stubGlobal("ResizeObserver", class {
-      constructor(private callback: ResizeObserverCallback) {}
-      observe(element: Element) {
-        if (element.matches("[data-review-horizontal-scroll='canvas']")) {
-          publishViewport = () => this.callback([], this as unknown as ResizeObserver);
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(private callback: ResizeObserverCallback) {}
+        observe(element: Element) {
+          if (element.matches("[data-review-horizontal-scroll='canvas']")) {
+            publishViewport = () => this.callback([], this as unknown as ResizeObserver);
+          }
         }
-      }
-      unobserve() {}
-      disconnect() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    setupBridge({
+      "workspaces.readFile": async () => ({
+        relativePath: "pixel.png",
+        renderKind: "image",
+        size: 1,
+        mtimeMs: 1,
+        dataUrl: "data:image/png;base64,cGl4ZWw=",
+      }),
     });
-    setupBridge({ "workspaces.readFile": async () => ({ relativePath: "pixel.png", renderKind: "image", size: 1, mtimeMs: 1, dataUrl: "data:image/png;base64,cGl4ZWw=" }) });
     const text = fileSummary();
     const image = { ...fileSummary(), id: "image", path: "pixel.png", renderKind: "image" as const };
     const failed = { ...fileSummary(), id: "failed", path: "failed.txt" };
     const view = render(
       <ReviewDiffCanvas
-        workspaceRoot="/fixture" files={[text, image, failed]}
+        workspaceRoot="/fixture"
+        files={[text, image, failed]}
         diffs={new Map([[text.id, singleLineDiff(text, "long_value_".repeat(100))]])}
-        fileRequests={new Map([[text.id, { status: "ready" }], [failed.id, { status: "failed", error: "read failed" }]])}
-        fileContents={new Map()} capabilities={capabilities()}
-        expandedFileIds={new Set([text.id, image.id, failed.id])} selectedFileId={null}
-        mode="unified" wrap={false} wordDiff={false} richPreview={true} loadFullFiles={false} singleFileMode={true}
-        onToggleFile={vi.fn()} onSelectFile={vi.fn()} onExpandContext={vi.fn()}
-        onRetryDiff={vi.fn()} onVisibleFiles={vi.fn()}
+        fileRequests={
+          new Map([
+            [text.id, { status: "ready" }],
+            [failed.id, { status: "failed", error: "read failed" }],
+          ])
+        }
+        fileContents={new Map()}
+        capabilities={capabilities()}
+        expandedFileIds={new Set([text.id, image.id, failed.id])}
+        selectedFileId={null}
+        mode="unified"
+        wrap={false}
+        wordDiff={false}
+        richPreview={true}
+        loadFullFiles={false}
+        singleFileMode={true}
+        onToggleFile={vi.fn()}
+        onSelectFile={vi.fn()}
+        onExpandContext={vi.fn()}
+        onRetryDiff={vi.fn()}
+        onVisibleFiles={vi.fn()}
       />,
     );
     try {
       await screen.findByRole("img", { name: "当前版本 pixel.png" });
-      const nonCodeRows = Array.from(view.container.querySelectorAll<HTMLElement>("[data-review-row='file'], [data-review-row='hunk'], [data-review-row='state']"));
+      const nonCodeRows = Array.from(
+        view.container.querySelectorAll<HTMLElement>(
+          "[data-review-row='file'], [data-review-row='hunk'], [data-review-row='state']",
+        ),
+      );
       expect(nonCodeRows).toHaveLength(6);
       const assertViewport = (width: number) => {
         for (const row of nonCodeRows) {
@@ -139,9 +186,14 @@ describe("Review diff virtualization", () => {
         expect(screen.getByText("变更较多，每次显示一个文件").parentElement?.style.width).toBe(`${width}px`);
       };
       await waitFor(() => assertViewport(390));
-      act(() => { viewportWidth = 840; publishViewport(); });
+      act(() => {
+        viewportWidth = 840;
+        publishViewport();
+      });
       await waitFor(() => assertViewport(840));
-      expect(view.container.querySelector("[data-review-content-width]")?.getAttribute("data-review-content-width")).toBe("max(100%, 480ch)");
+      expect(
+        view.container.querySelector("[data-review-content-width]")?.getAttribute("data-review-content-width"),
+      ).toBe("max(100%, 480ch)");
       expect(view.container.querySelectorAll("[data-review-horizontal-scroll]")).toHaveLength(1);
       expect(view.container.querySelector<HTMLElement>("[data-review-row='line']")?.style.width).toBe("100%");
       expect(screen.queryByRole("button", { name: /暂存|还原|已查看/ })).toBeNull();
@@ -185,15 +237,17 @@ function singleLineDiff(file: ReviewFileSummary, text: string): ReviewFileDiff {
     generation: 1,
     fileId: file.id,
     path: file.path,
-    hunks: [{
-      id: "hunk",
-      header: "@@ -1 +1 @@",
-      oldStart: 1,
-      oldLines: 0,
-      newStart: 1,
-      newLines: 1,
-      lines: [{ id: "line", kind: "addition", newLine: 1, text }],
-    }],
+    hunks: [
+      {
+        id: "hunk",
+        header: "@@ -1 +1 @@",
+        oldStart: 1,
+        oldLines: 0,
+        newStart: 1,
+        newLines: 1,
+        lines: [{ id: "line", kind: "addition", newLine: 1, text }],
+      },
+    ],
     oldContentAvailable: true,
     newContentAvailable: true,
     partial: false,

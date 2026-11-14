@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 import type { BigIntStats } from "node:fs";
 import type { FileHandle } from "node:fs/promises";
 
-export interface ExpectedContent { readonly size: number; readonly sha256: string }
+export interface ExpectedContent {
+  readonly size: number;
+  readonly sha256: string;
+}
 
 /**
  * File times advance in steps (a few milliseconds on most filesystems, up to 2 s on some). A rewrite in
@@ -26,15 +29,18 @@ export class VerifiedContent {
   constructor(private readonly limit = 1024) {}
   /** Whether the file holds exactly the expected content. The handle must only be used for positional reads. */
   async matches(key: string, file: FileHandle, expected: ExpectedContent): Promise<boolean> {
-    const before = await file.stat({ bigint: true }), version = versionOf(before, expected);
+    const before = await file.stat({ bigint: true }),
+      version = versionOf(before, expected);
     if (this.#checked.get(key) === version) return true;
     this.#checked.delete(key);
     if (Number(before.size) !== expected.size) return false;
-    const hash = createHash("sha256"), piece = Buffer.allocUnsafe(Math.min(expected.size, 1024 * 1024));
-    for (let position = 0; position < expected.size;) {
+    const hash = createHash("sha256"),
+      piece = Buffer.allocUnsafe(Math.min(expected.size, 1024 * 1024));
+    for (let position = 0; position < expected.size; ) {
       const { bytesRead } = await file.read(piece, 0, Math.min(piece.length, expected.size - position), position);
       if (bytesRead === 0) return false;
-      hash.update(piece.subarray(0, bytesRead)); position += bytesRead;
+      hash.update(piece.subarray(0, bytesRead));
+      position += bytesRead;
     }
     if (hash.digest("hex") !== expected.sha256) return false;
     const after = await file.stat({ bigint: true });

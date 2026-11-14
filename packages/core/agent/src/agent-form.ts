@@ -34,10 +34,11 @@ export type ActivatedAgentForm = Readonly<{
 export function defineMainAgentForm(members: readonly AgentFormMember[]): AgentForm {
   const ids = new Set<string>();
   const tools = new Map<string, string>();
-  const frozen = members.map(member => {
+  const frozen = members.map((member) => {
     if (ids.has(member.id)) throw new Error(`Agent form member ${member.id} is listed twice.`);
     ids.add(member.id);
-    if (!Number.isSafeInteger(member.version) || member.version < 1) throw new Error(`Agent form member ${member.id} needs a positive version.`);
+    if (!Number.isSafeInteger(member.version) || member.version < 1)
+      throw new Error(`Agent form member ${member.id} needs a positive version.`);
     if (member.toolNames.length === 0) throw new Error(`Agent form member ${member.id} contributes no tools.`);
     for (const name of member.toolNames) {
       const owner = tools.get(name);
@@ -46,31 +47,43 @@ export function defineMainAgentForm(members: readonly AgentFormMember[]): AgentF
     }
     return Object.freeze({ ...member, toolNames: Object.freeze([...member.toolNames]) });
   });
-  return Object.freeze({ id: MAIN_AGENT_FORM_ID, version: MAIN_AGENT_FORM_VERSION, defaultMode: "agent", members: Object.freeze(frozen) });
+  return Object.freeze({
+    id: MAIN_AGENT_FORM_ID,
+    version: MAIN_AGENT_FORM_VERSION,
+    defaultMode: "agent",
+    members: Object.freeze(frozen),
+  });
 }
 
 /** Members present for this Host (required ones plus admitted optional ones) and a digest independent of unrelated Host plugins. */
 export function agentFormComposition(form: AgentForm, plugins: readonly Readonly<{ id: string; version: string }>[]) {
-  const admitted = new Set(plugins.map(plugin => plugin.id));
+  const admitted = new Set(plugins.map((plugin) => plugin.id));
   const members = form.members
-    .filter(member => member.required || admitted.has(member.id))
-    .map(member => Object.freeze({ id: member.id, version: member.version }));
-  const digest = createHash("sha256").update(JSON.stringify({ id: form.id, version: form.version, members })).digest("hex");
+    .filter((member) => member.required || admitted.has(member.id))
+    .map((member) => Object.freeze({ id: member.id, version: member.version }));
+  const digest = createHash("sha256")
+    .update(JSON.stringify({ id: form.id, version: form.version, members }))
+    .digest("hex");
   return Object.freeze({ members: Object.freeze(members), digest });
 }
 
 /** Bind each member's registered tools to `scope`; a required member missing any declared tool fails the activation. */
-export function activateAgentFormTools(form: AgentForm, scope: AgentScope, runtime: ToolRuntimeContract): ActivatedAgentForm {
-  const available = new Map(runtime.registry.listDefinitions().map(definition => [definition.name, definition]));
+export function activateAgentFormTools(
+  form: AgentForm,
+  scope: AgentScope,
+  runtime: ToolRuntimeContract,
+): ActivatedAgentForm {
+  const available = new Map(runtime.registry.listDefinitions().map((definition) => [definition.name, definition]));
   const members: Array<{ id: string; version: number; toolNames: readonly string[] }> = [];
   for (const member of form.members) {
-    const definitions = member.toolNames.map(name => available.get(name));
+    const definitions = member.toolNames.map((name) => available.get(name));
     const present = definitions.filter((definition) => definition?.pluginId === member.id);
     if (present.length === 0 && !member.required) continue;
     if (present.length !== member.toolNames.length) {
       throw new Error(`Agent form member ${member.id} is incomplete or unavailable.`);
     }
-    for (const definition of present) scope.tools.register({ id: definition!.name, owner: member.id, value: definition!.pluginId });
+    for (const definition of present)
+      scope.tools.register({ id: definition!.name, owner: member.id, value: definition!.pluginId });
     members.push(Object.freeze({ id: member.id, version: member.version, toolNames: member.toolNames }));
   }
   return Object.freeze({ id: form.id, version: form.version, members: Object.freeze(members) });

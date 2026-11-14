@@ -28,10 +28,7 @@ export function useSettings(onSettingsChange?: (settings: AppSettings) => void) 
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
   useEffect(() => {
-    void Promise.all([
-      settingsApi.get(),
-      settingsApi.getV4(),
-    ])
+    void Promise.all([settingsApi.get(), settingsApi.getV4()])
       .then(([next, nextV4]) => {
         setSettings(next);
         setSettingsV4(nextV4);
@@ -54,24 +51,28 @@ export function useSettings(onSettingsChange?: (settings: AppSettings) => void) 
     }
   }, [onSettingsChange]);
 
-  const updateNamespace = useCallback(async (input: SettingsV4NamespacePatch): Promise<SettingsV4Snapshot | null> => {
-    if (!settingsV4) return null;
-    const result = await settingsApi.updateV4({ ...input, expectedRevision: settingsV4.revision });
-    if ("latest" in result) {
-      setSettingsV4(result.latest);
-      throw new Error(result.message);
-    }
-    setSettingsV4(result.snapshot);
-    const legacy = await settingsApi.get();
-    setSettings(legacy);
-    onSettingsChange?.(legacy);
-    return result.snapshot;
-  }, [onSettingsChange, settingsV4]);
+  const updateNamespace = useCallback(
+    async (input: SettingsV4NamespacePatch): Promise<SettingsV4Snapshot | null> => {
+      if (!settingsV4) return null;
+      const result = await settingsApi.updateV4({ ...input, expectedRevision: settingsV4.revision });
+      if ("latest" in result) {
+        setSettingsV4(result.latest);
+        throw new Error(result.message);
+      }
+      setSettingsV4(result.snapshot);
+      const legacy = await settingsApi.get();
+      setSettings(legacy);
+      onSettingsChange?.(legacy);
+      return result.snapshot;
+    },
+    [onSettingsChange, settingsV4],
+  );
 
   const update = useCallback(
     (input: SettingsUpdateInput) => {
       setSettings((current) => (current ? mergeSettings(current, input) : current));
-      settingsApi.update(input)
+      settingsApi
+        .update(input)
         .then((next) => {
           setSettings(next);
           onSettingsChange?.(next);
@@ -83,10 +84,13 @@ export function useSettings(onSettingsChange?: (settings: AppSettings) => void) 
     [onSettingsChange],
   );
 
-  const replaceSettings = useCallback((next: AppSettings) => {
-    setSettings(next);
-    onSettingsChange?.(next);
-  }, [onSettingsChange]);
+  const replaceSettings = useCallback(
+    (next: AppSettings) => {
+      setSettings(next);
+      onSettingsChange?.(next);
+    },
+    [onSettingsChange],
+  );
 
   const saveProviderKey = useCallback(
     async (provider: SecretProviderId, apiKey: string): Promise<SetProviderKeyResult> => {
@@ -105,5 +109,15 @@ export function useSettings(onSettingsChange?: (settings: AppSettings) => void) 
     [refresh],
   );
 
-  return { settings, settingsV4, settingsError, refresh, update, updateNamespace, replaceSettings, saveProviderKey, clearProviderKey };
+  return {
+    settings,
+    settingsV4,
+    settingsError,
+    refresh,
+    update,
+    updateNamespace,
+    replaceSettings,
+    saveProviderKey,
+    clearProviderKey,
+  };
 }

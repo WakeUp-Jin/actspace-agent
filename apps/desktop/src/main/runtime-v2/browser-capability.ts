@@ -1,9 +1,7 @@
 import { createNodeBrowserCapability, type BrowserCapability } from "@actspace/tool-browser";
 import type { DesktopRuntimeBrowserPort } from "./host-ports";
 
-export async function createDesktopBrowserCapability(
-  service: DesktopRuntimeBrowserPort,
-): Promise<BrowserCapability> {
+export async function createDesktopBrowserCapability(service: DesktopRuntimeBrowserPort): Promise<BrowserCapability> {
   const status = await service.getStatus();
   const socketPath = service.socketPath;
   const capability = createNodeBrowserCapability({

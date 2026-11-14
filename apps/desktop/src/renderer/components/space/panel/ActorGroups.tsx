@@ -1,9 +1,7 @@
 import { memo, useRef } from "react";
 import { Check, ChevronDown, Users } from "lucide-react";
 import { ActorAvatar } from "../avatar/ActorAvatar";
-import {
-  currentSpace, currentTab, describeMember, groupMembers, showTodo, STATUS_LABEL,
-} from "../model/selectors";
+import { currentSpace, currentTab, describeMember, groupMembers, showTodo, STATUS_LABEL } from "../model/selectors";
 import type { MemberStatus, RosterActor, SpaceMember } from "../model/types";
 import { useSpaceDemoActions, useSpaceDemoSelector } from "../model/use-space-demo";
 import { PanelEmpty } from "./PanelEmpty";
@@ -31,7 +29,11 @@ function TodoRing({ done, total }: { done: number; total: number }) {
       <circle className="fill-none stroke-line [stroke-width:1.8]" cx="6.5" cy="6.5" r="5" />
       <circle
         className="fill-none stroke-line-strong transition-[stroke-dashoffset] duration-(--motion-slow) [stroke-linecap:round] [stroke-width:1.8]"
-        cx="6.5" cy="6.5" r="5" strokeDasharray={circumference.toFixed(2)} strokeDashoffset={offset.toFixed(2)}
+        cx="6.5"
+        cy="6.5"
+        r="5"
+        strokeDasharray={circumference.toFixed(2)}
+        strokeDashoffset={offset.toFixed(2)}
       />
     </svg>
   );
@@ -48,21 +50,40 @@ interface RowProps {
 }
 
 // 保留原生 <button>：这是头像 + 多列文字的行，ui/Button 固定内边距和单行布局，套不上。
-const ActorRow = /* @__PURE__ */ memo(function ActorRow({ member: m, actor, current, lit, fresh, tabbable, onOpen }: RowProps) {
+const ActorRow = /* @__PURE__ */ memo(function ActorRow({
+  member: m,
+  actor,
+  current,
+  lit,
+  fresh,
+  tabbable,
+  onOpen,
+}: RowProps) {
   const d = describeMember(m);
   const name = actor?.name ?? m.id;
   const todo = showTodo(m) ? m.todo : undefined;
-  const cls = [ROW_CLASS, current ? "bg-selected" : "", lit ? "space-row-lit" : "", fresh ? "space-row-fresh" : ""].filter(Boolean).join(" ");
+  const cls = [ROW_CLASS, current ? "bg-selected" : "", lit ? "space-row-lit" : "", fresh ? "space-row-fresh" : ""]
+    .filter(Boolean)
+    .join(" ");
   return (
     <button
-      type="button" className={cls} data-row={m.id} aria-current={current} tabIndex={tabbable ? 0 : -1}
-      title={`${name} · ${d.title}`} onClick={() => onOpen(m.id)}
+      type="button"
+      className={cls}
+      data-row={m.id}
+      aria-current={current}
+      tabIndex={tabbable ? 0 : -1}
+      title={`${name} · ${d.title}`}
+      onClick={() => onOpen(m.id)}
     >
       <ActorAvatar id={m.id} actor={actor} size={22} working={m.status === "run"} />
-      <span className={`max-w-[46%] shrink overflow-hidden text-ellipsis whitespace-nowrap text-act-sm text-text-main ${m.unread ? "font-semibold" : "font-medium"}`}>
+      <span
+        className={`max-w-[46%] shrink overflow-hidden text-ellipsis whitespace-nowrap text-act-sm text-text-main ${m.unread ? "font-semibold" : "font-medium"}`}
+      >
         {name}
       </span>
-      <span className={`inline-flex min-w-0 flex-1 items-center gap-1 text-act-xs ${d.faint ? "text-text-faint" : "text-text-muted"}`}>
+      <span
+        className={`inline-flex min-w-0 flex-1 items-center gap-1 text-act-xs ${d.faint ? "text-text-faint" : "text-text-muted"}`}
+      >
         {d.check ? <Check size={12} className="shrink-0 text-operational" aria-hidden="true" /> : null}
         <span className="overflow-hidden text-ellipsis whitespace-nowrap">{d.text}</span>
       </span>
@@ -76,20 +97,37 @@ const ActorRow = /* @__PURE__ */ memo(function ActorRow({ member: m, actor, curr
           {todo[0]}/{todo[1]}
         </span>
       ) : null}
-      {m.time ? <span className="min-w-[3.5em] shrink-0 whitespace-nowrap text-right text-act-xxs tabular-nums text-text-faint">{m.time}</span> : null}
+      {m.time ? (
+        <span className="min-w-[3.5em] shrink-0 whitespace-nowrap text-right text-act-xxs tabular-nums text-text-faint">
+          {m.time}
+        </span>
+      ) : null}
     </button>
   );
 });
 
-function GroupHead({ status, count, closed, onToggle }: { status: MemberStatus; count: number; closed: boolean; onToggle: (s: MemberStatus) => void }) {
+function GroupHead({
+  status,
+  count,
+  closed,
+  onToggle,
+}: {
+  status: MemberStatus;
+  count: number;
+  closed: boolean;
+  onToggle: (s: MemberStatus) => void;
+}) {
   const wait = status === "wait";
   return (
     <button
-      type="button" className={`${GROUP_HEAD_BASE} ${wait ? GROUP_HEAD_WAIT : GROUP_HEAD_NORMAL}`}
-      aria-expanded={!closed} onClick={() => onToggle(status)}
+      type="button"
+      className={`${GROUP_HEAD_BASE} ${wait ? GROUP_HEAD_WAIT : GROUP_HEAD_NORMAL}`}
+      aria-expanded={!closed}
+      onClick={() => onToggle(status)}
     >
       <ChevronDown
-        size={13} aria-hidden="true"
+        size={13}
+        aria-hidden="true"
         className={`shrink-0 transition-transform duration-(--motion-base) ${closed ? "-rotate-90" : ""} ${wait ? "" : "text-text-faint"}`}
       />
       <span>{STATUS_LABEL[status]}</span>
@@ -126,8 +164,14 @@ export function ActorGroups() {
               <div className="flex min-h-0 flex-col gap-px overflow-hidden pt-[3px]">
                 {g.members.map((m) => (
                   <ActorRow
-                    key={m.id} member={m} actor={actors[m.id]} current={tab === m.id}
-                    lit={litRows.includes(m.id)} fresh={fresh.has(m.id)} tabbable={!closed} onOpen={openActorTab}
+                    key={m.id}
+                    member={m}
+                    actor={actors[m.id]}
+                    current={tab === m.id}
+                    lit={litRows.includes(m.id)}
+                    fresh={fresh.has(m.id)}
+                    tabbable={!closed}
+                    onOpen={openActorTab}
                   />
                 ))}
               </div>

@@ -4,7 +4,13 @@ import { registerRemoteHostIpc } from "./remote-hosts/ipc";
 import { ResourceMonitorController } from "./resource-monitor/monitor-controller";
 import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
-import { BROWSER_PLUGIN_ID, disabledPluginIds, ENGLISH_LEARNING_PLUGIN_ID, resolvePluginSettings, resolvePluginSwitches } from "./plugins/plugin-switches";
+import {
+  BROWSER_PLUGIN_ID,
+  disabledPluginIds,
+  ENGLISH_LEARNING_PLUGIN_ID,
+  resolvePluginSettings,
+  resolvePluginSwitches,
+} from "./plugins/plugin-switches";
 import { registerPluginsIpc } from "./plugins/plugins-ipc";
 import { registerPythonRuntimeIpc } from "./python-runtime/python-runtime-ipc";
 import { PythonRuntimeService, resolveDesktopPythonRuntime } from "./python-runtime/python-runtime-service";
@@ -33,7 +39,14 @@ import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
 import { registerFixedRendererIpc, type FixedRendererIpcRegistration } from "./runtime-v2/fixed-renderer-ipc";
 import { LocalUpdateService } from "./local-update-service";
 import { attachWindowLifecycle, installProcessErrorLogging, runShutdownSteps } from "./main-lifecycle";
-import { attachNavigationGuards, blockWebviewAttachment, buildContentSecurityPolicy, createAppUrlMatcher, createMainWindowOptions, installContentSecurityPolicy } from "./window-security";
+import {
+  attachNavigationGuards,
+  blockWebviewAttachment,
+  buildContentSecurityPolicy,
+  createAppUrlMatcher,
+  createMainWindowOptions,
+  installContentSecurityPolicy,
+} from "./window-security";
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const APP_ID = process.env.ACTSPACE_DEV_APP_ID?.trim() || "com.actspace.desktop";
@@ -115,7 +128,17 @@ const electronSecretCrypto: SecretCrypto = {
 
 function configureAppPaths(): void {
   app.setName(APP_DISPLAY_NAME);
-  app.setPath("userData", resolveActSpaceDataRoot({ env: process.env, platform: process.platform === "darwin" || process.platform === "linux" || process.platform === "win32" ? process.platform : "other", homeDir: homedir() }));
+  app.setPath(
+    "userData",
+    resolveActSpaceDataRoot({
+      env: process.env,
+      platform:
+        process.platform === "darwin" || process.platform === "linux" || process.platform === "win32"
+          ? process.platform
+          : "other",
+      homeDir: homedir(),
+    }),
+  );
 }
 
 async function ensureDataDirectories(): Promise<AppDataRoots> {
@@ -156,10 +179,12 @@ function getMainWindowOrNull(): BrowserWindow | null {
 
 async function createMainWindow(): Promise<BrowserWindow> {
   const indexHtmlPath = join(__dirname, "..", "..", "dist", "index.html");
-  const win = new BrowserWindow(createMainWindowOptions({
-    preload: join(__dirname, "..", "preload", "index.bundle.js"),
-    title: APP_DISPLAY_NAME,
-  }));
+  const win = new BrowserWindow(
+    createMainWindowOptions({
+      preload: join(__dirname, "..", "preload", "index.bundle.js"),
+      title: APP_DISPLAY_NAME,
+    }),
+  );
   mainWindow = win;
   attachNavigationGuards(win, createAppUrlMatcher({ devServerUrl: DEV_SERVER_URL, indexHtmlPath }));
   attachWindowLifecycle(win, {
@@ -182,13 +207,19 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   const modelStore = new ModelStoreService({ settings: settingsService });
   modelRuntimeService = new ModelRuntimeService(settingsService, modelStore);
   const quickOpenSettings = settingsService.getV2().shortcuts.quickOpen;
-  quickOpenShortcutController = new QuickOpenShortcutController(globalShortcut, () => {
-    const window = getMainWindow();
-    if (!window) return;
-    void presentQuickOpenWindow(window, screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea)
-      .then((presented) => { if (presented) fixedRendererIpc?.requestQuickOpen(); })
-      .catch((error) => void logMain("quick open presentation failed", { error: String(error) }));
-  }, quickOpenSettings.accelerator);
+  quickOpenShortcutController = new QuickOpenShortcutController(
+    globalShortcut,
+    () => {
+      const window = getMainWindow();
+      if (!window) return;
+      void presentQuickOpenWindow(window, screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea)
+        .then((presented) => {
+          if (presented) fixedRendererIpc?.requestQuickOpen();
+        })
+        .catch((error) => void logMain("quick open presentation failed", { error: String(error) }));
+    },
+    quickOpenSettings.accelerator,
+  );
   await logMain("v2 quick open initialized", quickOpenShortcutController.activate(quickOpenSettings));
   // Startup switches: fixed for this process. A switched-off plugin is not created, polled or installed;
   // changing the setting only takes effect after a restart (see plugin-switches.ts).
@@ -197,13 +228,16 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   const startupPluginSettings = resolvePluginSettings(settingsService.getV4().settings);
   const browserEnabled = startupSwitches.get(BROWSER_PLUGIN_ID) === true;
   const englishLearningEnabled = startupSwitches.get(ENGLISH_LEARNING_PLUGIN_ID) === true;
-  browserBridgeService = browserEnabled ? new BrowserBridgeService({
-    dataRoot: roots.dataRoot,
-    bundledRoot: app.isPackaged && !process.env.ACTSPACE_DEV_APP_ID
-      ? join(process.resourcesPath, "app", "browser-components")
-      : join(roots.logRoot, "..", "dist", "browser-components"),
-    log: (message, details) => void logMain(message, details),
-  }) : undefined;
+  browserBridgeService = browserEnabled
+    ? new BrowserBridgeService({
+        dataRoot: roots.dataRoot,
+        bundledRoot:
+          app.isPackaged && !process.env.ACTSPACE_DEV_APP_ID
+            ? join(process.resourcesPath, "app", "browser-components")
+            : join(roots.logRoot, "..", "dist", "browser-components"),
+        log: (message, details) => void logMain(message, details),
+      })
+    : undefined;
   localUpdateService = new LocalUpdateService({
     dataRoot: roots.dataRoot,
     appPath: app.getPath("exe"),
@@ -212,11 +246,25 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   });
   await localUpdateService.load();
   const packagedResources = app.isPackaged && !process.env.ACTSPACE_DEV_APP_ID;
-  const nonoPath = resolveDesktopNonoPath({ packaged: packagedResources, resourcesPath: process.resourcesPath, repoRoot: join(roots.logRoot, ".."), env: process.env });
+  const nonoPath = resolveDesktopNonoPath({
+    packaged: packagedResources,
+    resourcesPath: process.resourcesPath,
+    repoRoot: join(roots.logRoot, ".."),
+    env: process.env,
+  });
   await logMain("sandbox nono resolved", { nonoPath: nonoPath ?? null });
-  const pythonRuntime = resolveDesktopPythonRuntime({ packaged: packagedResources, resourcesPath: process.resourcesPath, repoRoot: join(roots.logRoot, ".."), env: process.env });
+  const pythonRuntime = resolveDesktopPythonRuntime({
+    packaged: packagedResources,
+    resourcesPath: process.resourcesPath,
+    repoRoot: join(roots.logRoot, ".."),
+    env: process.env,
+  });
   await logMain("python runtime resolved", { root: pythonRuntime?.root ?? null });
-  pythonRuntimeService = new PythonRuntimeService({ runtime: pythonRuntime, dataRoot: roots.dataRoot, log: (message, details) => void logMain(message, details) });
+  pythonRuntimeService = new PythonRuntimeService({
+    runtime: pythonRuntime,
+    dataRoot: roots.dataRoot,
+    log: (message, details) => void logMain(message, details),
+  });
   const speech = englishLearningEnabled ? new DesktopSpeechPlayback(roots.tmpRoot, settingsService) : undefined;
   speechPlayback = speech;
   runtimeRegistry = new DesktopRuntimeRegistry({
@@ -230,7 +278,8 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     nonoPath,
     python: pythonRuntimeService.forBash(),
     disabledSkillIds: () => settingsService?.get().skills.disabled ?? [],
-    chatCompactionTriggerRatio: () => settingsService?.getV4().settings.general.taskDefaults.chatCompactionTriggerRatio ?? 0.8,
+    chatCompactionTriggerRatio: () =>
+      settingsService?.getV4().settings.general.taskDefaults.chatCompactionTriggerRatio ?? 0.8,
     log: (message, details) => void logMain(message, details),
   });
   disposeRuntimeDesktopShell = registerRuntimeDesktopShell({
@@ -247,7 +296,9 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   };
   let browserFailures = 0;
   const scheduleBrowserSync = (delay: number) => {
-    browserConnectionTimer = setTimeout(() => { void pollBrowser(); }, delay);
+    browserConnectionTimer = setTimeout(() => {
+      void pollBrowser();
+    }, delay);
     browserConnectionTimer.unref();
   };
   const pollBrowser = async () => {
@@ -257,7 +308,10 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
       browserFailures = 0;
     } catch (error) {
       browserFailures++;
-      if (browserFailures === 1) await logMain("Chrome connection refresh failed", { error: error instanceof Error ? error.message : String(error) });
+      if (browserFailures === 1)
+        await logMain("Chrome connection refresh failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
     }
     if (!shuttingDown) {
       const base = browserFailures ? [1_000, 2_000, 5_000, 10_000][Math.min(browserFailures - 1, 3)] : 10_000;
@@ -275,13 +329,25 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     log: (message, details) => void logMain(message, details),
   });
   disposeEnglishLearningIpc = englishLearningEnabled
-    ? registerEnglishLearningIpc({ registry: runtimeRegistry, settings: settingsService, getMainWindow: getMainWindowOrNull })
+    ? registerEnglishLearningIpc({
+        registry: runtimeRegistry,
+        settings: settingsService,
+        getMainWindow: getMainWindowOrNull,
+      })
     : registerDisabledEnglishLearningIpc({ getMainWindow: getMainWindowOrNull });
-  disposePluginsIpc = registerPluginsIpc({ getMainWindow, catalog: runtimeModule.PLUGIN_CATALOG, startupSwitches, startupPluginSettings, settings: settingsService });
+  disposePluginsIpc = registerPluginsIpc({
+    getMainWindow,
+    catalog: runtimeModule.PLUGIN_CATALOG,
+    startupSwitches,
+    startupPluginSettings,
+    settings: settingsService,
+  });
   disposePythonRuntimeIpc = registerPythonRuntimeIpc({ getMainWindow, service: pythonRuntimeService });
   remoteHosts = new RemoteHostRegistry(roots.dataRoot);
   await remoteHosts.open();
-  disposeRemoteHostIpc = registerRemoteHostIpc(remoteHosts, getMainWindowOrNull, async sessionId => { await remoteDesktop?.activate(sessionId); });
+  disposeRemoteHostIpc = registerRemoteHostIpc(remoteHosts, getMainWindowOrNull, async (sessionId) => {
+    await remoteDesktop?.activate(sessionId);
+  });
   remoteDesktop = new RemoteDesktopAdapter(remoteHosts, getMainWindow, roots.dataRoot);
   fixedRendererIpc = registerFixedRendererIpc({
     remote: remoteDesktop,
@@ -300,25 +366,28 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   });
 }
 
-app.whenReady().then(async () => {
-  configureAppPaths();
-  app.setAppUserModelId(APP_ID);
-  installContentSecurityPolicy(session.defaultSession, buildContentSecurityPolicy({ devServerUrl: DEV_SERVER_URL }));
-  const roots = await ensureDataDirectories();
-  try {
-    await bootRuntime(roots);
-  } catch (error) {
-    await logMain("v2 boot failed", { error: error instanceof Error ? error.message : String(error) });
-  }
-  await createMainWindow();
-  app.on("activate", async () => {
-    // 资源监控悬浮窗也是窗口，不能按窗口总数判断主窗口在不在。
-    if (!getMainWindow()) await createMainWindow();
+app
+  .whenReady()
+  .then(async () => {
+    configureAppPaths();
+    app.setAppUserModelId(APP_ID);
+    installContentSecurityPolicy(session.defaultSession, buildContentSecurityPolicy({ devServerUrl: DEV_SERVER_URL }));
+    const roots = await ensureDataDirectories();
+    try {
+      await bootRuntime(roots);
+    } catch (error) {
+      await logMain("v2 boot failed", { error: error instanceof Error ? error.message : String(error) });
+    }
+    await createMainWindow();
+    app.on("activate", async () => {
+      // 资源监控悬浮窗也是窗口，不能按窗口总数判断主窗口在不在。
+      if (!getMainWindow()) await createMainWindow();
+    });
+  })
+  .catch((error: unknown) => {
+    void logMain("desktop bootstrap failed", { error: error instanceof Error ? error.message : String(error) });
+    app.quit();
   });
-}).catch((error: unknown) => {
-  void logMain("desktop bootstrap failed", { error: error instanceof Error ? error.message : String(error) });
-  app.quit();
-});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
@@ -333,24 +402,31 @@ app.on("before-quit", (event) => {
   void (async () => {
     // 每一步单独兜错：任何一步抛错（比如窗口已销毁时解绑监听）都只记日志，后面的步骤照常执行，
     // 最后一定走到 app.exit(0)，不会卡在「正在安全关闭」直到 35 秒兜底。
-    await runShutdownSteps([
-      ["notify renderer", () => getMainWindow()?.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.appShuttingDown, { reason: "normal" })],
-      ["remote desktop", () => remoteDesktop?.dispose()],
-      ["remote hosts", () => remoteHosts?.dispose()],
-      ["remote host ipc", () => disposeRemoteHostIpc?.()],
-      ["runtime", () => runtimeRegistry?.dispose()],
-      ["provider network", () => providerNetworkService?.dispose()],
-      ["quick open", () => quickOpenShortcutController?.dispose()],
-      ["browser bridge", () => browserBridgeService?.dispose()],
-      ["local update", () => localUpdateService?.dispose()],
-      ["resource monitor", () => resourceMonitor?.dispose()],
-      ["english learning ipc", () => disposeEnglishLearningIpc?.()],
-      ["plugins ipc", () => disposePluginsIpc?.()],
-      ["python runtime ipc", () => disposePythonRuntimeIpc?.()],
-      ["speech playback", () => speechPlayback?.dispose()],
-      ["desktop shell", () => disposeRuntimeDesktopShell?.()],
-      ["fixed renderer ipc", () => fixedRendererIpc?.dispose()],
-    ], (message, details) => void logMain(message, details));
+    await runShutdownSteps(
+      [
+        [
+          "notify renderer",
+          () =>
+            getMainWindow()?.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.appShuttingDown, { reason: "normal" }),
+        ],
+        ["remote desktop", () => remoteDesktop?.dispose()],
+        ["remote hosts", () => remoteHosts?.dispose()],
+        ["remote host ipc", () => disposeRemoteHostIpc?.()],
+        ["runtime", () => runtimeRegistry?.dispose()],
+        ["provider network", () => providerNetworkService?.dispose()],
+        ["quick open", () => quickOpenShortcutController?.dispose()],
+        ["browser bridge", () => browserBridgeService?.dispose()],
+        ["local update", () => localUpdateService?.dispose()],
+        ["resource monitor", () => resourceMonitor?.dispose()],
+        ["english learning ipc", () => disposeEnglishLearningIpc?.()],
+        ["plugins ipc", () => disposePluginsIpc?.()],
+        ["python runtime ipc", () => disposePythonRuntimeIpc?.()],
+        ["speech playback", () => speechPlayback?.dispose()],
+        ["desktop shell", () => disposeRuntimeDesktopShell?.()],
+        ["fixed renderer ipc", () => fixedRendererIpc?.dispose()],
+      ],
+      (message, details) => void logMain(message, details),
+    );
     clearTimeout(timeout);
     app.exit(0);
   })();

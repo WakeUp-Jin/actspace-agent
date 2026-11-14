@@ -1,6 +1,13 @@
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import { Check } from "lucide-react";
-import { THINKING_LEVELS, type ConnectionModelView, type EffectiveModel, type ModelOverrides, type ModelRates, type ThinkingLevel } from "@actspace/shared";
+import {
+  THINKING_LEVELS,
+  type ConnectionModelView,
+  type EffectiveModel,
+  type ModelOverrides,
+  type ModelRates,
+  type ThinkingLevel,
+} from "@actspace/shared";
 import { cx } from "../../ui/Button";
 import { Select } from "../../ui/Select";
 import { ProviderLogo } from "../ProviderLogo";
@@ -26,7 +33,9 @@ export function FieldRow({ label, children }: { label: string; children: ReactNo
   return (
     <div className="flex min-h-[52px] items-center gap-3 px-4 py-2 max-[600px]:flex-wrap max-[600px]:gap-1.5">
       <div className="w-[72px] shrink-0 text-act-xs text-text-muted max-[600px]:w-full">{label}</div>
-      <div className="relative flex min-w-0 flex-1 items-center gap-2 max-[600px]:w-full max-[600px]:flex-wrap">{children}</div>
+      <div className="relative flex min-w-0 flex-1 items-center gap-2 max-[600px]:w-full max-[600px]:flex-wrap">
+        {children}
+      </div>
     </div>
   );
 }
@@ -35,9 +44,15 @@ export function FieldRow({ label, children }: { label: string; children: ReactNo
 export function FamilyMark({ model }: { model: Pick<ConnectionModelView, "apiModel" | "effective"> }) {
   const key = familyLogo(model);
   if (key) return <ProviderLogo logoKey={key} size="xs" />;
-  const letter = model.apiModel.replace(/^[^/]+\//, "").slice(0, 1).toUpperCase();
+  const letter = model.apiModel
+    .replace(/^[^/]+\//, "")
+    .slice(0, 1)
+    .toUpperCase();
   return (
-    <span aria-hidden="true" className="grid h-6 w-6 shrink-0 place-items-center rounded-act-sm bg-surface-subtle text-act-xxs font-semibold text-text-muted">
+    <span
+      aria-hidden="true"
+      className="grid h-6 w-6 shrink-0 place-items-center rounded-act-sm bg-surface-subtle text-act-xxs font-semibold text-text-muted"
+    >
       {letter}
     </span>
   );
@@ -46,7 +61,12 @@ export function FamilyMark({ model }: { model: Pick<ConnectionModelView, "apiMod
 /** 输入框里短暂出现的「已保存」。每次保存换一个 key 重新播放。 */
 export function SavedMark({ offset = "right-2.5" }: { offset?: string }) {
   return (
-    <span className={cx("pointer-events-none absolute inset-y-0 flex items-center gap-1 text-act-xs text-operational animate-[settings-saved-fade_1.8s_forwards] motion-reduce:animate-none", offset)}>
+    <span
+      className={cx(
+        "pointer-events-none absolute inset-y-0 flex items-center gap-1 text-act-xs text-operational animate-[settings-saved-fade_1.8s_forwards] motion-reduce:animate-none",
+        offset,
+      )}
+    >
       <Check size={12} aria-hidden="true" />
       已保存
     </span>
@@ -54,7 +74,14 @@ export function SavedMark({ offset = "right-2.5" }: { offset?: string }) {
 }
 
 /** 失焦或回车才提交；onCommit 返回 false 表示输入不合法，输入框退回原值。Esc 放弃这次修改。 */
-export function CommitInput({ value, onCommit, ...rest }: Omit<ComponentProps<typeof SettingsInput>, "value" | "onChange" | "onBlur"> & { value: string; onCommit: (text: string) => boolean | void }) {
+export function CommitInput({
+  value,
+  onCommit,
+  ...rest
+}: Omit<ComponentProps<typeof SettingsInput>, "value" | "onChange" | "onBlur"> & {
+  value: string;
+  onCommit: (text: string) => boolean | void;
+}) {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
   return (
@@ -62,21 +89,44 @@ export function CommitInput({ value, onCommit, ...rest }: Omit<ComponentProps<ty
       {...rest}
       value={text}
       onChange={(event) => setText(event.target.value)}
-      onBlur={() => { if (text !== value && onCommit(text) === false) setText(value); }}
+      onBlur={() => {
+        if (text !== value && onCommit(text) === false) setText(value);
+      }}
       onKeyDown={(event) => {
         if (event.key === "Enter") (event.target as HTMLInputElement).blur();
-        if (event.key === "Escape") { event.stopPropagation(); setText(value); }
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          setText(value);
+        }
       }}
     />
   );
 }
 
 /** 输入框里贴着边的单位：右边是「tokens」「入」「出」，左边是「官方价 ×」。 */
-export function UnitBox({ unit, side = "right", className, children }: { unit: string; side?: "left" | "right"; className?: string; children: ReactNode }) {
+export function UnitBox({
+  unit,
+  side = "right",
+  className,
+  children,
+}: {
+  unit: string;
+  side?: "left" | "right";
+  className?: string;
+  children: ReactNode;
+}) {
   return (
     <span className={cx("relative min-w-0 flex-1", className)}>
       {children}
-      <span aria-hidden="true" className={cx("pointer-events-none absolute inset-y-0 flex items-center text-act-xxs text-text-subtle", side === "left" ? "left-2.5" : "right-2.5")}>{unit}</span>
+      <span
+        aria-hidden="true"
+        className={cx(
+          "pointer-events-none absolute inset-y-0 flex items-center text-act-xxs text-text-subtle",
+          side === "left" ? "left-2.5" : "right-2.5",
+        )}
+      >
+        {unit}
+      </span>
     </span>
   );
 }
@@ -93,7 +143,17 @@ function UnitInput({ unit, ...rest }: ComponentProps<typeof CommitInput> & { uni
 }
 
 /** 勾选 chip：思考档位、输入类型。 */
-export function Chip({ checked, disabled = false, onToggle, children }: { checked: boolean; disabled?: boolean; onToggle?: () => void; children: ReactNode }) {
+export function Chip({
+  checked,
+  disabled = false,
+  onToggle,
+  children,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onToggle?: () => void;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -119,7 +179,11 @@ export function CheckMark({ checked, muted = false }: { checked: boolean; muted?
       aria-hidden="true"
       className={cx(
         "grid h-3.5 w-3.5 shrink-0 place-items-center rounded-act-xs border",
-        muted ? "border-line bg-surface-subtle text-text-faint" : checked ? "border-action bg-action text-on-action" : "border-line-strong bg-surface",
+        muted
+          ? "border-line bg-surface-subtle text-text-faint"
+          : checked
+            ? "border-action bg-action text-on-action"
+            : "border-line-strong bg-surface",
       )}
     >
       {checked ? <Check size={10} /> : null}
@@ -136,10 +200,21 @@ export type FieldsChange = <K extends keyof ModelOverrides>(field: K, value: Mod
  * 模型的字段：平时三项（上下文、默认思考、价格），「显示更多」再给名称、最大输出、缓存价、思考档位、输入类型。
  * 每个字段改完就交给 onChange；值从 effective 读，保存后跟着新的有效值刷新。卡片和手动添加共用。
  */
-export function ModelFields({ effective, more, hideLabel = false, onChange }: { effective: EffectiveModel; more: boolean; hideLabel?: boolean; onChange: FieldsChange }) {
+export function ModelFields({
+  effective,
+  more,
+  hideLabel = false,
+  onChange,
+}: {
+  effective: EffectiveModel;
+  more: boolean;
+  hideLabel?: boolean;
+  onChange: FieldsChange;
+}) {
   const thinking = effective.thinking;
-  const restore = (field: FieldKey) => canRestore(effective, field) ? () => onChange(field, undefined) : undefined;
-  const scaled = effective.ratesScaled && effective.multiplier !== 1 ? `· 已 ×${formatMultiplier(effective.multiplier)}` : null;
+  const restore = (field: FieldKey) => (canRestore(effective, field) ? () => onChange(field, undefined) : undefined);
+  const scaled =
+    effective.ratesScaled && effective.multiplier !== 1 ? `· 已 ×${formatMultiplier(effective.multiplier)}` : null;
   const tokens = (field: "contextWindow" | "maxOutput") => (text: string) => {
     const value = parseTokens(text);
     if (value === undefined) return false;
@@ -155,10 +230,19 @@ export function ModelFields({ effective, more, hideLabel = false, onChange }: { 
     <>
       <div className="grid grid-cols-3 gap-3 max-[600px]:grid-cols-1">
         <Field label="上下文" onRestore={restore("contextWindow")}>
-          <UnitInput unit="tokens" value={formatTokenInput(effective.contextWindow)} placeholder="例如 128K" aria-label="上下文" onCommit={tokens("contextWindow")} />
+          <UnitInput
+            unit="tokens"
+            value={formatTokenInput(effective.contextWindow)}
+            placeholder="例如 128K"
+            aria-label="上下文"
+            onCommit={tokens("contextWindow")}
+          />
         </Field>
         <Field label="默认思考" onRestore={restore("thinking")}>
-          <DefaultThinking effective={effective} onChange={(level) => thinking && onChange("thinking", { levels: thinking.levels, default: level })} />
+          <DefaultThinking
+            effective={effective}
+            onChange={(level) => thinking && onChange("thinking", { levels: thinking.levels, default: level })}
+          />
         </Field>
         <Field label="价格 · 每百万 token" extra={scaled} onRestore={restore("rates")}>
           <RatePair rates={effective.rates} onCommit={(rates) => onChange("rates", rates ?? undefined)} />
@@ -168,29 +252,67 @@ export function ModelFields({ effective, more, hideLabel = false, onChange }: { 
         <div className="mt-3 grid grid-cols-3 gap-3 max-[600px]:grid-cols-1">
           {hideLabel ? null : (
             <Field label="显示名称" onRestore={restore("label")}>
-              <CommitInput width="full" value={effective.label} aria-label="显示名称" onCommit={(text) => onChange("label", text.trim() || undefined)} />
+              <CommitInput
+                width="full"
+                value={effective.label}
+                aria-label="显示名称"
+                onCommit={(text) => onChange("label", text.trim() || undefined)}
+              />
             </Field>
           )}
           <Field label="最大输出" onRestore={restore("maxOutput")}>
-            <UnitInput unit="tokens" value={formatTokenInput(effective.maxOutput)} placeholder="例如 32K" aria-label="最大输出" onCommit={tokens("maxOutput")} />
+            <UnitInput
+              unit="tokens"
+              value={formatTokenInput(effective.maxOutput)}
+              placeholder="例如 32K"
+              aria-label="最大输出"
+              onCommit={tokens("maxOutput")}
+            />
           </Field>
           <Field label="缓存价格 · 每百万 token">
             <span className="flex gap-1.5">
-              <UnitInput unit="读" value={formatRateInput(effective.rates?.cacheRead)} placeholder="—" disabled={!effective.rates} aria-label="缓存读价格" onCommit={commitCache("cacheRead")} />
-              <UnitInput unit="写" value={formatRateInput(effective.rates?.cacheWrite)} placeholder="—" disabled={!effective.rates} aria-label="缓存写价格" onCommit={commitCache("cacheWrite")} />
+              <UnitInput
+                unit="读"
+                value={formatRateInput(effective.rates?.cacheRead)}
+                placeholder="—"
+                disabled={!effective.rates}
+                aria-label="缓存读价格"
+                onCommit={commitCache("cacheRead")}
+              />
+              <UnitInput
+                unit="写"
+                value={formatRateInput(effective.rates?.cacheWrite)}
+                placeholder="—"
+                disabled={!effective.rates}
+                aria-label="缓存写价格"
+                onCommit={commitCache("cacheWrite")}
+              />
             </span>
           </Field>
           <Field label="思考档位" wide>
             <span role="group" aria-label="思考档位" className="flex flex-wrap gap-1.5">
               {THINKING_LEVELS.map((level) => (
-                <Chip key={level} checked={Boolean(thinking?.levels.includes(level))} onToggle={() => onChange("thinking", toggleLevel(thinking, level))}>{LEVEL_LABELS[level]}</Chip>
+                <Chip
+                  key={level}
+                  checked={Boolean(thinking?.levels.includes(level))}
+                  onToggle={() => onChange("thinking", toggleLevel(thinking, level))}
+                >
+                  {LEVEL_LABELS[level]}
+                </Chip>
               ))}
             </span>
           </Field>
           <Field label="输入类型" wide>
             <span role="group" aria-label="输入类型" className="flex flex-wrap gap-1.5">
-              <Chip checked disabled>文本</Chip>
-              <Chip checked={canSeeImages(effective)} onToggle={() => onChange("input", canSeeImages(effective) ? ["text"] : ["text", "image"])}>图片</Chip>
+              <Chip checked disabled>
+                文本
+              </Chip>
+              <Chip
+                checked={canSeeImages(effective)}
+                onToggle={() => onChange("input", canSeeImages(effective) ? ["text"] : ["text", "image"])}
+              >
+                图片
+              </Chip>
             </span>
           </Field>
         </div>
@@ -200,7 +322,19 @@ export function ModelFields({ effective, more, hideLabel = false, onChange }: { 
 }
 
 /** 字段标题；用户改过、目录里又有原值时，标题后面给「已修改 · 恢复」。 */
-function Field({ label, extra, wide = false, onRestore, children }: { label: string; extra?: ReactNode; wide?: boolean; onRestore?: () => void; children: ReactNode }) {
+function Field({
+  label,
+  extra,
+  wide = false,
+  onRestore,
+  children,
+}: {
+  label: string;
+  extra?: ReactNode;
+  wide?: boolean;
+  onRestore?: () => void;
+  children: ReactNode;
+}) {
   return (
     <div className={cx("flex min-w-0 flex-col gap-1.5", wide && "col-span-full")}>
       <div className="flex min-h-4 items-center gap-1.5 text-act-xs text-text-faint">
@@ -209,7 +343,13 @@ function Field({ label, extra, wide = false, onRestore, children }: { label: str
         {onRestore ? (
           <>
             <span className="text-act-xxs text-info">已修改</span>
-            <button type="button" onClick={onRestore} className="ml-auto text-act-xxs text-text-faint underline underline-offset-2 hover:text-text-main">恢复</button>
+            <button
+              type="button"
+              onClick={onRestore}
+              className="ml-auto text-act-xxs text-text-faint underline underline-offset-2 hover:text-text-main"
+            >
+              恢复
+            </button>
           </>
         ) : null}
       </div>
@@ -218,10 +358,26 @@ function Field({ label, extra, wide = false, onRestore, children }: { label: str
   );
 }
 
-function DefaultThinking({ effective, onChange }: { effective: EffectiveModel; onChange: (level: ThinkingLevel) => void }) {
+function DefaultThinking({
+  effective,
+  onChange,
+}: {
+  effective: EffectiveModel;
+  onChange: (level: ThinkingLevel) => void;
+}) {
   const levels = effective.thinking?.levels ?? null;
   if (!levels || levels.length === 0) {
-    return <Select value="" options={[]} onValueChange={() => undefined} disabled ariaLabel="默认思考" placeholder={levels ? "不支持思考" : "未设置档位"} className="w-full" />;
+    return (
+      <Select
+        value=""
+        options={[]}
+        onValueChange={() => undefined}
+        disabled
+        ariaLabel="默认思考"
+        placeholder={levels ? "不支持思考" : "未设置档位"}
+        className="w-full"
+      />
+    );
   }
   return (
     <Select
@@ -268,7 +424,10 @@ function RatePair({ rates, onCommit }: { rates: ModelRates | null; onCommit: (ra
         onBlur={commit}
         onKeyDown={(event) => {
           if (event.key === "Enter") (event.target as HTMLInputElement).blur();
-          if (event.key === "Escape") { event.stopPropagation(); setText(initial); }
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            setText(initial);
+          }
         }}
       />
     </UnitBox>

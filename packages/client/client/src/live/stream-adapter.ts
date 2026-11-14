@@ -5,8 +5,26 @@ import { FileGenerationCounter } from "./file-generation-counter.js";
 import { toolPreview } from "../sessions/tool-card.js";
 import { SubagentActivity } from "./subagent-activity.js";
 
-type Identity = { sessionId: string; agentRunId: string; turnId: string; llmCallId: string; toolCallId: string; toolName: string };
-type Entry = { identity: Identity; args: RuntimeJsonValue; phase: "streaming" | "prepared" | "running" | "finished"; counter?: FileGenerationCounter; timer?: ReturnType<typeof setTimeout>; message?: string; additions?: number; deletions?: number; childSessionId?: string; activity?: SubagentActivity };
+type Identity = {
+  sessionId: string;
+  agentRunId: string;
+  turnId: string;
+  llmCallId: string;
+  toolCallId: string;
+  toolName: string;
+};
+type Entry = {
+  identity: Identity;
+  args: RuntimeJsonValue;
+  phase: "streaming" | "prepared" | "running" | "finished";
+  counter?: FileGenerationCounter;
+  timer?: ReturnType<typeof setTimeout>;
+  message?: string;
+  additions?: number;
+  deletions?: number;
+  childSessionId?: string;
+  activity?: SubagentActivity;
+};
 
 /** Transient presentation state. Journal and tool execution remain the source of truth. */
 export class FixedRendererStreamAdapter {
@@ -15,7 +33,10 @@ export class FixedRendererStreamAdapter {
    * `coalesceMs`. Any other event flushes the pending delta first, so order never changes; the run end,
    * `clearTransient` and `dispose` flush as well. 0 (default) emits every delta immediately.
    */
-  constructor(private readonly workspaceFor: (sessionId: string) => string | undefined = () => undefined, private readonly coalesceMs = 0) {}
+  constructor(
+    private readonly workspaceFor: (sessionId: string) => string | undefined = () => undefined,
+    private readonly coalesceMs = 0,
+  ) {}
   #pendingDelta: Extract<RuntimeStreamEvent, { type: "assistant_text_delta" | "assistant_thinking_delta" }> | undefined;
   #deltaTimer: ReturnType<typeof setTimeout> | undefined;
   readonly #calls = new Map<string, Entry>();
@@ -23,7 +44,9 @@ export class FixedRendererStreamAdapter {
   readonly #listeners = new Set<(event: RuntimeStreamEvent) => void>();
   subscribe(listener: (event: RuntimeStreamEvent) => void): () => void {
     this.#listeners.add(listener);
-    return () => { this.#listeners.delete(listener); };
+    return () => {
+      this.#listeners.delete(listener);
+    };
   }
   dispose(): void {
     this.clearTransient();
@@ -31,7 +54,10 @@ export class FixedRendererStreamAdapter {
   }
   /** Emit a buffered delta now. Hosts call this before sending a related message through another path. */
   flush(): void {
-    if (this.#deltaTimer !== undefined) { clearTimeout(this.#deltaTimer); this.#deltaTimer = undefined; }
+    if (this.#deltaTimer !== undefined) {
+      clearTimeout(this.#deltaTimer);
+      this.#deltaTimer = undefined;
+    }
     const pending = this.#pendingDelta;
     if (pending === undefined) return;
     this.#pendingDelta = undefined;
@@ -48,32 +74,70 @@ export class FixedRendererStreamAdapter {
     this.#send(event);
   }
   #emitDelta(event: Extract<RuntimeStreamEvent, { type: "assistant_text_delta" | "assistant_thinking_delta" }>): void {
-    if (this.coalesceMs <= 0) { this.#send(event); return; }
+    if (this.coalesceMs <= 0) {
+      this.#send(event);
+      return;
+    }
     const pending = this.#pendingDelta;
     if (pending !== undefined) {
       if (sameDeltaTarget(pending, event)) {
         // The merged frame carries the newest live revision it contains.
-        this.#pendingDelta = { ...pending, delta: pending.delta + event.delta, ...(event.liveRevision === undefined ? {} : { liveRevision: event.liveRevision }) };
+        this.#pendingDelta = {
+          ...pending,
+          delta: pending.delta + event.delta,
+          ...(event.liveRevision === undefined ? {} : { liveRevision: event.liveRevision }),
+        };
         return;
       }
       this.flush();
     }
     this.#pendingDelta = event;
-    this.#deltaTimer = setTimeout(() => { this.#deltaTimer = undefined; this.flush(); }, this.coalesceMs);
+    this.#deltaTimer = setTimeout(() => {
+      this.#deltaTimer = undefined;
+      this.flush();
+    }, this.coalesceMs);
   }
   #send(event: RuntimeStreamEvent): void {
     for (const listener of this.#listeners) {
-      try { listener(event); } catch { /* Presentation observers cannot fail the run. */ }
+      try {
+        listener(event);
+      } catch {
+        /* Presentation observers cannot fail the run. */
+      }
     }
   }
-  #key(sessionId: string, agentRunId: string, callId: string): string { return JSON.stringify([sessionId, agentRunId, callId]); }
+  #key(sessionId: string, agentRunId: string, callId: string): string {
+    return JSON.stringify([sessionId, agentRunId, callId]);
+  }
   #preview(entry: Entry) {
-    const preview = toolPreview(entry.identity.toolName, undefined, entry.message ? { summary: entry.message } : {}, { args: entry.args }, undefined, entry.identity.sessionId, entry.identity.agentRunId, entry.phase, this.workspaceFor(entry.identity.sessionId), entry.additions === undefined && entry.deletions === undefined ? undefined : { additions: entry.additions ?? 0, deletions: entry.deletions ?? 0 });
+    const preview = toolPreview(
+      entry.identity.toolName,
+      undefined,
+      entry.message ? { summary: entry.message } : {},
+      { args: entry.args },
+      undefined,
+      entry.identity.sessionId,
+      entry.identity.agentRunId,
+      entry.phase,
+      this.workspaceFor(entry.identity.sessionId),
+      entry.additions === undefined && entry.deletions === undefined
+        ? undefined
+        : { additions: entry.additions ?? 0, deletions: entry.deletions ?? 0 },
+    );
     if ((preview.kind === "write" || preview.kind === "edit_diff") && entry.phase !== "finished") {
-      preview.generationProgress = { phase: entry.phase === "streaming" ? "generating" : entry.phase === "prepared" ? "preparing" : "saving", characters: entry.counter?.count ?? 0 };
+      preview.generationProgress = {
+        phase: entry.phase === "streaming" ? "generating" : entry.phase === "prepared" ? "preparing" : "saving",
+        characters: entry.counter?.count ?? 0,
+      };
     }
     if (preview.kind === "agent" && entry.activity?.model) preview.model = entry.activity.model;
-    if (preview.kind === "agent" && entry.childSessionId) preview.transcriptRef = { kind: "subagent_transcript", sessionId: entry.identity.sessionId, agentRunId: entry.identity.agentRunId, runId: entry.childSessionId };
+    if (preview.kind === "agent" && entry.childSessionId)
+      preview.transcriptRef = {
+        kind: "subagent_transcript",
+        sessionId: entry.identity.sessionId,
+        agentRunId: entry.identity.agentRunId,
+        runId: entry.childSessionId,
+      };
     return preview;
   }
   #clearTimer(entry: Entry): void {
@@ -87,7 +151,12 @@ export class FixedRendererStreamAdapter {
     const runKey = JSON.stringify([event.sessionId, event.agentRunId]);
     if (this.#closedRuns.has(runKey)) return;
     if (event.parentSessionId && event.parentCallId) {
-      const parent = [...this.#calls.values()].find((entry) => entry.identity.sessionId === event.parentSessionId && entry.identity.toolCallId === event.parentCallId && entry.phase === "running");
+      const parent = [...this.#calls.values()].find(
+        (entry) =>
+          entry.identity.sessionId === event.parentSessionId &&
+          entry.identity.toolCallId === event.parentCallId &&
+          entry.phase === "running",
+      );
       if (parent && (!parent.childSessionId || parent.childSessionId === event.sessionId)) {
         parent.activity ??= new SubagentActivity();
         const message = parent.activity.accept(event);
@@ -101,8 +170,14 @@ export class FixedRendererStreamAdapter {
     // A subagent's Run carries its main Session, so clients leave the child's task queue alone.
     const child = event.parentSessionId ? { parentSessionId: event.parentSessionId } : {};
     if (event.kind === "assistant-delta" || event.kind === "reasoning-delta") {
-      this.#emitDelta({ type: event.kind === "assistant-delta" ? "assistant_text_delta" : "assistant_thinking_delta", ...ids, llmCallId: event.requestId, messageId: event.messageId, delta: event.message,
-        ...(event.liveRevision === undefined ? {} : { liveRevision: event.liveRevision }) });
+      this.#emitDelta({
+        type: event.kind === "assistant-delta" ? "assistant_text_delta" : "assistant_thinking_delta",
+        ...ids,
+        llmCallId: event.requestId,
+        messageId: event.messageId,
+        delta: event.message,
+        ...(event.liveRevision === undefined ? {} : { liveRevision: event.liveRevision }),
+      });
       return;
     }
     if (event.kind === "run-state") {
@@ -120,24 +195,61 @@ export class FixedRendererStreamAdapter {
           this.#calls.delete(key);
         }
         if (event.message === "aborted") this.#emit({ type: "agent_run_aborted", ...ids, ...child });
-        else if (event.message === "failed") this.#emit({ type: "agent_run_failed", ...ids, error: { code: event.failure?.kind ?? "AGENT_RUN_FAILED", message: event.failure?.message ?? "The Agent run failed.", recoverable: event.failure?.retryable ?? false }, ...child });
+        else if (event.message === "failed")
+          this.#emit({
+            type: "agent_run_failed",
+            ...ids,
+            error: {
+              code: event.failure?.kind ?? "AGENT_RUN_FAILED",
+              message: event.failure?.message ?? "The Agent run failed.",
+              recoverable: event.failure?.retryable ?? false,
+            },
+            ...child,
+          });
         else this.#emit({ type: "agent_run_finished", ...ids, resultEventIds: [], ...child });
       }
       return;
     }
     if (event.kind === "compaction-started") {
-      this.#emit({ type: "context_compaction_started", sessionId: event.sessionId, agentRunId: event.agentRunId, startedAt: new Date().toISOString() });
+      this.#emit({
+        type: "context_compaction_started",
+        sessionId: event.sessionId,
+        agentRunId: event.agentRunId,
+        startedAt: new Date().toISOString(),
+      });
       return;
     }
     if (event.kind === "compaction-finished") {
-      this.#emit({ type: "context_compaction_finished", sessionId: event.sessionId, agentRunId: event.agentRunId, payload: { triggerTokens: event.beforeTokens ?? 0, thresholdTokens: 0, beforeCount: event.removedCount, afterCount: 1, summaryChars: 0, historyRefPath: "journal.jsonl", status: "compacted", removedCount: event.removedCount, durationMs: event.durationMs,
-        ...(event.compactionId ? { compactionId: event.compactionId } : {}), ...(event.trigger ? { trigger: event.trigger } : {}),
-        ...(event.beforeTokens === undefined ? {} : { beforeTokens: event.beforeTokens }), ...(event.afterTokens === undefined ? {} : { afterTokens: event.afterTokens }),
-        ...(event.beforeEstimated ? { beforeEstimated: true } : {}) } });
+      this.#emit({
+        type: "context_compaction_finished",
+        sessionId: event.sessionId,
+        agentRunId: event.agentRunId,
+        payload: {
+          triggerTokens: event.beforeTokens ?? 0,
+          thresholdTokens: 0,
+          beforeCount: event.removedCount,
+          afterCount: 1,
+          summaryChars: 0,
+          historyRefPath: "journal.jsonl",
+          status: "compacted",
+          removedCount: event.removedCount,
+          durationMs: event.durationMs,
+          ...(event.compactionId ? { compactionId: event.compactionId } : {}),
+          ...(event.trigger ? { trigger: event.trigger } : {}),
+          ...(event.beforeTokens === undefined ? {} : { beforeTokens: event.beforeTokens }),
+          ...(event.afterTokens === undefined ? {} : { afterTokens: event.afterTokens }),
+          ...(event.beforeEstimated ? { beforeEstimated: true } : {}),
+        },
+      });
       return;
     }
     if (event.kind === "compaction-failed") {
-      this.#emit({ type: "context_compaction_failed", sessionId: event.sessionId, agentRunId: event.agentRunId, error: { code: "CONTEXT_COMPACTION_FAILED", message: event.message, recoverable: true } });
+      this.#emit({
+        type: "context_compaction_failed",
+        sessionId: event.sessionId,
+        agentRunId: event.agentRunId,
+        error: { code: "CONTEXT_COMPACTION_FAILED", message: event.message, recoverable: true },
+      });
       return;
     }
     if (event.kind === "inbox-claimed") {
@@ -145,9 +257,28 @@ export class FixedRendererStreamAdapter {
       if (event.source === "steer") this.#emit({ type: "user_message_steered", ...ids, messageId: event.messageId });
       const notice = event.notice;
       // Background tasks, subagent completion notices and agent messages, whether they open a Turn or arrive inside one.
-      const taskKind = notice && (event.source === "task_notification" || event.source === "subagent_notification" || event.source === "agent_message") && isNoticeKind(notice.kind) ? notice.kind : undefined;
+      const taskKind =
+        notice &&
+        (event.source === "task_notification" ||
+          event.source === "subagent_notification" ||
+          event.source === "agent_message") &&
+        isNoticeKind(notice.kind)
+          ? notice.kind
+          : undefined;
       if (notice && taskKind) {
-        this.#emit({ type: "background_notice_claimed", ...ids, messageId: event.messageId, content: event.content ?? "", notice: { taskId: notice.taskId, taskKind, title: notice.title, status: notice.status, opensTurn: event.opensTurn === true } });
+        this.#emit({
+          type: "background_notice_claimed",
+          ...ids,
+          messageId: event.messageId,
+          content: event.content ?? "",
+          notice: {
+            taskId: notice.taskId,
+            taskKind,
+            title: notice.title,
+            status: notice.status,
+            opensTurn: event.opensTurn === true,
+          },
+        });
       }
       return;
     }
@@ -156,13 +287,19 @@ export class FixedRendererStreamAdapter {
     if (entry?.phase === "finished") return;
     if (entry && entry.identity.llmCallId !== event.requestId) return;
     const initial = entry === undefined;
-    entry ??= { identity: { ...ids, llmCallId: event.requestId, toolCallId: event.callId, toolName: event.name }, args: {}, phase: "streaming" };
+    entry ??= {
+      identity: { ...ids, llmCallId: event.requestId, toolCallId: event.callId, toolName: event.name },
+      args: {},
+      phase: "streaming",
+    };
     if (event.name) entry.identity.toolName = event.name;
     this.#calls.set(key, entry);
     if (event.kind === "tool-call-delta") {
       if (entry.phase !== "streaming") return;
       if (entry.identity.toolName === "write_file" || entry.identity.toolName === "edit_file") {
-        entry.counter ??= new FileGenerationCounter(entry.identity.toolName === "write_file" ? "content" : "new_string");
+        entry.counter ??= new FileGenerationCounter(
+          entry.identity.toolName === "write_file" ? "content" : "new_string",
+        );
         const before = entry.counter.count;
         entry.counter.accept(event.argumentsDelta);
         if (entry.counter.count !== before && entry.timer === undefined) {
@@ -188,12 +325,36 @@ export class FixedRendererStreamAdapter {
       this.#clearTimer(entry);
       entry.counter = undefined;
       entry.phase = "finished";
-      const preview = toolPreview(event.name, undefined, event.result as unknown as Record<string, RuntimeJsonValue>, { args: entry.args }, undefined, event.sessionId, event.agentRunId, "finished", this.workspaceFor(event.sessionId));
-      this.#emit({ type: "tool_finished", ...entry.identity, resultEventId: event.resultEventId, isError: event.result.status !== "completed", status: event.result.status, preview });
+      const preview = toolPreview(
+        event.name,
+        undefined,
+        event.result as unknown as Record<string, RuntimeJsonValue>,
+        { args: entry.args },
+        undefined,
+        event.sessionId,
+        event.agentRunId,
+        "finished",
+        this.workspaceFor(event.sessionId),
+      );
+      this.#emit({
+        type: "tool_finished",
+        ...entry.identity,
+        resultEventId: event.resultEventId,
+        isError: event.result.status !== "completed",
+        status: event.result.status,
+        preview,
+      });
       entry.args = {};
     }
   }
-  progress(update: { sessionId: string; agentRunId: string; callId: string; message: string; additions?: number; deletions?: number }): void {
+  progress(update: {
+    sessionId: string;
+    agentRunId: string;
+    callId: string;
+    message: string;
+    additions?: number;
+    deletions?: number;
+  }): void {
     const entry = this.#calls.get(this.#key(update.sessionId, update.agentRunId, update.callId));
     if (entry?.phase !== "running") return;
     entry.message = update.message;
@@ -209,5 +370,12 @@ function isNoticeKind(kind: string): kind is "bash" | "agent" | "subagent" | "ag
 
 type DeltaEvent = Extract<RuntimeStreamEvent, { type: "assistant_text_delta" | "assistant_thinking_delta" }>;
 function sameDeltaTarget(a: DeltaEvent, b: DeltaEvent): boolean {
-  return a.type === b.type && a.sessionId === b.sessionId && a.agentRunId === b.agentRunId && a.turnId === b.turnId && a.llmCallId === b.llmCallId && a.messageId === b.messageId;
+  return (
+    a.type === b.type &&
+    a.sessionId === b.sessionId &&
+    a.agentRunId === b.agentRunId &&
+    a.turnId === b.turnId &&
+    a.llmCallId === b.llmCallId &&
+    a.messageId === b.messageId
+  );
 }

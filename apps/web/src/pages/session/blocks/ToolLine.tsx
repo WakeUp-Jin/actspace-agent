@@ -21,21 +21,51 @@ export type ToolLineProps = {
 };
 
 /** 过程行：无图标，动作 + 浅色目标；进行中动作扫光，失败变红。 */
-export function ToolLine({ verb, target, extra, running = false, error = false, open, onToggle, grow = false, title, children }: ToolLineProps) {
+export function ToolLine({
+  verb,
+  target,
+  extra,
+  running = false,
+  error = false,
+  open,
+  onToggle,
+  grow = false,
+  title,
+  children,
+}: ToolLineProps) {
   const content = (
     <>
       <span className={cx("tl-verb", running && "shimmer-text")}>{verb}</span>
-      {target ? <span className={cx("tl-target", grow && "flex-1")} title={title}>{target}</span> : null}
+      {target ? (
+        <span className={cx("tl-target", grow && "flex-1")} title={title}>
+          {target}
+        </span>
+      ) : null}
       {extra}
-      {onToggle ? <ChevronRight size={14} aria-hidden className={cx("transition-transform duration-(--motion-fast)", open && "rotate-90")} /> : null}
+      {onToggle ? (
+        <ChevronRight
+          size={14}
+          aria-hidden
+          className={cx("transition-transform duration-(--motion-fast)", open && "rotate-90")}
+        />
+      ) : null}
     </>
   );
   return (
     <div>
       {onToggle ? (
-        <Pressable className="tl flex rounded-act-xs active:bg-transparent" data-error={error || undefined} aria-expanded={open} onClick={onToggle}>{content}</Pressable>
+        <Pressable
+          className="tl flex rounded-act-xs active:bg-transparent"
+          data-error={error || undefined}
+          aria-expanded={open}
+          onClick={onToggle}
+        >
+          {content}
+        </Pressable>
       ) : (
-        <div className="tl" data-error={error || undefined}>{content}</div>
+        <div className="tl" data-error={error || undefined}>
+          {content}
+        </div>
       )}
       {open ? children : null}
     </div>

@@ -76,8 +76,12 @@ test("collects source, test, docs, language, and area metrics", async () => {
 test("round-trips the embedded snapshot and renders deltas", () => {
   const metrics = {
     totals: { sourceFiles: 1, sourceLines: 10, testFiles: 1, testLines: 5, docsFiles: 1, docsCharacters: 20 },
-    areas: { "packages/app": { sourceFiles: 1, sourceLines: 10, testFiles: 1, testLines: 5, docsFiles: 0, docsCharacters: 0 } },
-    languages: { TypeScript: { sourceFiles: 1, sourceLines: 10, testFiles: 1, testLines: 5, docsFiles: 0, docsCharacters: 0 } },
+    areas: {
+      "packages/app": { sourceFiles: 1, sourceLines: 10, testFiles: 1, testLines: 5, docsFiles: 0, docsCharacters: 0 },
+    },
+    languages: {
+      TypeScript: { sourceFiles: 1, sourceLines: 10, testFiles: 1, testLines: 5, docsFiles: 0, docsCharacters: 0 },
+    },
   };
   const before = {
     schemaVersion: 1,
@@ -100,4 +104,3 @@ test("round-trips the embedded snapshot and renders deltas", () => {
   assert.match(report, /\| 源代码行 \| 10 \| 8 \| -2 \|/u);
   assert.deepEqual(extractSnapshot(report), after);
 });
-

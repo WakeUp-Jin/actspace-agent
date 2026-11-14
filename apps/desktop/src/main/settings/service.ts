@@ -78,7 +78,10 @@ export class SettingsService {
   }
 
   /** Main-only storage snapshot used by model services; never contains decrypted secrets. */
-  getModelStorageState(): Pick<PersistedSettingsV3, "installedModels" | "customModels" | "taskModels" | "modelOverrides"> {
+  getModelStorageState(): Pick<
+    PersistedSettingsV3,
+    "installedModels" | "customModels" | "taskModels" | "modelOverrides"
+  > {
     return general.getModelStorageState(this.store);
   }
 
@@ -102,12 +105,18 @@ export class SettingsService {
     return providers.updateProviderConnection(this.store, input);
   }
 
-  getConnectionRuntimeConfig(provider: LlmProviderId, connectionId?: string): ProviderRuntimeConfig | ProviderRuntimeError {
+  getConnectionRuntimeConfig(
+    provider: LlmProviderId,
+    connectionId?: string,
+  ): ProviderRuntimeConfig | ProviderRuntimeError {
     return providers.getConnectionRuntimeConfig(this.store, provider, connectionId);
   }
 
   /** 设置 › 模型 的连接写入：Key 与 models 补丁一起提交。 */
-  applyModelsChange(build: (models: SettingsV4Models) => SettingsV4ModelsPatch, secret?: modelConnections.ConnectionSecretChange): Promise<void> {
+  applyModelsChange(
+    build: (models: SettingsV4Models) => SettingsV4ModelsPatch,
+    secret?: modelConnections.ConnectionSecretChange,
+  ): Promise<void> {
     return modelConnections.applyModelsChange(this.store, build, secret);
   }
 
@@ -123,9 +132,7 @@ export class SettingsService {
     return media.getImageGenerationRuntimeConfig(this.store);
   }
 
-  updateImageGeneration(
-    input: UpdateImageGenerationSettingsInput,
-  ): Promise<ImageGenerationSettingsView> {
+  updateImageGeneration(input: UpdateImageGenerationSettingsInput): Promise<ImageGenerationSettingsView> {
     return media.updateImageGeneration(this.store, input);
   }
 

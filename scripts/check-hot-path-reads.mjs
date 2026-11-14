@@ -20,7 +20,20 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const BASELINE_PATH = path.join(repoRoot, "scripts/hot-path-reads-baseline.json");
 const ROOTS = ["packages", "apps"];
-const SKIP_DIRS = new Set(["node_modules", "dist", "build", "out", "test", "tests", "__tests__", "testing", "fixtures", "mock", "mocks", "e2e"]);
+const SKIP_DIRS = new Set([
+  "node_modules",
+  "dist",
+  "build",
+  "out",
+  "test",
+  "tests",
+  "__tests__",
+  "testing",
+  "fixtures",
+  "mock",
+  "mocks",
+  "e2e",
+]);
 
 export const RULES = [
   { id: "full-iterate", pattern: /\.iterateEvents\(\s*\)/g },
@@ -65,7 +78,12 @@ export function countSource(source) {
 }
 
 function isSourceFile(name) {
-  return /\.(ts|tsx|mts|cts)$/.test(name) && !name.endsWith(".d.ts") && !/\.(test|spec|bench|perf)\.[cm]?tsx?$/.test(name) && !/^testing\.tsx?$/.test(name);
+  return (
+    /\.(ts|tsx|mts|cts)$/.test(name) &&
+    !name.endsWith(".d.ts") &&
+    !/\.(test|spec|bench|perf)\.[cm]?tsx?$/.test(name) &&
+    !/^testing\.tsx?$/.test(name)
+  );
 }
 
 /** 扫描整个仓库 → { "相对路径": { 规则: 次数 } }，只记有出现的文件。 */
@@ -75,7 +93,10 @@ export function collectCounts(root = repoRoot) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.name.startsWith(".")) continue;
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) { if (!SKIP_DIRS.has(entry.name)) walk(full); continue; }
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name)) walk(full);
+        continue;
+      }
       if (!isSourceFile(entry.name)) continue;
       const counts = countSource(fs.readFileSync(full, "utf8"));
       if (Object.keys(counts).length) result[path.relative(root, full).split(path.sep).join("/")] = counts;
@@ -97,7 +118,8 @@ export function compareWithBaseline(counts, baseline) {
       const current = now[rule] ?? 0;
       const limit = allowed[rule] ?? 0;
       if (current > limit) problems.push(`${file}：${rule} 有 ${current} 处，基线 ${limit}`);
-      else if (current < limit) notices.push(`${file}：${rule} 从 ${limit} 降到 ${current}，可以运行 --update-baseline 收紧基线`);
+      else if (current < limit)
+        notices.push(`${file}：${rule} 从 ${limit} 降到 ${current}，可以运行 --update-baseline 收紧基线`);
     }
   }
   return { problems, notices };
@@ -108,7 +130,11 @@ export function loadBaseline(baselinePath = BASELINE_PATH) {
 }
 
 function sortedBaseline(counts) {
-  return Object.fromEntries(Object.keys(counts).sort().map((file) => [file, Object.fromEntries(Object.entries(counts[file]).sort())]));
+  return Object.fromEntries(
+    Object.keys(counts)
+      .sort()
+      .map((file) => [file, Object.fromEntries(Object.entries(counts[file]).sort())]),
+  );
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -121,7 +147,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     for (const notice of notices) console.log(`提示：${notice}`);
     if (problems.length) {
       console.error("高频路径读写检查失败：新增了整份读日志或整份深拷贝的写法。");
-      console.error("改成增量读 / 引用已有视图（docs/coding-standards/perf-memory-conventions.md）；确实在低频路径上，就在同一行或上一行写 `perf-allow: 理由`。");
+      console.error(
+        "改成增量读 / 引用已有视图（docs/coding-standards/perf-memory-conventions.md）；确实在低频路径上，就在同一行或上一行写 `perf-allow: 理由`。",
+      );
       for (const problem of problems) console.error(`  ${problem}`);
       process.exit(1);
     }

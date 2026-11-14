@@ -10,7 +10,8 @@ export const PATH_PAGE_LIMIT = 50;
 /** 工作区内的路径显示为相对路径，其余原样；末尾斜杠前是目录，之后是文件名。 */
 export function splitContextPath(path: string, workspaceRoot?: string): { dir: string; name: string } {
   const root = workspaceRoot?.replace(/[\\/]+$/, "");
-  const shown = root && (path.startsWith(`${root}/`) || path.startsWith(`${root}\\`)) ? path.slice(root.length + 1) : path;
+  const shown =
+    root && (path.startsWith(`${root}/`) || path.startsWith(`${root}\\`)) ? path.slice(root.length + 1) : path;
   const cut = Math.max(shown.lastIndexOf("/"), shown.lastIndexOf("\\"));
   return cut < 0 ? { dir: "", name: shown } : { dir: shown.slice(0, cut + 1), name: shown.slice(cut + 1) };
 }

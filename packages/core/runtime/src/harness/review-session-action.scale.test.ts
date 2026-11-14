@@ -15,14 +15,37 @@ function reviewCase(count: number) {
   const { journal, history } = syntheticJournal(count, { textLength: 1, toolCallsPerTurn: 8 });
   const session = { header: { sessionId: "scale" }, journal } as unknown as SessionHandle;
   const reviews: unknown[][] = [];
-  const reviewer = { review: async (input: { snapshot: { conversation: unknown[] } }) => { reviews.push(input.snapshot.conversation); return { approved: true }; } };
-  const append = (type: string, data: Record<string, unknown>) => journal.append({ type, eventVersion: 1, source: SOURCE, data: data as never, surface: null });
+  const reviewer = {
+    review: async (input: { snapshot: { conversation: unknown[] } }) => {
+      reviews.push(input.snapshot.conversation);
+      return { approved: true };
+    },
+  };
+  const append = (type: string, data: Record<string, unknown>) =>
+    journal.append({ type, eventVersion: 1, source: SOURCE, data: data as never, surface: null });
   append("turn/start", { turnId: "turn-review" });
   append("step/start", { turnId: "turn-review", stepId: "step-review" });
   const review = async (callId: string) => {
-    append("tool/call", { callId, name: "write_file", agentRunId: "run", turnId: "turn-review", stepId: "step-review", args: { path: "a.ts" } });
+    append("tool/call", {
+      callId,
+      name: "write_file",
+      agentRunId: "run",
+      turnId: "turn-review",
+      stepId: "step-review",
+      args: { path: "a.ts" },
+    });
     const before = history.eventsRead;
-    await reviewSessionAction(session, reviewer as never, { callId, model: "review", action: { path: "a.ts" }, workspaceRoot: "/fixture", signal: new AbortController().signal } as never);
+    await reviewSessionAction(
+      session,
+      reviewer as never,
+      {
+        callId,
+        model: "review",
+        action: { path: "a.ts" },
+        workspaceRoot: "/fixture",
+        signal: new AbortController().signal,
+      } as never,
+    );
     return history.eventsRead - before;
   };
   return { journal, history, review, reviews };
@@ -40,5 +63,5 @@ it("reads the same number of archived events per review for 1k and 10k event ses
   // 增量折叠出的审查对话和整份重算一致：原始消息全部保留，工具调用只留最近 24 条。
   expect(large.reviews[1]).toEqual(reviewConversation(large.journal.readEvents()));
   const conversation = large.reviews[1] as { role?: string; content?: string; seq: number }[];
-  expect(conversation.find(item => item.role === "user")).toMatchObject({ seq: 2, content: "0 x" });
+  expect(conversation.find((item) => item.role === "user")).toMatchObject({ seq: 2, content: "0 x" });
 }, 60_000);

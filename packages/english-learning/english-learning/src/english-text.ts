@@ -11,14 +11,19 @@ export function extractEnglish(text: string): string[] {
       continue;
     }
     if (fence || /^(?: {4}|\t)/.test(line)) continue;
-    const clean = withoutTags(line
-      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-      .replace(/`+[^`]*`+/g, "")
-      .replace(/https?:\/\/\S+/g, ""))
+    const clean = withoutTags(
+      line
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+        .replace(/`+[^`]*`+/g, "")
+        .replace(/https?:\/\/\S+/g, ""),
+    )
       .replace(/^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/, "")
-      .replace(/[*_~|]/g, "").replace(/\s+/g, " ").trim();
-    if (!/[A-Za-z]{2}/.test(clean) || /\p{Script=Han}/u.test(clean) || /^(?:[./~]|[A-Za-z]:[\\/])\S*$/.test(clean)) continue;
+      .replace(/[*_~|]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!/[A-Za-z]{2}/.test(clean) || /\p{Script=Han}/u.test(clean) || /^(?:[./~]|[A-Za-z]:[\\/])\S*$/.test(clean))
+      continue;
     result.push(...splitEnglish(clean));
   }
   return result;
@@ -50,7 +55,10 @@ export function splitEnglish(text: string, limit = 1_000): string[] {
       if (points.length) current += `${current ? " " : ""}${points.join("")}`;
     }
     // Preserve sentence boundaries for large paragraphs without fragmenting short speech.
-    if ([...current].length > limit * 0.8) { result.push(current); current = ""; }
+    if ([...current].length > limit * 0.8) {
+      result.push(current);
+      current = "";
+    }
   }
   if (current) result.push(current);
   return result;

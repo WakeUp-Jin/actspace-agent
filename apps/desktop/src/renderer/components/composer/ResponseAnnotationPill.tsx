@@ -45,7 +45,11 @@ export function ResponseAnnotationPill({
     if (!next && contentRef.current?.contains(document.activeElement)) return;
     if (next && !isDraft && context) {
       // 已发送批注在卡片打开时解析一次：回复可能已不在已加载历史里。
-      setAvailableIds(new Set(annotations.flatMap((annotation) => (context.resolveRange(annotation) ? [annotation.annotationId] : []))));
+      setAvailableIds(
+        new Set(
+          annotations.flatMap((annotation) => (context.resolveRange(annotation) ? [annotation.annotationId] : [])),
+        ),
+      );
     }
     setOpen(next);
   };
@@ -68,8 +72,12 @@ export function ResponseAnnotationPill({
               // Escape 后把焦点还给胶囊时不重新打开。
               if (dismissedRef.current) event.preventDefault();
             }}
-            onBlur={() => { dismissedRef.current = false; }}
-            onPointerEnter={() => { dismissedRef.current = false; }}
+            onBlur={() => {
+              dismissedRef.current = false;
+            }}
+            onPointerEnter={() => {
+              dismissedRef.current = false;
+            }}
             onClick={() => {
               dismissedRef.current = false;
               changeOpen(!open);
@@ -100,7 +108,11 @@ export function ResponseAnnotationPill({
           }}
           onPointerLeave={() => context?.setActiveAnnotationId(null)}
           onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null) && event.relatedTarget !== triggerRef.current) close();
+            if (
+              !event.currentTarget.contains(event.relatedTarget as Node | null) &&
+              event.relatedTarget !== triggerRef.current
+            )
+              close();
           }}
         >
           <ol aria-label={isDraft ? "草稿批注" : "已发送的批注"}>
@@ -139,7 +151,12 @@ export function ResponseAnnotationPill({
                       >
                         <Pencil size={13} aria-hidden="true" />
                       </IconButton>
-                      <IconButton label={`删除第 ${number} 条批注`} tooltip="删除" size="xs" onClick={() => context?.removeDraft(annotation.annotationId)}>
+                      <IconButton
+                        label={`删除第 ${number} 条批注`}
+                        tooltip="删除"
+                        size="xs"
+                        onClick={() => context?.removeDraft(annotation.annotationId)}
+                      >
                         <Trash size={13} aria-hidden="true" />
                       </IconButton>
                     </div>

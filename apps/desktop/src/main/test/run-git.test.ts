@@ -17,7 +17,12 @@ vi.mock("node:child_process", async (importOriginal) => {
 
 const roots: string[] = [];
 let gitAvailable = true;
-const options = (cwd: string, overrides: Partial<{ timeoutMs: number; maxOutputChars: number }> = {}) => ({ cwd, timeoutMs: 10_000, maxOutputChars: 64 * 1024, ...overrides });
+const options = (cwd: string, overrides: Partial<{ timeoutMs: number; maxOutputChars: number }> = {}) => ({
+  cwd,
+  timeoutMs: 10_000,
+  maxOutputChars: 64 * 1024,
+  ...overrides,
+});
 
 beforeAll(() => {
   // 不用被测函数探测，免得它出错时相关用例被一起跳过。

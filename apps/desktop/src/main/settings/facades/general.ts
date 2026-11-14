@@ -39,31 +39,37 @@ import { type ModelStorageMutationInput, type PersistedSettingsV3, SettingsRevis
 import { cloneJson, isDefined } from "../utils";
 import * as media from "./media";
 
-export async function updateNamespaceV4(store: SettingsStore, input: SettingsV4UpdateInput): Promise<SettingsV4Snapshot> {
+export async function updateNamespaceV4(
+  store: SettingsStore,
+  input: SettingsV4UpdateInput,
+): Promise<SettingsV4Snapshot> {
   return store.enqueueMutation(() => applyNamespaceV4(store, input));
 }
 
-export async function applyNamespaceV4(store: SettingsStore, input: SettingsV4UpdateInput): Promise<SettingsV4Snapshot> {
-    const current = store.getV4();
-    if (input.expectedRevision !== current.revision) {
-      throw new SettingsRevisionConflictError(current);
-    }
-    const previousSettings = cloneJson(store.settings);
-    const previousMetadata = cloneJson(store.v4Metadata);
-    try {
-      const next = applySettingsV4NamespacePatch(current.settings, input);
-      const normalized = parseSettingsV4(next as unknown as Record<string, unknown>, store.dataRoot);
-      if (!normalized) throw new Error("Settings v4 patch is invalid.");
-      store.settings = normalized.settings;
-      store.v4Metadata = normalized.v4Metadata;
-      await store.writeSettingsFile([input.namespace]);
-      store.applyToEnv();
-      return store.getV4();
-    } catch (error) {
-      store.settings = previousSettings;
-      store.v4Metadata = previousMetadata;
-      throw error;
-    }
+export async function applyNamespaceV4(
+  store: SettingsStore,
+  input: SettingsV4UpdateInput,
+): Promise<SettingsV4Snapshot> {
+  const current = store.getV4();
+  if (input.expectedRevision !== current.revision) {
+    throw new SettingsRevisionConflictError(current);
+  }
+  const previousSettings = cloneJson(store.settings);
+  const previousMetadata = cloneJson(store.v4Metadata);
+  try {
+    const next = applySettingsV4NamespacePatch(current.settings, input);
+    const normalized = parseSettingsV4(next as unknown as Record<string, unknown>, store.dataRoot);
+    if (!normalized) throw new Error("Settings v4 patch is invalid.");
+    store.settings = normalized.settings;
+    store.v4Metadata = normalized.v4Metadata;
+    await store.writeSettingsFile([input.namespace]);
+    store.applyToEnv();
+    return store.getV4();
+  } catch (error) {
+    store.settings = previousSettings;
+    store.v4Metadata = previousMetadata;
+    throw error;
+  }
 }
 
 export function getLastLoadError(store: SettingsStore): string | undefined {
@@ -98,26 +104,31 @@ export function get(store: SettingsStore): AppSettings {
 /** Main-only pure v2 view. */
 export function getV2(store: SettingsStore): AppSettingsV2 {
   const definitions = [...BUILTIN_MODEL_LIST, ...Object.values(store.settings.customModels).filter(isDefined)];
-  const providers = Object.fromEntries(PROVIDER_IDS.map((provider) => {
-    const providerModels = definitions.filter((definition) => definition.provider === provider);
-    const installed = providerModels.filter((definition) => Boolean(store.settings.installedModels[definition.key]));
-    const enabled = installed.filter((definition) => store.settings.installedModels[definition.key]?.enabled);
-    const settings = store.settings.providers[provider];
-    return [provider, {
-      hasApiKey: Boolean(store.getStoredKey(provider)),
-      ...(provider === "openrouter" && { hasManagementKey: Boolean(store.getStoredKey("openrouter-management")) }),
-      enabled: settings.enabled,
-      baseUrl: settings.baseUrl,
-      proxy: {
-        enabled: settings.proxy.enabled,
-        url: redactProxyUrl(settings.proxy.url),
-      },
-      lastConnection: { ...settings.lastConnection },
-      installedModelCount: installed.length,
-      enabledModelCount: enabled.length,
-      defaultPricingMultiplier: settings.defaultPricingMultiplier,
-    }];
-  })) as AppSettingsV2["providers"];
+  const providers = Object.fromEntries(
+    PROVIDER_IDS.map((provider) => {
+      const providerModels = definitions.filter((definition) => definition.provider === provider);
+      const installed = providerModels.filter((definition) => Boolean(store.settings.installedModels[definition.key]));
+      const enabled = installed.filter((definition) => store.settings.installedModels[definition.key]?.enabled);
+      const settings = store.settings.providers[provider];
+      return [
+        provider,
+        {
+          hasApiKey: Boolean(store.getStoredKey(provider)),
+          ...(provider === "openrouter" && { hasManagementKey: Boolean(store.getStoredKey("openrouter-management")) }),
+          enabled: settings.enabled,
+          baseUrl: settings.baseUrl,
+          proxy: {
+            enabled: settings.proxy.enabled,
+            url: redactProxyUrl(settings.proxy.url),
+          },
+          lastConnection: { ...settings.lastConnection },
+          installedModelCount: installed.length,
+          enabledModelCount: enabled.length,
+          defaultPricingMultiplier: settings.defaultPricingMultiplier,
+        },
+      ];
+    }),
+  ) as AppSettingsV2["providers"];
 
   return {
     version: 2,
@@ -140,7 +151,9 @@ export function getV2(store: SettingsStore): AppSettingsV2 {
 }
 
 /** Main-only storage snapshot used by model services; never contains decrypted secrets. */
-export function getModelStorageState(store: SettingsStore): Pick<PersistedSettingsV3, "installedModels" | "customModels" | "taskModels" | "modelOverrides"> {
+export function getModelStorageState(
+  store: SettingsStore,
+): Pick<PersistedSettingsV3, "installedModels" | "customModels" | "taskModels" | "modelOverrides"> {
   return cloneJson({
     installedModels: store.settings.installedModels,
     customModels: store.settings.customModels,
@@ -163,7 +176,8 @@ export async function updateModelStorage(store: SettingsStore, input: ModelStora
         const key = normalizeModelKey(rawKey);
         if (!key) continue;
         if (value === null) delete store.settings.customModels[key];
-        else if (isValidModelDefinition(value, key)) store.settings.customModels[key] = sanitizeCustomModels({ [key]: value })[key];
+        else if (isValidModelDefinition(value, key))
+          store.settings.customModels[key] = sanitizeCustomModels({ [key]: value })[key];
       }
       for (const [rawKey, value] of Object.entries(input.overrides ?? {})) {
         const key = normalizeModelKey(rawKey);
@@ -172,10 +186,15 @@ export async function updateModelStorage(store: SettingsStore, input: ModelStora
         if (overrides) store.settings.modelOverrides[key] = overrides;
         else delete store.settings.modelOverrides[key];
       }
-      if (input.taskModels) store.settings.taskModels = sanitizeTaskModels({ ...store.settings.taskModels, ...input.taskModels });
+      if (input.taskModels)
+        store.settings.taskModels = sanitizeTaskModels({ ...store.settings.taskModels, ...input.taskModels });
       if (input.connections) {
         const current = store.getV4();
-        await applyNamespaceV4(store, { namespace: "models", expectedRevision: current.revision, patch: { connections: input.connections } });
+        await applyNamespaceV4(store, {
+          namespace: "models",
+          expectedRevision: current.revision,
+          patch: { connections: input.connections },
+        });
         return;
       }
       await store.writeSettingsFile();
@@ -221,7 +240,11 @@ export async function updateV2(store: SettingsStore, input: SettingsV2UpdateInpu
           const patch = input.providers[provider];
           if (!patch) continue;
           store.settings.providers[provider] = sanitizeProviderSettings(
-            { ...store.settings.providers[provider], ...patch, proxy: { ...store.settings.providers[provider].proxy, ...patch.proxy } },
+            {
+              ...store.settings.providers[provider],
+              ...patch,
+              proxy: { ...store.settings.providers[provider].proxy, ...patch.proxy },
+            },
             store.settings.providers[provider],
             provider,
           );
@@ -252,10 +275,17 @@ export async function updateV2(store: SettingsStore, input: SettingsV2UpdateInpu
       }
       if (input.skills) store.settings.skills = sanitizeSkills({ ...store.settings.skills, ...input.skills });
       if (input.imageGeneration) {
-        store.settings.imageGeneration = sanitizeImageGenerationSettings({ ...store.settings.imageGeneration, ...input.imageGeneration }, store.settings.imageGeneration);
+        store.settings.imageGeneration = sanitizeImageGenerationSettings(
+          { ...store.settings.imageGeneration, ...input.imageGeneration },
+          store.settings.imageGeneration,
+        );
       }
       if (input.shortcuts) {
-        store.settings.shortcuts = sanitizeShortcuts({ ...store.settings.shortcuts, ...input.shortcuts, quickOpen: { ...store.settings.shortcuts.quickOpen, ...input.shortcuts.quickOpen } });
+        store.settings.shortcuts = sanitizeShortcuts({
+          ...store.settings.shortcuts,
+          ...input.shortcuts,
+          quickOpen: { ...store.settings.shortcuts.quickOpen, ...input.shortcuts.quickOpen },
+        });
       }
       await store.writeSettingsFile();
       store.applyToEnv();
@@ -267,7 +297,10 @@ export async function updateV2(store: SettingsStore, input: SettingsV2UpdateInpu
   });
 }
 
-export async function updateQuickOpenShortcut(store: SettingsStore, input: QuickOpenShortcutUpdateInput): Promise<AppSettings> {
+export async function updateQuickOpenShortcut(
+  store: SettingsStore,
+  input: QuickOpenShortcutUpdateInput,
+): Promise<AppSettings> {
   return store.enqueueMutation(async () => {
     const previous = cloneJson(store.settings);
     try {
@@ -301,7 +334,11 @@ function applySettingsV4NamespacePatch(settings: SettingsV4, input: SettingsV4Up
   const next = cloneJson(settings);
   switch (input.namespace) {
     case "general":
-      next.general = { ...next.general, ...input.patch, shortcuts: { ...next.general.shortcuts, ...(input.patch.shortcuts ?? {}) } };
+      next.general = {
+        ...next.general,
+        ...input.patch,
+        shortcuts: { ...next.general.shortcuts, ...(input.patch.shortcuts ?? {}) },
+      };
       break;
     case "models":
       next.models = {
@@ -316,25 +353,60 @@ function applySettingsV4NamespacePatch(settings: SettingsV4, input: SettingsV4Up
       };
       break;
     case "tools":
-      next.tools = { ...next.tools, ...input.patch, bash: { ...next.tools.bash, ...(input.patch.bash ?? {}) }, plugins: { ...(next.tools.plugins ?? {}), ...(input.patch.plugins ?? {}) }, ...(input.patch.externalSubagents || next.tools.externalSubagents ? { externalSubagents: { codex: { ...(next.tools.externalSubagents?.codex ?? {}), ...(input.patch.externalSubagents?.codex ?? {}) }, claudeCode: { ...(next.tools.externalSubagents?.claudeCode ?? {}), ...(input.patch.externalSubagents?.claudeCode ?? {}) } } } : {}), searchProviders: { ...next.tools.searchProviders, ...(input.patch.searchProviders ?? {}) } };
+      next.tools = {
+        ...next.tools,
+        ...input.patch,
+        bash: { ...next.tools.bash, ...(input.patch.bash ?? {}) },
+        plugins: { ...(next.tools.plugins ?? {}), ...(input.patch.plugins ?? {}) },
+        ...(input.patch.externalSubagents || next.tools.externalSubagents
+          ? {
+              externalSubagents: {
+                codex: {
+                  ...(next.tools.externalSubagents?.codex ?? {}),
+                  ...(input.patch.externalSubagents?.codex ?? {}),
+                },
+                claudeCode: {
+                  ...(next.tools.externalSubagents?.claudeCode ?? {}),
+                  ...(input.patch.externalSubagents?.claudeCode ?? {}),
+                },
+              },
+            }
+          : {}),
+        searchProviders: { ...next.tools.searchProviders, ...(input.patch.searchProviders ?? {}) },
+      };
       break;
     case "media":
-      next.media = { ...next.media, ...input.patch, imageGeneration: { ...next.media.imageGeneration, ...(input.patch.imageGeneration ?? {}) } };
+      next.media = {
+        ...next.media,
+        ...input.patch,
+        imageGeneration: { ...next.media.imageGeneration, ...(input.patch.imageGeneration ?? {}) },
+      };
       break;
     case "skills":
       next.skills = { ...next.skills, ...input.patch };
       break;
     case "subagents":
-      next.subagents = { ...next.subagents, ...input.patch, routes: { ...next.subagents.routes, ...(input.patch.routes ?? {}) } };
+      next.subagents = {
+        ...next.subagents,
+        ...input.patch,
+        routes: { ...next.subagents.routes, ...(input.patch.routes ?? {}) },
+      };
       break;
     case "activity":
-      next.activity = { ...next.activity, ...input.patch, usage: { ...next.activity.usage, ...(input.patch.usage ?? {}) } };
+      next.activity = {
+        ...next.activity,
+        ...input.patch,
+        usage: { ...next.activity.usage, ...(input.patch.usage ?? {}) },
+      };
       break;
   }
   return next;
 }
 
-function applyRecordPatch<T>(current: Record<string, T>, patch: Record<string, T | null | undefined> | undefined): Record<string, T> {
+function applyRecordPatch<T>(
+  current: Record<string, T>,
+  patch: Record<string, T | null | undefined> | undefined,
+): Record<string, T> {
   const next = { ...current };
   for (const [key, value] of Object.entries(patch ?? {})) {
     if (value === null) delete next[key];

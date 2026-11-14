@@ -40,7 +40,11 @@ describe("composerSendButtonState", () => {
 
 describe("ReviewStrip", () => {
   function renderStrip(summary: Parameters<typeof ReviewStrip>[0]["summary"]) {
-    render(<TooltipProvider><ReviewStrip summary={summary} /></TooltipProvider>);
+    render(
+      <TooltipProvider>
+        <ReviewStrip summary={summary} />
+      </TooltipProvider>,
+    );
   }
 
   it("names the button by the change counts", () => {

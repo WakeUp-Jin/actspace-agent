@@ -1,4 +1,12 @@
-import { clipboard, ClipboardItem, Menu, nativeImage, shell, type BrowserWindow, type MenuItemConstructorOptions } from "electron";
+import {
+  clipboard,
+  ClipboardItem,
+  Menu,
+  nativeImage,
+  shell,
+  type BrowserWindow,
+  type MenuItemConstructorOptions,
+} from "electron";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { ArtifactContextMenuInput, ArtifactContextMenuResult } from "@actspace/shared";
@@ -50,27 +58,28 @@ function runMenuAction(label: string, action: () => void | Promise<void>): void 
   });
 }
 
-export function createArtifactContextMenuTemplate(
-  target: ResolvedArtifactContextTarget,
-): MenuItemConstructorOptions[] {
-  const copyArtifact = target.kind === "session_image"
-    ? {
-        label: "Copy image",
-        click: () => runMenuAction("copy image", async () => {
-          const image = nativeImage.createFromDataURL(target.sessionImageDataUrl ?? "");
-          if (image.isEmpty()) return;
-          await clipboard.write([new ClipboardItem({ "image/png": new Blob([new Uint8Array(image.toPNG())]) })]);
-        }),
-      }
-    : {
-        label: "Copy file contents",
-        enabled: target.size <= MAX_COPY_TEXT_BYTES,
-        click: () => runMenuAction("copy file contents", async () => {
-          const bytes = await readFile(target.path);
-          if (bytes.includes(0)) throw new Error("binary files cannot be copied as text");
-          await clipboard.writeText(bytes.toString("utf8"));
-        }),
-      };
+export function createArtifactContextMenuTemplate(target: ResolvedArtifactContextTarget): MenuItemConstructorOptions[] {
+  const copyArtifact =
+    target.kind === "session_image"
+      ? {
+          label: "Copy image",
+          click: () =>
+            runMenuAction("copy image", async () => {
+              const image = nativeImage.createFromDataURL(target.sessionImageDataUrl ?? "");
+              if (image.isEmpty()) return;
+              await clipboard.write([new ClipboardItem({ "image/png": new Blob([new Uint8Array(image.toPNG())]) })]);
+            }),
+        }
+      : {
+          label: "Copy file contents",
+          enabled: target.size <= MAX_COPY_TEXT_BYTES,
+          click: () =>
+            runMenuAction("copy file contents", async () => {
+              const bytes = await readFile(target.path);
+              if (bytes.includes(0)) throw new Error("binary files cannot be copied as text");
+              await clipboard.writeText(bytes.toString("utf8"));
+            }),
+        };
 
   return [
     {
@@ -79,10 +88,11 @@ export function createArtifactContextMenuTemplate(
     },
     {
       label: "Open with default app",
-      click: () => runMenuAction("open with default app", async () => {
-        const error = await shell.openPath(target.path);
-        if (error) throw new Error(error);
-      }),
+      click: () =>
+        runMenuAction("open with default app", async () => {
+          const error = await shell.openPath(target.path);
+          if (error) throw new Error(error);
+        }),
     },
     { type: "separator" },
     {

@@ -1,5 +1,22 @@
-import { GlobalSessionIndex, SessionProjectionCache, createHistoryIndex, indexHistoryEvent, indexHistoryEvents, type HistoryIndex, type ProjectionCacheRead } from "@actspace/session-projection-cache";
-import type { RuntimeDesktopSessionProjection, RuntimeSessionProjectionInput, RuntimeSessionUpdate, RuntimeProjectionValues, RuntimeJsonValue, RuntimeSessionObservation, RuntimeReadModelWatermarks, RuntimeWindowSupportFact } from "@actspace/shared/runtime-v2";
+import {
+  GlobalSessionIndex,
+  SessionProjectionCache,
+  createHistoryIndex,
+  indexHistoryEvent,
+  indexHistoryEvents,
+  type HistoryIndex,
+  type ProjectionCacheRead,
+} from "@actspace/session-projection-cache";
+import type {
+  RuntimeDesktopSessionProjection,
+  RuntimeSessionProjectionInput,
+  RuntimeSessionUpdate,
+  RuntimeProjectionValues,
+  RuntimeJsonValue,
+  RuntimeSessionObservation,
+  RuntimeReadModelWatermarks,
+  RuntimeWindowSupportFact,
+} from "@actspace/shared/runtime-v2";
 import { randomUUID } from "node:crypto";
 import { agentFormComposition } from "@actspace/agent";
 import { MAIN_AGENT_FORM } from "../main-agent-form.js";
@@ -11,7 +28,11 @@ import type { SessionHandle } from "@actspace/session-persistence";
 import { SessionHandle as RuntimeSessionHandle } from "@actspace/session-persistence";
 import { createSessionHeader } from "@actspace/session-journal";
 import type { SessionStore } from "@actspace/session-persistence";
-import { applySessionRecovery, classifySessionRecoveryAccess, type SessionRecoveryAccess } from "@actspace/session-persistence";
+import {
+  applySessionRecovery,
+  classifySessionRecoveryAccess,
+  type SessionRecoveryAccess,
+} from "@actspace/session-persistence";
 import { SessionReadModel } from "../projection/durable-session.js";
 import type { RendererAllowlist } from "../projection/tool-dto.js";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
@@ -40,24 +61,39 @@ export class RuntimeSessionController {
   #sweepQueued = false;
   #disposed = false;
   readonly #cache: SessionProjectionCache;
-  readonly #coldModels = new WeakMap<ProjectionCacheRead, { readonly model: SessionReadModel; readonly snapshot: RuntimeSessionSnapshot }>();
+  readonly #coldModels = new WeakMap<
+    ProjectionCacheRead,
+    { readonly model: SessionReadModel; readonly snapshot: RuntimeSessionSnapshot }
+  >();
   readonly #globalIndex: GlobalSessionIndex;
   #globalIndexBuild: Promise<void> | undefined;
   #globalIndexReady = false;
 
-  subscribeProjection(listener: (update: RuntimeSessionUpdate) => void): () => void { this.#projectionListeners.add(listener); return () => { this.#projectionListeners.delete(listener); }; }
+  subscribeProjection(listener: (update: RuntimeSessionUpdate) => void): () => void {
+    this.#projectionListeners.add(listener);
+    return () => {
+      this.#projectionListeners.delete(listener);
+    };
+  }
 
   /**
    * 内存里正在写的会话：主会话（`#open`）或外部登记的子 Agent 会话（`#external`）。
    * 读它们直接用内存里的日志和读模型，不整份重读文件；不刷新空闲计时（与 `getOpen` 不同）。
    */
-  private liveSession(sessionId: string): SessionHandle | undefined { return this.#open.get(sessionId) ?? this.#external.get(sessionId); }
+  private liveSession(sessionId: string): SessionHandle | undefined {
+    return this.#open.get(sessionId) ?? this.#external.get(sessionId);
+  }
 
   private liveModel(session: SessionHandle): SessionReadModel {
     let model = this.#models.get(session.header.sessionId);
     if (!model) {
       const events = session.journal.readEvents();
-      model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService).replay(events);
+      model = new SessionReadModel(
+        session.header,
+        this.options.registry,
+        this.options.rendererAllowlist,
+        this.options.projectionService,
+      ).replay(events);
       this.#models.set(session.header.sessionId, model);
       // 位置索引用同一份事件建好，不为它再读一遍日志。
       if (!this.#liveIndexes.has(session.journal)) {
@@ -74,7 +110,8 @@ export class RuntimeSessionController {
       const values = model.apply(event)?.values ?? {};
       if (!pushes) continue;
       const changes = this.#changes.get(session.header.sessionId) ?? new Map();
-      changes.set(event.seq, values); this.#changes.set(session.header.sessionId, changes);
+      changes.set(event.seq, values);
+      this.#changes.set(session.header.sessionId, changes);
     }
     return model;
   }
@@ -85,19 +122,35 @@ export class RuntimeSessionController {
    */
   private liveIndex(session: SessionHandle): HistoryIndex {
     let entry = this.#liveIndexes.get(session.journal);
-    if (!entry) { entry = { index: createHistoryIndex(), through: -1 }; this.#liveIndexes.set(session.journal, entry); }
-    for (const event of session.journal.iterateEvents(entry.through + 1)) { indexHistoryEvent(entry.index, event); entry.through = event.seq; }
+    if (!entry) {
+      entry = { index: createHistoryIndex(), through: -1 };
+      this.#liveIndexes.set(session.journal, entry);
+    }
+    for (const event of session.journal.iterateEvents(entry.through + 1)) {
+      indexHistoryEvent(entry.index, event);
+      entry.through = event.seq;
+    }
     return entry.index;
   }
 
-  private async readModel(sessionId: string): Promise<{ model: SessionReadModel; snapshot: RuntimeSessionSnapshot; read?: ProjectionCacheRead }> {
+  private async readModel(
+    sessionId: string,
+  ): Promise<{ model: SessionReadModel; snapshot: RuntimeSessionSnapshot; read?: ProjectionCacheRead }> {
     const live = this.liveSession(sessionId);
-    if (live) { const model = this.liveModel(live); return { model, snapshot: model.snapshot(live.journal.validation.accessState) }; }
+    if (live) {
+      const model = this.liveModel(live);
+      return { model, snapshot: model.snapshot(live.journal.validation.accessState) };
+    }
     const read = await this.#cache.read(sessionId);
     // The cache returns the same read object until the journal grows, so an unchanged Session keeps its restored model.
     const built = this.#coldModels.get(read);
     if (built !== undefined) return { ...built, read };
-    const model = new SessionReadModel(read.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService);
+    const model = new SessionReadModel(
+      read.header,
+      this.options.registry,
+      this.options.rendererAllowlist,
+      this.options.projectionService,
+    );
     model.projections.restore(sessionId, read.checkpoint);
     const snapshot = model.snapshot(read.accessState);
     await this.repairGlobalIndex(snapshot, model.header.createdWith.profileId);
@@ -113,8 +166,31 @@ export class RuntimeSessionController {
     this.#globalIndex.replace(this.summary(snapshot, profileId));
   }
 
-  private summary(snapshot: RuntimeSessionSnapshot, profileId: string): import("@actspace/shared/runtime-v2").RuntimeGlobalSessionSummary {
-    return { sessionId: snapshot.sessionId, throughJournalSeq: snapshot.throughJournalSeq, summaryVersion: 2, createdAt: snapshot.createdAt, updatedAt: snapshot.updatedAt, workspaceRoot: snapshot.workspaceRoot, ...(snapshot.worktree ? { worktree: snapshot.worktree } : {}), profileId, agentForm: snapshot.agentForm, agentFormId: snapshot.agentFormId, agentMode: snapshot.agentMode, agentModeRevision: snapshot.agentModeRevision, title: snapshot.metadata.title, pinned: snapshot.metadata.pinned, archived: snapshot.metadata.archived, completedTurnCount: snapshot.activity.completedTurnCount, usage: snapshot.usage, accessState: snapshot.accessState, lineage: snapshot.lineage };
+  private summary(
+    snapshot: RuntimeSessionSnapshot,
+    profileId: string,
+  ): import("@actspace/shared/runtime-v2").RuntimeGlobalSessionSummary {
+    return {
+      sessionId: snapshot.sessionId,
+      throughJournalSeq: snapshot.throughJournalSeq,
+      summaryVersion: 2,
+      createdAt: snapshot.createdAt,
+      updatedAt: snapshot.updatedAt,
+      workspaceRoot: snapshot.workspaceRoot,
+      ...(snapshot.worktree ? { worktree: snapshot.worktree } : {}),
+      profileId,
+      agentForm: snapshot.agentForm,
+      agentFormId: snapshot.agentFormId,
+      agentMode: snapshot.agentMode,
+      agentModeRevision: snapshot.agentModeRevision,
+      title: snapshot.metadata.title,
+      pinned: snapshot.metadata.pinned,
+      archived: snapshot.metadata.archived,
+      completedTurnCount: snapshot.activity.completedTurnCount,
+      usage: snapshot.usage,
+      accessState: snapshot.accessState,
+      lineage: snapshot.lineage,
+    };
   }
 
   private async ensureGlobalIndex(): Promise<void> {
@@ -122,13 +198,19 @@ export class RuntimeSessionController {
     if (this.#globalIndexBuild) return this.#globalIndexBuild;
     this.#globalIndexBuild = (async () => {
       const summaries = [] as import("@actspace/shared/runtime-v2").RuntimeGlobalSessionSummary[];
-        for (const sessionId of await this.store.listSessionIds()) {
-          try { const { snapshot, model } = await this.readModel(sessionId); summaries.push(this.summary(snapshot, model.header.createdWith.profileId)); }
-          catch { /* corrupt sessions remain visible through the failed count */ }
+      for (const sessionId of await this.store.listSessionIds()) {
+        try {
+          const { snapshot, model } = await this.readModel(sessionId);
+          summaries.push(this.summary(snapshot, model.header.createdWith.profileId));
+        } catch {
+          /* corrupt sessions remain visible through the failed count */
         }
+      }
       this.#globalIndex.replaceAll(summaries);
       this.#globalIndexReady = true;
-    })().finally(() => { this.#globalIndexBuild = undefined; });
+    })().finally(() => {
+      this.#globalIndexBuild = undefined;
+    });
     return this.#globalIndexBuild;
   }
 
@@ -140,9 +222,21 @@ export class RuntimeSessionController {
     const { starts, requests, prompts, toolSets } = read ?? (live ? this.liveIndex(live) : createHistoryIndex());
     const end = snapshot.throughJournalSeq + 1;
     const before = input.beforeSeq ?? end;
-    if (!Number.isSafeInteger(before) || before < 0 || before > end || (input.afterSeq !== undefined && (!Number.isSafeInteger(input.afterSeq) || input.afterSeq < -1 || input.afterSeq >= end))) throw new Error("Invalid history cursor.");
+    if (
+      !Number.isSafeInteger(before) ||
+      before < 0 ||
+      before > end ||
+      (input.afterSeq !== undefined &&
+        (!Number.isSafeInteger(input.afterSeq) || input.afterSeq < -1 || input.afterSeq >= end))
+    )
+      throw new Error("Invalid history cursor.");
     const turnsBefore = countBelow(starts, before);
-    const from = input.afterSeq !== undefined ? input.afterSeq + 1 : turnsBefore <= HISTORY_PAGE_TURNS ? 0 : starts[turnsBefore - HISTORY_PAGE_TURNS];
+    const from =
+      input.afterSeq !== undefined
+        ? input.afterSeq + 1
+        : turnsBefore <= HISTORY_PAGE_TURNS
+          ? 0
+          : starts[turnsBefore - HISTORY_PAGE_TURNS];
     const until = input.afterSeq !== undefined ? end : before;
     let journal = live ? live.journal.readEvents(from, until) : await this.#cache.events(read!, from, until);
     if (input.afterSeq === undefined && !input.includeToolDetails) journal = slimHistoryWindow(journal);
@@ -152,7 +246,10 @@ export class RuntimeSessionController {
     const sizes = new Map<SessionEventEnvelopeV1, number>();
     const sizeOf = (event: SessionEventEnvelopeV1): number => {
       let size = sizes.get(event);
-      if (size === undefined) { size = JSON.stringify(event).length; sizes.set(event, size); }
+      if (size === undefined) {
+        size = JSON.stringify(event).length;
+        sizes.set(event, size);
+      }
       return size;
     };
     // 窗口超出预算时裁掉头部。从尾部往前量，量到装不下为止，裁掉的那些不用序列化；至少留一条。
@@ -183,9 +280,17 @@ export class RuntimeSessionController {
     const requestOffset = countBelow(requests, windowFrom);
     // 提示词与工具定义只在变化时记一次（agent-spec-request-record.md §4.3）。窗口不从头开始时，补上起点之前最近的一条，
     // 让窗口内每次请求都能找到自己生效的提示词与工具；它们不计入窗口的事件数/字节预算。
-    const carried = [latestBefore(prompts, windowFrom), latestBefore(toolSets, windowFrom)].filter((seq): seq is number => seq !== null).sort((a, b) => a - b);
+    const carried = [latestBefore(prompts, windowFrom), latestBefore(toolSets, windowFrom)]
+      .filter((seq): seq is number => seq !== null)
+      .sort((a, b) => a - b);
     if (carried.length > 0) {
-      const records = (await Promise.all(carried.map(seq => live ? live.journal.readEvents(seq, seq + 1) : this.#cache.events(read!, seq, seq + 1)))).flat();
+      const records = (
+        await Promise.all(
+          carried.map((seq) =>
+            live ? live.journal.readEvents(seq, seq + 1) : this.#cache.events(read!, seq, seq + 1),
+          ),
+        )
+      ).flat();
       journal = [...records, ...journal];
     }
     // 窗口只扫一遍：对话里出现的消息、每次工具调用的事件 seq、哪些调用带着超过延后阈值的事件。
@@ -197,61 +302,145 @@ export class RuntimeSessionController {
       const callId = eventData(event)?.callId;
       if (typeof callId !== "string") continue;
       let call = calls.get(callId);
-      if (!call) { call = { eventSeqs: [], oversized: false }; calls.set(callId, call); }
+      if (!call) {
+        call = { eventSeqs: [], oversized: false };
+        calls.set(callId, call);
+      }
       call.eventSeqs.push(event.seq);
       if (!input.includeToolDetails && !call.oversized && sizeOf(event) > DEFERRED_DETAIL_BYTES) call.oversized = true;
     }
-    const deferredToolCalls = [...calls].flatMap(([callId, call]) => call.oversized ? [callId] : []);
+    const deferredToolCalls = [...calls].flatMap(([callId, call]) => (call.oversized ? [callId] : []));
     const deferred = new Set(deferredToolCalls);
-    const boundedJournal = journal.map(event => {
+    const boundedJournal = journal.map((event) => {
       const data = eventData(event);
       return data && typeof data.callId === "string" && deferred.has(data.callId) ? boundToolEvent(event) : event;
     });
-    const windowSnapshot = { ...snapshot,
-      messages: snapshot.messages.filter(message => messageIds.has(message.messageId)).map(message => message.kind === "tool-result" && message.callId && deferred.has(message.callId) ? { ...message, content: "" } : message),
-      tools: snapshot.tools.filter(tool => calls.has(tool.callId)).map(tool => deferred.has(tool.callId) ? { ...tool, modelOutput: null, detail: [] } : tool),
+    const windowSnapshot = {
+      ...snapshot,
+      messages: snapshot.messages
+        .filter((message) => messageIds.has(message.messageId))
+        .map((message) =>
+          message.kind === "tool-result" && message.callId && deferred.has(message.callId)
+            ? { ...message, content: "" }
+            : message,
+        ),
+      tools: snapshot.tools
+        .filter((tool) => calls.has(tool.callId))
+        .map((tool) => (deferred.has(tool.callId) ? { ...tool, modelOutput: null, detail: [] } : tool)),
     };
     const projectionValues = model.projections.snapshot(input.sessionId).values;
     const values = publicValues(projectionValues);
     const support: RuntimeWindowSupportFact[] = [];
     const surface = projectionValues.surface;
-    if (surface && typeof surface === "object" && !Array.isArray(surface) && typeof (surface as Record<string, unknown>).replaceGeneration === "number") support.push({ kind: "surface", replaceGeneration: (surface as Record<string, number>).replaceGeneration });
+    if (
+      surface &&
+      typeof surface === "object" &&
+      !Array.isArray(surface) &&
+      typeof (surface as Record<string, unknown>).replaceGeneration === "number"
+    )
+      support.push({ kind: "surface", replaceGeneration: (surface as Record<string, number>).replaceGeneration });
     for (const [callId, call] of calls) support.push({ kind: "tool-call", callId, eventSeqs: call.eventSeqs });
-    return { kind: "session-projection", schemaVersion: 1, sessionId: input.sessionId, throughJournalSeq: snapshot.throughJournalSeq,
-      snapshot: windowSnapshot, values, activeMessageIds: snapshot.messages.map(message => message.messageId), deferredToolCalls,
+    return {
+      kind: "session-projection",
+      schemaVersion: 1,
+      sessionId: input.sessionId,
+      throughJournalSeq: snapshot.throughJournalSeq,
+      snapshot: windowSnapshot,
+      values,
+      activeMessageIds: snapshot.messages.map((message) => message.messageId),
+      deferredToolCalls,
       watermarks: watermarksFor(live, snapshot.throughJournalSeq, until - 1),
-      window: { events: boundedJournal, fromSeq: windowFrom, throughJournalSeq: until - 1, beforeSeq: windowFrom > 0 ? windowFrom : null, turnOffset, requestOffset, support, deferredDetails: deferredToolCalls.map(callId => ({ sessionId: input.sessionId, callId, kind: "tool" as const })) } };
+      window: {
+        events: boundedJournal,
+        fromSeq: windowFrom,
+        throughJournalSeq: until - 1,
+        beforeSeq: windowFrom > 0 ? windowFrom : null,
+        turnOffset,
+        requestOffset,
+        support,
+        deferredDetails: deferredToolCalls.map((callId) => ({
+          sessionId: input.sessionId,
+          callId,
+          kind: "tool" as const,
+        })),
+      },
+    };
   }
 
   async readObservation(input: RuntimeSessionProjectionInput): Promise<RuntimeSessionObservation> {
     const envelope = await this.readProjection(input);
-    const projection = Object.freeze({ kind: "session-projection" as const, schemaVersion: 1 as const, sessionId: envelope.sessionId, throughJournalSeq: envelope.throughJournalSeq, values: envelope.values });
-    return Object.freeze({ kind: "session-observation" as const, schemaVersion: 1 as const, sessionId: envelope.sessionId, projection, snapshot: envelope.snapshot, window: envelope.window, activeMessageIds: envelope.activeMessageIds, deferredToolCalls: envelope.deferredToolCalls, watermarks: envelope.watermarks ?? watermarksFor(this.#open.get(input.sessionId), envelope.throughJournalSeq, envelope.window.throughJournalSeq) });
+    const projection = Object.freeze({
+      kind: "session-projection" as const,
+      schemaVersion: 1 as const,
+      sessionId: envelope.sessionId,
+      throughJournalSeq: envelope.throughJournalSeq,
+      values: envelope.values,
+    });
+    return Object.freeze({
+      kind: "session-observation" as const,
+      schemaVersion: 1 as const,
+      sessionId: envelope.sessionId,
+      projection,
+      snapshot: envelope.snapshot,
+      window: envelope.window,
+      activeMessageIds: envelope.activeMessageIds,
+      deferredToolCalls: envelope.deferredToolCalls,
+      watermarks:
+        envelope.watermarks ??
+        watermarksFor(this.#open.get(input.sessionId), envelope.throughJournalSeq, envelope.window.throughJournalSeq),
+    });
   }
 
   async browseToolDetail(sessionId: string, callId: string) {
     const source = await this.readModel(sessionId);
-    const tool = source.snapshot.tools.find(item => item.callId === callId);
+    const tool = source.snapshot.tools.find((item) => item.callId === callId);
     if (!tool) throw new Error("Tool detail is unavailable.");
     const sequences = source.read?.calls[callId];
     const live = sequences ? undefined : this.liveSession(sessionId);
     // 打开中的会话按索引只读这次调用自己的事件，不把整份日志读出来再按 callId 过滤。
-    const journal = sequences ? (await Promise.all(sequences.map(seq => this.#cache.events(source.read!, seq, seq + 1)))).flat() : live ? eventsAt(live.journal, this.liveIndex(live).calls[callId] ?? []) : [];
-    return { snapshot: { ...source.snapshot, tools: [tool] }, journal, history: { before: null, throughJournalSeq: source.snapshot.throughJournalSeq } };
+    const journal = sequences
+      ? (await Promise.all(sequences.map((seq) => this.#cache.events(source.read!, seq, seq + 1)))).flat()
+      : live
+        ? eventsAt(live.journal, this.liveIndex(live).calls[callId] ?? [])
+        : [];
+    return {
+      snapshot: { ...source.snapshot, tools: [tool] },
+      journal,
+      history: { before: null, throughJournalSeq: source.snapshot.throughJournalSeq },
+    };
   }
 
   async browseSessions() {
     await this.ensureGlobalIndex();
     const ids = await this.store.listSessionIds();
-    const indexed = new Set(this.#globalIndex.values().map(item => item.sessionId));
+    const indexed = new Set(this.#globalIndex.values().map((item) => item.sessionId));
     for (const id of ids) {
       if (!indexed.has(id)) {
-        try { await this.readModel(id); } catch { /* Keep unreadable sessions in the failed count; retry on the next browse. */ }
+        try {
+          await this.readModel(id);
+        } catch {
+          /* Keep unreadable sessions in the failed count; retry on the next browse. */
+        }
       }
     }
-    const items: RuntimeSessionListItem[] = this.#globalIndex.values().map(summary => ({ sessionId: summary.sessionId, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, ...(summary.worktree ? { worktree: summary.worktree } : {}), profileId: summary.profileId, agentForm: summary.agentForm ?? "agent", agentFormId: summary.agentFormId, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, accessState: summary.accessState, metadata: { title: summary.title, pinned: summary.pinned, archived: summary.archived }, lineage: summary.lineage, completedTurnCount: summary.completedTurnCount }));
-    const known = new Set(items.map(item => item.sessionId));
-    const failed = ids.filter(sessionId => !known.has(sessionId)).length;
+    const items: RuntimeSessionListItem[] = this.#globalIndex.values().map((summary) => ({
+      sessionId: summary.sessionId,
+      createdAt: summary.createdAt,
+      updatedAt: summary.updatedAt,
+      workspaceRoot: summary.workspaceRoot,
+      ...(summary.worktree ? { worktree: summary.worktree } : {}),
+      profileId: summary.profileId,
+      agentForm: summary.agentForm ?? "agent",
+      agentFormId: summary.agentFormId,
+      agentMode: summary.agentMode,
+      agentModeRevision: summary.agentModeRevision,
+      accessState: summary.accessState,
+      metadata: { title: summary.title, pinned: summary.pinned, archived: summary.archived },
+      lineage: summary.lineage,
+      completedTurnCount: summary.completedTurnCount,
+    }));
+    const known = new Set(items.map((item) => item.sessionId));
+    const failed = ids.filter((sessionId) => !known.has(sessionId)).length;
     items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
     return { items, indexing: false, failed };
   }
@@ -264,13 +453,17 @@ export class RuntimeSessionController {
     for (let offset = 0; offset < ids.length; offset += 128) {
       const batch = ids.slice(offset, offset + 128);
       let sources: readonly import("@actspace/session-storage").SessionQuerySource[];
-      try { sources = this.store.storage.querySources ? await this.store.storage.querySources(batch) : await Promise.all(batch.map(read)); }
-      catch {
+      try {
+        sources = this.store.storage.querySources
+          ? await this.store.storage.querySources(batch)
+          : await Promise.all(batch.map(read));
+      } catch {
         // Batch acceleration must retain the original per-Session fault isolation.
         const settled = await Promise.allSettled(batch.map(read));
         sources = settled.flatMap((item, index) => {
           if (item.status === "fulfilled") return [item.value];
-          failedSessionIds.push(batch[index]); return [];
+          failedSessionIds.push(batch[index]);
+          return [];
         });
       }
       for (const source of sources) result.push(this.queryBoundary(source));
@@ -287,41 +480,102 @@ export class RuntimeSessionController {
     const digest = this.options.registry.digest;
     // Only the owning provider can attest to append-only growth. A raw stamp
     // change from an external or modified file retains conservative invalidation.
-    const physical = live?.durabilityState === "healthy" && source.appendOnlyToken ? `owned:${source.appendOnlyToken}` : source.stamp;
+    const physical =
+      live?.durabilityState === "healthy" && source.appendOnlyToken ? `owned:${source.appendOnlyToken}` : source.stamp;
     return { ...source, throughSeq, codecSetDigest: digest, stamp: `${physical}:${throughSeq}:${digest}` };
   }
-  async globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeGlobalSessionSummary[]> { await this.ensureGlobalIndex(); return this.#globalIndex.values(); }
-  constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; projectionService?: SessionProjectionService; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void>; maxIdleSessions?: number }, store: SessionStore) { this.store = store; this.#cache = new SessionProjectionCache({ storage: store.storage, codecs: options.registry, createRegistry: header => new SessionReadModel(header, options.registry, options.rendererAllowlist, options.projectionService).projections }); this.#globalIndex = new GlobalSessionIndex(); }
+  async globalSessionSummaries(): Promise<
+    readonly import("@actspace/shared/runtime-v2").RuntimeGlobalSessionSummary[]
+  > {
+    await this.ensureGlobalIndex();
+    return this.#globalIndex.values();
+  }
+  constructor(
+    readonly options: {
+      dataRoot: string;
+      runtimeId: string;
+      registry: EventCodecRegistry;
+      profileId: string;
+      manifestDigest: string;
+      plugins: readonly { id: string; version: string }[];
+      rendererAllowlist?: RendererAllowlist;
+      projectionService?: SessionProjectionService;
+      beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>;
+      onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>;
+      onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>;
+      onCreated?: (sessionId: string) => void | Promise<void>;
+      onDisposed?: (
+        sessionId: string,
+        outcome: { readonly ok: boolean; readonly error?: unknown },
+      ) => void | Promise<void>;
+      maxIdleSessions?: number;
+    },
+    store: SessionStore,
+  ) {
+    this.store = store;
+    this.#cache = new SessionProjectionCache({
+      storage: store.storage,
+      codecs: options.registry,
+      createRegistry: (header) =>
+        new SessionReadModel(header, options.registry, options.rendererAllowlist, options.projectionService)
+          .projections,
+    });
+    this.#globalIndex = new GlobalSessionIndex();
+  }
   private onEvent(sessionId: string): (event: SessionEventEnvelopeV1) => void | Promise<void> {
-    return event => {
+    return (event) => {
       const model = this.#models.get(sessionId);
       if (model) {
         const current = model.projections.throughSeq(sessionId);
         const change = event.seq > current ? model.apply(event) : null;
         const values = this.#changes.get(sessionId)?.get(event.seq) ?? change?.values ?? {};
         this.#changes.get(sessionId)?.delete(event.seq);
-        const callId = event.data && typeof event.data === "object" && !Array.isArray(event.data) ? (event.data as Record<string, unknown>).callId : undefined;
-        const tool = (values.tools as RuntimeSessionSnapshot["tools"] | undefined)?.find(item => item.callId === callId);
-        const update = { sessionId, throughJournalSeq: event.seq, event, values: publicValues(values), ...(tool ? { tool } : {}) };
-        for (const listener of this.#projectionListeners) { try { listener(update); } catch { /* observers cannot block accepted facts */ } }
+        const callId =
+          event.data && typeof event.data === "object" && !Array.isArray(event.data)
+            ? (event.data as Record<string, unknown>).callId
+            : undefined;
+        const tool = (values.tools as RuntimeSessionSnapshot["tools"] | undefined)?.find(
+          (item) => item.callId === callId,
+        );
+        const update = {
+          sessionId,
+          throughJournalSeq: event.seq,
+          event,
+          values: publicValues(values),
+          ...(tool ? { tool } : {}),
+        };
+        for (const listener of this.#projectionListeners) {
+          try {
+            listener(update);
+          } catch {
+            /* observers cannot block accepted facts */
+          }
+        }
       }
       return this.options.onEvent?.(sessionId, event);
     };
   }
-  private onFlush(sessionId: string): (throughSeq: number) => void | Promise<void> { return async throughSeq => {
-    // Durability is independent of browse caches. Cold reads rebuild on demand.
-    await this.options.onFlush?.(sessionId, throughSeq);
-    if (!this.#ephemeral.has(sessionId)) {
-      // Global summaries are a lazy read cache. A flush must not initialize
-      // every historical Session merely to refresh an unused cache.
-      if (!this.#globalIndexReady) return;
-      const live = this.#open.get(sessionId);
-      const model = live ? this.liveModel(live) : undefined;
-      if (live && model) this.#globalIndex.replace(this.summary(model.snapshot(live.journal.validation.accessState), this.options.profileId));
+  private onFlush(sessionId: string): (throughSeq: number) => void | Promise<void> {
+    return async (throughSeq) => {
+      // Durability is independent of browse caches. Cold reads rebuild on demand.
+      await this.options.onFlush?.(sessionId, throughSeq);
+      if (!this.#ephemeral.has(sessionId)) {
+        // Global summaries are a lazy read cache. A flush must not initialize
+        // every historical Session merely to refresh an unused cache.
+        if (!this.#globalIndexReady) return;
+        const live = this.#open.get(sessionId);
+        const model = live ? this.liveModel(live) : undefined;
+        if (live && model)
+          this.#globalIndex.replace(
+            this.summary(model.snapshot(live.journal.validation.accessState), this.options.profileId),
+          );
       }
-  }; }
+    };
+  }
   /** New headers describe this runtime; inherited events retain their original provenance. */
-  creationProvenance(mode: import("@actspace/shared/runtime-v2").RuntimeAgentMode = "agent"): import("@actspace/session-journal").SessionCreatedWithV1 {
+  creationProvenance(
+    mode: import("@actspace/shared/runtime-v2").RuntimeAgentMode = "agent",
+  ): import("@actspace/session-journal").SessionCreatedWithV1 {
     const composition = agentFormComposition(MAIN_AGENT_FORM, this.options.plugins);
     return {
       profileId: this.options.profileId,
@@ -337,19 +591,120 @@ export class RuntimeSessionController {
       codecSetDigest: this.options.registry.digest,
     };
   }
-  async create(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent", worktree?: import("@actspace/shared").SessionWorktreeContext): Promise<SessionHandle> { const session = await this.store.create({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), ...(worktree ? { worktree } : {}), lineage: null, createdWith: this.creationProvenance(agentForm) }, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.touch(sessionId); const model = this.liveModel(session); if (this.#globalIndexReady) { this.#globalIndex.replace(this.summary(model.snapshot(session.journal.validation.accessState), this.options.profileId)); } await this.options.onCreated?.(sessionId); this.requestSweep(); return session; }
-  async createEphemeral(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent"): Promise<SessionHandle> { const header = createSessionHeader({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: this.creationProvenance(agentForm) }); const session = RuntimeSessionHandle.createEphemeral({ header, registry: this.options.registry, onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.touch(sessionId); this.liveModel(session); this.#ephemeral.add(sessionId); await this.options.onCreated?.(sessionId); return session; }
-  async resume(sessionId: string): Promise<SessionHandle> { const existing = this.#open.get(sessionId); if (existing !== undefined) { this.touch(sessionId); return existing; } const closing = this.#closing.get(sessionId); if (closing !== undefined) { await closing; return this.resume(sessionId); } const session = await this.store.open(sessionId, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); try { this.liveModel(session); await this.options.beforeRecovery?.(session, this.store); await applySessionRecovery(session); if (this.#open.has(sessionId)) { await session.close().catch(() => undefined); return this.#open.get(sessionId)!; } this.#open.set(sessionId, session); this.touch(sessionId); this.liveModel(session); await this.options.onCreated?.(sessionId); this.requestSweep(); return session; } catch (error) { await session.close().catch(() => undefined); throw error; } }
+  async create(
+    sessionId: string = randomUUID(),
+    cwd?: string,
+    agentForm: MainAgentForm = "agent",
+    worktree?: import("@actspace/shared").SessionWorktreeContext,
+  ): Promise<SessionHandle> {
+    const session = await this.store.create(
+      {
+        sessionId,
+        createdAt: new Date().toISOString(),
+        ...(cwd === undefined ? {} : { cwd }),
+        ...(worktree ? { worktree } : {}),
+        lineage: null,
+        createdWith: this.creationProvenance(agentForm),
+      },
+      { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) },
+    );
+    this.#open.set(sessionId, session);
+    this.touch(sessionId);
+    const model = this.liveModel(session);
+    if (this.#globalIndexReady) {
+      this.#globalIndex.replace(
+        this.summary(model.snapshot(session.journal.validation.accessState), this.options.profileId),
+      );
+    }
+    await this.options.onCreated?.(sessionId);
+    this.requestSweep();
+    return session;
+  }
+  async createEphemeral(
+    sessionId: string = randomUUID(),
+    cwd?: string,
+    agentForm: MainAgentForm = "agent",
+  ): Promise<SessionHandle> {
+    const header = createSessionHeader({
+      sessionId,
+      createdAt: new Date().toISOString(),
+      ...(cwd === undefined ? {} : { cwd }),
+      lineage: null,
+      createdWith: this.creationProvenance(agentForm),
+    });
+    const session = RuntimeSessionHandle.createEphemeral({
+      header,
+      registry: this.options.registry,
+      onEvent: this.onEvent(sessionId),
+      onFlush: this.onFlush(sessionId),
+    });
+    this.#open.set(sessionId, session);
+    this.touch(sessionId);
+    this.liveModel(session);
+    this.#ephemeral.add(sessionId);
+    await this.options.onCreated?.(sessionId);
+    return session;
+  }
+  async resume(sessionId: string): Promise<SessionHandle> {
+    const existing = this.#open.get(sessionId);
+    if (existing !== undefined) {
+      this.touch(sessionId);
+      return existing;
+    }
+    const closing = this.#closing.get(sessionId);
+    if (closing !== undefined) {
+      await closing;
+      return this.resume(sessionId);
+    }
+    const session = await this.store.open(sessionId, {
+      onEvent: this.onEvent(sessionId),
+      onFlush: this.onFlush(sessionId),
+    });
+    try {
+      this.liveModel(session);
+      await this.options.beforeRecovery?.(session, this.store);
+      await applySessionRecovery(session);
+      if (this.#open.has(sessionId)) {
+        await session.close().catch(() => undefined);
+        return this.#open.get(sessionId)!;
+      }
+      this.#open.set(sessionId, session);
+      this.touch(sessionId);
+      this.liveModel(session);
+      await this.options.onCreated?.(sessionId);
+      this.requestSweep();
+      return session;
+    } catch (error) {
+      await session.close().catch(() => undefined);
+      throw error;
+    }
+  }
   /** Provider-owned sessions participate in checkpoints without transferring close ownership. */
   registerExternal(session: SessionHandle): () => void {
     const id = session.header.sessionId;
     if (this.getOpen(id) !== undefined) throw new Error(`Session ${id} is already live.`);
     this.#external.set(id, session);
     // 子 Agent 会话结束后，它在内存里的读模型一起释放，之后再读走冷缓存。
-    return () => { if (this.#external.get(id) !== session) return; this.#external.delete(id); if (!this.#open.has(id)) { this.#models.delete(id); this.#changes.delete(id); } };
+    return () => {
+      if (this.#external.get(id) !== session) return;
+      this.#external.delete(id);
+      if (!this.#open.has(id)) {
+        this.#models.delete(id);
+        this.#changes.delete(id);
+      }
+    };
   }
-  isEphemeral(sessionId: string): boolean { return this.#ephemeral.has(sessionId); }
-  getOpen(sessionId: string): SessionHandle | undefined { const open = this.#open.get(sessionId); if (open !== undefined) { this.touch(sessionId); return open; } return this.#external.get(sessionId); }
+  isEphemeral(sessionId: string): boolean {
+    return this.#ephemeral.has(sessionId);
+  }
+  getOpen(sessionId: string): SessionHandle | undefined {
+    const open = this.#open.get(sessionId);
+    if (open !== undefined) {
+      this.touch(sessionId);
+      return open;
+    }
+    return this.#external.get(sessionId);
+  }
   /** Mark a Session as recently used, so the idle limit evicts others first. */
   touch(sessionId: string): void {
     if (!this.#open.has(sessionId)) return;
@@ -357,9 +712,19 @@ export class RuntimeSessionController {
     this.#recent.set(sessionId, true);
   }
   /** A pin keeps a Session open while it answers true (running work, a viewer, a pending approval). Returns the unregister function. */
-  addPin(pin: (sessionId: string) => boolean): () => void { this.#pins.add(pin); return () => { this.#pins.delete(pin); }; }
+  addPin(pin: (sessionId: string) => boolean): () => void {
+    this.#pins.add(pin);
+    return () => {
+      this.#pins.delete(pin);
+    };
+  }
   /** A gate owns per-Session state that holds the handle. `release` must drop that state in the same tick as a true `canRelease`. */
-  addReleaseGate(gate: SessionReleaseGate): () => void { this.#gates.add(gate); return () => { this.#gates.delete(gate); }; }
+  addReleaseGate(gate: SessionReleaseGate): () => void {
+    this.#gates.add(gate);
+    return () => {
+      this.#gates.delete(gate);
+    };
+  }
   /** Sessions a renderer shows or subscribes to; replaces the previous set. */
   setObserved(sessionIds: readonly string[]): void {
     this.#observed = new Set(sessionIds);
@@ -367,14 +732,32 @@ export class RuntimeSessionController {
     this.requestSweep();
   }
   /** Idle Sessions that stay resident: the LRU keeps the newest ones and releases the rest. */
-  get maxIdleSessions(): number { const configured = this.options.maxIdleSessions; return configured !== undefined && Number.isInteger(configured) && configured >= 0 ? configured : DEFAULT_MAX_IDLE_SESSIONS; }
+  get maxIdleSessions(): number {
+    const configured = this.options.maxIdleSessions;
+    return configured !== undefined && Number.isInteger(configured) && configured >= 0
+      ? configured
+      : DEFAULT_MAX_IDLE_SESSIONS;
+  }
   /** True when nothing needs this Session resident: not ephemeral, no pin, no holder, no open child. */
   isReleasable(sessionId: string): boolean {
     if (!this.#open.has(sessionId) || this.#ephemeral.has(sessionId) || this.#observed.has(sessionId)) return false;
-    for (const pin of this.#pins) { try { if (pin(sessionId)) return false; } catch { return false; } }
-    for (const gate of this.#gates) { try { if (!gate.canRelease(sessionId)) return false; } catch { return false; } }
+    for (const pin of this.#pins) {
+      try {
+        if (pin(sessionId)) return false;
+      } catch {
+        return false;
+      }
+    }
+    for (const gate of this.#gates) {
+      try {
+        if (!gate.canRelease(sessionId)) return false;
+      } catch {
+        return false;
+      }
+    }
     // A side chat reads its parent while it is open.
-    for (const [id, open] of this.#open) if (id !== sessionId && open.header.lineage?.parentSessionId === sessionId) return false;
+    for (const [id, open] of this.#open)
+      if (id !== sessionId && open.header.lineage?.parentSessionId === sessionId) return false;
     return true;
   }
   /** Close one idle Session and drop everything derived from it. Returns false, changing nothing, when it is pinned. */
@@ -384,20 +767,43 @@ export class RuntimeSessionController {
     // Check and removal are one synchronous step: nothing can acquire the handle in between.
     this.#open.delete(sessionId);
     this.#recent.delete(sessionId);
-    const holders = [...this.#gates].map(gate => gate.release(sessionId));
+    const holders = [...this.#gates].map((gate) => gate.release(sessionId));
     const closing = (async () => {
       let error: unknown;
-      const note = (caught: unknown) => { error = error === undefined ? caught : new AggregateError([error, caught], "Session release failed."); };
+      const note = (caught: unknown) => {
+        error = error === undefined ? caught : new AggregateError([error, caught], "Session release failed.");
+      };
       for (const result of await Promise.allSettled(holders)) if (result.status === "rejected") note(result.reason);
-      try { await session.flush(); } catch (caught) { note(caught); }
-      try { await session.close(); } catch (caught) { note(caught); }
-      try { if (this.#globalIndexReady) this.#globalIndex.replace(this.summary(this.snapshot(session), this.options.profileId)); } catch { /* summaries are a rebuildable cache */ }
+      try {
+        await session.flush();
+      } catch (caught) {
+        note(caught);
+      }
+      try {
+        await session.close();
+      } catch (caught) {
+        note(caught);
+      }
+      try {
+        if (this.#globalIndexReady)
+          this.#globalIndex.replace(this.summary(this.snapshot(session), this.options.profileId));
+      } catch {
+        /* summaries are a rebuildable cache */
+      }
       this.#models.delete(sessionId);
       this.#changes.delete(sessionId);
-      try { await this.options.onDisposed?.(sessionId, error === undefined ? { ok: true } : { ok: false, error }); } catch (caught) { note(caught); }
+      try {
+        await this.options.onDisposed?.(sessionId, error === undefined ? { ok: true } : { ok: false, error });
+      } catch (caught) {
+        note(caught);
+      }
       if (error !== undefined) throw error;
     })();
-    const tracked = closing.catch(() => undefined).finally(() => { if (this.#closing.get(sessionId) === tracked) this.#closing.delete(sessionId); });
+    const tracked = closing
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.#closing.get(sessionId) === tracked) this.#closing.delete(sessionId);
+      });
     this.#closing.set(sessionId, tracked);
     await closing;
     return true;
@@ -408,44 +814,98 @@ export class RuntimeSessionController {
    * Release gates must agree (nothing running or queued); pins and viewers do not block, the caller stopped the work.
    * A reopen elsewhere waits for the whole rewrite. A storage failure reopens the unchanged Session and rethrows.
    */
-  async rewrite(sessionId: string, input: { readonly expectedLastSeq: number; readonly cutSeq: number; readonly closing: SessionPrefixRewrite["closing"]; readonly label: string; readonly retire: readonly string[] }): Promise<{ readonly session: SessionHandle; readonly archive: string; readonly retireFailures: readonly { readonly sessionId: string; readonly error: unknown }[] }> {
+  async rewrite(
+    sessionId: string,
+    input: {
+      readonly expectedLastSeq: number;
+      readonly cutSeq: number;
+      readonly closing: SessionPrefixRewrite["closing"];
+      readonly label: string;
+      readonly retire: readonly string[];
+    },
+  ): Promise<{
+    readonly session: SessionHandle;
+    readonly archive: string;
+    readonly retireFailures: readonly { readonly sessionId: string; readonly error: unknown }[];
+  }> {
     const storage = this.store.storage;
-    if (this.#ephemeral.has(sessionId) || !storage.rewritePrefix || !storage.retireInto) throw new SessionRewriteError("REWIND_UNAVAILABLE", "This Session cannot be rewound.");
+    if (this.#ephemeral.has(sessionId) || !storage.rewritePrefix || !storage.retireInto)
+      throw new SessionRewriteError("REWIND_UNAVAILABLE", "This Session cannot be rewound.");
     const session = this.#open.get(sessionId);
-    if (session === undefined || this.#closing.has(sessionId)) throw new SessionRewriteError("SESSION_BUSY", `Session ${sessionId} is not open.`);
-    for (const gate of this.#gates) { let ok = false; try { ok = gate.canRelease(sessionId); } catch { /* treated as busy */ } if (!ok) throw new SessionRewriteError("SESSION_BUSY", `Session ${sessionId} has running or queued work.`); }
+    if (session === undefined || this.#closing.has(sessionId))
+      throw new SessionRewriteError("SESSION_BUSY", `Session ${sessionId} is not open.`);
+    for (const gate of this.#gates) {
+      let ok = false;
+      try {
+        ok = gate.canRelease(sessionId);
+      } catch {
+        /* treated as busy */
+      }
+      if (!ok) throw new SessionRewriteError("SESSION_BUSY", `Session ${sessionId} has running or queued work.`);
+    }
     this.#open.delete(sessionId);
     this.#recent.delete(sessionId);
-    const holders = [...this.#gates].map(gate => gate.release(sessionId));
+    const holders = [...this.#gates].map((gate) => gate.release(sessionId));
     const retireFailures: { sessionId: string; error: unknown }[] = [];
     let archive: string | undefined;
     const work = (async () => {
       let closeError: unknown;
-      for (const result of await Promise.allSettled(holders)) if (result.status === "rejected") closeError ??= result.reason;
-      try { await session.flush(); } catch (caught) { closeError ??= caught; }
-      try { await session.close(); } catch (caught) { closeError ??= caught; }
+      for (const result of await Promise.allSettled(holders))
+        if (result.status === "rejected") closeError ??= result.reason;
+      try {
+        await session.flush();
+      } catch (caught) {
+        closeError ??= caught;
+      }
+      try {
+        await session.close();
+      } catch (caught) {
+        closeError ??= caught;
+      }
       this.#models.delete(sessionId);
       this.#changes.delete(sessionId);
-      try { await this.options.onDisposed?.(sessionId, closeError === undefined ? { ok: true } : { ok: false, error: closeError }); } catch { /* observers cannot block the rewrite */ }
+      try {
+        await this.options.onDisposed?.(
+          sessionId,
+          closeError === undefined ? { ok: true } : { ok: false, error: closeError },
+        );
+      } catch {
+        /* observers cannot block the rewrite */
+      }
       if (closeError !== undefined) throw closeError;
-      ({ archive } = await storage.rewritePrefix!(sessionId, { expectedLastSeq: input.expectedLastSeq, cutSeq: input.cutSeq, closing: input.closing, label: input.label }));
+      ({ archive } = await storage.rewritePrefix!(sessionId, {
+        expectedLastSeq: input.expectedLastSeq,
+        cutSeq: input.cutSeq,
+        closing: input.closing,
+        label: input.label,
+      }));
       // The rewrite already happened; a child that cannot move stays as an unlisted directory, which affects nothing.
       for (const childId of input.retire) {
         try {
-          if (this.#external.has(childId)) throw new SessionRewriteError("SESSION_BUSY", `Subagent Session ${childId} is in use.`);
+          if (this.#external.has(childId))
+            throw new SessionRewriteError("SESSION_BUSY", `Subagent Session ${childId} is in use.`);
           const open = this.#open.get(childId);
-          if (open !== undefined) { this.#open.delete(childId); this.#recent.delete(childId); await open.close(); this.#models.delete(childId); this.#changes.delete(childId); }
+          if (open !== undefined) {
+            this.#open.delete(childId);
+            this.#recent.delete(childId);
+            await open.close();
+            this.#models.delete(childId);
+            this.#changes.delete(childId);
+          }
           await storage.retireInto!(childId, sessionId, input.label);
           this.#globalIndex.remove(childId);
-        } catch (error) { retireFailures.push({ sessionId: childId, error }); }
+        } catch (error) {
+          retireFailures.push({ sessionId: childId, error });
+        }
       }
       // Summaries only accept a growing seq; the rewritten Journal is shorter.
       this.#globalIndex.remove(sessionId);
     })();
     const tracked = work.catch(() => undefined);
     this.#closing.set(sessionId, tracked);
-    try { await work; }
-    catch (error) {
+    try {
+      await work;
+    } catch (error) {
       if (this.#closing.get(sessionId) === tracked) this.#closing.delete(sessionId);
       // Storage left the old Journal in place; reopen it so the Session stays usable.
       await this.resume(sessionId).catch(() => undefined);
@@ -453,12 +913,16 @@ export class RuntimeSessionController {
     }
     if (this.#closing.get(sessionId) === tracked) this.#closing.delete(sessionId);
     const reopened = await this.resume(sessionId);
-    if (this.#globalIndexReady) this.#globalIndex.replace(this.summary(this.snapshot(reopened), this.options.profileId));
+    if (this.#globalIndexReady)
+      this.#globalIndex.replace(this.summary(this.snapshot(reopened), this.options.profileId));
     return { session: reopened, archive: archive!, retireFailures };
   }
   /** Release the oldest idle Sessions beyond the limit. Concurrent calls share one pass and a pass that overlaps a change runs again. */
   sweep(): Promise<void> {
-    if (this.#sweeping) { this.#sweepAgain = true; return this.#sweeping; }
+    if (this.#sweeping) {
+      this.#sweepAgain = true;
+      return this.#sweeping;
+    }
     const pass = (async () => {
       // Let the assignment below happen first, so the pass can clear itself in the same step it decides to stop.
       await undefined;
@@ -466,12 +930,18 @@ export class RuntimeSessionController {
         do {
           this.#sweepAgain = false;
           if (this.#disposed) break;
-          const idle = [...this.#recent.keys()].filter(id => this.isReleasable(id));
+          const idle = [...this.#recent.keys()].filter((id) => this.isReleasable(id));
           for (const id of idle.slice(0, Math.max(0, idle.length - this.maxIdleSessions))) {
-            try { await this.release(id); } catch { /* the Session left #open; its failure is reported by onDisposed */ }
+            try {
+              await this.release(id);
+            } catch {
+              /* the Session left #open; its failure is reported by onDisposed */
+            }
           }
         } while (this.#sweepAgain);
-      } finally { this.#sweeping = undefined; }
+      } finally {
+        this.#sweeping = undefined;
+      }
     })();
     this.#sweeping = pass;
     return pass;
@@ -480,32 +950,62 @@ export class RuntimeSessionController {
   requestSweep(): void {
     if (this.#sweepQueued || this.#disposed) return;
     this.#sweepQueued = true;
-    queueMicrotask(() => { this.#sweepQueued = false; void this.sweep(); });
+    queueMicrotask(() => {
+      this.#sweepQueued = false;
+      void this.sweep();
+    });
   }
-  snapshot(session: SessionHandle): RuntimeSessionSnapshot { return this.liveModel(session).snapshot(session.journal.validation.accessState); }
-  async inspect(sessionId: string): Promise<RuntimeSessionSnapshot> { return (await this.readModel(sessionId)).snapshot; }
+  snapshot(session: SessionHandle): RuntimeSessionSnapshot {
+    return this.liveModel(session).snapshot(session.journal.validation.accessState);
+  }
+  async inspect(sessionId: string): Promise<RuntimeSessionSnapshot> {
+    return (await this.readModel(sessionId)).snapshot;
+  }
   /** 只读一个投影值（例如 `contextEstimate`），不读日志窗口。 */
-  async projectionValue(sessionId: string, key: string): Promise<import("@actspace/shared/runtime-v2").RuntimeJsonValue | undefined> { return (await this.readModel(sessionId)).model.projections.value(sessionId, key); }
-  async recoveryAccess(sessionId: string): Promise<SessionRecoveryAccess> { const open = this.#open.get(sessionId); if (open !== undefined) return open.durabilityState === "blocked" ? "read-only" : "read-write"; return classifySessionRecoveryAccess(await this.store.inspect(sessionId)); }
+  async projectionValue(
+    sessionId: string,
+    key: string,
+  ): Promise<import("@actspace/shared/runtime-v2").RuntimeJsonValue | undefined> {
+    return (await this.readModel(sessionId)).model.projections.value(sessionId, key);
+  }
+  async recoveryAccess(sessionId: string): Promise<SessionRecoveryAccess> {
+    const open = this.#open.get(sessionId);
+    if (open !== undefined) return open.durabilityState === "blocked" ? "read-only" : "read-write";
+    return classifySessionRecoveryAccess(await this.store.inspect(sessionId));
+  }
   async readEventBatch(sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput) {
     if (!this.store.storage.readEventBatch) throw new Error("Session provider does not support bounded query reads.");
     const batch = await this.store.storage.readEventBatch(sessionId, input);
-    const events = batch.events.flatMap(event => {
+    const events = batch.events.flatMap((event) => {
       if (input.eventTypes && !input.eventTypes.includes(event.type)) return [];
       const resolved = this.options.registry.resolve(event);
-      if (resolved.kind === "unknown-required" || resolved.kind === "unsupported-required") throw new Error("Session requires an unavailable codec; query index cannot interpret its facts.");
+      if (resolved.kind === "unknown-required" || resolved.kind === "unsupported-required")
+        throw new Error("Session requires an unavailable codec; query index cannot interpret its facts.");
       return resolved.kind === "known" ? [{ ...event, data: resolved.data }] : [];
     });
     return { ...batch, events };
   }
-  async inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]> { const open = this.liveSession(sessionId); if (open !== undefined) return open.journal.readEvents(); const inspection = await this.store.inspect(sessionId); if (inspection.header === null || inspection.validation === null) throw new Error(`Session ${sessionId} is corrupt.`); return inspection.events; }
+  async inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]> {
+    const open = this.liveSession(sessionId);
+    if (open !== undefined) return open.journal.readEvents();
+    const inspection = await this.store.inspect(sessionId);
+    if (inspection.header === null || inspection.validation === null)
+      throw new Error(`Session ${sessionId} is corrupt.`);
+    return inspection.events;
+  }
   /** `afterSeq` 之后的事件和当前 lastSeq，给按会话常驻的增量折叠用。内存里的会话只碰尾部窗口；冷会话才整份读取。 */
-  async inspectEventsAfter(sessionId: string, afterSeq: number): Promise<{ readonly lastSeq: number; readonly events: readonly SessionEventEnvelopeV1[] }> {
+  async inspectEventsAfter(
+    sessionId: string,
+    afterSeq: number,
+  ): Promise<{ readonly lastSeq: number; readonly events: readonly SessionEventEnvelopeV1[] }> {
     const live = this.liveSession(sessionId);
-    if (live !== undefined) { const lastSeq = live.journal.lastSeq; return { lastSeq, events: afterSeq >= lastSeq ? [] : live.journal.eventsAfter(afterSeq) }; }
+    if (live !== undefined) {
+      const lastSeq = live.journal.lastSeq;
+      return { lastSeq, events: afterSeq >= lastSeq ? [] : live.journal.eventsAfter(afterSeq) };
+    }
     const events = await this.inspectEvents(sessionId);
     const lastSeq = events.at(-1)?.seq ?? -1;
-    return { lastSeq, events: afterSeq < 0 ? events : events.filter(event => event.seq > afterSeq) };
+    return { lastSeq, events: afterSeq < 0 ? events : events.filter((event) => event.seq > afterSeq) };
   }
   /** 某类事件的最新一条。内存里的会话查日志自带的类型索引，不读历史；冷会话才整份读取。 */
   async latestEvent(sessionId: string, type: string): Promise<SessionEventEnvelopeV1 | undefined> {
@@ -515,10 +1015,23 @@ export class RuntimeSessionController {
     for (let index = events.length - 1; index >= 0; index -= 1) if (events[index].type === type) return events[index];
     return undefined;
   }
-  async list(): Promise<readonly RuntimeSessionListItem[]> { return (await this.browseSessions()).items; }
-  async export(sessionId: string): Promise<string> { const open = this.#open.get(sessionId); if (open !== undefined && this.#ephemeral.has(sessionId)) return [open.header, ...open.journal.readEvents()].map((record) => JSON.stringify(record)).join("\n") + "\n"; const inspection = await this.store.inspect(sessionId); if (inspection.header === null) throw new Error(`Session ${sessionId} has no header.`); return [inspection.header, ...inspection.events].map((record) => JSON.stringify(record)).join("\n") + "\n"; }
-  openSessions(): readonly SessionHandle[] { return Object.freeze([...this.#open.values()]); }
-  async flushAll(): Promise<void> { for (const session of this.#open.values()) await session.flush(); }
+  async list(): Promise<readonly RuntimeSessionListItem[]> {
+    return (await this.browseSessions()).items;
+  }
+  async export(sessionId: string): Promise<string> {
+    const open = this.#open.get(sessionId);
+    if (open !== undefined && this.#ephemeral.has(sessionId))
+      return [open.header, ...open.journal.readEvents()].map((record) => JSON.stringify(record)).join("\n") + "\n";
+    const inspection = await this.store.inspect(sessionId);
+    if (inspection.header === null) throw new Error(`Session ${sessionId} has no header.`);
+    return [inspection.header, ...inspection.events].map((record) => JSON.stringify(record)).join("\n") + "\n";
+  }
+  openSessions(): readonly SessionHandle[] {
+    return Object.freeze([...this.#open.values()]);
+  }
+  async flushAll(): Promise<void> {
+    for (const session of this.#open.values()) await session.flush();
+  }
   async closeAll(): Promise<void> {
     this.#disposed = true;
     await this.#sweeping?.catch(() => undefined);
@@ -527,32 +1040,61 @@ export class RuntimeSessionController {
     const entries = [...this.#open];
     this.#open.clear();
     this.#recent.clear();
-    const closed = await Promise.allSettled(entries.map(async ([sessionId, session]) => {
-      let error: unknown;
-      try {
-        if (session.journal.eventsAfter(Math.max(-1, session.lastSeq - 1)).at(-1)?.type !== "session/end-seed") await session.append(coreEvent("session/end-seed", { sessionId: session.header.sessionId, lastSeq: session.lastSeq }));
-        await session.flush();
-        // The Session already left #open, so onFlush cannot see the end-seed; record it here.
-        if (!this.#ephemeral.has(sessionId) && this.#globalIndexReady) this.#globalIndex.replace(this.summary(this.snapshot(session), this.options.profileId));
-      } catch (caught) { error = caught; }
-      try { await session.close(); } catch (caught) { error = error === undefined ? caught : new AggregateError([error, caught], "Session flush and close failed."); }
-      this.#models.delete(session.header.sessionId);
-      this.#changes.delete(session.header.sessionId);
-      this.#ephemeral.delete(sessionId);
-      try { await this.options.onDisposed?.(session.header.sessionId, error === undefined ? { ok: true } : { ok: false, error }); }
-      catch (caught) { error = error === undefined ? caught : new AggregateError([error, caught], "Session disposal notification failed."); }
-      if (error !== undefined) throw error;
-    }));
+    const closed = await Promise.allSettled(
+      entries.map(async ([sessionId, session]) => {
+        let error: unknown;
+        try {
+          if (session.journal.eventsAfter(Math.max(-1, session.lastSeq - 1)).at(-1)?.type !== "session/end-seed")
+            await session.append(
+              coreEvent("session/end-seed", { sessionId: session.header.sessionId, lastSeq: session.lastSeq }),
+            );
+          await session.flush();
+          // The Session already left #open, so onFlush cannot see the end-seed; record it here.
+          if (!this.#ephemeral.has(sessionId) && this.#globalIndexReady)
+            this.#globalIndex.replace(this.summary(this.snapshot(session), this.options.profileId));
+        } catch (caught) {
+          error = caught;
+        }
+        try {
+          await session.close();
+        } catch (caught) {
+          error = error === undefined ? caught : new AggregateError([error, caught], "Session flush and close failed.");
+        }
+        this.#models.delete(session.header.sessionId);
+        this.#changes.delete(session.header.sessionId);
+        this.#ephemeral.delete(sessionId);
+        try {
+          await this.options.onDisposed?.(
+            session.header.sessionId,
+            error === undefined ? { ok: true } : { ok: false, error },
+          );
+        } catch (caught) {
+          error =
+            error === undefined ? caught : new AggregateError([error, caught], "Session disposal notification failed.");
+        }
+        if (error !== undefined) throw error;
+      }),
+    );
     this.#ephemeral.clear();
     const failed = closed.filter((result): result is PromiseRejectedResult => result.status === "rejected");
-    if (failed.length) throw new AggregateError(failed.map(result => result.reason), "Session shutdown failed.");
+    if (failed.length)
+      throw new AggregateError(
+        failed.map((result) => result.reason),
+        "Session shutdown failed.",
+      );
   }
 }
 
 const DEFAULT_MAX_IDLE_SESSIONS = 3;
 
 export class SessionRewriteError extends Error {
-  constructor(readonly code: "SESSION_BUSY" | "REWIND_UNAVAILABLE", message: string) { super(message); this.name = "SessionRewriteError"; }
+  constructor(
+    readonly code: "SESSION_BUSY" | "REWIND_UNAVAILABLE",
+    message: string,
+  ) {
+    super(message);
+    this.name = "SessionRewriteError";
+  }
 }
 
 /** Holder of per-Session state that keeps a handle alive (the run scheduler, for one). */
@@ -575,17 +1117,28 @@ export function slimHistoryWindow(journal: readonly SessionEventEnvelopeV1[]): S
   const tokenTimes = new Map<string, { first: string; nonEmpty?: string }>();
   for (const event of journal) {
     const data = eventData(event);
-    if (event.type === "assistant/message" && typeof data?.messageId === "string") completedMessages.add(data.messageId);
+    if (event.type === "assistant/message" && typeof data?.messageId === "string")
+      completedMessages.add(data.messageId);
     if (event.type === "assistant/chunk" && typeof data?.messageId === "string") {
       const timing = tokenTimes.get(data.messageId) ?? { first: event.time };
       if (!timing.nonEmpty && hasChunkText(data.delta ?? data.content)) timing.nonEmpty = event.time;
       tokenTimes.set(data.messageId, timing);
     }
   }
-  return journal.flatMap(event => {
+  return journal.flatMap((event) => {
     const data = eventData(event);
-    if (event.type === "assistant/chunk" && typeof data?.messageId === "string" && completedMessages.has(data.messageId)) return [];
-    if (event.type === "assistant/message" && typeof data?.messageId === "string" && data.firstTokenAt == null && data.firstTokenTime == null) {
+    if (
+      event.type === "assistant/chunk" &&
+      typeof data?.messageId === "string" &&
+      completedMessages.has(data.messageId)
+    )
+      return [];
+    if (
+      event.type === "assistant/message" &&
+      typeof data?.messageId === "string" &&
+      data.firstTokenAt == null &&
+      data.firstTokenTime == null
+    ) {
       const timing = tokenTimes.get(data.messageId);
       if (timing) return [{ ...event, data: { ...data, firstTokenAt: timing.nonEmpty ?? timing.first } }];
     }
@@ -611,7 +1164,18 @@ function boundToolEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {
   const data = eventData(event);
   if (!data) return event;
   const bounded: Record<string, RuntimeJsonValue> = { deferredDetail: true };
-  for (const key of ["agentRunId", "turnId", "stepId", "requestId", "callId", "toolCallId", "pluginId", "name", "status", "phase"] as const) {
+  for (const key of [
+    "agentRunId",
+    "turnId",
+    "stepId",
+    "requestId",
+    "callId",
+    "toolCallId",
+    "pluginId",
+    "name",
+    "status",
+    "phase",
+  ] as const) {
     const value = data[key];
     if (value !== undefined) bounded[key] = value;
   }
@@ -622,15 +1186,24 @@ function boundToolEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {
   return { ...event, data: bounded };
 }
 function jsonRecord(value: RuntimeJsonValue | undefined): Readonly<Record<string, RuntimeJsonValue>> | null {
-  return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : null;
+  return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value)
+    ? (value as Readonly<Record<string, RuntimeJsonValue>>)
+    : null;
 }
 function eventData(event: SessionEventEnvelopeV1): Readonly<Record<string, RuntimeJsonValue>> | null {
-  return event.data !== null && typeof event.data === "object" && !Array.isArray(event.data) ? event.data as Readonly<Record<string, RuntimeJsonValue>> : null;
+  return event.data !== null && typeof event.data === "object" && !Array.isArray(event.data)
+    ? (event.data as Readonly<Record<string, RuntimeJsonValue>>)
+    : null;
 }
 /** 有序 seq 列表里小于 `seq` 的有几个（也就是第一个不小于 `seq` 的下标）。 */
 function countBelow(seqs: readonly number[], seq: number): number {
-  let low = 0, high = seqs.length;
-  while (low < high) { const mid = (low + high) >> 1; if (seqs[mid] < seq) low = mid + 1; else high = mid; }
+  let low = 0,
+    high = seqs.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (seqs[mid] < seq) low = mid + 1;
+    else high = mid;
+  }
   return low;
 }
 /** 有序 seq 列表里小于 `seq` 的最后一个。 */
@@ -641,7 +1214,7 @@ function latestBefore(seqs: readonly number[], seq: number): number | null {
 /** 日志里这些 seq（升序）上的事件；连着的 seq 合成一段读一次。 */
 function eventsAt(journal: SessionJournal, seqs: readonly number[]): SessionEventEnvelopeV1[] {
   const events: SessionEventEnvelopeV1[] = [];
-  for (let first = 0; first < seqs.length;) {
+  for (let first = 0; first < seqs.length; ) {
     let last = first;
     while (last + 1 < seqs.length && seqs[last + 1] === seqs[last] + 1) last += 1;
     for (const event of journal.readEvents(seqs[first], seqs[last] + 1)) events.push(event);
@@ -649,6 +1222,16 @@ function eventsAt(journal: SessionJournal, seqs: readonly number[]): SessionEven
   }
   return events;
 }
-function watermarksFor(session: SessionHandle | undefined, projectionThroughSeq: number, windowThroughSeq: number): RuntimeReadModelWatermarks {
-  return { acceptedThroughSeq: session?.acceptedSeq ?? projectionThroughSeq, durableThroughSeq: session?.durableSeq ?? projectionThroughSeq, projectionThroughSeq, windowThroughSeq, indexGeneration: null };
+function watermarksFor(
+  session: SessionHandle | undefined,
+  projectionThroughSeq: number,
+  windowThroughSeq: number,
+): RuntimeReadModelWatermarks {
+  return {
+    acceptedThroughSeq: session?.acceptedSeq ?? projectionThroughSeq,
+    durableThroughSeq: session?.durableSeq ?? projectionThroughSeq,
+    projectionThroughSeq,
+    windowThroughSeq,
+    indexGeneration: null,
+  };
 }

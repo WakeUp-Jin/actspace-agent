@@ -215,10 +215,7 @@ async function collectGitDiff(repoRoot, beforeCommit) {
 }
 
 async function createSnapshot({ repoRoot, plan, slot }) {
-  const [gitState, files] = await Promise.all([
-    collectGitState(repoRoot),
-    listRepositoryFiles(repoRoot),
-  ]);
+  const [gitState, files] = await Promise.all([collectGitState(repoRoot), listRepositoryFiles(repoRoot)]);
   return {
     schemaVersion: 1,
     plan,
@@ -266,7 +263,10 @@ function renderMetricsTable(metrics) {
 function renderBreakdown(title, record) {
   const rows = Object.entries(record)
     .filter(([, metrics]) => metrics.sourceFiles > 0 || metrics.testFiles > 0)
-    .map(([name, metrics]) => `| ${name} | ${number(metrics.sourceFiles)} | ${number(metrics.sourceLines)} | ${number(metrics.testFiles)} | ${number(metrics.testLines)} |`);
+    .map(
+      ([name, metrics]) =>
+        `| ${name} | ${number(metrics.sourceFiles)} | ${number(metrics.sourceLines)} | ${number(metrics.testFiles)} | ${number(metrics.testLines)} |`,
+    );
   return [
     `## ${title}`,
     "",
@@ -320,7 +320,10 @@ function renderComparisonTable(before, after) {
   return [
     "| 指标 | 重构前 | 重构后 | 变化 |",
     "| --- | ---: | ---: | ---: |",
-    ...labels.map(([key, label]) => `| ${label} | ${number(before[key])} | ${number(after[key])} | ${signed(after[key] - before[key])} |`),
+    ...labels.map(
+      ([key, label]) =>
+        `| ${label} | ${number(before[key])} | ${number(after[key])} | ${signed(after[key] - before[key])} |`,
+    ),
   ].join("\n");
 }
 

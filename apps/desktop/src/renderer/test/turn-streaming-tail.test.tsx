@@ -7,16 +7,34 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 
 // 一轮还在跑时，只有本轮最后一项正在写的回复带末尾渐显和光标；中间已写完的回复按普通正文显示（聊天区规范 §7.1）。
 
-const user: Extract<MessageBlock, { kind: "user" }> = { kind: "user", id: "u", content: "看看子智能体", createdAt: "now" };
+const user: Extract<MessageBlock, { kind: "user" }> = {
+  kind: "user",
+  id: "u",
+  content: "看看子智能体",
+  createdAt: "now",
+};
 const reply = (id: string, content: string): MessageBlock => ({ kind: "assistant", id, content, createdAt: "now" });
-const read = (id: string): MessageBlock => ({ kind: "read", id, displayText: "Read a.ts", createdAt: "now", status: "completed", filePath: "a.ts" });
+const read = (id: string): MessageBlock => ({
+  kind: "read",
+  id,
+  displayText: "Read a.ts",
+  createdAt: "now",
+  status: "completed",
+  filePath: "a.ts",
+});
 
 function caretsIn(container: HTMLElement, id: string) {
   return container.querySelector(`[data-assistant-message-id="${id}"]`)!.querySelectorAll(".md-caret").length;
 }
 
 function renderTurn(messages: MessageBlock[], isActive: boolean) {
-  return render(<TooltipProvider><RightPanelProvider><TurnView turn={{ id: "t", user, messages }} isActive={isActive} sessionId="s" setTurnElement={() => {}} /></RightPanelProvider></TooltipProvider>);
+  return render(
+    <TooltipProvider>
+      <RightPanelProvider>
+        <TurnView turn={{ id: "t", user, messages }} isActive={isActive} sessionId="s" setTurnElement={() => {}} />
+      </RightPanelProvider>
+    </TooltipProvider>,
+  );
 }
 
 it("only the reply still being written gets the streaming tail while the turn runs", () => {

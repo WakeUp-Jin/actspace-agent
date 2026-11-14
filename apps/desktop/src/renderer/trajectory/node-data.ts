@@ -5,7 +5,7 @@ import type { TrajectorySourceBlock } from "./contract";
 export type Data = Readonly<Record<string, RuntimeJsonValue>>;
 
 export const asRecord = (value: RuntimeJsonValue | undefined): Data =>
-  value !== null && typeof value === "object" && !Array.isArray(value) ? value as Data : {};
+  value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Data) : {};
 export const dataOf = (node: RuntimeTrajectoryNode): Data => asRecord(node.data);
 export const text = (value: RuntimeJsonValue | undefined): string | null => {
   if (typeof value === "string") return value;
@@ -33,32 +33,46 @@ export const json = (value: RuntimeJsonValue | undefined, max = 240): string => 
 export function valueText(value: RuntimeJsonValue | undefined): string {
   if (typeof value === "string") return value;
   if (value === undefined || value === null) return "";
-  if (Array.isArray(value)) return value.map(item => valueText(item)).filter(Boolean).join("\n\n");
+  if (Array.isArray(value))
+    return value
+      .map((item) => valueText(item))
+      .filter(Boolean)
+      .join("\n\n");
   const data = asRecord(value);
   return pick(data, ["text", "content", "message", "summary", "delta"]) ?? json(value);
 }
 
-export function sourceBlocks(value: RuntimeJsonValue | undefined, fallbackType = "text"): readonly TrajectorySourceBlock[] {
+export function sourceBlocks(
+  value: RuntimeJsonValue | undefined,
+  fallbackType = "text",
+): readonly TrajectorySourceBlock[] {
   if (typeof value === "string") return value === "" ? [] : [{ type: fallbackType, content: value, raw: value }];
   if (!Array.isArray(value)) {
     const content = valueText(value);
     return content === "" ? [] : [{ type: fallbackType, content, raw: value }];
   }
-  return value.flatMap(item => {
+  return value.flatMap((item) => {
     const data = asRecord(item);
     const type = pick(data, ["type", "kind"]) ?? fallbackType;
     // Older sessions carry a runtime-context block the loop appended for the model; it is not message content.
     if (type === "runtime-context") return [];
     const args = data.arguments ?? data.args ?? data.input;
-    const content = type === "tool-call" && args !== undefined ? (typeof args === "string" ? args : JSON.stringify(args)) : valueText(item);
+    const content =
+      type === "tool-call" && args !== undefined
+        ? typeof args === "string"
+          ? args
+          : JSON.stringify(args)
+        : valueText(item);
     const callId = pick(data, ["callId", "toolCallId"]);
     const toolName = pick(data, ["name", "toolName"]);
-    return [{
-      type,
-      content,
-      ...(callId === null ? {} : { callId }),
-      ...(toolName === null ? {} : { toolName }),
-      raw: item,
-    }];
+    return [
+      {
+        type,
+        content,
+        ...(callId === null ? {} : { callId }),
+        ...(toolName === null ? {} : { toolName }),
+        raw: item,
+      },
+    ];
   });
 }

@@ -23,7 +23,11 @@ export function getService<TService>(ctx: ServiceReader | undefined, key: Servic
 }
 
 /** 取必须存在的服务。没注册时报 `<consumer> requires <id>.`，`consumer` 写取用方自己的名字。 */
-export function requireService<TService>(ctx: ServiceReader | undefined, key: ServiceKey<TService>, consumer: string): TService {
+export function requireService<TService>(
+  ctx: ServiceReader | undefined,
+  key: ServiceKey<TService>,
+  consumer: string,
+): TService {
   const service = getService(ctx, key);
   if (service === undefined) throw new Error(`${consumer} requires ${key.id}.`);
   return service;
@@ -33,7 +37,11 @@ export function requireService<TService>(ctx: ServiceReader | undefined, key: Se
  * 按定义注册服务。值的类型不满足定义时编译不过，提供方和取用方因此不会各说各话。
  * 视图只描述取用方用到的一部分，不能拿来注册：传视图进来编译不过。
  */
-export function provideService<TService>(ctx: ServiceWriter, key: ServiceKey<TService> & { readonly view?: never }, value: NoInfer<TService>): void {
+export function provideService<TService>(
+  ctx: ServiceWriter,
+  key: ServiceKey<TService> & { readonly view?: never },
+  value: NoInfer<TService>,
+): void {
   ctx.provide?.(key.id, value);
 }
 

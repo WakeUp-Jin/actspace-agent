@@ -1,5 +1,11 @@
 import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType } from "@actspace/cordis-adapter";
-import type { SessionHeaderV1, SessionEventEnvelopeV1, SessionEventCandidateV1, SessionAccessState, SessionValidationResult } from "@actspace/session-journal";
+import type {
+  SessionHeaderV1,
+  SessionEventEnvelopeV1,
+  SessionEventCandidateV1,
+  SessionAccessState,
+  SessionValidationResult,
+} from "@actspace/session-journal";
 
 /** Opaque revision: compare only within one storage identity and session. */
 export interface SessionStorageSnapshot {
@@ -11,7 +17,11 @@ export interface SessionStorageSnapshot {
   /** Physical size of the Journal this snapshot reflects; consumers use it only to estimate retention cost. */
   readonly bytes?: number;
   /** Validation the provider already ran over exactly `events`. Valid only for the codec set whose digest matches; otherwise re-validate. */
-  readonly validated?: { readonly codecDigest: string; readonly accessState: SessionAccessState; readonly result: SessionValidationResult };
+  readonly validated?: {
+    readonly codecDigest: string;
+    readonly accessState: SessionAccessState;
+    readonly result: SessionValidationResult;
+  };
 }
 
 /** Result of `SessionStorage.refresh`: how the physical Journal relates to the base snapshot. */

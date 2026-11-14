@@ -7,16 +7,31 @@ export class SessionModeWriter {
   assertAvailable(sessionId: string): void {
     if (this.#blocked.has(sessionId)) throw new Error("AGENT_MODE_RECOVERY_REQUIRED");
   }
-  async change(session: SessionHandle, mode: RuntimeAgentMode, snapshot: (session: SessionHandle) => RuntimeSessionSnapshot, source: string): Promise<RuntimeSessionSnapshot> {
+  async change(
+    session: SessionHandle,
+    mode: RuntimeAgentMode,
+    snapshot: (session: SessionHandle) => RuntimeSessionSnapshot,
+    source: string,
+  ): Promise<RuntimeSessionSnapshot> {
     this.assertAvailable(session.header.sessionId);
     if (mode !== "chat" && mode !== "plan" && mode !== "agent") throw new Error("INVALID_AGENT_MODE");
     const before = snapshot(session);
     if ((before.agentMode ?? "agent") === mode) return before;
     if (mode !== "chat" && before.workspaceRoot === null) throw new Error("WORKSPACE_REQUIRED");
     try {
-      await session.append(coreEvent("agent/mode-set", { mode, revision: (before.agentModeRevision ?? 0) + 1, changedAt: new Date().toISOString(), source }));
+      await session.append(
+        coreEvent("agent/mode-set", {
+          mode,
+          revision: (before.agentModeRevision ?? 0) + 1,
+          changedAt: new Date().toISOString(),
+          source,
+        }),
+      );
       await session.flush();
-    } catch (error) { this.#blocked.add(session.header.sessionId); throw error; }
+    } catch (error) {
+      this.#blocked.add(session.header.sessionId);
+      throw error;
+    }
     return snapshot(session);
   }
 }

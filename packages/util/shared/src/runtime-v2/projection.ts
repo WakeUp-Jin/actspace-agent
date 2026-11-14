@@ -39,7 +39,8 @@ export type RuntimeGlobalSessionSummary = {
   readonly summaryVersion: number;
   readonly createdAt: string;
   readonly updatedAt: string;
-  readonly workspaceRoot: string | null; readonly worktree?: import("../session").SessionWorktreeContext;
+  readonly workspaceRoot: string | null;
+  readonly worktree?: import("../session").SessionWorktreeContext;
   readonly profileId: string;
   readonly agentForm: import("./runtime").MainAgentForm;
   readonly agentFormId?: import("./runtime").AgentFormId;
@@ -175,7 +176,18 @@ export type RuntimeTrajectoryNode = {
   readonly eventSeq: number;
   readonly eventType: string;
   readonly time: string;
-  readonly kind: "turn" | "step" | "request" | "user" | "assistant" | "tool" | "approval" | "retry" | "compaction" | "error" | "other";
+  readonly kind:
+    | "turn"
+    | "step"
+    | "request"
+    | "user"
+    | "assistant"
+    | "tool"
+    | "approval"
+    | "retry"
+    | "compaction"
+    | "error"
+    | "other";
   readonly state: "started" | "updated" | "completed" | "failed" | "aborted" | "observed";
   readonly callId: string | null;
   readonly data: RuntimeJsonValue;
@@ -200,14 +212,18 @@ export type RuntimeTrajectorySnapshot = {
 export function isRuntimeProjectionRevision(value: unknown): value is RuntimeProjectionRevision {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const candidate = value as Record<string, unknown>;
-  return candidate.schemaVersion === RUNTIME_PROJECTION_SCHEMA_VERSION
-    && typeof candidate.sessionId === "string"
-    && candidate.sessionId.length > 0
-    && typeof candidate.throughJournalSeq === "number"
-    && Number.isSafeInteger(candidate.throughJournalSeq)
-    && candidate.throughJournalSeq >= -1
-    && (candidate.requestId === undefined || (typeof candidate.requestId === "string" && candidate.requestId.length > 0))
-    && (candidate.runtimeInstanceId === undefined || (typeof candidate.runtimeInstanceId === "string" && candidate.runtimeInstanceId.length > 0));
+  return (
+    candidate.schemaVersion === RUNTIME_PROJECTION_SCHEMA_VERSION &&
+    typeof candidate.sessionId === "string" &&
+    candidate.sessionId.length > 0 &&
+    typeof candidate.throughJournalSeq === "number" &&
+    Number.isSafeInteger(candidate.throughJournalSeq) &&
+    candidate.throughJournalSeq >= -1 &&
+    (candidate.requestId === undefined ||
+      (typeof candidate.requestId === "string" && candidate.requestId.length > 0)) &&
+    (candidate.runtimeInstanceId === undefined ||
+      (typeof candidate.runtimeInstanceId === "string" && candidate.runtimeInstanceId.length > 0))
+  );
 }
 
 export function isRuntimeProjectionKey(value: unknown): value is RuntimeProjectionKey {
@@ -215,7 +231,14 @@ export function isRuntimeProjectionKey(value: unknown): value is RuntimeProjecti
 }
 
 export type RuntimeToolProjectionState = "running" | "completed" | "failed" | "denied" | "aborted";
-export type RuntimeToolRunningPhase = "validating" | "policy" | "awaiting-approval" | "queued" | "executing" | "finalizing" | "committing";
+export type RuntimeToolRunningPhase =
+  | "validating"
+  | "policy"
+  | "awaiting-approval"
+  | "queued"
+  | "executing"
+  | "finalizing"
+  | "committing";
 
 export type RuntimeToolArgsField = {
   readonly name: string;
@@ -361,7 +384,8 @@ export type RuntimeSessionSnapshot = {
   readonly sessionId: string;
   readonly createdAt: string;
   readonly updatedAt: string;
-  readonly workspaceRoot: string | null; readonly worktree?: import("../session").SessionWorktreeContext;
+  readonly workspaceRoot: string | null;
+  readonly worktree?: import("../session").SessionWorktreeContext;
   readonly agentForm: import("./runtime").MainAgentForm;
   readonly agentFormId?: import("./runtime").AgentFormId;
   readonly agentMode?: import("./runtime").RuntimeAgentMode;
@@ -373,7 +397,11 @@ export type RuntimeSessionSnapshot = {
   readonly metadata: RuntimeSessionMetadata;
   readonly messages: readonly RuntimeSessionMessage[];
   readonly tools: readonly RuntimeToolView[];
-  readonly pendingInbox: readonly { readonly messageId: string; readonly target: "next-step" | "next-turn"; readonly source?: import("./subagents").InboxSourceId }[];
+  readonly pendingInbox: readonly {
+    readonly messageId: string;
+    readonly target: "next-step" | "next-turn";
+    readonly source?: import("./subagents").InboxSourceId;
+  }[];
   readonly todos: readonly RuntimeTodoItem[];
   readonly delegations: readonly RuntimeDelegationView[];
   readonly usage: RuntimeUsageSummary;
@@ -382,7 +410,14 @@ export type RuntimeSessionSnapshot = {
 };
 
 export type RuntimeLiveEvent = {
-  readonly kind: "assistant-delta" | "reasoning-delta" | "tool-progress" | "run-state" | "runtime-live" | "resync-required" | "journal-update";
+  readonly kind:
+    | "assistant-delta"
+    | "reasoning-delta"
+    | "tool-progress"
+    | "run-state"
+    | "runtime-live"
+    | "resync-required"
+    | "journal-update";
   readonly update?: RuntimeSessionUpdate;
   readonly schemaVersion: 1;
   readonly runtimeInstanceId: string;
@@ -403,7 +438,15 @@ export type RuntimeLiveEvent = {
 };
 
 export type RuntimeDiagnosticSeverity = "info" | "warning" | "error" | "fatal";
-export type RuntimeDiagnosticSource = "boot" | "composition" | "cordis" | "session" | "llm" | "tool" | "host" | "projection";
+export type RuntimeDiagnosticSource =
+  | "boot"
+  | "composition"
+  | "cordis"
+  | "session"
+  | "llm"
+  | "tool"
+  | "host"
+  | "projection";
 
 export type RuntimeDiagnostic = {
   readonly kind: "runtime-diagnostic";

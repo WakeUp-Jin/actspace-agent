@@ -4,7 +4,10 @@ import { SessionSearch } from "../components/sidebar/SessionSearch";
 import { overrideBridge } from "./helpers/bridge";
 
 it("queries history beyond loaded sidebar items and replaces each bounded result page", async () => {
-  const listPage = vi.fn().mockResolvedValueOnce({ items: [{ id: "first", title: "Old session" }], groups: [], nextCursor: "first" }).mockResolvedValueOnce({ items: [{ id: "second", title: "Another old session" }], groups: [] });
+  const listPage = vi
+    .fn()
+    .mockResolvedValueOnce({ items: [{ id: "first", title: "Old session" }], groups: [], nextCursor: "first" })
+    .mockResolvedValueOnce({ items: [{ id: "second", title: "Another old session" }], groups: [] });
   overrideBridge({ "sessions.listPage": listPage });
   const select = vi.fn();
   render(<SessionSearch onSelect={select} />);
@@ -21,12 +24,17 @@ it("queries history beyond loaded sidebar items and replaces each bounded result
   await waitFor(() => expect(screen.queryByLabelText("搜索会话标题和片段")).not.toBeInTheDocument());
 });
 
-
 it("shows Session fallback status while keeping results usable", async () => {
-  overrideBridge({ "sessions.listPage": vi.fn().mockResolvedValue({items:[{id:"fallback",title:"Recovered title"}],groups:[],readModel:{source:"session",status:"fallback"}}) });
+  overrideBridge({
+    "sessions.listPage": vi.fn().mockResolvedValue({
+      items: [{ id: "fallback", title: "Recovered title" }],
+      groups: [],
+      readModel: { source: "session", status: "fallback" },
+    }),
+  });
   render(<SessionSearch onSelect={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button", { name:"搜索本机会话" }));
-  fireEvent.change(screen.getByLabelText("搜索会话标题和片段"), {target:{value:"recovered"}});
-  await screen.findByRole("button", {name:"Recovered title"});
+  fireEvent.click(screen.getByRole("button", { name: "搜索本机会话" }));
+  fireEvent.change(screen.getByLabelText("搜索会话标题和片段"), { target: { value: "recovered" } });
+  await screen.findByRole("button", { name: "Recovered title" });
   expect(screen.getByText("查询索引暂不可用，已从会话文件读取")).toBeInTheDocument();
 });

@@ -24,7 +24,10 @@ export function withFileIcon(children: ReactNode): ReactNode {
   const lead = String.fromCodePoint(first.codePointAt(0)!);
   return (
     <>
-      <span className="md-path-lead">{icon}{lead}</span>
+      <span className="md-path-lead">
+        {icon}
+        {lead}
+      </span>
       {first.slice(lead.length)}
       {list.slice(1)}
     </>

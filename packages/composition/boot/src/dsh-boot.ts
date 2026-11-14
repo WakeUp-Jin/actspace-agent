@@ -2,7 +2,13 @@ import { isAbsolute } from "node:path";
 import { readFile } from "node:fs/promises";
 import type { JsonValue } from "@actspace/cordis-adapter";
 import type { ResolvedComposition } from "@actspace/composition";
-import { createCordisRoot, mountCordisConfig, type CordisContext, type CordisLifecycleProbe, type CordisRootHandle } from "@actspace/cordis-adapter";
+import {
+  createCordisRoot,
+  mountCordisConfig,
+  type CordisContext,
+  type CordisLifecycleProbe,
+  type CordisRootHandle,
+} from "@actspace/cordis-adapter";
 
 export type DshCordisBootOptions = {
   readonly configPath: string;
@@ -31,14 +37,17 @@ export type DshCordisBoot = {
  */
 export async function bootDshCordis(options: DshCordisBootOptions): Promise<DshCordisBoot> {
   const binName = options.binName ?? "actspace";
-  if (!isAbsolute(options.configPath)) throw new Error(`${binName}: Cordis config path must be absolute: ${options.configPath}`);
+  if (!isAbsolute(options.configPath))
+    throw new Error(`${binName}: Cordis config path must be absolute: ${options.configPath}`);
   const root = await (options.createRoot ?? createCordisRoot)();
   try {
-    if (options.composition !== undefined) await assertLoaderTransport(options.configPath, options.composition.loaderConfig);
+    if (options.composition !== undefined)
+      await assertLoaderTransport(options.configPath, options.composition.loaderConfig);
     await options.prepare?.(root.context);
     await mountCordisConfig(root, options.configPath, "include", options.transportPatches);
     const settlement = await root.awaitSettlement();
-    if (!settlement.settled) throw new Error(`${binName}: Cordis settlement pending: ${settlement.pendingServices.join(", ")}`);
+    if (!settlement.settled)
+      throw new Error(`${binName}: Cordis settlement pending: ${settlement.pendingServices.join(", ")}`);
     const missing = (options.requiredServices ?? []).filter((serviceId) => root.getService(serviceId) === undefined);
     if (missing.length > 0) throw new Error(`${binName}: required Cordis services are missing: ${missing.join(", ")}`);
     return Object.freeze({
@@ -56,13 +65,28 @@ export async function bootDshCordis(options: DshCordisBootOptions): Promise<DshC
 
 /** Fail closed when the checked-in Include transport diverges from Composer. */
 export async function assertLoaderTransport(configPath: string, loaderConfig: JsonValue | undefined): Promise<void> {
-  if (loaderConfig === undefined || loaderConfig === null || typeof loaderConfig !== "object" || Array.isArray(loaderConfig)) return;
+  if (
+    loaderConfig === undefined ||
+    loaderConfig === null ||
+    typeof loaderConfig !== "object" ||
+    Array.isArray(loaderConfig)
+  )
+    return;
   const expected = (loaderConfig as Record<string, JsonValue>).entries;
   if (!Array.isArray(expected)) return;
   // A generic Composer instance may only carry `{ id, config }` entries. The
   // file-backed DSH transport check applies when the resolved loader facts
   // explicitly carry the transport's `name` field.
-  if (!expected.some((entry) => entry !== null && typeof entry === "object" && !Array.isArray(entry) && typeof (entry as Record<string, JsonValue>).name === "string")) return;
+  if (
+    !expected.some(
+      (entry) =>
+        entry !== null &&
+        typeof entry === "object" &&
+        !Array.isArray(entry) &&
+        typeof (entry as Record<string, JsonValue>).name === "string",
+    )
+  )
+    return;
   const content = await readFile(configPath, "utf8");
   const actual: Array<{ id: string; name: string; inject: string[] }> = [];
   let current: { id?: string; name?: string; inject: string[] } | undefined;
@@ -70,24 +94,40 @@ export async function assertLoaderTransport(configPath: string, loaderConfig: Js
     const line = rawLine.replace(/#.*/u, "").trim();
     const id = line.match(/^-\s+id:\s*["']?([^"']+?)["']?$/u)?.[1];
     if (id !== undefined) {
-      if (current?.id !== undefined && current.name !== undefined) actual.push({ id: current.id, name: current.name, inject: current.inject });
+      if (current?.id !== undefined && current.name !== undefined)
+        actual.push({ id: current.id, name: current.name, inject: current.inject });
       current = { id, inject: [] };
       continue;
     }
     if (current === undefined) continue;
     const name = line.match(/^name:\s*["']?([^"']+?)["']?$/u)?.[1];
-    if (name !== undefined) { current.name = name; continue; }
+    if (name !== undefined) {
+      current.name = name;
+      continue;
+    }
     const inject = line.match(/^inject:\s*\[([^\]]*)\]$/u)?.[1];
-    if (inject !== undefined) current.inject = inject.split(",").map((value) => value.trim().replace(/^["']|["']$/gu, "")).filter(Boolean);
+    if (inject !== undefined)
+      current.inject = inject
+        .split(",")
+        .map((value) => value.trim().replace(/^["']|["']$/gu, ""))
+        .filter(Boolean);
   }
-  if (current?.id !== undefined && current.name !== undefined) actual.push({ id: current.id, name: current.name, inject: current.inject });
+  if (current?.id !== undefined && current.name !== undefined)
+    actual.push({ id: current.id, name: current.name, inject: current.inject });
   const normalize = (value: JsonValue): unknown => value;
   const expectedRows = expected.map((entry) => {
-    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) throw new Error("Composer loaderConfig entries must be objects.");
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry))
+      throw new Error("Composer loaderConfig entries must be objects.");
     const row = entry as Record<string, JsonValue>;
-    return { id: String(row.id ?? ""), name: String(row.name ?? ""), inject: Array.isArray(row.inject) ? row.inject.map(String) : [] };
+    return {
+      id: String(row.id ?? ""),
+      name: String(row.name ?? ""),
+      inject: Array.isArray(row.inject) ? row.inject.map(String) : [],
+    };
   });
   if (JSON.stringify(normalize(expectedRows as unknown as JsonValue)) !== JSON.stringify(actual)) {
-    throw new Error(`Cordis transport config diverges from ResolvedComposition (expected ${expectedRows.length} entries, found ${actual.length}).`);
+    throw new Error(
+      `Cordis transport config diverges from ResolvedComposition (expected ${expectedRows.length} entries, found ${actual.length}).`,
+    );
   }
 }

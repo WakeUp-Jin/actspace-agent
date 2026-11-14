@@ -68,9 +68,17 @@ export function parseUnifiedDiff(diff: string): DiffHunk[] {
     // hunk 行数用完后，后面的 "--- a/" 之类按文件头处理，不当成删除行。
     if (!current || (remainingOld <= 0 && remainingNew <= 0)) continue;
     const sign = line[0];
-    if (sign === "+") { current.lines.push(line); remainingNew -= 1; }
-    else if (sign === "-") { current.lines.push(line); remainingOld -= 1; }
-    else if (sign === " " || line === "") { current.lines.push(line === "" ? " " : line); remainingOld -= 1; remainingNew -= 1; }
+    if (sign === "+") {
+      current.lines.push(line);
+      remainingNew -= 1;
+    } else if (sign === "-") {
+      current.lines.push(line);
+      remainingOld -= 1;
+    } else if (sign === " " || line === "") {
+      current.lines.push(line === "" ? " " : line);
+      remainingOld -= 1;
+      remainingNew -= 1;
+    }
   }
   return hunks;
 }
@@ -115,12 +123,14 @@ export function collectTurnChanges(messages: readonly MessageBlock[]): TurnChang
         deletions: (existing?.deletions ?? 0) + (created ? 0 : message.deletions),
         created: existing ? existing.created : created !== null,
         deleted: false,
-        hunks: [...existing?.hunks ?? [], ...created ?? parsed],
+        hunks: [...(existing?.hunks ?? []), ...(created ?? parsed)],
       });
       continue;
     }
     if (message.kind === "delete" && message.status === "completed") {
-      const path = relativeKey(message.outputRelativePath) ?? (message.outputPath ? undefined : legacyDeletedPath(files, message.filePath));
+      const path =
+        relativeKey(message.outputRelativePath) ??
+        (message.outputPath ? undefined : legacyDeletedPath(files, message.filePath));
       if (!path) continue;
       const existing = files.get(path);
       if (existing?.created) {

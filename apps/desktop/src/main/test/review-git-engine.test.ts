@@ -59,7 +59,9 @@ describe("ReviewGitEngine", () => {
 
     expect(snapshot.status).toBe("notAvailable");
     expect(snapshot.files).toEqual([]);
-    expect(snapshot.warnings).toContainEqual(expect.objectContaining({ kind: "unsupported", message: "当前目录不是 Git 仓库。" }));
+    expect(snapshot.warnings).toContainEqual(
+      expect.objectContaining({ kind: "unsupported", message: "当前目录不是 Git 仓库。" }),
+    );
   });
 
   it("reports a missing workspace folder instead of claiming Git is unavailable", async () => {
@@ -94,11 +96,23 @@ describe("ReviewGitEngine", () => {
     await writeFile(join(root, "untracked.txt"), "untracked\n", "utf8");
 
     const engine = new ReviewGitEngine();
-    const uncommitted = await engine.getSnapshot({ ...workspace(root), selection: { kind: "uncommitted" }, generation: 1 });
+    const uncommitted = await engine.getSnapshot({
+      ...workspace(root),
+      selection: { kind: "uncommitted" },
+      generation: 1,
+    });
     const staged = await engine.getSnapshot({ ...workspace(root), selection: { kind: "staged" }, generation: 1 });
     const unstaged = await engine.getSnapshot({ ...workspace(root), selection: { kind: "unstaged" }, generation: 1 });
-    const commit = await engine.getSnapshot({ ...workspace(root), selection: { kind: "commit", sha: branchCommit }, generation: 1 });
-    const branch = await engine.getSnapshot({ ...workspace(root), selection: { kind: "branch", branch: "feature" }, generation: 1 });
+    const commit = await engine.getSnapshot({
+      ...workspace(root),
+      selection: { kind: "commit", sha: branchCommit },
+      generation: 1,
+    });
+    const branch = await engine.getSnapshot({
+      ...workspace(root),
+      selection: { kind: "branch", branch: "feature" },
+      generation: 1,
+    });
 
     expect(uncommitted.files.map((file) => file.path).sort()).toEqual(["staged.txt", "unstaged.txt", "untracked.txt"]);
     expect(staged.files.map((file) => file.path)).toEqual(["staged.txt"]);
@@ -106,7 +120,13 @@ describe("ReviewGitEngine", () => {
     expect(commit.files.map((file) => file.path)).toEqual(["branch.txt"]);
     expect(branch.files.map((file) => file.path)).toEqual(["branch.txt"]);
     expect(branch.comparison).toEqual({ from: "feature", to: "origin/main" });
-    await expect(engine.listBranches(workspace(root))).resolves.toContainEqual({ branch: "feature", upstream: "origin/main", current: true, ahead: 1, behind: 0 });
+    await expect(engine.listBranches(workspace(root))).resolves.toContainEqual({
+      branch: "feature",
+      upstream: "origin/main",
+      current: true,
+      ahead: 1,
+      behind: 0,
+    });
   });
 
   it("reviews an untracked file whose name merely starts with two dots", async () => {
@@ -117,12 +137,25 @@ describe("ReviewGitEngine", () => {
     await writeFile(join(root, "..notes.md"), "one\ntwo\n", "utf8");
 
     const engine = new ReviewGitEngine();
-    const snapshot = await engine.getSnapshot({ ...workspace(root), selection: { kind: "uncommitted" }, generation: 1 });
+    const snapshot = await engine.getSnapshot({
+      ...workspace(root),
+      selection: { kind: "uncommitted" },
+      generation: 1,
+    });
     expect(snapshot.warnings ?? []).toEqual([]);
     expect(snapshot.files).toMatchObject([{ path: "..notes.md", status: "added", additions: 2, deletions: 0 }]);
-    const diff = await engine.getFileDiff({ ...workspace(root), snapshot, fileId: snapshot.files[0].id, generation: 1 });
+    const diff = await engine.getFileDiff({
+      ...workspace(root),
+      snapshot,
+      fileId: snapshot.files[0].id,
+      generation: 1,
+    });
     expect(diff.ok).toBe(true);
-    if (diff.ok) expect(diff.diff.hunks[0]?.lines.filter((line) => line.kind === "addition").map((line) => line.text)).toEqual(["one", "two"]);
+    if (diff.ok)
+      expect(diff.diff.hunks[0]?.lines.filter((line) => line.kind === "addition").map((line) => line.text)).toEqual([
+        "one",
+        "two",
+      ]);
   });
 
   it("keeps quoted and spaced paths and scopes a repository subdirectory", async () => {
@@ -154,7 +187,9 @@ describe("ReviewGitEngine", () => {
     });
     expect(diff.ok).toBe(true);
     if (diff.ok) {
-      expect(diff.diff.hunks[0]?.lines.some((line) => line.kind === "addition" && line.text.includes("after"))).toBe(true);
+      expect(diff.diff.hunks[0]?.lines.some((line) => line.kind === "addition" && line.text.includes("after"))).toBe(
+        true,
+      );
     }
   });
 

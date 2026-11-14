@@ -64,13 +64,15 @@ describe("session selectors", () => {
         summary: "Updated todos",
         uiPreview: {
           kind: "todo",
-          todos: [{
-            id: "todo-1",
-            content: "Implement Todo tools",
-            status,
-            createdAt: "2026-08-08T09:00:00.000Z",
-            updatedAt: "2026-08-08T09:30:00.000Z",
-          }],
+          todos: [
+            {
+              id: "todo-1",
+              content: "Implement Todo tools",
+              status,
+              createdAt: "2026-08-08T09:00:00.000Z",
+              updatedAt: "2026-08-08T09:30:00.000Z",
+            },
+          ],
           totalCount: 1,
           completedCount: status === "completed" ? 1 : 0,
           revision,
@@ -79,32 +81,53 @@ describe("session selectors", () => {
       },
     });
 
-    expect(createMessageBlocks([todo("todo-old", 1, "pending"), todo("todo-new", 2, "completed")])).toEqual([{
-      kind: "todo",
-      id: "todo-new",
-      renderKey: "turn:run-todo:todo",
-      runId: "run-todo",
-      todos: [expect.objectContaining({ id: "todo-1", status: "completed" })],
-      totalCount: 1,
-      completedCount: 1,
-      revision: 2,
-      displayText: "1 of 1 To-dos Completed",
-      status: "completed",
-      isError: false,
-      createdAt: base.timestamp,
-    }]);
+    expect(createMessageBlocks([todo("todo-old", 1, "pending"), todo("todo-new", 2, "completed")])).toEqual([
+      {
+        kind: "todo",
+        id: "todo-new",
+        renderKey: "turn:run-todo:todo",
+        runId: "run-todo",
+        todos: [expect.objectContaining({ id: "todo-1", status: "completed" })],
+        totalCount: 1,
+        completedCount: 1,
+        revision: 2,
+        displayText: "1 of 1 To-dos Completed",
+        status: "completed",
+        isError: false,
+        createdAt: base.timestamp,
+      },
+    ]);
   });
 
   it("maps a completed workspace preparation event to a worktree block", () => {
-    const blocks = createMessageBlocks([{
-      id: "prep-1",
-      sessionId: "session-1",
-      agentRunId: "turn-1",
-      type: "workspace_preparation",
-      timestamp: "2026-07-29T00:00:00.000Z",
-      schemaVersion: 2,
-      payload: {
-        kind: "worktree",
+    const blocks = createMessageBlocks([
+      {
+        id: "prep-1",
+        sessionId: "session-1",
+        agentRunId: "turn-1",
+        type: "workspace_preparation",
+        timestamp: "2026-07-29T00:00:00.000Z",
+        schemaVersion: 2,
+        payload: {
+          kind: "worktree",
+          status: "completed",
+          sourceWorkspaceRoot: "/work/source",
+          workspaceRoot: "/work/worktree",
+          baseBranch: "main",
+          branch: "actspace/92803054",
+          baseCommit: "a1b2c3d4",
+          durationMs: 240,
+          environmentSetup: "none",
+        },
+      },
+    ]);
+
+    expect(blocks).toEqual([
+      {
+        kind: "workspace_preparation",
+        id: "prep-1",
+        renderKey: "turn:turn-1:workspace-preparation:0",
+        runId: "turn-1",
         status: "completed",
         sourceWorkspaceRoot: "/work/source",
         workspaceRoot: "/work/worktree",
@@ -113,36 +136,25 @@ describe("session selectors", () => {
         baseCommit: "a1b2c3d4",
         durationMs: 240,
         environmentSetup: "none",
+        createdAt: "2026-07-29T00:00:00.000Z",
       },
-    }]);
-
-    expect(blocks).toEqual([{
-      kind: "workspace_preparation",
-      id: "prep-1",
-      renderKey: "turn:turn-1:workspace-preparation:0",
-      runId: "turn-1",
-      status: "completed",
-      sourceWorkspaceRoot: "/work/source",
-      workspaceRoot: "/work/worktree",
-      baseBranch: "main",
-      branch: "actspace/92803054",
-      baseCommit: "a1b2c3d4",
-      durationMs: 240,
-      environmentSetup: "none",
-      createdAt: "2026-07-29T00:00:00.000Z",
-    }]);
+    ]);
   });
 
   it("ignores malformed workspace preparation events", () => {
-    expect(createMessageBlocks([{
-      id: "prep-bad",
-      sessionId: "session-1",
-      agentRunId: "turn-1",
-      type: "workspace_preparation",
-      timestamp: "2026-07-29T00:00:00.000Z",
-      schemaVersion: 2,
-      payload: { kind: "worktree", status: "completed" },
-    }])).toEqual([]);
+    expect(
+      createMessageBlocks([
+        {
+          id: "prep-bad",
+          sessionId: "session-1",
+          agentRunId: "turn-1",
+          type: "workspace_preparation",
+          timestamp: "2026-07-29T00:00:00.000Z",
+          schemaVersion: 2,
+          payload: { kind: "worktree", status: "completed" },
+        },
+      ]),
+    ).toEqual([]);
   });
 
   it("accepts only SessionEvent V2 records", () => {
@@ -164,24 +176,26 @@ describe("session selectors", () => {
       path: "/tmp/session/artifacts/generated-01.png",
       mimeType: "image/png",
     };
-    const [block] = createMessageBlocks([toolResultEvent({
-      toolCallId: "toolu-image-1",
-      toolName: "generate_image",
-      ok: true,
-      summary: "Generated 1 image",
-      uiPreview: {
-        kind: "image_generation",
-        status: "completed",
-        promptPreview: "A serene koi pond",
-        requestedCount: 1,
-        generatedCount: 1,
-        model: "gpt-image-2",
-        size: "1024x1024",
-        displayText: "Generated 1 image",
-        images: [image],
-      },
-      artifacts: [image],
-    })]);
+    const [block] = createMessageBlocks([
+      toolResultEvent({
+        toolCallId: "toolu-image-1",
+        toolName: "generate_image",
+        ok: true,
+        summary: "Generated 1 image",
+        uiPreview: {
+          kind: "image_generation",
+          status: "completed",
+          promptPreview: "A serene koi pond",
+          requestedCount: 1,
+          generatedCount: 1,
+          model: "gpt-image-2",
+          size: "1024x1024",
+          displayText: "Generated 1 image",
+          images: [image],
+        },
+        artifacts: [image],
+      }),
+    ]);
 
     expect(block).toMatchObject({
       kind: "image_generation",
@@ -227,23 +241,25 @@ describe("session selectors", () => {
   });
 
   it("restores write output paths for the turn artifact shelf", () => {
-    const [block] = createMessageBlocks([toolResultEvent({
-      toolCallId: "toolu-write-1",
-      toolName: "write_file",
-      ok: true,
-      summary: "Write report.md",
-      uiPreview: {
-        kind: "write",
-        filePath: "report.md",
-        outputPath: "/workspace/docs/report.md",
-        outputRelativePath: "docs/report.md",
-        additions: 4,
-        deletions: 0,
-        diff: "",
-        collapsedLines: 0,
-        status: "completed",
-      },
-    })]);
+    const [block] = createMessageBlocks([
+      toolResultEvent({
+        toolCallId: "toolu-write-1",
+        toolName: "write_file",
+        ok: true,
+        summary: "Write report.md",
+        uiPreview: {
+          kind: "write",
+          filePath: "report.md",
+          outputPath: "/workspace/docs/report.md",
+          outputRelativePath: "docs/report.md",
+          additions: 4,
+          deletions: 0,
+          diff: "",
+          collapsedLines: 0,
+          status: "completed",
+        },
+      }),
+    ]);
 
     expect(block).toMatchObject({
       kind: "write_diff",
@@ -312,7 +328,7 @@ describe("session selectors", () => {
         id: "thinking-signature-only",
         payload: {
           content: "",
-          signature: "openai-responses-reasoning:{\"id\":\"rs_1\",\"type\":\"reasoning\"}",
+          signature: 'openai-responses-reasoning:{"id":"rs_1","type":"reasoning"}',
           api: "openai-responses",
           model: "gpt-5.6-sol",
           provider: "openrouter",
@@ -366,7 +382,12 @@ describe("session selectors", () => {
         ...base,
         id: "assistant-intermediate",
         type: "assistant_message",
-        payload: { content: "I will inspect the files.", stopReason: "toolUse", model: "model-a", provider: "provider-a" },
+        payload: {
+          content: "I will inspect the files.",
+          stopReason: "toolUse",
+          model: "model-a",
+          provider: "provider-a",
+        },
       },
       {
         ...base,
@@ -421,32 +442,92 @@ describe("session selectors", () => {
   });
 
   it("folds token buckets, routes, and cost basis into the turn usage", () => {
-    const base = { sessionId: "session-usage", agentRunId: "turn-usage", timestamp: "2026-10-15T12:00:00.000Z", schemaVersion: 2 as const };
+    const base = {
+      sessionId: "session-usage",
+      agentRunId: "turn-usage",
+      timestamp: "2026-10-15T12:00:00.000Z",
+      schemaVersion: 2 as const,
+    };
     const usage = (id: string, payload: Record<string, unknown>) => ({
       ...base,
       id,
       type: "llm_usage" as const,
-      payload: { llmCallId: id, attempt: 1, durationMs: 0, provider: "deepseek", model: "deepseek-flash", promptTokens: 0, completionTokens: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, currency: "USD" }, ...payload },
+      payload: {
+        llmCallId: id,
+        attempt: 1,
+        durationMs: 0,
+        provider: "deepseek",
+        model: "deepseek-flash",
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, currency: "USD" },
+        ...payload,
+      },
     });
     const [estimated] = createMessageBlocks([
-      usage("u1", { promptTokens: 100, completionTokens: 20, cacheHitTokens: 300, cacheMissTokens: 10, reasoningTokens: 5, totalTokens: 430, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.01, currency: "USD" }, costBasis: "estimated" }),
-      usage("u2", { provider: "default", model: "default", promptTokens: 50, completionTokens: 10, totalTokens: 60, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.02, currency: "USD" }, costBasis: "priced" }),
-      { ...base, id: "final", type: "assistant_message", payload: { content: "Done.", stopReason: "stop", model: "deepseek-flash", provider: "deepseek" } },
+      usage("u1", {
+        promptTokens: 100,
+        completionTokens: 20,
+        cacheHitTokens: 300,
+        cacheMissTokens: 10,
+        reasoningTokens: 5,
+        totalTokens: 430,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.01, currency: "USD" },
+        costBasis: "estimated",
+      }),
+      usage("u2", {
+        provider: "default",
+        model: "default",
+        promptTokens: 50,
+        completionTokens: 10,
+        totalTokens: 60,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.02, currency: "USD" },
+        costBasis: "priced",
+      }),
+      {
+        ...base,
+        id: "final",
+        type: "assistant_message",
+        payload: { content: "Done.", stopReason: "stop", model: "deepseek-flash", provider: "deepseek" },
+      },
     ]);
     expect(estimated).toMatchObject({
-      usage: { totalTokens: 490, inputTokens: 150, cacheReadTokens: 300, cacheWriteTokens: 10, outputTokens: 30, reasoningTokens: 5, routes: ["deepseek/deepseek-flash"], unpricedRequestCount: 0, costEstimated: true },
+      usage: {
+        totalTokens: 490,
+        inputTokens: 150,
+        cacheReadTokens: 300,
+        cacheWriteTokens: 10,
+        outputTokens: 30,
+        reasoningTokens: 5,
+        routes: ["deepseek/deepseek-flash"],
+        unpricedRequestCount: 0,
+        costEstimated: true,
+      },
     });
     expect((estimated as { usage: { costUsd: number } }).usage.costUsd).toBeCloseTo(0.03);
 
     const [partial] = createMessageBlocks([
       usage("u1", { promptTokens: 100, totalTokens: 100, costBasis: "unavailable" }),
-      { ...base, id: "final", type: "assistant_message", payload: { content: "Done.", stopReason: "stop", model: "m", provider: "p" } },
+      {
+        ...base,
+        id: "final",
+        type: "assistant_message",
+        payload: { content: "Done.", stopReason: "stop", model: "m", provider: "p" },
+      },
     ]);
-    expect(partial).toMatchObject({ usage: { totalTokens: 100, costUsd: 0, unpricedRequestCount: 1, costEstimated: false } });
+    expect(partial).toMatchObject({
+      usage: { totalTokens: 100, costUsd: 0, unpricedRequestCount: 1, costEstimated: false },
+    });
   });
 
   it("stamps every block with its event's runId, and sourceSeq only when the event has one", () => {
-    const base = { sessionId: "session-identity", agentRunId: "run-identity", timestamp: "2026-10-06T00:00:00.000Z", schemaVersion: 2 as const };
+    const base = {
+      sessionId: "session-identity",
+      agentRunId: "run-identity",
+      timestamp: "2026-10-06T00:00:00.000Z",
+      schemaVersion: 2 as const,
+    };
     const blocks = createMessageBlocks([
       { ...base, id: "user-1", type: "user_message", sourceSeq: 7, payload: { content: "question" } },
       { ...base, id: "assistant-1", type: "assistant_message", payload: { content: "answer" } },
@@ -461,39 +542,51 @@ describe("session selectors", () => {
   });
 
   it("restores an aborted turn as a persisted Stopped status", () => {
-    const blocks = createMessageBlocks([{
-      id: "evt-aborted",
-      sessionId: "session-aborted",
-      agentRunId: "turn-aborted",
-      type: "agent_run_aborted",
-      timestamp: "2026-07-17T07:00:00.000Z",
-      schemaVersion: 2,
-      payload: { reason: "user" },
-    }]);
+    const blocks = createMessageBlocks([
+      {
+        id: "evt-aborted",
+        sessionId: "session-aborted",
+        agentRunId: "turn-aborted",
+        type: "agent_run_aborted",
+        timestamp: "2026-07-17T07:00:00.000Z",
+        schemaVersion: 2,
+        payload: { reason: "user" },
+      },
+    ]);
 
-    expect(blocks).toEqual([{
-      kind: "status",
-      id: "evt-aborted",
-      renderKey: "turn:turn-aborted:status:0",
-      runId: "turn-aborted",
-      content: "Stopped",
-      createdAt: "2026-07-17T07:00:00.000Z",
-      tone: "muted",
-    }]);
+    expect(blocks).toEqual([
+      {
+        kind: "status",
+        id: "evt-aborted",
+        renderKey: "turn:turn-aborted:status:0",
+        runId: "turn-aborted",
+        content: "Stopped",
+        createdAt: "2026-07-17T07:00:00.000Z",
+        tone: "muted",
+      },
+    ]);
   });
 
   it("restores a step-limit notice as a muted status, not an error", () => {
-    const blocks = createMessageBlocks([{
-      id: "evt-limit",
-      sessionId: "session-limit",
-      agentRunId: "turn-limit",
-      type: "agent_run_notice",
-      timestamp: "2026-10-31T07:00:00.000Z",
-      schemaVersion: 2,
-      payload: { message: "本轮达到 1000 步上限，已停止。发送「继续」可以接着做。" },
-    }]);
+    const blocks = createMessageBlocks([
+      {
+        id: "evt-limit",
+        sessionId: "session-limit",
+        agentRunId: "turn-limit",
+        type: "agent_run_notice",
+        timestamp: "2026-10-31T07:00:00.000Z",
+        schemaVersion: 2,
+        payload: { message: "本轮达到 1000 步上限，已停止。发送「继续」可以接着做。" },
+      },
+    ]);
 
-    expect(blocks).toEqual([expect.objectContaining({ kind: "status", content: "本轮达到 1000 步上限，已停止。发送「继续」可以接着做。", tone: "muted" })]);
+    expect(blocks).toEqual([
+      expect.objectContaining({
+        kind: "status",
+        content: "本轮达到 1000 步上限，已停止。发送「继续」可以接着做。",
+        tone: "muted",
+      }),
+    ]);
   });
 
   it("restores a completed delete_file result as a delete message block", () => {
@@ -534,7 +627,14 @@ describe("session selectors", () => {
   });
 
   it("restores a completed present result as a present message block", () => {
-    const files = [{ path: "report.docx", outputPath: "/workspace/report.docx", outputRelativePath: "report.docx", description: "Quarterly report" }];
+    const files = [
+      {
+        path: "report.docx",
+        outputPath: "/workspace/report.docx",
+        outputRelativePath: "report.docx",
+        description: "Quarterly report",
+      },
+    ];
     const blocks = createMessageBlocks([
       toolResultEvent({
         toolName: "present",
@@ -547,7 +647,15 @@ describe("session selectors", () => {
     ]);
 
     expect(blocks).toMatchObject([
-      { kind: "present", id: "evt-present", runId: "turn-delete", files, displayText: "Presented 1 file", status: "completed", isError: false },
+      {
+        kind: "present",
+        id: "evt-present",
+        runId: "turn-delete",
+        files,
+        displayText: "Presented 1 file",
+        status: "completed",
+        isError: false,
+      },
     ]);
   });
 
@@ -583,10 +691,7 @@ describe("session selectors", () => {
 
     expect(blocks.map((block) => block.kind)).toEqual(["delete", "delete"]);
     expect(blocks.map((block) => block.status)).toEqual(["failed", "denied"]);
-    expect(blocks.map((block) => block.displayText)).toEqual([
-      "Delete missing.md failed",
-      "Denied delete notes.md",
-    ]);
+    expect(blocks.map((block) => block.displayText)).toEqual(["Delete missing.md failed", "Denied delete notes.md"]);
   });
 
   it("preserves write_file streaming content when restoring preview blocks", () => {
@@ -830,36 +935,95 @@ describe("session selectors", () => {
   });
 
   it("renders subagent notices and agent messages like task notices, never as user bubbles", () => {
-    const notice = (id: string, source: string, content: string, backgroundNotice?: { taskId: string; taskKind: "subagent" | "agent_message"; title: string; status: string }) => ({
-      id, sessionId: "session-1", agentRunId: "turn-2", type: "user_message" as const, timestamp: "2026-11-04T12:00:00.000Z", schemaVersion: 2 as const,
+    const notice = (
+      id: string,
+      source: string,
+      content: string,
+      backgroundNotice?: { taskId: string; taskKind: "subagent" | "agent_message"; title: string; status: string },
+    ) => ({
+      id,
+      sessionId: "session-1",
+      agentRunId: "turn-2",
+      type: "user_message" as const,
+      timestamp: "2026-11-04T12:00:00.000Z",
+      schemaVersion: 2 as const,
       payload: { content, source, ...(backgroundNotice ? { backgroundNotice } : {}) },
     });
     const blocks = createMessageBlocks([
-      notice("evt-done", "subagent_notification", "<subagent_notification>\n<agent_id>child-1</agent_id>\n</subagent_notification>", { taskId: "child-1", taskKind: "subagent", title: "复核提交顺序", status: "completed" }),
-      notice("evt-message", "agent_message", '<agent_message from="child-1" relation="child">\n只改一处\n</agent_message>', { taskId: "child-1", taskKind: "agent_message", title: "复核提交顺序", status: "message" }),
+      notice(
+        "evt-done",
+        "subagent_notification",
+        "<subagent_notification>\n<agent_id>child-1</agent_id>\n</subagent_notification>",
+        { taskId: "child-1", taskKind: "subagent", title: "复核提交顺序", status: "completed" },
+      ),
+      notice(
+        "evt-message",
+        "agent_message",
+        '<agent_message from="child-1" relation="child">\n只改一处\n</agent_message>',
+        { taskId: "child-1", taskKind: "agent_message", title: "复核提交顺序", status: "message" },
+      ),
       // 回合进行中领取的（没有开启唤醒的那一条）不渲染。
-      notice("evt-mid-turn", "agent_message", '<agent_message from="child-1" relation="child">\n进度\n</agent_message>'),
+      notice(
+        "evt-mid-turn",
+        "agent_message",
+        '<agent_message from="child-1" relation="child">\n进度\n</agent_message>',
+      ),
     ]);
     expect(blocks).toMatchObject([
-      { kind: "background_notice", taskId: "child-1", taskKind: "subagent", title: "复核提交顺序", status: "completed" },
+      {
+        kind: "background_notice",
+        taskId: "child-1",
+        taskKind: "subagent",
+        title: "复核提交顺序",
+        status: "completed",
+      },
       { kind: "background_notice", taskId: "child-1", taskKind: "agent_message", status: "message" },
     ]);
     expect(blocks).toHaveLength(2);
   });
 
   it("carries file references and quoted replies onto user blocks only when present", () => {
-    const excerpt = { annotationId: "ann", assistantMessageId: "v2-1", selectedText: "x", startOffset: 0, endOffset: 1, prefixContext: "", suffixContext: "" };
+    const excerpt = {
+      annotationId: "ann",
+      assistantMessageId: "v2-1",
+      selectedText: "x",
+      startOffset: 0,
+      endOffset: 1,
+      prefixContext: "",
+      suffixContext: "",
+    };
     const blocks = createMessageBlocks([
-      { id: "evt-plain", sessionId: "session-1", agentRunId: "turn-1", type: "user_message", timestamp: "2026-07-03T12:00:00.000Z", schemaVersion: 2, payload: { content: "plain" } },
-      { id: "evt-refs", sessionId: "session-1", agentRunId: "turn-2", type: "user_message", timestamp: "2026-07-03T12:00:01.000Z", schemaVersion: 2, payload: {
-        content: "with refs",
-        fileReferences: [{ relativePath: "src/a.ts", displayName: "a.ts" }],
-        responseAnnotations: [excerpt],
-      } },
+      {
+        id: "evt-plain",
+        sessionId: "session-1",
+        agentRunId: "turn-1",
+        type: "user_message",
+        timestamp: "2026-07-03T12:00:00.000Z",
+        schemaVersion: 2,
+        payload: { content: "plain" },
+      },
+      {
+        id: "evt-refs",
+        sessionId: "session-1",
+        agentRunId: "turn-2",
+        type: "user_message",
+        timestamp: "2026-07-03T12:00:01.000Z",
+        schemaVersion: 2,
+        payload: {
+          content: "with refs",
+          fileReferences: [{ relativePath: "src/a.ts", displayName: "a.ts" }],
+          responseAnnotations: [excerpt],
+        },
+      },
     ]);
     expect(blocks[0]).not.toHaveProperty("fileReferences");
     expect(blocks[0]).not.toHaveProperty("responseAnnotations");
-    expect(blocks[1]).toMatchObject({ kind: "user", content: "with refs", fileReferences: [{ relativePath: "src/a.ts", displayName: "a.ts" }], responseAnnotations: [excerpt] });
+    expect(blocks[1]).toMatchObject({
+      kind: "user",
+      content: "with refs",
+      fileReferences: [{ relativePath: "src/a.ts", displayName: "a.ts" }],
+      responseAnnotations: [excerpt],
+    });
   });
 
   it("restores a running Agent tool block with recent transcript summaries", () => {
@@ -889,5 +1053,4 @@ describe("session selectors", () => {
       recentEvents: preview.recentEvents,
     });
   });
-
 });

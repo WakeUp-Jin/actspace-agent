@@ -43,7 +43,10 @@ describe("T5 标签栏与对话", () => {
 
   it("协调 Agent 标签固定在最左且没有关闭按钮；关闭按钮只关对应标签", async () => {
     render(<Workbench />);
-    act(() => { actions.openActorTab("perf"); actions.openActorTab("be"); });
+    act(() => {
+      actions.openActorTab("perf");
+      actions.openActorTab("be");
+    });
     expect(screen.getAllByRole("tab")).toHaveLength(3);
     expect(screen.getAllByRole("tab")[0]).toHaveTextContent("支付链路提速");
     expect(screen.queryByRole("button", { name: "关闭 支付链路提速" })).toBeNull();
@@ -63,7 +66,11 @@ describe("T5 标签栏与对话", () => {
     const client = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(200);
     try {
       render(<Workbench />);
-      act(() => { actions.openActorTab("perf"); actions.openActorTab("be"); actions.openActorTab("fe"); });
+      act(() => {
+        actions.openActorTab("perf");
+        actions.openActorTab("be");
+        actions.openActorTab("fe");
+      });
       await userEvent.click(screen.getByRole("button", { name: "全部标签" }));
       expect(screen.getByRole("menuitem", { name: "关闭其他标签" })).toBeInTheDocument();
       await userEvent.click(screen.getByRole("menuitem", { name: "关闭其他标签" }));
@@ -127,7 +134,9 @@ describe("T5 标签栏与对话", () => {
     await userEvent.click(screen.getByRole("button", { name: "留下" }));
     expect(card()).toHaveAttribute("data-keep-state", "growing");
     expect(card().querySelectorAll(".space-spark")).toHaveLength(8);
-    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
     expect(card()).toHaveAttribute("data-keep-state", "kept");
     expect(card()).toHaveTextContent("现在在名册里，以后可以直接找它。");
     await userEvent.click(within(card()).getByRole("button", { name: "去名册" }));
@@ -165,7 +174,9 @@ describe("T9 弹窗、提示与演示说明", () => {
     const [open, setOpen] = useState(false);
     return (
       <>
-        <button type="button" onClick={() => setOpen(true)}>+</button>
+        <button type="button" onClick={() => setOpen(true)}>
+          +
+        </button>
         <NewSpaceDialog open={open} onOpenChange={setOpen} onCreated={onCreated} />
       </>
     );
@@ -213,7 +224,10 @@ describe("T9 弹窗、提示与演示说明", () => {
   it("演示提示条常驻，点「重置演示」回到初始数据", async () => {
     render(<Workbench />);
     expect(screen.getByRole("note")).toHaveTextContent("开发中演示 · 数据是模拟的，操作不会真正执行");
-    act(() => { actions.openActorTab("be"); actions.switchSpace("sp2"); });
+    act(() => {
+      actions.openActorTab("be");
+      actions.switchSpace("sp2");
+    });
     expect(spaceDemoStore.getSnapshot().spaceId).toBe("sp2");
     await userEvent.click(screen.getByRole("button", { name: "重置演示" }));
     const state = spaceDemoStore.getSnapshot();
@@ -228,7 +242,9 @@ describe("T9 弹窗、提示与演示说明", () => {
     expect(screen.queryByRole("status")).toBeNull();
     act(() => actions.showNotice("已忘记"));
     expect(screen.getByRole("status")).toHaveTextContent("已忘记");
-    act(() => { vi.advanceTimersByTime(2300); });
+    act(() => {
+      vi.advanceTimersByTime(2300);
+    });
     expect(screen.queryByRole("status")).toBeNull();
   });
 });

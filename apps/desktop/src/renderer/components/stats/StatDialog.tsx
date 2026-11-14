@@ -29,7 +29,9 @@ export function StatDialogBody({ icon: Icon, dialog }: { icon: LucideIcon; dialo
           <Icon className="shrink-0 self-center" size={14} aria-hidden="true" />
           {dialog.title}
         </span>
-        {dialog.titleValue ? <span className="font-semibold text-text-main tabular-nums">{dialog.titleValue}</span> : null}
+        {dialog.titleValue ? (
+          <span className="font-semibold text-text-main tabular-nums">{dialog.titleValue}</span>
+        ) : null}
       </div>
       <div className="mt-2 mb-2.5 h-px bg-line" aria-hidden="true" />
       <dl className="m-0 grid grid-cols-[minmax(76px,auto)_minmax(0,1fr)] gap-x-4 gap-y-1.5">

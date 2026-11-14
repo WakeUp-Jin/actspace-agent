@@ -35,18 +35,35 @@ export function ContextTrend({ points }: { points: readonly ContextPanelTrendPoi
       <div className="px-3 pb-3 pt-2">
         <p className="m-0 truncate pb-1.5 text-act-xxs tabular-nums text-text-muted" aria-live="polite">
           第 {active.turnIndex} 轮 · 步 {active.stepIndex} · {formatApproxTokens(active.estimatedTokens)}
-          {active.actual ? ` · 实际输入 ${formatTokenCount(active.actual.inputTokens + active.actual.cacheReadTokens + active.actual.cacheWriteTokens)}` : ""}
+          {active.actual
+            ? ` · 实际输入 ${formatTokenCount(active.actual.inputTokens + active.actual.cacheReadTokens + active.actual.cacheWriteTokens)}`
+            : ""}
         </p>
         <div ref={scrollRef} className="overflow-x-auto" onMouseLeave={() => setHovered(null)}>
-          <div className="flex h-[92px] items-end gap-[3px] border-b border-line" style={{ minWidth: `${columns.length * COLUMN_PITCH_PX}px` }}>
+          <div
+            className="flex h-[92px] items-end gap-[3px] border-b border-line"
+            style={{ minWidth: `${columns.length * COLUMN_PITCH_PX}px` }}
+          >
             {columns.map((column, index) => (
               <div key={column.point.requestId} className="flex h-full min-w-0 flex-1 items-end gap-[3px]">
-                {column.compactedBefore ? <span aria-hidden="true" className="h-full shrink-0 border-l border-dashed border-danger" /> : null}
-                <div data-trend-column={index} onMouseEnter={() => setHovered(index)}
-                  className={cn("flex min-w-0 flex-1 flex-col-reverse overflow-hidden rounded-t-xs", hovered === index && "outline outline-1 outline-line-strong")}
-                  style={{ height: `${Math.max(1, column.height * 100)}%` }}>
+                {column.compactedBefore ? (
+                  <span aria-hidden="true" className="h-full shrink-0 border-l border-dashed border-danger" />
+                ) : null}
+                <div
+                  data-trend-column={index}
+                  onMouseEnter={() => setHovered(index)}
+                  className={cn(
+                    "flex min-w-0 flex-1 flex-col-reverse overflow-hidden rounded-t-xs",
+                    hovered === index && "outline outline-1 outline-line-strong",
+                  )}
+                  style={{ height: `${Math.max(1, column.height * 100)}%` }}
+                >
                   {column.segments.map((segment) => (
-                    <i key={segment.key} className="block shrink-0" style={{ height: `${segment.share * 100}%`, background: colorOf(segment.colorVar) }} />
+                    <i
+                      key={segment.key}
+                      className="block shrink-0"
+                      style={{ height: `${segment.share * 100}%`, background: colorOf(segment.colorVar) }}
+                    />
                   ))}
                 </div>
               </div>
@@ -55,7 +72,12 @@ export function ContextTrend({ points }: { points: readonly ContextPanelTrendPoi
         </div>
         <div className="mt-[3px] flex justify-between gap-2 text-act-xxs tabular-nums text-text-faint">
           <span>#1</span>
-          {lastCompaction ? <span className="text-danger">✂ 压缩{lastCompaction.reclaimedTokens === null ? "" : ` −${formatTokenCount(lastCompaction.reclaimedTokens)}`}</span> : null}
+          {lastCompaction ? (
+            <span className="text-danger">
+              ✂ 压缩
+              {lastCompaction.reclaimedTokens === null ? "" : ` −${formatTokenCount(lastCompaction.reclaimedTokens)}`}
+            </span>
+          ) : null}
           <span>#{columns.length} 最新</span>
         </div>
       </div>

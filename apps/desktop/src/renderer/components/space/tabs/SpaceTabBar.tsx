@@ -26,7 +26,9 @@ const FADE_CLASS = {
 function SingleTab({ children }: { children: ReactNode }) {
   return (
     <div role="tablist" aria-label="标签" className="flex h-full min-w-0 items-center">
-      <div role="tab" aria-selected="true" className={`${TAB_CLASS} ${TAB_ACTIVE_CLASS} gap-[7px] font-semibold`}>{children}</div>
+      <div role="tab" aria-selected="true" className={`${TAB_CLASS} ${TAB_ACTIVE_CLASS} gap-[7px] font-semibold`}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -37,15 +39,29 @@ function ActorTab({ member, active }: { member: SpaceMember; active: boolean }) 
   const name = actor?.name ?? member.id;
   const flagged = member.status === "wait" || member.status === "fail";
   return (
-    <div data-tab-id={member.id} data-active={active} className={`${TAB_CLASS} ${active ? TAB_ACTIVE_CLASS : TAB_IDLE_CLASS}`}>
-      <button type="button" role="tab" aria-selected={active} className={TAB_BODY_CLASS} onClick={() => selectTab(member.id)}>
+    <div
+      data-tab-id={member.id}
+      data-active={active}
+      className={`${TAB_CLASS} ${active ? TAB_ACTIVE_CLASS : TAB_IDLE_CLASS}`}
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active}
+        className={TAB_BODY_CLASS}
+        onClick={() => selectTab(member.id)}
+      >
         <ActorAvatar id={member.id} actor={actor} size={18} working={member.status === "run"} />
         <span className="min-w-0 truncate">{name}</span>
         {flagged ? <StatusDot status={member.status} /> : null}
-        {member.unread ? <span role="img" aria-label="有未读" className="size-1.5 shrink-0 rounded-act-pill bg-info" /> : null}
+        {member.unread ? (
+          <span role="img" aria-label="有未读" className="size-1.5 shrink-0 rounded-act-pill bg-info" />
+        ) : null}
       </button>
       <IconButton
-        label={`关闭 ${name}`} tooltip={false} size="xs"
+        label={`关闭 ${name}`}
+        tooltip={false}
+        size="xs"
         className="ml-1 size-[18px] opacity-0 group-hover:opacity-100 group-data-[active=true]:opacity-100 focus-visible:opacity-100"
         onClick={() => closeTab(member.id)}
       >
@@ -68,7 +84,10 @@ export function SpaceTabBar() {
   if (state.view === "roster") {
     return (
       <div className="flex h-full min-w-0 items-center">
-        <SingleTab><Users size={16} aria-hidden="true" /><span className="truncate">Actor 名册</span></SingleTab>
+        <SingleTab>
+          <Users size={16} aria-hidden="true" />
+          <span className="truncate">Actor 名册</span>
+        </SingleTab>
       </div>
     );
   }
@@ -88,14 +107,29 @@ export function SpaceTabBar() {
   const fade = fadeLeft && fadeRight ? "both" : fadeLeft ? "left" : fadeRight ? "right" : "none";
   return (
     <div role="tablist" aria-label="Space 标签" className="flex h-full min-w-0 items-center gap-0.5">
-      <div data-tab-id={COORD_TAB} data-active={coordActive} className={`${TAB_CLASS} ${coordActive ? TAB_ACTIVE_CLASS : TAB_IDLE_CLASS}`}>
-        <button type="button" role="tab" aria-selected={coordActive} className={TAB_BODY_CLASS} onClick={() => selectTab(COORD_TAB)}>
+      <div
+        data-tab-id={COORD_TAB}
+        data-active={coordActive}
+        className={`${TAB_CLASS} ${coordActive ? TAB_ACTIVE_CLASS : TAB_IDLE_CLASS}`}
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={coordActive}
+          className={TAB_BODY_CLASS}
+          onClick={() => selectTab(COORD_TAB)}
+        >
           <SpaceAvatar space={space} size={18} />
           <span className="min-w-0 truncate font-semibold">{space.name}</span>
         </button>
       </div>
-      <div ref={stripRef} className={`scrollbar-none flex min-w-0 items-center gap-0.5 overflow-x-auto ${FADE_CLASS[fade]}`}>
-        {openMembers.map((m) => <ActorTab key={m.id} member={m} active={active === m.id} />)}
+      <div
+        ref={stripRef}
+        className={`scrollbar-none flex min-w-0 items-center gap-0.5 overflow-x-auto ${FADE_CLASS[fade]}`}
+      >
+        {openMembers.map((m) => (
+          <ActorTab key={m.id} member={m} active={active === m.id} />
+        ))}
       </div>
       {over ? <SpaceTabMenu space={space} actors={state.actors} activeTab={active} visibleIds={visibleIds} /> : null}
     </div>

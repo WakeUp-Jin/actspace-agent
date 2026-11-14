@@ -146,8 +146,19 @@ describe("Sidebar (cursor-aligned layout)", () => {
   it("keeps side chats out of the list and counts them on their main session", () => {
     renderSidebar({
       sessions: [
-        makeSession({ id: "s-main", title: "主会话", workspaceRoot: "/Users/me/projects/actspace-agent", sideChatCount: 2 }),
-        makeSession({ id: "s-side", title: "侧边问题", workspaceRoot: "/Users/me/projects/actspace-agent", sideChatParentId: "s-main", isChildSession: true }),
+        makeSession({
+          id: "s-main",
+          title: "主会话",
+          workspaceRoot: "/Users/me/projects/actspace-agent",
+          sideChatCount: 2,
+        }),
+        makeSession({
+          id: "s-side",
+          title: "侧边问题",
+          workspaceRoot: "/Users/me/projects/actspace-agent",
+          sideChatParentId: "s-main",
+          isChildSession: true,
+        }),
       ],
     });
 
@@ -219,7 +230,9 @@ describe("Sidebar (cursor-aligned layout)", () => {
     fireEvent.contextMenu(workspaceLabel, { clientX: 24, clientY: 60 });
     await user.click(outside);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(workspaceLabel).not.toHaveFocus();
   });
 
@@ -319,7 +332,9 @@ describe("Sidebar (cursor-aligned layout)", () => {
     await user.keyboard("{Enter}");
     const input = screen.getByRole("textbox", { name: "重命名会话 工具定义格式和命名规范" });
     // Radix 在 setTimeout(0) 里处理菜单关闭后的焦点，不能把焦点从输入框拿走。
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(input).toHaveFocus();
     await user.keyboard("{Control>}a{/Control}键盘改名{Enter}");
     expect(onRename).toHaveBeenCalledWith("s-actspace-1", "键盘改名");
@@ -331,7 +346,9 @@ describe("Sidebar (cursor-aligned layout)", () => {
     const startRename = async () => {
       screen.getByRole("button", { name: /^工具定义格式和命名规范/ }).focus();
       await user.keyboard("{Shift>}{F10}{/Shift}{ArrowDown}{Enter}");
-      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
       return screen.getByRole("textbox", { name: "重命名会话 工具定义格式和命名规范" });
     };
 
@@ -363,7 +380,9 @@ describe("Sidebar (cursor-aligned layout)", () => {
     await user.keyboard("{Shift>}{F10}{/Shift}");
     await user.keyboard("{ArrowDown}{Enter}");
     const input = screen.getByRole("textbox", { name: "重命名会话 工具定义格式和命名规范" });
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(input).toHaveFocus();
     expect(action).toBeInTheDocument();
   });
@@ -432,7 +451,9 @@ describe("Sidebar (cursor-aligned layout)", () => {
     // 指针移进菜单再回到行上：菜单没关，提示也不弹。
     await user.hover(screen.getByRole("menuitem", { name: "置顶" }));
     await user.hover(row);
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    });
     expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
@@ -509,12 +530,16 @@ describe("Sidebar (cursor-aligned layout)", () => {
     });
 
     const activeRow = container.querySelector('[data-group-key="actspace-agent"]') ?? container;
-    expect(within(activeRow as HTMLElement).getByText("工具定义格式和命名规范").closest(".session-row")).toHaveClass(
-      "is-active",
-    );
-    expect(within(activeRow as HTMLElement).getByText("Conversation context lookup").closest(".session-row")).toHaveClass(
-      "is-busy",
-    );
+    expect(
+      within(activeRow as HTMLElement)
+        .getByText("工具定义格式和命名规范")
+        .closest(".session-row"),
+    ).toHaveClass("is-active");
+    expect(
+      within(activeRow as HTMLElement)
+        .getByText("Conversation context lookup")
+        .closest(".session-row"),
+    ).toHaveClass("is-busy");
   });
 
   it("falls back to idle when a session status is unknown at runtime", () => {
@@ -572,7 +597,9 @@ describe("Sidebar (cursor-aligned layout)", () => {
     // 说明开着时指针离开了这一行（去点别处），说明关闭后行的悬停提示不应该再冒出来。
     await user.click(document.body);
     expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    });
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
@@ -589,7 +616,9 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.getByRole("menu")).toBeInTheDocument();
     await user.click(document.body);
     expect(screen.queryByRole("menu")).toBeNull();
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    });
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
     // 悬停出提示后用键盘打开状态说明，说明开着时指针离开这一行，再点别处关掉说明。
@@ -601,7 +630,9 @@ describe("Sidebar (cursor-aligned layout)", () => {
     await user.unhover(row);
     await user.click(document.body);
     expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    });
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
     // 键盘打开状态说明，同样点别处关掉。
@@ -613,7 +644,9 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(await screen.findByRole("dialog", { name: "会话状态：空闲" })).toBeInTheDocument();
     await user.click(document.body);
     expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    });
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
@@ -703,7 +736,15 @@ describe("Sidebar (cursor-aligned layout)", () => {
 
     rerender(
       <TooltipProvider delayDuration={0}>
-        <TestSidebar sessions={SESSIONS} workspaces={WORKSPACES} activeSessionId={null} mode="expanded" view="chat" onArchiveWorkspace={vi.fn()} sessionStatuses={{ "s-harness-1": "waiting_approval" }} />
+        <TestSidebar
+          sessions={SESSIONS}
+          workspaces={WORKSPACES}
+          activeSessionId={null}
+          mode="expanded"
+          view="chat"
+          onArchiveWorkspace={vi.fn()}
+          sessionStatuses={{ "s-harness-1": "waiting_approval" }}
+        />
       </TooltipProvider>,
     );
     expect(archiveAll("actspace-agent")).toBe(false);
@@ -712,10 +753,28 @@ describe("Sidebar (cursor-aligned layout)", () => {
 
   it("labels a remote workspace group with the host name from the host directory", async () => {
     setupBridge({
-      "hosts.list": async () => [{ id: "c1", hostId: "h1", name: "新名", endpoint: { kind: "wss", url: "wss://example.test" }, state: "connected" }] as never,
+      "hosts.list": async () =>
+        [
+          {
+            id: "c1",
+            hostId: "h1",
+            name: "新名",
+            endpoint: { kind: "wss", url: "wss://example.test" },
+            state: "connected",
+          },
+        ] as never,
     });
     renderSidebar({
-      sessions: [makeSession({ id: "remote", title: "Remote", hostId: "h1", hostName: "旧名", connectionState: "connected", workspaceRoot: "/srv/app" })],
+      sessions: [
+        makeSession({
+          id: "remote",
+          title: "Remote",
+          hostId: "h1",
+          hostName: "旧名",
+          connectionState: "connected",
+          workspaceRoot: "/srv/app",
+        }),
+      ],
     });
 
     expect(screen.getByRole("button", { name: "旧名 · app" })).toBeInTheDocument();
@@ -833,7 +892,10 @@ describe("WindowChromeBar", () => {
     expanded.unmount();
 
     // 面板没开、或紧凑布局（面板是覆盖层，走 data-compact-panel-open）时不标记
-    for (const overrides of [{ rightOpen: false, rightExpanded: true }, { rightOpen: true, rightExpanded: true, compactLayout: true }]) {
+    for (const overrides of [
+      { rightOpen: false, rightExpanded: true },
+      { rightOpen: true, rightExpanded: true, compactLayout: true },
+    ]) {
       const { container, unmount } = renderChromeBar(overrides);
       expect(container.querySelector(".window-chrome-bar")!.hasAttribute("data-right-expanded")).toBe(false);
       unmount();
@@ -936,7 +998,8 @@ describe("WindowChromeBar", () => {
   it("refreshes context when the chrome preview is reopened", async () => {
     const user = userEvent.setup();
     const getSessionPreview = vi.fn(async () => ({
-      sessionId: "s-actspace-1", contextSnapshot: { ...HOVER_CONTEXT, cumulativeTokens: 40000 },
+      sessionId: "s-actspace-1",
+      contextSnapshot: { ...HOVER_CONTEXT, cumulativeTokens: 40000 },
     }));
     renderChromeBar({ currentSession: SESSIONS[1], getSessionPreview });
     const trigger = screen.getByRole("button", { name: "查看会话详情： New chat" });
@@ -945,7 +1008,10 @@ describe("WindowChromeBar", () => {
     fireEvent.blur(trigger);
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
-    getSessionPreview.mockResolvedValue({ sessionId: "s-actspace-1", contextSnapshot: { ...HOVER_CONTEXT, cumulativeTokens: 60000 } });
+    getSessionPreview.mockResolvedValue({
+      sessionId: "s-actspace-1",
+      contextSnapshot: { ...HOVER_CONTEXT, cumulativeTokens: 60000 },
+    });
     fireEvent.focus(trigger);
     await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("累计 Token：60K"));
     expect(getSessionPreview).toHaveBeenCalledTimes(2);

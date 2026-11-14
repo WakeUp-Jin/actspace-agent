@@ -3,9 +3,30 @@ import { findRevealRecord, type TrajectoryRecord } from "../trajectory";
 
 function record(id: string, patch: Partial<TrajectoryRecord>): TrajectoryRecord {
   return {
-    id, kind: "assistant", state: "completed", eventType: "test", turnId: "t1", turnNumber: 1, stepId: null, stepNumber: null,
-    callId: null, requestId: null, messageId: null, summary: id, preview: "", raw: null, sourceSequences: [1], startedAt: null,
-    completedAt: null, durationMs: null, usage: null, result: null, isError: false, partial: false, visible: true, ...patch,
+    id,
+    kind: "assistant",
+    state: "completed",
+    eventType: "test",
+    turnId: "t1",
+    turnNumber: 1,
+    stepId: null,
+    stepNumber: null,
+    callId: null,
+    requestId: null,
+    messageId: null,
+    summary: id,
+    preview: "",
+    raw: null,
+    sourceSequences: [1],
+    startedAt: null,
+    completedAt: null,
+    durationMs: null,
+    usage: null,
+    result: null,
+    isError: false,
+    partial: false,
+    visible: true,
+    ...patch,
   };
 }
 
@@ -14,7 +35,17 @@ const records = [
   record("req", { kind: "request", callId: "c1", requestOnly: true }),
   record("tool1", { kind: "tool", callId: "c1" }),
   record("a1", { kind: "assistant", messageId: "m2" }),
-  record("compact", { kind: "compaction", compaction: { compactionId: "k1", trigger: "auto", messageCount: 4, beforeTokens: null, afterTokens: null, beforeEstimated: false } }),
+  record("compact", {
+    kind: "compaction",
+    compaction: {
+      compactionId: "k1",
+      trigger: "auto",
+      messageCount: 4,
+      beforeTokens: null,
+      afterTokens: null,
+      beforeEstimated: false,
+    },
+  }),
   record("u2", { kind: "user", messageId: "m3" }),
   record("tool2", { kind: "tool", callId: "c2" }),
   record("hidden", { kind: "assistant", messageId: "m4", visible: false }),

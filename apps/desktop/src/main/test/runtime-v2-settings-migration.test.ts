@@ -44,7 +44,9 @@ describe("SettingsService v4 migration", () => {
     await new SettingsService({ dataRoot: root, crypto }).load();
 
     expect(await readFile(join(root, "settings.v2.backup.json"), "utf8")).toBe(rawV2);
-    expect(await readFile(join(root, "settings.v2.backup.sha256"), "utf8")).toBe(`${createHash("sha256").update(rawV2).digest("hex")}\n`);
+    expect(await readFile(join(root, "settings.v2.backup.sha256"), "utf8")).toBe(
+      `${createHash("sha256").update(rawV2).digest("hex")}\n`,
+    );
     expect(JSON.parse(await readFile(join(root, "settings.json"), "utf8"))).toMatchObject({ version: 4 });
   });
 
@@ -61,8 +63,15 @@ describe("SettingsService v4 migration", () => {
     await new SettingsService({ dataRoot: root, crypto }).load();
 
     expect(await readFile(join(root, "settings.v3.backup.json"), "utf8")).toBe(rawV3);
-    expect(await readFile(join(root, "settings.v3.backup.sha256"), "utf8")).toBe(`${createHash("sha256").update(rawV3).digest("hex")}\n`);
-    expect(JSON.parse(await readFile(join(root, "settings.json"), "utf8"))).toMatchObject({ version: 4, general: {}, models: {}, tools: {} });
+    expect(await readFile(join(root, "settings.v3.backup.sha256"), "utf8")).toBe(
+      `${createHash("sha256").update(rawV3).digest("hex")}\n`,
+    );
+    expect(JSON.parse(await readFile(join(root, "settings.json"), "utf8"))).toMatchObject({
+      version: 4,
+      general: {},
+      models: {},
+      tools: {},
+    });
   });
 
   it("exposes a redacted v4 snapshot and rejects stale revisions", async () => {
@@ -81,11 +90,13 @@ describe("SettingsService v4 migration", () => {
     const reloaded = new SettingsService({ dataRoot: root, crypto });
     await reloaded.load();
     expect(reloaded.getV4().settings.general.personalization).toEqual({ displayName: "Jin", responseStyle: "concise" });
-    await expect(service.updateNamespaceV4({
-      namespace: "general",
-      expectedRevision: initial.revision,
-      patch: { personalization: { displayName: "stale", responseStyle: "" } },
-    })).rejects.toMatchObject({ name: "SettingsRevisionConflictError" });
+    await expect(
+      service.updateNamespaceV4({
+        namespace: "general",
+        expectedRevision: initial.revision,
+        patch: { personalization: { displayName: "stale", responseStyle: "" } },
+      }),
+    ).rejects.toMatchObject({ name: "SettingsRevisionConflictError" });
     expect(JSON.stringify(next.settings)).not.toMatch(/apiKey|authorization|bearer/i);
   });
 
@@ -101,44 +112,85 @@ describe("SettingsService v4 migration", () => {
 });
 
 it("migrates Flash aliases with bindings, drops removed extra-key bindings, with canonical configuration winning", async () => {
-  const root = await mkdtemp(join(tmpdir(), "actspace-flash-migration-")); roots.push(root);
-  const initial = new SettingsService({ dataRoot: root, crypto }); await initial.load();
+  const root = await mkdtemp(join(tmpdir(), "actspace-flash-migration-"));
+  roots.push(root);
+  const initial = new SettingsService({ dataRoot: root, crypto });
+  await initial.load();
   const settings = JSON.parse(await readFile(join(root, "settings.json"), "utf8"));
   delete settings.models.installed["deepseek:deepseek-flash"];
-  settings.models.installed["deepseek:deepseek-v4-flash"] = { connectionId: "deepseek:default", enabled: false, addedAt: "2026-08-01T00:00:00Z", credentialId: "extra-key", customLabel: "My Flash" };
+  settings.models.installed["deepseek:deepseek-v4-flash"] = {
+    connectionId: "deepseek:default",
+    enabled: false,
+    addedAt: "2026-08-01T00:00:00Z",
+    credentialId: "extra-key",
+    customLabel: "My Flash",
+  };
   settings.models.taskBindings.utility = "deepseek:deepseek-v4-flash";
   await writeFile(join(root, "settings.json"), JSON.stringify(settings));
-  const migrated = new SettingsService({ dataRoot: root, crypto }); await migrated.load();
-  expect(migrated.getV4().settings.models.installed["deepseek:deepseek-flash"]).toMatchObject({ enabled: false, customLabel: "My Flash", addedAt: "2026-08-01T00:00:00Z" });
+  const migrated = new SettingsService({ dataRoot: root, crypto });
+  await migrated.load();
+  expect(migrated.getV4().settings.models.installed["deepseek:deepseek-flash"]).toMatchObject({
+    enabled: false,
+    customLabel: "My Flash",
+    addedAt: "2026-08-01T00:00:00Z",
+  });
   // 多 Key 已删除：旧的额外 Key 绑定在读取时丢弃，模型改用连接的 Key。
   expect(migrated.getV4().settings.models.installed["deepseek:deepseek-flash"]).not.toHaveProperty("credentialId");
   expect(migrated.getV4().settings.models.taskBindings.utility).toBe("deepseek:deepseek-flash");
-  const again = new SettingsService({ dataRoot: root, crypto }); await again.load();
+  const again = new SettingsService({ dataRoot: root, crypto });
+  await again.load();
   expect(again.getV4().settings.models).toEqual(migrated.getV4().settings.models);
-  settings.models.installed = { "deepseek:deepseek-flash": { enabled: true, customLabel: "Canonical", addedAt: "2026-09-10T00:00:00Z" }, ...settings.models.installed };
+  settings.models.installed = {
+    "deepseek:deepseek-flash": { enabled: true, customLabel: "Canonical", addedAt: "2026-09-10T00:00:00Z" },
+    ...settings.models.installed,
+  };
   await writeFile(join(root, "settings.json"), JSON.stringify(settings));
-  const preferred = new SettingsService({ dataRoot: root, crypto }); await preferred.load();
-  expect(preferred.getV4().settings.models.installed["deepseek:deepseek-flash"]).toMatchObject({ enabled: true, customLabel: "Canonical" });
+  const preferred = new SettingsService({ dataRoot: root, crypto });
+  await preferred.load();
+  expect(preferred.getV4().settings.models.installed["deepseek:deepseek-flash"]).toMatchObject({
+    enabled: true,
+    customLabel: "Canonical",
+  });
 });
 
 it("retires Pro into Flash without retaining stale definitions, and prefers an existing Flash configuration", async () => {
   const { ModelStoreService } = await import("../model-store-service");
-  const root = await mkdtemp(join(tmpdir(), "actspace-pro-migration-")); roots.push(root);
-  const initial = new SettingsService({ dataRoot: root, crypto }); await initial.load();
+  const root = await mkdtemp(join(tmpdir(), "actspace-pro-migration-"));
+  roots.push(root);
+  const initial = new SettingsService({ dataRoot: root, crypto });
+  await initial.load();
   const settings = JSON.parse(await readFile(join(root, "settings.json"), "utf8"));
-  settings.models.installed = { "deepseek:deepseek-v4-pro": { enabled: true, addedAt: "2026-08-01T00:00:00Z", credentialId: "pro-key" } };
-  settings.models.definitions["deepseek:deepseek-v4-pro"] = { key: "deepseek:deepseek-v4-pro", provider: "deepseek", api: "openai-completions", apiModel: "deepseek-v4-pro", label: "DeepSeek V4 Pro", source: "provider-catalog" };
+  settings.models.installed = {
+    "deepseek:deepseek-v4-pro": { enabled: true, addedAt: "2026-08-01T00:00:00Z", credentialId: "pro-key" },
+  };
+  settings.models.definitions["deepseek:deepseek-v4-pro"] = {
+    key: "deepseek:deepseek-v4-pro",
+    provider: "deepseek",
+    api: "openai-completions",
+    apiModel: "deepseek-v4-pro",
+    label: "DeepSeek V4 Pro",
+    source: "provider-catalog",
+  };
   settings.models.taskBindings.defaultChat = "deepseek:deepseek-v4-pro";
   await writeFile(join(root, "settings.json"), JSON.stringify(settings));
-  const migrated = new SettingsService({ dataRoot: root, crypto }); await migrated.load();
+  const migrated = new SettingsService({ dataRoot: root, crypto });
+  await migrated.load();
   expect(migrated.getV4().settings.models.taskBindings.defaultChat).toBe("deepseek:deepseek-flash");
   expect(migrated.getV4().settings.models.installed["deepseek:deepseek-flash"]).toMatchObject({ enabled: true });
   expect(migrated.getV4().settings.models.installed["deepseek:deepseek-flash"]).not.toHaveProperty("credentialId");
   const models = new ModelStoreService({ settings: migrated }).listInstalledModels();
   expect(models).toHaveLength(1);
-  expect(models[0].definition).toMatchObject({ apiModel: "deepseek-flash", label: "deepseek-flash", capabilities: { input: ["text", "image"] } });
-  settings.models.installed = { "deepseek:deepseek-v4-flash": { enabled: false, credentialId: "flash-key" }, ...settings.models.installed };
+  expect(models[0].definition).toMatchObject({
+    apiModel: "deepseek-flash",
+    label: "deepseek-flash",
+    capabilities: { input: ["text", "image"] },
+  });
+  settings.models.installed = {
+    "deepseek:deepseek-v4-flash": { enabled: false, credentialId: "flash-key" },
+    ...settings.models.installed,
+  };
   await writeFile(join(root, "settings.json"), JSON.stringify(settings));
-  const preferred = new SettingsService({ dataRoot: root, crypto }); await preferred.load();
+  const preferred = new SettingsService({ dataRoot: root, crypto });
+  await preferred.load();
   expect(preferred.getV4().settings.models.installed["deepseek:deepseek-flash"]).toMatchObject({ enabled: false });
 });

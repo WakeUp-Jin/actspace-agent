@@ -16,7 +16,9 @@ export function useDocsListing({ workspaceRoot, revalidateKey }: { workspaceRoot
   const [error, setError] = useState<string | null>(null);
   const sequence = useRef(0);
   // 点过「继续加载」的根，之后的刷新也用放大的上限；换根后失效。
-  const [expandedRoot, setExpandedRoot] = useState<string | null>(() => (docsListing?.expanded ? docsListing.root : null));
+  const [expandedRoot, setExpandedRoot] = useState<string | null>(() =>
+    docsListing?.expanded ? docsListing.root : null,
+  );
   const expanded = expandedRoot !== null && expandedRoot === workspaceRoot;
 
   useEffect(() => {
@@ -36,7 +38,14 @@ export function useDocsListing({ workspaceRoot, revalidateKey }: { workspaceRoot
           setError(result.error === "not_found" ? "工作区目录不存在。" : "无法读取工作区目录。");
           return;
         }
-        setDocsListing({ root: workspaceRoot, files: result.files, truncated: result.truncated, source: result.source, ...(result.incompleteDirs ? { incompleteDirs: result.incompleteDirs } : {}), ...(expanded ? { expanded: true } : {}) });
+        setDocsListing({
+          root: workspaceRoot,
+          files: result.files,
+          truncated: result.truncated,
+          source: result.source,
+          ...(result.incompleteDirs ? { incompleteDirs: result.incompleteDirs } : {}),
+          ...(expanded ? { expanded: true } : {}),
+        });
         setStatus("ready");
       })
       .catch(() => {

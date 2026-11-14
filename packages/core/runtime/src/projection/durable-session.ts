@@ -1,26 +1,71 @@
-import { applyContextEstimate, initialContextEstimate, viewContextEstimate, type ContextEstimateState } from "@actspace/shared";
-import { mainAgentFormFromPresetId, type RuntimeAgentMode, type RuntimeJsonValue, type RuntimeSessionSnapshot, type RuntimeToolView } from "@actspace/shared/runtime-v2";
-import { SessionSurface, type SessionSurfaceView, type EventCodecRegistry, type SessionEventEnvelopeV1, type SessionHeaderV1 } from "@actspace/session-journal";
-import { registerSessionFacts, sessionFacts, SessionProjectionRegistry, type SessionProjectionService } from "@actspace/session-projection";
+import {
+  applyContextEstimate,
+  initialContextEstimate,
+  viewContextEstimate,
+  type ContextEstimateState,
+} from "@actspace/shared";
+import {
+  mainAgentFormFromPresetId,
+  type RuntimeAgentMode,
+  type RuntimeJsonValue,
+  type RuntimeSessionSnapshot,
+  type RuntimeToolView,
+} from "@actspace/shared/runtime-v2";
+import {
+  SessionSurface,
+  type SessionSurfaceView,
+  type EventCodecRegistry,
+  type SessionEventEnvelopeV1,
+  type SessionHeaderV1,
+} from "@actspace/session-journal";
+import {
+  registerSessionFacts,
+  sessionFacts,
+  SessionProjectionRegistry,
+  type SessionProjectionService,
+} from "@actspace/session-projection";
 import { createRunningToolView, completeToolView, projectRendererHint, type RendererAllowlist } from "./tool-dto.js";
 import { redactProjectionText } from "./redaction.js";
 
 export class SessionReadModel {
   readonly projections: SessionProjectionRegistry;
-  constructor(readonly header: SessionHeaderV1, readonly codecs: EventCodecRegistry, readonly rendererAllowlist?: RendererAllowlist, readonly projectionService?: SessionProjectionService) {
-    this.projections = projectionService?.createRegistry(event => codecs.resolve(event).kind === "known") ?? new SessionProjectionRegistry(event => codecs.resolve(event).kind === "known");
+  constructor(
+    readonly header: SessionHeaderV1,
+    readonly codecs: EventCodecRegistry,
+    readonly rendererAllowlist?: RendererAllowlist,
+    readonly projectionService?: SessionProjectionService,
+  ) {
+    this.projections =
+      projectionService?.createRegistry((event) => codecs.resolve(event).kind === "known") ??
+      new SessionProjectionRegistry((event) => codecs.resolve(event).kind === "known");
     registerSessionFacts(this.projections, redactProjectionText);
     this.projections.register<{ readonly mode: RuntimeAgentMode; readonly revision: number }>({
-      key: "agentMode", stateVersion: 1,
-      init: () => ({ mode: header.createdWith.initialAgentMode ?? (header.createdWith.presetId === "actspace.chat" ? "chat" : "agent"), revision: 0 }),
-      view: state => state,
+      key: "agentMode",
+      stateVersion: 1,
+      init: () => ({
+        mode:
+          header.createdWith.initialAgentMode ?? (header.createdWith.presetId === "actspace.chat" ? "chat" : "agent"),
+        revision: 0,
+      }),
+      view: (state) => state,
       apply: (state, event) => {
         if (event.type === "agent/mode-set" && isRecord(event.data)) {
           const mode = event.data.mode;
           const revision = event.data.revision;
-          if ((mode === "chat" || mode === "plan" || mode === "agent") && typeof revision === "number" && revision === state.revision + 1) return { mode, revision };
+          if (
+            (mode === "chat" || mode === "plan" || mode === "agent") &&
+            typeof revision === "number" &&
+            revision === state.revision + 1
+          )
+            return { mode, revision };
         }
-        if (event.type === "turn/start" && state.revision === 0 && header.createdWith.initialAgentMode === undefined && header.createdWith.presetId !== "actspace.chat" && isRecord(event.data)) {
+        if (
+          event.type === "turn/start" &&
+          state.revision === 0 &&
+          header.createdWith.initialAgentMode === undefined &&
+          header.createdWith.presetId !== "actspace.chat" &&
+          isRecord(event.data)
+        ) {
           const mode = event.data.mode;
           if (mode === "plan" || mode === "agent") return { mode, revision: 0 };
         }
@@ -29,7 +74,10 @@ export class SessionReadModel {
     });
     projectionService?.applyContributors(this.projections, redactProjectionText);
     this.projections.register<SessionSurfaceView>({
-      key: "surface", stateVersion: 1, init: () => ({ entries: [], replaceGeneration: 0 }), view: state => state,
+      key: "surface",
+      stateVersion: 1,
+      init: () => ({ entries: [], replaceGeneration: 0 }),
+      view: (state) => state,
       apply: (state, event) => {
         if (!event.surface) return state;
         const surface = SessionSurface.fromView(state);
@@ -38,30 +86,52 @@ export class SessionReadModel {
       },
     });
     this.projections.register<readonly RuntimeToolView[]>({
-      key: "tools", stateVersion: 1, init: () => [], view: state => state,
+      key: "tools",
+      stateVersion: 1,
+      init: () => [],
+      view: (state) => state,
       apply: (state, event) => applyTool(state, header.sessionId, event, rendererAllowlist),
     });
     this.projections.register<string | null>({
-      key: "workspaceRoot", stateVersion: 1, init: () => header.cwd ?? null, view: state => state,
-      apply: (state, event) => event.type === "session/workspace-set" && isRecord(event.data) && typeof event.data.workspaceRoot === "string" && event.data.workspaceRoot.trim() ? event.data.workspaceRoot : state,
+      key: "workspaceRoot",
+      stateVersion: 1,
+      init: () => header.cwd ?? null,
+      view: (state) => state,
+      apply: (state, event) =>
+        event.type === "session/workspace-set" &&
+        isRecord(event.data) &&
+        typeof event.data.workspaceRoot === "string" &&
+        event.data.workspaceRoot.trim()
+          ? event.data.workspaceRoot
+          : state,
     });
     this.projections.register<string>({
-      key: "updatedAt", stateVersion: 1, init: () => header.createdAt, view: state => state,
+      key: "updatedAt",
+      stateVersion: 1,
+      init: () => header.createdAt,
+      view: (state) => state,
       apply: (_, event) => event.time,
     });
     // 上下文估算（agent-spec-request-record.md §6.3）：状态只含非对话项与两个对话合计，不随消息数增长；
     // 与估算无关的事件返回同一引用，注册表不重建、不推送。
     this.projections.register<ContextEstimateState>({
-      key: "contextEstimate", stateVersion: 1, init: initialContextEstimate,
+      key: "contextEstimate",
+      stateVersion: 1,
+      init: initialContextEstimate,
       apply: (state, event) => applyContextEstimate(state, event),
-      view: state => viewContextEstimate(state) as unknown as RuntimeJsonValue,
+      view: (state) => viewContextEstimate(state) as unknown as RuntimeJsonValue,
     });
     this.projections.seal();
     this.projections.ensureSession(header.sessionId);
   }
 
-  replay(events: readonly SessionEventEnvelopeV1[]): this { this.projections.sync(this.header.sessionId, events); return this; }
-  apply(event: SessionEventEnvelopeV1) { return this.projections.apply(this.header.sessionId, event); }
+  replay(events: readonly SessionEventEnvelopeV1[]): this {
+    this.projections.sync(this.header.sessionId, events);
+    return this;
+  }
+  apply(event: SessionEventEnvelopeV1) {
+    return this.projections.apply(this.header.sessionId, event);
+  }
 
   snapshot(accessState: RuntimeSessionSnapshot["accessState"] = "read-write"): RuntimeSessionSnapshot {
     const projection = this.projections.snapshot(this.header.sessionId);
@@ -69,38 +139,91 @@ export class SessionReadModel {
     const surface = values.surface as SessionSurfaceView;
     const agentMode = values.agentMode as { readonly mode: RuntimeAgentMode; readonly revision: number };
     return {
-      kind: "session-snapshot", schemaVersion: 1, sessionId: this.header.sessionId,
-      createdAt: this.header.createdAt, updatedAt: values.updatedAt as string,
-      workspaceRoot: values.workspaceRoot as string | null, ...(this.header.worktree ? { worktree: this.header.worktree } : {}), agentForm: this.header.lineage?.origin === "delegation" ? "agent" : mainAgentFormFromPresetId(this.header.createdWith.presetId), agentFormId: "actspace.main", agentMode: agentMode.mode, agentModeRevision: agentMode.revision, throughJournalSeq: projection.throughJournalSeq, accessState,
+      kind: "session-snapshot",
+      schemaVersion: 1,
+      sessionId: this.header.sessionId,
+      createdAt: this.header.createdAt,
+      updatedAt: values.updatedAt as string,
+      workspaceRoot: values.workspaceRoot as string | null,
+      ...(this.header.worktree ? { worktree: this.header.worktree } : {}),
+      agentForm:
+        this.header.lineage?.origin === "delegation"
+          ? "agent"
+          : mainAgentFormFromPresetId(this.header.createdWith.presetId),
+      agentFormId: "actspace.main",
+      agentMode: agentMode.mode,
+      agentModeRevision: agentMode.revision,
+      throughJournalSeq: projection.throughJournalSeq,
+      accessState,
       ...sessionFacts(this.projections, this.header.sessionId),
-      messages: surface.entries.map(entry => ({ kind: entry.node.kind, messageId: entry.node.messageId, content: entry.node.content, ...(entry.node.kind === "tool-result" ? { callId: entry.node.callId } : {}) })),
-      tools: values.tools as readonly RuntimeToolView[], lineage: this.header.lineage as RuntimeJsonValue | null,
+      messages: surface.entries.map((entry) => ({
+        kind: entry.node.kind,
+        messageId: entry.node.messageId,
+        content: entry.node.content,
+        ...(entry.node.kind === "tool-result" ? { callId: entry.node.callId } : {}),
+      })),
+      tools: values.tools as readonly RuntimeToolView[],
+      lineage: this.header.lineage as RuntimeJsonValue | null,
     };
   }
 }
 
-function applyTool(state: readonly RuntimeToolView[], sessionId: string, event: SessionEventEnvelopeV1, allowlist: RendererAllowlist | undefined): readonly RuntimeToolView[] {
+function applyTool(
+  state: readonly RuntimeToolView[],
+  sessionId: string,
+  event: SessionEventEnvelopeV1,
+  allowlist: RendererAllowlist | undefined,
+): readonly RuntimeToolView[] {
   if (!isRecord(event.data)) return state;
-  const data = event.data; const callId = stringValue(data.callId);
+  const data = event.data;
+  const callId = stringValue(data.callId);
   if (!callId) return state;
   if (event.type === "tool/call") {
-    const tool = createRunningToolView({ sessionId, callId, agentRunId: stringValue(data.agentRunId) ?? "unknown", turnId: stringValue(data.turnId) ?? "unknown", stepId: stringValue(data.stepId) ?? "unknown", pluginId: stringValue(data.pluginId) ?? event.source.ownerPluginId, name: stringValue(data.name) ?? "unknown" }, event, data.args ?? {}, projectRendererHint(data.renderer, allowlist));
-    return [...state.filter(item => item.callId !== callId), tool].sort((a, b) => a.startedAt.localeCompare(b.startedAt) || a.callId.localeCompare(b.callId));
+    const tool = createRunningToolView(
+      {
+        sessionId,
+        callId,
+        agentRunId: stringValue(data.agentRunId) ?? "unknown",
+        turnId: stringValue(data.turnId) ?? "unknown",
+        stepId: stringValue(data.stepId) ?? "unknown",
+        pluginId: stringValue(data.pluginId) ?? event.source.ownerPluginId,
+        name: stringValue(data.name) ?? "unknown",
+      },
+      event,
+      data.args ?? {},
+      projectRendererHint(data.renderer, allowlist),
+    );
+    return [...state.filter((item) => item.callId !== callId), tool].sort(
+      (a, b) => a.startedAt.localeCompare(b.startedAt) || a.callId.localeCompare(b.callId),
+    );
   }
-  const previous = state.find(item => item.callId === callId);
+  const previous = state.find((item) => item.callId === callId);
   if (!previous) return state;
   let next = previous;
-  if (["tool-workflow/run-start", "tool-workflow/agent-start", "tool/code-dispatch-start"].includes(event.type)) next = { ...previous, phase: "executing" };
-  if (["tool/result", "tool/recovery-outcome"].includes(event.type)) next = completeFromEvent(previous, event, allowlist);
-  return next === previous ? state : state.map(item => item.callId === callId ? next : item);
+  if (["tool-workflow/run-start", "tool-workflow/agent-start", "tool/code-dispatch-start"].includes(event.type))
+    next = { ...previous, phase: "executing" };
+  if (["tool/result", "tool/recovery-outcome"].includes(event.type))
+    next = completeFromEvent(previous, event, allowlist);
+  return next === previous ? state : state.map((item) => (item.callId === callId ? next : item));
 }
 
-function completeFromEvent(previous: RuntimeToolView, event: SessionEventEnvelopeV1, rendererAllowlist: RendererAllowlist | undefined): RuntimeToolView {
+function completeFromEvent(
+  previous: RuntimeToolView,
+  event: SessionEventEnvelopeV1,
+  rendererAllowlist: RendererAllowlist | undefined,
+): RuntimeToolView {
   const data = isRecord(event.data) ? event.data : {};
   const rawStatus = stringValue(data.status);
-  const status = rawStatus === "failed" || rawStatus === "denied" || rawStatus === "aborted" || rawStatus === "outcome-unknown" || rawStatus === "completed"
-    ? rawStatus
-    : event.type === "tool/result" ? "completed" : "outcome-unknown";
+  const status =
+    rawStatus === "failed" ||
+    rawStatus === "denied" ||
+    rawStatus === "aborted" ||
+    rawStatus === "outcome-unknown" ||
+    rawStatus === "completed"
+      ? rawStatus
+      : event.type === "tool/result"
+        ? "completed"
+        : "outcome-unknown";
   const result = {
     status,
     callId: previous.callId,
@@ -113,13 +236,24 @@ function completeFromEvent(previous: RuntimeToolView, event: SessionEventEnvelop
     modelOutput: Array.isArray(data.modelOutput) ? data.modelOutput : [],
     detail: Array.isArray(data.detail) ? data.detail : [],
     artifacts: Array.isArray(data.artifacts) ? data.artifacts : [],
-    failure: isRecord(data.failure) ? {
-      code: stringValue(data.failure.code) ?? "TOOL_FAILURE",
-      message: stringValue(data.failure.message) ?? "Tool failed.",
-      retryable: data.failure.retryable === true,
-      phase: "body" as const,
-    } : status === "outcome-unknown" ? { code: "TOOL_OUTCOME_UNKNOWN", message: "Tool outcome is unknown.", retryable: false, phase: "body" as const } : undefined,
-    ...(data.approvalMode === "auto" || data.approvalMode === "manual" || data.approvalMode === "session" ? { approvalMode: data.approvalMode as "auto" | "manual" | "session" } : {}),
+    failure: isRecord(data.failure)
+      ? {
+          code: stringValue(data.failure.code) ?? "TOOL_FAILURE",
+          message: stringValue(data.failure.message) ?? "Tool failed.",
+          retryable: data.failure.retryable === true,
+          phase: "body" as const,
+        }
+      : status === "outcome-unknown"
+        ? {
+            code: "TOOL_OUTCOME_UNKNOWN",
+            message: "Tool outcome is unknown.",
+            retryable: false,
+            phase: "body" as const,
+          }
+        : undefined,
+    ...(data.approvalMode === "auto" || data.approvalMode === "manual" || data.approvalMode === "session"
+      ? { approvalMode: data.approvalMode as "auto" | "manual" | "session" }
+      : {}),
     ...(typeof data.approvalReason === "string" ? { approvalReason: data.approvalReason } : {}),
     finalizerFailures: [],
     dispatched: true,

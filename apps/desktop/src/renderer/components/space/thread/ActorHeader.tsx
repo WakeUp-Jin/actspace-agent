@@ -21,7 +21,9 @@ export function ActorHeader({ member, actor }: { member: SpaceMember; actor: Ros
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-2.5">
           <h1 className="text-act-md font-semibold text-text-main">{actor?.name ?? member.id}</h1>
-          <span className={`inline-flex h-[22px] items-center gap-1.5 rounded-act-pill px-2 text-act-xs font-medium ${CHIP_TONE[member.status]}`}>
+          <span
+            className={`inline-flex h-[22px] items-center gap-1.5 rounded-act-pill px-2 text-act-xs font-medium ${CHIP_TONE[member.status]}`}
+          >
             <StatusDot status={member.status} />
             {STATUS_LABEL[member.status]}
           </span>
@@ -30,19 +32,35 @@ export function ActorHeader({ member, actor }: { member: SpaceMember; actor: Ros
         {actor?.abilities.length ? (
           <ul className="flex flex-wrap gap-1.5">
             {actor.abilities.map((a) => (
-              <li key={a} className="inline-flex h-5 items-center rounded-act-xs bg-surface-subtle px-[7px] text-act-xxs text-text-muted">{a}</li>
+              <li
+                key={a}
+                className="inline-flex h-5 items-center rounded-act-xs bg-surface-subtle px-[7px] text-act-xxs text-text-muted"
+              >
+                {a}
+              </li>
             ))}
           </ul>
         ) : null}
         <p className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-act-xs text-text-faint">
-          <span className={meta}><Folder size={12} aria-hidden="true" /><b className="font-medium text-text-muted">{member.dir}</b></span>
+          <span className={meta}>
+            <Folder size={12} aria-hidden="true" />
+            <b className="font-medium text-text-muted">{member.dir}</b>
+          </span>
           {member.tree ? (
-            <span className={meta}><GitBranch size={12} aria-hidden="true" />工作树 <b className="font-medium text-text-muted">{member.tree}</b></span>
+            <span className={meta}>
+              <GitBranch size={12} aria-hidden="true" />
+              工作树 <b className="font-medium text-text-muted">{member.tree}</b>
+            </span>
           ) : null}
           {actor?.nascent ? (
-            <span className={meta}>归属 <b className="font-medium text-text-muted">Space</b></span>
+            <span className={meta}>
+              归属 <b className="font-medium text-text-muted">Space</b>
+            </span>
           ) : (
-            <span className={meta}><Brain size={12} aria-hidden="true" />自己的记忆 <b className="font-medium text-text-muted">{actor?.memN ?? 0} 条</b></span>
+            <span className={meta}>
+              <Brain size={12} aria-hidden="true" />
+              自己的记忆 <b className="font-medium text-text-muted">{actor?.memN ?? 0} 条</b>
+            </span>
           )}
         </p>
       </div>

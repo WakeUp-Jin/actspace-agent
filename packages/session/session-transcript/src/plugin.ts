@@ -1,21 +1,43 @@
 import { existsSync } from "node:fs";
 import { mkdir, open, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { ACTSPACE_SERVICE_IDS, containNotification, getService, provideService, serviceKey, serviceView, type CordisContext } from "@actspace/cordis-adapter";
+import {
+  ACTSPACE_SERVICE_IDS,
+  containNotification,
+  getService,
+  provideService,
+  serviceKey,
+  serviceView,
+  type CordisContext,
+} from "@actspace/cordis-adapter";
 import { PROMPT_HOST_PORT } from "@actspace/prompt";
 import { runtimeInfo } from "@actspace/prompt/source-support";
 import type { SessionEventEnvelopeV1, SessionHeaderV1 } from "@actspace/session-journal";
 import { sessionsRoot, transcriptPath } from "./paths.js";
 import { PLUGIN_ID, PROMPT_ID, sessionHistorySection } from "./prompt.js";
-import { EMPTY_TRANSCRIPT, foldTranscript, inheritedThroughSeq, reduceSubagentFacts, reduceTranscript, renderTranscript, type TranscriptBranch, type TranscriptState, type TranscriptSubagentFacts } from "./render.js";
+import {
+  EMPTY_TRANSCRIPT,
+  foldTranscript,
+  inheritedThroughSeq,
+  reduceSubagentFacts,
+  reduceTranscript,
+  renderTranscript,
+  type TranscriptBranch,
+  type TranscriptState,
+  type TranscriptSubagentFacts,
+} from "./render.js";
 
 type OpenSession = {
   readonly header: SessionHeaderV1;
-  readonly journal: { project<T>(key: symbol, initial: () => T, reduce: (state: T, event: SessionEventEnvelopeV1) => T): T };
+  readonly journal: {
+    project<T>(key: symbol, initial: () => T, reduce: (state: T, event: SessionEventEnvelopeV1) => T): T;
+  };
 };
 type SessionRuntime = { getOpen(sessionId: string): OpenSession | undefined };
 type SessionStorage = {
-  inspect(sessionId: string): Promise<{ readonly header: SessionHeaderV1 | null; readonly events: readonly SessionEventEnvelopeV1[] }>;
+  inspect(
+    sessionId: string,
+  ): Promise<{ readonly header: SessionHeaderV1 | null; readonly events: readonly SessionEventEnvelopeV1[] }>;
   listSessionIds(): Promise<readonly string[]>;
 };
 type HostSession = { readonly dataRoot: string };
@@ -49,9 +71,15 @@ export class SessionTranscriptService {
   #branchScan: Promise<void> | undefined;
   #closed = false;
 
-  constructor(private readonly ctx: CordisContext, private readonly dataRoot: string) {
+  constructor(
+    private readonly ctx: CordisContext,
+    private readonly dataRoot: string,
+  ) {
     const service = this;
-    const listen = (name: "session/event" | "session/created" | "session/disposed", listener: (...args: never[]) => unknown) => {
+    const listen = (
+      name: "session/event" | "session/created" | "session/disposed",
+      listener: (...args: never[]) => unknown,
+    ) => {
       const remove = ctx.on?.(name, containNotification(ctx, listener as never) as never);
       if (typeof remove === "function") this.#removeListeners.push(remove as () => void);
     };
@@ -59,33 +87,53 @@ export class SessionTranscriptService {
       const sessionId = this?.sessionId;
       if (!sessionId || !event) return;
       if (event.type === "turn/start") service.#activeTurns.add(sessionId);
-      else if (event.type === "turn/end") { service.#activeTurns.delete(sessionId); return service.render(sessionId); }
+      else if (event.type === "turn/end") {
+        service.#activeTurns.delete(sessionId);
+        return service.render(sessionId);
+      }
       // The generated title usually lands after a short first Turn has ended; a manual rename can come any time.
       else if (TITLE_EVENTS.has(event.type)) return service.#retitle(sessionId);
       // A rewind replaced the Journal under a fresh handle; the transcript follows the shorter history.
       else if (event.type === "session/rewound") return service.render(sessionId);
     });
     listen("session/created", (payload: { sessionId: string }) => this.#created(payload.sessionId));
-    listen("session/disposed", (payload: { sessionId: string }) => { this.#activeTurns.delete(payload.sessionId); this.#detachPrompt(payload.sessionId); });
+    listen("session/disposed", (payload: { sessionId: string }) => {
+      this.#activeTurns.delete(payload.sessionId);
+      this.#detachPrompt(payload.sessionId);
+    });
   }
 
-  get root(): string { return sessionsRoot(this.dataRoot); }
+  get root(): string {
+    return sessionsRoot(this.dataRoot);
+  }
 
-  hasPrompt(sessionId: string): boolean { return this.#prompts.has(sessionId); }
+  hasPrompt(sessionId: string): boolean {
+    return this.#prompts.has(sessionId);
+  }
 
   /**
    * Rewrite one transcript now, even mid-Turn (calls without a result show `→ running`).
    * The subagent module calls this when an activation starts, after each child `step/end`, and when it settles.
    */
-  refresh(sessionId: string): Promise<void> { return this.render(sessionId); }
+  refresh(sessionId: string): Promise<void> {
+    return this.render(sessionId);
+  }
 
   /** Rewrite one transcript; overlapping requests for the same Session coalesce into one extra pass. */
   render(sessionId: string): Promise<void> {
     const running = this.#running.get(sessionId);
-    if (running) { this.#dirty.add(sessionId); return running; }
+    if (running) {
+      this.#dirty.add(sessionId);
+      return running;
+    }
     const run = (async () => {
-      do { this.#dirty.delete(sessionId); await this.#write(sessionId); } while (this.#dirty.has(sessionId) && !this.#closed);
-    })().finally(() => { this.#running.delete(sessionId); });
+      do {
+        this.#dirty.delete(sessionId);
+        await this.#write(sessionId);
+      } while (this.#dirty.has(sessionId) && !this.#closed);
+    })().finally(() => {
+      this.#running.delete(sessionId);
+    });
     this.#running.set(sessionId, run);
     return run;
   }
@@ -98,13 +146,17 @@ export class SessionTranscriptService {
   #retitle(sessionId: string): Promise<void> | undefined {
     if (this.#activeTurns.has(sessionId)) return undefined;
     let target: string;
-    try { target = transcriptPath(this.dataRoot, sessionId); } catch { return undefined; }
+    try {
+      target = transcriptPath(this.dataRoot, sessionId);
+    } catch {
+      return undefined;
+    }
     return existsSync(target) ? this.render(sessionId) : undefined;
   }
 
   async #write(sessionId: string): Promise<void> {
     // `turn/end` is observed inside the Session's serialized append; leave it before projecting.
-    await new Promise<void>(resolve => setImmediate(resolve));
+    await new Promise<void>((resolve) => setImmediate(resolve));
     if (this.#closed) return;
     const target = transcriptPath(this.dataRoot, sessionId);
     // Ephemeral sessions have no directory and get no transcript.
@@ -121,7 +173,14 @@ export class SessionTranscriptService {
     const live = getService(this.ctx, TRANSCRIPT_SESSIONS_VIEW)?.getOpen(sessionId);
     if (live) {
       const inherited = inheritedThroughSeq(live.header);
-      return { header: live.header, state: live.journal.project(PROJECTION, () => EMPTY_TRANSCRIPT, (state, event) => reduceTranscript(state, event, inherited)) };
+      return {
+        header: live.header,
+        state: live.journal.project(
+          PROJECTION,
+          () => EMPTY_TRANSCRIPT,
+          (state, event) => reduceTranscript(state, event, inherited),
+        ),
+      };
     }
     const snapshot = await this.#storage().inspect(sessionId);
     if (!snapshot.header) return undefined;
@@ -134,7 +193,9 @@ export class SessionTranscriptService {
     if (lineage?.origin !== "delegation") return undefined;
     const live = getService(this.ctx, TRANSCRIPT_SESSIONS_VIEW)?.getOpen(lineage.parentSessionId);
     if (live) return live.journal.project(SUBAGENT_FACTS, () => NO_SUBAGENTS, reduceSubagentFacts)[header.sessionId];
-    const parent = await this.#storage().inspect(lineage.parentSessionId).catch(() => undefined);
+    const parent = await this.#storage()
+      .inspect(lineage.parentSessionId)
+      .catch(() => undefined);
     let facts = NO_SUBAGENTS;
     for (const event of parent?.events ?? []) facts = reduceSubagentFacts(facts, event);
     return facts[header.sessionId];
@@ -143,8 +204,15 @@ export class SessionTranscriptService {
   /** A delegated child is rewritten only when its Journal is newer than its transcript. */
   async #stale(sessionId: string): Promise<boolean> {
     let target: string;
-    try { target = transcriptPath(this.dataRoot, sessionId); } catch { return false; }
-    const [journal, transcript] = await Promise.all([stat(join(dirname(target), "journal.jsonl")).catch(() => null), stat(target).catch(() => null)]);
+    try {
+      target = transcriptPath(this.dataRoot, sessionId);
+    } catch {
+      return false;
+    }
+    const [journal, transcript] = await Promise.all([
+      stat(join(dirname(target), "journal.jsonl")).catch(() => null),
+      stat(target).catch(() => null),
+    ]);
     return journal !== null && (transcript === null || transcript.mtimeMs < journal.mtimeMs);
   }
 
@@ -156,7 +224,8 @@ export class SessionTranscriptService {
     if (lineage && lineage.origin !== "delegation") {
       await this.#ensureBranchIndex();
       // A new side chat or fork adds a mark to the parent's existing transcript.
-      if (this.#noteBranch(session.header) && existsSync(transcriptPath(this.dataRoot, lineage.parentSessionId))) await this.render(lineage.parentSessionId);
+      if (this.#noteBranch(session.header) && existsSync(transcriptPath(this.dataRoot, lineage.parentSessionId)))
+        await this.render(lineage.parentSessionId);
     }
   }
 
@@ -165,14 +234,23 @@ export class SessionTranscriptService {
     const extensions = getService(this.ctx, PROMPT_HOST_PORT)?.extensions;
     if (!extensions) return;
     const section = sessionHistorySection(this.root);
-    this.#prompts.set(sessionId, extensions.registerMainSession(sessionId, {
-      id: PROMPT_ID, owner: PLUGIN_ID, order: 100, criticality: "optional", fields: ["system"],
-      get: (context, write) => {
-        // Chat mode has no file tools to read a transcript with.
-        if (runtimeInfo(context).mode === "chat") return;
-        write({ system: { sections: [{ id: PROMPT_ID, owner: PLUGIN_ID, order: 4800, content: section }], modelFacts: [] } });
-      },
-    }));
+    this.#prompts.set(
+      sessionId,
+      extensions.registerMainSession(sessionId, {
+        id: PROMPT_ID,
+        owner: PLUGIN_ID,
+        order: 100,
+        criticality: "optional",
+        fields: ["system"],
+        get: (context, write) => {
+          // Chat mode has no file tools to read a transcript with.
+          if (runtimeInfo(context).mode === "chat") return;
+          write({
+            system: { sections: [{ id: PROMPT_ID, owner: PLUGIN_ID, order: 4800, content: section }], modelFacts: [] },
+          });
+        },
+      }),
+    );
   }
 
   #detachPrompt(sessionId: string): void {
@@ -200,8 +278,13 @@ export class SessionTranscriptService {
     const lineage = header.lineage;
     if (!lineage || lineage.origin === "delegation") return false;
     const list = this.#branches.get(lineage.parentSessionId) ?? [];
-    if (list.some(item => item.sessionId === header.sessionId)) return false;
-    list.push({ sessionId: header.sessionId, origin: lineage.origin, boundarySeq: lineage.parentBoundarySeq, createdAt: header.createdAt });
+    if (list.some((item) => item.sessionId === header.sessionId)) return false;
+    list.push({
+      sessionId: header.sessionId,
+      origin: lineage.origin,
+      boundarySeq: lineage.parentBoundarySeq,
+      createdAt: header.createdAt,
+    });
     list.sort((a, b) => a.boundarySeq - b.boundarySeq || a.sessionId.localeCompare(b.sessionId));
     this.#branches.set(lineage.parentSessionId, list);
     return true;
@@ -250,8 +333,14 @@ async function readHeader(path: string): Promise<SessionHeaderV1 | undefined> {
       if (newline !== -1) break;
     }
     const value = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Partial<SessionHeaderV1>;
-    return value.recordKind === "header" && typeof value.sessionId === "string" ? value as SessionHeaderV1 : undefined;
-  } catch { return undefined; } finally { await file.close(); }
+    return value.recordKind === "header" && typeof value.sessionId === "string"
+      ? (value as SessionHeaderV1)
+      : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    await file.close();
+  }
 }
 
 export function apply(ctx: CordisContext): void {

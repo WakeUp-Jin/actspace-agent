@@ -63,9 +63,7 @@ function parseTask(item: ListItem, sourcePath: string): RoadmapItem {
 
   const match = COMPLETED_PATTERN.exec(text);
   if (!match) {
-    throw new RoadmapParseError(
-      `${location(sourcePath, line)}：已完成项目必须使用“标题 — 完成于 YYYY-MM-DD”格式。`,
-    );
+    throw new RoadmapParseError(`${location(sourcePath, line)}：已完成项目必须使用“标题 — 完成于 YYYY-MM-DD”格式。`);
   }
   const [, title, completedAt] = match;
   if (!title.trim()) {

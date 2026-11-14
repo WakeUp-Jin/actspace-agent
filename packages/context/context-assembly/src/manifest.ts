@@ -5,7 +5,13 @@ export const CONTEXT_ASSEMBLY_SERVICE_ID = "context.assembly" as const;
 export const DEFAULT_REQUIRED_CONTEXT_KINDS: readonly string[] = Object.freeze(["system", "conversation"]);
 
 export const manifest = defineBuiltinPluginManifest({
-  display: { title: "上下文装配", description: "登记每个上下文来源，按 Agent 角色拼出每轮请求的上下文", scope: "session", defaultEnabled: true, canDisable: false },
+  display: {
+    title: "上下文装配",
+    description: "登记每个上下文来源，按 Agent 角色拼出每轮请求的上下文",
+    scope: "session",
+    defaultEnabled: true,
+    canDisable: false,
+  },
   pluginId: "actspace.context-assembly",
   version: "0.1.0",
   name: "ActSpace Context Assembly",

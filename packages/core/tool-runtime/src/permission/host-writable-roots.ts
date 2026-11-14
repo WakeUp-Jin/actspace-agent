@@ -13,16 +13,24 @@ export const HOST_WRITABLE_ROOTS_SERVICE_ID = "actspace.host-writable-roots";
  */
 export class HostWritableRoots {
   readonly #roots = new Set<string>();
-  add(root: string): void { this.#roots.add(canonical(root)); }
+  add(root: string): void {
+    this.#roots.add(canonical(root));
+  }
   has(canonicalPath: string): boolean {
     for (const root of this.#roots) if (isPathWithin(root, canonicalPath)) return true;
     return false;
   }
-  remove(root: string): void { this.#roots.delete(canonical(root)); }
+  remove(root: string): void {
+    this.#roots.delete(canonical(root));
+  }
 }
 
 export const HOST_WRITABLE_ROOTS_SERVICE = serviceKey<HostWritableRoots>(HOST_WRITABLE_ROOTS_SERVICE_ID);
 
 function canonical(path: string): string {
-  try { return realpathSync(path); } catch { return resolve(path); }
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
 }

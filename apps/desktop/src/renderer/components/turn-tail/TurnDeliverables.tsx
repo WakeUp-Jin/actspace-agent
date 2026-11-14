@@ -39,7 +39,11 @@ export function cardDescription(description: string | undefined, fallback: strin
   return trimmed ? trimmed : fallback;
 }
 
-export function TurnDeliverables({ files, sessionId, workspaceRoot }: {
+export function TurnDeliverables({
+  files,
+  sessionId,
+  workspaceRoot,
+}: {
   files: readonly TurnPresentedFile[];
   sessionId: string | null;
   workspaceRoot?: string | null;
@@ -50,7 +54,9 @@ export function TurnDeliverables({ files, sessionId, workspaceRoot }: {
   const shown = collapsible && !expanded ? files.slice(0, COLLAPSED_PRESENTED_COUNT) : files;
   return (
     <div className="@container flex min-w-0 flex-col gap-4" data-turn-deliverables>
-      <div className={`grid min-w-0 gap-2.5 ${files.length === 1 ? "grid-cols-1" : "grid-cols-2 @max-[620px]:grid-cols-1"}`}>
+      <div
+        className={`grid min-w-0 gap-2.5 ${files.length === 1 ? "grid-cols-1" : "grid-cols-2 @max-[620px]:grid-cols-1"}`}
+      >
         {shown.map((file) => (
           <PresentedFileCard key={file.path} file={file} sessionId={sessionId} workspaceRoot={workspaceRoot} />
         ))}
@@ -71,7 +77,11 @@ export function TurnDeliverables({ files, sessionId, workspaceRoot }: {
   );
 }
 
-function PresentedFileCard({ file, sessionId, workspaceRoot }: {
+function PresentedFileCard({
+  file,
+  sessionId,
+  workspaceRoot,
+}: {
   file: TurnPresentedFile;
   sessionId: string | null;
   workspaceRoot?: string | null;
@@ -86,7 +96,14 @@ function PresentedFileCard({ file, sessionId, workspaceRoot }: {
   const [fading, setFading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const timers = useRef<number[]>([]);
-  useEffect(() => () => { timers.current.forEach((timer) => { window.clearTimeout(timer); }); }, []);
+  useEffect(
+    () => () => {
+      timers.current.forEach((timer) => {
+        window.clearTimeout(timer);
+      });
+    },
+    [],
+  );
 
   const name = basename(file.path);
   const pending = phase === "opening" || phase === "revealing";
@@ -95,13 +112,18 @@ function PresentedFileCard({ file, sessionId, workspaceRoot }: {
   const status = phase ? PHASE_TEXT[phase] : previewError;
 
   function settle(next: Phase) {
-    timers.current.forEach((timer) => { window.clearTimeout(timer); });
+    timers.current.forEach((timer) => {
+      window.clearTimeout(timer);
+    });
     setFading(false);
     setPhase(next);
     if (next !== "opened" && next !== "revealed") return;
     timers.current = [
       window.setTimeout(() => setFading(true), PRESENTED_SUCCESS_HOLD_MS),
-      window.setTimeout(() => { setPhase(null); setFading(false); }, PRESENTED_SUCCESS_HOLD_MS + PRESENTED_SUCCESS_FADE_MS),
+      window.setTimeout(() => {
+        setPhase(null);
+        setFading(false);
+      }, PRESENTED_SUCCESS_HOLD_MS + PRESENTED_SUCCESS_FADE_MS),
     ];
   }
 
@@ -117,7 +139,7 @@ function PresentedFileCard({ file, sessionId, workspaceRoot }: {
         action: reveal ? "reveal" : "open",
         ...(operation.kind === "application" ? { applicationId: operation.id } : {}),
       });
-      settle(result.ok ? reveal ? "revealed" : "opened" : reveal ? "revealError" : "error");
+      settle(result.ok ? (reveal ? "revealed" : "opened") : reveal ? "revealError" : "error");
     } catch {
       settle(reveal ? "revealError" : "error");
     }
@@ -130,7 +152,9 @@ function PresentedFileCard({ file, sessionId, workspaceRoot }: {
 
   async function showMenu() {
     setPhase(null);
-    setPreviewError(await showTurnFileMenu({ sessionId, workspaceRoot, relativePath: file.path, remote: isRemote, openTab }));
+    setPreviewError(
+      await showTurnFileMenu({ sessionId, workspaceRoot, relativePath: file.path, remote: isRemote, openTab }),
+    );
   }
 
   return (

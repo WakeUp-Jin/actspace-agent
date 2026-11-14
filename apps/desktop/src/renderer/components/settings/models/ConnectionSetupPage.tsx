@@ -8,7 +8,10 @@ import { PageHeader, SegmentedControl, SettingGroup, SettingsInput } from "../Se
 import { FieldRow } from "./model-fields";
 import { useModelsPage, type ConnectionDraft } from "./ModelsPage";
 
-const PROTOCOLS = (Object.keys(PROTOCOL_LABELS) as ModelApi[]).map((value) => ({ value, label: PROTOCOL_LABELS[value] }));
+const PROTOCOLS = (Object.keys(PROTOCOL_LABELS) as ModelApi[]).map((value) => ({
+  value,
+  label: PROTOCOL_LABELS[value],
+}));
 
 /**
  * 添加连接第二步：官方服务只填 Key；中转还要选协议、填地址。地址和代理收在「高级设置」里。
@@ -42,7 +45,12 @@ export function ConnectionSetupPage({ draft }: { draft: ConnectionDraft }) {
         return;
       }
       const result = await controller.run(
-        () => modelConnectionsApi.create({ ...fields, ...(probe.resolvedAuth ? { resolvedAuth: probe.resolvedAuth } : {}), models: [] }),
+        () =>
+          modelConnectionsApi.create({
+            ...fields,
+            ...(probe.resolvedAuth ? { resolvedAuth: probe.resolvedAuth } : {}),
+            models: [],
+          }),
         "连接已保存",
       );
       if ("error" in result) {
@@ -61,7 +69,14 @@ export function ConnectionSetupPage({ draft }: { draft: ConnectionDraft }) {
 
   const address = (
     <FieldRow label="服务地址">
-      <SettingsInput width="full" mono value={draft.baseUrl} onChange={(event) => update({ baseUrl: event.target.value })} placeholder={relay ? "https://your-relay.com" : template.defaultBaseUrl} aria-label="服务地址" />
+      <SettingsInput
+        width="full"
+        mono
+        value={draft.baseUrl}
+        onChange={(event) => update({ baseUrl: event.target.value })}
+        placeholder={relay ? "https://your-relay.com" : template.defaultBaseUrl}
+        aria-label="服务地址"
+      />
     </FieldRow>
   );
   return (
@@ -76,31 +91,73 @@ export function ConnectionSetupPage({ draft }: { draft: ConnectionDraft }) {
         {relay ? (
           <>
             <FieldRow label="协议">
-              <SegmentedControl ariaLabel="协议" value={draft.protocol} options={PROTOCOLS} onChange={(protocol) => update({ protocol })} />
+              <SegmentedControl
+                ariaLabel="协议"
+                value={draft.protocol}
+                options={PROTOCOLS}
+                onChange={(protocol) => update({ protocol })}
+              />
             </FieldRow>
             {address}
           </>
         ) : null}
         <FieldRow label="API Key">
-          <SettingsInput width="full" mono type="password" autoComplete="off" value={draft.apiKey} onChange={(event) => update({ apiKey: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter") void connect(); }} placeholder="粘贴 Key" aria-label="API Key" />
+          <SettingsInput
+            width="full"
+            mono
+            type="password"
+            autoComplete="off"
+            value={draft.apiKey}
+            onChange={(event) => update({ apiKey: event.target.value })}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void connect();
+            }}
+            placeholder="粘贴 Key"
+            aria-label="API Key"
+          />
         </FieldRow>
         {advanced ? (
           <>
             {relay ? null : address}
             <FieldRow label="代理">
-              <SettingsInput width="full" mono value={draft.proxyUrl} onChange={(event) => update({ proxyUrl: event.target.value })} placeholder="http://127.0.0.1:7890" aria-label="代理" />
+              <SettingsInput
+                width="full"
+                mono
+                value={draft.proxyUrl}
+                onChange={(event) => update({ proxyUrl: event.target.value })}
+                placeholder="http://127.0.0.1:7890"
+                aria-label="代理"
+              />
             </FieldRow>
           </>
         ) : null}
         <div className="flex items-center gap-2.5 px-4 py-3 max-[600px]:flex-wrap">
-          <Button variant="ghost" size="xs" className="-ml-2" aria-expanded={advanced} onClick={() => setAdvanced((value) => !value)}>
-            <ChevronRight size={13} aria-hidden="true" className={cx("transition-transform", advanced && "rotate-90")} />
+          <Button
+            variant="ghost"
+            size="xs"
+            className="-ml-2"
+            aria-expanded={advanced}
+            onClick={() => setAdvanced((value) => !value)}
+          >
+            <ChevronRight
+              size={13}
+              aria-hidden="true"
+              className={cx("transition-transform", advanced && "rotate-90")}
+            />
             高级设置
           </Button>
-          <span role={error ? "alert" : undefined} className={cx("min-w-0 flex-1 text-right text-act-xs max-[600px]:text-left", error ? "text-on-danger" : "text-text-faint")}>
+          <span
+            role={error ? "alert" : undefined}
+            className={cx(
+              "min-w-0 flex-1 text-right text-act-xs max-[600px]:text-left",
+              error ? "text-on-danger" : "text-text-faint",
+            )}
+          >
             {error}
           </span>
-          <Button variant="primary" busy={busy} disabled={busy} onClick={() => void connect()}>{busy ? "正在连接" : "连接"}</Button>
+          <Button variant="primary" busy={busy} disabled={busy} onClick={() => void connect()}>
+            {busy ? "正在连接" : "连接"}
+          </Button>
         </div>
       </SettingGroup>
     </>

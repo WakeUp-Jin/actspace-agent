@@ -133,8 +133,28 @@ const USAGE_AT = 4.5;
 // 时间线上的每一段：[起点 %, 宽度 %]。工具那一行里有一次失败的调用，照样记着。
 const LANES = [
   { name: "输入", tone: "input", segments: [[1, 5]] },
-  { name: "模型", tone: "model", segments: [[8, 9], [27, 7], [46, 7], [66, 6], [86, 10]] },
-  { name: "工具", tone: "tool", segments: [[18, 8], [35, 10], [54, 5, "fail"], [60, 5], [73, 12]] },
+  {
+    name: "模型",
+    tone: "model",
+    segments: [
+      [8, 9],
+      [27, 7],
+      [46, 7],
+      [66, 6],
+      [86, 10],
+    ],
+  },
+  {
+    name: "工具",
+    tone: "tool",
+    segments: [
+      [18, 8],
+      [35, 10],
+      [54, 5, "fail"],
+      [60, 5],
+      [73, 12],
+    ],
+  },
 ];
 
 const lanes = LANES.map(
@@ -158,7 +178,8 @@ const CHANGES = [
   { path: "src/lib/validate.test.ts", plus: 10, minus: 0 },
 ];
 
-const diff = (plus, minus) => `<span class="diff mono"><em class="plus">+${plus}</em><em class="minus">−${minus}</em></span>`;
+const diff = (plus, minus) =>
+  `<span class="diff mono"><em class="plus">+${plus}</em><em class="minus">−${minus}</em></span>`;
 
 const record = feature({
   id: "record",

@@ -7,11 +7,19 @@ import { SPACE_DEMO_ENABLED } from "./space/space-demo-enabled";
  * Space 演示在生产构建里是常量 false，这里的动态 import 随分支一起被删掉，不会产生多余的 chunk。
  */
 
-export const SettingsPage = lazy(() => import("./settings/SettingsPage").then((module) => ({ default: module.SettingsPage })));
-export const ExtensionsPage = lazy(() => import("./extensions/ExtensionsPage").then((module) => ({ default: module.ExtensionsPage })));
-export const TrajectoryView = lazy(() => import("./TrajectoryView").then((module) => ({ default: module.TrajectoryView })));
+export const SettingsPage = lazy(() =>
+  import("./settings/SettingsPage").then((module) => ({ default: module.SettingsPage })),
+);
+export const ExtensionsPage = lazy(() =>
+  import("./extensions/ExtensionsPage").then((module) => ({ default: module.ExtensionsPage })),
+);
+export const TrajectoryView = lazy(() =>
+  import("./TrajectoryView").then((module) => ({ default: module.TrajectoryView })),
+);
 
-export const SubagentsPanel = lazy(() => import("./right-panel/SubagentsPanel").then((module) => ({ default: module.SubagentsPanel })));
+export const SubagentsPanel = lazy(() =>
+  import("./right-panel/SubagentsPanel").then((module) => ({ default: module.SubagentsPanel })),
+);
 
 const Disabled: ComponentType<never> = () => null;
 
@@ -28,7 +36,9 @@ export const SpaceTabBar = SPACE_DEMO_ENABLED
   ? lazy(() => import("./space/tabs/SpaceTabBar").then((module) => ({ default: module.SpaceTabBar })))
   : (Disabled as ComponentType);
 export const SpaceDemoHelpButton = SPACE_DEMO_ENABLED
-  ? lazy(() => import("./space/dialogs/SpaceDemoHelpDialog").then((module) => ({ default: module.SpaceDemoHelpButton })))
+  ? lazy(() =>
+      import("./space/dialogs/SpaceDemoHelpDialog").then((module) => ({ default: module.SpaceDemoHelpButton })),
+    )
   : (Disabled as ComponentType);
 export const NewSpaceDialog = SPACE_DEMO_ENABLED
   ? lazy(() => import("./space/dialogs/NewSpaceDialog").then((module) => ({ default: module.NewSpaceDialog })))

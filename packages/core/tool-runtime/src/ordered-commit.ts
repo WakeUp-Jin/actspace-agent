@@ -23,7 +23,15 @@ export class OrderedToolCommitQueue {
     const index = this.#reserved++;
     let used = false;
     const submit = <T>(action: () => Promise<T>): Promise<T> => {
-      if (used) return Promise.reject(new ToolRuntimeError({ code: "TOOL_COMMIT_FAILED", message: `Commit slot ${index} was already used.`, retryable: false, phase: "commit" }));
+      if (used)
+        return Promise.reject(
+          new ToolRuntimeError({
+            code: "TOOL_COMMIT_FAILED",
+            message: `Commit slot ${index} was already used.`,
+            retryable: false,
+            phase: "commit",
+          }),
+        );
       used = true;
       if (this.#failure !== undefined) return Promise.reject(this.#failure);
       return new Promise<T>((resolve, reject) => {

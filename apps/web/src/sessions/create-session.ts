@@ -15,15 +15,23 @@ export type CreateInput = {
 
 /** 带步骤名的错误；cause 保留原始错误，供 reportError 判断 HostError。 */
 export class CreateSessionError extends Error {
-  constructor(readonly step: CreateStep, readonly cause: unknown) {
+  constructor(
+    readonly step: CreateStep,
+    readonly cause: unknown,
+  ) {
     super(`${STEP_LABELS[step]}失败：${cause instanceof Error ? cause.message : String(cause)}`);
     this.name = "CreateSessionError";
   }
 }
 
-const STEP_LABELS: Record<CreateStep, string> = { create: "创建会话", mode: "切换模式", configure: "设置模型", submit: "发送消息" };
+const STEP_LABELS: Record<CreateStep, string> = {
+  create: "创建会话",
+  mode: "切换模式",
+  configure: "设置模型",
+  submit: "发送消息",
+};
 export const STEP_PROGRESS: Record<CreateStep, (host: string) => string> = {
-  create: host => `在 ${host} 上创建会话…`,
+  create: (host) => `在 ${host} 上创建会话…`,
   mode: () => "切换模式…",
   configure: () => "设置模型…",
   submit: () => "启动 Agent…",
@@ -31,27 +39,57 @@ export const STEP_PROGRESS: Record<CreateStep, (host: string) => string> = {
 
 async function run<T>(step: CreateStep, onStep: CreateInput["onStep"], action: () => Promise<T>): Promise<T> {
   onStep?.(step);
-  try { return await action(); } catch (error) { throw new CreateSessionError(step, error); }
+  try {
+    return await action();
+  } catch (error) {
+    throw new CreateSessionError(step, error);
+  }
 }
 
 /** 成功返回 sessionId。`sessions.create` 的返回值是会话快照，其 agentModeRevision 就是 expectedRevision（缺省 0）。 */
 export async function createSession(client: Pick<HostClient, "call">, input: CreateInput): Promise<string> {
-  const created = await run("create", input.onStep, () => client.call("sessions.create", { workspaceId: input.workspaceId, agentForm: input.mode === "chat" ? "chat" : "agent" })) as { sessionId: string; agentModeRevision?: number };
+  const created = (await run("create", input.onStep, () =>
+    client.call("sessions.create", {
+      workspaceId: input.workspaceId,
+      agentForm: input.mode === "chat" ? "chat" : "agent",
+    }),
+  )) as { sessionId: string; agentModeRevision?: number };
   const sessionId = created.sessionId;
   if (input.mode === "plan") {
-    await run("mode", input.onStep, () => client.call("sessions.update", { sessionId, patch: { mode: "plan", expectedRevision: created.agentModeRevision ?? 0 } }));
+    await run("mode", input.onStep, () =>
+      client.call("sessions.update", {
+        sessionId,
+        patch: { mode: "plan", expectedRevision: created.agentModeRevision ?? 0 },
+      }),
+    );
   }
   if (input.model) {
-    await run("configure", input.onStep, () => client.call("tasks.command", { sessionId, op: "configure", configuration: { model: input.model } }));
+    await run("configure", input.onStep, () =>
+      client.call("tasks.command", { sessionId, op: "configure", configuration: { model: input.model } }),
+    );
   }
-  await run("submit", input.onStep, () => client.call("tasks.submit", { sessionId, submissionId: input.submissionId ?? crypto.randomUUID(), content: input.content }));
+  await run("submit", input.onStep, () =>
+    client.call("tasks.submit", {
+      sessionId,
+      submissionId: input.submissionId ?? crypto.randomUUID(),
+      content: input.content,
+    }),
+  );
   return sessionId;
 }
 
 const LAST_WORKSPACE_KEY = "actspace.web.lastWorkspace";
 export function readLastWorkspace(): string | null {
-  try { return localStorage.getItem(LAST_WORKSPACE_KEY); } catch { return null; }
+  try {
+    return localStorage.getItem(LAST_WORKSPACE_KEY);
+  } catch {
+    return null;
+  }
 }
 export function writeLastWorkspace(id: string): void {
-  try { localStorage.setItem(LAST_WORKSPACE_KEY, id); } catch { /* 只在本次页面内有效 */ }
+  try {
+    localStorage.setItem(LAST_WORKSPACE_KEY, id);
+  } catch {
+    /* 只在本次页面内有效 */
+  }
 }

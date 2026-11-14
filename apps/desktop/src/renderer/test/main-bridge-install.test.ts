@@ -27,7 +27,9 @@ describe("renderer bridge bootstrap", () => {
   });
 
   afterEach(() => {
-    act(() => { for (const root of mountedRoots.splice(0)) root.unmount(); });
+    act(() => {
+      for (const root of mountedRoots.splice(0)) root.unmount();
+    });
     vi.unstubAllEnvs();
     vi.resetModules();
     clearBridge();
@@ -50,7 +52,10 @@ describe("renderer bridge bootstrap", () => {
 
     for (const [domain, members] of Object.entries(desktopBridgeContract)) {
       for (const member of Object.keys(members)) {
-        expect(typeof (window.actspace as unknown as Record<string, Record<string, unknown>>)[domain]?.[member], `${domain}.${member}`).toBe("function");
+        expect(
+          typeof (window.actspace as unknown as Record<string, Record<string, unknown>>)[domain]?.[member],
+          `${domain}.${member}`,
+        ).toBe("function");
       }
     }
     expect(window.actspace).not.toHaveProperty("listSessionPage");

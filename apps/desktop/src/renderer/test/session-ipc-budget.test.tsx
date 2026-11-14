@@ -36,27 +36,93 @@ function counter() {
 }
 
 function listItem(index: number): SessionListItem {
-  return { id: `s-${index}`, title: `Session ${index}`, updatedAt: NOW, agentRunCount: 1, workspaceRoot: "/tmp/workspace" };
+  return {
+    id: `s-${index}`,
+    title: `Session ${index}`,
+    updatedAt: NOW,
+    agentRunCount: 1,
+    workspaceRoot: "/tmp/workspace",
+  };
 }
 
 function eventsRecord(id: string, events: SessionEvent[], title = id): SessionRecord {
-  return { meta: { schemaVersion: 2, id, title, createdAt: NOW, updatedAt: NOW, agentRunCount: 1, workspaceRoot: "/tmp/workspace" }, events };
+  return {
+    meta: {
+      schemaVersion: 2,
+      id,
+      title,
+      createdAt: NOW,
+      updatedAt: NOW,
+      agentRunCount: 1,
+      workspaceRoot: "/tmp/workspace",
+    },
+    events,
+  };
 }
 
-function message(sessionId: string, seq: number, type: "user_message" | "assistant_message", content: string): SessionEvent {
-  return { id: `v2-${seq}`, schemaVersion: 2, sessionId, agentRunId: `run-${Math.floor(seq / 2)}`, type, timestamp: NOW, payload: { content } };
+function message(
+  sessionId: string,
+  seq: number,
+  type: "user_message" | "assistant_message",
+  content: string,
+): SessionEvent {
+  return {
+    id: `v2-${seq}`,
+    schemaVersion: 2,
+    sessionId,
+    agentRunId: `run-${Math.floor(seq / 2)}`,
+    type,
+    timestamp: NOW,
+    payload: { content },
+  };
 }
 
-function install(input: { items: SessionListItem[]; page: (args: { sessionId: string; beforeSeq?: number }) => unknown; listPage?: (args?: { after?: string }) => unknown }) {
+function install(input: {
+  items: SessionListItem[];
+  page: (args: { sessionId: string; beforeSeq?: number }) => unknown;
+  listPage?: (args?: { after?: string }) => unknown;
+}) {
   const c = counter();
   setupBridge({
-    "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    "workspaces.list": async () => ({ version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: NOW, updatedAt: NOW }] }),
+    "app.getBootstrapState": async () => ({
+      appVersion: "test",
+      dataRoot: "/tmp/test",
+      sessionRoot: "/tmp/test",
+      logRoot: "/tmp/test",
+      tmpRoot: "/tmp/test",
+      workspaceRoot: "/tmp/workspace",
+    }),
+    "workspaces.list": async () => ({
+      version: 1,
+      items: [
+        {
+          id: "default",
+          kind: "folder",
+          label: "workspace",
+          path: "/tmp/workspace",
+          order: 0,
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ],
+    }),
     "sessions.list": async () => input.items,
-    "sessions.listPage": async (args?: { after?: string }) => input.listPage?.(args) ?? ({ items: input.items, groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }], indexing: false, failed: 0 }),
+    "sessions.listPage": async (args?: { after?: string }) =>
+      input.listPage?.(args) ?? {
+        items: input.items,
+        groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }],
+        indexing: false,
+        failed: 0,
+      },
     "sessions.rename": async () => ({ ok: true }),
-    "sessions.getPage": async (args: { sessionId: string; beforeSeq?: number }) => { c.counts.getPage++; return input.page(args); },
-    "approvals.listPending": async () => { c.counts.listPending++; return []; },
+    "sessions.getPage": async (args: { sessionId: string; beforeSeq?: number }) => {
+      c.counts.getPage++;
+      return input.page(args);
+    },
+    "approvals.listPending": async () => {
+      c.counts.listPending++;
+      return [];
+    },
     "tasks.command": async (command: { sessionId: string }) => {
       c.counts.taskCommand++;
       return { snapshot: { sessionId: command.sessionId, revision: 1, paused: false, tasks: [], queue: [], runs: [] } };
@@ -68,12 +134,18 @@ function install(input: { items: SessionListItem[]; page: (args: { sessionId: st
 }
 
 function renderApp() {
-  return render(<TooltipProvider><App /></TooltipProvider>);
+  return render(
+    <TooltipProvider>
+      <App />
+    </TooltipProvider>,
+  );
 }
 
 describe("session IPC budget", () => {
   // 预算按「侧栏行全部挂上」来量：单列表不折叠，按工作区分组每组只先显示 5 条。
-  beforeEach(() => { localStorage.setItem(SIDEBAR_VIEW_STORAGE_KEY, JSON.stringify({ options: { groupBy: "flat" } })); });
+  beforeEach(() => {
+    localStorage.setItem(SIDEBAR_VIEW_STORAGE_KEY, JSON.stringify({ options: { groupBy: "flat" } }));
+  });
   it("catalog rows without pending tasks do not recover background history", async () => {
     const items = Array.from({ length: 20 }, (_, index) => ({ ...listItem(index), hasPendingTasks: false }));
     const c = install({ items, page: ({ sessionId }) => recordProjectionFixture(eventsRecord(sessionId, [])) });
@@ -85,7 +157,11 @@ describe("session IPC budget", () => {
   });
   it("100 sessions: mount, then rename one title", { timeout: 30_000 }, async () => {
     const items = Array.from({ length: 100 }, (_, index) => listItem(index));
-    const c = install({ items, page: ({ sessionId }) => recordProjectionFixture(eventsRecord(sessionId, [message(sessionId, 0, "user_message", `hello ${sessionId}`)])) });
+    const c = install({
+      items,
+      page: ({ sessionId }) =>
+        recordProjectionFixture(eventsRecord(sessionId, [message(sessionId, 0, "user_message", `hello ${sessionId}`)])),
+    });
     renderApp();
     await waitFor(() => expect(document.querySelectorAll(".session-row")).toHaveLength(100), { timeout: 10_000 });
     await waitFor(() => expect(c.counts.listPending).toBeGreaterThan(0));
@@ -105,20 +181,37 @@ describe("session IPC budget", () => {
 
     budget.mount100 = mounted;
     expect(mounted.createMessageBlocks).toBeLessThanOrEqual(4);
-    budget.rename = Object.fromEntries(Object.entries(renamed).map(([key, value]) => [key, value - mounted[key as keyof typeof mounted]]));
+    budget.rename = Object.fromEntries(
+      Object.entries(renamed).map(([key, value]) => [key, value - mounted[key as keyof typeof mounted]]),
+    );
     expect(budget.rename).toMatchObject({ listPending: 0, taskCommand: 0 });
   });
 
   it("loading one more sidebar page of M sessions hydrates exactly those M", { timeout: 30_000 }, async () => {
     const M = 15;
     const first = Array.from({ length: 20 }, (_, index) => listItem(index));
-    const second = Array.from({ length: M }, (_, index) => ({ ...listItem(20 + index), updatedAt: "2026-10-05T00:00:00.000Z" }));
+    const second = Array.from({ length: M }, (_, index) => ({
+      ...listItem(20 + index),
+      updatedAt: "2026-10-05T00:00:00.000Z",
+    }));
     const c = install({
       items: first,
-      page: ({ sessionId }) => recordProjectionFixture(eventsRecord(sessionId, [message(sessionId, 0, "user_message", `hello ${sessionId}`)])),
-      listPage: (args) => args?.after
-        ? { items: second, groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }], indexing: false, failed: 0 }
-        : { items: first, groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: true }], indexing: false, failed: 0 },
+      page: ({ sessionId }) =>
+        recordProjectionFixture(eventsRecord(sessionId, [message(sessionId, 0, "user_message", `hello ${sessionId}`)])),
+      listPage: (args) =>
+        args?.after
+          ? {
+              items: second,
+              groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }],
+              indexing: false,
+              failed: 0,
+            }
+          : {
+              items: first,
+              groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: true }],
+              indexing: false,
+              failed: 0,
+            },
     });
     renderApp();
     await waitFor(() => expect(document.querySelectorAll(".session-row")).toHaveLength(20), { timeout: 10_000 });
@@ -128,13 +221,23 @@ describe("session IPC budget", () => {
     await waitFor(() => expect(document.querySelectorAll(".session-row")).toHaveLength(20 + M));
     await settle();
     const after = c.snapshot();
-    budget.morePage = Object.fromEntries(Object.entries(after).map(([key, value]) => [key, value - before[key as keyof typeof before]]));
+    budget.morePage = Object.fromEntries(
+      Object.entries(after).map(([key, value]) => [key, value - before[key as keyof typeof before]]),
+    );
     expect(budget.morePage).toMatchObject({ listPending: M, taskCommand: M });
   });
 
   it("one session with 2000 events: open", { timeout: 30_000 }, async () => {
-    const events = Array.from({ length: 2000 }, (_, seq) => message("big", seq, seq % 2 === 0 ? "user_message" : "assistant_message", `message ${seq}`));
-    const c = install({ items: [listItem(0), { ...listItem(1), id: "big", title: "Big session" }], page: ({ sessionId }) => recordProjectionFixture(eventsRecord(sessionId, sessionId === "big" ? events : [message(sessionId, 0, "user_message", "hello")])) });
+    const events = Array.from({ length: 2000 }, (_, seq) =>
+      message("big", seq, seq % 2 === 0 ? "user_message" : "assistant_message", `message ${seq}`),
+    );
+    const c = install({
+      items: [listItem(0), { ...listItem(1), id: "big", title: "Big session" }],
+      page: ({ sessionId }) =>
+        recordProjectionFixture(
+          eventsRecord(sessionId, sessionId === "big" ? events : [message(sessionId, 0, "user_message", "hello")]),
+        ),
+    });
     renderApp();
     await screen.findByText("Big session");
     await settle();
@@ -143,7 +246,9 @@ describe("session IPC budget", () => {
     await screen.findByText("message 1999");
     await settle();
     const after = c.snapshot();
-    budget.open2000 = Object.fromEntries(Object.entries(after).map(([key, value]) => [key, value - before[key as keyof typeof before]]));
+    budget.open2000 = Object.fromEntries(
+      Object.entries(after).map(([key, value]) => [key, value - before[key as keyof typeof before]]),
+    );
     expect(budget.open2000.createMessageBlocks).toBeLessThanOrEqual(5);
   });
 
@@ -151,7 +256,11 @@ describe("session IPC budget", () => {
     const PAGES = 11; // 最新一页 + 10 页早期历史
     const pageFor = (index: number) => {
       const seq = (PAGES - 1 - index) * 10;
-      const record = eventsRecord("paged", [message("paged", seq, "user_message", `Question ${index}`)], "Paged session");
+      const record = eventsRecord(
+        "paged",
+        [message("paged", seq, "user_message", `Question ${index}`)],
+        "Paged session",
+      );
       const base = recordProjectionFixture(record);
       const events = base.window.events.map((event) => ({ ...event, seq }));
       const beforeSeq = index === PAGES - 1 ? null : seq;
@@ -159,7 +268,13 @@ describe("session IPC budget", () => {
         ...base,
         throughJournalSeq: (PAGES - 1) * 10,
         snapshot: { ...base.snapshot, throughJournalSeq: (PAGES - 1) * 10 },
-        window: { ...base.window, events, fromSeq: seq, throughJournalSeq: index === 0 ? (PAGES - 1) * 10 : seq + 9, beforeSeq },
+        window: {
+          ...base.window,
+          events,
+          fromSeq: seq,
+          throughJournalSeq: index === 0 ? (PAGES - 1) * 10 : seq + 9,
+          beforeSeq,
+        },
       };
     };
     const c = install({
@@ -176,7 +291,9 @@ describe("session IPC budget", () => {
       await settle();
     }
     const after = c.snapshot();
-    budget.earlier10 = Object.fromEntries(Object.entries(after).map(([key, value]) => [key, value - before[key as keyof typeof before]]));
+    budget.earlier10 = Object.fromEntries(
+      Object.entries(after).map(([key, value]) => [key, value - before[key as keyof typeof before]]),
+    );
     // 每加载一页只投影一次：durable 块从 cell 派生，不再手工合并后重算。
     expect(budget.earlier10.createMessageBlocks).toBeLessThanOrEqual(PAGES - 1);
   });

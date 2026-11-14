@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  AppSettings,
-  SecretProviderId,
-  UsageActivitySnapshot,
-  WorkspaceEntry,
-} from "@actspace/shared";
+import type { AppSettings, SecretProviderId, UsageActivitySnapshot, WorkspaceEntry } from "@actspace/shared";
 import { SettingsNav, type SettingsSectionId } from "./SettingsNav";
 import { HostConnectionsSettings } from "./HostConnectionsSettings";
 import { ModelsPage } from "./models/ModelsPage";
@@ -70,20 +65,33 @@ export function SettingsPage({
   workspaces?: WorkspaceEntry[];
 }) {
   const [section, setSection] = useState<SettingsSectionId>(initialSection);
-  const { settings, settingsV4, settingsError, refresh, update, updateNamespace, replaceSettings, saveProviderKey, clearProviderKey } =
-    useSettings(onSettingsChange);
+  const {
+    settings,
+    settingsV4,
+    settingsError,
+    refresh,
+    update,
+    updateNamespace,
+    replaceSettings,
+    saveProviderKey,
+    clearProviderKey,
+  } = useSettings(onSettingsChange);
   const [keyModalProvider, setKeyModalProvider] = useState<SecretProviderId | null>(null);
   const mainRef = useRef<HTMLElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!shellRef.current?.contains(document.activeElement) && !document.querySelector('[aria-modal="true"]')) shellRef.current?.focus();
+    if (!shellRef.current?.contains(document.activeElement) && !document.querySelector('[aria-modal="true"]'))
+      shellRef.current?.focus();
   }, []);
 
-  const navigate = useCallback((nextSection: SettingsSectionId) => {
-    setSection(nextSection);
-    onSectionChange?.(nextSection);
-    mainRef.current?.scrollTo?.({ top: 0 });
-  }, [onSectionChange]);
+  const navigate = useCallback(
+    (nextSection: SettingsSectionId) => {
+      setSection(nextSection);
+      onSectionChange?.(nextSection);
+      mainRef.current?.scrollTo?.({ top: 0 });
+    },
+    [onSectionChange],
+  );
 
   useEffect(() => {
     if (!focusSpeech || !settings || section !== "general") return;
@@ -93,76 +101,78 @@ export function SettingsPage({
 
   return (
     <SettingsSaveNoticeProvider>
-    <div
-      ref={shellRef}
-      tabIndex={-1}
-      onKeyDown={(event) => {
-        if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
-        event.preventDefault();
-        event.stopPropagation();
-        onBack();
-      }}
-      data-testid="settings-page-shell"
-      className="flex h-screen min-h-0 flex-col overflow-hidden bg-app-bg text-text-main"
-    >
-      <div className="window-chrome-bar" role="presentation">
-        <div className="chrome-left" />
-        <div className="chrome-center" />
-        <div className="chrome-right" />
-      </div>
+      <div
+        ref={shellRef}
+        tabIndex={-1}
+        onKeyDown={(event) => {
+          if (
+            event.key !== "Escape" ||
+            event.defaultPrevented ||
+            event.nativeEvent.isComposing ||
+            event.keyCode === 229
+          )
+            return;
+          event.preventDefault();
+          event.stopPropagation();
+          onBack();
+        }}
+        data-testid="settings-page-shell"
+        className="flex h-screen min-h-0 flex-col overflow-hidden bg-app-bg text-text-main"
+      >
+        <div className="window-chrome-bar" role="presentation">
+          <div className="chrome-left" />
+          <div className="chrome-center" />
+          <div className="chrome-right" />
+        </div>
 
-      {/* 导航列与内容区各自延伸到窗口顶部，顶部 chrome 区域不再是一条独立色带。 */}
-      <div className="flex min-h-0 flex-1 overflow-hidden max-[820px]:flex-col">
-        <SettingsNav
-          active={section}
-          onSelect={navigate}
-          onBack={onBack}
-        />
-        <main
-          ref={mainRef}
-          aria-label="设置内容"
-          className={`mt-[var(--window-chrome-strip-height)] min-h-0 flex-1 bg-app-bg max-[820px]:mt-0 overflow-y-auto`}
-        >
-          {settings ? (
-            <SettingsContent
-              section={section}
-              settings={settings}
-              onUpdate={update}
-              onConnectProvider={setKeyModalProvider}
-              onClearProvider={clearProviderKey}
-              onSaveProviderKey={saveProviderKey}
-              onNavigate={navigate}
-              onArchivedSessionsChange={onArchivedSessionsChange}
-              onRefresh={refresh}
-              settingsV4={settingsV4}
-              onUpdateNamespace={updateNamespace}
-              onReplaceSettings={replaceSettings}
-              usageActivitySnapshot={usageActivitySnapshot}
-              usageProgress={usageProgress}
-              onUsageCancel={onUsageCancel}
-              usageLoading={usageLoading}
-              usageError={usageError}
-              onUsageQuery={onUsageQuery}
-              workspaces={workspaces}
-            />
-          ) : settingsError ? (
-            <div className="flex h-full items-center justify-center px-6 text-center text-act-sm text-text-faint">
-              {settingsError}
-            </div>
-          ) : (
-            <div className="flex h-full items-center justify-center text-act-sm text-text-faint">加载设置中…</div>
-          )}
-        </main>
-      </div>
+        {/* 导航列与内容区各自延伸到窗口顶部，顶部 chrome 区域不再是一条独立色带。 */}
+        <div className="flex min-h-0 flex-1 overflow-hidden max-[820px]:flex-col">
+          <SettingsNav active={section} onSelect={navigate} onBack={onBack} />
+          <main
+            ref={mainRef}
+            aria-label="设置内容"
+            className={`mt-[var(--window-chrome-strip-height)] min-h-0 flex-1 bg-app-bg max-[820px]:mt-0 overflow-y-auto`}
+          >
+            {settings ? (
+              <SettingsContent
+                section={section}
+                settings={settings}
+                onUpdate={update}
+                onConnectProvider={setKeyModalProvider}
+                onClearProvider={clearProviderKey}
+                onSaveProviderKey={saveProviderKey}
+                onNavigate={navigate}
+                onArchivedSessionsChange={onArchivedSessionsChange}
+                onRefresh={refresh}
+                settingsV4={settingsV4}
+                onUpdateNamespace={updateNamespace}
+                onReplaceSettings={replaceSettings}
+                usageActivitySnapshot={usageActivitySnapshot}
+                usageProgress={usageProgress}
+                onUsageCancel={onUsageCancel}
+                usageLoading={usageLoading}
+                usageError={usageError}
+                onUsageQuery={onUsageQuery}
+                workspaces={workspaces}
+              />
+            ) : settingsError ? (
+              <div className="flex h-full items-center justify-center px-6 text-center text-act-sm text-text-faint">
+                {settingsError}
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center text-act-sm text-text-faint">加载设置中…</div>
+            )}
+          </main>
+        </div>
 
-      {keyModalProvider ? (
-        <ProviderKeyModal
-          provider={keyModalProvider}
-          onClose={() => setKeyModalProvider(null)}
-          onSave={(apiKey) => saveProviderKey(keyModalProvider, apiKey)}
-        />
-      ) : null}
-    </div>
+        {keyModalProvider ? (
+          <ProviderKeyModal
+            provider={keyModalProvider}
+            onClose={() => setKeyModalProvider(null)}
+            onSave={(apiKey) => saveProviderKey(keyModalProvider, apiKey)}
+          />
+        ) : null}
+      </div>
     </SettingsSaveNoticeProvider>
   );
 }
@@ -171,7 +181,8 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
   // 英语学习插件本次启动没加载时，不挂载语音设置。
   const englishLearningLoaded = usePluginLoaded("english-learning") === true;
   switch (section) {
-    case "hosts": return <HostConnectionsSettings />;
+    case "hosts":
+      return <HostConnectionsSettings />;
     case "general":
       return (
         <PageShell title="通用">
@@ -208,13 +219,29 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
         </PageShell>
       );
     case "tools":
-      return <PageShell title="工具"><ToolsSection {...rest} /></PageShell>;
+      return (
+        <PageShell title="工具">
+          <ToolsSection {...rest} />
+        </PageShell>
+      );
     case "appearance":
-      return <PageShell title="外观"><AppearanceSection /></PageShell>;
+      return (
+        <PageShell title="外观">
+          <AppearanceSection />
+        </PageShell>
+      );
     case "archivedChats":
-      return <PageShell title="归档会话"><ArchivedChatsSection onArchivedSessionsChange={rest.onArchivedSessionsChange} /></PageShell>;
+      return (
+        <PageShell title="归档会话">
+          <ArchivedChatsSection onArchivedSessionsChange={rest.onArchivedSessionsChange} />
+        </PageShell>
+      );
     case "subagents":
-      return <PageShell title="子 Agent"><SubagentSection onNavigate={rest.onNavigate} /></PageShell>;
+      return (
+        <PageShell title="子 Agent">
+          <SubagentSection onNavigate={rest.onNavigate} />
+        </PageShell>
+      );
     case "usage":
       return (
         <UsageStatisticsPage
@@ -232,9 +259,17 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
     case "harnessStats":
       return <HarnessStatsPage />;
     case "resources":
-      return <PageShell title="资源占用"><ResourceUsageSection {...rest} /></PageShell>;
+      return (
+        <PageShell title="资源占用">
+          <ResourceUsageSection {...rest} />
+        </PageShell>
+      );
     case "update":
-      return <PageShell title="更新"><LocalUpdateSection /></PageShell>;
+      return (
+        <PageShell title="更新">
+          <LocalUpdateSection />
+        </PageShell>
+      );
     default:
       return null;
   }

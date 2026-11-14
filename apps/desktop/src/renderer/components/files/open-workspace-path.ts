@@ -46,10 +46,18 @@ export type OpenWorkspacePathInput = {
 /** `openWorkspacePath` 的函数形状；组件里经 `useOpenWorkspacePath()` 拿到的是会弹兜底对话框的版本。 */
 export type OpenWorkspacePath = (input: OpenWorkspacePathInput) => Promise<OpenWorkspacePathResult>;
 
-export async function openWorkspacePath({ workspaceRoot, relativePath, line, openTab }: OpenWorkspacePathInput): Promise<OpenWorkspacePathResult> {
+export async function openWorkspacePath({
+  workspaceRoot,
+  relativePath,
+  line,
+  openTab,
+}: OpenWorkspacePathInput): Promise<OpenWorkspacePathResult> {
   try {
     if (classifyWorkspaceFile(relativePath) === "external") {
-      return externalFailure(await workspacesApi.openFile({ workspaceRoot, relativePath, action: "open" }), relativePath);
+      return externalFailure(
+        await workspacesApi.openFile({ workspaceRoot, relativePath, action: "open" }),
+        relativePath,
+      );
     }
     if (classifyWorkspaceFile(relativePath) === "markdown") {
       // 只确认文件还在：正文由文档面板自己读（读取、草稿、新鲜度都归它管）。
@@ -57,7 +65,13 @@ export async function openWorkspacePath({ workspaceRoot, relativePath, line, ope
       if (stat.error === "not_found" || stat.error === "escapes_root" || stat.error === "not_a_file") {
         return { ok: false, reason: "error", message: READ_ERROR_TEXT[stat.error] };
       }
-      openTab({ id: "docs", kind: "docs", title: "MD 文档", select: stat.relativePath || relativePath, ...(line !== undefined ? { line } : {}) });
+      openTab({
+        id: "docs",
+        kind: "docs",
+        title: "MD 文档",
+        select: stat.relativePath || relativePath,
+        ...(line !== undefined ? { line } : {}),
+      });
       return { ok: true };
     }
     const result = await workspacesApi.readFile({ workspaceRoot, relativePath });

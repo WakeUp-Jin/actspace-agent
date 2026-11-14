@@ -61,9 +61,7 @@ function makeService(options: Partial<ConstructorParameters<typeof LocalUpdateSe
 
 describe("LocalUpdateService", () => {
   it("derives the macOS .app root from the executable path", () => {
-    expect(deriveMacAppPath("/Applications/Actspace.app/Contents/MacOS/Actspace")).toBe(
-      "/Applications/Actspace.app",
-    );
+    expect(deriveMacAppPath("/Applications/Actspace.app/Contents/MacOS/Actspace")).toBe("/Applications/Actspace.app");
     expect(deriveMacAppPath("/tmp/dev/electron")).toBeNull();
   });
 
@@ -77,7 +75,10 @@ describe("LocalUpdateService", () => {
   });
 
   it("reports missing source before update can start", async () => {
-    const svc = makeService({ dataRoot: await makeTempRoot("actspace-update-data-"), appPath: await makeInstalledApp() });
+    const svc = makeService({
+      dataRoot: await makeTempRoot("actspace-update-data-"),
+      appPath: await makeInstalledApp(),
+    });
     await svc.load();
 
     const state = await svc.getState();
@@ -110,22 +111,22 @@ describe("LocalUpdateService", () => {
 
     const scriptPath = spawnHelper.mock.calls[0]?.[0] ?? "";
     const script = await readFile(scriptPath, "utf8");
-    expect(script).toContain("export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH\"");
+    expect(script).toContain('export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"');
     expect(script).toContain("STATUS_PATH=");
-    expect(script).toContain("write_status \"building\"");
+    expect(script).toContain('write_status "building"');
     expect(script).toContain("command -v pnpm");
     expect(script).toContain("export ACTSPACE_MAC_ADHOC_SIGN=true");
-    expect(script).toContain("\"$PNPM_BIN\" package:desktop:dmg");
+    expect(script).toContain('"$PNPM_BIN" package:desktop:dmg');
     expect(script).toContain("validate_new_app()");
-    expect(script).toContain("codesign --verify --no-strict --verbose=2 \"$app\"");
-    expect(script).toContain("write_failed \"构建出的 Actspace.app 未通过启动前验证，已保留当前版本。\"");
-    expect(script).toContain("write_status \"ready_to_replace\"");
+    expect(script).toContain('codesign --verify --no-strict --verbose=2 "$app"');
+    expect(script).toContain('write_failed "构建出的 Actspace.app 未通过启动前验证，已保留当前版本。"');
+    expect(script).toContain('write_status "ready_to_replace"');
     expect(script).toContain('NEW_APP="$SOURCE_ROOT/dist/desktop/Actspace.app"');
     expect(script).toContain('NEW_APP="$SOURCE_ROOT/dist/desktop/actspace.app"');
     expect(script).toContain('TARGET_APP="$(dirname "$APP_PATH")/$(basename "$NEW_APP")"');
     expect(script).toContain('ditto "$NEW_APP" "$TARGET_APP"');
     expect(script).toContain('if ! open "$TARGET_APP"; then');
-    expect(script).toContain("write_failed \"更新后的 Actspace.app 启动失败，已恢复旧版本。\"");
+    expect(script).toContain('write_failed "更新后的 Actspace.app 启动失败，已恢复旧版本。"');
   });
 
   it("allows a copied Actspace app even when Electron reports isPackaged=false", async () => {
@@ -283,8 +284,8 @@ describe("LocalUpdateService", () => {
     expect(script).toContain("SOURCE_ROOT='/tmp/source with '\\''quote'\\'''");
     expect(script).toContain("STATUS_PATH='/tmp/status with '\\''quote'\\''.json'");
     expect(script).toContain("APP_PID=42");
-    expect(script).toContain("CURRENT_BACKUP=\"$APP_PATH.previous-local-update\"");
-    expect(script).toContain("TARGET_BACKUP=\"$TARGET_APP.previous-local-update\"");
+    expect(script).toContain('CURRENT_BACKUP="$APP_PATH.previous-local-update"');
+    expect(script).toContain('TARGET_BACKUP="$TARGET_APP.previous-local-update"');
   });
 
   it("restores the previous app when the copied update fails to open", () => {
@@ -297,10 +298,10 @@ describe("LocalUpdateService", () => {
     });
 
     expect(script).toContain("restore_previous_app()");
-    expect(script).toContain("rm -rf \"$TARGET_APP\"");
-    expect(script).toContain("mv \"$CURRENT_BACKUP\" \"$APP_PATH\"");
-    expect(script).toContain("if ! open \"$TARGET_APP\"; then");
+    expect(script).toContain('rm -rf "$TARGET_APP"');
+    expect(script).toContain('mv "$CURRENT_BACKUP" "$APP_PATH"');
+    expect(script).toContain('if ! open "$TARGET_APP"; then');
     expect(script).toContain("restore_previous_app");
-    expect(script).toContain("write_failed \"更新后的 Actspace.app 启动失败，已恢复旧版本。\"");
+    expect(script).toContain('write_failed "更新后的 Actspace.app 启动失败，已恢复旧版本。"');
   });
 });

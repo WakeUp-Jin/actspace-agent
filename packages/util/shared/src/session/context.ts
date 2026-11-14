@@ -30,13 +30,7 @@ export type ContextUsageSnapshot = {
 
 export type ContextStateEntry = {
   id: string;
-  kind:
-    | "systemPrompt"
-    | "toolDefinitions"
-    | "rules"
-    | "skills"
-    | "summarizedConversation"
-    | "conversation";
+  kind: "systemPrompt" | "toolDefinitions" | "rules" | "skills" | "summarizedConversation" | "conversation";
   title: string;
   estimatedTokens: number;
   included: boolean;

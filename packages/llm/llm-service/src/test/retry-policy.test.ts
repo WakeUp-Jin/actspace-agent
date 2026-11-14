@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { LlmFailure } from "../failure.js";
 import { DEFAULT_LLM_RETRY_POLICY, normalizeRetryPolicy, retryDelay } from "../retry-policy.js";
 
-const failure = (kind: LlmFailure["kind"], retryable = true): LlmFailure => ({ kind, message: kind, retryable, attempt: 1 });
+const failure = (kind: LlmFailure["kind"], retryable = true): LlmFailure => ({
+  kind,
+  message: kind,
+  retryable,
+  attempt: 1,
+});
 
 describe("default LLM retry policy", () => {
   it("retries connection-level failures twice, with backoff, then gives up", () => {
@@ -23,7 +28,12 @@ describe("default LLM retry policy", () => {
   });
 
   it("keeps a route-provided shouldRetry", () => {
-    const policy = normalizeRetryPolicy({ maxAttempts: 2, baseDelayMs: 0, maxDelayMs: 0, shouldRetry: value => value.kind === "provider" });
+    const policy = normalizeRetryPolicy({
+      maxAttempts: 2,
+      baseDelayMs: 0,
+      maxDelayMs: 0,
+      shouldRetry: (value) => value.kind === "provider",
+    });
     expect(retryDelay(policy, failure("provider"), 1)).toBe(0);
     expect(retryDelay(policy, failure("timeout"), 1)).toBeNull();
   });

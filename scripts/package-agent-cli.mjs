@@ -6,7 +6,9 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const target = `${process.platform}-${process.arch}`;
-const requestedArtifactRoot = resolve(readOption("--out-dir") ?? join(repoRoot, "artifacts", "agent-cli-managed", target));
+const requestedArtifactRoot = resolve(
+  readOption("--out-dir") ?? join(repoRoot, "artifacts", "agent-cli-managed", target),
+);
 await mkdir(requestedArtifactRoot, { recursive: true });
 const artifactRoot = await realpath(requestedArtifactRoot);
 const packageRoot = join(artifactRoot, "actspace-agent");
@@ -30,14 +32,18 @@ await rm(join(packageRoot, "node_modules", ".pnpm", "node_modules", "@actspace",
 const binDir = join(packageRoot, "bin");
 await mkdir(binDir, { recursive: true });
 const launcher = join(binDir, "actspace-agent");
-await writeFile(launcher, `#!/usr/bin/env node
+await writeFile(
+  launcher,
+  `#!/usr/bin/env node
 const [major, minor] = process.versions.node.split(".").map(Number);
 if (major < 22 || (major === 22 && minor < 19)) {
   process.stderr.write("ActSpace Agent requires Node >=22.19.0.\\n");
   process.exit(1);
 }
 require("../dist/cli.js").main(process.argv.slice(2)).then((code) => { process.exitCode = code; });
-`, "utf8");
+`,
+  "utf8",
+);
 await chmod(launcher, 0o755);
 const manifestPath = join(packageRoot, "package.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -46,17 +52,31 @@ manifest.engines = { node: ">=22.19.0" };
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 await assertNoDeepImports(await regularFiles(join(packageRoot, "dist")));
 const dependencies = await dependencyInventory(packageRoot);
-await writeFile(join(packageRoot, "DEPENDENCIES.json"), `${JSON.stringify({ schemaVersion: 1, generatedAt: new Date().toISOString(), packages: dependencies }, null, 2)}\n`, "utf8");
+await writeFile(
+  join(packageRoot, "DEPENDENCIES.json"),
+  `${JSON.stringify({ schemaVersion: 1, generatedAt: new Date().toISOString(), packages: dependencies }, null, 2)}\n`,
+  "utf8",
+);
 await writeFile(join(packageRoot, "THIRD_PARTY_NOTICES.md"), licenseNotice(dependencies), "utf8");
 await writeFile(join(packageRoot, "MANIFEST.sha256"), await integrityManifest(packageRoot), "utf8");
 run("tar", ["-czf", archive, "-C", artifactRoot, "actspace-agent"]);
 process.stdout.write(`${packageRoot}\n${archive}\n`);
 
-function readOption(name) { const index = process.argv.indexOf(name); if (index < 0) return undefined; const value = process.argv[index + 1]; if (!value || value.startsWith("--")) throw new Error(`Missing value for ${name}`); return value; }
-function run(command, args) { execFileSync(command, args, { cwd: repoRoot, stdio: "inherit" }); }
+function readOption(name) {
+  const index = process.argv.indexOf(name);
+  if (index < 0) return undefined;
+  const value = process.argv[index + 1];
+  if (!value || value.startsWith("--")) throw new Error(`Missing value for ${name}`);
+  return value;
+}
+function run(command, args) {
+  execFileSync(command, args, { cwd: repoRoot, stdio: "inherit" });
+}
 
 async function dependencyInventory(root) {
-  const manifests = (await regularFiles(join(root, "node_modules"))).filter((path) => path.endsWith("/package.json") || path.endsWith("\\package.json"));
+  const manifests = (await regularFiles(join(root, "node_modules"))).filter(
+    (path) => path.endsWith("/package.json") || path.endsWith("\\package.json"),
+  );
   const packages = new Map();
   for (const path of manifests) {
     const value = JSON.parse(await readFile(path, "utf8"));
@@ -64,9 +84,12 @@ async function dependencyInventory(root) {
     const key = `${value.name}@${value.version}`;
     const source = path.slice(root.length + 1);
     const current = packages.get(key);
-    if (current === undefined || source.length < current.source.length) packages.set(key, { name: value.name, version: value.version, license: normalizeLicense(value.license), source });
+    if (current === undefined || source.length < current.source.length)
+      packages.set(key, { name: value.name, version: value.version, license: normalizeLicense(value.license), source });
   }
-  return [...packages.values()].sort((left, right) => left.name.localeCompare(right.name) || left.version.localeCompare(right.version));
+  return [...packages.values()].sort(
+    (left, right) => left.name.localeCompare(right.name) || left.version.localeCompare(right.version),
+  );
 }
 
 function normalizeLicense(value) {
@@ -76,11 +99,18 @@ function normalizeLicense(value) {
 }
 
 function licenseNotice(packages) {
-  const rows = packages.map((entry) => `| ${escapeCell(entry.name)} | ${escapeCell(entry.version)} | ${escapeCell(entry.license)} | ${escapeCell(entry.source)} |`).join("\n");
+  const rows = packages
+    .map(
+      (entry) =>
+        `| ${escapeCell(entry.name)} | ${escapeCell(entry.version)} | ${escapeCell(entry.license)} | ${escapeCell(entry.source)} |`,
+    )
+    .join("\n");
   return `# Third-Party Notices\n\nThis managed package contains the following production dependencies. License files distributed by each package remain beside its package contents.\n\n| Package | Version | License | Package manifest |\n|---|---:|---|---|\n${rows}\n`;
 }
 
-function escapeCell(value) { return String(value).replaceAll("|", "\\|").replaceAll("\n", " "); }
+function escapeCell(value) {
+  return String(value).replaceAll("|", "\\|").replaceAll("\n", " ");
+}
 
 async function integrityManifest(root) {
   const files = (await regularFiles(root)).filter((path) => path !== join(root, "MANIFEST.sha256")).sort();
@@ -90,7 +120,10 @@ async function integrityManifest(root) {
     // readlink 对非符号链接报 EINVAL；不先 lstat 再读，避免两步之间文件被换掉。
     const payload = await readlink(path).then(
       (target) => Buffer.from(`symlink:${target}`),
-      (error) => { if (error?.code !== "EINVAL") throw error; return readFile(path); },
+      (error) => {
+        if (error?.code !== "EINVAL") throw error;
+        return readFile(path);
+      },
     );
     rows.push(`${createHash("sha256").update(payload).digest("hex")}  ${relativePath}`);
   }
@@ -105,23 +138,39 @@ async function regularFiles(root) {
     if (metadata.isSymbolicLink()) {
       const target = await realpath(path);
       const relativeTarget = target.slice(packageRoot.length + 1);
-      if (target !== packageRoot && (relativeTarget.startsWith("..") || resolve(packageRoot, relativeTarget) !== target)) throw new Error(`Managed package symlink escapes package root: ${path}`);
+      if (
+        target !== packageRoot &&
+        (relativeTarget.startsWith("..") || resolve(packageRoot, relativeTarget) !== target)
+      )
+        throw new Error(`Managed package symlink escapes package root: ${path}`);
       await visit(target);
       return;
     }
-    if (!metadata.isDirectory()) { output.push(path); return; }
+    if (!metadata.isDirectory()) {
+      output.push(path);
+      return;
+    }
     const canonical = await realpath(path);
     if (visited.has(canonical)) return;
     visited.add(canonical);
     for (const entry of await readdir(path, { withFileTypes: true })) await visit(join(path, entry.name));
   }
-  try { await visit(root); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+  try {
+    await visit(root);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
   return output;
 }
 
 function assertNoDeepImports(files) {
-  return Promise.all(files.filter((path) => /\.[cm]?js$/.test(path)).map(async (path) => {
-    const source = await readFile(path, "utf8");
-    if (/(?:@actspace\/runtime|@deepseek-ai\/[^"']+)\/src\//.test(source)) throw new Error(`Managed CLI contains a forbidden source deep import: ${path}`);
-  }));
+  return Promise.all(
+    files
+      .filter((path) => /\.[cm]?js$/.test(path))
+      .map(async (path) => {
+        const source = await readFile(path, "utf8");
+        if (/(?:@actspace\/runtime|@deepseek-ai\/[^"']+)\/src\//.test(source))
+          throw new Error(`Managed CLI contains a forbidden source deep import: ${path}`);
+      }),
+  );
 }

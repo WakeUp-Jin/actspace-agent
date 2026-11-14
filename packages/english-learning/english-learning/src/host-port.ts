@@ -13,5 +13,10 @@ export interface SpeechHostPort {
 export const SPEECH_HOST_PORT = serviceKey<SpeechHostPort>(SPEECH_HOST_PORT_ID);
 
 export class SpeechError extends Error {
-  constructor(readonly code: string, message: string) { super(message); }
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
 }

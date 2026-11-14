@@ -38,7 +38,12 @@ export class FileGenerationCounter {
       }
       if (char === '"') {
         this.inString = true;
-        this.role = this.depth === 1 && this.expectsKey ? "key" : this.depth === 1 && this.key === this.field ? "content" : "other";
+        this.role =
+          this.depth === 1 && this.expectsKey
+            ? "key"
+            : this.depth === 1 && this.key === this.field
+              ? "content"
+              : "other";
         if (this.role === "key") this.key = "";
       } else if (char === "{" || char === "[") {
         this.depth++;

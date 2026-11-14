@@ -13,14 +13,21 @@ export class ToolExecutionScheduler {
     options: { readonly maxParallel?: number } = {},
   ) {
     const requested = options.maxParallel ?? 4;
-    if (!Number.isSafeInteger(requested) || requested < 1 || requested > 4) throw new TypeError("Tool maxParallel must be between 1 and 4.");
+    if (!Number.isSafeInteger(requested) || requested < 1 || requested > 4)
+      throw new TypeError("Tool maxParallel must be between 1 and 4.");
     this.maxParallel = requested;
   }
 
-  prepareBatch(calls: readonly ToolCallInput[], environment: ToolPreparedEnvironment): readonly PreparedToolExecution[] {
+  prepareBatch(
+    calls: readonly ToolCallInput[],
+    environment: ToolPreparedEnvironment,
+  ): readonly PreparedToolExecution[] {
     const commits = new OrderedToolCommitQueue();
     const batchChars = environment.modelOutputBatchChars;
-    const outputBudget = typeof batchChars === "number" && Number.isFinite(batchChars) ? new ToolOutputBudget(batchChars, calls.length) : undefined;
+    const outputBudget =
+      typeof batchChars === "number" && Number.isFinite(batchChars)
+        ? new ToolOutputBudget(batchChars, calls.length)
+        : undefined;
     const prepared: PreparedToolExecution[] = [];
     try {
       for (const call of calls) {
@@ -34,7 +41,10 @@ export class ToolExecutionScheduler {
     }
   }
 
-  async executeBatch(calls: readonly ToolCallInput[], environment: ToolPreparedEnvironment): Promise<readonly ToolExecutionResult[]> {
+  async executeBatch(
+    calls: readonly ToolCallInput[],
+    environment: ToolPreparedEnvironment,
+  ): Promise<readonly ToolExecutionResult[]> {
     const prepared = this.prepareBatch(calls, environment);
     const results: ToolExecutionResult[] = [];
     try {
@@ -63,7 +73,7 @@ export class ToolExecutionScheduler {
           }),
           this.maxParallel,
         );
-        results.push(...await Promise.all(committing));
+        results.push(...(await Promise.all(committing)));
       }
       return Object.freeze(results);
     } finally {

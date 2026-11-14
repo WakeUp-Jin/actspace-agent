@@ -6,12 +6,16 @@ export const DIFF_FOLD_LINES = 12;
 type Row = { readonly kind: "add" | "del" | "meta" | "ctx"; readonly text: string };
 
 export function parseDiff(diff: string): Row[] {
-  return diff.replace(/\n$/, "").split("\n").map((line): Row => {
-    if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("@@") || line.startsWith("diff ")) return { kind: "meta", text: line };
-    if (line.startsWith("+")) return { kind: "add", text: line.slice(1) };
-    if (line.startsWith("-")) return { kind: "del", text: line.slice(1) };
-    return { kind: "ctx", text: line.startsWith(" ") ? line.slice(1) : line };
-  });
+  return diff
+    .replace(/\n$/, "")
+    .split("\n")
+    .map((line): Row => {
+      if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("@@") || line.startsWith("diff "))
+        return { kind: "meta", text: line };
+      if (line.startsWith("+")) return { kind: "add", text: line.slice(1) };
+      if (line.startsWith("-")) return { kind: "del", text: line.slice(1) };
+      return { kind: "ctx", text: line.startsWith(" ") ? line.slice(1) : line };
+    });
 }
 
 type Props = {
@@ -41,8 +45,15 @@ export function DiffCard({ kind, filePath, additions, deletions, diff, status, e
       title={filePath}
       running={running}
       error={failed}
-      extra={status === "denied" ? null : <><span className="tl-add">+{additions}</span><span className="tl-del">-{deletions}</span></>}
-      {...(rows.length || errorMessage ? { open, onToggle: () => setOpen(value => !value) } : {})}
+      extra={
+        status === "denied" ? null : (
+          <>
+            <span className="tl-add">+{additions}</span>
+            <span className="tl-del">-{deletions}</span>
+          </>
+        )
+      }
+      {...(rows.length || errorMessage ? { open, onToggle: () => setOpen((value) => !value) } : {})}
     >
       <div className="tool-out">
         {errorMessage ? <p className="m-0 px-3 py-2 text-act-sm text-danger">{errorMessage}</p> : null}
@@ -50,13 +61,22 @@ export function DiffCard({ kind, filePath, additions, deletions, diff, status, e
           <div className="diff py-1" role="group" aria-label="文件改动">
             {shown.map((row, index) => (
               <div key={index} className="diff-row" data-kind={row.kind}>
-                <span className="diff-gutter" aria-hidden>{row.kind === "add" ? "+" : row.kind === "del" ? "-" : ""}</span>
+                <span className="diff-gutter" aria-hidden>
+                  {row.kind === "add" ? "+" : row.kind === "del" ? "-" : ""}
+                </span>
                 <span className="diff-text">{row.text || " "}</span>
               </div>
             ))}
           </div>
         ) : null}
-        {hidden ? <Pressable className="min-h-9 border-t border-line px-3 text-act-sm text-text-muted" onClick={() => setAll(true)}>还有 {hidden} 行</Pressable> : null}
+        {hidden ? (
+          <Pressable
+            className="min-h-9 border-t border-line px-3 text-act-sm text-text-muted"
+            onClick={() => setAll(true)}
+          >
+            还有 {hidden} 行
+          </Pressable>
+        ) : null}
       </div>
     </ToolLine>
   );

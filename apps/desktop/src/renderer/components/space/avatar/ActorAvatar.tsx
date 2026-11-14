@@ -36,15 +36,29 @@ export function ActorAvatar({
   working?: boolean;
   className?: string;
 }) {
-  const ring = working ? `space-avatar-working ${size <= 18 ? "space-avatar-working-sm" : size >= 40 ? "space-avatar-working-lg" : ""}` : "";
+  const ring = working
+    ? `space-avatar-working ${size <= 18 ? "space-avatar-working-sm" : size >= 40 ? "space-avatar-working-lg" : ""}`
+    : "";
   return (
-    <span className={`${AVATAR_CLASS} ${SIZE_CLASS[size]} ${ring} ${className}`} data-actor-avatar={id} aria-hidden="true">
+    <span
+      className={`${AVATAR_CLASS} ${SIZE_CLASS[size]} ${ring} ${className}`}
+      data-actor-avatar={id}
+      aria-hidden="true"
+    >
       <img className={IMAGE_CLASS} src={actorImage(actor, id)} alt="" draggable={false} />
     </span>
   );
 }
 
-export function SpaceAvatar({ space, size, className = "" }: { space: Pick<Space, "img">; size: SpaceAvatarSize; className?: string }) {
+export function SpaceAvatar({
+  space,
+  size,
+  className = "",
+}: {
+  space: Pick<Space, "img">;
+  size: SpaceAvatarSize;
+  className?: string;
+}) {
   return (
     <span className={`${AVATAR_CLASS} ${SIZE_CLASS[size]} ${className}`} aria-hidden="true">
       <img className={IMAGE_CLASS} src={spaceImageFor(space.img)} alt="" draggable={false} />

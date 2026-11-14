@@ -6,11 +6,18 @@ import { SessionJournal } from "../journal.js";
 
 const source = { ownerPluginId: "@actspace/core" } as const;
 
-function omit<T extends Record<string, RuntimeJsonValue>>(value: T, ...keys: string[]): Record<string, RuntimeJsonValue> {
+function omit<T extends Record<string, RuntimeJsonValue>>(
+  value: T,
+  ...keys: string[]
+): Record<string, RuntimeJsonValue> {
   return Object.fromEntries(Object.entries(value).filter(([key]) => !keys.includes(key)));
 }
 
-function candidate(type: string, data: RuntimeJsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
+function candidate(
+  type: string,
+  data: RuntimeJsonValue,
+  extra: Partial<SessionEventCandidateV1> = {},
+): SessionEventCandidateV1 {
   return { type, eventVersion: 1, source, data, surface: null, ...extra };
 }
 
@@ -18,70 +25,217 @@ describe("Session Journal", () => {
   it("keeps Todo outside the Agent Loop core event set", () => {
     expect(CORE_EVENT_TYPES).toHaveLength(14);
     expect(CORE_EVENT_TYPES).toEqual([
-      "turn/start", "turn/end", "step/start", "step/end", "user/message", "assistant/chunk", "assistant/message",
-      "tool/call", "tool/result", "request/header", "request/system-prompt", "request/tools", "request/context", "session/end-seed",
+      "turn/start",
+      "turn/end",
+      "step/start",
+      "step/end",
+      "user/message",
+      "assistant/chunk",
+      "assistant/message",
+      "tool/call",
+      "tool/result",
+      "request/header",
+      "request/system-prompt",
+      "request/tools",
+      "request/context",
+      "session/end-seed",
     ]);
   });
 
   it("validates background task start and settle facts", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-10-22T12:00:00.000Z" });
-    journal.append(candidate("background/task", { op: "start", taskId: "bash_1", kind: "bash", callId: "call-1", description: "pnpm test", startedAt: "2026-10-22T12:00:00.000Z" }));
-    journal.append(candidate("background/task", { op: "settle", taskId: "bash_1", status: "completed", exitCode: 0, endedAt: "2026-10-22T12:00:05.000Z", delivery: "notified" }));
-    expect(journal.events.map(event => event.type)).toEqual(["background/task", "background/task"]);
-    expect(() => journal.append(candidate("background/task", { op: "settle", taskId: "bash_1", status: "running", endedAt: "2026-10-22T12:00:05.000Z", delivery: "notified" }))).toThrow(/status must be/);
-    expect(() => journal.append(candidate("background/task", { op: "start", taskId: "x", kind: "shell", callId: "c", description: "", startedAt: "2026-10-22T12:00:00.000Z" }))).toThrow(/kind must be/);
+    journal.append(
+      candidate("background/task", {
+        op: "start",
+        taskId: "bash_1",
+        kind: "bash",
+        callId: "call-1",
+        description: "pnpm test",
+        startedAt: "2026-10-22T12:00:00.000Z",
+      }),
+    );
+    journal.append(
+      candidate("background/task", {
+        op: "settle",
+        taskId: "bash_1",
+        status: "completed",
+        exitCode: 0,
+        endedAt: "2026-10-22T12:00:05.000Z",
+        delivery: "notified",
+      }),
+    );
+    expect(journal.events.map((event) => event.type)).toEqual(["background/task", "background/task"]);
+    expect(() =>
+      journal.append(
+        candidate("background/task", {
+          op: "settle",
+          taskId: "bash_1",
+          status: "running",
+          endedAt: "2026-10-22T12:00:05.000Z",
+          delivery: "notified",
+        }),
+      ),
+    ).toThrow(/status must be/);
+    expect(() =>
+      journal.append(
+        candidate("background/task", {
+          op: "start",
+          taskId: "x",
+          kind: "shell",
+          callId: "c",
+          description: "",
+          startedAt: "2026-10-22T12:00:00.000Z",
+        }),
+      ),
+    ).toThrow(/kind must be/);
   });
 
   it("validates background task prune facts", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-11-03T12:00:00.000Z" });
-    journal.append(candidate("background/task", { op: "prune", taskId: "bash_1", prunedAt: "2026-11-03T12:00:00.000Z", reason: "session-cap" }));
-    expect(() => journal.append(candidate("background/task", { op: "prune", taskId: "bash_1", prunedAt: "2026-11-03T12:00:00.000Z", reason: "manual" }))).toThrow(/session-cap/);
-    expect(() => journal.append(candidate("background/task", { op: "prune", taskId: "bash_1", reason: "session-cap" }))).toThrow(/prunedAt/);
-    expect(() => journal.append(candidate("background/task", { op: "expire", taskId: "bash_1" }))).toThrow(/start, settle or prune/);
+    journal.append(
+      candidate("background/task", {
+        op: "prune",
+        taskId: "bash_1",
+        prunedAt: "2026-11-03T12:00:00.000Z",
+        reason: "session-cap",
+      }),
+    );
+    expect(() =>
+      journal.append(
+        candidate("background/task", {
+          op: "prune",
+          taskId: "bash_1",
+          prunedAt: "2026-11-03T12:00:00.000Z",
+          reason: "manual",
+        }),
+      ),
+    ).toThrow(/session-cap/);
+    expect(() =>
+      journal.append(candidate("background/task", { op: "prune", taskId: "bash_1", reason: "session-cap" })),
+    ).toThrow(/prunedAt/);
+    expect(() => journal.append(candidate("background/task", { op: "expire", taskId: "bash_1" }))).toThrow(
+      /start, settle or prune/,
+    );
   });
 
   it("validates subagent spawned facts", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-11-03T12:00:00.000Z" });
-    const spawned = { agentId: "child-1", callId: "call-1", kind: "local", preset: "general", description: "review auth", transcriptPath: "/data/sessions-v2/child-1/transcript.md", createdAt: "2026-11-03T12:00:00.000Z" };
+    const spawned = {
+      agentId: "child-1",
+      callId: "call-1",
+      kind: "local",
+      preset: "general",
+      description: "review auth",
+      transcriptPath: "/data/sessions-v2/child-1/transcript.md",
+      createdAt: "2026-11-03T12:00:00.000Z",
+    };
     journal.append(candidate("subagent/spawned", spawned));
-    journal.append(candidate("subagent/spawned", { ...omit(spawned, "preset"), agentId: "child-2", kind: "fork", inheritedThroughSeq: 12 }));
+    journal.append(
+      candidate("subagent/spawned", {
+        ...omit(spawned, "preset"),
+        agentId: "child-2",
+        kind: "fork",
+        inheritedThroughSeq: 12,
+      }),
+    );
     journal.append(candidate("subagent/spawned", { ...omit(spawned, "preset"), agentId: "child-3", kind: "codex" }));
     expect(() => journal.append(candidate("subagent/spawned", { ...spawned, kind: "remote" }))).toThrow(/kind must be/);
-    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, preset: "plan" }))).toThrow(/preset must be/);
+    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, preset: "plan" }))).toThrow(
+      /preset must be/,
+    );
     expect(() => journal.append(candidate("subagent/spawned", omit(spawned, "preset")))).toThrow(/preset must be/);
-    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, kind: "codex" }))).toThrow(/only allowed for a local/);
-    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, inheritedThroughSeq: 3 }))).toThrow(/only allowed for a fork/);
-    expect(() => journal.append(candidate("subagent/spawned", { ...omit(spawned, "preset"), kind: "fork", inheritedThroughSeq: -1 }))).toThrow(/non-negative/);
-    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, transcriptPath: "" }))).toThrow(/transcriptPath/);
+    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, kind: "codex" }))).toThrow(
+      /only allowed for a local/,
+    );
+    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, inheritedThroughSeq: 3 }))).toThrow(
+      /only allowed for a fork/,
+    );
+    expect(() =>
+      journal.append(
+        candidate("subagent/spawned", { ...omit(spawned, "preset"), kind: "fork", inheritedThroughSeq: -1 }),
+      ),
+    ).toThrow(/non-negative/);
+    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, transcriptPath: "" }))).toThrow(
+      /transcriptPath/,
+    );
   });
 
   it("validates subagent activation start and settle facts", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-11-03T12:00:00.000Z" });
-    const start = { op: "start", agentId: "child-1", activationId: "act-1", trigger: "spawn", callId: "call-1", background: true, model: "deepseek:deepseek-chat", startedAt: "2026-11-03T12:00:00.000Z" };
-    const settle = { op: "settle", agentId: "child-1", activationId: "act-1", status: "completed", summary: "done", result: "ok", delivery: "notified", endedAt: "2026-11-03T12:01:00.000Z" };
+    const start = {
+      op: "start",
+      agentId: "child-1",
+      activationId: "act-1",
+      trigger: "spawn",
+      callId: "call-1",
+      background: true,
+      model: "deepseek:deepseek-chat",
+      startedAt: "2026-11-03T12:00:00.000Z",
+    };
+    const settle = {
+      op: "settle",
+      agentId: "child-1",
+      activationId: "act-1",
+      status: "completed",
+      summary: "done",
+      result: "ok",
+      delivery: "notified",
+      endedAt: "2026-11-03T12:01:00.000Z",
+    };
     journal.append(candidate("subagent/activation", start));
-    journal.append(candidate("subagent/activation", { ...start, activationId: "act-2", trigger: "message", senderId: "main" }));
+    journal.append(
+      candidate("subagent/activation", { ...start, activationId: "act-2", trigger: "message", senderId: "main" }),
+    );
     journal.append(candidate("subagent/activation", settle));
     journal.append(candidate("subagent/activation", { ...omit(settle, "result"), status: "lost", delivery: "lost" }));
-    expect(() => journal.append(candidate("subagent/activation", { ...start, trigger: "resume" }))).toThrow(/trigger must be/);
-    expect(() => journal.append(candidate("subagent/activation", { ...start, background: "yes" }))).toThrow(/background must be/);
-    expect(() => journal.append(candidate("subagent/activation", { ...settle, status: "running" }))).toThrow(/status must be/);
-    expect(() => journal.append(candidate("subagent/activation", { ...settle, delivery: "wait" }))).toThrow(/delivery must be/);
-    expect(() => journal.append(candidate("subagent/activation", { ...settle, op: "stop" }))).toThrow(/op must be start or settle/);
+    expect(() => journal.append(candidate("subagent/activation", { ...start, trigger: "resume" }))).toThrow(
+      /trigger must be/,
+    );
+    expect(() => journal.append(candidate("subagent/activation", { ...start, background: "yes" }))).toThrow(
+      /background must be/,
+    );
+    expect(() => journal.append(candidate("subagent/activation", { ...settle, status: "running" }))).toThrow(
+      /status must be/,
+    );
+    expect(() => journal.append(candidate("subagent/activation", { ...settle, delivery: "wait" }))).toThrow(
+      /delivery must be/,
+    );
+    expect(() => journal.append(candidate("subagent/activation", { ...settle, op: "stop" }))).toThrow(
+      /op must be start or settle/,
+    );
     // 8KB is measured in UTF-8 bytes: 2731 three-byte characters exceed it, 2730 fit.
     journal.append(candidate("subagent/activation", { ...settle, result: "界".repeat(2730) }));
-    expect(() => journal.append(candidate("subagent/activation", { ...settle, result: "界".repeat(2731) }))).toThrow(/8192 UTF-8 bytes/);
+    expect(() => journal.append(candidate("subagent/activation", { ...settle, result: "界".repeat(2731) }))).toThrow(
+      /8192 UTF-8 bytes/,
+    );
   });
 
   it("accepts a DSH core Turn and rebuilds a deterministic Surface", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-08-29T12:00:00.000Z" });
     journal.append(candidate("turn/start", { turnId: "turn-1" }));
     journal.append(candidate("step/start", { turnId: "turn-1", stepId: "step-1" }));
-    journal.append(candidate("user/message", { messageId: "user-1", content: "hello" }, { surface: { kind: "append" } }));
+    journal.append(
+      candidate("user/message", { messageId: "user-1", content: "hello" }, { surface: { kind: "append" } }),
+    );
     journal.append(candidate("request/header", { requestId: "request-1", turnId: "turn-1", stepId: "step-1" }));
-    journal.append(candidate("request/context", { requestId: "request-1", turnId: "turn-1", stepId: "step-1", messages: [{ role: "user", content: "hello" }] }));
-    journal.append(candidate("assistant/chunk", { messageId: "assistant-1", requestId: "request-1", chunkIndex: 0, delta: "world" }));
-    journal.append(candidate("assistant/message", { messageId: "assistant-1", requestId: "request-1", content: "world", finishReason: "stop" }, { surface: { kind: "append" } }));
+    journal.append(
+      candidate("request/context", {
+        requestId: "request-1",
+        turnId: "turn-1",
+        stepId: "step-1",
+        messages: [{ role: "user", content: "hello" }],
+      }),
+    );
+    journal.append(
+      candidate("assistant/chunk", { messageId: "assistant-1", requestId: "request-1", chunkIndex: 0, delta: "world" }),
+    );
+    journal.append(
+      candidate(
+        "assistant/message",
+        { messageId: "assistant-1", requestId: "request-1", content: "world", finishReason: "stop" },
+        { surface: { kind: "append" } },
+      ),
+    );
     journal.append(candidate("step/end", { turnId: "turn-1", stepId: "step-1", status: "completed" }));
     journal.append(candidate("turn/end", { turnId: "turn-1", status: "completed" }));
 
@@ -93,30 +247,58 @@ describe("Session Journal", () => {
 
   it("accepts firstTokenAt on assistant/message only as a valid timestamp", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
-    journal.append(candidate("assistant/message", { messageId: "a-1", content: "ok", firstTokenAt: "2026-11-05T12:00:00.250Z" }));
-    expect(() => journal.append(candidate("assistant/message", { messageId: "a-2", content: "ok", firstTokenAt: "soon" }))).toThrow(/firstTokenAt must be a valid timestamp/);
-    expect(() => journal.append(candidate("assistant/message", { messageId: "a-3", content: "ok", firstTokenAt: 12 }))).toThrow(/firstTokenAt/);
+    journal.append(
+      candidate("assistant/message", { messageId: "a-1", content: "ok", firstTokenAt: "2026-11-05T12:00:00.250Z" }),
+    );
+    expect(() =>
+      journal.append(candidate("assistant/message", { messageId: "a-2", content: "ok", firstTokenAt: "soon" })),
+    ).toThrow(/firstTokenAt must be a valid timestamp/);
+    expect(() =>
+      journal.append(candidate("assistant/message", { messageId: "a-3", content: "ok", firstTokenAt: 12 })),
+    ).toThrow(/firstTokenAt/);
   });
 
   it("accepts the prompt and tools records only between a request header and its context, once each", () => {
     const ids = { requestId: "r", turnId: "t", stepId: "s" };
-    const prompt = candidate("request/system-prompt", { ...ids, digest: "p", sections: [], modelFacts: [], contributorProvenance: [] });
+    const prompt = candidate("request/system-prompt", {
+      ...ids,
+      digest: "p",
+      sections: [],
+      modelFacts: [],
+      contributorProvenance: [],
+    });
     const tools = candidate("request/tools", { ...ids, digest: "d", tools: [] });
     const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
     journal.append(candidate("turn/start", { turnId: "t" }));
     journal.append(candidate("step/start", ids));
     expect(() => journal.append(prompt)).toThrow(/open request header/);
     journal.append(candidate("request/header", ids));
-    expect(() => journal.append(candidate("request/system-prompt", { ...ids, digest: "p", sections: "x", modelFacts: [], contributorProvenance: [] }))).toThrow(/sections must be an array/);
+    expect(() =>
+      journal.append(
+        candidate("request/system-prompt", {
+          ...ids,
+          digest: "p",
+          sections: "x",
+          modelFacts: [],
+          contributorProvenance: [],
+        }),
+      ),
+    ).toThrow(/sections must be an array/);
     expect(() => journal.append(candidate("request/tools", { ...ids, tools: [] }))).toThrow(/digest/);
     journal.append(prompt);
     expect(() => journal.append(prompt)).toThrow(/open request header/);
     journal.append(tools);
     expect(() => journal.append(tools)).toThrow(/open request header/);
     journal.append(candidate("request/context", ids));
-    expect(() => journal.append(candidate("request/tools", { ...ids, digest: "e", tools: [] }))).toThrow(/open request header/);
+    expect(() => journal.append(candidate("request/tools", { ...ids, digest: "e", tools: [] }))).toThrow(
+      /open request header/,
+    );
     const replay = new SessionJournal({ registry: createCoreCodecRegistry(), seed: journal.events });
-    expect(replay.events.map(event => event.type).slice(-3)).toEqual(["request/system-prompt", "request/tools", "request/context"]);
+    expect(replay.events.map((event) => event.type).slice(-3)).toEqual([
+      "request/system-prompt",
+      "request/tools",
+      "request/context",
+    ]);
   });
 
   it("settles a failed request before retry wait and preserves that boundary on replay", () => {
@@ -144,7 +326,9 @@ describe("Session Journal", () => {
     expect(() => journal.append(candidate("turn/end", { turnId: "turn-1" }))).toThrow();
     expect(journal.lastSeq).toBe(1);
     expect(journal.surface.entries).toEqual([]);
-    expect(() => journal.append(candidate("user/message", { messageId: "secret", apiKey: "canary" }))).toThrow("forbidden secret field");
+    expect(() => journal.append(candidate("user/message", { messageId: "secret", apiKey: "canary" }))).toThrow(
+      "forbidden secret field",
+    );
     expect(journal.lastSeq).toBe(1);
   });
 
@@ -155,16 +339,37 @@ describe("Session Journal", () => {
     expect(() => journal.append(candidate("tool/call", { callId: "call-1", toolId: "read_file" }))).toThrow("name");
     journal.append(candidate("tool/call", { callId: "call-1", name: "read_file" }));
     expect(() => journal.append(candidate("tool/result", { callId: "call-1", status: "completed" }))).toThrow("name");
-    expect(() => journal.append(candidate("tool/result", { callId: "call-1", name: "plugin/read_file", status: "completed" }))).toThrow("name must match");
+    expect(() =>
+      journal.append(candidate("tool/result", { callId: "call-1", name: "plugin/read_file", status: "completed" })),
+    ).toThrow("name must match");
     journal.append(candidate("tool/result", { callId: "call-1", name: "read_file", status: "completed" }));
   });
 
   it("validates permission events strictly and fails closed on a newer required version", () => {
     const registry = createCoreCodecRegistry();
     const journal = new SessionJournal({ registry, now: () => "2026-09-23T12:00:00.000Z" });
-    expect(() => journal.append(candidate("permission/mode-set", { mode: "trusted" }))).toThrow("default or full-access");
-    expect(() => journal.append(candidate("permission/decided", { requestId: "request-1", kind: "allow", decidedAt: "2026-09-23T12:00:00.000Z" }))).toThrow("once, session or deny");
-    expect(() => journal.append(candidate("permission/decided", { requestId: "request-1", kind: "session", suggestionId: "suggestion-1", decidedAt: "2026-09-23T12:00:00.000Z" }))).not.toThrow();
+    expect(() => journal.append(candidate("permission/mode-set", { mode: "trusted" }))).toThrow(
+      "default or full-access",
+    );
+    expect(() =>
+      journal.append(
+        candidate("permission/decided", {
+          requestId: "request-1",
+          kind: "allow",
+          decidedAt: "2026-09-23T12:00:00.000Z",
+        }),
+      ),
+    ).toThrow("once, session or deny");
+    expect(() =>
+      journal.append(
+        candidate("permission/decided", {
+          requestId: "request-1",
+          kind: "session",
+          suggestionId: "suggestion-1",
+          decidedAt: "2026-09-23T12:00:00.000Z",
+        }),
+      ),
+    ).not.toThrow();
 
     const newer = {
       recordKind: "event" as const,
@@ -199,27 +404,70 @@ describe("Session Journal", () => {
       issuedAt: "2026-09-23T12:00:00.000Z",
     };
     journal.append(candidate("permission/grant-added", grant));
-    journal.append(candidate("permission/grant-revoked", { schemaVersion: 1, grantId: "grant-1", sessionId: "session-1", agentId: "main:session-1", revokedAt: "2026-09-23T12:01:00.000Z" }));
-    expect(() => journal.append(candidate("permission/grant-added", { ...grant, grantId: "grant-2", access: "write" }))).toThrow("action and access must agree");
-    expect(() => journal.append(candidate("permission/grant-added", { ...grant, grantId: "grant-3", selector: { kind: "glob", pattern: "/workspace/**" } }))).toThrow("selector.kind must be exact or subtree");
+    journal.append(
+      candidate("permission/grant-revoked", {
+        schemaVersion: 1,
+        grantId: "grant-1",
+        sessionId: "session-1",
+        agentId: "main:session-1",
+        revokedAt: "2026-09-23T12:01:00.000Z",
+      }),
+    );
+    expect(() =>
+      journal.append(candidate("permission/grant-added", { ...grant, grantId: "grant-2", access: "write" })),
+    ).toThrow("action and access must agree");
+    expect(() =>
+      journal.append(
+        candidate("permission/grant-added", {
+          ...grant,
+          grantId: "grant-3",
+          selector: { kind: "glob", pattern: "/workspace/**" },
+        }),
+      ),
+    ).toThrow("selector.kind must be exact or subtree");
   });
 
   it("applies compaction replacement as an append-only transaction", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-08-29T12:00:00.000Z" });
     journal.append(candidate("user/message", { messageId: "user-1", content: "one" }, { surface: { kind: "append" } }));
-    journal.append(candidate("assistant/message", { messageId: "assistant-1", content: "two" }, { surface: { kind: "append" } }));
+    journal.append(
+      candidate("assistant/message", { messageId: "assistant-1", content: "two" }, { surface: { kind: "append" } }),
+    );
     journal.append(candidate("compaction/start", { compactionId: "compact-1", start: 0, end: 2 }));
     journal.append(candidate("compaction/summary", { compactionId: "compact-1", summaryDigest: "digest" }));
-    journal.append(candidate("surface/replaced", { compactionId: "compact-1", sourceEventSeqs: [0, 1], replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test", node: { kind: "user", messageId: "summary-1", content: "summary" } }, {
-      provenance: { sourceEventSeqs: [0, 1], contributorIds: ["compactor"], runtimeSelectionSeq: null },
-      surface: { kind: "replace", start: 0, end: 2, sourceEventSeqs: [0, 1] },
-    }));
+    journal.append(
+      candidate(
+        "surface/replaced",
+        {
+          compactionId: "compact-1",
+          sourceEventSeqs: [0, 1],
+          replacedTokens: { conversation: 0, summarizedConversation: 0 },
+          estimatorVersion: "test",
+          node: { kind: "user", messageId: "summary-1", content: "summary" },
+        },
+        {
+          provenance: { sourceEventSeqs: [0, 1], contributorIds: ["compactor"], runtimeSelectionSeq: null },
+          surface: { kind: "replace", start: 0, end: 2, sourceEventSeqs: [0, 1] },
+        },
+      ),
+    );
     journal.append(candidate("compaction/end", { compactionId: "compact-1", summaryDigest: "digest" }));
     expect(journal.events).toHaveLength(6);
     const missing = new SessionJournal({ registry: createCoreCodecRegistry(), seed: journal.events.slice(0, 2) });
     missing.append(candidate("compaction/start", { compactionId: "compact-2", start: 0, end: 2 }));
-    expect(() => missing.append(candidate("surface/replaced", { compactionId: "compact-2", sourceEventSeqs: [0, 1] }))).toThrow(/replacedTokens must be an object/);
-    expect(() => missing.append(candidate("surface/replaced", { compactionId: "compact-2", sourceEventSeqs: [0, 1], replacedTokens: { conversation: -1, summarizedConversation: 0 }, estimatorVersion: "v" }))).toThrow(/non-negative integer/);
+    expect(() =>
+      missing.append(candidate("surface/replaced", { compactionId: "compact-2", sourceEventSeqs: [0, 1] })),
+    ).toThrow(/replacedTokens must be an object/);
+    expect(() =>
+      missing.append(
+        candidate("surface/replaced", {
+          compactionId: "compact-2",
+          sourceEventSeqs: [0, 1],
+          replacedTokens: { conversation: -1, summarizedConversation: 0 },
+          estimatorVersion: "v",
+        }),
+      ),
+    ).toThrow(/non-negative integer/);
     expect(journal.surface.entries).toHaveLength(1);
     expect(journal.surface.entries[0]?.node).toMatchObject({ messageId: "summary-1" });
     expect(journal.surface.replaceGeneration).toBe(1);
@@ -228,66 +476,203 @@ describe("Session Journal", () => {
   // agent-spec-surface-derived.md §9：surface 只做标记，节点从 data 推出；旧格式和缺字段的事件都被拒。
   it("rejects old-format Surface nodes and events whose node cannot be derived", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
-    const oldFormat = { kind: "append", node: { kind: "user", messageId: "user-1", content: "hello" } } as unknown as SessionEventCandidateV1["surface"];
-    expect(() => journal.append(candidate("user/message", { messageId: "user-1", content: "hello" }, { surface: oldFormat }))).toThrow(/old Session format/);
-    expect(() => journal.append(candidate("user/message", { messageId: "user-1" }, { surface: { kind: "append" } }))).toThrow(/cannot derive a node/);
+    const oldFormat = {
+      kind: "append",
+      node: { kind: "user", messageId: "user-1", content: "hello" },
+    } as unknown as SessionEventCandidateV1["surface"];
+    expect(() =>
+      journal.append(candidate("user/message", { messageId: "user-1", content: "hello" }, { surface: oldFormat })),
+    ).toThrow(/old Session format/);
+    expect(() =>
+      journal.append(candidate("user/message", { messageId: "user-1" }, { surface: { kind: "append" } })),
+    ).toThrow(/cannot derive a node/);
     expect(journal.events).toHaveLength(0);
 
-    journal.append(candidate("agent/inbox/spliced", { operation: "enqueue", messageId: "inbox-1", target: "next-step", content: "steer" }));
-    expect(() => journal.append(candidate("agent/inbox/spliced", { operation: "claim", messageId: "inbox-1", target: "next-step" }, {
-      surface: { kind: "append" }, provenance: { sourceEventSeqs: [0], contributorIds: [], runtimeSelectionSeq: null },
-    }))).toThrow(/cannot derive a node/);
-    journal.append(candidate("agent/inbox/spliced", { operation: "claim", messageId: "inbox-1", target: "next-step", content: "steer" }, {
-      surface: { kind: "append" }, provenance: { sourceEventSeqs: [0], contributorIds: [], runtimeSelectionSeq: null },
-    }));
-    expect(journal.surface.entries.map(entry => entry.node)).toEqual([{ kind: "user", messageId: "inbox-1", content: "steer" }]);
+    journal.append(
+      candidate("agent/inbox/spliced", {
+        operation: "enqueue",
+        messageId: "inbox-1",
+        target: "next-step",
+        content: "steer",
+      }),
+    );
+    expect(() =>
+      journal.append(
+        candidate(
+          "agent/inbox/spliced",
+          { operation: "claim", messageId: "inbox-1", target: "next-step" },
+          {
+            surface: { kind: "append" },
+            provenance: { sourceEventSeqs: [0], contributorIds: [], runtimeSelectionSeq: null },
+          },
+        ),
+      ),
+    ).toThrow(/cannot derive a node/);
+    journal.append(
+      candidate(
+        "agent/inbox/spliced",
+        { operation: "claim", messageId: "inbox-1", target: "next-step", content: "steer" },
+        {
+          surface: { kind: "append" },
+          provenance: { sourceEventSeqs: [0], contributorIds: [], runtimeSelectionSeq: null },
+        },
+      ),
+    );
+    expect(journal.surface.entries.map((entry) => entry.node)).toEqual([
+      { kind: "user", messageId: "inbox-1", content: "steer" },
+    ]);
 
     journal.append(candidate("compaction/start", { compactionId: "compact-1", start: 0, end: 1 }));
     journal.append(candidate("compaction/summary", { compactionId: "compact-1", summaryDigest: "digest" }));
-    expect(() => journal.append(candidate("surface/replaced", { compactionId: "compact-1", sourceEventSeqs: [0, 2], replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test" }, {
-      provenance: { sourceEventSeqs: [0, 2], contributorIds: [], runtimeSelectionSeq: null }, surface: { kind: "replace", start: 0, end: 1, sourceEventSeqs: [0, 2] },
-    }))).toThrow(/node must be a user, assistant or tool-result Surface node/);
+    expect(() =>
+      journal.append(
+        candidate(
+          "surface/replaced",
+          {
+            compactionId: "compact-1",
+            sourceEventSeqs: [0, 2],
+            replacedTokens: { conversation: 0, summarizedConversation: 0 },
+            estimatorVersion: "test",
+          },
+          {
+            provenance: { sourceEventSeqs: [0, 2], contributorIds: [], runtimeSelectionSeq: null },
+            surface: { kind: "replace", start: 0, end: 1, sourceEventSeqs: [0, 2] },
+          },
+        ),
+      ),
+    ).toThrow(/node must be a user, assistant or tool-result Surface node/);
   });
 
   it("rejects a tool recovery outcome without model-visible content", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
-    expect(() => journal.append(candidate("tool/recovery-outcome", { repairId: "repair-1", callId: "call-1", outcome: "not-started" }, { surface: { kind: "append" } }))).toThrow(/content must be a string/);
+    expect(() =>
+      journal.append(
+        candidate(
+          "tool/recovery-outcome",
+          { repairId: "repair-1", callId: "call-1", outcome: "not-started" },
+          { surface: { kind: "append" } },
+        ),
+      ),
+    ).toThrow(/content must be a string/);
   });
 });
 
 describe("Event Codec Registry", () => {
   it("produces a stable digest independent of registration order", () => {
-    const codecs: EventCodec[] = ["plugin/a/first", "plugin/a/second"].map((type) => ({ type, ownerPluginId: "a", currentVersion: 1, criticality: "required", validate: () => undefined }));
+    const codecs: EventCodec[] = ["plugin/a/first", "plugin/a/second"].map((type) => ({
+      type,
+      ownerPluginId: "a",
+      currentVersion: 1,
+      criticality: "required",
+      validate: () => undefined,
+    }));
     expect(new EventCodecRegistry(codecs).digest).toBe(new EventCodecRegistry([...codecs].reverse()).digest);
   });
 
   it("rejects duplicate ownership and broken upgrade chains", () => {
     const registry = new EventCodecRegistry();
-    registry.register({ type: "plugin/a/event", ownerPluginId: "a", currentVersion: 1, criticality: "required", validate: () => undefined });
-    expect(() => registry.register({ type: "plugin/a/event", ownerPluginId: "a", currentVersion: 1, criticality: "required", validate: () => undefined })).toThrow("Duplicate Event Codec");
-    expect(() => new EventCodecRegistry([{ type: "plugin/b/event", ownerPluginId: "b", currentVersion: 3, criticality: "required", upgrades: { 1: (data) => data }, validate: () => undefined }])).toThrow("missing version 2");
+    registry.register({
+      type: "plugin/a/event",
+      ownerPluginId: "a",
+      currentVersion: 1,
+      criticality: "required",
+      validate: () => undefined,
+    });
+    expect(() =>
+      registry.register({
+        type: "plugin/a/event",
+        ownerPluginId: "a",
+        currentVersion: 1,
+        criticality: "required",
+        validate: () => undefined,
+      }),
+    ).toThrow("Duplicate Event Codec");
+    expect(
+      () =>
+        new EventCodecRegistry([
+          {
+            type: "plugin/b/event",
+            ownerPluginId: "b",
+            currentVersion: 3,
+            criticality: "required",
+            upgrades: { 1: (data) => data },
+            validate: () => undefined,
+          },
+        ]),
+    ).toThrow("missing version 2");
   });
 
   it("maps unknown required and ignorable events to access states", () => {
-    const base = { recordKind: "event" as const, seq: 0, eventVersion: 1, time: "2026-08-29T12:00:00.000Z", source: { ownerPluginId: "missing" }, data: {}, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
-    const required = { ...base, type: "plugin/missing/state", criticality: "required" as const } satisfies SessionEventEnvelopeV1;
-    const ignorable = { ...base, type: "plugin/missing/info", criticality: "ignorable" as const } satisfies SessionEventEnvelopeV1;
-    expect(new SessionJournal({ registry: createCoreCodecRegistry(), seed: [required] }).validation.accessState).toBe("browse-only");
-    expect(new SessionJournal({ registry: createCoreCodecRegistry(), seed: [ignorable] }).validation.accessState).toBe("degraded");
+    const base = {
+      recordKind: "event" as const,
+      seq: 0,
+      eventVersion: 1,
+      time: "2026-08-29T12:00:00.000Z",
+      source: { ownerPluginId: "missing" },
+      data: {},
+      surface: null,
+      provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
+    };
+    const required = {
+      ...base,
+      type: "plugin/missing/state",
+      criticality: "required" as const,
+    } satisfies SessionEventEnvelopeV1;
+    const ignorable = {
+      ...base,
+      type: "plugin/missing/info",
+      criticality: "ignorable" as const,
+    } satisfies SessionEventEnvelopeV1;
+    expect(new SessionJournal({ registry: createCoreCodecRegistry(), seed: [required] }).validation.accessState).toBe(
+      "browse-only",
+    );
+    expect(new SessionJournal({ registry: createCoreCodecRegistry(), seed: [ignorable] }).validation.accessState).toBe(
+      "degraded",
+    );
   });
 });
 
-
 it("validates process grant combinations and records grant use without a request", () => {
   const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
-  const grant = { schemaVersion: 1, grantId: "g", sessionId: "s", agentId: "a", audience: { pluginId: "shell", permissionDomain: "bash", policyVersion: 1 }, action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["git", "status"], cwdRoot: "/workspace" }, sourceRequestId: "r", sourceCallId: "c", sourceToolName: "bash", issuedAt: "2026-10-11T00:00:00Z" };
+  const grant = {
+    schemaVersion: 1,
+    grantId: "g",
+    sessionId: "s",
+    agentId: "a",
+    audience: { pluginId: "shell", permissionDomain: "bash", policyVersion: 1 },
+    action: "process.execute",
+    access: "execute",
+    selector: { kind: "command_prefix", prefix: ["git", "status"], cwdRoot: "/workspace" },
+    sourceRequestId: "r",
+    sourceCallId: "c",
+    sourceToolName: "bash",
+    issuedAt: "2026-10-11T00:00:00Z",
+  };
   expect(() => journal.append(candidate("permission/grant-added", grant))).not.toThrow();
-  for (const selector of [ { kind: "command_prefix", prefix: [], cwdRoot: "/workspace" }, { ...grant.selector, prefix: ["a", "b", "c"] }, { ...grant.selector, prefix: ["pnpm test"] }, { ...grant.selector, cwdRoot: "relative" }, { kind: "exact", canonicalPath: "/workspace" } ]) {
+  for (const selector of [
+    { kind: "command_prefix", prefix: [], cwdRoot: "/workspace" },
+    { ...grant.selector, prefix: ["a", "b", "c"] },
+    { ...grant.selector, prefix: ["pnpm test"] },
+    { ...grant.selector, cwdRoot: "relative" },
+    { kind: "exact", canonicalPath: "/workspace" },
+  ]) {
     expect(() => journal.append(candidate("permission/grant-added", { ...grant, selector }))).toThrow();
   }
   expect(() => journal.append(candidate("permission/grant-added", { ...grant, access: "read" }))).toThrow();
-  expect(() => journal.append(candidate("permission/grant-added", { ...grant, action: "file.read", access: "read" }))).toThrow();
-  const use = { schemaVersion: 1, grantId: "g", sessionId: "s", agentId: "a", callId: "c", pluginId: "shell", toolName: "bash", commandDigest: "digest", usedAt: "2026-10-11T00:00:00Z" };
+  expect(() =>
+    journal.append(candidate("permission/grant-added", { ...grant, action: "file.read", access: "read" })),
+  ).toThrow();
+  const use = {
+    schemaVersion: 1,
+    grantId: "g",
+    sessionId: "s",
+    agentId: "a",
+    callId: "c",
+    pluginId: "shell",
+    toolName: "bash",
+    commandDigest: "digest",
+    usedAt: "2026-10-11T00:00:00Z",
+  };
   expect(() => journal.append(candidate("permission/grant-used", use))).not.toThrow();
   expect(() => journal.append(candidate("permission/grant-used", { ...use, usedAt: "invalid" }))).toThrow();
   expect(() => journal.append(candidate("permission/grant-used", { ...use, grantId: "" }))).toThrow();
@@ -297,17 +682,52 @@ describe("relation rules read history only when they declare it", () => {
   const plugin = { ownerPluginId: "@test/relations" } as const;
   const seen: number[] = [];
   const codecs: EventCodec[] = [
-    { type: "plugin/@test/relations/local", ownerPluginId: plugin.ownerPluginId, currentVersion: 1, criticality: "required", validate: () => undefined, validateRelations: ({ candidate }) => { if (candidate.surface !== null) throw new Error("no surface"); } },
-    { type: "plugin/@test/relations/history", ownerPluginId: plugin.ownerPluginId, currentVersion: 1, criticality: "required", readsHistory: true, validate: () => undefined, validateRelations: ({ previous }) => { seen.push(previous.length); } },
-    { type: "plugin/@test/relations/sneaky", ownerPluginId: plugin.ownerPluginId, currentVersion: 1, criticality: "required", validate: () => undefined, validateRelations: ({ previous }) => { seen.push(previous.length); } },
+    {
+      type: "plugin/@test/relations/local",
+      ownerPluginId: plugin.ownerPluginId,
+      currentVersion: 1,
+      criticality: "required",
+      validate: () => undefined,
+      validateRelations: ({ candidate }) => {
+        if (candidate.surface !== null) throw new Error("no surface");
+      },
+    },
+    {
+      type: "plugin/@test/relations/history",
+      ownerPluginId: plugin.ownerPluginId,
+      currentVersion: 1,
+      criticality: "required",
+      readsHistory: true,
+      validate: () => undefined,
+      validateRelations: ({ previous }) => {
+        seen.push(previous.length);
+      },
+    },
+    {
+      type: "plugin/@test/relations/sneaky",
+      ownerPluginId: plugin.ownerPluginId,
+      currentVersion: 1,
+      criticality: "required",
+      validate: () => undefined,
+      validateRelations: ({ previous }) => {
+        seen.push(previous.length);
+      },
+    },
   ];
-  const event = (type: string) => ({ type, eventVersion: 1, source: plugin, data: {}, surface: null }) as SessionEventCandidateV1;
+  const event = (type: string) =>
+    ({ type, eventVersion: 1, source: plugin, data: {}, surface: null }) as SessionEventCandidateV1;
 
   it("never loads history for a rule that only checks the candidate", () => {
-    const journal = new SessionJournal({ registry: createCoreCodecRegistry(codecs), now: () => "2026-11-05T12:00:00.000Z" });
+    const journal = new SessionJournal({
+      registry: createCoreCodecRegistry(codecs),
+      now: () => "2026-11-05T12:00:00.000Z",
+    });
     let reads = 0;
     const original = journal.readEvents.bind(journal);
-    journal.readEvents = () => { reads++; return original(); };
+    journal.readEvents = () => {
+      reads++;
+      return original();
+    };
     for (let index = 0; index < 5; index++) journal.append(event("plugin/@test/relations/local"));
     expect(reads).toBe(0);
     expect(codecReadsHistory(createCoreCodecRegistry(codecs).get("plugin/@test/relations/local"))).toBe(false);
@@ -317,7 +737,8 @@ describe("relation rules read history only when they declare it", () => {
     seen.length = 0;
     const registry = createCoreCodecRegistry(codecs);
     const journal = new SessionJournal({ registry, now: () => "2026-11-05T12:00:00.000Z" });
-    journal.append(event("plugin/@test/relations/local")); journal.append(event("plugin/@test/relations/local"));
+    journal.append(event("plugin/@test/relations/local"));
+    journal.append(event("plugin/@test/relations/local"));
     journal.append(event("plugin/@test/relations/history"));
     expect(seen).toEqual([2]);
     expect(codecReadsHistory(registry.get("plugin/@test/relations/history"))).toBe(true);

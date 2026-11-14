@@ -4,6 +4,11 @@ import { apply } from "../plugin.js";
 it("declares Host application and stays dormant in embedded profiles", () => {
   expect(manifest.behaviors[0]?.entryId).toBe("host.application");
   const provided: string[] = [];
-  apply({ get: () => undefined, provide: name => { provided.push(name); } });
+  apply({
+    get: () => undefined,
+    provide: (name) => {
+      provided.push(name);
+    },
+  });
   expect(provided).toEqual([]);
 });

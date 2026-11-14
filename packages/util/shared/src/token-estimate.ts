@@ -38,8 +38,10 @@ export function estimateItem(value: unknown): number {
 export function estimateBlock(block: unknown): number {
   if (block === null || typeof block !== "object" || Array.isArray(block)) return estimateItem(block);
   const value = block as Record<string, unknown>;
-  if ((value.type === "text" || value.type === "reasoning") && typeof value.text === "string") return estimateText(value.text) + BLOCK_OVERHEAD;
-  if (value.type === "tool-call" && typeof value.name === "string") return estimateText(value.name) + estimateValue(value.arguments) + BLOCK_OVERHEAD;
+  if ((value.type === "text" || value.type === "reasoning") && typeof value.text === "string")
+    return estimateText(value.text) + BLOCK_OVERHEAD;
+  if (value.type === "tool-call" && typeof value.name === "string")
+    return estimateText(value.name) + estimateValue(value.arguments) + BLOCK_OVERHEAD;
   return estimateItem(block);
 }
 
@@ -56,7 +58,12 @@ export function estimateMessage(content: unknown): number {
 }
 
 /** 一次实际请求的输入（容量检查用）：每条消息、每个工具定义。 */
-export function estimateRequestInput(input: { readonly messages: readonly { readonly content: unknown }[]; readonly tools: readonly unknown[] }): number {
-  return input.messages.reduce<number>((sum, message) => sum + estimateMessage(message.content), 0)
-    + input.tools.reduce<number>((sum, tool) => sum + estimateItem(tool), 0);
+export function estimateRequestInput(input: {
+  readonly messages: readonly { readonly content: unknown }[];
+  readonly tools: readonly unknown[];
+}): number {
+  return (
+    input.messages.reduce<number>((sum, message) => sum + estimateMessage(message.content), 0) +
+    input.tools.reduce<number>((sum, tool) => sum + estimateItem(tool), 0)
+  );
 }

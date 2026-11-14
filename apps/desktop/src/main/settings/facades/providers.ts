@@ -27,7 +27,10 @@ import * as general from "./general";
 import * as media from "./media";
 import * as search from "./search";
 
-export async function updateProviderConnection(store: SettingsStore, input: ProviderConnectionMutationInput): Promise<AppSettings> {
+export async function updateProviderConnection(
+  store: SettingsStore,
+  input: ProviderConnectionMutationInput,
+): Promise<AppSettings> {
   return store.enqueueMutation(async () => {
     const previousSettings = cloneJson(store.settings);
     const previousSecrets = cloneJson(store.secrets);
@@ -36,14 +39,16 @@ export async function updateProviderConnection(store: SettingsStore, input: Prov
       const current = store.settings.providers[input.provider];
       const next: ProviderConnectionSettings = {
         enabled: input.enabled ?? current.enabled,
-        baseUrl: input.baseUrl === undefined
-          ? current.baseUrl
-          : migrateLegacyProviderBaseUrl(input.provider, normalizeOptionalBaseUrl(input.baseUrl)),
+        baseUrl:
+          input.baseUrl === undefined
+            ? current.baseUrl
+            : migrateLegacyProviderBaseUrl(input.provider, normalizeOptionalBaseUrl(input.baseUrl)),
         proxy: input.proxy === undefined ? { ...current.proxy } : normalizeProxySettings(input.proxy),
         lastConnection: { status: "untested" },
-        defaultPricingMultiplier: input.defaultPricingMultiplier === undefined
-          ? current.defaultPricingMultiplier
-          : normalizePricingMultiplier(input.defaultPricingMultiplier),
+        defaultPricingMultiplier:
+          input.defaultPricingMultiplier === undefined
+            ? current.defaultPricingMultiplier
+            : normalizePricingMultiplier(input.defaultPricingMultiplier),
       };
 
       if (input.apiKey !== undefined) {
@@ -86,7 +91,10 @@ export async function updateProviderConnection(store: SettingsStore, input: Prov
   });
 }
 
-export function getProviderRuntimeConfig(store: SettingsStore, provider: LlmProviderId): ProviderRuntimeConfig | ProviderRuntimeError {
+export function getProviderRuntimeConfig(
+  store: SettingsStore,
+  provider: LlmProviderId,
+): ProviderRuntimeConfig | ProviderRuntimeError {
   return getConnectionRuntimeConfig(store, provider);
 }
 
@@ -132,7 +140,9 @@ export function getConnectionRuntimeConfig(
   return {
     provider,
     ...(connection && { protocol: connection.protocol ?? "openai-completions" }),
-    ...(connection && { promptCacheMode: resolvePromptCacheMode(connection.protocol ?? "openai-completions", connection.promptCacheMode) }),
+    ...(connection && {
+      promptCacheMode: resolvePromptCacheMode(connection.protocol ?? "openai-completions", connection.promptCacheMode),
+    }),
     ...(connection?.protocol === "anthropic-messages" && { authScheme: resolveAuthScheme(connection) }),
     apiKey,
     baseUrl,
@@ -141,7 +151,9 @@ export function getConnectionRuntimeConfig(
   };
 }
 
-export function getOpenRouterManagementRuntimeConfig(store: SettingsStore): ProviderRuntimeConfig | ProviderRuntimeError {
+export function getOpenRouterManagementRuntimeConfig(
+  store: SettingsStore,
+): ProviderRuntimeConfig | ProviderRuntimeError {
   const runtime = getProviderRuntimeConfig(store, "openrouter");
   if ("code" in runtime) return runtime;
   const managementKey = store.getStoredKey("openrouter-management");
@@ -152,7 +164,11 @@ export function getOpenRouterManagementRuntimeConfig(store: SettingsStore): Prov
 }
 
 /** Compatibility API for the current key modal; all LLM providers share the v2 connection path. */
-export async function setProviderKey(store: SettingsStore, provider: SecretProviderId, apiKey: string): Promise<{ ok: boolean; error?: string }> {
+export async function setProviderKey(
+  store: SettingsStore,
+  provider: SecretProviderId,
+  apiKey: string,
+): Promise<{ ok: boolean; error?: string }> {
   if (provider === "speech-minimax") return media.setSpeechKey(store, apiKey);
   if (provider === "deepseek" || provider === "kimi" || provider === "openrouter") {
     try {

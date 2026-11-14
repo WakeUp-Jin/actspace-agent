@@ -55,12 +55,17 @@ export class LiveProgressHub {
   }
 
   publish(input: LiveProgressInput): RuntimeLiveEvent | null {
-    if (input.runtimeInstanceId !== undefined && input.runtimeInstanceId !== this.runtimeInstanceId) return this.drop("LIVE_EVENT_DROPPED", "runtime-changed");
+    if (input.runtimeInstanceId !== undefined && input.runtimeInstanceId !== this.runtimeInstanceId)
+      return this.drop("LIVE_EVENT_DROPPED", "runtime-changed");
     const activeRun = this.#runs.get(input.sessionId);
-    if (activeRun !== undefined && input.agentRunId !== undefined && activeRun !== input.agentRunId) return this.drop("LIVE_EVENT_DROPPED", "agent-run-changed");
-    if (input.callId !== undefined && this.#terminalCalls.has(`${input.sessionId}:${input.callId}`)) return this.drop("LIVE_EVENT_DROPPED", "late-terminal-event");
-    if (input.current !== undefined && input.current !== null && (!Number.isFinite(input.current) || input.current < 0)) return this.drop("LIVE_EVENT_DROPPED", "invalid-current");
-    if (input.total !== undefined && input.total !== null && (!Number.isFinite(input.total) || input.total < 0)) return this.drop("LIVE_EVENT_DROPPED", "invalid-total");
+    if (activeRun !== undefined && input.agentRunId !== undefined && activeRun !== input.agentRunId)
+      return this.drop("LIVE_EVENT_DROPPED", "agent-run-changed");
+    if (input.callId !== undefined && this.#terminalCalls.has(`${input.sessionId}:${input.callId}`))
+      return this.drop("LIVE_EVENT_DROPPED", "late-terminal-event");
+    if (input.current !== undefined && input.current !== null && (!Number.isFinite(input.current) || input.current < 0))
+      return this.drop("LIVE_EVENT_DROPPED", "invalid-current");
+    if (input.total !== undefined && input.total !== null && (!Number.isFinite(input.total) || input.total < 0))
+      return this.drop("LIVE_EVENT_DROPPED", "invalid-total");
     const event: RuntimeLiveEvent = Object.freeze({
       kind: input.callId === undefined ? "runtime-live" : "tool-progress",
       schemaVersion: 1,
@@ -68,7 +73,9 @@ export class LiveProgressHub {
       liveSeq: this.#nextSeq++,
       throughJournalSeq: input.throughJournalSeq ?? -1,
       sessionId: input.sessionId,
-      ...(input.message === undefined ? {} : { message: input.message === null ? null : redactProjectionText(input.message) }),
+      ...(input.message === undefined
+        ? {}
+        : { message: input.message === null ? null : redactProjectionText(input.message) }),
       ...(input.pluginId === undefined ? {} : { pluginId: input.pluginId }),
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.callId === undefined ? {} : { callId: input.callId }),
@@ -85,14 +92,21 @@ export class LiveProgressHub {
     const capturedSeq = this.#nextSeq - 1;
     const view = snapshot();
     const cursor = Object.freeze({ runtimeInstanceId: this.runtimeInstanceId, liveSeq: capturedSeq });
-    if (afterCursor === undefined) return Object.freeze({ snapshot: view, events: Object.freeze([]), cursor, resyncRequired: false });
+    if (afterCursor === undefined)
+      return Object.freeze({ snapshot: view, events: Object.freeze([]), cursor, resyncRequired: false });
     if (afterCursor.runtimeInstanceId !== this.runtimeInstanceId) return this.resync(view, cursor, "runtime-changed");
     const oldest = this.#events[0]?.liveSeq ?? this.#nextSeq;
     if (afterCursor.liveSeq < oldest - 1) {
-      this.#onDiagnostic?.("LIVE_CURSOR_GAP", { sessionId, after: String(afterCursor.liveSeq), oldest: String(oldest) });
+      this.#onDiagnostic?.("LIVE_CURSOR_GAP", {
+        sessionId,
+        after: String(afterCursor.liveSeq),
+        oldest: String(oldest),
+      });
       return this.resync(view, cursor, "gap");
     }
-    const events = this.#events.filter((event) => event.sessionId === sessionId && event.liveSeq > afterCursor.liveSeq && event.liveSeq <= capturedSeq);
+    const events = this.#events.filter(
+      (event) => event.sessionId === sessionId && event.liveSeq > afterCursor.liveSeq && event.liveSeq <= capturedSeq,
+    );
     return Object.freeze({ snapshot: view, events: Object.freeze(events), cursor, resyncRequired: false });
   }
 
@@ -100,8 +114,20 @@ export class LiveProgressHub {
     return Object.freeze({ runtimeInstanceId: this.runtimeInstanceId, liveSeq: this.#nextSeq - 1 });
   }
 
-  private resync(snapshot: RuntimeSessionSnapshot, cursor: LiveCursor, reason: "gap" | "runtime-changed"): LiveHandshake {
-    const event: RuntimeLiveEvent = Object.freeze({ kind: "resync-required", schemaVersion: 1, runtimeInstanceId: this.runtimeInstanceId, liveSeq: cursor.liveSeq, throughJournalSeq: snapshot.throughJournalSeq, sessionId: snapshot.sessionId, reason });
+  private resync(
+    snapshot: RuntimeSessionSnapshot,
+    cursor: LiveCursor,
+    reason: "gap" | "runtime-changed",
+  ): LiveHandshake {
+    const event: RuntimeLiveEvent = Object.freeze({
+      kind: "resync-required",
+      schemaVersion: 1,
+      runtimeInstanceId: this.runtimeInstanceId,
+      liveSeq: cursor.liveSeq,
+      throughJournalSeq: snapshot.throughJournalSeq,
+      sessionId: snapshot.sessionId,
+      reason,
+    });
     return Object.freeze({ snapshot, events: Object.freeze([event]), cursor, resyncRequired: true });
   }
 

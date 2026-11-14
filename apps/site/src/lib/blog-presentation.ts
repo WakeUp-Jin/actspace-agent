@@ -1,8 +1,5 @@
 /** 列表封面与文章头部的展示信息：分类、角色插画编号、封面上的英文关键词。 */
-export const blogPresentation: Record<
-  string,
-  { category: string; cover: CoverId; key: string }
-> = {
+export const blogPresentation: Record<string, { category: string; cover: CoverId; key: string }> = {
   "bash-tool-design": { category: "工具与扩展", cover: "06", key: "Bash" },
   "grep-and-glob": { category: "工具与扩展", cover: "04", key: "Grep / Glob" },
   "write-and-edit": { category: "工具与扩展", cover: "01", key: "Write / Edit" },
@@ -29,5 +26,4 @@ export const coverColors = {
 } as const;
 export type CoverId = keyof typeof coverColors;
 
-export const presentationFor = (id: string) =>
-  blogPresentation[id.replace(/\.(md|mdx)$/, "")];
+export const presentationFor = (id: string) => blogPresentation[id.replace(/\.(md|mdx)$/, "")];

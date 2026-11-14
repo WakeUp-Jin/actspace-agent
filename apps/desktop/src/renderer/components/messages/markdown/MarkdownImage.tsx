@@ -21,17 +21,22 @@ let nextLoaderId = 1;
 
 export function loadCached(loader: Loader, path: string): Promise<string | null> {
   let id = loaderIds.get(loader);
-  if (id === undefined) { id = nextLoaderId++; loaderIds.set(loader, id); }
+  if (id === undefined) {
+    id = nextLoaderId++;
+    loaderIds.set(loader, id);
+  }
   const key = `${id}\u0000${path}`;
   const hit = imageCache.get(key);
   if (hit !== undefined) return Promise.resolve(hit);
   let pending = inflight.get(key);
   if (!pending) {
-    pending = loader(path).catch(() => null).then((url) => {
-      inflight.delete(key);
-      imageCache.set(key, url, url === null ? 64 : url.length);
-      return url;
-    });
+    pending = loader(path)
+      .catch(() => null)
+      .then((url) => {
+        inflight.delete(key);
+        imageCache.set(key, url, url === null ? 64 : url.length);
+        return url;
+      });
     inflight.set(key, pending);
   }
   return pending;
@@ -44,7 +49,11 @@ export function clearMarkdownImageCache(): void {
 }
 
 function Placeholder({ label, note, title }: { label: string; note: string; title?: string }) {
-  return <span className="md-img-note" title={title}>图片：{label}（{note}）</span>;
+  return (
+    <span className="md-img-note" title={title}>
+      图片：{label}（{note}）
+    </span>
+  );
 }
 
 /**
@@ -54,7 +63,11 @@ function Placeholder({ label, note, title }: { label: string; note: string; titl
  * - http / https 远程图片：**不加载**，不发任何网络请求，只显示占位（隐私：不让回复里的远程地址追踪用户）。
  * 原始 HTML 里的 `<img>` 走同一个组件。
  */
-export function MarkdownImage({ src = "", alt = "", node: _node }: ComponentPropsWithoutRef<"img"> & { node?: unknown }) {
+export function MarkdownImage({
+  src = "",
+  alt = "",
+  node: _node,
+}: ComponentPropsWithoutRef<"img"> & { node?: unknown }) {
   const { loadImage, openPath, workspaceRoot } = useContext(MarkdownHostContext);
   const target = src ? classifyLinkTarget(src) : ({ kind: "blocked" } as const);
   const path = target.kind === "local" ? resolveWorkspacePath(target.path, { workspaceRoot }) : null;
@@ -63,19 +76,31 @@ export function MarkdownImage({ src = "", alt = "", node: _node }: ComponentProp
   useEffect(() => {
     if (!path || !loadImage) return;
     let cancelled = false;
-    void loadCached(loadImage, path).then((url) => { if (!cancelled) setState({ path, url }); });
-    return () => { cancelled = true; };
+    void loadCached(loadImage, path).then((url) => {
+      if (!cancelled) setState({ path, url });
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [path, loadImage]);
 
   const label = alt || src;
   if (target.kind === "external") return <Placeholder label={label} note="远程地址，不加载" title="远程图片不加载" />;
   if (!path) return <Placeholder label={label} note={target.kind === "local" ? "找不到文件" : "不支持的地址"} />;
   if (!loadImage) {
-    return openPath
-      ? <PlainButton className="md-img-note is-link" title={`在 ActSpace 中打开 ${path}`} onClick={() => openPath(path)}>图片：{label}</PlainButton>
-      : <Placeholder label={label} note="无法预览" />;
+    return openPath ? (
+      <PlainButton className="md-img-note is-link" title={`在 ActSpace 中打开 ${path}`} onClick={() => openPath(path)}>
+        图片：{label}
+      </PlainButton>
+    ) : (
+      <Placeholder label={label} note="无法预览" />
+    );
   }
   if (state?.path !== path) return <Placeholder label={label} note="读取中" />;
   if (!state.url) return <Placeholder label={label} note="找不到文件" />;
-  return <span className="md-img"><img src={state.url} alt={alt} /></span>;
+  return (
+    <span className="md-img">
+      <img src={state.url} alt={alt} />
+    </span>
+  );
 }

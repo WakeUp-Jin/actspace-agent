@@ -32,33 +32,39 @@ describe("composer attachment service", () => {
         updatedAt: "2026-08-01T00:00:00.000Z",
         agentRunCount: 1,
       },
-      events: [{
-        id: "evt-user-image",
-        sessionId: "session-image-preview",
-        agentRunId: "agent-run-image",
-        type: "user_message",
-        timestamp: "2026-08-01T00:00:00.000Z",
-        schemaVersion: 2,
-        payload: {
-          content: "Inspect this image",
-          attachments: [{
-            id: "att-image",
-            kind: "image",
-            name: "screen.png",
-            path: "/Users/test/screen.png",
-            mimeType: "image/png",
-          }],
+      events: [
+        {
+          id: "evt-user-image",
+          sessionId: "session-image-preview",
+          agentRunId: "agent-run-image",
+          type: "user_message",
+          timestamp: "2026-08-01T00:00:00.000Z",
+          schemaVersion: 2,
+          payload: {
+            content: "Inspect this image",
+            attachments: [
+              {
+                id: "att-image",
+                kind: "image",
+                name: "screen.png",
+                path: "/Users/test/screen.png",
+                mimeType: "image/png",
+              },
+            ],
+          },
         },
-      }],
+      ],
     };
     const loadPreview = vi.fn(async () => "data:image/png;base64,rehydrated");
 
     const hydrated = await hydrateSessionAttachmentPreviews(record, loadPreview);
 
     expect(loadPreview).toHaveBeenCalledWith("/Users/test/screen.png");
-    expect(hydrated?.events[0]?.payload).toEqual(expect.objectContaining({
-      attachments: [expect.objectContaining({ previewUrl: "data:image/png;base64,rehydrated" })],
-    }));
+    expect(hydrated?.events[0]?.payload).toEqual(
+      expect.objectContaining({
+        attachments: [expect.objectContaining({ previewUrl: "data:image/png;base64,rehydrated" })],
+      }),
+    );
     expect(record.events[0]?.payload).not.toHaveProperty("attachments.0.previewUrl");
   });
 
@@ -72,26 +78,33 @@ describe("composer attachment service", () => {
         updatedAt: "2026-08-01T00:00:00.000Z",
         agentRunCount: 1,
       },
-      events: [{
-        id: "evt-user-image-missing",
-        sessionId: "session-missing-preview",
-        agentRunId: "agent-run-image-missing",
-        type: "user_message",
-        timestamp: "2026-08-01T00:00:00.000Z",
-        schemaVersion: 2,
-        payload: {
-          content: "Inspect missing image",
-          attachments: [{
-            id: "att-image-missing",
-            kind: "image",
-            name: "missing.png",
-            path: "/Users/test/missing.png",
-          }],
+      events: [
+        {
+          id: "evt-user-image-missing",
+          sessionId: "session-missing-preview",
+          agentRunId: "agent-run-image-missing",
+          type: "user_message",
+          timestamp: "2026-08-01T00:00:00.000Z",
+          schemaVersion: 2,
+          payload: {
+            content: "Inspect missing image",
+            attachments: [
+              {
+                id: "att-image-missing",
+                kind: "image",
+                name: "missing.png",
+                path: "/Users/test/missing.png",
+              },
+            ],
+          },
         },
-      }],
+      ],
     };
 
-    const hydrated = await hydrateSessionAttachmentPreviews(record, vi.fn(async () => undefined));
+    const hydrated = await hydrateSessionAttachmentPreviews(
+      record,
+      vi.fn(async () => undefined),
+    );
 
     expect(hydrated?.events[0]?.payload).toEqual(record.events[0]?.payload);
   });

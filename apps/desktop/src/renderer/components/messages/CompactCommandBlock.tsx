@@ -48,7 +48,12 @@ function useElapsedMs(startedAt: string | undefined, active: boolean): number | 
 }
 
 function Divider({ state, children }: { state: CompactMessage["status"]; children: ReactNode }) {
-  const tone = state === "failed" ? "compact-divider-failed text-on-danger" : state === "running" ? "compact-divider-running text-text-faint" : "text-text-faint";
+  const tone =
+    state === "failed"
+      ? "compact-divider-failed text-on-danger"
+      : state === "running"
+        ? "compact-divider-running text-text-faint"
+        : "text-text-faint";
   return (
     <div className={`${DIVIDER_CLASS} ${tone}`}>
       <span className={DIVIDER_LINE_CLASS} aria-hidden="true" />
@@ -59,7 +64,9 @@ function Divider({ state, children }: { state: CompactMessage["status"]; childre
 }
 
 function completedTitle(message: CompactMessage): string {
-  return typeof message.removedCount === "number" && message.removedCount > 0 ? `以上 ${message.removedCount} 条消息已压缩` : "上下文已压缩";
+  return typeof message.removedCount === "number" && message.removedCount > 0
+    ? `以上 ${message.removedCount} 条消息已压缩`
+    : "上下文已压缩";
 }
 
 /** 「182K → 约 9.1K tokens · 23s」；压缩前含估算时也带「约」，旧会话没有 token 时只留耗时。 */
@@ -93,7 +100,9 @@ export function CompactCommandBlock({
       <article className={blockClassName}>
         <Divider state="running">
           <span className={SPINNER_CLASS} aria-hidden="true" />
-          <span className={`${DIVIDER_TITLE_CLASS} text-text-muted`} role="status" aria-live="polite">正在压缩上下文</span>
+          <span className={`${DIVIDER_TITLE_CLASS} text-text-muted`} role="status" aria-live="polite">
+            正在压缩上下文
+          </span>
           {elapsedMs === null ? null : <span>{formatCompactionDuration(elapsedMs)}</span>}
         </Divider>
       </article>
@@ -105,9 +114,19 @@ export function CompactCommandBlock({
       <article className={blockClassName}>
         <Divider state="failed">
           <CircleExclamationPoint size={14} className={DIVIDER_ICON_CLASS} aria-hidden="true" />
-          <span className={DIVIDER_TITLE_CLASS} role="alert">上下文压缩失败</span>
-          {message.errorMessage ? <span className={DIVIDER_TEXT_CLASS} title={message.errorMessage}>{message.errorMessage}</span> : null}
-          {retry ? <button type="button" className={RETRY_CLASS} onClick={retry}>重试</button> : null}
+          <span className={DIVIDER_TITLE_CLASS} role="alert">
+            上下文压缩失败
+          </span>
+          {message.errorMessage ? (
+            <span className={DIVIDER_TEXT_CLASS} title={message.errorMessage}>
+              {message.errorMessage}
+            </span>
+          ) : null}
+          {retry ? (
+            <button type="button" className={RETRY_CLASS} onClick={retry}>
+              重试
+            </button>
+          ) : null}
         </Divider>
       </article>
     );
@@ -120,12 +139,22 @@ export function CompactCommandBlock({
     <article className={blockClassName}>
       <Divider state="completed">
         <Archive size={14} className={`${DIVIDER_ICON_CLASS} text-text-muted`} aria-hidden="true" />
-        <span className={`${DIVIDER_TITLE_CLASS} text-text-muted`} role="separator" aria-label={stats ? `${title} · ${stats}` : title}>{title}</span>
+        <span
+          className={`${DIVIDER_TITLE_CLASS} text-text-muted`}
+          role="separator"
+          aria-label={stats ? `${title} · ${stats}` : title}
+        >
+          {title}
+        </span>
         {stats ? <span className="whitespace-nowrap">{stats}</span> : null}
         {navigation && compactionId ? (
           <>
             <span aria-hidden="true">·</span>
-            <button type="button" className={LINK_CLASS} onClick={() => navigation.revealInTrajectory({ compactionId })}>
+            <button
+              type="button"
+              className={LINK_CLASS}
+              onClick={() => navigation.revealInTrajectory({ compactionId })}
+            >
               在轨迹中查看
               <ChevronRight size={11} aria-hidden="true" />
             </button>

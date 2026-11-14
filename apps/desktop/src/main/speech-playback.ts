@@ -16,7 +16,12 @@ export class DesktopSpeechPlayback implements SpeechHostPort {
   private generation = 0;
   private readonly pending = new Set<Promise<void>>();
 
-  constructor(tmpRoot: string, private readonly preferences: SettingsService, private readonly spawnPlayer: typeof spawn = spawn, platform = process.platform) {
+  constructor(
+    tmpRoot: string,
+    private readonly preferences: SettingsService,
+    private readonly spawnPlayer: typeof spawn = spawn,
+    platform = process.platform,
+  ) {
     this.supported = platform === "darwin";
     this.root = join(tmpRoot, "english-learning-audio");
     this.ready = this.cleanStart();
@@ -24,8 +29,12 @@ export class DesktopSpeechPlayback implements SpeechHostPort {
     void this.ready.catch(() => {});
   }
 
-  settings() { return this.preferences.getSpeechSettings(); }
-  resolveCredential() { return this.preferences.getStoredKey("speech-minimax"); }
+  settings() {
+    return this.preferences.getSpeechSettings();
+  }
+  resolveCredential() {
+    return this.preferences.getStoredKey("speech-minimax");
+  }
   subscribeSettings(listener: () => void): () => void {
     let previousSettings = JSON.stringify(this.settings());
     let previousKey = this.resolveCredential();
@@ -33,7 +42,8 @@ export class DesktopSpeechPlayback implements SpeechHostPort {
       const settings = JSON.stringify(this.settings());
       const key = this.resolveCredential();
       if (settings === previousSettings && key === previousKey) return;
-      previousSettings = settings; previousKey = key;
+      previousSettings = settings;
+      previousKey = key;
       listener();
     });
   }
@@ -66,9 +76,13 @@ export class DesktopSpeechPlayback implements SpeechHostPort {
         const finish = (failed: boolean) => {
           if (finished) return;
           finished = true;
-          clearTimeout(timer); clearTimeout(killTimer);
+          clearTimeout(timer);
+          clearTimeout(killTimer);
           signal.removeEventListener("abort", abort);
-          if (this.child === child) { this.child = undefined; this.finishPlayback = undefined; }
+          if (this.child === child) {
+            this.child = undefined;
+            this.finishPlayback = undefined;
+          }
           failed && !signal.aborted ? reject(new Error("语音播放失败。")) : resolve();
         };
         this.finishPlayback = () => finish(false);
@@ -86,7 +100,9 @@ export class DesktopSpeechPlayback implements SpeechHostPort {
       });
       this.settled = playback.catch(() => {});
       await playback;
-    } finally { await rm(directory, { recursive: true, force: true }); }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   }
 
   async stop(): Promise<void> {
@@ -95,17 +111,24 @@ export class DesktopSpeechPlayback implements SpeechHostPort {
     if (!child) return;
     child.kill("SIGTERM");
     let timer: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([this.settled, new Promise<void>((resolve) => {
-      timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        if (this.child === child) this.finishPlayback?.();
-        resolve();
-      }, 2_000);
-    })]);
+    await Promise.race([
+      this.settled,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(() => {
+          child.kill("SIGKILL");
+          if (this.child === child) this.finishPlayback?.();
+          resolve();
+        }, 2_000);
+      }),
+    ]);
     clearTimeout(timer);
   }
 
-  async dispose(): Promise<void> { this.disposed = true; await this.stop(); await Promise.allSettled([...this.pending]); }
+  async dispose(): Promise<void> {
+    this.disposed = true;
+    await this.stop();
+    await Promise.allSettled([...this.pending]);
+  }
   private async cleanStart(): Promise<void> {
     await rm(this.root, { recursive: true, force: true });
     await mkdir(this.root, { recursive: true, mode: 0o700 });

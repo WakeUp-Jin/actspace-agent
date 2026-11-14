@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  desktopBridgeContract,
-  type BridgeSpec,
-} from "../desktop-bridge";
+import { desktopBridgeContract, type BridgeSpec } from "../desktop-bridge";
 import { ENGLISH_LEARNING_CHANNELS } from "../english-learning";
 import { HOST_IPC } from "../host-protocol";
 import { RESOURCE_MONITOR_CHANNELS } from "../resource-monitor";
@@ -10,7 +7,10 @@ import { RUNTIME_FIXED_RENDERER_CHANNELS } from "../runtime-v2";
 
 function entries(): Array<{ path: string; spec: BridgeSpec }> {
   return Object.entries(desktopBridgeContract).flatMap(([domain, members]) =>
-    Object.entries(members as Record<string, BridgeSpec>).map(([member, spec]) => ({ path: `${domain}.${member}`, spec })),
+    Object.entries(members as Record<string, BridgeSpec>).map(([member, spec]) => ({
+      path: `${domain}.${member}`,
+      spec,
+    })),
   );
 }
 
@@ -34,18 +34,26 @@ describe("desktop bridge contract", () => {
       ...Object.values(ENGLISH_LEARNING_CHANNELS),
       ...Object.values(HOST_IPC),
     ];
-    expect(channels().map(({ channel }) => channel).sort()).toEqual([...known].sort());
+    expect(
+      channels()
+        .map(({ channel }) => channel)
+        .sort(),
+    ).toEqual([...known].sort());
   });
 
   it("keeps only preload-implemented members as local", () => {
-    expect(entries().filter(({ spec }) => spec.kind === "local").map(({ path }) => path).sort()).toEqual([
-      "appearance.setUiZoom",
-      "dialogs.getPathForFile",
-    ]);
+    expect(
+      entries()
+        .filter(({ spec }) => spec.kind === "local")
+        .map(({ path }) => path)
+        .sort(),
+    ).toEqual(["appearance.setUiZoom", "dialogs.getPathForFile"]);
   });
 
   it("keeps the argument defaults the preload used to apply", () => {
-    const defaults = entries().flatMap(({ path, spec }) => (spec.kind === "invoke" && "defaultInput" in spec ? [[path, spec.defaultInput]] : []));
+    const defaults = entries().flatMap(({ path, spec }) =>
+      spec.kind === "invoke" && "defaultInput" in spec ? [[path, spec.defaultInput]] : [],
+    );
     expect(Object.fromEntries(defaults)).toEqual({
       "approvals.listPending": {},
       "sessions.listPage": {},

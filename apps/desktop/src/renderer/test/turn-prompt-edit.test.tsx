@@ -16,8 +16,24 @@ function turns(count: number): MessageBlock[] {
   return Array.from({ length: count }, (_, index) => {
     const n = index + 1;
     return [
-      { kind: "user" as const, id: `v2-${n * 10}`, renderKey: `turn:run-${n}:user:0`, runId: `run-${n}`, sourceSeq: n * 10, content: `第 ${n} 轮提问`, createdAt: at },
-      { kind: "assistant" as const, id: `v2-${n * 10 + 1}`, renderKey: `turn:run-${n}:assistant:0`, runId: `run-${n}`, sourceSeq: n * 10 + 1, content: `第 ${n} 轮回复`, createdAt: at },
+      {
+        kind: "user" as const,
+        id: `v2-${n * 10}`,
+        renderKey: `turn:run-${n}:user:0`,
+        runId: `run-${n}`,
+        sourceSeq: n * 10,
+        content: `第 ${n} 轮提问`,
+        createdAt: at,
+      },
+      {
+        kind: "assistant" as const,
+        id: `v2-${n * 10 + 1}`,
+        renderKey: `turn:run-${n}:assistant:0`,
+        runId: `run-${n}`,
+        sourceSeq: n * 10 + 1,
+        content: `第 ${n} 轮回复`,
+        createdAt: at,
+      },
     ];
   }).flat();
 }
@@ -84,9 +100,16 @@ describe("editing a prompt in the message flow", () => {
     vi.useFakeTimers();
     fireEvent.keyDown(input, { key: "Enter" });
     expect(turnOf("第 3 轮提问").querySelector(".opacity-0")).not.toBeNull();
-    await act(async () => { vi.advanceTimersByTime(300); });
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
     expect(onResendTurn).toHaveBeenCalledOnce();
-    expect(onResendTurn.mock.calls[0][0]).toMatchObject({ sessionId: "session-1", runId: "run-2", fromSeq: 20, text: "改过的第二问" });
+    expect(onResendTurn.mock.calls[0][0]).toMatchObject({
+      sessionId: "session-1",
+      runId: "run-2",
+      fromSeq: 20,
+      text: "改过的第二问",
+    });
     expect(screen.queryByRole("textbox", { name: "编辑提问内容" })).toBeNull();
   });
 
@@ -106,7 +129,9 @@ describe("editing a prompt in the message flow", () => {
 
   it("reopens the editor with what was typed when the resend fails", async () => {
     const user = userEvent.setup();
-    const onResendTurn = vi.fn(async () => { throw new Error("这段对话有了新内容，看过最新内容后再编辑。"); });
+    const onResendTurn = vi.fn(async () => {
+      throw new Error("这段对话有了新内容，看过最新内容后再编辑。");
+    });
     renderConversation({ messages: turns(2), onResendTurn });
     await user.click(screen.getByText("第 1 轮提问"));
     const input = screen.getByRole("textbox", { name: "编辑提问内容" });
@@ -124,7 +149,13 @@ describe("editing a prompt in the message flow", () => {
     expect(screen.queryByRole("textbox", { name: "编辑提问内容" })).toBeNull();
     unmount();
 
-    const optimistic: MessageBlock = { kind: "user", id: "turn:run-x:user:0", runId: "run-x", content: "还在发送", createdAt: at };
+    const optimistic: MessageBlock = {
+      kind: "user",
+      id: "turn:run-x:user:0",
+      runId: "run-x",
+      content: "还在发送",
+      createdAt: at,
+    };
     renderConversation({ messages: [...turns(1), optimistic], onResendTurn: vi.fn() });
     expect(card("还在发送")).not.toHaveAttribute("data-editable");
     expect(card("第 1 轮提问")).toHaveAttribute("data-editable", "true");
@@ -148,8 +179,15 @@ describe("editing a prompt in the message flow", () => {
 });
 
 describe("editor initial content", () => {
-  const user = { kind: "user" as const, id: "v2-4", runId: "run-1", sourceSeq: 4, content: "原文", createdAt: at,
-    attachments: [{ id: "art-img", path: "art-img", kind: "image" as const, name: "shot.png", mimeType: "image/png" }] };
+  const user = {
+    kind: "user" as const,
+    id: "v2-4",
+    runId: "run-1",
+    sourceSeq: 4,
+    content: "原文",
+    createdAt: at,
+    attachments: [{ id: "art-img", path: "art-img", kind: "image" as const, name: "shot.png", mimeType: "image/png" }],
+  };
 
   it("reads the original prompt, references and attachments from the Task, with artifact ids", () => {
     const prepared = [
@@ -158,10 +196,33 @@ describe("editor initial content", () => {
       { type: "artifact", artifact: { artifactId: "art-img", mediaType: "image/png" }, label: "shot.png" },
       { type: "text", text: "Attached file: notes.md (art-file)" },
     ];
-    const tasks = { sessionId: "s", revision: 3, paused: false, queue: [], runs: [], tasks: [
-      { taskId: "t1", submissionId: "x", acceptedSeq: 1, state: "completed", targetRunId: null, runId: "run-1", continuationOf: null,
-        content: { kind: "composer-task", original: { userInput: "原文", fileReferences: [{ relativePath: "src/a.ts", displayName: "a.ts" }], attachments: [{ id: "a", kind: "image", name: "shot.png", path: "/tmp/gone.png" }] }, prepared } },
-    ] } as unknown as TaskSnapshot;
+    const tasks = {
+      sessionId: "s",
+      revision: 3,
+      paused: false,
+      queue: [],
+      runs: [],
+      tasks: [
+        {
+          taskId: "t1",
+          submissionId: "x",
+          acceptedSeq: 1,
+          state: "completed",
+          targetRunId: null,
+          runId: "run-1",
+          continuationOf: null,
+          content: {
+            kind: "composer-task",
+            original: {
+              userInput: "原文",
+              fileReferences: [{ relativePath: "src/a.ts", displayName: "a.ts" }],
+              attachments: [{ id: "a", kind: "image", name: "shot.png", path: "/tmp/gone.png" }],
+            },
+            prepared,
+          },
+        },
+      ],
+    } as unknown as TaskSnapshot;
     const draft = turnPromptDraft("local-session", user, tasks);
     expect(draft.text).toBe("原文");
     expect(draft.fileReferences).toEqual([{ relativePath: "src/a.ts", displayName: "a.ts" }]);
@@ -174,13 +235,17 @@ describe("editor initial content", () => {
 
   it("falls back to the durable user block when the Task is gone", () => {
     expect(turnPromptDraft("local-session", user, undefined)).toEqual({
-      text: "原文", fileReferences: [], responseAnnotations: [],
+      text: "原文",
+      fileReferences: [],
+      responseAnnotations: [],
       attachments: [{ id: "art-img", artifactId: "art-img", kind: "image", name: "shot.png", mimeType: "image/png" }],
     });
   });
 
   it("ignores prepared blocks that are not attachments", () => {
     expect(preparedAttachments("plain text")).toEqual([]);
-    expect(preparedAttachments([{ type: "text", text: "Attached file: but not really" }, { type: "response-excerpt" }])).toEqual([]);
+    expect(
+      preparedAttachments([{ type: "text", text: "Attached file: but not really" }, { type: "response-excerpt" }]),
+    ).toEqual([]);
   });
 });

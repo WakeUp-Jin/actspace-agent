@@ -13,31 +13,70 @@ import type { LlmMessage } from "@actspace/llm-service";
 
 it("runs large Bash output through storage, the next request, and paginated read/search", async () => {
   const root = await realpath(await mkdtemp(join(tmpdir(), "actspace-output-flow-")));
-  const workspaceRoot = join(root, "workspace"); await mkdir(workspaceRoot);
+  const workspaceRoot = join(root, "workspace");
+  await mkdir(workspaceRoot);
   const store = new DesktopArtifactStore(join(root, "data"));
   const sessionId = "output-flow";
   const resolveArtifact = (session: string, id: string) => store.resolveForSession(session, id);
-  const ports = { ...createReadPorts({ workspaceRoot, resolveArtifact }), ...createSearchPorts({ workspaceRoot, resolveArtifact }), ...createNodeBashToolPorts({ workspaceRoot, tmpRoot: join(root, "tmp"), dataRoot: join(root, "data") }) };
+  const ports = {
+    ...createReadPorts({ workspaceRoot, resolveArtifact }),
+    ...createSearchPorts({ workspaceRoot, resolveArtifact }),
+    ...createNodeBashToolPorts({ workspaceRoot, tmpRoot: join(root, "tmp"), dataRoot: join(root, "data") }),
+  };
   const context: ToolExecutionContext = {
-    sessionId, workspaceRoot, callId: "read-1", agentRunId: "run", turnId: "turn", stepId: "step", name: "bash", pluginId: "core",
-    signal: new AbortController().signal, capabilities: { ids: [], has: () => false, get: () => { throw new Error("unused"); } },
-    reportProgress: () => {}, defer: () => {},
-    createArtifact: (input) => store.create({ ...input, owner: { sessionId, callId: "read-1", pluginId: "core", name: "bash" } }),
+    sessionId,
+    workspaceRoot,
+    callId: "read-1",
+    agentRunId: "run",
+    turnId: "turn",
+    stepId: "step",
+    name: "bash",
+    pluginId: "core",
+    signal: new AbortController().signal,
+    capabilities: {
+      ids: [],
+      has: () => false,
+      get: () => {
+        throw new Error("unused");
+      },
+    },
+    reportProgress: () => {},
+    defer: () => {},
+    createArtifact: (input) =>
+      store.create({ ...input, owner: { sessionId, callId: "read-1", pluginId: "core", name: "bash" } }),
   };
   try {
-    const body = await ports.bash!({ command: "for ((i=1;i<=3000;i++)); do printf 'line-%s needle\\n' \"$i\"; done", intent: "output regression", blockMs: 1000, sandbox_permissions: "require_escalated", justification: "Output regression." }, context);
+    const body = await ports.bash!(
+      {
+        command: "for ((i=1;i<=3000;i++)); do printf 'line-%s needle\\n' \"$i\"; done",
+        intent: "output regression",
+        blockMs: 1000,
+        sandbox_permissions: "require_escalated",
+        justification: "Output regression.",
+      },
+      context,
+    );
     expect(body.status).toBe("completed");
     expect(body.artifacts?.[0].mediaType).toBe("text/plain");
     const requests: (readonly LlmMessage[])[] = [];
-    const run = await runToolStreamFixture({ sessionId, resolveArtifact, execute: async () => body, onMessages: (messages) => requests.push(messages) });
+    const run = await runToolStreamFixture({
+      sessionId,
+      resolveArtifact,
+      execute: async () => body,
+      onMessages: (messages) => requests.push(messages),
+    });
     const file = await store.resolveForSession(sessionId, body.artifacts![0].artifactId);
     const nextInput = JSON.stringify(requests[1]);
     expect(nextInput).toContain(file.path);
     expect(nextInput).not.toContain('"type":"image"');
     expect(nextInput).not.toContain("line-3000");
     // request/context 只留小字段（agent-spec-request-record.md）；日志里的工具结果存 artifact 引用，路径在发请求时才解析。
-    expect(JSON.stringify(run.journal.filter((event) => event.type === "request/context").at(-1)!.data)).not.toContain(file.path);
-    expect(JSON.stringify(run.journal.filter((event) => event.type === "tool/result").map((event) => event.data))).toContain(body.artifacts![0].artifactId);
+    expect(JSON.stringify(run.journal.filter((event) => event.type === "request/context").at(-1)!.data)).not.toContain(
+      file.path,
+    );
+    expect(
+      JSON.stringify(run.journal.filter((event) => event.type === "tool/result").map((event) => event.data)),
+    ).toContain(body.artifacts![0].artifactId);
     const page = await ports.read_file!({ path: file.path, offset: 2999, limit: 2 }, context);
     expect(page.status).toBe("completed");
     expect(JSON.stringify(page)).toContain("3000|line-3000 needle");
@@ -46,5 +85,8 @@ it("runs large Bash output through storage, the next request, and paginated read
     expect(JSON.stringify(search)).toContain("line-3000");
     const denied = await ports.read_file!({ path: file.path }, { ...context, sessionId: "other" });
     expect(denied.status).toBe("failed");
-  } finally { await ports.dispose?.(); await rm(root, { recursive: true, force: true }); }
+  } finally {
+    await ports.dispose?.();
+    await rm(root, { recursive: true, force: true });
+  }
 });

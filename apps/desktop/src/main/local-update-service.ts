@@ -162,7 +162,11 @@ export class LocalUpdateService {
     if (this.readinessTimer) clearInterval(this.readinessTimer);
     const tick = async () => {
       const progress = await this.readProgress();
-      if (progress.phase === "ready_to_replace" || progress.phase === "waiting_for_exit" || progress.phase === "replacing") {
+      if (
+        progress.phase === "ready_to_replace" ||
+        progress.phase === "waiting_for_exit" ||
+        progress.phase === "replacing"
+      ) {
         if (!this.replacementQuitRequested) {
           this.replacementQuitRequested = true;
           this.onReadyToReplace?.();
@@ -198,10 +202,7 @@ export class LocalUpdateService {
     return { ok: false, error, message, state: await this.getState() };
   }
 
-  private reasonFor(
-    source: SourceValidationResult,
-    app: InstallTargetResult,
-  ): string | undefined {
+  private reasonFor(source: SourceValidationResult, app: InstallTargetResult): string | undefined {
     if (this.running) return "本地更新已经在运行。";
     if (source.ok === false) return this.messageForSourceError(source.error);
     if (app.ok === false) return this.messageForAppError(app.error);
@@ -282,9 +283,7 @@ export class LocalUpdateService {
   }
 }
 
-type SourceValidationResult =
-  | { ok: true; sourceRoot: string }
-  | { ok: false; error: LocalUpdateErrorCode };
+type SourceValidationResult = { ok: true; sourceRoot: string } | { ok: false; error: LocalUpdateErrorCode };
 
 type InstallTargetResult =
   | { ok: true; appPath: string; installParent: string }

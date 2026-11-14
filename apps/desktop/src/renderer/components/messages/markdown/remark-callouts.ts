@@ -20,7 +20,10 @@ export function remarkCallouts() {
       if (paragraph.children!.length === 0) node.children!.shift();
       node.data = {
         ...node.data,
-        hProperties: { className: ["md-callout", `md-callout-${marker.type}`], dataCalloutLabel: CALLOUT_LABEL[marker.type] },
+        hProperties: {
+          className: ["md-callout", `md-callout-${marker.type}`],
+          dataCalloutLabel: CALLOUT_LABEL[marker.type],
+        },
       };
     });
   };

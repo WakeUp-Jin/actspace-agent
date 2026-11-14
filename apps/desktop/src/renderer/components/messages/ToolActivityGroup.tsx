@@ -29,7 +29,9 @@ export function ToolActivityGroup({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => { setExpanded(false); }, [running]);
+  useEffect(() => {
+    setExpanded(false);
+  }, [running]);
 
   if (running) {
     return <div className={RUNNING_FLOW_CLASS}>{children}</div>;
@@ -44,11 +46,7 @@ export function ToolActivityGroup({
         onClick={() => setExpanded((value) => !value)}
       >
         <span>{formatWorkedDuration(durationMs)}</span>
-        {expanded ? (
-          <ChevronDown size={15} aria-hidden="true" />
-        ) : (
-          <ChevronRight size={15} aria-hidden="true" />
-        )}
+        {expanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronRight size={15} aria-hidden="true" />}
       </button>
       {expanded ? <div className={DONE_FLOW_CLASS}>{children}</div> : null}
     </div>

@@ -35,7 +35,12 @@ export class SessionWriteBehind {
 
   enqueue(event: SessionEventEnvelopeV1): void {
     if (this.#closed) throw new SessionError("SESSION_CLOSED", "Session write-behind is closed.");
-    if (this.#blocked !== undefined) throw new SessionError("SESSION_DURABILITY_FAILED", "Session writer is blocked after a durability failure.", this.#blocked);
+    if (this.#blocked !== undefined)
+      throw new SessionError(
+        "SESSION_DURABILITY_FAILED",
+        "Session writer is blocked after a durability failure.",
+        this.#blocked,
+      );
     this.#pending.push(event);
     this.#pendingBytes += Buffer.byteLength(JSON.stringify(event));
     if (this.#pending.length >= this.#maxEvents || this.#pendingBytes >= this.#maxBytes) {
@@ -52,7 +57,10 @@ export class SessionWriteBehind {
 
   /** The producer waits at the queue budget; a slow fsync cannot accumulate unlimited batches. */
   waitForCapacity(): Promise<void> | undefined {
-    return this.#pending.length + this.#activeEvents >= this.#maxEvents || this.#pendingBytes + this.#activeBytes >= this.#maxBytes ? this.flush() : undefined;
+    return this.#pending.length + this.#activeEvents >= this.#maxEvents ||
+      this.#pendingBytes + this.#activeBytes >= this.#maxBytes
+      ? this.flush()
+      : undefined;
   }
 
   flush(): Promise<void> {
@@ -75,13 +83,24 @@ export class SessionWriteBehind {
   }
 
   async #drain(): Promise<void> {
-    if (this.#blocked !== undefined) throw new SessionError("SESSION_DURABILITY_FAILED", "Session writer is blocked after a durability failure.", this.#blocked);
+    if (this.#blocked !== undefined)
+      throw new SessionError(
+        "SESSION_DURABILITY_FAILED",
+        "Session writer is blocked after a durability failure.",
+        this.#blocked,
+      );
     if (this.#active !== undefined) await this.#active;
     while (this.#pending.length > 0) await this.#startWrite(false);
   }
 
   async #startBackground(): Promise<void> {
-    if (this.#active !== undefined || this.#pending.length === 0 || this.#barrier !== undefined || this.#blocked !== undefined) return;
+    if (
+      this.#active !== undefined ||
+      this.#pending.length === 0 ||
+      this.#barrier !== undefined ||
+      this.#blocked !== undefined
+    )
+      return;
     try {
       await this.#startWrite(true);
       if (this.#pending.length > 0 && this.#timer === undefined) {
@@ -98,7 +117,8 @@ export class SessionWriteBehind {
 
   #startWrite(background: boolean): Promise<void> {
     const batch = this.#pending;
-    this.#activeEvents = batch.length; this.#activeBytes = this.#pendingBytes;
+    this.#activeEvents = batch.length;
+    this.#activeBytes = this.#pendingBytes;
     this.#pending = [];
     this.#pendingBytes = 0;
     const operation = Promise.resolve()
@@ -111,7 +131,9 @@ export class SessionWriteBehind {
         throw error;
       })
       .finally(() => {
-        this.#active = undefined; this.#activeEvents = 0; this.#activeBytes = 0;
+        this.#active = undefined;
+        this.#activeEvents = 0;
+        this.#activeBytes = 0;
       });
     this.#active = operation;
     return operation;

@@ -10,9 +10,15 @@ const TABS = [
   { id: "skills", label: "Skills" },
   { id: "mcp", label: "MCP" },
 ] as const;
-type ExtensionTab = typeof TABS[number]["id"];
+type ExtensionTab = (typeof TABS)[number]["id"];
 
-export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSettingsChange?: (settings: AppSettings) => void; onConfigureSpeech?: () => void }) {
+export function ExtensionsPage({
+  onSettingsChange,
+  onConfigureSpeech,
+}: {
+  onSettingsChange?: (settings: AppSettings) => void;
+  onConfigureSpeech?: () => void;
+}) {
   const [tab, setTab] = useState<ExtensionTab>("plugins");
   const [queries, setQueries] = useState<Record<ExtensionTab, string>>({ plugins: "", skills: "", mcp: "" });
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -22,12 +28,17 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
   useEffect(() => {
     let canceled = false;
     setError(null);
-    void settingsApi.get().then((next) => {
-      if (!canceled) setSettings(next);
-    }).catch(() => {
-      if (!canceled) setError("读取 Skills 设置失败，请重试。");
-    });
-    return () => { canceled = true; };
+    void settingsApi
+      .get()
+      .then((next) => {
+        if (!canceled) setSettings(next);
+      })
+      .catch(() => {
+        if (!canceled) setError("读取 Skills 设置失败，请重试。");
+      });
+    return () => {
+      canceled = true;
+    };
   }, [reload]);
 
   const updateSkills = async (input: SettingsUpdateInput) => {
@@ -64,9 +75,16 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
               tabIndex={tab === item.id ? 0 : -1}
               onClick={() => setTab(item.id)}
               onKeyDown={(event) => {
-                const next = event.key === "ArrowRight" ? (index + 1) % TABS.length
-                  : event.key === "ArrowLeft" ? (index + TABS.length - 1) % TABS.length
-                  : event.key === "Home" ? 0 : event.key === "End" ? TABS.length - 1 : null;
+                const next =
+                  event.key === "ArrowRight"
+                    ? (index + 1) % TABS.length
+                    : event.key === "ArrowLeft"
+                      ? (index + TABS.length - 1) % TABS.length
+                      : event.key === "Home"
+                        ? 0
+                        : event.key === "End"
+                          ? TABS.length - 1
+                          : null;
                 if (next === null) return;
                 event.preventDefault();
                 setTab(TABS[next].id);
@@ -79,23 +97,46 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
           ))}
         </div>
         <div className="pt-3">
-          <section role="tabpanel" id="extension-panel-plugins" aria-labelledby="extension-tab-plugins" hidden={tab !== "plugins"}>
+          <section
+            role="tabpanel"
+            id="extension-panel-plugins"
+            aria-labelledby="extension-tab-plugins"
+            hidden={tab !== "plugins"}
+          >
             <PluginsSection query={queries.plugins} onConfigureSpeech={onConfigureSpeech} />
           </section>
-          <section role="tabpanel" id="extension-panel-skills" aria-labelledby="extension-tab-skills" hidden={tab !== "skills"}>
+          <section
+            role="tabpanel"
+            id="extension-panel-skills"
+            aria-labelledby="extension-tab-skills"
+            hidden={tab !== "skills"}
+          >
             {error ? (
               <div role="alert" className="flex items-center gap-3 py-8 text-act-sm text-text-faint">
                 {error}
-                <button type="button" className="text-text-main underline" onClick={() => setReload((value) => value + 1)}>重试</button>
+                <button
+                  type="button"
+                  className="text-text-main underline"
+                  onClick={() => setReload((value) => value + 1)}
+                >
+                  重试
+                </button>
               </div>
-            ) : settings ? <SkillsSection settings={settings} onUpdate={updateSkills} query={queries.skills} />
-              : <p role="status" className="py-8 text-act-sm text-text-faint">加载 Skills 中…</p>}
+            ) : settings ? (
+              <SkillsSection settings={settings} onUpdate={updateSkills} query={queries.skills} />
+            ) : (
+              <p role="status" className="py-8 text-act-sm text-text-faint">
+                加载 Skills 中…
+              </p>
+            )}
           </section>
           <section role="tabpanel" id="extension-panel-mcp" aria-labelledby="extension-tab-mcp" hidden={tab !== "mcp"}>
             <div className="flex flex-col items-center gap-3 py-16 text-center">
               <Unplug size={25} className="text-text-faint" />
               <h2 className="text-act-md font-medium">MCP 暂未接入</h2>
-              <p className="max-w-[34ch] text-act-sm leading-relaxed text-text-faint">接入后，你可以在这里管理 MCP 服务。</p>
+              <p className="max-w-[34ch] text-act-sm leading-relaxed text-text-faint">
+                接入后，你可以在这里管理 MCP 服务。
+              </p>
             </div>
           </section>
         </div>

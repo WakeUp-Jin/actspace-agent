@@ -37,7 +37,11 @@ const LOOKAHEAD_CHARS = 200_000;
  * 从下一行开始找结束行，返回结束行的 [起点, 终点)；`isClose` 判断某一行是不是结束行。
  * 没找到返回 null。
  */
-function findCloseLine(cx: BlockContext, nextLineStart: number, isClose: (text: string) => boolean): { start: number; end: number } | null {
+function findCloseLine(
+  cx: BlockContext,
+  nextLineStart: number,
+  isClose: (text: string) => boolean,
+): { start: number; end: number } | null {
   const input = inputOf(cx);
   if (!input) return null;
   const chunk = input.read(nextLineStart, nextLineStart + LOOKAHEAD_CHARS);
@@ -63,7 +67,9 @@ function nextLineStartOf(cx: BlockContext, line: Line): number {
 
 /** 消费到结束行（含），返回后 `line` 已经移到结束行之后。 */
 function consumeThrough(cx: BlockContext, closeStart: number): void {
-  while (cx.lineStart < closeStart && cx.nextLine()) { /* 逐行前进 */ }
+  while (cx.lineStart < closeStart && cx.nextLine()) {
+    /* 逐行前进 */
+  }
 }
 
 const MATH_FENCE = /^[ \t]{0,3}\$\$[ \t]*$/;
@@ -108,7 +114,10 @@ export const MathExtension: MarkdownConfig = {
         for (let i = pos + 1; i < cx.end; i++) {
           const c = cx.char(i);
           if (c === NEWLINE) return -1;
-          if (c === BACKSLASH) { i++; continue; }
+          if (c === BACKSLASH) {
+            i++;
+            continue;
+          }
           if (c !== DOLLAR) continue;
           const before = cx.char(i - 1);
           if (before === SPACE || before === TAB) return -1;
@@ -136,7 +145,8 @@ export const FrontmatterExtension: MarkdownConfig = {
       name: "Frontmatter",
       before: "HorizontalRule",
       parse(cx, line) {
-        if (cx.lineStart !== 0 || cx.parentType().name !== "Document" || !FRONTMATTER_OPEN.test(line.text)) return false;
+        if (cx.lineStart !== 0 || cx.parentType().name !== "Document" || !FRONTMATTER_OPEN.test(line.text))
+          return false;
         const close = findCloseLine(cx, nextLineStartOf(cx, line), (text) => FRONTMATTER_CLOSE.test(text));
         if (!close) return false;
         consumeThrough(cx, close.start);

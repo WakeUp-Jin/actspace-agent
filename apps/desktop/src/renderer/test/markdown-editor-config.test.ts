@@ -43,7 +43,8 @@ describe("模式：预览 / 源码", () => {
     expect(parent.querySelector(".cm-md-source")).not.toBeNull();
     expect(parent.querySelector(".cm-md-preview")).toBeNull();
     expect(parent.querySelector(".cm-lineNumbers")).not.toBeNull();
-    for (const selector of [".md-h", ".md-checkbox", ".md-path", ".md-bullet", ".md-code-head", ".md-fm-card"]) expect(parent.querySelector(selector)).toBeNull();
+    for (const selector of [".md-h", ".md-checkbox", ".md-path", ".md-bullet", ".md-code-head", ".md-fm-card"])
+      expect(parent.querySelector(selector)).toBeNull();
     expect(parent.querySelector(".cm-content")?.textContent).toContain("# 标题");
     expect(parent.querySelector(".cm-content")?.textContent).toContain("**粗**");
     setMode(view, "preview");
@@ -63,7 +64,11 @@ describe("模式：预览 / 源码", () => {
     expect(view.state.selection.main.head).toBe(5);
     expect(undoDepth(view.state)).toBe(1);
     // 在源码里再改一笔，切回预览后一并撤销
-    view.dispatch({ changes: { from: 1, insert: "乙" }, userEvent: "input.type", annotations: isolateHistory.of("full") });
+    view.dispatch({
+      changes: { from: 1, insert: "乙" },
+      userEvent: "input.type",
+      annotations: isolateHistory.of("full"),
+    });
     setMode(view, "preview");
     expect(undoDepth(view.state)).toBe(2);
     expect(undo(view)).toBe(true);
@@ -105,7 +110,11 @@ describe("模式：预览 / 源码", () => {
       ...Array.from(document.querySelectorAll("style"), (el) => el.textContent ?? ""),
       ...(document.adoptedStyleSheets ?? []).flatMap((sheet) => Array.from(sheet.cssRules, (rule) => rule.cssText)),
     ].join("\n");
-    for (const rule of [/\.cm-scroller\s*\{[^}]*font-family:\s*revert-layer/, /\.cm-line\s*\{[^}]*padding:\s*revert-layer/, /\.cm-content\s*\{[^}]*margin:\s*revert-layer/]) {
+    for (const rule of [
+      /\.cm-scroller\s*\{[^}]*font-family:\s*revert-layer/,
+      /\.cm-line\s*\{[^}]*padding:\s*revert-layer/,
+      /\.cm-content\s*\{[^}]*margin:\s*revert-layer/,
+    ]) {
       expect(css).toMatch(rule);
     }
   });
@@ -209,7 +218,8 @@ describe("onChange：每帧最多一次", () => {
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
     const onChange = vi.fn();
     const { view } = mountEditor({ doc: "", onChange });
-    for (const ch of "abc") view.dispatch({ changes: { from: view.state.doc.length, insert: ch }, userEvent: "input.type" });
+    for (const ch of "abc")
+      view.dispatch({ changes: { from: view.state.doc.length, insert: ch }, userEvent: "input.type" });
     expect(onChange).not.toHaveBeenCalled();
     vi.advanceTimersByTime(20);
     expect(onChange).toHaveBeenCalledTimes(1);
@@ -236,7 +246,9 @@ describe("onChange：每帧最多一次", () => {
     const { view, parent } = mountEditor({ doc: "- [ ] a\n\n末尾", onChange });
     focusView(view);
     view.dispatch({ selection: { anchor: view.state.doc.length } });
-    parent.querySelector(".md-checkbox")?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    parent
+      .querySelector(".md-checkbox")
+      ?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
     vi.advanceTimersByTime(20);
     expect(onChange).toHaveBeenCalledWith("- [x] a\n\n末尾");
   });
@@ -286,13 +298,18 @@ describe("宿主", () => {
     setHost(view, makeHost({ docPath: "other/deep/note.md", openPath }));
     expect(parent.querySelector(".md-link-file")).not.toBeNull();
     // 点击时用新宿主打开
-    parent.querySelector(".md-link")?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0, detail: 1 }));
+    parent
+      .querySelector(".md-link")
+      ?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0, detail: 1 }));
     window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     expect(openPath).toHaveBeenCalledWith("other/deep/a.md", undefined);
   });
 
   it("路径和本地链接：文件图标和第一个字符在同一个不换行的 .md-path-lead 里", () => {
-    const { view, parent } = mountEditor({ doc: "改了 `src/app.ts` 和 [入口](a.md)\n\n末尾", host: makeHost({ docPath: "docs/note.md" }) });
+    const { view, parent } = mountEditor({
+      doc: "改了 `src/app.ts` 和 [入口](a.md)\n\n末尾",
+      host: makeHost({ docPath: "docs/note.md" }),
+    });
     focusView(view);
     view.dispatch({ selection: { anchor: view.state.doc.length } });
     const pathLead = parent.querySelector(".md-path .md-path-lead");

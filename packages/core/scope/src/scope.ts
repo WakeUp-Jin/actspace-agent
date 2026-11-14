@@ -28,7 +28,9 @@ export function bindScopeParent(key: ScopeKey, parent: ScopeKey): ScopeParentBin
   return { rebind: (next) => linkScopeParent(key, next) };
 }
 
-export function scopeParentOf(key: ScopeKey): ScopeKey | undefined { return scopeParents.get(key); }
+export function scopeParentOf(key: ScopeKey): ScopeKey | undefined {
+  return scopeParents.get(key);
+}
 
 export function scopeChainOf(key: ScopeKey | undefined): ScopeKey[] {
   const chain: ScopeKey[] = [];
@@ -61,7 +63,9 @@ export function isScopeCarrier(value: unknown): value is object {
  * ancestor scope; untagged listeners remain global observers.
  */
 export function scopeTarget<T extends object>(base: T, key: ScopeKey | undefined): T {
-  const baseFilter = (base as T & { [CordisContextClass.filter]?: (ctx: CordisContext) => boolean })[CordisContextClass.filter];
+  const baseFilter = (base as T & { [CordisContextClass.filter]?: (ctx: CordisContext) => boolean })[
+    CordisContextClass.filter
+  ];
   const carrier = {
     [CordisContextClass.filter](ctx: CordisContext): boolean {
       if (baseFilter !== undefined && !baseFilter.call(base, ctx)) return false;
@@ -79,45 +83,56 @@ export function scopeTarget<T extends object>(base: T, key: ScopeKey | undefined
   return carrier;
 }
 
-export function carrierKeyOf(value: unknown): ScopeKey | undefined { return isScopeCarrier(value) ? carrierKeys.get(value) : undefined; }
+export function carrierKeyOf(value: unknown): ScopeKey | undefined {
+  return isScopeCarrier(value) ? carrierKeys.get(value) : undefined;
+}
 
 /** Tag a Cordis context with this scope for listener admission checks. */
 export function scopeContext(context: CordisContext, key: ScopeKey, ownerDisposer?: ScopeDisposer): CordisContext {
   const tagged = context.extend?.({ [scopeTag]: key }) ?? context;
   if (ownerDisposer === undefined || typeof tagged.on !== "function") return tagged;
 
-  const wrapRegistration = (method: "on" | "once") => (...args: readonly unknown[]): unknown => {
-    if (!scopeActiveOf(key)) throw new Error("Scope is already disposed.");
-    const register = tagged[method] as ((...values: readonly unknown[]) => unknown);
-    const remove = register(...args);
-    if (typeof remove !== "function") return remove;
-    let active = true;
-    let cancel: (() => void) | undefined;
-    try {
-      cancel = ownerDisposer.add(() => {
-        if (!active) return;
-        active = false;
+  const wrapRegistration =
+    (method: "on" | "once") =>
+    (...args: readonly unknown[]): unknown => {
+      if (!scopeActiveOf(key)) throw new Error("Scope is already disposed.");
+      const register = tagged[method] as (...values: readonly unknown[]) => unknown;
+      const remove = register(...args);
+      if (typeof remove !== "function") return remove;
+      let active = true;
+      let cancel: (() => void) | undefined;
+      try {
+        cancel = ownerDisposer.add(() => {
+          if (!active) return;
+          active = false;
+          remove();
+        });
+      } catch (error) {
         remove();
-      });
-    } catch (error) {
-      remove();
-      throw error;
-    }
-    return () => {
-      if (!active) return false;
-      active = false;
-      cancel?.();
-      return remove();
+        throw error;
+      }
+      return () => {
+        if (!active) return false;
+        active = false;
+        cancel?.();
+        return remove();
+      };
     };
-  };
 
-  return tagged.extend?.({
-    on: wrapRegistration("on"),
-    once: wrapRegistration("once"),
-  }) ?? tagged;
+  return (
+    tagged.extend?.({
+      on: wrapRegistration("on"),
+      once: wrapRegistration("once"),
+    }) ?? tagged
+  );
 }
 
-export type ScopeIdentity = { readonly scopeId: string; readonly parentScopeId: string | null; readonly agentId: string; readonly lineage: readonly string[] };
+export type ScopeIdentity = {
+  readonly scopeId: string;
+  readonly parentScopeId: string | null;
+  readonly agentId: string;
+  readonly lineage: readonly string[];
+};
 
 export class AgentScope {
   readonly scopeKey: ScopeKey;
@@ -126,19 +141,30 @@ export class AgentScope {
   readonly contributors: ScopedRegistry<unknown>;
   readonly tools: ScopedRegistry<unknown>;
 
-  constructor(readonly agentId: string, readonly parent?: AgentScope, scopeId: string = randomUUID() as string) {
+  constructor(
+    readonly agentId: string,
+    readonly parent?: AgentScope,
+    scopeId: string = randomUUID() as string,
+  ) {
     parent?.assertActive();
     this.scopeKey = Object.freeze({});
     activeScopeKeys.add(this.scopeKey);
     scopeDisposers.set(this.scopeKey, this.disposer);
     if (parent !== undefined) bindScopeParent(this.scopeKey, parent.scopeKey);
-    this.contributors = parent === undefined
-      ? new ScopedRegistry<unknown>().forScope(this.scopeKey, this.disposer)
-      : parent.contributors.forScope(this.scopeKey, this.disposer);
-    this.tools = parent === undefined
-      ? new ScopedRegistry<unknown>().forScope(this.scopeKey, this.disposer)
-      : parent.tools.forScope(this.scopeKey, this.disposer);
-    this.identity = Object.freeze({ scopeId, parentScopeId: parent?.identity.scopeId ?? null, agentId, lineage: Object.freeze([...parent?.identity.lineage ?? [], agentId]) });
+    this.contributors =
+      parent === undefined
+        ? new ScopedRegistry<unknown>().forScope(this.scopeKey, this.disposer)
+        : parent.contributors.forScope(this.scopeKey, this.disposer);
+    this.tools =
+      parent === undefined
+        ? new ScopedRegistry<unknown>().forScope(this.scopeKey, this.disposer)
+        : parent.tools.forScope(this.scopeKey, this.disposer);
+    this.identity = Object.freeze({
+      scopeId,
+      parentScopeId: parent?.identity.scopeId ?? null,
+      agentId,
+      lineage: Object.freeze([...(parent?.identity.lineage ?? []), agentId]),
+    });
   }
 
   /** Create an explicitly flat child that has no parent registry/event inheritance. */
@@ -154,7 +180,9 @@ export class AgentScope {
     return child;
   }
 
-  assertActive(): void { if (this.disposer.state !== "active") throw new Error(`Scope ${this.identity.scopeId} is disposed.`); }
+  assertActive(): void {
+    if (this.disposer.state !== "active") throw new Error(`Scope ${this.identity.scopeId} is disposed.`);
+  }
 
   async dispose(): Promise<void> {
     activeScopeKeys.delete(this.scopeKey);

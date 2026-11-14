@@ -5,14 +5,23 @@ import { renderMessage } from "../components/conversation/render-message";
 
 // 这里验证的是“按需加载工具详情”的交互；bridge 原始 page → MessageBlock[] 的投影由 api-sessions 测试覆盖。
 const getSessionToolDetail = vi.hoisted(() => vi.fn());
-vi.mock("../api/sessions", async (importOriginal) => ({ ...await importOriginal<typeof import("../api/sessions")>(), getSessionToolDetail }));
-beforeEach(() => { getSessionToolDetail.mockReset(); });
+vi.mock("../api/sessions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/sessions")>()),
+  getSessionToolDetail,
+}));
+beforeEach(() => {
+  getSessionToolDetail.mockReset();
+});
 const deferredToolDetail = { sessionId: "parent", callId: "call" };
 
 it("renders a persisted generic tool without toolName instead of crashing", () => {
   const message: MessageBlock = {
-    kind: "tool", id: "generic-without-name", createdAt: "now",
-    title: "Browser action", content: "Stopped", status: "pending",
+    kind: "tool",
+    id: "generic-without-name",
+    createdAt: "now",
+    title: "Browser action",
+    content: "Stopped",
+    status: "pending",
   };
   render(<>{renderMessage(message)}</>);
   expect(screen.getByText("Browser action: Stopped")).toBeVisible();
@@ -23,8 +32,15 @@ it.each(["agent", "explore"] as const)("renders deferred %s as a directly usable
   const open = vi.fn();
   getSessionToolDetail.mockImplementation(load);
   const message: MessageBlock = {
-    kind: "agent", id: "child", createdAt: "now", description: "检查工作区",
-    subagentType: "explore", agentKind, status: "completed", summary: "检查完成", displayText: "检查工作区",
+    kind: "agent",
+    id: "child",
+    createdAt: "now",
+    description: "检查工作区",
+    subagentType: "explore",
+    agentKind,
+    status: "completed",
+    summary: "检查完成",
+    displayText: "检查工作区",
     transcriptRef: { kind: "subagent_transcript", sessionId: "parent", agentRunId: "run", runId: "child-session" },
     deferredToolDetail,
   };
@@ -41,10 +57,22 @@ it.each(["agent", "explore"] as const)("renders deferred %s as a directly usable
 
 it("keeps the tool identity visible while loading details on demand and retrying errors", async () => {
   const message: MessageBlock = {
-    kind: "glob", id: "glob", renderKey: "page:glob", createdAt: "now", pattern: "**/*.css", scope: ".", resultCount: 125,
-    displayText: "Glob **/*.css in .", deferredToolDetail,
+    kind: "glob",
+    id: "glob",
+    renderKey: "page:glob",
+    createdAt: "now",
+    pattern: "**/*.css",
+    scope: ".",
+    resultCount: 125,
+    displayText: "Glob **/*.css in .",
+    deferredToolDetail,
   };
-  const full: MessageBlock = { ...message, renderKey: undefined, resultPreview: ["src/styles/main.css", "src/styles/theme.css"], deferredToolDetail: undefined };
+  const full: MessageBlock = {
+    ...message,
+    renderKey: undefined,
+    resultPreview: ["src/styles/main.css", "src/styles/theme.css"],
+    deferredToolDetail: undefined,
+  };
   const load = vi.fn().mockRejectedValueOnce(new Error("读取失败")).mockResolvedValueOnce([full]);
   getSessionToolDetail.mockImplementation(load);
   render(<>{renderMessage(message)}</>);
@@ -64,15 +92,38 @@ it("keeps the tool identity visible while loading details on demand and retrying
 it("expands an existing preview with no explicit status without fetching", () => {
   const load = vi.fn();
   getSessionToolDetail.mockImplementation(load);
-  render(<>{renderMessage({ kind: "glob", id: "small", createdAt: "now", pattern: "*.css", scope: ".", resultCount: 1, displayText: "Glob *.css in .", resultPreview: ["main.css"] })}</>);
+  render(
+    <>
+      {renderMessage({
+        kind: "glob",
+        id: "small",
+        createdAt: "now",
+        pattern: "*.css",
+        scope: ".",
+        resultCount: 1,
+        displayText: "Glob *.css in .",
+        resultPreview: ["main.css"],
+      })}
+    </>,
+  );
   fireEvent.click(screen.getByRole("button", { name: "Glob *.css in ." }));
   expect(screen.getByText("main.css")).toBeVisible();
   expect(load).not.toHaveBeenCalled();
 });
 
 it("loads web tool content through its existing toggle and preserves expansion", async () => {
-  const message: MessageBlock = { kind: "web_search", id: "web", createdAt: "now", mode: "query", query: "docs", displayText: "Search docs", deferredToolDetail };
-  const load = vi.fn().mockResolvedValue([{ ...message, deferredToolDetail: undefined, contentPreview: "Loaded search result" }]);
+  const message: MessageBlock = {
+    kind: "web_search",
+    id: "web",
+    createdAt: "now",
+    mode: "query",
+    query: "docs",
+    displayText: "Search docs",
+    deferredToolDetail,
+  };
+  const load = vi
+    .fn()
+    .mockResolvedValue([{ ...message, deferredToolDetail: undefined, contentPreview: "Loaded search result" }]);
   getSessionToolDetail.mockImplementation(load);
   render(<>{renderMessage(message)}</>);
   fireEvent.click(screen.getByRole("button", { name: "Search docs" }));
@@ -84,8 +135,17 @@ it("loads web tool content through its existing toggle and preserves expansion",
 });
 
 it("keeps Read file navigation separate from loading its result", async () => {
-  const message: MessageBlock = { kind: "read", id: "read", createdAt: "now", filePath: "README.md", displayText: "Read README.md", deferredToolDetail };
-  const load = vi.fn().mockResolvedValue([{ ...message, deferredToolDetail: undefined, resultPreview: ["# Read result"] }]);
+  const message: MessageBlock = {
+    kind: "read",
+    id: "read",
+    createdAt: "now",
+    filePath: "README.md",
+    displayText: "Read README.md",
+    deferredToolDetail,
+  };
+  const load = vi
+    .fn()
+    .mockResolvedValue([{ ...message, deferredToolDetail: undefined, resultPreview: ["# Read result"] }]);
   const openFile = vi.fn();
   getSessionToolDetail.mockImplementation(load);
   render(<>{renderMessage(message, undefined, undefined, false, openFile)}</>);

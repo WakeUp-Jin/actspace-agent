@@ -10,7 +10,14 @@ const STATUS_COLOR: Record<ReviewFileSummary["status"], string> = {
   typeChanged: "text-warning",
 };
 
-export function ReviewFileTree({ files, selectedFileId, filter, onFilter, onSelect, onClose }: {
+export function ReviewFileTree({
+  files,
+  selectedFileId,
+  filter,
+  onFilter,
+  onSelect,
+  onClose,
+}: {
   files: ReviewFileSummary[];
   selectedFileId: string | null;
   filter: string;
@@ -23,22 +30,55 @@ export function ReviewFileTree({ files, selectedFileId, filter, onFilter, onSele
     <aside className="flex h-full min-h-0 w-full flex-col bg-surface-raised" aria-label="已变更文件">
       <div className="flex items-center gap-1 border-b border-line p-2">
         <div className="relative min-w-0 flex-1">
-        <Search size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-text-faint" />
-        <input className="h-8 w-full rounded-act-sm border border-line bg-surface pl-7 pr-2 text-act-xs text-text-main outline-none placeholder:text-text-faint focus:border-focus-ring" value={filter} onChange={(event) => onFilter(event.target.value)} placeholder="筛选文件…" aria-label="筛选变更文件" />
+          <Search size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-text-faint" />
+          <input
+            className="h-8 w-full rounded-act-sm border border-line bg-surface pl-7 pr-2 text-act-xs text-text-main outline-none placeholder:text-text-faint focus:border-focus-ring"
+            value={filter}
+            onChange={(event) => onFilter(event.target.value)}
+            placeholder="筛选文件…"
+            aria-label="筛选变更文件"
+          />
         </div>
-        {onClose ? <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" aria-label="隐藏文件列表" onClick={onClose}><X size={15} /></button> : null}
+        {onClose ? (
+          <button
+            type="button"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main"
+            aria-label="隐藏文件列表"
+            onClick={onClose}
+          >
+            <X size={15} />
+          </button>
+        ) : null}
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-1 pb-2" role="tree">
         {filtered.map((file) => (
-          <div key={file.id} className={`group flex min-h-8 items-center gap-2 rounded-act-sm px-2 ${selectedFileId === file.id ? "bg-selected" : "hover:bg-surface-subtle"}`} role="treeitem" aria-selected={selectedFileId === file.id}>
-            <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => onSelect(file.id)} title={file.path}>
+          <div
+            key={file.id}
+            className={`group flex min-h-8 items-center gap-2 rounded-act-sm px-2 ${selectedFileId === file.id ? "bg-selected" : "hover:bg-surface-subtle"}`}
+            role="treeitem"
+            aria-selected={selectedFileId === file.id}
+          >
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-2 text-left"
+              onClick={() => onSelect(file.id)}
+              title={file.path}
+            >
               <FileCodeCorner size={14} className={STATUS_COLOR[file.status]} />
               <span className="min-w-0 flex-1 truncate font-mono text-act-xxs text-text-main">{file.path}</span>
-              {file.additions > 0 || file.deletions > 0 ? <span className="shrink-0 text-act-xxs tabular-nums">{file.additions > 0 ? <span className="text-success">+{file.additions}</span> : null}{file.additions > 0 && file.deletions > 0 ? " " : null}{file.deletions > 0 ? <span className="text-danger">-{file.deletions}</span> : null}</span> : null}
+              {file.additions > 0 || file.deletions > 0 ? (
+                <span className="shrink-0 text-act-xxs tabular-nums">
+                  {file.additions > 0 ? <span className="text-success">+{file.additions}</span> : null}
+                  {file.additions > 0 && file.deletions > 0 ? " " : null}
+                  {file.deletions > 0 ? <span className="text-danger">-{file.deletions}</span> : null}
+                </span>
+              ) : null}
             </button>
           </div>
         ))}
-        {filtered.length === 0 ? <div className="px-3 py-6 text-center text-act-xs text-text-faint">没有匹配的文件。</div> : null}
+        {filtered.length === 0 ? (
+          <div className="px-3 py-6 text-center text-act-xs text-text-faint">没有匹配的文件。</div>
+        ) : null}
       </div>
     </aside>
   );

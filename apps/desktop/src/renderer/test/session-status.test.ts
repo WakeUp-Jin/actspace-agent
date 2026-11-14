@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isSessionBusy, needsAttention, SESSION_STATUS_META, sessionStatusOf } from "../components/sidebar/session-status";
+import {
+  isSessionBusy,
+  needsAttention,
+  SESSION_STATUS_META,
+  sessionStatusOf,
+} from "../components/sidebar/session-status";
 
 describe("sessionStatusOf", () => {
   it("prefers the recorded status, then falls back to the busy set", () => {
@@ -22,13 +27,20 @@ describe("sessionStatusOf", () => {
 
 describe("isSessionBusy", () => {
   it("is true only while a turn is still open", () => {
-    expect(Object.keys(SESSION_STATUS_META).filter((status) => isSessionBusy(status as never))).toEqual(["running", "waiting_approval"]);
+    expect(Object.keys(SESSION_STATUS_META).filter((status) => isSessionBusy(status as never))).toEqual([
+      "running",
+      "waiting_approval",
+    ]);
   });
 });
 
 describe("needsAttention", () => {
   it("collects what the user still has to look at into 需要处理", () => {
     expect(sessionStatusOf("done", undefined, { done: "unread" })).toBe("unread");
-    expect(Object.keys(SESSION_STATUS_META).filter((status) => needsAttention(status as never))).toEqual(["waiting_approval", "failed", "unread"]);
+    expect(Object.keys(SESSION_STATUS_META).filter((status) => needsAttention(status as never))).toEqual([
+      "waiting_approval",
+      "failed",
+      "unread",
+    ]);
   });
 });

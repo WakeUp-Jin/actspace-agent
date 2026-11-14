@@ -1,14 +1,7 @@
 import { BackgroundTasksPanel } from "./right-panel/BackgroundTasksPanel";
 import { SubagentsPanel } from "./lazy-pages";
 import { Suspense, memo, useContext, useEffect, useMemo, useState } from "react";
-import {
-  BookOpen,
-  Eye,
-  GitBranch,
-  GitFork,
-  Layers,
-  MessageSquare,
-} from "lucide-react";
+import { BookOpen, Eye, GitBranch, GitFork, Layers, MessageSquare } from "lucide-react";
 import type { SessionListItem } from "@actspace/shared";
 import type { ContextState } from "@actspace/shared";
 import { CodeRenderView } from "./right-panel/CodeRenderView";
@@ -26,11 +19,7 @@ import { sideChatAge, sideChatListTitle } from "./right-panel/side-chat/side-cha
 import { useOpenSideChat } from "./right-panel/side-chat/use-open-side-chat";
 import { SESSION_STATUS_META, type SessionUiStatusKind } from "./sidebar/session-status";
 import { ActiveSessionContext } from "../session/active-session-context";
-import {
-  isWorkspaceFileTab,
-  useRightPanel,
-  type RightPanelTab,
-} from "./right-panel/RightPanelContext";
+import { isWorkspaceFileTab, useRightPanel, type RightPanelTab } from "./right-panel/RightPanelContext";
 import { useFileFreshness } from "./right-panel/useFileFreshness";
 import { WorkspaceOperationBar } from "./right-panel/WorkspaceOperationBar";
 
@@ -124,7 +113,9 @@ function RightPanelTabs({ developmentEnabled, sessionId }: { developmentEnabled:
         id: tab.id,
         title: tab.title,
         label: tab.title,
-        ...(tab.kind === "sideChat" ? { icon: <SideChatTabIcon status={sideChat?.statuses[tab.sessionId]} />, closeVerb: "收起" } : {}),
+        ...(tab.kind === "sideChat"
+          ? { icon: <SideChatTabIcon status={sideChat?.statuses[tab.sessionId]} />, closeVerb: "收起" }
+          : {}),
       }))}
       onSelect={setActiveTab}
       onClose={requestCloseTab}
@@ -167,9 +158,25 @@ function RightPanelBody({
 
   if (tab.kind === "sideChat") return <SideChatView tab={tab} />;
 
-  if (tab.kind === "subagents") return <Suspense fallback={null}><SubagentsPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} focus={tab.sessionId === sessionId ? tab.focus : undefined} /></Suspense>;
+  if (tab.kind === "subagents")
+    return (
+      <Suspense fallback={null}>
+        <SubagentsPanel
+          key={sessionId ?? "none"}
+          sessionId={sessionId ?? null}
+          focus={tab.sessionId === sessionId ? tab.focus : undefined}
+        />
+      </Suspense>
+    );
 
-  if (tab.kind === "backgroundTasks") return <BackgroundTasksPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
+  if (tab.kind === "backgroundTasks")
+    return (
+      <BackgroundTasksPanel
+        key={sessionId ?? "none"}
+        sessionId={sessionId ?? null}
+        focus={tab.sessionId === sessionId ? tab.focus : undefined}
+      />
+    );
 
   if (tab.kind === "review") {
     return (
@@ -195,7 +202,15 @@ function RightPanelBody({
     return <CodeRenderView content={tab.content} />;
   }
 
-  return <ContextPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} contextState={contextState} contextRevision={contextRevision} workspaceRoot={workspaceRoot} />;
+  return (
+    <ContextPanel
+      key={sessionId ?? "none"}
+      sessionId={sessionId ?? null}
+      contextState={contextState}
+      contextRevision={contextRevision}
+      workspaceRoot={workspaceRoot}
+    />
+  );
 }
 
 function RightPanelLauncher({
@@ -237,7 +252,8 @@ function RightPanelLauncher({
         description: "在后台跑的命令",
         icon: <Layers size={15} />,
         disabled: !sessionId,
-        onClick: () => sessionId && openTab({ id: "background-tasks", kind: "backgroundTasks", title: "后台任务", sessionId }),
+        onClick: () =>
+          sessionId && openTab({ id: "background-tasks", kind: "backgroundTasks", title: "后台任务", sessionId }),
       },
       {
         id: "docs",
@@ -267,17 +283,19 @@ function RightPanelLauncher({
     <RightPanelLauncherList
       label="右侧面板对象"
       items={items}
-      groups={[{
-        id: "side-chats",
-        caption: "本会话的侧边对话 · 已收起",
-        items: collapsedSideChats.map(({ item, title }) => ({
-          id: `side-chat:${item.id}`,
-          label: title,
-          description: sideChatAge(item.updatedAt),
-          icon: <GitFork size={15} />,
-          onClick: () => sideChat.reopen(item, title),
-        })),
-      }]}
+      groups={[
+        {
+          id: "side-chats",
+          caption: "本会话的侧边对话 · 已收起",
+          items: collapsedSideChats.map(({ item, title }) => ({
+            id: `side-chat:${item.id}`,
+            label: title,
+            description: sideChatAge(item.updatedAt),
+            icon: <GitFork size={15} />,
+            onClick: () => sideChat.reopen(item, title),
+          })),
+        },
+      ]}
     />
   );
 }
@@ -289,12 +307,22 @@ function useCollapsedSideChats(sessionId: string | null, tabs: readonly RightPan
   const [items, setItems] = useState<SessionListItem[]>([]);
   const list = runtime?.available ? runtime.list : null;
   useEffect(() => {
-    if (!sessionId || !list) { setItems([]); return; }
+    if (!sessionId || !list) {
+      setItems([]);
+      return;
+    }
     let cancelled = false;
-    void list(sessionId).then((next) => { if (!cancelled) setItems(next); }, (error: unknown) => console.error("Failed to list side chats", error));
-    return () => { cancelled = true; };
+    void list(sessionId).then(
+      (next) => {
+        if (!cancelled) setItems(next);
+      },
+      (error: unknown) => console.error("Failed to list side chats", error),
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId, list, tabs.length]);
-  const open = new Set(tabs.flatMap((tab) => tab.kind === "sideChat" ? [tab.sessionId] : []));
+  const open = new Set(tabs.flatMap((tab) => (tab.kind === "sideChat" ? [tab.sessionId] : [])));
   return items
     .map((item, index) => ({ item, title: sideChatListTitle(item, parentTitle, index) }))
     .filter(({ item }) => !open.has(item.id));

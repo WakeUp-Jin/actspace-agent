@@ -27,21 +27,39 @@ export function TurnUsagePill({ usage }: { usage: TurnUsageSummary | undefined }
   rows.push(["输出", model.output]);
   rows.push([
     "花费",
-    model.cost.kind === "known" && model.cost.estimated
-      ? <>{model.cost.text}<span className={`${STAT_NOTE_CLASS} ml-1.5`}>预估</span></>
-      : model.cost.text,
+    model.cost.kind === "known" && model.cost.estimated ? (
+      <>
+        {model.cost.text}
+        <span className={`${STAT_NOTE_CLASS} ml-1.5`}>预估</span>
+      </>
+    ) : (
+      model.cost.text
+    ),
   ]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {/* 原生 button：和输入框状态栏的统计胶囊一样是纯文字入口，不要 Button 的边框和字重。 */}
-        <button className={PILL_CLASS} type="button" aria-haspopup="dialog" aria-label={`${model.label}，查看本轮用量`} data-turn-usage="">
+        <button
+          className={PILL_CLASS}
+          type="button"
+          aria-haspopup="dialog"
+          aria-label={`${model.label}，查看本轮用量`}
+          data-turn-usage=""
+        >
           <Database className="shrink-0" size={15} aria-hidden="true" />
           <span className={PILL_LABEL_CLASS}>{model.label}</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="start" sideOffset={8} radius="lg" aria-label={TITLE} className={STAT_DIALOG_CONTENT_CLASS}>
+      <PopoverContent
+        side="top"
+        align="start"
+        sideOffset={8}
+        radius="lg"
+        aria-label={TITLE}
+        className={STAT_DIALOG_CONTENT_CLASS}
+      >
         <StatDialogBody icon={Database} dialog={{ title: TITLE, titleValue: model.total, rows }} />
       </PopoverContent>
     </Popover>

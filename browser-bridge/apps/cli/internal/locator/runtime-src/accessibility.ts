@@ -8,31 +8,58 @@ export function computedRole(element: Element): string | undefined {
 
   const tagName = element.tagName.toLowerCase();
   switch (tagName) {
-    case "a": return element.hasAttribute("href") ? "link" : undefined;
-    case "article": return "article";
-    case "aside": return "complementary";
-    case "button": return "button";
-    case "dialog": return "dialog";
-    case "footer": return "contentinfo";
-    case "h1": case "h2": case "h3": case "h4": case "h5": case "h6": return "heading";
-    case "header": return "banner";
-    case "img": return element.getAttribute("alt") === "" ? undefined : "img";
-    case "li": return "listitem";
-    case "main": return "main";
-    case "nav": return "navigation";
-    case "ol": case "ul": return "list";
-    case "option": return "option";
-    case "progress": return "progressbar";
-    case "section": return accessibleName(element) ? "region" : undefined;
+    case "a":
+      return element.hasAttribute("href") ? "link" : undefined;
+    case "article":
+      return "article";
+    case "aside":
+      return "complementary";
+    case "button":
+      return "button";
+    case "dialog":
+      return "dialog";
+    case "footer":
+      return "contentinfo";
+    case "h1":
+    case "h2":
+    case "h3":
+    case "h4":
+    case "h5":
+    case "h6":
+      return "heading";
+    case "header":
+      return "banner";
+    case "img":
+      return element.getAttribute("alt") === "" ? undefined : "img";
+    case "li":
+      return "listitem";
+    case "main":
+      return "main";
+    case "nav":
+      return "navigation";
+    case "ol":
+    case "ul":
+      return "list";
+    case "option":
+      return "option";
+    case "progress":
+      return "progressbar";
+    case "section":
+      return accessibleName(element) ? "region" : undefined;
     case "select": {
       const select = element as HTMLSelectElement;
       return select.multiple || select.size > 1 ? "listbox" : "combobox";
     }
-    case "summary": return "button";
-    case "table": return "table";
-    case "textarea": return "textbox";
-    case "input": return inputRole(element as HTMLInputElement);
-    default: return undefined;
+    case "summary":
+      return "button";
+    case "table":
+      return "table";
+    case "textarea":
+      return "textbox";
+    case "input":
+      return inputRole(element as HTMLInputElement);
+    default:
+      return undefined;
   }
 }
 
@@ -101,7 +128,12 @@ export function labelText(label: HTMLLabelElement, control: Element): string {
   return textAlternative(label, new Set([control]), false, control);
 }
 
-function textAlternative(element: Element, visited: Set<Element>, referenced: boolean, excludedSubtree?: Element): string {
+function textAlternative(
+  element: Element,
+  visited: Set<Element>,
+  referenced: boolean,
+  excludedSubtree?: Element,
+): string {
   if (!referenced && (element.hasAttribute("hidden") || element.getAttribute("aria-hidden") === "true")) return "";
   const nestedLabel = normalizeWhitespace(element.getAttribute("aria-label"));
   if (nestedLabel) return nestedLabel;
@@ -113,14 +145,28 @@ function textAlternative(element: Element, visited: Set<Element>, referenced: bo
 
 function inputRole(input: HTMLInputElement): string | undefined {
   switch (input.type) {
-    case "button": case "image": case "reset": case "submit": return "button";
-    case "checkbox": return "checkbox";
-    case "number": return "spinbutton";
-    case "radio": return "radio";
-    case "range": return "slider";
-    case "search": return "searchbox";
-    case "email": case "tel": case "text": case "url": return input.hasAttribute("list") ? "combobox" : "textbox";
-    default: return undefined;
+    case "button":
+    case "image":
+    case "reset":
+    case "submit":
+      return "button";
+    case "checkbox":
+      return "checkbox";
+    case "number":
+      return "spinbutton";
+    case "radio":
+      return "radio";
+    case "range":
+      return "slider";
+    case "search":
+      return "searchbox";
+    case "email":
+    case "tel":
+    case "text":
+    case "url":
+      return input.hasAttribute("list") ? "combobox" : "textbox";
+    default:
+      return undefined;
   }
 }
 
@@ -131,7 +177,24 @@ function computedRoleWithoutNameRecursion(element: Element): string | undefined 
 
 function nameFromContent(role: string): boolean {
   return new Set([
-    "button", "cell", "checkbox", "columnheader", "gridcell", "heading", "link", "listitem",
-    "menuitem", "menuitemcheckbox", "menuitemradio", "option", "radio", "row", "rowheader", "switch", "tab", "tooltip", "treeitem",
+    "button",
+    "cell",
+    "checkbox",
+    "columnheader",
+    "gridcell",
+    "heading",
+    "link",
+    "listitem",
+    "menuitem",
+    "menuitemcheckbox",
+    "menuitemradio",
+    "option",
+    "radio",
+    "row",
+    "rowheader",
+    "switch",
+    "tab",
+    "tooltip",
+    "treeitem",
   ]).has(role);
 }

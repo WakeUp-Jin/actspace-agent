@@ -5,7 +5,16 @@ import type { HostConnection, HostConnectionState } from "@actspace/shared/host-
 import { describeReadiness, type ReadinessTone } from "../../target/readiness";
 import type { Capability, RunTarget } from "../../target/run-target";
 import { cn } from "../ui/cn";
-import { Menu, MenuContent, MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger, MenuTrigger } from "../ui/Menu";
+import {
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuSeparator,
+  MenuSub,
+  MenuSubContent,
+  MenuSubTrigger,
+  MenuTrigger,
+} from "../ui/Menu";
 
 /** Host 达到这个数量时，远端机器子菜单顶部显示搜索。 */
 export const HOST_SEARCH_THRESHOLD = 5;
@@ -21,11 +30,17 @@ const DOT_CLASS: Record<RunTargetDotTone, string> = {
 
 /** 运行目标的状态点：运行位置菜单的 Host 行、新建页的运行位置按钮、对话中的状态行共用。 */
 export function RunTargetDot({ tone, className }: { tone: RunTargetDotTone; className?: string }) {
-  return <span aria-hidden="true" data-tone={tone} className={cn("inline-block size-[7px] shrink-0 rounded-full", DOT_CLASS[tone], className)} />;
+  return (
+    <span
+      aria-hidden="true"
+      data-tone={tone}
+      className={cn("inline-block size-[7px] shrink-0 rounded-full", DOT_CLASS[tone], className)}
+    />
+  );
 }
 
 export function hostStateTone(state: HostConnectionState): RunTargetDotTone {
-  return state === "connected" ? "connected" : describeReadiness({ state }, "").tone ?? "error";
+  return state === "connected" ? "connected" : (describeReadiness({ state }, "").tone ?? "error");
 }
 
 /** Host 行右侧的状态文字；connected 时不显示。 */
@@ -61,7 +76,18 @@ const SECOND_LINE_CLASS = "truncate text-act-xxs text-text-faint";
  * 不可用的 Host 也能选中：草稿照常编辑，发送按 readiness 禁用并说明原因。
  */
 export function RunLocationMenu({
-  open, onOpenChange, children, target, runLocation, hosts, newWorktree, branch, onSelectLocal, onSelectWorktree, onSelectHost, onConnectHost,
+  open,
+  onOpenChange,
+  children,
+  target,
+  runLocation,
+  hosts,
+  newWorktree,
+  branch,
+  onSelectLocal,
+  onSelectWorktree,
+  onSelectHost,
+  onConnectHost,
 }: RunLocationMenuProps) {
   const isLocal = target.kind === "local";
   const remoteHostId = target.kind === "remote" ? target.hostId : null;
@@ -80,11 +106,18 @@ export function RunLocationMenu({
             <MenuSubTrigger>
               <Server className={ICON_CLASS} size={15} aria-hidden="true" />
               <span className="min-w-0 flex-1 truncate">远端机器</span>
-              {remoteName ? <span className="max-w-[96px] shrink-0 truncate text-act-xs text-text-faint">{remoteName}</span> : null}
+              {remoteName ? (
+                <span className="max-w-[96px] shrink-0 truncate text-act-xs text-text-faint">{remoteName}</span>
+              ) : null}
             </MenuSubTrigger>
             {/* 窄窗口两侧都放不下 260px 时，按 Radix 算出的可用宽度收窄（shift 只沿纵向挪，横向不会把子菜单推回视口）。 */}
             <MenuSubContent className="w-[min(260px,var(--radix-dropdown-menu-content-available-width))]">
-              <HostList hosts={hosts} selectedHostId={remoteHostId} onSelectHost={onSelectHost} onConnectHost={onConnectHost} />
+              <HostList
+                hosts={hosts}
+                selectedHostId={remoteHostId}
+                onSelectHost={onSelectHost}
+                onConnectHost={onConnectHost}
+              />
             </MenuSubContent>
           </MenuSub>
         ) : (
@@ -104,7 +137,9 @@ export function RunLocationMenu({
           <GitFork className={ICON_CLASS} size={15} aria-hidden="true" />
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
             <span className="truncate">新建工作树</span>
-            <span className={SECOND_LINE_CLASS}>{newWorktree.enabled ? (branch ? `从 ${branch} 创建隔离分支` : "创建隔离分支") : newWorktree.reason}</span>
+            <span className={SECOND_LINE_CLASS}>
+              {newWorktree.enabled ? (branch ? `从 ${branch} 创建隔离分支` : "创建隔离分支") : newWorktree.reason}
+            </span>
           </span>
           {isLocal && runLocation === "worktree" ? <Check className="shrink-0" size={14} aria-hidden="true" /> : null}
         </MenuItem>
@@ -113,7 +148,12 @@ export function RunLocationMenu({
   );
 }
 
-function HostList({ hosts, selectedHostId, onSelectHost, onConnectHost }: {
+function HostList({
+  hosts,
+  selectedHostId,
+  onSelectHost,
+  onConnectHost,
+}: {
   hosts: readonly HostConnection[];
   selectedHostId: string | null;
   onSelectHost: (hostId: string) => void;
@@ -129,7 +169,9 @@ function HostList({ hosts, selectedHostId, onSelectHost, onConnectHost }: {
     return () => window.clearTimeout(timer);
   }, [searchable]);
   const needle = query.trim().toLowerCase();
-  const visible = needle ? hosts.filter((host) => host.name.toLowerCase().includes(needle) || host.hostId.toLowerCase().includes(needle)) : hosts;
+  const visible = needle
+    ? hosts.filter((host) => host.name.toLowerCase().includes(needle) || host.hostId.toLowerCase().includes(needle))
+    : hosts;
 
   function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape" || event.key === "Tab") return;
@@ -137,7 +179,10 @@ function HostList({ hosts, selectedHostId, onSelectHost, onConnectHost }: {
     event.stopPropagation();
     if (event.key !== "ArrowDown") return;
     event.preventDefault();
-    event.currentTarget.closest("[role=menu]")?.querySelector<HTMLElement>("[role^=menuitem]:not([data-disabled])")?.focus();
+    event.currentTarget
+      .closest("[role=menu]")
+      ?.querySelector<HTMLElement>("[role^=menuitem]:not([data-disabled])")
+      ?.focus();
   }
 
   return (
@@ -159,7 +204,13 @@ function HostList({ hosts, selectedHostId, onSelectHost, onConnectHost }: {
         const label = hostStateLabel(host.state);
         const selected = host.hostId === selectedHostId;
         return (
-          <MenuItem key={host.hostId} role="menuitemradio" aria-checked={selected} textValue={host.name} onSelect={() => onSelectHost(host.hostId)}>
+          <MenuItem
+            key={host.hostId}
+            role="menuitemradio"
+            aria-checked={selected}
+            textValue={host.name}
+            onSelect={() => onSelectHost(host.hostId)}
+          >
             <RunTargetDot tone={hostStateTone(host.state)} />
             <span className="min-w-0 flex-1 truncate">{host.name}</span>
             {label || selected ? (

@@ -58,7 +58,9 @@ export class CodeHeaderWidget extends WidgetType {
       void copyFencedCode(view.state, view.posAtDOM(head)).then((ok) => {
         copy.textContent = ok ? "已复制" : "复制失败";
         clearTimeout(timer);
-        timer = setTimeout(() => { copy.textContent = "复制"; }, 1200);
+        timer = setTimeout(() => {
+          copy.textContent = "复制";
+        }, 1200);
       });
     });
     // 点代码头的空白处：光标放进代码，露出围栏

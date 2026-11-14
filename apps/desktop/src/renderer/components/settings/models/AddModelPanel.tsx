@@ -13,7 +13,15 @@ import { withOverride } from "./model-view";
  * 目录里能精确认出的直接填好；只是变体的按最接近的目录模型填（自动沿用，不对可以改）；认不出的留空让用户填。
  * 字段和模型卡片是同一套，改动只留在草稿里，点「添加」才写进连接。回车添加，Esc 取消。
  */
-export function AddModelPanel({ connectionId, onAdd, onCancel }: { connectionId: string; onAdd: (model: ConnectionModelInput) => Promise<boolean>; onCancel: () => void }) {
+export function AddModelPanel({
+  connectionId,
+  onAdd,
+  onCancel,
+}: {
+  connectionId: string;
+  onAdd: (model: ConnectionModelInput) => Promise<boolean>;
+  onCancel: () => void;
+}) {
   const [apiModel, setApiModel] = useState("");
   const [label, setLabel] = useState("");
   const [overrides, setOverrides] = useState<ModelOverrides | null>(null);
@@ -34,18 +42,30 @@ export function AddModelPanel({ connectionId, onAdd, onCancel }: { connectionId:
     let cancelled = false;
     const timer = window.setTimeout(() => {
       const scoped = JSON.parse(draftKey) as ModelOverrides;
-      void modelConnectionsApi.preview({ apiModel: id, connectionId, ...(Object.keys(scoped).length > 0 ? { overrides: scoped } : {}) })
-        .then((result) => { if (!cancelled) setPreview(result); })
-        .catch(() => { if (!cancelled) setPreview(null); });
+      void modelConnectionsApi
+        .preview({ apiModel: id, connectionId, ...(Object.keys(scoped).length > 0 ? { overrides: scoped } : {}) })
+        .then((result) => {
+          if (!cancelled) setPreview(result);
+        })
+        .catch(() => {
+          if (!cancelled) setPreview(null);
+        });
     }, 250);
-    return () => { cancelled = true; window.clearTimeout(timer); };
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [id, connectionId, draftKey]);
 
   // 变体（例如带日期后缀）：自动按最接近的目录模型填。
-  const near = preview && !preview.effective.aliased && preview.effective.catalog && !preview.effective.catalog.exact ? preview.effective.catalog : null;
+  const near =
+    preview && !preview.effective.aliased && preview.effective.catalog && !preview.effective.catalog.exact
+      ? preview.effective.catalog
+      : null;
   const nearApiModel = near?.apiModel;
   useEffect(() => {
-    if (nearApiModel !== undefined && !noAlias && !overrides?.canonical) setOverrides((current) => ({ ...(current ?? {}), canonical: nearApiModel }));
+    if (nearApiModel !== undefined && !noAlias && !overrides?.canonical)
+      setOverrides((current) => ({ ...(current ?? {}), canonical: nearApiModel }));
   }, [nearApiModel, noAlias, overrides?.canonical]);
 
   const changeId = (next: string) => {
@@ -65,7 +85,9 @@ export function AddModelPanel({ connectionId, onAdd, onCancel }: { connectionId:
     setBusy(false);
     if (ok) onCancel();
   };
-  const enter = (event: KeyboardEvent) => { if (event.key === "Enter") void submit(); };
+  const enter = (event: KeyboardEvent) => {
+    if (event.key === "Enter") void submit();
+  };
 
   let fill: ReactNode = null;
   if (id && effective) {
@@ -73,21 +95,60 @@ export function AddModelPanel({ connectionId, onAdd, onCancel }: { connectionId:
     else if (effective.aliased && effective.catalog) {
       fill = (
         <p className="flex flex-wrap items-center gap-1.5 text-operational">
-          <Check size={13} aria-hidden="true" />
-          按 {effective.catalog.name} 填好了
-          <Button variant="ghost" size="xs" onClick={() => { setNoAlias(true); change("canonical", undefined); }}>不是它</Button>
+          <Check size={13} aria-hidden="true" />按 {effective.catalog.name} 填好了
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => {
+              setNoAlias(true);
+              change("canonical", undefined);
+            }}
+          >
+            不是它
+          </Button>
         </p>
       );
     } else if (effective.catalog?.exact) {
-      fill = <p className="flex items-center gap-1.5 text-operational"><Check size={13} aria-hidden="true" />认出来了：{effective.catalog.name}</p>;
+      fill = (
+        <p className="flex items-center gap-1.5 text-operational">
+          <Check size={13} aria-hidden="true" />
+          认出来了：{effective.catalog.name}
+        </p>
+      );
     } else fill = <p>没认出来：填上上下文和价格，用量和费用才算得准</p>;
   }
 
   return (
-    <div className={cx(CARD_FRAME, "border-line-strong")} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); onCancel(); } }}>
+    <div
+      className={cx(CARD_FRAME, "border-line-strong")}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          onCancel();
+        }
+      }}
+    >
       <div className="flex gap-1.5 max-[600px]:flex-col">
-        <SettingsInput width="full" mono autoFocus value={apiModel} onChange={(event) => changeId(event.target.value)} onKeyDown={enter} placeholder="模型 ID" aria-label="模型 ID" className="h-[34px] flex-[1.4]" />
-        <SettingsInput width="full" value={label} onChange={(event) => setLabel(event.target.value)} onKeyDown={enter} placeholder="显示名称（可选）" aria-label="显示名称" className="h-[34px] flex-1" />
+        <SettingsInput
+          width="full"
+          mono
+          autoFocus
+          value={apiModel}
+          onChange={(event) => changeId(event.target.value)}
+          onKeyDown={enter}
+          placeholder="模型 ID"
+          aria-label="模型 ID"
+          className="h-[34px] flex-[1.4]"
+        />
+        <SettingsInput
+          width="full"
+          value={label}
+          onChange={(event) => setLabel(event.target.value)}
+          onKeyDown={enter}
+          placeholder="显示名称（可选）"
+          aria-label="显示名称"
+          className="h-[34px] flex-1"
+        />
       </div>
       {fill ? <div className="px-1 pt-2 text-act-xs text-text-faint">{fill}</div> : null}
       {ready && effective ? (
@@ -98,8 +159,12 @@ export function AddModelPanel({ connectionId, onAdd, onCancel }: { connectionId:
       <div className="mt-2.5 flex items-center gap-2 px-1.5 pb-0.5">
         {ready ? <MoreToggle more={more} onClick={() => setMore((value) => !value)} /> : null}
         <span className="flex-1" />
-        <Button variant="ghost" size="xs" onClick={onCancel}>取消</Button>
-        <Button variant="primary" size="xs" busy={busy} disabled={!ready || busy} onClick={() => void submit()}>添加</Button>
+        <Button variant="ghost" size="xs" onClick={onCancel}>
+          取消
+        </Button>
+        <Button variant="primary" size="xs" busy={busy} disabled={!ready || busy} onClick={() => void submit()}>
+          添加
+        </Button>
       </div>
     </div>
   );

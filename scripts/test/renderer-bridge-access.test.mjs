@@ -10,7 +10,13 @@ import {
 } from "../check-renderer-bridge-access.mjs";
 
 test("allows main.tsx, api/bridge.ts, mock/** and test/** only", () => {
-  for (const file of ["main.tsx", "api/bridge.ts", "mock/handlers.ts", "mock/scenarios/long-session.ts", "test/helpers/bridge.ts"]) {
+  for (const file of [
+    "main.tsx",
+    "api/bridge.ts",
+    "mock/handlers.ts",
+    "mock/scenarios/long-session.ts",
+    "test/helpers/bridge.ts",
+  ]) {
     assert.equal(isAllowedPath(file), true, file);
   }
   for (const file of ["App.tsx", "api/sessions.ts", "components/main.tsx", "components/mock/x.ts", "hooks/test.ts"]) {
@@ -62,7 +68,13 @@ test("reports each direct access outside the allowed files", () => {
 });
 
 test("only api/**, main.tsx, bridge-bootstrap.ts, mock/** and test/** may import api/bridge", () => {
-  for (const file of ["api/hosts.ts", "main.tsx", "bridge-bootstrap.ts", "mock/install-mock-bridge.ts", "test/helpers/bridge.ts"]) {
+  for (const file of [
+    "api/hosts.ts",
+    "main.tsx",
+    "bridge-bootstrap.ts",
+    "mock/install-mock-bridge.ts",
+    "test/helpers/bridge.ts",
+  ]) {
     assert.equal(isBridgeImportAllowed(file), true, file);
   }
   for (const file of ["App.tsx", "components/Composer.tsx", "hooks/api/bridge.ts"]) {
@@ -76,11 +88,14 @@ test("only api/**, main.tsx, bridge-bootstrap.ts, mock/** and test/** may import
     'import { x } from "../api/bridge-utils";',
   ].join("\n");
   assert.deepEqual(findBridgeImports(source), [1, 3, 4]);
-  assert.deepEqual(auditRendererBridgeAccess([
-    { path: "components/Composer.tsx", text: 'import { getBridge } from "../api/bridge";' },
-    { path: "api/hosts.ts", text: 'import { domainApi } from "./bridge";' },
-    { path: "main.tsx", text: 'import { hasPreloadBridge } from "./api/bridge";' },
-  ]), ["apps/desktop/src/renderer/components/Composer.tsx:1 导入了 api/bridge，请改用 api/<域>"]);
+  assert.deepEqual(
+    auditRendererBridgeAccess([
+      { path: "components/Composer.tsx", text: 'import { getBridge } from "../api/bridge";' },
+      { path: "api/hosts.ts", text: 'import { domainApi } from "./bridge";' },
+      { path: "main.tsx", text: 'import { hasPreloadBridge } from "./api/bridge";' },
+    ]),
+    ["apps/desktop/src/renderer/components/Composer.tsx:1 导入了 api/bridge，请改用 api/<域>"],
+  );
 });
 
 test("the repository renderer passes", () => {

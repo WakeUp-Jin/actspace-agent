@@ -1,14 +1,23 @@
-import { validateSessionEvents, type EventCodecRegistry, type SessionEventEnvelopeV1, type SessionHeaderV1 } from "@actspace/session-journal";
+import {
+  validateSessionEvents,
+  type EventCodecRegistry,
+  type SessionEventEnvelopeV1,
+  type SessionHeaderV1,
+} from "@actspace/session-journal";
 import type { SessionStorage, SessionStorageSnapshot } from "@actspace/session-storage";
 import type { ProjectionCheckpoint, SessionProjectionRegistry } from "@actspace/session-projection";
 import { createHistoryIndex, forkHistoryIndex, indexHistoryEvents, type HistoryIndex } from "./history-index.js";
 
 export type ProjectionCacheRead = {
-  readonly identity: symbol; readonly revision: string; readonly header: SessionHeaderV1;
+  readonly identity: symbol;
+  readonly revision: string;
+  readonly header: SessionHeaderV1;
   readonly events: readonly SessionEventEnvelopeV1[];
-  readonly starts: readonly number[]; readonly requests: readonly number[];
+  readonly starts: readonly number[];
+  readonly requests: readonly number[];
   /** Seqs of `request/system-prompt` / `request/tools`; history windows prepend the latest one before their start. */
-  readonly prompts: readonly number[]; readonly toolSets: readonly number[];
+  readonly prompts: readonly number[];
+  readonly toolSets: readonly number[];
   readonly calls: Readonly<Record<string, number[]>>;
   readonly checkpoint: ProjectionCheckpoint;
   readonly accessState: "read-write" | "degraded" | "browse-only" | "corrupt";
@@ -39,21 +48,39 @@ export class SessionProjectionCache {
   readonly #pending = new Map<string, Promise<ProjectionCacheRead>>();
   readonly #cached = new Map<string, CacheEntry>();
   #cachedBytes = 0;
-  constructor(private readonly options: {
-    storage: SessionStorage; codecs: EventCodecRegistry;
-    createRegistry: (header: SessionHeaderV1) => SessionProjectionRegistry;
-  }) {}
+  constructor(
+    private readonly options: {
+      storage: SessionStorage;
+      codecs: EventCodecRegistry;
+      createRegistry: (header: SessionHeaderV1) => SessionProjectionRegistry;
+    },
+  ) {}
 
   read(sessionId: string): Promise<ProjectionCacheRead> {
     const pending = this.#pending.get(sessionId);
     if (pending) return pending;
     const job = this.#read(sessionId).finally(() => this.#pending.delete(sessionId));
-    this.#pending.set(sessionId, job); return job;
+    this.#pending.set(sessionId, job);
+    return job;
   }
-  async idle(): Promise<void> { await Promise.allSettled(this.#pending.values()); }
-  async events(read: ProjectionCacheRead, fromSeq = 0, untilSeq = read.events.length): Promise<readonly SessionEventEnvelopeV1[]> {
-    if (read.identity !== this.options.storage.identity) throw new Error("Snapshot belongs to another storage provider.");
-    if (!Number.isSafeInteger(fromSeq) || !Number.isSafeInteger(untilSeq) || fromSeq < 0 || untilSeq < fromSeq || untilSeq > read.events.length) throw new Error("Invalid Journal range.");
+  async idle(): Promise<void> {
+    await Promise.allSettled(this.#pending.values());
+  }
+  async events(
+    read: ProjectionCacheRead,
+    fromSeq = 0,
+    untilSeq = read.events.length,
+  ): Promise<readonly SessionEventEnvelopeV1[]> {
+    if (read.identity !== this.options.storage.identity)
+      throw new Error("Snapshot belongs to another storage provider.");
+    if (
+      !Number.isSafeInteger(fromSeq) ||
+      !Number.isSafeInteger(untilSeq) ||
+      fromSeq < 0 ||
+      untilSeq < fromSeq ||
+      untilSeq > read.events.length
+    )
+      throw new Error("Invalid Journal range.");
     return read.events.slice(fromSeq, untilSeq);
   }
 
@@ -64,12 +91,20 @@ export class SessionProjectionCache {
     else if (cached !== undefined && storage.refresh !== undefined) {
       // Validity is decided by the backend's cheap change check, before any Journal content is read.
       const probe = this.options.createRegistry(cached.read.header);
-      if (cached.codecDigest !== codecs.digest || cached.stateVersions !== JSON.stringify(probe.stateVersions)) this.#drop(sessionId);
+      if (cached.codecDigest !== codecs.digest || cached.stateVersions !== JSON.stringify(probe.stateVersions))
+        this.#drop(sessionId);
       else {
         let refreshed;
-        try { refreshed = await storage.refresh(sessionId, cached.snapshot); }
-        catch (error) { this.#drop(sessionId); throw error; }
-        if (refreshed.kind === "unchanged") { this.#touch(sessionId, cached); return cached.read; }
+        try {
+          refreshed = await storage.refresh(sessionId, cached.snapshot);
+        } catch (error) {
+          this.#drop(sessionId);
+          throw error;
+        }
+        if (refreshed.kind === "unchanged") {
+          this.#touch(sessionId, cached);
+          return cached.read;
+        }
         this.#drop(sessionId);
         const { snapshot } = refreshed;
         if (refreshed.kind === "appended") {
@@ -80,18 +115,23 @@ export class SessionProjectionCache {
       }
     }
     const snapshot = await storage.inspect(sessionId);
-    if (!snapshot.header || snapshot.integrity !== "complete") throw new Error(snapshot.problem ?? "Session requires repair.");
+    if (!snapshot.header || snapshot.integrity !== "complete")
+      throw new Error(snapshot.problem ?? "Session requires repair.");
     const registry = this.options.createRegistry(snapshot.header);
     const key = JSON.stringify([snapshot.revision, codecs.digest, registry.stateVersions]);
     const stale = this.#cached.get(sessionId);
-    if (stale?.key === key && stale.read.identity === storage.identity) { this.#touch(sessionId, stale); return stale.read; }
+    if (stale?.key === key && stale.read.identity === storage.identity) {
+      this.#touch(sessionId, stale);
+      return stale.read;
+    }
     if (stale) this.#drop(sessionId);
     return this.#retain(sessionId, this.#build(sessionId, snapshot, registry)).read;
   }
 
   /** Full build: validate (unless the backend already did), fold the projections, index every event. */
   #build(sessionId: string, snapshot: SessionStorageSnapshot, fresh?: SessionProjectionRegistry): CacheEntry {
-    if (!snapshot.header || snapshot.integrity !== "complete") throw new Error(snapshot.problem ?? "Session requires repair.");
+    if (!snapshot.header || snapshot.integrity !== "complete")
+      throw new Error(snapshot.problem ?? "Session requires repair.");
     const registry = fresh ?? this.options.createRegistry(snapshot.header);
     const accessState = this.#accessState(snapshot);
     registry.sync(sessionId, snapshot.events);
@@ -102,7 +142,13 @@ export class SessionProjectionCache {
 
   /** Append-only continuation: validate-free (the backend validated the new events), fold and index only the new events. */
   #extend(sessionId: string, base: CacheEntry, snapshot: SessionStorageSnapshot, fromEvent: number): CacheEntry | null {
-    if (!snapshot.header || snapshot.integrity !== "complete" || fromEvent !== base.snapshot.events.length || snapshot.events.length < fromEvent) return null;
+    if (
+      !snapshot.header ||
+      snapshot.integrity !== "complete" ||
+      fromEvent !== base.snapshot.events.length ||
+      snapshot.events.length < fromEvent
+    )
+      return null;
     if (snapshot.validated?.codecDigest !== this.options.codecs.digest) return null;
     try {
       const added = snapshot.events.slice(fromEvent);
@@ -122,24 +168,62 @@ export class SessionProjectionCache {
     return validateSessionEvents(snapshot.events, this.options.codecs).accessState;
   }
 
-  #entry(sessionId: string, snapshot: SessionStorageSnapshot, registry: SessionProjectionRegistry, index: HistoryIndex, accessState: ProjectionCacheRead["accessState"]): CacheEntry {
-    const identity = this.options.storage.identity, codecDigest = this.options.codecs.digest;
-    const read: ProjectionCacheRead = { identity, revision: snapshot.revision, header: snapshot.header!, events: snapshot.events, starts: index.starts, requests: index.requests, prompts: index.prompts, toolSets: index.toolSets, calls: index.calls, checkpoint: registry.checkpoint(sessionId), accessState };
+  #entry(
+    sessionId: string,
+    snapshot: SessionStorageSnapshot,
+    registry: SessionProjectionRegistry,
+    index: HistoryIndex,
+    accessState: ProjectionCacheRead["accessState"],
+  ): CacheEntry {
+    const identity = this.options.storage.identity,
+      codecDigest = this.options.codecs.digest;
+    const read: ProjectionCacheRead = {
+      identity,
+      revision: snapshot.revision,
+      header: snapshot.header!,
+      events: snapshot.events,
+      starts: index.starts,
+      requests: index.requests,
+      prompts: index.prompts,
+      toolSets: index.toolSets,
+      calls: index.calls,
+      checkpoint: registry.checkpoint(sessionId),
+      accessState,
+    };
     const stateVersions = JSON.stringify(registry.stateVersions);
-    return { snapshot, key: JSON.stringify([snapshot.revision, codecDigest, registry.stateVersions]), codecDigest, stateVersions, read, registry, floor: index.floor, bytes: snapshot.bytes ?? 0 };
+    return {
+      snapshot,
+      key: JSON.stringify([snapshot.revision, codecDigest, registry.stateVersions]),
+      codecDigest,
+      stateVersions,
+      read,
+      registry,
+      floor: index.floor,
+      bytes: snapshot.bytes ?? 0,
+    };
   }
 
-  #touch(sessionId: string, entry: CacheEntry): void { this.#cached.delete(sessionId); this.#cached.set(sessionId, entry); }
+  #touch(sessionId: string, entry: CacheEntry): void {
+    this.#cached.delete(sessionId);
+    this.#cached.set(sessionId, entry);
+  }
   #drop(sessionId: string): void {
     const entry = this.#cached.get(sessionId);
-    if (entry) { this.#cached.delete(sessionId); this.#cachedBytes -= entry.bytes; }
+    if (entry) {
+      this.#cached.delete(sessionId);
+      this.#cachedBytes -= entry.bytes;
+    }
   }
 
   /** Lists touch every Session. Keep the most recent few (by count, with a byte guard) instead of pinning all history. */
   #retain(sessionId: string, entry: CacheEntry): CacheEntry {
     this.#drop(sessionId);
-    this.#cached.set(sessionId, entry); this.#cachedBytes += entry.bytes;
-    while (this.#cached.size > 1 && (this.#cached.size > MAX_CACHED_SESSIONS || this.#cachedBytes > MAX_CACHED_JOURNAL_BYTES)) {
+    this.#cached.set(sessionId, entry);
+    this.#cachedBytes += entry.bytes;
+    while (
+      this.#cached.size > 1 &&
+      (this.#cached.size > MAX_CACHED_SESSIONS || this.#cachedBytes > MAX_CACHED_JOURNAL_BYTES)
+    ) {
       this.#drop(this.#cached.keys().next().value!);
     }
     return entry;

@@ -1,6 +1,13 @@
 import { useLayoutEffect, useRef } from "react";
 import type { ClipboardEvent, KeyboardEvent, MouseEvent, PointerEvent, RefObject } from "react";
-import { caretInCode, moveCodeCaret, selectedCode, sourceOffsetAt, type CodeSelection, type CodeSource } from "./code-source-selection";
+import {
+  caretInCode,
+  moveCodeCaret,
+  selectedCode,
+  sourceOffsetAt,
+  type CodeSelection,
+  type CodeSource,
+} from "./code-source-selection";
 
 /** Preserve source selection while the virtualizer removes its native anchor DOM. */
 export function useCodeSelection(
@@ -60,8 +67,12 @@ export function useCodeSelection(
     const root = scrollRef.current;
     if (!pointer || !root) return;
     const bounds = root.getBoundingClientRect();
-    const delta = pointer.y < bounds.top ? pointer.y - bounds.top : pointer.y > bounds.bottom ? pointer.y - bounds.bottom : 0;
-    if (delta) { root.scrollTop += Math.max(-60, Math.min(60, delta)); extendDrag(); }
+    const delta =
+      pointer.y < bounds.top ? pointer.y - bounds.top : pointer.y > bounds.bottom ? pointer.y - bounds.bottom : 0;
+    if (delta) {
+      root.scrollTop += Math.max(-60, Math.min(60, delta));
+      extendDrag();
+    }
     pointer.frame = requestAnimationFrame(autoScroll);
   };
   const stopDrag = () => {
@@ -70,7 +81,10 @@ export function useCodeSelection(
   };
 
   // Recreate only the visible intersection. Copy always uses the full source offsets.
-  useLayoutEffect(() => { if (drag.current) extendDrag(); else project(); });
+  useLayoutEffect(() => {
+    if (drag.current) extendDrag();
+    else project();
+  });
   useLayoutEffect(() => {
     const root = scrollRef.current;
     return () => {
@@ -90,18 +104,25 @@ export function useCodeSelection(
       event.currentTarget.focus({ preventScroll: true });
       set({ anchor: event.shiftKey && state.current.active ? state.current.selection.anchor : offset, focus: offset });
       stopDrag();
-      drag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, frame: requestAnimationFrame(autoScroll) };
+      drag.current = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        frame: requestAnimationFrame(autoScroll),
+      };
       event.currentTarget.setPointerCapture(event.pointerId);
     },
     onPointerMove(event: PointerEvent<HTMLDivElement>) {
       if (drag.current?.pointerId !== event.pointerId) return;
       event.preventDefault();
-      drag.current.x = event.clientX; drag.current.y = event.clientY;
+      drag.current.x = event.clientX;
+      drag.current.y = event.clientY;
       extendDrag();
     },
     onPointerUp(event: PointerEvent<HTMLDivElement>) {
       if (drag.current?.pointerId !== event.pointerId) return;
-      extendDrag(); stopDrag();
+      extendDrag();
+      stopDrag();
       event.currentTarget.releasePointerCapture(event.pointerId);
     },
     onPointerCancel: stopDrag,
@@ -110,29 +131,46 @@ export function useCodeSelection(
       const offset = atPoint(event.clientX, event.clientY);
       if (offset === null) return;
       // Use the browser's Unicode word boundaries, including Chinese text.
-      const segments = new Intl.Segmenter(undefined, { granularity: "word" }).segment(source.lines[source.position(offset).line]);
+      const segments = new Intl.Segmenter(undefined, { granularity: "word" }).segment(
+        source.lines[source.position(offset).line],
+      );
       const { line, column } = source.position(offset);
       for (const segment of segments) {
         if (column >= segment.index && column < segment.index + segment.segment.length) {
-          set({ anchor: source.offset(line, segment.index), focus: source.offset(line, segment.index + segment.segment.length) });
+          set({
+            anchor: source.offset(line, segment.index),
+            focus: source.offset(line, segment.index + segment.segment.length),
+          });
           break;
         }
       }
     },
     onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
-        event.preventDefault(); set({ anchor: 0, focus: source.text.length }); return;
+        event.preventDefault();
+        set({ anchor: 0, focus: source.text.length });
+        return;
       }
-      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(event.key)) return;
+      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(event.key))
+        return;
       event.preventDefault();
       const previous = state.current.selection;
       let key = event.key;
       if (event.metaKey && key === "ArrowLeft") key = "Home";
       if (event.metaKey && key === "ArrowRight") key = "End";
-      const collapse = !event.shiftKey && previous.anchor !== previous.focus && (key === "ArrowLeft" || key === "ArrowRight");
-      const next = collapse ? (key === "ArrowLeft" ? Math.min(previous.anchor, previous.focus) : Math.max(previous.anchor, previous.focus))
-        : moveCodeCaret(source, previous.focus, key, (event.metaKey || event.ctrlKey) && (key === "Home" || key === "End") && event.key === key,
-          Math.max(1, Math.floor((scrollRef.current?.clientHeight ?? 400) / 20)));
+      const collapse =
+        !event.shiftKey && previous.anchor !== previous.focus && (key === "ArrowLeft" || key === "ArrowRight");
+      const next = collapse
+        ? key === "ArrowLeft"
+          ? Math.min(previous.anchor, previous.focus)
+          : Math.max(previous.anchor, previous.focus)
+        : moveCodeCaret(
+            source,
+            previous.focus,
+            key,
+            (event.metaKey || event.ctrlKey) && (key === "Home" || key === "End") && event.key === key,
+            Math.max(1, Math.floor((scrollRef.current?.clientHeight ?? 400) / 20)),
+          );
       set({ anchor: event.shiftKey ? previous.anchor : next, focus: next });
       reveal(source.position(next).line);
     },

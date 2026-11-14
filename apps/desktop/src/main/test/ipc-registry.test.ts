@@ -15,13 +15,21 @@ const { handlers, listeners, ipcMain } = vi.hoisted(() => {
   return { handlers, listeners, ipcMain };
 });
 vi.mock("electron", () => ({ ipcMain }));
-afterEach(() => { handlers.clear(); listeners.clear(); vi.clearAllMocks(); });
+afterEach(() => {
+  handlers.clear();
+  listeners.clear();
+  vi.clearAllMocks();
+});
 
 const channel = contract.workspaces.readFile.channel;
 
 function setup(options: Partial<Parameters<typeof createIpcRegistrar>[0]> = {}) {
   const { window, event } = trustedWindow();
-  const registrar = createIpcRegistrar({ getWindow: () => window, untrustedMessage: "Untrusted test sender", ...options });
+  const registrar = createIpcRegistrar({
+    getWindow: () => window,
+    untrustedMessage: "Untrusted test sender",
+    ...options,
+  });
   return { registrar, event, window };
 }
 
@@ -32,14 +40,18 @@ describe("IPC registrar", () => {
     const { registrar } = setup({ guards: new Map([[channel, guard]]) });
     registrar.handle(contract.workspaces.readFile, handler);
 
-    await expect(handlers.get(channel)!({ sender: {}, senderFrame: {} }, { relativePath: "a" })).rejects.toThrow("Untrusted test sender");
+    await expect(handlers.get(channel)!({ sender: {}, senderFrame: {} }, { relativePath: "a" })).rejects.toThrow(
+      "Untrusted test sender",
+    );
     expect(guard).not.toHaveBeenCalled();
     expect(handler).not.toHaveBeenCalled();
   });
 
   it("refuses to register a channel that has no guard", () => {
     const { registrar } = setup({ guards: new Map() });
-    expect(() => registrar.handle(contract.workspaces.readFile, vi.fn())).toThrow(`Missing IPC input guard for ${channel}`);
+    expect(() => registrar.handle(contract.workspaces.readFile, vi.fn())).toThrow(
+      `Missing IPC input guard for ${channel}`,
+    );
     expect(ipcMain.handle).not.toHaveBeenCalled();
   });
 
@@ -56,9 +68,15 @@ describe("IPC registrar", () => {
 
   it("passes guarded input and the event to the handler", async () => {
     const { registrar, event } = setup();
-    registrar.handle(contract.workspaces.readFile, (input, received) => ({ ok: (received as unknown) === event, path: input.relativePath }) as never);
+    registrar.handle(
+      contract.workspaces.readFile,
+      (input, received) => ({ ok: (received as unknown) === event, path: input.relativePath }) as never,
+    );
 
-    await expect(handlers.get(channel)!(event, { relativePath: "src/a.ts" })).resolves.toEqual({ ok: true, path: "src/a.ts" });
+    await expect(handlers.get(channel)!(event, { relativePath: "src/a.ts" })).resolves.toEqual({
+      ok: true,
+      path: "src/a.ts",
+    });
   });
 
   it("runs the middleware around the handler", async () => {
@@ -72,7 +90,10 @@ describe("IPC registrar", () => {
         return result;
       },
     });
-    registrar.handle(contract.sessions.getPreview, () => { calls.push("handler"); return null; });
+    registrar.handle(contract.sessions.getPreview, () => {
+      calls.push("handler");
+      return null;
+    });
     const previewChannel = contract.sessions.getPreview.channel;
 
     await expect(handlers.get(previewChannel)!(event, { sessionId: "remote" })).resolves.toBe("routed");
@@ -82,7 +103,9 @@ describe("IPC registrar", () => {
 
   it("wraps non-Error throws so Electron can serialize them", async () => {
     const { registrar, event } = setup();
-    registrar.handle(contract.app.getBootstrapState, () => { throw "boom"; });
+    registrar.handle(contract.app.getBootstrapState, () => {
+      throw "boom";
+    });
 
     await expect(handlers.get(contract.app.getBootstrapState.channel)!(event)).rejects.toThrow(new Error("boom"));
   });
@@ -104,7 +127,11 @@ describe("IPC registrar", () => {
     registrar.handle(contract.app.getBootstrapState, () => ({}) as never);
     registrar.handle(contract.workspaces.readFile, () => ({}) as never);
     registrar.on(contract.appearance.setNativeTheme, () => undefined);
-    expect(registrar.channels).toEqual([contract.app.getBootstrapState.channel, channel, contract.appearance.setNativeTheme.channel]);
+    expect(registrar.channels).toEqual([
+      contract.app.getBootstrapState.channel,
+      channel,
+      contract.appearance.setNativeTheme.channel,
+    ]);
 
     registrar.dispose();
     expect(handlers.size).toBe(0);

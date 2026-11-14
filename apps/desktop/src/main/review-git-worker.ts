@@ -21,9 +21,10 @@ parentPort.on("message", async (request: ReviewWorkerRequest) => {
     }
     const controller = new AbortController();
     controllers.set(request.id, controller);
-    const value = request.type === "cat-file"
-      ? await loadGitObjects(request.input, controller.signal)
-      : await runReviewGitCommand(request.args, { ...request.options, signal: controller.signal });
+    const value =
+      request.type === "cat-file"
+        ? await loadGitObjects(request.input, controller.signal)
+        : await runReviewGitCommand(request.args, { ...request.options, signal: controller.signal });
     controllers.delete(request.id);
     post({ id: request.id, ok: true, value });
   } catch (error) {
@@ -36,9 +37,18 @@ function post(response: ReviewWorkerResponse): void {
   parentPort?.postMessage(response);
 }
 
-async function loadGitObjects(input: Extract<ReviewWorkerRequest, { type: "cat-file" }>["input"], signal: AbortSignal): Promise<ReviewGitObjectOutcome[]> {
+async function loadGitObjects(
+  input: Extract<ReviewWorkerRequest, { type: "cat-file" }>["input"],
+  signal: AbortSignal,
+): Promise<ReviewGitObjectOutcome[]> {
   const requests = input.requests.slice(0, 4);
-  const check = await runGitBuffer(input.cwd, ["cat-file", "--batch-check"], requests.map((request) => request.spec).join("\n") + "\n", signal, 256 * 1024);
+  const check = await runGitBuffer(
+    input.cwd,
+    ["cat-file", "--batch-check"],
+    requests.map((request) => request.spec).join("\n") + "\n",
+    signal,
+    256 * 1024,
+  );
   if (check.exitCode !== 0) throw new Error(check.stderr || "git cat-file --batch-check failed.");
   const checkLines = check.stdout.toString("utf8").trimEnd().split("\n");
   const outcomes = new Map<string, ReviewGitObjectOutcome>();
@@ -62,7 +72,13 @@ async function loadGitObjects(input: Extract<ReviewWorkerRequest, { type: "cat-f
   }
   if (eligible.length > 0) {
     const maxOutput = eligible.reduce((total, item) => total + item.bytes + 256, 0);
-    const batch = await runGitBuffer(input.cwd, ["cat-file", "--batch"], eligible.map((request) => request.spec).join("\n") + "\n", signal, maxOutput);
+    const batch = await runGitBuffer(
+      input.cwd,
+      ["cat-file", "--batch"],
+      eligible.map((request) => request.spec).join("\n") + "\n",
+      signal,
+      maxOutput,
+    );
     if (batch.exitCode !== 0) throw new Error(batch.stderr || "git cat-file --batch failed.");
     let offset = 0;
     for (const request of eligible) {
@@ -71,7 +87,8 @@ async function loadGitObjects(input: Extract<ReviewWorkerRequest, { type: "cat-f
       const header = batch.stdout.subarray(offset, newline).toString("utf8");
       const match = /^[0-9a-f]+\s+blob\s+(\d+)$/.exec(header);
       const bytes = Number(match?.[1] ?? -1);
-      if (!match || bytes < 0 || newline + 1 + bytes > batch.stdout.length) throw new Error("git cat-file returned an incomplete object.");
+      if (!match || bytes < 0 || newline + 1 + bytes > batch.stdout.length)
+        throw new Error("git cat-file returned an incomplete object.");
       const content = batch.stdout.subarray(newline + 1, newline + 1 + bytes);
       outcomes.set(request.key, {
         key: request.key,
@@ -82,16 +99,30 @@ async function loadGitObjects(input: Extract<ReviewWorkerRequest, { type: "cat-f
       offset = newline + 1 + bytes + 1;
     }
   }
-  return requests.map((request) => outcomes.get(request.key) ?? ({ key: request.key, side: { available: false, bytes: 0, partial: false } }));
+  return requests.map(
+    (request) =>
+      outcomes.get(request.key) ?? { key: request.key, side: { available: false, bytes: 0, partial: false } },
+  );
 }
 
-function runGitBuffer(cwd: string, args: string[], input: string, signal: AbortSignal, maxOutputBytes: number): Promise<{ stdout: Buffer; stderr: string; exitCode: number | null }> {
+function runGitBuffer(
+  cwd: string,
+  args: string[],
+  input: string,
+  signal: AbortSignal,
+  maxOutputBytes: number,
+): Promise<{ stdout: Buffer; stderr: string; exitCode: number | null }> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
       reject(new Error("Review request was cancelled."));
       return;
     }
-    const child = spawn("git", ["-C", cwd, ...args], { cwd, windowsHide: true, stdio: ["pipe", "pipe", "pipe"], env: hostChildEnv(process.env, { GIT_TERMINAL_PROMPT: "0" }) });
+    const child = spawn("git", ["-C", cwd, ...args], {
+      cwd,
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: hostChildEnv(process.env, { GIT_TERMINAL_PROMPT: "0" }),
+    });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let stdoutBytes = 0;
@@ -117,7 +148,11 @@ function runGitBuffer(cwd: string, args: string[], input: string, signal: AbortS
         reject(new Error("git cat-file exceeded the Review output limit."));
         return;
       }
-      resolve({ stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr).toString("utf8").slice(0, 2_000), exitCode: code });
+      resolve({
+        stdout: Buffer.concat(stdout),
+        stderr: Buffer.concat(stderr).toString("utf8").slice(0, 2_000),
+        exitCode: code,
+      });
     });
     child.stdin.end(input);
   });

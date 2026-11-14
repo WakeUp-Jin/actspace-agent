@@ -5,7 +5,13 @@ export const CODEX_SUBAGENT_PLUGIN_ID = "actspace.subagent-codex" as const;
 export const CODEX_SUBAGENT_TOOL_NAMES = Object.freeze(["agent_codex"] as const);
 
 export const manifest = defineBuiltinPluginManifest({
-  display: { title: "Codex 子智能体", description: "用本机 Codex 跑子任务，用它自己的权限，不经审批和沙箱", scope: "session", defaultEnabled: false, canDisable: true },
+  display: {
+    title: "Codex 子智能体",
+    description: "用本机 Codex 跑子任务，用它自己的权限，不经审批和沙箱",
+    scope: "session",
+    defaultEnabled: false,
+    canDisable: true,
+  },
   pluginId: CODEX_SUBAGENT_PLUGIN_ID,
   version: "0.1.0",
   name: "ActSpace Codex Subagent",

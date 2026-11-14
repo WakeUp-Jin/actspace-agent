@@ -7,7 +7,8 @@ type BackgroundNoticeMessage = Extract<MessageBlock, { kind: "background_notice"
 
 // 空闲会话被收件箱通知唤醒的那一轮的开头：一条细分隔线，点开看内容（Bash 是通知原文，子智能体是结论或来信正文）。
 // 展开开关是分隔线中间的一段文字，与压缩分隔行一样用原生 button，不套 Button 的填充样式。
-const BLOCK_CLASS = "message-row background-notice-row w-full px-[var(--conversation-text-inset)] animate-[rise-in_220ms_ease_both]";
+const BLOCK_CLASS =
+  "message-row background-notice-row w-full px-[var(--conversation-text-inset)] animate-[rise-in_220ms_ease_both]";
 const DIVIDER_CLASS = "flex w-full items-center gap-3 py-2.5 text-act-xs leading-4 font-medium text-text-faint";
 const DIVIDER_LINE_CLASS = "h-px min-w-6 flex-1 bg-line";
 const TOGGLE_CLASS =
@@ -17,11 +18,19 @@ const CHEVRON_CLASS = "shrink-0 transition-transform duration-(--motion-fast) mo
 const BODY_CLASS =
   "mb-2 max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-act-md bg-surface-subtle px-3.5 py-3 font-mono text-act-xs leading-5 text-text-muted animate-[rise-in_180ms_ease_both]";
 
-const STATUS_LABELS: Record<string, string> = { completed: "已完成", failed: "失败", stopped: "已停止", lost: "已失联", output_match: "输出匹配", subscription_stopped: "输出订阅已停止" };
+const STATUS_LABELS: Record<string, string> = {
+  completed: "已完成",
+  failed: "失败",
+  stopped: "已停止",
+  lost: "已失联",
+  output_match: "输出匹配",
+  subscription_stopped: "输出订阅已停止",
+};
 
 /** 子智能体一次激活结束：「子智能体 ‹描述› 已完成」；子智能体发来消息：「‹描述› 发来消息」；Bash 照旧（设计 05 §1）。 */
 export function backgroundNoticeLabel(message: Pick<BackgroundNoticeMessage, "taskKind" | "title" | "status">): string {
-  if (message.taskKind === "subagent") return `子智能体 ${message.title} ${subagentActivationStatusLabel(message.status)}`;
+  if (message.taskKind === "subagent")
+    return `子智能体 ${message.title} ${subagentActivationStatusLabel(message.status)}`;
   if (message.taskKind === "agent_message") return `${message.title} 发来消息`;
   return `后台任务 · ${message.taskKind === "agent" ? "Agent" : "Bash"}: ${message.title} · ${STATUS_LABELS[message.status] ?? message.status}`;
 }
@@ -33,7 +42,10 @@ export function backgroundNoticeBody(message: Pick<BackgroundNoticeMessage, "tas
     const closing = xmlText(message.content, "closing_message", !message.content.startsWith("<task_notification>"));
     const summary = xmlText(message.content, "summary");
     const note = xmlText(message.content, "note");
-    return [closing && closing !== "(no closing message)" ? closing : summary, note].filter(Boolean).join("\n\n") || message.content;
+    return (
+      [closing && closing !== "(no closing message)" ? closing : summary, note].filter(Boolean).join("\n\n") ||
+      message.content
+    );
   }
   if (message.taskKind === "agent_message") return agentMessageBody(message.content);
   return message.content;
@@ -46,7 +58,13 @@ function xmlText(content: string, tag: string, escaped = true): string | undefin
   return escaped ? value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&") : value;
 }
 
-export function BackgroundNoticeRow({ message, onOpenSubagent }: { message: BackgroundNoticeMessage; onOpenSubagent?: (agentId: string) => void }) {
+export function BackgroundNoticeRow({
+  message,
+  onOpenSubagent,
+}: {
+  message: BackgroundNoticeMessage;
+  onOpenSubagent?: (agentId: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const label = backgroundNoticeLabel(message);
   // 两种子智能体通知的 taskId 都是子智能体 id（agent_message 是发送方）。
@@ -55,7 +73,13 @@ export function BackgroundNoticeRow({ message, onOpenSubagent }: { message: Back
     <article className={BLOCK_CLASS}>
       <div className={DIVIDER_CLASS}>
         <span className={DIVIDER_LINE_CLASS} aria-hidden="true" />
-        <button type="button" className={TOGGLE_CLASS} aria-expanded={expanded} title={label} onClick={() => setExpanded((value) => !value)}>
+        <button
+          type="button"
+          className={TOGGLE_CLASS}
+          aria-expanded={expanded}
+          title={label}
+          onClick={() => setExpanded((value) => !value)}
+        >
           <RotateCcw size={12} className="shrink-0" aria-hidden="true" />
           <span className={TEXT_CLASS}>{label}</span>
           <ChevronRight size={12} className={`${CHEVRON_CLASS}${expanded ? " rotate-90" : ""}`} aria-hidden="true" />
@@ -63,7 +87,13 @@ export function BackgroundNoticeRow({ message, onOpenSubagent }: { message: Back
         <span className={DIVIDER_LINE_CLASS} aria-hidden="true" />
       </div>
       {expanded ? <pre className={BODY_CLASS}>{backgroundNoticeBody(message)}</pre> : null}
-      {expanded && openable ? <div className="mb-2 flex justify-end"><Button size="xs" variant="ghost" onClick={() => onOpenSubagent(message.taskId)}>打开子智能体</Button></div> : null}
+      {expanded && openable ? (
+        <div className="mb-2 flex justify-end">
+          <Button size="xs" variant="ghost" onClick={() => onOpenSubagent(message.taskId)}>
+            打开子智能体
+          </Button>
+        </div>
+      ) : null}
     </article>
   );
 }

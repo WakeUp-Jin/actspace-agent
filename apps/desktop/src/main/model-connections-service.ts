@@ -70,35 +70,64 @@ export class ModelConnectionsService {
       if (binding.model) usedBy.set(binding.model, [...(usedBy.get(binding.model) ?? []), purpose]);
     }
     const connections = Object.values(v4.connections)
-      .filter((connection) => !isDefaultConnection(connection) || this.settings.hasConnectionKey(connection.connectionId, connection.providerId))
+      .filter(
+        (connection) =>
+          !isDefaultConnection(connection) ||
+          this.settings.hasConnectionKey(connection.connectionId, connection.providerId),
+      )
       .map((connection) => {
         const template = templateForConnection(connection);
         const models = Object.entries(v4.installed)
-          .filter(([key, installed]) => installed && (installed.connectionId ?? `${key.slice(0, key.indexOf(":"))}:default`) === connection.connectionId)
+          .filter(
+            ([key, installed]) =>
+              installed &&
+              (installed.connectionId ?? `${key.slice(0, key.indexOf(":"))}:default`) === connection.connectionId,
+          )
           .flatMap(([rawKey, installed]): ConnectionModelView[] => {
             const key = rawKey as ModelKey;
             const definition = snapshot.definitions[key];
             if (!definition?.effective || !installed) return [];
             const overrides = v4.overrides?.[key];
-            return [{
-              key,
-              apiModel: definition.apiModel,
-              effective: definition.effective,
-              overrides: overrides && Object.keys(overrides).length > 0 ? overrides : null,
-              usedBy: usedBy.get(key) ?? [],
-            }];
+            return [
+              {
+                key,
+                apiModel: definition.apiModel,
+                effective: definition.effective,
+                overrides: overrides && Object.keys(overrides).length > 0 ? overrides : null,
+                usedBy: usedBy.get(key) ?? [],
+              },
+            ];
           })
           .sort((left, right) => left.effective.label.localeCompare(right.effective.label));
         return this.#connectionView(connection, template, models);
       })
-      .sort((left, right) => templateOrder(left.templateId) - templateOrder(right.templateId) || left.label.localeCompare(right.label));
+      .sort(
+        (left, right) =>
+          templateOrder(left.templateId) - templateOrder(right.templateId) || left.label.localeCompare(right.label),
+      );
     return { connections, purposes };
   }
 
   async probe(input: ConnectionProbeInput): Promise<ConnectionProbeResult> {
     const checkedAt = new Date().toISOString();
-    const invalid = (message: string): ConnectionProbeResult => ({ ok: false, message, checkedAt, errorKind: "invalid_request", listSource: "none", models: [] });
-    let target: { template: ProviderTemplate; protocol: ModelApi; baseUrl: string; apiKey: string; proxyUrl?: string; resolvedAuth?: CustomConnectionResolvedAuth; multiplier: number; connectionId?: string };
+    const invalid = (message: string): ConnectionProbeResult => ({
+      ok: false,
+      message,
+      checkedAt,
+      errorKind: "invalid_request",
+      listSource: "none",
+      models: [],
+    });
+    let target: {
+      template: ProviderTemplate;
+      protocol: ModelApi;
+      baseUrl: string;
+      apiKey: string;
+      proxyUrl?: string;
+      resolvedAuth?: CustomConnectionResolvedAuth;
+      multiplier: number;
+      connectionId?: string;
+    };
     if (input?.kind === "saved") {
       const connection = this.settings.getV4().settings.models.connections[input.connectionId];
       if (!connection) return invalid("连接不存在。");
@@ -136,15 +165,31 @@ export class ModelConnectionsService {
       ...(target.proxyUrl ? { transport: { proxyUrl: target.proxyUrl } } : {}),
     });
     if (target.connectionId) await this.#markConnection(target.connectionId, result);
-    const base = { ok: result.ok, message: result.message, checkedAt: result.checkedAt, ...(result.errorKind ? { errorKind: result.errorKind } : {}), ...(result.statusCode ? { statusCode: result.statusCode } : {}), ...(result.resolvedAuth ? { resolvedAuth: result.resolvedAuth } : {}) };
+    const base = {
+      ok: result.ok,
+      message: result.message,
+      checkedAt: result.checkedAt,
+      ...(result.errorKind ? { errorKind: result.errorKind } : {}),
+      ...(result.statusCode ? { statusCode: result.statusCode } : {}),
+      ...(result.resolvedAuth ? { resolvedAuth: result.resolvedAuth } : {}),
+    };
     if (!result.ok) return { ...base, listSource: "none", models: [] };
 
-    const added = new Set(target.connectionId ? this.#connectionModels(target.connectionId).map((model) => model.apiModel) : []);
+    const added = new Set(
+      target.connectionId ? this.#connectionModels(target.connectionId).map((model) => model.apiModel) : [],
+    );
     const catalog = this.models.catalog();
     const toProbed = (apiModel: string, providerFacts: ModelFacts): ProbedModel => ({
       apiModel,
       providerFacts,
-      effective: resolveEffectiveModel({ apiModel, protocol: target.protocol, catalog, catalogProvider: target.template.catalogProvider, providerFacts, multiplier: target.multiplier }),
+      effective: resolveEffectiveModel({
+        apiModel,
+        protocol: target.protocol,
+        catalog,
+        catalogProvider: target.template.catalogProvider,
+        providerFacts,
+        multiplier: target.multiplier,
+      }),
       added: added.has(apiModel),
     });
     if (result.models && result.models.length > 0) {
@@ -154,12 +199,20 @@ export class ModelConnectionsService {
         const known = rows.filter((row) => matchCatalogModel(catalog, row.id, target.template.catalogProvider)?.exact);
         if (known.length > 0) rows = known;
       }
-      return { ...base, listSource: "provider", models: rows.map((row) => toProbed(row.id, { ...(row.label ? { label: row.label } : {}), ...sanitizeModelFacts(row.facts) })) };
+      return {
+        ...base,
+        listSource: "provider",
+        models: rows.map((row) =>
+          toProbed(row.id, { ...(row.label ? { label: row.label } : {}), ...sanitizeModelFacts(row.facts) }),
+        ),
+      };
     }
     // 服务没提供列表：官方模板退回目录里这家的模型；中转只能手动添加。
     const provider = target.template.catalogProvider;
     if (!provider) return { ...base, listSource: "none", models: [] };
-    const fallback = catalog.entries.filter((entry) => entry.sourceProviderId === provider).map((entry) => toProbed(entry.apiModel, {}));
+    const fallback = catalog.entries
+      .filter((entry) => entry.sourceProviderId === provider)
+      .map((entry) => toProbed(entry.apiModel, {}));
     return { ...base, listSource: fallback.length > 0 ? "catalog" : "none", models: fallback };
   }
 
@@ -173,7 +226,9 @@ export class ModelConnectionsService {
       const legacyId = legacyProvider ? `${legacyProvider}:default` : undefined;
       // 内置服务商还没配 Key 时，第一份 Key 落在旧的 `<p>:default` 连接上。
       // 新连接的模型列表从空开始，由用户在「获取可用模型」里挑：先清掉这个连接下预装的内置模型（没有 Key 时它们本来就看不到）。
-      const useLegacy = Boolean(legacyProvider && legacyId && !this.settings.hasConnectionKey(legacyId, legacyProvider));
+      const useLegacy = Boolean(
+        legacyProvider && legacyId && !this.settings.hasConnectionKey(legacyId, legacyProvider),
+      );
       const providerId: LlmProviderId = legacyProvider ?? "openrouter";
       const connectionId = useLegacy ? legacyId! : uniqueConnectionId(template.id, current);
       const proxy = normalizeProxy(input.proxy);
@@ -198,24 +253,31 @@ export class ModelConnectionsService {
             lastConnection: { status: "untested" },
             defaultPricingMultiplier: multiplier,
             defaultModel: input.models[0]?.apiModel.trim() || null,
-            ...(draft.protocol === "anthropic-messages" ? { authMode: "auto" as const, ...(input.resolvedAuth ? { resolvedAuth: input.resolvedAuth } : {}) } : {}),
+            ...(draft.protocol === "anthropic-messages"
+              ? { authMode: "auto" as const, ...(input.resolvedAuth ? { resolvedAuth: input.resolvedAuth } : {}) }
+              : {}),
           };
-      await this.settings.applyModelsChange((models) => {
-        const cleared = useLegacy ? removeKeysPatch(models, this.#keysOf(models, connectionId)) : {};
-        const base: SettingsV4Models = {
-          ...models,
-          connections: { ...models.connections, [connectionId]: connection },
-          installed: Object.fromEntries(Object.entries(models.installed).filter(([key]) => !cleared.installed || !(key in cleared.installed))) as SettingsV4Models["installed"],
-        };
-        const added = this.#modelsPatch(base, connectionId, input.models ?? []);
-        return {
-          ...cleared,
-          connections: { [connectionId]: connection },
-          ...(added.definitions ? { definitions: { ...cleared.definitions, ...added.definitions } } : {}),
-          installed: { ...cleared.installed, ...added.installed },
-          ...(added.overrides ? { overrides: { ...cleared.overrides, ...added.overrides } } : {}),
-        };
-      }, { connectionId, providerId, apiKey: draft.apiKey });
+      await this.settings.applyModelsChange(
+        (models) => {
+          const cleared = useLegacy ? removeKeysPatch(models, this.#keysOf(models, connectionId)) : {};
+          const base: SettingsV4Models = {
+            ...models,
+            connections: { ...models.connections, [connectionId]: connection },
+            installed: Object.fromEntries(
+              Object.entries(models.installed).filter(([key]) => !cleared.installed || !(key in cleared.installed)),
+            ) as SettingsV4Models["installed"],
+          };
+          const added = this.#modelsPatch(base, connectionId, input.models ?? []);
+          return {
+            ...cleared,
+            connections: { [connectionId]: connection },
+            ...(added.definitions ? { definitions: { ...cleared.definitions, ...added.definitions } } : {}),
+            installed: { ...cleared.installed, ...added.installed },
+            ...(added.overrides ? { overrides: { ...cleared.overrides, ...added.overrides } } : {}),
+          };
+        },
+        { connectionId, providerId, apiKey: draft.apiKey },
+      );
       return connectionId;
     });
   }
@@ -227,7 +289,11 @@ export class ModelConnectionsService {
       const legacy = isDefaultConnection(current);
       const next: SettingsV4ConnectionSettings = { ...current };
       if (input.label !== undefined && !legacy) next.displayName = input.label.trim() || template.label;
-      if (input.protocol !== undefined && isRelayTemplate(template) && input.protocol !== connectionProtocol(current, template)) {
+      if (
+        input.protocol !== undefined &&
+        isRelayTemplate(template) &&
+        input.protocol !== connectionProtocol(current, template)
+      ) {
         next.protocol = input.protocol;
       }
       if (input.baseUrl !== undefined) {
@@ -246,21 +312,33 @@ export class ModelConnectionsService {
         next.lastConnection = { status: "untested" };
         if (next.protocol === "anthropic-messages" && !legacy) next.authMode = "auto";
       }
-      const managementKey = input.managementKey === undefined || !(legacy && current.providerId === "openrouter") ? undefined : input.managementKey;
-      await this.settings.applyModelsChange((models) => {
-        const patch: SettingsV4ModelsPatch = { connections: { [current.connectionId]: next } };
-        // 协议变了：这个连接下自定义模型的协议跟着变。
-        if (next.protocol !== current.protocol && next.protocol) {
-          patch.definitions = Object.fromEntries(this.#keysOf(models, current.connectionId)
-            .flatMap((key) => {
-              const definition = models.definitions[key];
-              return definition?.source === "custom" ? [[key, { ...definition, api: next.protocol! }]] : [];
-            }));
-        }
-        return patch;
-      }, apiKey || managementKey !== undefined
-        ? { connectionId: current.connectionId, providerId: current.providerId, ...(apiKey ? { apiKey } : {}), ...(managementKey !== undefined ? { managementKey } : {}) }
-        : undefined);
+      const managementKey =
+        input.managementKey === undefined || !(legacy && current.providerId === "openrouter")
+          ? undefined
+          : input.managementKey;
+      await this.settings.applyModelsChange(
+        (models) => {
+          const patch: SettingsV4ModelsPatch = { connections: { [current.connectionId]: next } };
+          // 协议变了：这个连接下自定义模型的协议跟着变。
+          if (next.protocol !== current.protocol && next.protocol) {
+            patch.definitions = Object.fromEntries(
+              this.#keysOf(models, current.connectionId).flatMap((key) => {
+                const definition = models.definitions[key];
+                return definition?.source === "custom" ? [[key, { ...definition, api: next.protocol! }]] : [];
+              }),
+            );
+          }
+          return patch;
+        },
+        apiKey || managementKey !== undefined
+          ? {
+              connectionId: current.connectionId,
+              providerId: current.providerId,
+              ...(apiKey ? { apiKey } : {}),
+              ...(managementKey !== undefined ? { managementKey } : {}),
+            }
+          : undefined,
+      );
       return current.connectionId;
     });
   }
@@ -269,17 +347,29 @@ export class ModelConnectionsService {
     return this.#run(async () => {
       const current = this.#connection(input?.connectionId);
       const legacy = isDefaultConnection(current);
-      await this.settings.applyModelsChange((models) => {
-        const keys = this.#keysOf(models, current.connectionId);
-        const patch: SettingsV4ModelsPatch = {
-          // 内置连接不能真的删掉，只清空 Key 和设置；它的模型一并移出。
-          connections: { [current.connectionId]: legacy
-            ? { ...current, enabled: true, baseUrl: null, proxy: { enabled: false, url: null }, defaultPricingMultiplier: 1, lastConnection: { status: "untested" } }
-            : null },
-          ...removeKeysPatch(models, keys),
-        };
-        return patch;
-      }, { connectionId: current.connectionId, providerId: current.providerId, apiKey: null });
+      await this.settings.applyModelsChange(
+        (models) => {
+          const keys = this.#keysOf(models, current.connectionId);
+          const patch: SettingsV4ModelsPatch = {
+            // 内置连接不能真的删掉，只清空 Key 和设置；它的模型一并移出。
+            connections: {
+              [current.connectionId]: legacy
+                ? {
+                    ...current,
+                    enabled: true,
+                    baseUrl: null,
+                    proxy: { enabled: false, url: null },
+                    defaultPricingMultiplier: 1,
+                    lastConnection: { status: "untested" },
+                  }
+                : null,
+            },
+            ...removeKeysPatch(models, keys),
+          };
+          return patch;
+        },
+        { connectionId: current.connectionId, providerId: current.providerId, apiKey: null },
+      );
       return undefined;
     });
   }
@@ -287,8 +377,11 @@ export class ModelConnectionsService {
   async addModels(input: { connectionId: string; models: ConnectionModelInput[] }): Promise<ModelConnectionsResult> {
     return this.#run(async () => {
       const connection = this.#connection(input?.connectionId);
-      if (!Array.isArray(input.models) || input.models.length === 0) throw new ModelConnectionsError("invalid_input", "请选择要添加的模型。");
-      await this.settings.applyModelsChange((models) => this.#modelsPatch(models, connection.connectionId, input.models));
+      if (!Array.isArray(input.models) || input.models.length === 0)
+        throw new ModelConnectionsError("invalid_input", "请选择要添加的模型。");
+      await this.settings.applyModelsChange((models) =>
+        this.#modelsPatch(models, connection.connectionId, input.models),
+      );
       return connection.connectionId;
     });
   }
@@ -320,10 +413,18 @@ export class ModelConnectionsService {
 
   preview(input: ModelPreviewInput): ModelPreviewResult {
     const apiModel = typeof input?.apiModel === "string" ? input.apiModel.trim() : "";
-    const connection = input?.connectionId ? this.settings.getV4().settings.models.connections[input.connectionId] : undefined;
-    const template = connection ? templateForConnection(connection) : findProviderTemplate(input?.templateId) ?? findProviderTemplate("custom")!;
-    const protocol = input?.protocol ?? (connection ? connectionProtocol(connection, template) : template.protocol ?? "openai-completions");
-    const existing = connection ? this.#connectionModels(connection.connectionId).find((model) => model.apiModel === apiModel) : undefined;
+    const connection = input?.connectionId
+      ? this.settings.getV4().settings.models.connections[input.connectionId]
+      : undefined;
+    const template = connection
+      ? templateForConnection(connection)
+      : (findProviderTemplate(input?.templateId) ?? findProviderTemplate("custom")!);
+    const protocol =
+      input?.protocol ??
+      (connection ? connectionProtocol(connection, template) : (template.protocol ?? "openai-completions"));
+    const existing = connection
+      ? this.#connectionModels(connection.connectionId).find((model) => model.apiModel === apiModel)
+      : undefined;
     const definition = existing ? this.models.getModelSnapshot().definitions[existing.key] : undefined;
     const effective: EffectiveModel = resolveEffectiveModel({
       apiModel,
@@ -341,8 +442,13 @@ export class ModelConnectionsService {
     return this.#run(async () => {
       const installed = this.settings.getV4().settings.models.installed;
       const bindings: Partial<SettingsV4Models["taskBindings"]> = {};
-      const thinking: NonNullable<TaskModelSettings["thinking"]> = { ...this.settings.getModelStorageState().taskModels.thinking };
-      for (const [purpose, binding] of Object.entries(input ?? {}) as [PurposeId, PurposesView[PurposeId] | undefined][]) {
+      const thinking: NonNullable<TaskModelSettings["thinking"]> = {
+        ...this.settings.getModelStorageState().taskModels.thinking,
+      };
+      for (const [purpose, binding] of Object.entries(input ?? {}) as [
+        PurposeId,
+        PurposesView[PurposeId] | undefined,
+      ][]) {
         if (!binding || !PURPOSE_BINDING_FIELD[purpose]) continue;
         if (binding.model !== null) {
           const key = normalizeModelKey(binding.model);
@@ -355,7 +461,9 @@ export class ModelConnectionsService {
         if (binding.thinking) thinking[purpose] = binding.thinking;
         else delete thinking[purpose];
       }
-      await this.settings.applyModelsChange(() => ({ taskBindings: { ...bindings, thinking } as SettingsV4Models["taskBindings"] }));
+      await this.settings.applyModelsChange(() => ({
+        taskBindings: { ...bindings, thinking } as SettingsV4Models["taskBindings"],
+      }));
       return undefined;
     });
   }
@@ -364,14 +472,20 @@ export class ModelConnectionsService {
     const connection = this.#connection(input?.connectionId);
     const kind = templateForConnection(connection).balance;
     if (!kind) throw new Error("这个连接不支持查询余额。");
-    const runtime = kind === "openrouter" && isDefaultConnection(connection)
-      ? this.settings.getOpenRouterManagementRuntimeConfig()
-      : this.settings.getConnectionRuntimeConfig(connection.providerId, connection.connectionId);
+    const runtime =
+      kind === "openrouter" && isDefaultConnection(connection)
+        ? this.settings.getOpenRouterManagementRuntimeConfig()
+        : this.settings.getConnectionRuntimeConfig(connection.providerId, connection.connectionId);
     if ("code" in runtime) {
       if (runtime.code === "api_key_missing") return this.network.getBalance(kind, undefined);
       throw new Error(runtime.message);
     }
-    return this.network.getBalance(kind, { provider: kind, apiKey: runtime.apiKey, baseUrl: runtime.baseUrl, ...(runtime.transport ? { transport: runtime.transport } : {}) });
+    return this.network.getBalance(kind, {
+      provider: kind,
+      apiKey: runtime.apiKey,
+      baseUrl: runtime.baseUrl,
+      ...(runtime.transport ? { transport: runtime.transport } : {}),
+    });
   }
 
   #purposes(): PurposesView {
@@ -387,7 +501,11 @@ export class ModelConnectionsService {
     };
   }
 
-  #connectionView(connection: SettingsV4ConnectionSettings, template: ProviderTemplate, models: ConnectionModelView[]): ConnectionView {
+  #connectionView(
+    connection: SettingsV4ConnectionSettings,
+    template: ProviderTemplate,
+    models: ConnectionModelView[],
+  ): ConnectionView {
     const legacy = isDefaultConnection(connection);
     const relay = isRelayTemplate(template);
     return {
@@ -397,27 +515,35 @@ export class ModelConnectionsService {
       relay,
       protocol: connectionProtocol(connection, template),
       baseUrl: connection.baseUrl ?? template.defaultBaseUrl ?? "",
-      defaultBaseUrl: relay ? null : template.defaultBaseUrl ?? null,
+      defaultBaseUrl: relay ? null : (template.defaultBaseUrl ?? null),
       hasApiKey: this.settings.hasConnectionKey(connection.connectionId, connection.providerId),
       enabled: connection.enabled,
       lastConnection: connection.lastConnection,
       multiplier: connection.defaultPricingMultiplier ?? 1,
       proxy: connection.proxy,
       balance: Boolean(template.balance),
-      ...(legacy && connection.providerId === "openrouter" ? { hasManagementKey: this.settings.hasOpenRouterManagementKey() } : {}),
+      ...(legacy && connection.providerId === "openrouter"
+        ? { hasManagementKey: this.settings.hasOpenRouterManagementKey() }
+        : {}),
       models,
     };
   }
 
   /** 添加连接时填的内容 → 协议、地址、Key。官方模板固定协议，地址可以改；中转要自己选协议、填地址。 */
-  #draft(input: ConnectionDraftInput): { template: ProviderTemplate; protocol: ModelApi; baseUrl: string; apiKey: string; proxyUrl?: string } {
+  #draft(input: ConnectionDraftInput): {
+    template: ProviderTemplate;
+    protocol: ModelApi;
+    baseUrl: string;
+    apiKey: string;
+    proxyUrl?: string;
+  } {
     const template = findProviderTemplate(input?.templateId);
     if (!template || template.hidden) throw new ModelConnectionsError("invalid_input", "服务商模板不存在。");
     const apiKey = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
     if (!apiKey) throw new ModelConnectionsError("invalid_api_key", "请输入 API Key。");
     const relay = isRelayTemplate(template);
-    let protocol: ModelApi = relay ? input.protocol ?? "openai-completions" : template.protocol!;
-    const rawUrl = input.baseUrl?.trim() || (relay ? "" : template.defaultBaseUrl ?? "");
+    let protocol: ModelApi = relay ? (input.protocol ?? "openai-completions") : template.protocol!;
+    const rawUrl = input.baseUrl?.trim() || (relay ? "" : (template.defaultBaseUrl ?? ""));
     let baseUrl: string;
     if (relay) {
       const address = normalizeCustomConnectionAddress(rawUrl, protocol);
@@ -449,7 +575,9 @@ export class ModelConnectionsService {
       if (!apiModel || apiModel.length > 200) throw new ModelConnectionsError("invalid_input", "模型 ID 无效。");
       const key = legacy
         ? normalizeModelKey(`${connection.providerId}:${apiModel}`)
-        : normalizeModelKey(`${connection.providerId}:connection/${encodeURIComponent(connectionId)}/${encodeURIComponent(apiModel)}`);
+        : normalizeModelKey(
+            `${connection.providerId}:connection/${encodeURIComponent(connectionId)}/${encodeURIComponent(apiModel)}`,
+          );
       if (!key) throw new ModelConnectionsError("invalid_input", "模型 ID 无效。");
       if (installed[key]) continue;
       const builtin = builtins[key];
@@ -457,7 +585,8 @@ export class ModelConnectionsService {
         // 已经在连接里：只刷新服务商数据，用户修改不动。
         const stored = models.definitions[key];
         const facts = sanitizeModelFacts(input.providerFacts);
-        if (stored && Object.keys(facts).length > 0 && stored.source !== "builtin" && stored.source !== "curated") definitions[key] = { ...stored, providerFacts: facts };
+        if (stored && Object.keys(facts).length > 0 && stored.source !== "builtin" && stored.source !== "curated")
+          definitions[key] = { ...stored, providerFacts: facts };
         continue;
       }
       if (!(builtin && (builtin.source === "builtin" || builtin.source === "curated"))) {
@@ -487,49 +616,72 @@ export class ModelConnectionsService {
     };
   }
 
-  async #markConnection(connectionId: string, result: { ok: boolean; checkedAt: string; errorKind?: ConnectionProbeResult["errorKind"]; message: string; resolvedAuth?: CustomConnectionResolvedAuth }): Promise<void> {
-    await this.settings.applyModelsChange((models) => {
-      const connection = models.connections[connectionId];
-      if (!connection) return {};
-      return {
-        connections: {
-          [connectionId]: {
-            ...connection,
-            lastConnection: result.ok
-              ? { status: "available", checkedAt: result.checkedAt }
-              : { status: "unavailable", checkedAt: result.checkedAt, ...(result.errorKind ? { errorKind: result.errorKind } : {}), message: result.message },
-            ...(result.ok && result.resolvedAuth ? { resolvedAuth: result.resolvedAuth } : {}),
+  async #markConnection(
+    connectionId: string,
+    result: {
+      ok: boolean;
+      checkedAt: string;
+      errorKind?: ConnectionProbeResult["errorKind"];
+      message: string;
+      resolvedAuth?: CustomConnectionResolvedAuth;
+    },
+  ): Promise<void> {
+    await this.settings
+      .applyModelsChange((models) => {
+        const connection = models.connections[connectionId];
+        if (!connection) return {};
+        return {
+          connections: {
+            [connectionId]: {
+              ...connection,
+              lastConnection: result.ok
+                ? { status: "available", checkedAt: result.checkedAt }
+                : {
+                    status: "unavailable",
+                    checkedAt: result.checkedAt,
+                    ...(result.errorKind ? { errorKind: result.errorKind } : {}),
+                    message: result.message,
+                  },
+              ...(result.ok && result.resolvedAuth ? { resolvedAuth: result.resolvedAuth } : {}),
+            },
           },
-        },
-      };
-    }).catch(() => undefined);
+        };
+      })
+      .catch(() => undefined);
   }
 
   #connection(connectionId: string | undefined): SettingsV4ConnectionSettings {
-    const connection = typeof connectionId === "string" ? this.settings.getV4().settings.models.connections[connectionId] : undefined;
+    const connection =
+      typeof connectionId === "string" ? this.settings.getV4().settings.models.connections[connectionId] : undefined;
     if (!connection) throw new ModelConnectionsError("connection_missing", "连接不存在。");
     return connection;
   }
 
   #installedKey(raw: unknown): ModelKey {
     const key = normalizeModelKey(raw);
-    if (!key || !this.settings.getV4().settings.models.installed[key]) throw new ModelConnectionsError("model_missing", "模型不存在。");
+    if (!key || !this.settings.getV4().settings.models.installed[key])
+      throw new ModelConnectionsError("model_missing", "模型不存在。");
     return key;
   }
 
   #connectionIdOf(key: ModelKey): string {
-    return this.settings.getV4().settings.models.installed[key]?.connectionId ?? `${key.slice(0, key.indexOf(":"))}:default`;
+    return (
+      this.settings.getV4().settings.models.installed[key]?.connectionId ?? `${key.slice(0, key.indexOf(":"))}:default`
+    );
   }
 
   #keysOf(models: SettingsV4Models, connectionId: string): ModelKey[] {
-    return (Object.keys(models.installed) as ModelKey[])
-      .filter((key) => (models.installed[key]?.connectionId ?? `${key.slice(0, key.indexOf(":"))}:default`) === connectionId);
+    return (Object.keys(models.installed) as ModelKey[]).filter(
+      (key) => (models.installed[key]?.connectionId ?? `${key.slice(0, key.indexOf(":"))}:default`) === connectionId,
+    );
   }
 
   #connectionModels(connectionId: string): { key: ModelKey; apiModel: string }[] {
     const models = this.settings.getV4().settings.models;
     const definitions = this.models.getModelSnapshot().definitions;
-    return this.#keysOf(models, connectionId).flatMap((key) => definitions[key] ? [{ key, apiModel: definitions[key].apiModel }] : []);
+    return this.#keysOf(models, connectionId).flatMap((key) =>
+      definitions[key] ? [{ key, apiModel: definitions[key].apiModel }] : [],
+    );
   }
 
   async #run(action: () => Promise<string | undefined>): Promise<ModelConnectionsResult> {
@@ -537,18 +689,31 @@ export class ModelConnectionsService {
       const connectionId = await action();
       return { ok: true, view: this.list(), ...(connectionId ? { connectionId } : {}) };
     } catch (error) {
-      if (error instanceof ModelConnectionsError) return { ok: false, error: { code: error.code, message: error.message } };
+      if (error instanceof ModelConnectionsError)
+        return { ok: false, error: { code: error.code, message: error.message } };
       if (error instanceof ProviderSettingsError) {
-        const code: ModelConnectionsErrorCode = error.code === "invalid_api_key" || error.code === "invalid_base_url" || error.code === "invalid_proxy_url" || error.code === "secret_storage_unavailable" ? error.code : "write_failed";
+        const code: ModelConnectionsErrorCode =
+          error.code === "invalid_api_key" ||
+          error.code === "invalid_base_url" ||
+          error.code === "invalid_proxy_url" ||
+          error.code === "secret_storage_unavailable"
+            ? error.code
+            : "write_failed";
         return { ok: false, error: { code, message: error.message } };
       }
-      return { ok: false, error: { code: "write_failed", message: error instanceof Error ? error.message : "保存失败。" } };
+      return {
+        ok: false,
+        error: { code: "write_failed", message: error instanceof Error ? error.message : "保存失败。" },
+      };
     }
   }
 }
 
 class ModelConnectionsError extends Error {
-  constructor(readonly code: ModelConnectionsErrorCode, message: string) {
+  constructor(
+    readonly code: ModelConnectionsErrorCode,
+    message: string,
+  ) {
     super(message);
   }
 }
@@ -617,11 +782,17 @@ function removeKeysPatch(models: SettingsV4Models, keys: ModelKey[]): SettingsV4
   const removed = new Set<string>(keys);
   const nulls: Partial<Record<ModelKey, null>> = Object.fromEntries(keys.map((key) => [key, null]));
   const bindings = models.taskBindings;
-  const cleared: SettingsV4ModelsPatch["taskBindings"] = Object.fromEntries((["defaultChat", "utility", "autoReview", "subagentDefaultModel", "vision"] as const)
-    .filter((field) => bindings[field] && removed.has(bindings[field]))
-    .map((field) => [field, null]));
+  const cleared: SettingsV4ModelsPatch["taskBindings"] = Object.fromEntries(
+    (["defaultChat", "utility", "autoReview", "subagentDefaultModel", "vision"] as const)
+      .filter((field) => bindings[field] && removed.has(bindings[field]))
+      .map((field) => [field, null]),
+  );
   return {
-    definitions: Object.fromEntries(keys.filter((key) => models.definitions[key]?.source !== "builtin" && models.definitions[key]?.source !== "curated").map((key) => [key, null])),
+    definitions: Object.fromEntries(
+      keys
+        .filter((key) => models.definitions[key]?.source !== "builtin" && models.definitions[key]?.source !== "curated")
+        .map((key) => [key, null]),
+    ),
     installed: nulls,
     overrides: nulls,
     ...(Object.keys(cleared).length > 0 ? { taskBindings: cleared } : {}),

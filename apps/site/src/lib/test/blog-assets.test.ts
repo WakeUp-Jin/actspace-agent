@@ -39,9 +39,11 @@ function imageUrls(markdown: string): string[] {
 
 describe("blog article assets", () => {
   it("recognizes parentheses, HTML images and reference images, excluding code examples", () => {
-    expect(imageUrls('![图](./image/image%20(73).png)\n\n<img src="./html.png" />\n\n![图][diagram]\n\n[diagram]: ./reference.png\n\n```md\n![example](missing.png)\n```')).toEqual([
-      "./image/image%20(73).png", "./html.png", "./reference.png",
-    ]);
+    expect(
+      imageUrls(
+        '![图](./image/image%20(73).png)\n\n<img src="./html.png" />\n\n![图][diagram]\n\n[diagram]: ./reference.png\n\n```md\n![example](missing.png)\n```',
+      ),
+    ).toEqual(["./image/image%20(73).png", "./html.png", "./reference.png"]);
   });
 
   it("keeps every article image local and available through Astro's asset pipeline", () => {
@@ -52,8 +54,12 @@ describe("blog article assets", () => {
       const markdown = readFileSync(markdownPath, "utf8");
       for (const href of imageUrls(markdown)) {
         count++;
-        expect(href, `${file}: avoid temporary authenticated image URLs`).toMatch(/^\.\.\/\.\.\/assets\/blog\/source\//);
-        expect(existsSync(resolve(dirname(markdownPath), decodeURI(href))), `${file}: missing image ${href}`).toBe(true);
+        expect(href, `${file}: avoid temporary authenticated image URLs`).toMatch(
+          /^\.\.\/\.\.\/assets\/blog\/source\//,
+        );
+        expect(existsSync(resolve(dirname(markdownPath), decodeURI(href))), `${file}: missing image ${href}`).toBe(
+          true,
+        );
       }
       const cover = /^cover:\s*(.+)$/m.exec(markdown)?.[1]?.replace(/^['"]|['"]$/g, "");
       expect(cover, `${file}: missing cover`).toBeTruthy();
@@ -64,12 +70,14 @@ describe("blog article assets", () => {
 
   it("preserves the bytes of migrated article illustrations", () => {
     const manifest = JSON.parse(readFileSync(join(siteRoot, "blog-migration.json"), "utf8"));
-    const assets: Array<{target: string; sha256: string}> = [
+    const assets: Array<{ target: string; sha256: string }> = [
       ...manifest.articles.flatMap((article: { assets: unknown[] }) => article.assets),
       ...manifest.restoredImages,
     ];
     for (const asset of assets) {
-      const digest = createHash("sha256").update(readFileSync(join(siteRoot, asset.target))).digest("hex");
+      const digest = createHash("sha256")
+        .update(readFileSync(join(siteRoot, asset.target)))
+        .digest("hex");
       expect(digest, `Migrated image changed: ${asset.target}`).toBe(asset.sha256);
     }
   });

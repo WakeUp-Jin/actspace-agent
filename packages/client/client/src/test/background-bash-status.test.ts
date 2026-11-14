@@ -2,13 +2,32 @@ import { describe, expect, it } from "vitest";
 import { toolPreview } from "../sessions/tool-card.js";
 import { toolEntryToBlock } from "../live/stream-blocks.js";
 
-const launched = { status: "completed", summary: "Started background task", detail: [{ label: "background-task", value: { taskId: "bash_1" } }] };
+const launched = {
+  status: "completed",
+  summary: "Started background task",
+  detail: [{ label: "background-task", value: { taskId: "bash_1" } }],
+};
 
 function bashPreview(data: Record<string, unknown>, background?: { readonly status: string }) {
-  return toolPreview("bash", undefined, data as never, { args: { command: "sleep 35" } }, undefined, "session", "run", "finished", undefined, undefined, background);
+  return toolPreview(
+    "bash",
+    undefined,
+    data as never,
+    { args: { command: "sleep 35" } },
+    undefined,
+    "session",
+    "run",
+    "finished",
+    undefined,
+    undefined,
+    background,
+  );
 }
 
-function liveStatus(preview: ReturnType<typeof bashPreview>, tool: { finished?: boolean; isError?: boolean; approvalPending?: boolean } = { finished: true }) {
+function liveStatus(
+  preview: ReturnType<typeof bashPreview>,
+  tool: { finished?: boolean; isError?: boolean; approvalPending?: boolean } = { finished: true },
+) {
   return toolEntryToBlock("call", { toolName: "bash", preview, ...tool }, "now", "run");
 }
 
@@ -28,32 +47,69 @@ describe("background Bash card status", () => {
 
   it("keeps foreground success and failure from the tool result", () => {
     expect(liveStatus(bashPreview({ status: "completed", summary: "ok" }))).toMatchObject({ status: "success" });
-    expect(liveStatus(bashPreview({ status: "failed", summary: "exit 1" }), { finished: true, isError: true })).toMatchObject({ status: "failed" });
+    expect(
+      liveStatus(bashPreview({ status: "failed", summary: "exit 1" }), { finished: true, isError: true }),
+    ).toMatchObject({ status: "failed" });
   });
 
   it("keeps approval and cancellation states", () => {
     expect(liveStatus(bashPreview(launched), { approvalPending: true })).toMatchObject({ status: "pending" });
-    expect(liveStatus(bashPreview({ status: "denied", summary: "denied" }), { finished: true, isError: true })).toMatchObject({ status: "denied" });
-    expect(liveStatus(bashPreview({ status: "aborted", summary: "aborted" }), { finished: true, isError: true })).toMatchObject({ status: "cancelled" });
+    expect(
+      liveStatus(bashPreview({ status: "denied", summary: "denied" }), { finished: true, isError: true }),
+    ).toMatchObject({ status: "denied" });
+    expect(
+      liveStatus(bashPreview({ status: "aborted", summary: "aborted" }), { finished: true, isError: true }),
+    ).toMatchObject({ status: "cancelled" });
   });
 });
 
 describe("Bash execution environment", () => {
   it("reads sandboxed from the structured environment fact", () => {
-    expect(bashPreview({ status: "completed", summary: "ok", detail: [{ label: "environment", value: { sandboxed: true } }] })).toMatchObject({ sandboxed: true });
-    expect(bashPreview({ ...launched, detail: [...launched.detail, { label: "environment", value: { sandboxed: false } }] })).toMatchObject({ sandboxed: false, background: true });
+    expect(
+      bashPreview({
+        status: "completed",
+        summary: "ok",
+        detail: [{ label: "environment", value: { sandboxed: true } }],
+      }),
+    ).toMatchObject({ sandboxed: true });
+    expect(
+      bashPreview({ ...launched, detail: [...launched.detail, { label: "environment", value: { sandboxed: false } }] }),
+    ).toMatchObject({ sandboxed: false, background: true });
   });
 
   it("leaves historical results without the fact unknown instead of parsing the summary", () => {
-    expect(bashPreview({ status: "completed", summary: "Bash completed in 3ms (exit 0, sandboxed=true, sandbox=seatbelt)." })).not.toHaveProperty("sandboxed");
+    expect(
+      bashPreview({
+        status: "completed",
+        summary: "Bash completed in 3ms (exit 0, sandboxed=true, sandbox=seatbelt).",
+      }),
+    ).not.toHaveProperty("sandboxed");
   });
 });
 
 describe("Bash escalation justification", () => {
   it("carries the model's justification from the call arguments to the approval block", () => {
-    const preview = toolPreview("bash", undefined, {} as never, { args: { command: "git push", sandbox_permissions: "require_escalated", justification: "Pushing needs the keychain." } }, undefined, "session", "run", "prepared");
+    const preview = toolPreview(
+      "bash",
+      undefined,
+      {} as never,
+      {
+        args: {
+          command: "git push",
+          sandbox_permissions: "require_escalated",
+          justification: "Pushing needs the keychain.",
+        },
+      },
+      undefined,
+      "session",
+      "run",
+      "prepared",
+    );
     expect(preview).toMatchObject({ kind: "bash", justification: "Pushing needs the keychain." });
-    expect(toolEntryToBlock("call", { toolName: "bash", preview, approvalPending: true }, "now", "run")).toMatchObject({ status: "pending", justification: "Pushing needs the keychain." });
+    expect(toolEntryToBlock("call", { toolName: "bash", preview, approvalPending: true }, "now", "run")).toMatchObject({
+      status: "pending",
+      justification: "Pushing needs the keychain.",
+    });
     expect(bashPreview({ status: "completed", summary: "ok" })).not.toHaveProperty("justification", expect.anything());
   });
 });

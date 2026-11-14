@@ -15,11 +15,16 @@ export function collectPathHints(value: RuntimeJsonValue): readonly string[] {
   const walk = (item: RuntimeJsonValue): void => {
     if (typeof item === "string") {
       item = item.replace(/^\s*\d+\|/gm, " ");
-      for (const match of item.matchAll(/(?:^|[\s"'`(])((?:\.{0,2}\/|[A-Za-z0-9_.-]+\/)[^\s"'`<>|]*[A-Za-z0-9_.-])/g)) hints.add(match[1].replace(/:\d+(?::\d+)?$/, ""));
-      for (const match of item.matchAll(/(?:^|[\s"'`(])([A-Za-z0-9_-]+\.[A-Za-z][A-Za-z0-9_.-]*)(?=$|[\s"'`),:])/g)) hints.add(match[1]);
+      for (const match of item.matchAll(/(?:^|[\s"'`(])((?:\.{0,2}\/|[A-Za-z0-9_.-]+\/)[^\s"'`<>|]*[A-Za-z0-9_.-])/g))
+        hints.add(match[1].replace(/:\d+(?::\d+)?$/, ""));
+      for (const match of item.matchAll(/(?:^|[\s"'`(])([A-Za-z0-9_-]+\.[A-Za-z][A-Za-z0-9_.-]*)(?=$|[\s"'`),:])/g))
+        hints.add(match[1]);
       return;
     }
-    if (Array.isArray(item)) { item.forEach(walk); return; }
+    if (Array.isArray(item)) {
+      item.forEach(walk);
+      return;
+    }
     if (item && typeof item === "object") {
       const record = item as Readonly<Record<string, RuntimeJsonValue>>;
       if (record.type === "file-reference" && typeof record.relativePath === "string") hints.add(record.relativePath);

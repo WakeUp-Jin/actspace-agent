@@ -8,7 +8,11 @@
  * 同时实现 Runtime v2 的 Desktop approval port，由 ApprovalBroker 适配给 Tool Runtime。
  */
 
-import type { DesktopRuntimeApprovalDecision, DesktopRuntimeApprovalPort, DesktopRuntimeApprovalRequest } from "./runtime-v2/host-ports";
+import type {
+  DesktopRuntimeApprovalDecision,
+  DesktopRuntimeApprovalPort,
+  DesktopRuntimeApprovalRequest,
+} from "./runtime-v2/host-ports";
 
 const DEFAULT_TIMEOUT_MS = 3 * 60 * 60 * 1000;
 
@@ -35,7 +39,11 @@ export interface ApprovalRegistryConfig {
 export class PendingApprovalRegistry implements DesktopRuntimeApprovalPort {
   private pending = new Map<string, PendingEntry>();
   private timeoutMs: number;
-  private externalOnApprovalRequired?: (request: DesktopRuntimeApprovalRequest, sessionId: string, agentRunId: string) => void;
+  private externalOnApprovalRequired?: (
+    request: DesktopRuntimeApprovalRequest,
+    sessionId: string,
+    agentRunId: string,
+  ) => void;
   private externalOnApprovalResolved?: (
     request: DesktopRuntimeApprovalRequest,
     decision: DesktopRuntimeApprovalDecision,
@@ -88,14 +96,22 @@ export class PendingApprovalRegistry implements DesktopRuntimeApprovalPort {
 
   // ─── IPC 消费的公共方法 ───
 
-  decide(requestId: string, decision: DesktopRuntimeApprovalDecision["decision"], suggestionId?: string): { ok: true } | { ok: false; reason: string } {
+  decide(
+    requestId: string,
+    decision: DesktopRuntimeApprovalDecision["decision"],
+    suggestionId?: string,
+  ): { ok: true } | { ok: false; reason: string } {
     const entry = this.pending.get(requestId);
 
     if (!entry) {
       return { ok: false, reason: "not_found_or_already_resolved" };
     }
 
-    if (decision === "session" && (suggestionId === undefined || !entry.request.grantSuggestions?.some((suggestion) => suggestion.suggestionId === suggestionId))) {
+    if (
+      decision === "session" &&
+      (suggestionId === undefined ||
+        !entry.request.grantSuggestions?.some((suggestion) => suggestion.suggestionId === suggestionId))
+    ) {
       return { ok: false, reason: "invalid_grant_suggestion" };
     }
     this.resolveEntry(requestId, entry, decision, suggestionId);
@@ -159,11 +175,6 @@ export class PendingApprovalRegistry implements DesktopRuntimeApprovalPort {
       ...(suggestionId === undefined ? {} : { suggestionId }),
     };
     entry.resolve(resolvedDecision);
-    this.externalOnApprovalResolved?.(
-      entry.request,
-      resolvedDecision,
-      entry.sessionId,
-      entry.agentRunId,
-    );
+    this.externalOnApprovalResolved?.(entry.request, resolvedDecision, entry.sessionId, entry.agentRunId);
   }
 }

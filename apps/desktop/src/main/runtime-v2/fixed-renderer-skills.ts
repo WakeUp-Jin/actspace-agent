@@ -2,7 +2,12 @@ import { officialSkillsRoot, OFFICIAL_SKILLS_VERSION } from "@actspace/official-
 import { cp, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import * as nodePath from "node:path";
 import { basename, dirname, join, resolve } from "node:path";
-import { isLexicallyInside, type SkillInstallResult, type SkillListResult, type SkillUninstallResult } from "@actspace/shared";
+import {
+  isLexicallyInside,
+  type SkillInstallResult,
+  type SkillListResult,
+  type SkillUninstallResult,
+} from "@actspace/shared";
 
 type SkillCandidate = {
   readonly id: string;
@@ -79,7 +84,12 @@ export async function uninstallFixedRendererSkill(dataRoot: string, directory: s
   }
 }
 
-async function scanSkills(root: string, source: string, scope: "project" | "user" | "official", warnings: string[]): Promise<SkillCandidate[]> {
+async function scanSkills(
+  root: string,
+  source: string,
+  scope: "project" | "user" | "official",
+  warnings: string[],
+): Promise<SkillCandidate[]> {
   const items: SkillCandidate[] = [];
   await walk(root, 0, async (path) => {
     const skill = await readSkill(path, source, scope).catch((error: unknown) => {
@@ -106,7 +116,11 @@ async function walk(root: string, depth: number, visit: (path: string) => Promis
   }
 }
 
-async function readSkill(path: string, source: string, scope: "project" | "user" | "official"): Promise<SkillCandidate | null> {
+async function readSkill(
+  path: string,
+  source: string,
+  scope: "project" | "user" | "official",
+): Promise<SkillCandidate | null> {
   const text = await readFile(path, "utf8");
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
   if (match === null) return null;
@@ -114,13 +128,25 @@ async function readSkill(path: string, source: string, scope: "project" | "user"
   for (const line of match[1].split(/\r?\n/)) {
     const separator = line.indexOf(":");
     if (separator <= 0) continue;
-    fields.set(line.slice(0, separator).trim(), line.slice(separator + 1).trim().replace(/^['"]|['"]$/g, ""));
+    fields.set(
+      line.slice(0, separator).trim(),
+      line
+        .slice(separator + 1)
+        .trim()
+        .replace(/^['"]|['"]$/g, ""),
+    );
   }
   const directory = dirname(path);
   const id = fields.get("id") ?? fields.get("name") ?? basename(directory);
   const name = fields.get("name") ?? id;
   const description = fields.get("description") ?? "";
-  if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(id) || !description || description.length > 1024 || !(await stat(path)).isFile()) return null;
+  if (
+    !/^[a-z0-9][a-z0-9-]{0,63}$/.test(id) ||
+    !description ||
+    description.length > 1024 ||
+    !(await stat(path)).isFile()
+  )
+    return null;
   return { id, name, description, source, location: path, directory, scope };
 }
 

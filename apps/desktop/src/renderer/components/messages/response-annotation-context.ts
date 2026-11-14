@@ -34,5 +34,5 @@ export function useResponseAnnotations(): ResponseAnnotationContextValue | null 
  * 流式中和刚结束还没刷新投影的 live 块没有 sourceSeq。
  */
 export function annotatableMessageIds(blocks: readonly MessageBlock[]): ReadonlySet<string> {
-  return new Set(blocks.flatMap((block) => block.sourceSeq === undefined ? [] : [block.id]));
+  return new Set(blocks.flatMap((block) => (block.sourceSeq === undefined ? [] : [block.id])));
 }

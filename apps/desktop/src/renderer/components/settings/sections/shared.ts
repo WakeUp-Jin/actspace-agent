@@ -1,4 +1,13 @@
-import type { AppSettings, SecretProviderId, SetProviderKeyResult, SettingsV4NamespacePatch, SettingsV4Snapshot, SettingsUpdateInput, UsageActivitySnapshot, WorkspaceEntry } from "@actspace/shared";
+import type {
+  AppSettings,
+  SecretProviderId,
+  SetProviderKeyResult,
+  SettingsV4NamespacePatch,
+  SettingsV4Snapshot,
+  SettingsUpdateInput,
+  UsageActivitySnapshot,
+  WorkspaceEntry,
+} from "@actspace/shared";
 import type { UsageQuery } from "../../usage/usage-query";
 import type { SettingsSectionId } from "../SettingsNav";
 

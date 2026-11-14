@@ -90,7 +90,15 @@ describe("点击手势（真实 DOM 事件）", () => {
     return ctx;
   }
   const down = (target: Element, init: MouseEventInit = {}) => {
-    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0, detail: 1, clientX: 10, clientY: 10, ...init });
+    const event = new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      detail: 1,
+      clientX: 10,
+      clientY: 10,
+      ...init,
+    });
     target.dispatchEvent(event);
     return event;
   };

@@ -14,11 +14,20 @@ export function SpaceContextView({ usage }: { usage: ContextUsage }) {
     <div>
       <div className="flex items-baseline gap-2 px-1.5 pb-3 pt-1">
         <span className="text-act-xl font-semibold tabular-nums text-text-main">{usage.total.toFixed(1)}k</span>
-        <small className="text-act-xs text-text-faint">共 {usage.max}k · 用了 {usage.pct}%</small>
+        <small className="text-act-xs text-text-faint">
+          共 {usage.max}k · 用了 {usage.pct}%
+        </small>
       </div>
-      <div className="mx-1.5 mb-3 flex h-2 gap-0.5 overflow-hidden rounded-act-pill bg-surface-subtle" aria-hidden="true">
+      <div
+        className="mx-1.5 mb-3 flex h-2 gap-0.5 overflow-hidden rounded-act-pill bg-surface-subtle"
+        aria-hidden="true"
+      >
         {usage.parts.map((p) => (
-          <i key={p.name} className={`block h-full ${TONE_CLASS[p.tone]}`} style={{ width: `${((p.value / usage.max) * 100).toFixed(2)}%` }} />
+          <i
+            key={p.name}
+            className={`block h-full ${TONE_CLASS[p.tone]}`}
+            style={{ width: `${((p.value / usage.max) * 100).toFixed(2)}%` }}
+          />
         ))}
       </div>
       {usage.parts.map((p) => (

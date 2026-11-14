@@ -42,9 +42,13 @@ describe("块级装饰：平时 / 露出 / 失焦", () => {
   it("frontmatter：平时属性卡片，光标进入露出源码（卡片消失），失焦收起", () => {
     const doc = `${front}\n\n正文`;
     const normal = decos(blockDecorations(makeState(doc, { cursor: doc.length })));
-    expect(normal.map((d) => [d.kind, d.widget, d.from, d.to])).toEqual([["block", "FrontmatterWidget", 0, front.length]]);
+    expect(normal.map((d) => [d.kind, d.widget, d.from, d.to])).toEqual([
+      ["block", "FrontmatterWidget", 0, front.length],
+    ]);
     expect(decos(blockDecorations(makeState(doc, { cursor: 6 })))).toEqual([]);
-    expect(decos(blockDecorations(makeState(doc, { cursor: 6, focused: false }))).map((d) => d.widget)).toEqual(["FrontmatterWidget"]);
+    expect(decos(blockDecorations(makeState(doc, { cursor: 6, focused: false }))).map((d) => d.widget)).toEqual([
+      "FrontmatterWidget",
+    ]);
   });
 
   it("Mermaid：平时整块替换成图；光标进入后源码露出，图放在源码下方", () => {
@@ -52,15 +56,23 @@ describe("块级装饰：平时 / 露出 / 失焦", () => {
     const normal = decos(blockDecorations(makeState(doc, { cursor: doc.length })));
     expect(normal.map((d) => [d.widget, d.from, d.to])).toEqual([["MermaidWidget", 0, mermaid.length]]);
     const revealed = decos(blockDecorations(makeState(doc, { cursor: 14 })));
-    expect(revealed.map((d) => [d.kind, d.widget, d.from, d.to])).toEqual([["block", "MermaidWidget", mermaid.length, mermaid.length]]);
-    expect(decos(blockDecorations(makeState(doc, { cursor: 14, focused: false }))).map((d) => d.from === 0 && d.to > 0)).toEqual([true]);
+    expect(revealed.map((d) => [d.kind, d.widget, d.from, d.to])).toEqual([
+      ["block", "MermaidWidget", mermaid.length, mermaid.length],
+    ]);
+    expect(
+      decos(blockDecorations(makeState(doc, { cursor: 14, focused: false }))).map((d) => d.from === 0 && d.to > 0),
+    ).toEqual([true]);
   });
 
   it("块公式：平时 KaTeX 块，光标进入露出源码", () => {
     const doc = `${math}\n\n末尾`;
-    expect(decos(blockDecorations(makeState(doc, { cursor: doc.length }))).map((d) => d.widget)).toEqual(["MathWidget"]);
+    expect(decos(blockDecorations(makeState(doc, { cursor: doc.length }))).map((d) => d.widget)).toEqual([
+      "MathWidget",
+    ]);
     expect(decos(blockDecorations(makeState(doc, { cursor: 4 })))).toEqual([]);
-    expect(decos(blockDecorations(makeState(doc, { cursor: 4, focused: false }))).map((d) => d.widget)).toEqual(["MathWidget"]);
+    expect(decos(blockDecorations(makeState(doc, { cursor: 4, focused: false }))).map((d) => d.widget)).toEqual([
+      "MathWidget",
+    ]);
   });
 
   it("块级替换登记为原子范围", () => {

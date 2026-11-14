@@ -50,7 +50,10 @@ export async function setSearchProviderKey(
   });
 }
 
-export async function clearSearchProviderKey(store: SettingsStore, provider: SearchProviderId): Promise<{ ok: boolean }> {
+export async function clearSearchProviderKey(
+  store: SettingsStore,
+  provider: SearchProviderId,
+): Promise<{ ok: boolean }> {
   return store.enqueueMutation(async () => {
     const previous = { ...store.secrets };
     try {

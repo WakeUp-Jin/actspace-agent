@@ -1,11 +1,20 @@
-import type { HarnessPluginSource, HarnessRevisionInfo, HarnessRevisionKey, HarnessStatsRange, HarnessStatsSessionKind } from "@actspace/shared";
+import type {
+  HarnessPluginSource,
+  HarnessRevisionInfo,
+  HarnessRevisionKey,
+  HarnessStatsRange,
+  HarnessStatsSessionKind,
+} from "@actspace/shared";
 import { CONTEXT_BUCKET_REGISTRY, HARNESS_UNKNOWN_REVISION, getContextBucketDisplay } from "@actspace/shared";
 import { DASH, fmtTokens } from "../stats/stats-format";
 
 // Harness 统计页自己的文案与换算；通用数字格式在 ../stats/stats-format.ts。
 
 /** `<harnessId>@<revision>` → `@12`；找不到信息时回退到 key 本身。 */
-export function revisionLabel(key: HarnessRevisionKey | null | undefined, revisions?: readonly HarnessRevisionInfo[]): string {
+export function revisionLabel(
+  key: HarnessRevisionKey | null | undefined,
+  revisions?: readonly HarnessRevisionInfo[],
+): string {
   if (!key) return DASH;
   if (key === HARNESS_UNKNOWN_REVISION) return "未知版本";
   const info = revisions?.find((item) => item.key === key);
@@ -14,7 +23,12 @@ export function revisionLabel(key: HarnessRevisionKey | null | undefined, revisi
   return at >= 0 && /^\d+$/.test(key.slice(at + 1)) ? key.slice(at) : key;
 }
 
-export const SOURCE_LABEL: Record<HarnessPluginSource, string> = { builtin: "内置", user: "用户", evolved: "自进化", unknown: "来源未知" };
+export const SOURCE_LABEL: Record<HarnessPluginSource, string> = {
+  builtin: "内置",
+  user: "用户",
+  evolved: "自进化",
+  unknown: "来源未知",
+};
 
 export const SESSION_KIND_OPTIONS: ReadonlyArray<{ value: HarnessStatsSessionKind; label: string }> = [
   { value: "main", label: "主会话" },
@@ -31,7 +45,12 @@ export const RANGE_OPTIONS: ReadonlyArray<{ value: HarnessStatsRange; label: str
 ];
 
 /** 「把<范围>带的 token 加起来」里的范围说法。 */
-export const RANGE_WORD: Record<HarnessStatsRange, string> = { day: "这 24 小时", week: "这 7 天", month: "这 30 天", total: "全部时间里" };
+export const RANGE_WORD: Record<HarnessStatsRange, string> = {
+  day: "这 24 小时",
+  week: "这 7 天",
+  month: "这 30 天",
+  total: "全部时间里",
+};
 
 export const TRIGGER_LABEL: Record<string, string> = { auto: "自动", manual: "手动" };
 export const triggerLabel = (trigger: string) => TRIGGER_LABEL[trigger] ?? "未知";
@@ -56,11 +75,21 @@ export function bucketColor(bucket: string): string {
   return `var(${getContextBucketDisplay(bucket).colorVar})`;
 }
 
-export type BucketSegment = { readonly key: string; readonly label: string; readonly colorVar: string; readonly tokens: number; readonly share: number };
+export type BucketSegment = {
+  readonly key: string;
+  readonly label: string;
+  readonly colorVar: string;
+  readonly tokens: number;
+  readonly share: number;
+};
 
 /** 6 类上下文：按注册表顺序排列，缺失的类不画；未知 key 排在最后用兜底色。 */
-export function bucketSegments(buckets: readonly { readonly bucket: string; readonly avgTokens: number }[]): BucketSegment[] {
-  const sorted = [...buckets].filter((item) => item.avgTokens > 0).sort((a, b) => getContextBucketDisplay(a.bucket).order - getContextBucketDisplay(b.bucket).order);
+export function bucketSegments(
+  buckets: readonly { readonly bucket: string; readonly avgTokens: number }[],
+): BucketSegment[] {
+  const sorted = [...buckets]
+    .filter((item) => item.avgTokens > 0)
+    .sort((a, b) => getContextBucketDisplay(a.bucket).order - getContextBucketDisplay(b.bucket).order);
   const total = sorted.reduce((sum, item) => sum + item.avgTokens, 0);
   return sorted.map((item) => ({
     key: item.bucket,
@@ -71,12 +100,25 @@ export function bucketSegments(buckets: readonly { readonly bucket: string; read
   }));
 }
 
-export const ACTIVE_HISTOGRAM_LABELS = ["0–9", "10–19", "20–29", "30–39", "40–49", "50–59", "60–69", "70–79", "80–89", "90–99", "100"];
+export const ACTIVE_HISTOGRAM_LABELS = [
+  "0–9",
+  "10–19",
+  "20–29",
+  "30–39",
+  "40–49",
+  "50–59",
+  "60–69",
+  "70–79",
+  "80–89",
+  "90–99",
+  "100",
+];
 export const SLEEP_HISTOGRAM_LABELS = ["1", "2", "3", "4", "5", "6+"];
 
 /** 变化率达到这个值的非对话来源标「常变 · 打断缓存」。 */
 export const CHURN_RATE = 0.2;
-export const isChurning = (bucket: string, changeRate: number | null) => bucket !== "conversation" && changeRate != null && changeRate >= CHURN_RATE;
+export const isChurning = (bucket: string, changeRate: number | null) =>
+  bucket !== "conversation" && changeRate != null && changeRate >= CHURN_RATE;
 
 const MINUS = "−";
 const sign = (value: number) => (value > 0 ? "+" : value < 0 ? MINUS : "");

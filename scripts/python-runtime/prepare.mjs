@@ -21,15 +21,22 @@ const lock = JSON.parse(await readFile(join(repoRoot, "packages", "shell", "pyth
 
 const options = parseArgs(process.argv.slice(2));
 const target = lock.targets[options.target];
-if (!target) throw new Error(`lock.json has no target ${options.target}; known: ${Object.keys(lock.targets).join(", ")}.`);
+if (!target)
+  throw new Error(`lock.json has no target ${options.target}; known: ${Object.keys(lock.targets).join(", ")}.`);
 const windows = target.platform === "win32";
 const layout = windows
   ? { executable: "python.exe", sitePackages: "Lib/site-packages", stdlib: "Lib" }
-  : { executable: `bin/python${minor(lock.python.version)}`, sitePackages: `lib/python${minor(lock.python.version)}/site-packages`, stdlib: `lib/python${minor(lock.python.version)}` };
-const output = resolve(options.output ?? join(repoRoot, "dist", "python-runtime", options.layer === "core" ? options.target : `${options.target}-ext`));
+  : {
+      executable: `bin/python${minor(lock.python.version)}`,
+      sitePackages: `lib/python${minor(lock.python.version)}/site-packages`,
+      stdlib: `lib/python${minor(lock.python.version)}`,
+    };
+const output = resolve(
+  options.output ??
+    join(repoRoot, "dist", "python-runtime", options.layer === "core" ? options.target : `${options.target}-ext`),
+);
 const cache = resolve(options.cache ?? join(repoRoot, ".cache", "python-runtime"));
 await mkdir(cache, { recursive: true });
-
 
 async function prepareCore() {
   log(`core layer for ${options.target} -> ${output}`);
@@ -65,7 +72,10 @@ async function prepareExtension() {
   await installWheels(target.extension, sitePackages, pickPip(undefined));
   await prune(output);
   const digest = extensionDigest(target.extension);
-  await writeFile(join(output, "extension.json"), `${JSON.stringify({ digest, python: { version: lock.python.version, release: lock.python.release }, wheels: target.extension.map(({ name, version, sha256 }) => ({ name, version, sha256 })), installedAt: new Date().toISOString() }, null, 2)}\n`);
+  await writeFile(
+    join(output, "extension.json"),
+    `${JSON.stringify({ digest, python: { version: lock.python.version, release: lock.python.release }, wheels: target.extension.map(({ name, version, sha256 }) => ({ name, version, sha256 })), installedAt: new Date().toISOString() }, null, 2)}\n`,
+  );
   log(`extension.json written; digest ${digest}`);
 }
 
@@ -81,9 +91,39 @@ async function installWheels(wheels, sitePackages, pip) {
   for (const wheel of wheels) files.push(await download(wheel.url, wheel.sha256, wheel.file));
   // A foreign pip must be told the target's tags; the unpacked interpreter installs for itself.
   const tags = pip.foreign
-    ? ["--python-version", minor(lock.python.version), "--implementation", "cp", "--abi", `cp${minor(lock.python.version).replace(".", "")}`, "--abi", "abi3", "--abi", "none", ...PIP_PLATFORMS[options.target].flatMap((platform) => ["--platform", platform])]
+    ? [
+        "--python-version",
+        minor(lock.python.version),
+        "--implementation",
+        "cp",
+        "--abi",
+        `cp${minor(lock.python.version).replace(".", "")}`,
+        "--abi",
+        "abi3",
+        "--abi",
+        "none",
+        ...PIP_PLATFORMS[options.target].flatMap((platform) => ["--platform", platform]),
+      ]
     : [];
-  execFileSync(pip.command, ["-m", "pip", "install", "--quiet", "--no-deps", "--no-index", "--no-compile", "--only-binary=:all:", "--upgrade", "--target", sitePackages, ...tags, ...files], { stdio: "inherit", env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: "1", PIP_NO_CACHE_DIR: "1" } });
+  execFileSync(
+    pip.command,
+    [
+      "-m",
+      "pip",
+      "install",
+      "--quiet",
+      "--no-deps",
+      "--no-index",
+      "--no-compile",
+      "--only-binary=:all:",
+      "--upgrade",
+      "--target",
+      sitePackages,
+      ...tags,
+      ...files,
+    ],
+    { stdio: "inherit", env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: "1", PIP_NO_CACHE_DIR: "1" } },
+  );
   // Console scripts pip generated for the target; the app never calls them.
   await rm(join(sitePackages, "bin"), { recursive: true, force: true });
   await rm(join(sitePackages, "Scripts"), { recursive: true, force: true });
@@ -93,15 +133,31 @@ async function installWheels(wheels, sitePackages, pip) {
 async function prune(root) {
   const stdlib = join(root, ...layout.stdlib.split("/"));
   const sitePackages = join(root, ...layout.sitePackages.split("/"));
-  const removals = options.layer === "core" ? [
-    join(stdlib, "test"), join(stdlib, "idlelib"), join(stdlib, "tkinter"), join(stdlib, "turtledemo"), join(stdlib, "ensurepip"), join(stdlib, "turtle.py"),
-    join(root, "include"), join(root, "share"), join(root, "libs"), join(root, "tcl"), join(root, "Scripts"),
-    join(sitePackages, "_distutils_hack"), join(sitePackages, "distutils-precedence.pth"),
-  ] : [];
+  const removals =
+    options.layer === "core"
+      ? [
+          join(stdlib, "test"),
+          join(stdlib, "idlelib"),
+          join(stdlib, "tkinter"),
+          join(stdlib, "turtledemo"),
+          join(stdlib, "ensurepip"),
+          join(stdlib, "turtle.py"),
+          join(root, "include"),
+          join(root, "share"),
+          join(root, "libs"),
+          join(root, "tcl"),
+          join(root, "Scripts"),
+          join(sitePackages, "_distutils_hack"),
+          join(sitePackages, "distutils-precedence.pth"),
+        ]
+      : [];
   for (const path of removals) await rm(path, { recursive: true, force: true });
   if (options.layer === "core") {
     // Not on Windows: there `lib` is the standard library itself (`Lib`, case-insensitive), and this would take `threading.py`.
-    if (!windows) await removeMatching(join(root, "lib"), (name) => /^(tcl|tk|itcl|thread|tdbc|Tix|libtcl|libtk|pkgconfig)/.test(name));
+    if (!windows)
+      await removeMatching(join(root, "lib"), (name) =>
+        /^(tcl|tk|itcl|thread|tdbc|Tix|libtcl|libtk|pkgconfig)/.test(name),
+      );
     // The Linux interpreter is statically linked; the 32 MB shared library only serves embedders. macOS links it.
     if (target.platform === "linux") await removeMatching(join(root, "lib"), (name) => /^libpython3.*\.so/.test(name));
     await removeMatching(join(stdlib, "lib-dynload"), (name) => name.startsWith("_tkinter"));
@@ -116,7 +172,11 @@ async function prune(root) {
 /** `tests/` and `__pycache__/` anywhere under site-packages: pandas alone ships ~40 MB of tests. */
 async function removeTests(directory) {
   let entries;
-  try { entries = await readdir(directory, { withFileTypes: true }); } catch { return; }
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch {
+    return;
+  }
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const path = join(directory, entry.name);
@@ -127,7 +187,11 @@ async function removeTests(directory) {
 
 async function removeMatching(directory, matches) {
   let entries;
-  try { entries = await readdir(directory); } catch { return; }
+  try {
+    entries = await readdir(directory);
+  } catch {
+    return;
+  }
   for (const name of entries) if (matches(name)) await rm(join(directory, name), { recursive: true, force: true });
 }
 
@@ -136,9 +200,16 @@ async function writeShims(root) {
   await mkdir(shim, { recursive: true });
   // -E/-s keep the user's PYTHON* variables and user site-packages away from the bundled interpreter;
   // ACTSPACE_PYTHON_EXT is not a PYTHON* variable, so sitecustomize.py still sees it.
-  await writeFile(join(shim, "actspace-python"), `#!/bin/sh\n# ActSpace's bundled Python ${lock.python.version}.\nhere=$(cd "$(dirname "$0")" && pwd)\nexec "$here/../${layout.executable}" -E -s -X utf8 "$@"\n`);
+  await writeFile(
+    join(shim, "actspace-python"),
+    `#!/bin/sh\n# ActSpace's bundled Python ${lock.python.version}.\nhere=$(cd "$(dirname "$0")" && pwd)\nexec "$here/../${layout.executable}" -E -s -X utf8 "$@"\n`,
+  );
   await chmod(join(shim, "actspace-python"), 0o755);
-  if (windows) await writeFile(join(shim, "actspace-python.cmd"), `@echo off\r\n"%~dp0..\\${layout.executable.replaceAll("/", "\\")}" -E -s -X utf8 %*\r\n`);
+  if (windows)
+    await writeFile(
+      join(shim, "actspace-python.cmd"),
+      `@echo off\r\n"%~dp0..\\${layout.executable.replaceAll("/", "\\")}" -E -s -X utf8 %*\r\n`,
+    );
 }
 
 async function download(url, sha256, fileName = url.slice(url.lastIndexOf("/") + 1)) {
@@ -167,12 +238,22 @@ async function download(url, sha256, fileName = url.slice(url.lastIndexOf("/") +
 }
 
 async function digestFile(path) {
-  return createHash("sha256").update(await readFile(path)).digest("hex");
+  return createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex");
 }
 
 /** Mirrors `extensionLayerDigest` in @actspace/python-runtime. */
 function extensionDigest(wheels) {
-  return createHash("sha256").update(wheels.map((wheel) => wheel.sha256).sort().join("\n")).digest("hex").slice(0, 16);
+  return createHash("sha256")
+    .update(
+      wheels
+        .map((wheel) => wheel.sha256)
+        .sort()
+        .join("\n"),
+    )
+    .digest("hex")
+    .slice(0, 16);
 }
 
 function hostTarget() {
@@ -191,14 +272,22 @@ function tarCommand() {
   return process.platform === "win32" ? join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
 }
 
-function minor(version) { return version.split(".").slice(0, 2).join("."); }
-function log(message) { console.error(`[python-runtime] ${message}`); }
+function minor(version) {
+  return version.split(".").slice(0, 2).join(".");
+}
+function log(message) {
+  console.error(`[python-runtime] ${message}`);
+}
 
 function parseArgs(argv) {
   const parsed = { target: hostTarget(), layer: "core" };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
-    const value = () => { const next = argv[++index]; if (next === undefined) throw new Error(`${flag} needs a value.`); return next; };
+    const value = () => {
+      const next = argv[++index];
+      if (next === undefined) throw new Error(`${flag} needs a value.`);
+      return next;
+    };
     if (flag === "--target") parsed.target = value();
     else if (flag === "--output") parsed.output = value();
     else if (flag === "--layer") parsed.layer = value();
@@ -212,10 +301,45 @@ function parseArgs(argv) {
 }
 
 const PIP_PLATFORMS = {
-  "mac-arm64": ["macosx_11_0_arm64", "macosx_12_0_arm64", "macosx_13_0_arm64", "macosx_14_0_arm64", "macosx_10_9_universal2", "macosx_11_0_universal2"],
-  "mac-x64": ["macosx_10_9_x86_64", "macosx_10_13_x86_64", "macosx_10_15_x86_64", "macosx_11_0_x86_64", "macosx_12_0_x86_64", "macosx_13_0_x86_64", "macosx_14_0_x86_64", "macosx_10_9_universal2", "macosx_11_0_universal2"],
-  "linux-x64": ["manylinux_2_17_x86_64", "manylinux2014_x86_64", "manylinux_2_24_x86_64", "manylinux_2_26_x86_64", "manylinux_2_27_x86_64", "manylinux_2_28_x86_64", "manylinux_2_5_x86_64", "manylinux1_x86_64", "manylinux_2_12_x86_64", "manylinux2010_x86_64"],
-  "linux-arm64": ["manylinux_2_17_aarch64", "manylinux2014_aarch64", "manylinux_2_24_aarch64", "manylinux_2_26_aarch64", "manylinux_2_27_aarch64", "manylinux_2_28_aarch64"],
+  "mac-arm64": [
+    "macosx_11_0_arm64",
+    "macosx_12_0_arm64",
+    "macosx_13_0_arm64",
+    "macosx_14_0_arm64",
+    "macosx_10_9_universal2",
+    "macosx_11_0_universal2",
+  ],
+  "mac-x64": [
+    "macosx_10_9_x86_64",
+    "macosx_10_13_x86_64",
+    "macosx_10_15_x86_64",
+    "macosx_11_0_x86_64",
+    "macosx_12_0_x86_64",
+    "macosx_13_0_x86_64",
+    "macosx_14_0_x86_64",
+    "macosx_10_9_universal2",
+    "macosx_11_0_universal2",
+  ],
+  "linux-x64": [
+    "manylinux_2_17_x86_64",
+    "manylinux2014_x86_64",
+    "manylinux_2_24_x86_64",
+    "manylinux_2_26_x86_64",
+    "manylinux_2_27_x86_64",
+    "manylinux_2_28_x86_64",
+    "manylinux_2_5_x86_64",
+    "manylinux1_x86_64",
+    "manylinux_2_12_x86_64",
+    "manylinux2010_x86_64",
+  ],
+  "linux-arm64": [
+    "manylinux_2_17_aarch64",
+    "manylinux2014_aarch64",
+    "manylinux_2_24_aarch64",
+    "manylinux_2_26_aarch64",
+    "manylinux_2_27_aarch64",
+    "manylinux_2_28_aarch64",
+  ],
   "win-x64": ["win_amd64"],
 };
 
@@ -233,4 +357,5 @@ if _extension and os.path.isdir(_extension):
 del _extension
 `;
 
-if (options.layer === "core") await prepareCore(); else await prepareExtension();
+if (options.layer === "core") await prepareCore();
+else await prepareExtension();

@@ -20,11 +20,7 @@ import { PROVIDER_IDS, PROVIDER_REGISTRY, isProviderId } from "../provider-confi
 
 describe("model config", () => {
   it("exposes Kimi as a public model alongside DeepSeek", () => {
-    expect(MODEL_LIST.map((model) => model.id)).toEqual([
-      "deepseek-v4-flash",
-      "kimi-k2.6",
-      "kimi-k2.7-code",
-    ]);
+    expect(MODEL_LIST.map((model) => model.id)).toEqual(["deepseek-v4-flash", "kimi-k2.6", "kimi-k2.7-code"]);
     expect(ALL_MODEL_LIST.map((model) => model.id)).toContain("kimi-k2.6");
     expect(MODEL_REGISTRY["kimi-k2.6"].visibility).toBe("public");
     expect(MODEL_REGISTRY["kimi-k2.6"].pricing?.currency).toBe("USD");
@@ -112,9 +108,7 @@ describe("model config", () => {
 
   it("normalizes known legacy ids without defaulting unknown values", () => {
     expect(normalizeModelKey("deepseek-v4-pro")).toBe("deepseek:deepseek-flash");
-    expect(normalizeModelKey("openrouter:anthropic/claude-example")).toBe(
-      "openrouter:anthropic/claude-example",
-    );
+    expect(normalizeModelKey("openrouter:anthropic/claude-example")).toBe("openrouter:anthropic/claude-example");
     expect(normalizeModelKey("duckcoding:grok-4.5")).toBeUndefined();
     expect(normalizeModelKey("unknown-model")).toBeUndefined();
     expect(normalizeModelKey("other:model")).toBeUndefined();

@@ -3,7 +3,7 @@ import { taskHostFixture } from "./task-host-fixture";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState,  SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import type { AppSettings, BootstrapState, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { App } from "../App";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
@@ -24,8 +24,19 @@ const defaultSettings: AppSettings = {
   version: 1,
   defaultModelId: null,
   providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: false } },
-  searchProviders: { zhipu: { hasApiKey: false }, tavily: { hasApiKey: false }, tinyfish: { hasApiKey: false }, exa: { hasApiKey: false } },
-  agent: { systemPromptPath: "/tmp/actspace/prompts/main-agent.md", temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
+  searchProviders: {
+    zhipu: { hasApiKey: false },
+    tavily: { hasApiKey: false },
+    tinyfish: { hasApiKey: false },
+    exa: { hasApiKey: false },
+  },
+  agent: {
+    systemPromptPath: "/tmp/actspace/prompts/main-agent.md",
+    temperature: null,
+    maxTokens: null,
+    disabledTools: [],
+    bashAlwaysAsk: false,
+  },
   skills: { disabled: [] },
 };
 
@@ -35,10 +46,35 @@ const TITLES: Record<string, string> = { "annotated-a": "批注甲", "annotated-
 function createAnsweredSession(sessionId: string): SessionRecord {
   const now = "2026-09-28T00:00:00.000Z";
   return {
-    meta: { schemaVersion: 2, id: sessionId, title: TITLES[sessionId], createdAt: now, updatedAt: now, agentRunCount: 1, agentForm: "chat", workspaceRoot: "/tmp/workspace" },
+    meta: {
+      schemaVersion: 2,
+      id: sessionId,
+      title: TITLES[sessionId],
+      createdAt: now,
+      updatedAt: now,
+      agentRunCount: 1,
+      agentForm: "chat",
+      workspaceRoot: "/tmp/workspace",
+    },
     events: [
-      { id: "u", sessionId, agentRunId: "run-0", type: "user_message", timestamp: now, schemaVersion: 2, payload: { content: "问题" } },
-      { id: "a", sessionId, agentRunId: "run-0", type: "assistant_message", timestamp: now, schemaVersion: 2, payload: { content: `${sessionId} 第一段内容\n\n第二段的正文` } },
+      {
+        id: "u",
+        sessionId,
+        agentRunId: "run-0",
+        type: "user_message",
+        timestamp: now,
+        schemaVersion: 2,
+        payload: { content: "问题" },
+      },
+      {
+        id: "a",
+        sessionId,
+        agentRunId: "run-0",
+        type: "assistant_message",
+        timestamp: now,
+        schemaVersion: 2,
+        payload: { content: `${sessionId} 第一段内容\n\n第二段的正文` },
+      },
     ],
     messageBlocks: [],
     contextSnapshot: null,
@@ -49,26 +85,58 @@ function createAnsweredSession(sessionId: string): SessionRecord {
 function installBridge(runAgent: (input: FixtureRunInput) => Promise<unknown>, prepare = false) {
   const records = new Map(Object.keys(TITLES).map((id) => [id, createAnsweredSession(id)] as const));
   const execute = vi.fn(runAgent);
-  setupBridge(taskHostFixture({
-    "app.getBootstrapState": async () => bootstrapState,
-    "settings.get": async () => defaultSettings,
-    "sessions.getPage": async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
-    "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
-    "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
-    "workspaces.list": async (): Promise<WorkspaceListResult> => ({ version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: "2026-09-28T00:00:00.000Z", updatedAt: "2026-09-28T00:00:00.000Z" }] }),
-    "sessions.list": async () => [...records.values()].map((record) => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 1, agentForm: "chat", workspaceRoot: "/tmp/workspace" })),
-    getRecord: async ({ sessionId }: { sessionId: string }) => records.get(sessionId),
-    "sessions.create": projectRecord(async () => records.get("annotated-a")),
-    "approvals.listPending": async () => [],
-    "events.agentStream": () => () => {},
-    execute: prepare ? undefined : execute as (input: FixtureRunInput) => Promise<import("@actspace/shared").AgentRunResult>,
-    prepare: prepare ? runAgent : undefined,
-  }));
+  setupBridge(
+    taskHostFixture({
+      "app.getBootstrapState": async () => bootstrapState,
+      "settings.get": async () => defaultSettings,
+      "sessions.getPage": async ({ sessionId }: { sessionId: string }) =>
+        recordProjectionFixture(records.get(sessionId)!),
+      "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
+      "appearance.setUiZoom": () => {},
+      "appearance.setNativeTheme": () => {},
+      "events.shuttingDown": () => () => {},
+      "workspaces.list": async (): Promise<WorkspaceListResult> => ({
+        version: 1,
+        items: [
+          {
+            id: "default",
+            kind: "folder",
+            label: "workspace",
+            path: "/tmp/workspace",
+            order: 0,
+            createdAt: "2026-09-28T00:00:00.000Z",
+            updatedAt: "2026-09-28T00:00:00.000Z",
+          },
+        ],
+      }),
+      "sessions.list": async () =>
+        [...records.values()].map((record) => ({
+          id: record.meta.id,
+          title: record.meta.title,
+          updatedAt: record.meta.updatedAt,
+          agentRunCount: 1,
+          agentForm: "chat",
+          workspaceRoot: "/tmp/workspace",
+        })),
+      getRecord: async ({ sessionId }: { sessionId: string }) => records.get(sessionId),
+      "sessions.create": projectRecord(async () => records.get("annotated-a")),
+      "approvals.listPending": async () => [],
+      "events.agentStream": () => () => {},
+      execute: prepare
+        ? undefined
+        : (execute as (input: FixtureRunInput) => Promise<import("@actspace/shared").AgentRunResult>),
+      prepare: prepare ? runAgent : undefined,
+    }),
+  );
   return execute;
 }
 
 function renderApp() {
-  return render(<TooltipProvider delayDuration={0}><App /></TooltipProvider>);
+  return render(
+    <TooltipProvider delayDuration={0}>
+      <App />
+    </TooltipProvider>,
+  );
 }
 
 async function selectSession(sessionId: string) {
@@ -88,7 +156,10 @@ async function annotateReply(sessionId: string, needle = "第二段") {
   });
   // 切会话后 Composer 会在下一帧抢焦点；先等它落定，再像真实拖选那样让输入框失焦
   // （jsdom 里输入框拿着焦点会把脚本加的选区收起）。
-  await act(() => new Promise<void>((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))));
+  await act(
+    () =>
+      new Promise<void>((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))),
+  );
   (document.activeElement as HTMLElement | null)?.blur();
   selectText(reply, needle);
   await userEvent.click(await screen.findByRole("menuitem", { name: "添加到对话" }));
@@ -133,7 +204,12 @@ it("sends an annotation-only message and clears the pill once the run is submitt
   await userEvent.click(screen.getByRole("button", { name: "发送消息" }));
   await waitFor(() => expect(runAgent).toHaveBeenCalledTimes(1));
   expect(runAgent.mock.calls[0][0].responseAnnotations).toEqual([
-    expect.objectContaining({ assistantMessageId: "v2-1", selectedText: "第二段", prefixContext: "annotated-a 第一段内容\n", suffixContext: "的正文" }),
+    expect.objectContaining({
+      assistantMessageId: "v2-1",
+      selectedText: "第二段",
+      prefixContext: "annotated-a 第一段内容\n",
+      suffixContext: "的正文",
+    }),
   ]);
   expect(document.querySelector(".composer-annotations")).toBeNull();
   // 发出去的批注改由用户消息上方的只读胶囊展示。
@@ -141,7 +217,15 @@ it("sends an annotation-only message and clears the pill once the run is submitt
 });
 
 it("restores the drafts when main rejects the annotation", async () => {
-  installBridge(async (input) => ({ status: "submission-failed", acknowledgement: "rejected", message: "Annotation unavailable", referenceIssue: { code: "annotation_source_missing", kind: "annotation", index: 0 } }), true);
+  installBridge(
+    async (input) => ({
+      status: "submission-failed",
+      acknowledgement: "rejected",
+      message: "Annotation unavailable",
+      referenceIssue: { code: "annotation_source_missing", kind: "annotation", index: 0 },
+    }),
+    true,
+  );
   renderApp();
   await selectSession("annotated-a");
   await annotateReply("annotated-a");
@@ -157,7 +241,9 @@ it("restores the drafts when main rejects the annotation", async () => {
 
 it("restores the drafts when sending throws", async () => {
   const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
-  installBridge(async () => { throw new Error("ipc failed"); }, true);
+  installBridge(async () => {
+    throw new Error("ipc failed");
+  }, true);
   renderApp();
   await selectSession("annotated-a");
   await annotateReply("annotated-a");
@@ -175,13 +261,17 @@ it("keeps annotation drafts per session", async () => {
   expect(annotationPill(1)).toBeVisible();
 
   await selectSession("annotated-b");
-  await waitFor(() => expect(document.querySelector('[data-assistant-message-id="v2-1"]')).toHaveTextContent("annotated-b"));
+  await waitFor(() =>
+    expect(document.querySelector('[data-assistant-message-id="v2-1"]')).toHaveTextContent("annotated-b"),
+  );
   expect(annotationPill(1)).toBeNull();
   await annotateReply("annotated-b", "第一段");
   await annotateReply("annotated-b", "正文");
   expect(annotationPill(2)).toBeVisible();
 
   await selectSession("annotated-a");
-  await waitFor(() => expect(document.querySelector('[data-assistant-message-id="v2-1"]')).toHaveTextContent("annotated-a"));
+  await waitFor(() =>
+    expect(document.querySelector('[data-assistant-message-id="v2-1"]')).toHaveTextContent("annotated-a"),
+  );
   expect(annotationPill(1)).toBeVisible();
 });

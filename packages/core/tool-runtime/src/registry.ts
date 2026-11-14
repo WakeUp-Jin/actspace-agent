@@ -70,13 +70,22 @@ export class ToolRegistry {
   capture(name: string): CapturedToolRegistration {
     const registration = this.#byName.get(name);
     if (registration === undefined || registration.leaseOwner.state !== "active") {
-      throw new ToolRuntimeError({ code: "TOOL_NOT_FOUND", message: `Tool ${name} is not active.`, retryable: false, phase: "prepare" });
+      throw new ToolRuntimeError({
+        code: "TOOL_NOT_FOUND",
+        message: `Tool ${name} is not active.`,
+        retryable: false,
+        phase: "prepare",
+      });
     }
     return registration;
   }
 
   listDefinitions(): readonly NormalizedToolDefinition[] {
-    return Object.freeze([...this.#byName.values()].map((item) => item.definition).sort((left, right) => left.name.localeCompare(right.name)));
+    return Object.freeze(
+      [...this.#byName.values()]
+        .map((item) => item.definition)
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    );
   }
 }
 

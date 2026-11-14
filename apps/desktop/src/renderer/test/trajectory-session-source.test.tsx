@@ -21,7 +21,10 @@ vi.mock("../session/desktop-session-bridge", async (importOriginal) => {
       bridge.watch = (sessionId: string) => {
         watches.calls.push(sessionId);
         const dispose = watch(sessionId);
-        return () => { watches.disposed.push(sessionId); dispose(); };
+        return () => {
+          watches.disposed.push(sessionId);
+          dispose();
+        };
       };
       return bridge;
     },
@@ -29,8 +32,15 @@ vi.mock("../session/desktop-session-bridge", async (importOriginal) => {
 });
 
 const envelope = (seq: number, type: string, data: Record<string, unknown>): SessionEventEnvelopeV1 => ({
-  recordKind: "event", seq, type, eventVersion: 1, criticality: "ignorable", time: `2026-10-21T00:00:0${seq}.000Z`,
-  source: { ownerPluginId: "@actspace/core" }, data: data as SessionEventEnvelopeV1["data"], surface: null,
+  recordKind: "event",
+  seq,
+  type,
+  eventVersion: 1,
+  criticality: "ignorable",
+  time: `2026-10-21T00:00:0${seq}.000Z`,
+  source: { ownerPluginId: "@actspace/core" },
+  data: data as SessionEventEnvelopeV1["data"],
+  surface: null,
   provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
 });
 const sessionEvents = (tool: string) => [
@@ -41,17 +51,20 @@ const sessionEvents = (tool: string) => [
 
 describe("TrajectoryView with an explicit session", () => {
   it("shows the watched child session instead of the selected one and releases it on unmount", async () => {
-    watches.calls.length = 0; watches.disposed.length = 0;
+    watches.calls.length = 0;
+    watches.disposed.length = 0;
     setupBridge({
       "sessions.getProjectionSnapshot": async ({ sessionId }: { sessionId: string }) =>
         projectionFixture(sessionId, 2, sessionEvents(sessionId === "child" ? "grep" : "agent")),
       "events.sessionLive": () => () => undefined,
     });
-    const view = render(<TooltipProvider>
-      <SessionProjectionProvider sessionId="parent">
-        <TrajectoryView sessionId="child" variant="panel" />
-      </SessionProjectionProvider>
-    </TooltipProvider>);
+    const view = render(
+      <TooltipProvider>
+        <SessionProjectionProvider sessionId="parent">
+          <TrajectoryView sessionId="child" variant="panel" />
+        </SessionProjectionProvider>
+      </TooltipProvider>,
+    );
 
     expect(await screen.findByRole("row", { name: /工具，grep/ })).toBeInTheDocument();
     expect(screen.queryByRole("row", { name: /工具，agent/ })).not.toBeInTheDocument();
@@ -63,16 +76,43 @@ describe("TrajectoryView with an explicit session", () => {
 
   it("leaves Context-panel jumps to the main trajectory", async () => {
     const snapshot: RuntimeTrajectorySnapshot = {
-      kind: "trajectory", schemaVersion: 1, sessionId: "child", throughJournalSeq: 1,
+      kind: "trajectory",
+      schemaVersion: 1,
+      sessionId: "child",
+      throughJournalSeq: 1,
       nodes: [
-        { key: "child:0", sessionId: "child", eventSeq: 0, eventType: "turn/start", time: "2026-10-21T00:00:00.000Z", kind: "turn", state: "started", callId: null, data: {} },
-        { key: "child:1", sessionId: "child", eventSeq: 1, eventType: "tool/call", time: "2026-10-21T00:00:01.000Z", kind: "tool", state: "observed", callId: "call-1", data: { callId: "call-1", name: "grep" } },
+        {
+          key: "child:0",
+          sessionId: "child",
+          eventSeq: 0,
+          eventType: "turn/start",
+          time: "2026-10-21T00:00:00.000Z",
+          kind: "turn",
+          state: "started",
+          callId: null,
+          data: {},
+        },
+        {
+          key: "child:1",
+          sessionId: "child",
+          eventSeq: 1,
+          eventType: "tool/call",
+          time: "2026-10-21T00:00:01.000Z",
+          kind: "tool",
+          state: "observed",
+          callId: "call-1",
+          data: { callId: "call-1", name: "grep" },
+        },
       ],
     };
-    render(<TooltipProvider><TrajectoryNavigationProvider onShowTrajectory={() => undefined}>
-      <NavigationProbe />
-      <TrajectoryView snapshot={snapshot} variant="panel" />
-    </TrajectoryNavigationProvider></TooltipProvider>);
+    render(
+      <TooltipProvider>
+        <TrajectoryNavigationProvider onShowTrajectory={() => undefined}>
+          <NavigationProbe />
+          <TrajectoryView snapshot={snapshot} variant="panel" />
+        </TrajectoryNavigationProvider>
+      </TooltipProvider>,
+    );
 
     await userEvent.click(screen.getByRole("button", { name: "reveal" }));
     await waitFor(() => expect(screen.getByTestId("pending")).toHaveTextContent("1"));
@@ -83,16 +123,22 @@ describe("TrajectoryView with an explicit session", () => {
 
 function NavigationProbe() {
   const navigation = useTrajectoryNavigation();
-  return <>
-    <button type="button" onClick={() => navigation?.revealInTrajectory({ callId: "call-1" })}>reveal</button>
-    <span data-testid="pending">{navigation?.pending?.seq ?? "none"}</span>
-  </>;
+  return (
+    <>
+      <button type="button" onClick={() => navigation?.revealInTrajectory({ callId: "call-1" })}>
+        reveal
+      </button>
+      <span data-testid="pending">{navigation?.pending?.seq ?? "none"}</span>
+    </>
+  );
 }
 
 describe("TrajectoryView child session arriving late", () => {
   it("re-renders when the child session loads after the idle parent", async () => {
     let releaseChild: (() => void) | null = null;
-    const childReady = new Promise<void>((resolve) => { releaseChild = resolve; });
+    const childReady = new Promise<void>((resolve) => {
+      releaseChild = resolve;
+    });
     setupBridge({
       "sessions.getProjectionSnapshot": async ({ sessionId }: { sessionId: string }) => {
         if (sessionId === "child") await childReady;
@@ -100,11 +146,13 @@ describe("TrajectoryView child session arriving late", () => {
       },
       "events.sessionLive": () => () => undefined,
     });
-    render(<TooltipProvider>
-      <SessionProjectionProvider sessionId="parent">
-        <TrajectoryView sessionId="child" variant="panel" />
-      </SessionProjectionProvider>
-    </TooltipProvider>);
+    render(
+      <TooltipProvider>
+        <SessionProjectionProvider sessionId="parent">
+          <TrajectoryView sessionId="child" variant="panel" />
+        </SessionProjectionProvider>
+      </TooltipProvider>,
+    );
     // 父会话先就绪：子会话还没到时是加载中，不是「暂无轨迹」。
     expect(await screen.findByText("正在加载轨迹…")).toBeInTheDocument();
     expect(screen.queryByText("当前会话暂无可展示的 Agent 轨迹。")).toBeNull();

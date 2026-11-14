@@ -1,4 +1,10 @@
-import { ACTSPACE_SERVICE_IDS, containNotification, getService, serviceView, type CordisContext } from "@actspace/cordis-adapter";
+import {
+  ACTSPACE_SERVICE_IDS,
+  containNotification,
+  getService,
+  serviceView,
+  type CordisContext,
+} from "@actspace/cordis-adapter";
 import { PROMPT_HOST_PORT } from "@actspace/prompt";
 import type { SessionHeaderV1 } from "@actspace/session-journal";
 import { PLUGIN_ID, PROMPT_ID, SIDE_CHAT_SECTION } from "./prompt.js";
@@ -15,12 +21,21 @@ export class SideChatService {
   private readonly removeListeners: Array<() => void> = [];
 
   constructor(private readonly ctx: CordisContext) {
-    const created = ctx.on?.("session/created", containNotification(ctx, (payload: { sessionId: string }) => this.attach(payload.sessionId)));
-    const disposed = ctx.on?.("session/disposed", containNotification(ctx, (payload: { sessionId: string }) => this.detach(payload.sessionId)));
-    for (const remove of [created, disposed]) if (typeof remove === "function") this.removeListeners.push(remove as () => void);
+    const created = ctx.on?.(
+      "session/created",
+      containNotification(ctx, (payload: { sessionId: string }) => this.attach(payload.sessionId)),
+    );
+    const disposed = ctx.on?.(
+      "session/disposed",
+      containNotification(ctx, (payload: { sessionId: string }) => this.detach(payload.sessionId)),
+    );
+    for (const remove of [created, disposed])
+      if (typeof remove === "function") this.removeListeners.push(remove as () => void);
   }
 
-  isAttached(sessionId: string): boolean { return this.registrations.has(sessionId); }
+  isAttached(sessionId: string): boolean {
+    return this.registrations.has(sessionId);
+  }
 
   private attach(sessionId: string): void {
     if (this.registrations.has(sessionId)) return;
@@ -28,10 +43,24 @@ export class SideChatService {
     if (session?.header.lineage?.origin !== "side-chat") return;
     const extensions = getService(this.ctx, PROMPT_HOST_PORT)?.extensions;
     if (!extensions) throw new Error("Side chat prompt requires actspace.host.prompt extensions.");
-    this.registrations.set(sessionId, extensions.registerMainSession(sessionId, {
-      id: PROMPT_ID, owner: PLUGIN_ID, order: 100, criticality: "optional", fields: ["system"],
-      get: (_context, write) => { write({ system: { sections: [{ id: PROMPT_ID, owner: PLUGIN_ID, order: 4900, content: SIDE_CHAT_SECTION }], modelFacts: [] } }); },
-    }));
+    this.registrations.set(
+      sessionId,
+      extensions.registerMainSession(sessionId, {
+        id: PROMPT_ID,
+        owner: PLUGIN_ID,
+        order: 100,
+        criticality: "optional",
+        fields: ["system"],
+        get: (_context, write) => {
+          write({
+            system: {
+              sections: [{ id: PROMPT_ID, owner: PLUGIN_ID, order: 4900, content: SIDE_CHAT_SECTION }],
+              modelFacts: [],
+            },
+          });
+        },
+      }),
+    );
   }
 
   private detach(sessionId: string): void {

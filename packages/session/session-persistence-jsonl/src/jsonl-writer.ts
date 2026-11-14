@@ -5,11 +5,22 @@ import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHeaderV1 } from "@actspace/session-journal";
 import { SessionError } from "@actspace/session-journal";
 
-export type JsonlWriteOperation = "open" | "header-write" | "append-write" | "file-fsync" | "truncate" | "directory-fsync" | "rename";
+export type JsonlWriteOperation =
+  | "open"
+  | "header-write"
+  | "append-write"
+  | "file-fsync"
+  | "truncate"
+  | "directory-fsync"
+  | "rename";
 
 export type JsonlWriterHooks = {
   readonly before?: (operation: JsonlWriteOperation) => void | Promise<void>;
-  readonly afterWriteChunk?: (operation: "header-write" | "append-write", writtenBytes: number, totalBytes: number) => void | Promise<void>;
+  readonly afterWriteChunk?: (
+    operation: "header-write" | "append-write",
+    writtenBytes: number,
+    totalBytes: number,
+  ) => void | Promise<void>;
   readonly maxWriteBytes?: number;
 };
 
@@ -29,7 +40,11 @@ export class JsonlSessionWriter {
     this.#position = position;
   }
 
-  static async create(journalPath: string, header: SessionHeaderV1, hooks: JsonlWriterHooks = {}): Promise<JsonlSessionWriter> {
+  static async create(
+    journalPath: string,
+    header: SessionHeaderV1,
+    hooks: JsonlWriterHooks = {},
+  ): Promise<JsonlSessionWriter> {
     const directory = dirname(journalPath);
     await mkdir(directory, { recursive: true });
     const temporaryPath = join(directory, `.journal-${randomUUID()}.tmp`);
@@ -42,10 +57,13 @@ export class JsonlSessionWriter {
       await hooks.before?.("file-fsync");
       await temporary.sync();
       await temporary.close();
-      const existing = await stat(journalPath).then(() => true, (error: unknown) => {
-        if (errorCode(error) === "ENOENT") return false;
-        throw error;
-      });
+      const existing = await stat(journalPath).then(
+        () => true,
+        (error: unknown) => {
+          if (errorCode(error) === "ENOENT") return false;
+          throw error;
+        },
+      );
       if (existing) throw new SessionError("INVALID_HEADER", `Session Journal already exists at ${journalPath}.`);
       await hooks.before?.("rename");
       await rename(temporaryPath, journalPath);
@@ -89,7 +107,10 @@ export class JsonlSessionWriter {
       } catch (rollbackError) {
         this.#corrupt = true;
         await this.close().catch(() => undefined);
-        throw new SessionError("SESSION_CORRUPT", "Append failed and the Journal length could not be restored.", { error, rollbackError });
+        throw new SessionError("SESSION_CORRUPT", "Append failed and the Journal length could not be restored.", {
+          error,
+          rollbackError,
+        });
       }
       throw new SessionError("SESSION_DURABILITY_FAILED", "Journal append failed before durability.", error);
     }
@@ -142,5 +163,7 @@ async function syncDirectory(directory: string, hooks: JsonlWriterHooks): Promis
 }
 
 function errorCode(error: unknown): string | undefined {
-  return error !== null && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code) : undefined;
+  return error !== null && typeof error === "object" && "code" in error
+    ? String((error as { code?: unknown }).code)
+    : undefined;
 }

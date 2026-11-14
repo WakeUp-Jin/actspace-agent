@@ -22,7 +22,7 @@ export function devStartView(): SidebarView | null {
 
 export function devStartSettingsSection(): SettingsSectionId | null {
   const mock = params()?.get("mock");
-  return mock ? START_SECTION[mock] ?? null : null;
+  return mock ? (START_SECTION[mock] ?? null) : null;
 }
 
 /**

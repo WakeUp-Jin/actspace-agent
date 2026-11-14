@@ -69,7 +69,9 @@ export function collectHeadings(state: EditorState, tree: SyntaxTree = syntaxTre
 /** 完整解析一遍（给 50ms 预算）再取大纲；超时就用已有的部分语法树。 */
 export function getOutline(state: EditorState): OutlineItem[] {
   const tree = ensureSyntaxTree(state, state.doc.length, 50) ?? syntaxTree(state);
-  return collectHeadings(state, tree).filter((heading): heading is OutlineItem => heading.level === 2 || heading.level === 3);
+  return collectHeadings(state, tree).filter(
+    (heading): heading is OutlineItem => heading.level === 2 || heading.level === 3,
+  );
 }
 
 export function findHeadingBySlug(state: EditorState, slug: string): HeadingInfo | null {
@@ -78,5 +80,11 @@ export function findHeadingBySlug(state: EditorState, slug: string): HeadingInfo
 }
 
 export function sameOutline(a: readonly OutlineItem[], b: readonly OutlineItem[]): boolean {
-  return a.length === b.length && a.every((item, i) => item.level === b[i].level && item.text === b[i].text && item.line === b[i].line && item.from === b[i].from);
+  return (
+    a.length === b.length &&
+    a.every(
+      (item, i) =>
+        item.level === b[i].level && item.text === b[i].text && item.line === b[i].line && item.from === b[i].from,
+    )
+  );
 }

@@ -4,7 +4,13 @@ import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 
 export function isActiveLocalUpdatePhase(phase: LocalUpdateProgressPhase): boolean {
-  return phase === "starting" || phase === "building" || phase === "ready_to_replace" || phase === "waiting_for_exit" || phase === "replacing";
+  return (
+    phase === "starting" ||
+    phase === "building" ||
+    phase === "ready_to_replace" ||
+    phase === "waiting_for_exit" ||
+    phase === "replacing"
+  );
 }
 
 const LOCAL_UPDATE_STEPS: { phase: LocalUpdateProgressPhase; label: string }[] = [
@@ -33,13 +39,7 @@ function formatLocalUpdateTime(timestamp: string | undefined): string | null {
   }).format(date);
 }
 
-export function LocalUpdateProgressDialog({
-  state,
-  onClose,
-}: {
-  state: LocalUpdateState;
-  onClose: () => void;
-}) {
+export function LocalUpdateProgressDialog({ state, onClose }: { state: LocalUpdateState; onClose: () => void }) {
   const progress = state.progress;
   const phase = progress.phase;
   const isFailed = phase === "failed";
@@ -53,7 +53,12 @@ export function LocalUpdateProgressDialog({
 
   return (
     // 更新进行中不能关闭（Esc 和点遮罩都忽略），结束或失败后才能关。
-    <Dialog open onOpenChange={(open) => { if (!open && !isActive) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !isActive) onClose();
+      }}
+    >
       <DialogContent size="md" surface="raised" backdrop="overlay" className="p-5">
         <DialogTitle className="sr-only">本地更新进度</DialogTitle>
         <div className="flex items-start justify-between gap-4">
@@ -96,7 +101,9 @@ export function LocalUpdateProgressDialog({
           aria-label="本地更新进度"
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={isFailed ? 100 : Math.round(Math.min(100, Math.max(0, (completedSteps / LOCAL_UPDATE_STEPS.length) * 100)))}
+          aria-valuenow={
+            isFailed ? 100 : Math.round(Math.min(100, Math.max(0, (completedSteps / LOCAL_UPDATE_STEPS.length) * 100)))
+          }
         >
           <div
             className={[

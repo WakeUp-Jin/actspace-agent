@@ -1,6 +1,13 @@
 import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
 import { resolveModelPricing } from "@actspace/shared";
-import type { LlmAdapter, LlmAdapterDispatchInput, LlmAdapterPrepareInput, LlmPreparedAdapterCall, LlmStreamSource, LlmStreamEvent } from "@actspace/llm-service";
+import type {
+  LlmAdapter,
+  LlmAdapterDispatchInput,
+  LlmAdapterPrepareInput,
+  LlmPreparedAdapterCall,
+  LlmStreamSource,
+  LlmStreamEvent,
+} from "@actspace/llm-service";
 import type { PiAiWireRoute } from "@actspace/llm-pi-ai";
 import { DeepSeekFileUploader, PiAiAdapter } from "@actspace/llm-pi-ai";
 import { ProviderProxyPool } from "@actspace/llm-service";
@@ -17,13 +24,29 @@ export class NodeLlmAdapter implements LlmAdapter {
   readonly adapterVersion = "actspace.cli-pi-ai.v3";
   readonly #proxies = new ProviderProxyPool();
   readonly #deepSeekFiles = new DeepSeekFileUploader();
-  constructor(private readonly options: { readonly mock: boolean; readonly model?: string; readonly provider: NodePiAiProvider; readonly readArtifact: (sessionId: string, artifactId: string) => Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }> }) {}
+  constructor(
+    private readonly options: {
+      readonly mock: boolean;
+      readonly model?: string;
+      readonly provider: NodePiAiProvider;
+      readonly readArtifact: (
+        sessionId: string,
+        artifactId: string,
+      ) => Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }>;
+    },
+  ) {}
 
   prepare(input: LlmAdapterPrepareInput): LlmPreparedAdapterCall {
-    if (this.options.mock) return { request: input.request, dispatch: ({ signal }) => Promise.resolve(mockStream(signal)) };
+    if (this.options.mock)
+      return { request: input.request, dispatch: ({ signal }) => Promise.resolve(mockStream(signal)) };
     const apiModel = this.options.model ?? input.request.model;
     const engineOptions = {
-      pricing: resolveModelPricing(BUILTIN_MODEL_CATALOG, { providerId: this.options.provider.providerId, apiModel, modelKey: input.request.model, baseUrl: this.options.provider.baseUrl }),
+      pricing: resolveModelPricing(BUILTIN_MODEL_CATALOG, {
+        providerId: this.options.provider.providerId,
+        apiModel,
+        modelKey: input.request.model,
+        baseUrl: this.options.provider.baseUrl,
+      }),
       route: this.options.provider.route,
       providerId: this.options.provider.providerId,
       modelId: this.options.model,
@@ -34,12 +57,16 @@ export class NodeLlmAdapter implements LlmAdapter {
       },
       deepSeekFiles: this.#deepSeekFiles,
     } as const;
-    const adapter = new PiAiAdapter({
-      wire: { ...engineOptions, proxies: this.#proxies },
-      legacyProxy: { ...engineOptions, proxies: this.#proxies },
-    }, this.adapterVersion);
+    const adapter = new PiAiAdapter(
+      {
+        wire: { ...engineOptions, proxies: this.#proxies },
+        legacyProxy: { ...engineOptions, proxies: this.#proxies },
+      },
+      this.adapterVersion,
+    );
     const request = Object.freeze({ ...input.request, model: apiModel });
-    const dispatchBound = (requestForAttempt: typeof request, dispatchInput: LlmAdapterDispatchInput) => adapter.dispatch({
+    const dispatchBound = (requestForAttempt: typeof request, dispatchInput: LlmAdapterDispatchInput) =>
+      adapter.dispatch({
         ...dispatchInput,
         request: requestForAttempt,
         credential: {
@@ -52,25 +79,49 @@ export class NodeLlmAdapter implements LlmAdapter {
       request,
       dispatch: (dispatchInput) => dispatchBound(request, dispatchInput),
       forAttempt: (attemptRequest) => {
-        const fixedRequest = Object.freeze({ ...attemptRequest, model: request.model, contextWindow: request.contextWindow });
+        const fixedRequest = Object.freeze({
+          ...attemptRequest,
+          model: request.model,
+          contextWindow: request.contextWindow,
+        });
         return { request: fixedRequest, dispatch: (dispatchInput) => dispatchBound(fixedRequest, dispatchInput) };
       },
     };
   }
 
-  async dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> { return this.prepare({ request: input.request, signal: input.signal }).dispatch(input); }
+  async dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
+    return this.prepare({ request: input.request, signal: input.signal }).dispatch(input);
+  }
 
-  async dispose(): Promise<void> { this.#deepSeekFiles.clear(); await this.#proxies.dispose(); }
+  async dispose(): Promise<void> {
+    this.#deepSeekFiles.clear();
+    await this.#proxies.dispose();
+  }
 }
 
 async function* mockStream(signal: AbortSignal): AsyncGenerator<LlmStreamEvent> {
-  if (!await cancellableDelay(100, signal)) {
+  if (!(await cancellableDelay(100, signal))) {
     yield { type: "aborted", reason: "Mock LLM request aborted." };
     return;
   }
   const text = "Mock ActSpace Agent response.";
   yield { type: "text-delta", text };
-  yield { type: "done", stopReason: "stop", usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, cost: 0, costCurrency: "USD", source: "estimated", costProvenance: { version: 1, basis: "estimated", reason: "mock", pricingSnapshot: null } }, content: [{ type: "text", text }] };
+  yield {
+    type: "done",
+    stopReason: "stop",
+    usage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      reasoningTokens: 0,
+      cost: 0,
+      costCurrency: "USD",
+      source: "estimated",
+      costProvenance: { version: 1, basis: "estimated", reason: "mock", pricingSnapshot: null },
+    },
+    content: [{ type: "text", text }],
+  };
 }
 
 function cancellableDelay(delayMs: number, signal: AbortSignal): Promise<boolean> {

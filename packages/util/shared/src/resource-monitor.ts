@@ -6,7 +6,14 @@
 /** 固定分组，顺序即界面顺序。`monitor`（悬浮窗自身）不计入合计。 */
 export type ResourceGroupId = "main" | "renderer" | "gpu" | "utility" | "agent" | "monitor";
 
-export const RESOURCE_GROUP_ORDER: readonly ResourceGroupId[] = ["main", "renderer", "gpu", "utility", "agent", "monitor"];
+export const RESOURCE_GROUP_ORDER: readonly ResourceGroupId[] = [
+  "main",
+  "renderer",
+  "gpu",
+  "utility",
+  "agent",
+  "monitor",
+];
 
 export interface ResourceProcessRow {
   readonly pid: number;

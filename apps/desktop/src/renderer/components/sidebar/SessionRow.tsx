@@ -35,15 +35,16 @@ const SESSION_ROW_DRAGGING_CLASS = "opacity-40";
 const SESSION_ROW_MARKER_CLASS = "relative flex h-4 w-4 flex-none items-center justify-center";
 const SESSION_ROW_TITLE_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-act-sm font-medium";
 const SESSION_ROW_UNREAD_TITLE_CLASS = "font-semibold text-text-main";
-const SESSION_ROW_WORKSPACE_CLASS = "session-row-workspace max-w-[34%] flex-none overflow-hidden text-ellipsis whitespace-nowrap text-act-xxs text-text-faint";
+const SESSION_ROW_WORKSPACE_CLASS =
+  "session-row-workspace max-w-[34%] flex-none overflow-hidden text-ellipsis whitespace-nowrap text-act-xxs text-text-faint";
 const SESSION_ROW_END_CLASS = "flex flex-none items-center justify-end";
 // 悬停、键盘聚焦或菜单打开时尾部文字让位给操作按钮。
-const SESSION_ROW_END_HIDE_CLASS = "group-hover/session-row:hidden group-has-[:focus-visible]/session-row:hidden group-[.is-menu-open]/session-row:hidden";
+const SESSION_ROW_END_HIDE_CLASS =
+  "group-hover/session-row:hidden group-has-[:focus-visible]/session-row:hidden group-[.is-menu-open]/session-row:hidden";
 const SESSION_ROW_TIME_CLASS = `min-w-[22px] whitespace-nowrap text-right text-act-xxs text-text-faint ${SESSION_ROW_END_HIDE_CLASS}`;
 const SESSION_ROW_WAITING_CLASS = "text-warning";
 const SESSION_ROW_ARCHIVED_TAG_CLASS = `rounded-act-xs bg-surface-subtle px-1 text-act-xxs text-text-faint ${SESSION_ROW_END_HIDE_CLASS}`;
-const SESSION_ROW_MAIN_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} flex min-w-0 items-baseline gap-1.5 p-0 text-left text-text-muted transition-colors duration-(--motion-fast) ease-in-out group-hover/session-row:text-text-main group-[.is-active]/session-row:text-text-main`;
+const SESSION_ROW_MAIN_CLASS = `${SIDEBAR_BUTTON_RESET_CLASS} flex min-w-0 items-baseline gap-1.5 p-0 text-left text-text-muted transition-colors duration-(--motion-fast) ease-in-out group-hover/session-row:text-text-main group-[.is-active]/session-row:text-text-main`;
 const SESSION_ROW_MAIN_ARCHIVED_CLASS = "text-text-faint";
 const SESSION_ROW_RENAME_INPUT_CLASS =
   "min-w-0 flex-1 rounded-act-sm border border-focus-ring bg-surface-raised px-1.5 py-0.5 text-act-sm font-medium text-text-main outline-none ring-2 ring-focus-ring/20";
@@ -59,7 +60,17 @@ const SESSION_STATUS_DOT_CLASS = "session-status-dot block transition-opacity du
 // 点击状态点弹出的说明（16 T16b 改用 ui/Popover）。IconButton 自带 Tooltip，不能套 PopoverTrigger，所以用 PopoverAnchor 定位；
 // 点按钮本身不算点外面，否则按下时关闭、松开时又被 onClick 打开。打开期间行的悬停提示由 SessionRow 收起（和右键菜单一样），
 // 否则提示会盖在说明上面，Esc 先关掉的是提示。
-function SessionStatusButton({ status, dotClass, open, onOpenChange: setOpen }: { status: SessionUiStatusKind; dotClass: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+function SessionStatusButton({
+  status,
+  dotClass,
+  open,
+  onOpenChange: setOpen,
+}: {
+  status: SessionUiStatusKind;
+  dotClass: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const meta = SESSION_STATUS_META[status];
 
@@ -98,7 +109,6 @@ function SessionStatusButton({ status, dotClass, open, onOpenChange: setOpen }: 
     </Popover>
   );
 }
-
 
 type SessionRowProps = {
   session: SessionListItem;
@@ -143,9 +153,7 @@ export function SessionRow({
   const archiveDisabled = isActive || !onArchive;
   const archiveLabel = isActive ? "当前会话无法归档" : "归档会话";
   const forkDisabled = isSessionBusy(status) || !onFork;
-  const forkLabel = forkDisabled && onFork
-    ? "请等待当前轮次结束后再分叉"
-    : "分叉会话";
+  const forkLabel = forkDisabled && onFork ? "请等待当前轮次结束后再分叉" : "分叉会话";
   const [menuOpen, setMenuOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -169,7 +177,9 @@ export function SessionRow({
     menuOpen ? "is-menu-open bg-[var(--act-color-hover-overlay)]" : "",
     rowDrag?.isDragging ? SESSION_ROW_DRAGGING_CLASS : "",
     isRenaming ? "is-renaming" : "",
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
   const mainClass = `${SESSION_ROW_MAIN_CLASS} ${archived ? SESSION_ROW_MAIN_ARCHIVED_CLASS : ""}`;
 
   useEffect(() => {
@@ -232,11 +242,13 @@ export function SessionRow({
     }
   };
 
-  const endLabel = archived
-    ? <span className={`session-row-archived-tag ${SESSION_ROW_ARCHIVED_TAG_CLASS}`}>已归档</span>
-    : status === "waiting_approval"
-      ? <span className={`session-row-time ${SESSION_ROW_TIME_CLASS} ${SESSION_ROW_WAITING_CLASS}`}>待审批</span>
-      : <span className={`session-row-time ${SESSION_ROW_TIME_CLASS}`}>{formatRelativeTimeZh(session.updatedAt)}</span>;
+  const endLabel = archived ? (
+    <span className={`session-row-archived-tag ${SESSION_ROW_ARCHIVED_TAG_CLASS}`}>已归档</span>
+  ) : status === "waiting_approval" ? (
+    <span className={`session-row-time ${SESSION_ROW_TIME_CLASS} ${SESSION_ROW_WAITING_CLASS}`}>待审批</span>
+  ) : (
+    <span className={`session-row-time ${SESSION_ROW_TIME_CLASS}`}>{formatRelativeTimeZh(session.updatedAt)}</span>
+  );
 
   return (
     <ContextMenu onOpenChange={setMenuOpen}>
@@ -261,7 +273,12 @@ export function SessionRow({
             >
               <DropIndicator position={rowDrag?.dropPosition ?? null} />
               <span className={`session-row-marker ${SESSION_ROW_MARKER_CLASS}`}>
-                <SessionStatusButton status={status} dotClass={`${SESSION_STATUS_DOT_CLASS} ${statusMeta.dotClass}`} open={statusOpen} onOpenChange={setStatusOpen} />
+                <SessionStatusButton
+                  status={status}
+                  dotClass={`${SESSION_STATUS_DOT_CLASS} ${statusMeta.dotClass}`}
+                  open={statusOpen}
+                  onOpenChange={setStatusOpen}
+                />
               </span>
               {isRenaming ? (
                 <div className={mainClass}>
@@ -285,11 +302,24 @@ export function SessionRow({
                   onDoubleClick={startRename}
                   aria-current={isActive ? "page" : undefined}
                 >
-                  <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS} ${status === "unread" ? SESSION_ROW_UNREAD_TITLE_CLASS : ""}`}>{displayTitle}</span>
+                  <span
+                    className={`session-row-title ${SESSION_ROW_TITLE_CLASS} ${status === "unread" ? SESSION_ROW_UNREAD_TITLE_CLASS : ""}`}
+                  >
+                    {displayTitle}
+                  </span>
                   {workspaceLabel ? <span className={SESSION_ROW_WORKSPACE_CLASS}>{workspaceLabel}</span> : null}
-                  {session.hostName ? <span className="shrink-0 text-act-xxs text-text-faint" title={session.connectionState}>{session.hostName}{session.connectionState !== "connected" ? " · 离线" : ""}</span> : null}
+                  {session.hostName ? (
+                    <span className="shrink-0 text-act-xxs text-text-faint" title={session.connectionState}>
+                      {session.hostName}
+                      {session.connectionState !== "connected" ? " · 离线" : ""}
+                    </span>
+                  ) : null}
                   {session.sideChatCount ? (
-                    <span className="inline-flex shrink-0 items-center gap-0.5 text-act-xxs tabular-nums text-text-faint" aria-label={`${session.sideChatCount} 个侧边对话`} title={`${session.sideChatCount} 个侧边对话`}>
+                    <span
+                      className="inline-flex shrink-0 items-center gap-0.5 text-act-xxs tabular-nums text-text-faint"
+                      aria-label={`${session.sideChatCount} 个侧边对话`}
+                      title={`${session.sideChatCount} 个侧边对话`}
+                    >
                       <GitFork size={11} aria-hidden="true" />
                       {session.sideChatCount}
                     </span>
@@ -319,7 +349,10 @@ export function SessionRow({
                       size="xs"
                       label="取消归档"
                       disabled={!onRestore}
-                      onClick={(event) => { event.stopPropagation(); onRestore?.(); }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRestore?.();
+                      }}
                     >
                       <ArchiveArrowUp size={13} aria-hidden="true" />
                     </IconButton>
@@ -329,7 +362,10 @@ export function SessionRow({
                       size="xs"
                       label={archiveLabel}
                       disabled={archiveDisabled}
-                      onClick={(event) => { event.stopPropagation(); if (!archiveDisabled) onArchive?.(); }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!archiveDisabled) onArchive?.();
+                      }}
                     >
                       <Archive size={13} aria-hidden="true" />
                     </IconButton>
@@ -339,11 +375,12 @@ export function SessionRow({
                       className={`session-row-pin ${session.pinned ? "is-active text-text-main" : ""}`}
                       size="xs"
                       label={session.pinned ? "取消置顶会话" : "置顶会话"}
-                      onClick={(event) => { event.stopPropagation(); onTogglePin(); }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onTogglePin();
+                      }}
                     >
-                      {session.pinned
-                        ? <PinOff size={13} aria-hidden="true" />
-                        : <Pin size={13} aria-hidden="true" />}
+                      {session.pinned ? <PinOff size={13} aria-hidden="true" /> : <Pin size={13} aria-hidden="true" />}
                     </IconButton>
                   ) : null}
                 </div>

@@ -21,14 +21,32 @@ export type SessionTranscript = {
 };
 
 /** durable 记录、live run 和本地块合并成完整消息序列（规则见 transcript.ts）。引用随输入变化，输入不变则不变。 */
-export function useMergedMessages(sessionRecord: SessionRecord | null, live: LiveRunView, compactionFailure: CompactionBlock | null, rewindFromSeq?: number): MessageBlock[] {
+export function useMergedMessages(
+  sessionRecord: SessionRecord | null,
+  live: LiveRunView,
+  compactionFailure: CompactionBlock | null,
+  rewindFromSeq?: number,
+): MessageBlock[] {
   const persistedEvents = sessionRecord?.events ?? EMPTY_EVENTS;
   const { blocks, runId, recovered, isStreaming } = live;
-  return useMemo<MessageBlock[]>(() => mergeTranscript(
-    { blocks: sessionRecord?.messageBlocks, events: persistedEvents },
-    { blocks, runId, recovered },
-    { compactionFailure: compactionFailure ?? undefined, isStreaming, rewindFromSeq },
-  ), [sessionRecord?.messageBlocks, persistedEvents, blocks, runId, recovered, compactionFailure, isStreaming, rewindFromSeq]);
+  return useMemo<MessageBlock[]>(
+    () =>
+      mergeTranscript(
+        { blocks: sessionRecord?.messageBlocks, events: persistedEvents },
+        { blocks, runId, recovered },
+        { compactionFailure: compactionFailure ?? undefined, isStreaming, rewindFromSeq },
+      ),
+    [
+      sessionRecord?.messageBlocks,
+      persistedEvents,
+      blocks,
+      runId,
+      recovered,
+      compactionFailure,
+      isStreaming,
+      rewindFromSeq,
+    ],
+  );
 }
 
 /**
@@ -36,7 +54,11 @@ export function useMergedMessages(sessionRecord: SessionRecord | null, live: Liv
  * cell 只在 useChatSessionRecord 里读取，不进调用方的作用域（理由见 useChatSessionRecord）。
  */
 export function useSessionTranscript(
-  stores: { readonly sessionStore: ClientSessionStore; readonly liveRuns: LiveRunStore; readonly localStore: SessionLocalStore },
+  stores: {
+    readonly sessionStore: ClientSessionStore;
+    readonly liveRuns: LiveRunStore;
+    readonly localStore: SessionLocalStore;
+  },
   sessionId: string | null,
   workspaceRoot: string | undefined,
 ): SessionTranscript {

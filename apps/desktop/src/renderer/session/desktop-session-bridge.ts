@@ -1,5 +1,11 @@
 import { ClientSessionStore } from "@actspace/client/sessions";
-import type { RuntimeDesktopSessionProjection, RuntimeLiveEvent, RuntimeSessionSnapshot, RuntimeSessionProjectionInput, RuntimeSessionObservation } from "@actspace/shared/runtime-v2";
+import type {
+  RuntimeDesktopSessionProjection,
+  RuntimeLiveEvent,
+  RuntimeSessionSnapshot,
+  RuntimeSessionProjectionInput,
+  RuntimeSessionObservation,
+} from "@actspace/shared/runtime-v2";
 
 export type DesktopSessionTransport = {
   readonly inspectSession: (input: RuntimeSessionProjectionInput) => Promise<RuntimeDesktopSessionProjection>;
@@ -23,12 +29,43 @@ export type DesktopSessionBridgeOptions = {
 };
 const REFRESH_RETRY_DELAYS_MS = [1000, 2000, 4000] as const;
 
-export function createDesktopSessionBridge(api: DesktopSessionApi, store = new ClientSessionStore(), options: DesktopSessionBridgeOptions = {}): DesktopSessionBridge {
-  return new DesktopSessionBridge({ ...(api.setObservedSessions ? { reportObserved: api.setObservedSessions } : {}), inspectSession: async input => {
-    if (!api.getSessionObservation) return api.getSessionProjectionSnapshot(input);
-    const observation = await api.getSessionObservation(input);
-    return { kind: "session-projection", schemaVersion: 1, sessionId: observation.sessionId, throughJournalSeq: observation.projection.throughJournalSeq, snapshot: observation.snapshot, values: observation.projection.values, window: observation.window ?? { events: [], fromSeq: observation.projection.throughJournalSeq + 1, throughJournalSeq: observation.projection.throughJournalSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0 }, activeMessageIds: observation.activeMessageIds, deferredToolCalls: observation.deferredToolCalls, watermarks: observation.watermarks };
-  }, ...(api.getSessionObservation ? { observeSession: api.getSessionObservation } : {}), subscribeLive: listener => api.onSessionLiveEvent(({ event }) => listener(event)) }, store, options);
+export function createDesktopSessionBridge(
+  api: DesktopSessionApi,
+  store = new ClientSessionStore(),
+  options: DesktopSessionBridgeOptions = {},
+): DesktopSessionBridge {
+  return new DesktopSessionBridge(
+    {
+      ...(api.setObservedSessions ? { reportObserved: api.setObservedSessions } : {}),
+      inspectSession: async (input) => {
+        if (!api.getSessionObservation) return api.getSessionProjectionSnapshot(input);
+        const observation = await api.getSessionObservation(input);
+        return {
+          kind: "session-projection",
+          schemaVersion: 1,
+          sessionId: observation.sessionId,
+          throughJournalSeq: observation.projection.throughJournalSeq,
+          snapshot: observation.snapshot,
+          values: observation.projection.values,
+          window: observation.window ?? {
+            events: [],
+            fromSeq: observation.projection.throughJournalSeq + 1,
+            throughJournalSeq: observation.projection.throughJournalSeq,
+            beforeSeq: null,
+            turnOffset: 0,
+            requestOffset: 0,
+          },
+          activeMessageIds: observation.activeMessageIds,
+          deferredToolCalls: observation.deferredToolCalls,
+          watermarks: observation.watermarks,
+        };
+      },
+      ...(api.getSessionObservation ? { observeSession: api.getSessionObservation } : {}),
+      subscribeLive: (listener) => api.onSessionLiveEvent(({ event }) => listener(event)),
+    },
+    store,
+    options,
+  );
 }
 
 /** One event window for every target, with independent Host values and live overlays. */
@@ -43,7 +80,11 @@ export class DesktopSessionBridge {
   readonly #retryDelaysMs: readonly number[];
   #unsubscribeStore: (() => void) | undefined;
   #reportedObserved: string | null = null;
-  constructor(private readonly transport: DesktopSessionTransport, readonly store = new ClientSessionStore(), options: DesktopSessionBridgeOptions = {}) {
+  constructor(
+    private readonly transport: DesktopSessionTransport,
+    readonly store = new ClientSessionStore(),
+    options: DesktopSessionBridgeOptions = {},
+  ) {
     this.#retryDelaysMs = options.retryDelaysMs ?? REFRESH_RETRY_DELAYS_MS;
   }
   /** 选中 + 订阅的会话集合变化时上报一次；dispose 不上报，避免重建 bridge 时短暂清空。 */
@@ -56,14 +97,18 @@ export class DesktopSessionBridge {
     const key = sorted.join("\n");
     if (key === this.#reportedObserved) return;
     this.#reportedObserved = key;
-    try { report(sorted); } catch (error) { console.error("Reporting observed Sessions failed", error); }
+    try {
+      report(sorted);
+    } catch (error) {
+      console.error("Reporting observed Sessions failed", error);
+    }
   }
   start(): void {
     this.#disposed = false;
     this.#reportedObserved = null;
     this.#unsubscribeStore ??= this.store.subscribe(() => this.#reportObserved());
     this.#reportObserved();
-    this.#unsubscribeLive ??= this.transport.subscribeLive(event => this.#applyLive(event));
+    this.#unsubscribeLive ??= this.transport.subscribeLive((event) => this.#applyLive(event));
   }
   #applyLive(event: RuntimeLiveEvent): void {
     const type = event.update?.event.type;
@@ -72,8 +117,16 @@ export class DesktopSessionBridge {
     if (type === "session/rewound" && !this.store.isResetting(event.sessionId)) this.store.reset(event.sessionId);
     const applied = this.store.applyLiveEvent(event);
     if (this.store.selectedSessionId !== event.sessionId && !this.#watched.has(event.sessionId)) return;
-    if (!applied || event.kind === "resync-required" || type === "compaction/end" || type === "recovery/end" || type === "surface/replaced" || type === "session/rewound") {
-      this.#pendingRefresh.add(event.sessionId); this.#refresh(event.sessionId);
+    if (
+      !applied ||
+      event.kind === "resync-required" ||
+      type === "compaction/end" ||
+      type === "recovery/end" ||
+      type === "surface/replaced" ||
+      type === "session/rewound"
+    ) {
+      this.#pendingRefresh.add(event.sessionId);
+      this.#refresh(event.sessionId);
     }
   }
   async open(sessionId: string): Promise<RuntimeSessionSnapshot> {
@@ -93,19 +146,25 @@ export class DesktopSessionBridge {
     return () => {
       const count = (this.#watched.get(sessionId) ?? 1) - 1;
       if (count > 0) this.#watched.set(sessionId, count);
-      else { this.#watched.delete(sessionId); this.#pendingRefresh.delete(sessionId); this.#reportObserved(); }
+      else {
+        this.#watched.delete(sessionId);
+        this.#pendingRefresh.delete(sessionId);
+        this.#reportObserved();
+      }
     };
   }
   /** Reload a Session whose Journal was rewound; the window that asked for the rewind calls this once it is accepted. */
   reset(sessionId: string): Promise<void> {
     if (this.#disposed) return Promise.resolve();
     this.store.reset(sessionId);
-    this.#pendingRefresh.add(sessionId); this.#refresh(sessionId);
+    this.#pendingRefresh.add(sessionId);
+    this.#refresh(sessionId);
     return this.#refreshes.get(sessionId) ?? Promise.resolve();
   }
   refreshRelated(sessionId: string): Promise<void> {
     if (!this.#watched.has(sessionId)) return Promise.resolve();
-    this.#pendingRefresh.add(sessionId); this.#refresh(sessionId);
+    this.#pendingRefresh.add(sessionId);
+    this.#refresh(sessionId);
     return this.#refreshes.get(sessionId) ?? Promise.resolve();
   }
   loadEarlierHistory(sessionId: string): Promise<void> {
@@ -114,31 +173,46 @@ export class DesktopSessionBridge {
     const beforeSeq = this.store.get(sessionId).window?.beforeSeq;
     if (beforeSeq == null || this.#disposed) return Promise.resolve();
     const generation = this.store.get(sessionId).requestGeneration;
-    const job = this.#load({ sessionId, beforeSeq }, generation).then(() => undefined).finally(() => this.#historyLoads.delete(sessionId));
-    this.#historyLoads.set(sessionId, job); return job;
+    const job = this.#load({ sessionId, beforeSeq }, generation)
+      .then(() => undefined)
+      .finally(() => this.#historyLoads.delete(sessionId));
+    this.#historyLoads.set(sessionId, job);
+    return job;
   }
   #refresh(sessionId: string): void {
     if (this.#refreshes.has(sessionId)) return;
-    const current = () => !this.#disposed && (this.store.selectedSessionId === sessionId || this.#watched.has(sessionId));
+    const current = () =>
+      !this.#disposed && (this.store.selectedSessionId === sessionId || this.#watched.has(sessionId));
     const job = (async () => {
       while (this.#pendingRefresh.delete(sessionId) && current()) {
         // 失败时 #load 已经把错误写进 cell；按退避重试，成功的 applyEnvelope 会清掉错误。
         for (let attempt = 0; ; attempt++) {
-          try { await this.#load({ sessionId }, this.store.get(sessionId).requestGeneration); break; }
-          catch (error) {
+          try {
+            await this.#load({ sessionId }, this.store.get(sessionId).requestGeneration);
+            break;
+          } catch (error) {
             const delay = this.#retryDelaysMs[attempt];
-            if (delay === undefined) { console.error("Session refresh failed after retries", error); return; }
+            if (delay === undefined) {
+              console.error("Session refresh failed after retries", error);
+              return;
+            }
             await this.#wait(delay);
             if (!current()) return;
           }
         }
       }
-    })().finally(() => { this.#refreshes.delete(sessionId); if (this.#pendingRefresh.has(sessionId)) this.#refresh(sessionId); });
+    })().finally(() => {
+      this.#refreshes.delete(sessionId);
+      if (this.#pendingRefresh.has(sessionId)) this.#refresh(sessionId);
+    });
     this.#refreshes.set(sessionId, job);
   }
   #wait(ms: number): Promise<void> {
     return new Promise((resolve) => {
-      const timer = setTimeout(() => { this.#retryTimers.delete(timer); resolve(); }, ms);
+      const timer = setTimeout(() => {
+        this.#retryTimers.delete(timer);
+        resolve();
+      }, ms);
       this.#retryTimers.set(timer, resolve);
     });
   }
@@ -148,13 +222,24 @@ export class DesktopSessionBridge {
       if (envelope.sessionId !== input.sessionId) throw new Error("Session projection identity mismatch.");
       if (!this.#disposed) this.store.applyEnvelope(envelope, generation);
       return envelope.snapshot;
-    } catch (error) { this.store.markError(input.sessionId, error, generation); throw error; }
+    } catch (error) {
+      this.store.markError(input.sessionId, error, generation);
+      throw error;
+    }
   }
   dispose(): void {
     this.#watched.clear();
-    this.#disposed = true; this.#unsubscribeLive?.(); this.#unsubscribeLive = undefined; this.#unsubscribeStore?.(); this.#unsubscribeStore = undefined; this.#pendingRefresh.clear();
+    this.#disposed = true;
+    this.#unsubscribeLive?.();
+    this.#unsubscribeLive = undefined;
+    this.#unsubscribeStore?.();
+    this.#unsubscribeStore = undefined;
+    this.#pendingRefresh.clear();
     // 等待中的重试立即结束，循环看到 disposed 后退出。
-    for (const [timer, resolve] of this.#retryTimers) { clearTimeout(timer); resolve(); }
+    for (const [timer, resolve] of this.#retryTimers) {
+      clearTimeout(timer);
+      resolve();
+    }
     this.#retryTimers.clear();
   }
 }

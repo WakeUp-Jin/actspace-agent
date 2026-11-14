@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
-import { isWorkspaceFileTab, useRightPanel, type WorkspaceFileMeta, type WorkspaceFileTarget } from "./RightPanelContext";
+import {
+  isWorkspaceFileTab,
+  useRightPanel,
+  type WorkspaceFileMeta,
+  type WorkspaceFileTarget,
+} from "./RightPanelContext";
 import { readFailureTab, tabFromFile } from "./workspaceFileTab";
 import { workspacesApi } from "../../api/workspaces";
 
@@ -119,7 +124,8 @@ export function useAgentEditSignals(editedPaths: readonly string[], workspaceRoo
       if (!isWorkspaceFileTab(tab)) continue;
       const meta = tab as WorkspaceFileMeta;
       const relativePath = meta.relativePath as string;
-      if (meta.isStale || meta.hostId || (meta.workspaceRoot !== undefined && meta.workspaceRoot !== workspaceRoot)) continue;
+      if (meta.isStale || meta.hostId || (meta.workspaceRoot !== undefined && meta.workspaceRoot !== workspaceRoot))
+        continue;
       const hit = edited.some(
         (path) => path === relativePath || path === `${meta.workspaceRoot ?? workspaceRoot}/${relativePath}`,
       );

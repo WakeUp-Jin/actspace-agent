@@ -12,7 +12,9 @@ function Nested() {
       <Button onClick={() => setOuter(true)}>打开</Button>
       <Sheet open={outer} onOpenChange={setOuter} title="外层">
         <Button onClick={() => setInner(true)}>再打开</Button>
-        <Sheet open={inner} onOpenChange={setInner} title="内层"><p>内容</p></Sheet>
+        <Sheet open={inner} onOpenChange={setInner} title="内层">
+          <p>内容</p>
+        </Sheet>
       </Sheet>
     </>
   );

@@ -18,10 +18,26 @@ export type RuntimeDesktopSnapshot = {
   readonly selectedSession: RuntimeSessionSnapshot | null;
   readonly workspaceRoot: string;
 };
-export type RuntimeForkSessionInput = { readonly parentSessionId: string; readonly newSessionId: string } & ({ readonly boundarySeq: number } | { readonly turnId: string });
-export type RuntimeRequestRestartInput = { readonly reason: string; readonly source: string; readonly candidateDigest?: string };
-export type RuntimeUpdateSessionMetadataInput = { readonly sessionId: string; readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean };
-export type RuntimeReadArtifactResult = { readonly artifactId: string; readonly mimeType: string; readonly bytesBase64: string };
+export type RuntimeForkSessionInput = { readonly parentSessionId: string; readonly newSessionId: string } & (
+  | { readonly boundarySeq: number }
+  | { readonly turnId: string }
+);
+export type RuntimeRequestRestartInput = {
+  readonly reason: string;
+  readonly source: string;
+  readonly candidateDigest?: string;
+};
+export type RuntimeUpdateSessionMetadataInput = {
+  readonly sessionId: string;
+  readonly title?: string | null;
+  readonly pinned?: boolean;
+  readonly archived?: boolean;
+};
+export type RuntimeReadArtifactResult = {
+  readonly artifactId: string;
+  readonly mimeType: string;
+  readonly bytesBase64: string;
+};
 export type RuntimeAttachmentRef = {
   readonly artifactId: string;
   readonly mimeType: string;
@@ -32,7 +48,12 @@ export type RuntimeAttachmentRef = {
 };
 export type RuntimeApprovalDecisionInput =
   | { readonly requestId: string; readonly hostId?: string; readonly decision: "once" | "deny" }
-  | { readonly requestId: string; readonly hostId?: string; readonly decision: "session"; readonly suggestionId: string };
+  | {
+      readonly requestId: string;
+      readonly hostId?: string;
+      readonly decision: "session";
+      readonly suggestionId: string;
+    };
 export type RuntimeDesktopLiveEnvelope = {
   readonly event: RuntimeLiveEvent;
   readonly emittedAt: string;

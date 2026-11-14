@@ -1,8 +1,4 @@
-import {
-  PROVIDER_IDS,
-  PROVIDER_REGISTRY,
-  type LlmProviderId,
-} from "@actspace/shared";
+import { PROVIDER_IDS, PROVIDER_REGISTRY, type LlmProviderId } from "@actspace/shared";
 
 export type ProviderModelOptionLike = {
   provider: LlmProviderId;
@@ -24,7 +20,9 @@ function normalizeModelLabel(label: string): string {
 export function groupModelsByProvider<T extends ProviderModelOptionLike>(models: T[]): ProviderModelGroup<T>[] {
   return PROVIDER_IDS.flatMap((provider) => {
     const providerModels = models.filter((model) => model.provider === provider);
-    const labels = [...new Set(providerModels.map((model) => model.connectionLabel ?? PROVIDER_REGISTRY[provider].label))];
+    const labels = [
+      ...new Set(providerModels.map((model) => model.connectionLabel ?? PROVIDER_REGISTRY[provider].label)),
+    ];
     return labels.map((label) => ({
       provider,
       label,
@@ -43,8 +41,11 @@ export function hasDuplicateModelLabelWithinProvider<T extends ProviderModelOpti
   models: T[],
 ): boolean {
   const normalizedLabel = normalizeModelLabel(model.label);
-  return models.filter((candidate) =>
-    candidate.provider === model.provider && normalizeModelLabel(candidate.label) === normalizedLabel).length > 1;
+  return (
+    models.filter(
+      (candidate) => candidate.provider === model.provider && normalizeModelLabel(candidate.label) === normalizedLabel,
+    ).length > 1
+  );
 }
 
 export function formatSelectedModelLabel<T extends ProviderModelOptionLike>(model: T, models: T[]): string {

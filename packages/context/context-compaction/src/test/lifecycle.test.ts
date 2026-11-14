@@ -21,12 +21,26 @@ describe("compaction plugin lifecycle", () => {
     const prepare = vi.fn((request) => ({
       request: { ...request, requestId: "fixture-request" },
       registration: { registrationId: "fixture", adapter: { adapterVersion: "fixture" } },
-      dispatch: async () => (async function* () { yield { type: "done", usage: EMPTY_LLM_USAGE, stopReason: "stop", content: [{ type: "text", text: "summary" }] }; })(),
+      dispatch: async () =>
+        (async function* () {
+          yield {
+            type: "done",
+            usage: EMPTY_LLM_USAGE,
+            stopReason: "stop",
+            content: [{ type: "text", text: "summary" }],
+          };
+        })(),
       release: vi.fn(),
     }));
-    ctx.provide("llm.service", { routes: { list: () => routes.map(routeId => ({ routeId })) }, prepareAsync: prepare });
+    ctx.provide("llm.service", {
+      routes: { list: () => routes.map((routeId) => ({ routeId })) },
+      prepareAsync: prepare,
+    });
     try {
-      await ctx.plugin({ inject: ["llm.service", "context.engine"], apply: (inner) => apply(inner as never, { routeId: override }) });
+      await ctx.plugin({
+        inject: ["llm.service", "context.engine"],
+        apply: (inner) => apply(inner as never, { routeId: override }),
+      });
       expect(await (ctx.get("compaction.runtime") as CompactionService).compact(session)).toBe(true);
       expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ routeId: expected, model: "default" }));
     } finally {
@@ -63,7 +77,11 @@ describe("compaction plugin lifecycle", () => {
       // Selecting nothing ends the run right after the trigger gate, so `select` marks a triggered compaction.
       const select = vi.spyOn(chat, "select").mockReturnValue(null);
       const baseSelect = vi.spyOn(service.runtime, "select").mockReturnValue(null);
-      const session = { header: { sessionId: "s" }, lastSeq: 0, journal: { surface: { entries: [], replaceGeneration: 0 } } } as unknown as Parameters<CompactionPlugin["maybeCompact"]>[0];
+      const session = {
+        header: { sessionId: "s" },
+        lastSeq: 0,
+        journal: { surface: { entries: [], replaceGeneration: 0 } },
+      } as unknown as Parameters<CompactionPlugin["maybeCompact"]>[0];
       const usage = { inputTokens: 70_000, outputTokens: 0, contextWindow: 128_000 };
       expect(await chat.maybeCompact(session, usage)).toBe(false);
       expect(select).not.toHaveBeenCalled();
@@ -82,5 +100,4 @@ describe("compaction plugin lifecycle", () => {
     }
     expect(ctx.get("compaction.runtime")).toBeUndefined();
   });
-
 });

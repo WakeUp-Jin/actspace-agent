@@ -8,14 +8,40 @@ function setup(options: FakeHostOptions = {}, refuse = () => false) {
   const factory = fakeSockets(() => fakeHostHandler(current), { refuse });
   const events = target();
   let visible = true;
-  const store = new ConnectionStore({ createSocket: factory.create, storage: localStorage, target: events, isVisible: () => visible });
-  return { store, factory, events, setOptions: (next: FakeHostOptions) => { current = next; }, hide: (value: boolean) => { visible = !value; } };
+  const store = new ConnectionStore({
+    createSocket: factory.create,
+    storage: localStorage,
+    target: events,
+    isVisible: () => visible,
+  });
+  return {
+    store,
+    factory,
+    events,
+    setOptions: (next: FakeHostOptions) => {
+      current = next;
+    },
+    hide: (value: boolean) => {
+      visible = !value;
+    },
+  };
 }
-const saved = { hostId: "h1", deviceId: "d1", url: "https://host.example", token: "t1", name: "Safari · iPhone", pairedAt: "2026-10-17T00:00:00.000Z" };
+const saved = {
+  hostId: "h1",
+  deviceId: "d1",
+  url: "https://host.example",
+  token: "t1",
+  name: "Safari · iPhone",
+  pairedAt: "2026-10-17T00:00:00.000Z",
+};
 const settle = () => vi.advanceTimersByTimeAsync(0);
 
-beforeEach(() => { vi.useFakeTimers(); });
-afterEach(() => { vi.useRealTimers(); });
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 it("normalizes addresses to an origin and derives the rpc url", () => {
   expect(normalizeHostUrl("my-mac.tail.ts.net/")).toBe("https://my-mac.tail.ts.net");
@@ -28,8 +54,19 @@ it("pairs, stores the device token and becomes ready", async () => {
   await store.pair("https://host.example", " GOOD ", "Safari · iPhone");
   expect(store.getState().status).toBe("ready");
   expect(store.getState().connection?.description.workspaces[0]?.id).toBe("main");
-  expect(activeSavedHost()).toMatchObject({ hostId: "h1", deviceId: "d1", token: "t1", url: "https://host.example", name: "Safari · iPhone" });
-  expect(factory.last().sent.map(item => item.method)).toEqual(["host.hello", "auth.pair", "host.describe", "host.observe"]);
+  expect(activeSavedHost()).toMatchObject({
+    hostId: "h1",
+    deviceId: "d1",
+    token: "t1",
+    url: "https://host.example",
+    name: "Safari · iPhone",
+  });
+  expect(factory.last().sent.map((item) => item.method)).toEqual([
+    "host.hello",
+    "auth.pair",
+    "host.describe",
+    "host.observe",
+  ]);
 });
 
 it("reports an invalid pair code as failed without retrying", async () => {

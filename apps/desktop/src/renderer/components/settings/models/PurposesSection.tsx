@@ -22,7 +22,7 @@ export function PurposesSection({ view }: { view: ModelConnectionsView }) {
           tight
           title={purpose.label}
           description={purpose.description}
-          control={(
+          control={
             <PurposePicker
               purpose={purpose}
               connections={view.connections}
@@ -30,7 +30,7 @@ export function PurposesSection({ view }: { view: ModelConnectionsView }) {
               onChange={(binding) => update(purpose.id, binding)}
               onGoToModel={goToModel}
             />
-          )}
+          }
         />
       ))}
     </SettingGroup>

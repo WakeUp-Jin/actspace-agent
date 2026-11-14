@@ -8,7 +8,15 @@ import {
 } from "../components/sidebar/session-grouping";
 
 function workspace(id: string, path: string, kind: WorkspaceEntry["kind"] = "folder", label = id): WorkspaceEntry {
-  return { id, kind, label, path, order: 0, createdAt: "2026-07-29T00:00:00.000Z", updatedAt: "2026-07-29T00:00:00.000Z" };
+  return {
+    id,
+    kind,
+    label,
+    path,
+    order: 0,
+    createdAt: "2026-07-29T00:00:00.000Z",
+    updatedAt: "2026-07-29T00:00:00.000Z",
+  };
 }
 
 function session(id: string, updatedAt: string, partial: Partial<SessionListItem> = {}): SessionListItem {
@@ -28,13 +36,22 @@ const MIXED = [
   session("no-root", "2026-08-02T00:00:00.000Z"),
   session("empty-root", "2026-07-01T00:00:00.000Z", { workspaceRoot: "" }),
   session("unknown-id-no-root", "2026-07-02T00:00:00.000Z", { workspaceId: "ws-gone" }),
-  session("unknown-id-with-root", "2026-07-03T00:00:00.000Z", { workspaceId: "ws-gone", workspaceRoot: "/Users/me/gone/" }),
+  session("unknown-id-with-root", "2026-07-03T00:00:00.000Z", {
+    workspaceId: "ws-gone",
+    workspaceRoot: "/Users/me/gone/",
+  }),
   session("unregistered-root", "2026-08-05T00:00:00.000Z", { workspaceRoot: "/Users/me/c/" }),
-  session("remote-1", "2026-08-04T00:00:00.000Z", { hostId: "h1", hostName: "云端", workspaceRoot: "/srv/app", workspaceId: "ws-a" }),
+  session("remote-1", "2026-08-04T00:00:00.000Z", {
+    hostId: "h1",
+    hostName: "云端",
+    workspaceRoot: "/srv/app",
+    workspaceId: "ws-a",
+  }),
   session("remote-2", "2026-08-06T00:00:00.000Z", { hostId: "h1", hostName: "云端", workspaceRoot: "/Users/me/a" }),
 ];
 
-const keyOf = (groups: ReturnType<typeof groupSessionsByWorkspace>, id: string) => groups.find((group) => group.sessions.some((item) => item.id === id))?.key;
+const keyOf = (groups: ReturnType<typeof groupSessionsByWorkspace>, id: string) =>
+  groups.find((group) => group.sessions.some((item) => item.id === id))?.key;
 
 describe("groupSessionsByWorkspace", () => {
   it("puts each session into the workspace it belongs to", () => {
@@ -47,14 +64,31 @@ describe("groupSessionsByWorkspace", () => {
     expect(keyOf(groups, "unknown-id-no-root")).toBeUndefined();
     expect(groups.find((group) => group.key === "default")!.sessions).toEqual([]);
     // 未登记的 id、有路径：按 id 自成一组，名称取路径最后一段。
-    expect(groups.find((group) => group.key === "ws-gone")).toMatchObject({ label: "gone", workspaceId: "ws-gone", workspaceRoot: "/Users/me/gone/" });
-    expect(groups.find((group) => group.key === "/Users/me/c/")).toMatchObject({ label: "c", workspaceRoot: "/Users/me/c/", workspaceId: undefined });
+    expect(groups.find((group) => group.key === "ws-gone")).toMatchObject({
+      label: "gone",
+      workspaceId: "ws-gone",
+      workspaceRoot: "/Users/me/gone/",
+    });
+    expect(groups.find((group) => group.key === "/Users/me/c/")).toMatchObject({
+      label: "c",
+      workspaceRoot: "/Users/me/c/",
+      workspaceId: undefined,
+    });
   });
 
   it("keeps remote sessions apart per host and path, even when the path matches a local workspace", () => {
     const groups = groupSessionsByWorkspace(MIXED, WORKSPACES);
-    expect(groups.find((group) => group.key === JSON.stringify(["h1", "/srv/app"]))).toMatchObject({ hostId: "h1", label: "云端 · app", workspaceId: "ws-a", workspaceRoot: "/srv/app" });
-    expect(groups.find((group) => group.key === JSON.stringify(["h1", "/Users/me/a"]))).toMatchObject({ hostId: "h1", label: "云端 · a", workspaceId: undefined });
+    expect(groups.find((group) => group.key === JSON.stringify(["h1", "/srv/app"]))).toMatchObject({
+      hostId: "h1",
+      label: "云端 · app",
+      workspaceId: "ws-a",
+      workspaceRoot: "/srv/app",
+    });
+    expect(groups.find((group) => group.key === JSON.stringify(["h1", "/Users/me/a"]))).toMatchObject({
+      hostId: "h1",
+      label: "云端 · a",
+      workspaceId: undefined,
+    });
     expect(groups.find((group) => group.key === "ws-a")!.sessions.map((item) => item.id)).toEqual(["by-root", "by-id"]);
   });
 
@@ -80,11 +114,21 @@ describe("groupSessionsByWorkspace", () => {
       "default",
       "ws-b",
     ]);
-    expect(groups.find((group) => group.key === "ws-gone")!.sessions.map((item) => item.id)).toEqual(["unknown-id-with-root"]);
+    expect(groups.find((group) => group.key === "ws-gone")!.sessions.map((item) => item.id)).toEqual([
+      "unknown-id-with-root",
+    ]);
   });
 
   it("lists every registered workspace even without sessions", () => {
-    expect(groupSessionsByWorkspace([], WORKSPACES)).toEqual(WORKSPACES.map((item) => ({ key: item.id, label: item.label, workspaceId: item.id, workspaceRoot: item.path, sessions: [] })));
+    expect(groupSessionsByWorkspace([], WORKSPACES)).toEqual(
+      WORKSPACES.map((item) => ({
+        key: item.id,
+        label: item.label,
+        workspaceId: item.id,
+        workspaceRoot: item.path,
+        sessions: [],
+      })),
+    );
   });
 });
 
@@ -111,7 +155,13 @@ describe("sessionWorkspaceRoot", () => {
 
 describe("isOrphanSession", () => {
   it("flags only local sessions without a workspace or path", () => {
-    expect(MIXED.filter((item) => isOrphanSession(item, WORKSPACES)).map((item) => item.id)).toEqual(["no-root", "empty-root", "unknown-id-no-root"]);
-    expect(isOrphanSession(session("by-id-only", "2026-08-01T00:00:00.000Z", { workspaceId: "ws-b" }), WORKSPACES)).toBe(false);
+    expect(MIXED.filter((item) => isOrphanSession(item, WORKSPACES)).map((item) => item.id)).toEqual([
+      "no-root",
+      "empty-root",
+      "unknown-id-no-root",
+    ]);
+    expect(
+      isOrphanSession(session("by-id-only", "2026-08-01T00:00:00.000Z", { workspaceId: "ws-b" }), WORKSPACES),
+    ).toBe(false);
   });
 });

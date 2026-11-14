@@ -15,8 +15,16 @@ const NO_DRAG = "[-webkit-app-region:no-drag]";
  * 栏里已经看得到的灰一点，悬停出现 ×。
  */
 export function SpaceTabMenu({
-  space, actors, activeTab, visibleIds,
-}: { space: Space; actors: Record<string, RosterActor>; activeTab: string; visibleIds: () => Set<string> }) {
+  space,
+  actors,
+  activeTab,
+  visibleIds,
+}: {
+  space: Space;
+  actors: Record<string, RosterActor>;
+  activeTab: string;
+  visibleIds: () => Set<string>;
+}) {
   const { selectTab, closeTab, closeOtherTabs } = useSpaceDemoActions();
   const [seen, setSeen] = useState<Set<string>>(() => new Set());
   const openTabs = space.openTabs.flatMap((id) => {
@@ -26,8 +34,15 @@ export function SpaceTabMenu({
   const others = openTabs.filter((m) => m.id !== activeTab);
 
   const row = (id: string, avatar: ReactNode, name: string, extra?: ReactNode) => (
-    <MenuItem key={id} className={`group ${seen.has(id) || id === COORD_TAB ? "text-text-muted" : ""}`} onSelect={() => selectTab(id)} data-tab-menu-id={id}>
-      <span className="grid h-3.5 w-3.5 shrink-0 place-items-center text-text-main">{activeTab === id ? <Check size={12} aria-hidden="true" /> : null}</span>
+    <MenuItem
+      key={id}
+      className={`group ${seen.has(id) || id === COORD_TAB ? "text-text-muted" : ""}`}
+      onSelect={() => selectTab(id)}
+      data-tab-menu-id={id}
+    >
+      <span className="grid h-3.5 w-3.5 shrink-0 place-items-center text-text-main">
+        {activeTab === id ? <Check size={12} aria-hidden="true" /> : null}
+      </span>
       {avatar}
       <span className="min-w-0 flex-1 truncate">{name}</span>
       {extra}
@@ -35,7 +50,11 @@ export function SpaceTabMenu({
   );
 
   return (
-    <Menu onOpenChange={(open) => { if (open) setSeen(visibleIds()); }}>
+    <Menu
+      onOpenChange={(open) => {
+        if (open) setSeen(visibleIds());
+      }}
+    >
       <MenuTrigger asChild>
         <IconButton label="全部标签" tooltip={false} size="xs" className={`ml-0.5 ${NO_DRAG}`}>
           <ChevronDown size={14} aria-hidden="true" />
@@ -44,7 +63,9 @@ export function SpaceTabMenu({
       <MenuContent align="end" className="w-[260px]">
         {others.length ? (
           <>
-            <MenuItem className="text-text-muted" onSelect={closeOtherTabs}>关闭其他标签</MenuItem>
+            <MenuItem className="text-text-muted" onSelect={closeOtherTabs}>
+              关闭其他标签
+            </MenuItem>
             <MenuSeparator />
           </>
         ) : null}
@@ -57,9 +78,14 @@ export function SpaceTabMenu({
             <>
               {m.status === "wait" || m.status === "fail" ? <StatusDot status={m.status} /> : null}
               <IconButton
-                label={`关闭 ${nameOf(actors, m.id)}`} tooltip={false} size="xs"
+                label={`关闭 ${nameOf(actors, m.id)}`}
+                tooltip={false}
+                size="xs"
                 className="-mr-1 opacity-0 group-data-[highlighted]:opacity-100 focus-visible:opacity-100"
-                onClick={(event) => { event.stopPropagation(); closeTab(m.id); }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  closeTab(m.id);
+                }}
                 onPointerUp={(event) => event.stopPropagation()}
               >
                 <X size={12} aria-hidden="true" />

@@ -1,8 +1,4 @@
-import type {
-  AppSettings,
-  QuickOpenShortcutSettings,
-  QuickOpenShortcutStatus,
-} from "@actspace/shared";
+import type { AppSettings, QuickOpenShortcutSettings, QuickOpenShortcutStatus } from "@actspace/shared";
 
 export interface GlobalShortcutRegistrar {
   register(accelerator: string, callback: () => void): boolean;
@@ -41,7 +37,10 @@ export class QuickOpenShortcutController {
     current: QuickOpenShortcutSettings,
     next: QuickOpenShortcutSettings,
     persist: () => Promise<AppSettings>,
-  ): Promise<{ ok: true; settings: AppSettings; status: QuickOpenShortcutStatus } | { ok: false; error: string; status: QuickOpenShortcutStatus }> {
+  ): Promise<
+    | { ok: true; settings: AppSettings; status: QuickOpenShortcutStatus }
+    | { ok: false; error: string; status: QuickOpenShortcutStatus }
+  > {
     const needsNewRegistration = next.enabled && this.activeAccelerator !== next.accelerator;
     if (needsNewRegistration && !this.tryRegister(next.accelerator)) {
       const error = "快捷键已被系统或其他应用占用。";

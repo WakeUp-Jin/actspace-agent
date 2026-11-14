@@ -8,14 +8,14 @@ import { PLUGIN_CATALOG, isHarnessToolPlugin, type PluginCatalogEntry } from "./
  * `0.x` plugins count as version 1 because Headers need a positive version.
  */
 export function agentFormMembersFromCatalog(catalog: readonly PluginCatalogEntry[]): readonly AgentFormMember[] {
-  return catalog
-    .filter(isHarnessToolPlugin)
-    .map(entry => Object.freeze({
+  return catalog.filter(isHarnessToolPlugin).map((entry) =>
+    Object.freeze({
       id: entry.manifest.pluginId,
       version: Math.max(1, Number.parseInt(entry.manifest.version, 10) || 0),
       required: entry.manifest.behaviors[0]?.required ?? true,
       toolNames: entry.manifest.contributions.tools!,
-    }));
+    }),
+  );
 }
 
 export const MAIN_AGENT_FORM = defineMainAgentForm(agentFormMembersFromCatalog(PLUGIN_CATALOG));

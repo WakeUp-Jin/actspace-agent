@@ -50,10 +50,11 @@ export function ResponseAnnotationHighlights({
     if ((drafts.length === 0 && !activeAnnotation) || !container || typeof MutationObserver === "undefined") return;
     let frame: number | null = null;
     const observer = new MutationObserver(() => {
-      if (frame === null) frame = window.requestAnimationFrame(() => {
-        frame = null;
-        register();
-      });
+      if (frame === null)
+        frame = window.requestAnimationFrame(() => {
+          frame = null;
+          register();
+        });
     });
     observer.observe(container, { childList: true, subtree: true, characterData: true });
     return () => {
@@ -62,11 +63,14 @@ export function ResponseAnnotationHighlights({
     };
   }, [activeAnnotation, activeId, drafts, messages, resolveRange, scrollContainerRef]);
 
-  useLayoutEffect(() => () => {
-    const highlights = highlightRegistry();
-    highlights?.registry.delete(HIGHLIGHT_NAME);
-    highlights?.registry.delete(ACTIVE_HIGHLIGHT_NAME);
-  }, []);
+  useLayoutEffect(
+    () => () => {
+      const highlights = highlightRegistry();
+      highlights?.registry.delete(HIGHLIGHT_NAME);
+      highlights?.registry.delete(ACTIVE_HIGHLIGHT_NAME);
+    },
+    [],
+  );
 
   return null;
 }

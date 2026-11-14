@@ -38,7 +38,26 @@ const MAX_HEIGHT = 144;
  * 玻璃输入框：短输入时单行 [＋][文本][模型][发送]；输入变长、非 Agent 模式、拒绝后说明或新建时，文本在上、按钮行在下。
  * 非 Agent 模式在 ＋ 后显示可关闭的模式芯片，发送钮跟着模式着色。
  */
-export function ComposerBox({ value, onChange, onKeyDown, placeholder, ariaLabel, textareaRef, disabled = false, enterKeyHint = "enter", mode, onModeChange, modelLabel, onModelClick, modelDisabled = false, action, onSubmit, stacked = false, attention = false, bar }: ComposerBoxProps) {
+export function ComposerBox({
+  value,
+  onChange,
+  onKeyDown,
+  placeholder,
+  ariaLabel,
+  textareaRef,
+  disabled = false,
+  enterKeyHint = "enter",
+  mode,
+  onModeChange,
+  modelLabel,
+  onModelClick,
+  modelDisabled = false,
+  action,
+  onSubmit,
+  stacked = false,
+  attention = false,
+  bar,
+}: ComposerBoxProps) {
   const own = useRef<HTMLTextAreaElement>(null);
   const area = textareaRef ?? own;
   const [plusOpen, setPlusOpen] = useState(false);
@@ -66,7 +85,7 @@ export function ComposerBox({ value, onChange, onKeyDown, placeholder, ariaLabel
       aria-label={ariaLabel}
       enterKeyHint={enterKeyHint}
       disabled={disabled}
-      onChange={event => onChange(event.target.value)}
+      onChange={(event) => onChange(event.target.value)}
       onKeyDown={onKeyDown}
     />
   );
@@ -76,16 +95,36 @@ export function ComposerBox({ value, onChange, onKeyDown, placeholder, ariaLabel
       <div className="composer-bar">
         {bar ?? (
           <>
-            <IconButton label="模式与添加" size="md" tone="faint" onClick={() => setPlusOpen(true)}><Plus size={18} aria-hidden /></IconButton>
+            <IconButton label="模式与添加" size="md" tone="faint" onClick={() => setPlusOpen(true)}>
+              <Plus size={18} aria-hidden />
+            </IconButton>
             {mode !== "agent" ? (
-              <span className={cx("inline-flex h-[26px] flex-none items-center gap-1 rounded-act-pill pl-2 pr-0.5 text-act-sm font-medium", mode === "plan" ? "bg-warning-soft text-on-warning" : "bg-operational-soft text-operational")}>
-                <ModeIcon size={14} aria-hidden />{MODE_LABELS[mode]}
-                <IconButton label="回到 Agent" size="xs" className="text-current opacity-75 hover:bg-transparent" onClick={() => onModeChange("agent")}><X size={13} aria-hidden /></IconButton>
+              <span
+                className={cx(
+                  "inline-flex h-[26px] flex-none items-center gap-1 rounded-act-pill pl-2 pr-0.5 text-act-sm font-medium",
+                  mode === "plan" ? "bg-warning-soft text-on-warning" : "bg-operational-soft text-operational",
+                )}
+              >
+                <ModeIcon size={14} aria-hidden />
+                {MODE_LABELS[mode]}
+                <IconButton
+                  label="回到 Agent"
+                  size="xs"
+                  className="text-current opacity-75 hover:bg-transparent"
+                  onClick={() => onModeChange("agent")}
+                >
+                  <X size={13} aria-hidden />
+                </IconButton>
               </span>
             ) : null}
             {isStacked ? <span className="flex-1" /> : textarea}
-            <Pressable onClick={onModelClick} disabled={modelDisabled} className="inline-flex h-8 w-auto max-w-[150px] flex-none items-center gap-1 rounded-act-pill px-1.5 text-act-sm font-medium text-text-muted disabled:opacity-45">
-              <span className="truncate">{modelLabel}</span><ChevronDown size={12} aria-hidden className="flex-none" />
+            <Pressable
+              onClick={onModelClick}
+              disabled={modelDisabled}
+              className="inline-flex h-8 w-auto max-w-[150px] flex-none items-center gap-1 rounded-act-pill px-1.5 text-act-sm font-medium text-text-muted disabled:opacity-45"
+            >
+              <span className="truncate">{modelLabel}</span>
+              <ChevronDown size={12} aria-hidden className="flex-none" />
             </Pressable>
             <SendButton tone={action === "stop" ? "stop" : mode} disabled={action === "disabled"} onClick={onSubmit} />
           </>

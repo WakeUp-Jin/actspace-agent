@@ -39,7 +39,8 @@ export function normalizeProxyUrl(rawUrl: string): string {
 }
 
 const USAGE_TABS = ["requests", "models", "providers", "tools", "commands", "skills"] as const;
-const oneOf = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T => (allowed as readonly unknown[]).includes(value) ? value as T : fallback;
+const oneOf = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T =>
+  (allowed as readonly unknown[]).includes(value) ? (value as T) : fallback;
 
 /** 旧字段 status / modelFilter / showDetails 丢弃；旧 activeTab「pricing」回落 requests。 */
 export function sanitizeUsagePreferences(value: Record<string, unknown>): SettingsV4UsagePreferences {
@@ -84,9 +85,10 @@ export function sanitizeShortcuts(input: unknown): ShortcutsSettings {
 
 export function sanitizeQuickOpenShortcut(input: unknown): ShortcutsSettings["quickOpen"] {
   const value = isRecord(input) ? input : {};
-  const accelerator = typeof value.accelerator === "string" && value.accelerator.trim()
-    ? value.accelerator.trim().slice(0, 120)
-    : DEFAULT_QUICK_OPEN_ACCELERATOR;
+  const accelerator =
+    typeof value.accelerator === "string" && value.accelerator.trim()
+      ? value.accelerator.trim().slice(0, 120)
+      : DEFAULT_QUICK_OPEN_ACCELERATOR;
   return {
     enabled: typeof value.enabled === "boolean" ? value.enabled : true,
     accelerator,
@@ -112,12 +114,8 @@ export function sanitizeImageGenerationSettings(
   if (!isRecord(input)) return { ...fallback };
   try {
     return {
-      baseUrl: normalizeImageGenerationBaseUrl(
-        typeof input.baseUrl === "string" ? input.baseUrl : fallback.baseUrl,
-      ),
-      model: normalizeImageGenerationModel(
-        typeof input.model === "string" ? input.model : fallback.model,
-      ),
+      baseUrl: normalizeImageGenerationBaseUrl(typeof input.baseUrl === "string" ? input.baseUrl : fallback.baseUrl),
+      model: normalizeImageGenerationModel(typeof input.model === "string" ? input.model : fallback.model),
     };
   } catch {
     return { ...fallback };
@@ -164,22 +162,25 @@ export function sanitizeProviderSettings(
     try {
       const normalized = normalizeBaseUrl(value.baseUrl);
       baseUrl = provider ? migrateLegacyProviderBaseUrl(provider, normalized) : normalized;
-    } catch { baseUrl = fallback.baseUrl; }
+    } catch {
+      baseUrl = fallback.baseUrl;
+    }
   }
   return {
     enabled: typeof value.enabled === "boolean" ? value.enabled : fallback.enabled,
     baseUrl,
     proxy: sanitizeProxySettings(value.proxy, fallback.proxy),
     lastConnection: sanitizeConnectionState(value.lastConnection, fallback.lastConnection),
-    defaultPricingMultiplier: normalizePricingMultiplier(value.defaultPricingMultiplier, fallback.defaultPricingMultiplier),
+    defaultPricingMultiplier: normalizePricingMultiplier(
+      value.defaultPricingMultiplier,
+      fallback.defaultPricingMultiplier,
+    ),
   };
 }
 
 export function migrateLegacyProviderBaseUrl(provider: LlmProviderId, baseUrl: string | null): string | null {
   // Preserve custom gateways; only the retired official DeepSeek Anthropic endpoint is migrated.
-  return provider === "deepseek" && baseUrl === "https://api.deepseek.com/anthropic"
-    ? null
-    : baseUrl;
+  return provider === "deepseek" && baseUrl === "https://api.deepseek.com/anthropic" ? null : baseUrl;
 }
 
 export function sanitizeProxySettings(input: unknown, fallback: ProviderProxySettings): ProviderProxySettings {
@@ -187,7 +188,11 @@ export function sanitizeProxySettings(input: unknown, fallback: ProviderProxySet
   const enabled = typeof input.enabled === "boolean" ? input.enabled : fallback.enabled;
   if (input.url === null) return { enabled, url: null };
   if (typeof input.url !== "string") return { enabled, url: fallback.url };
-  try { return { enabled, url: normalizeProxyUrl(input.url) }; } catch { return { ...fallback }; }
+  try {
+    return { enabled, url: normalizeProxyUrl(input.url) };
+  } catch {
+    return { ...fallback };
+  }
 }
 
 export function normalizeProxySettings(input: ProviderProxySettings): ProviderProxySettings {
@@ -202,7 +207,9 @@ export function normalizeProxySettings(input: ProviderProxySettings): ProviderPr
 
 export function normalizeOptionalBaseUrl(value: string | null): string | null {
   if (value === null || !value.trim()) return null;
-  try { return normalizeBaseUrl(value); } catch {
+  try {
+    return normalizeBaseUrl(value);
+  } catch {
     throw new ProviderSettingsError("Base URL 无效，仅支持不含认证信息的 HTTP(S) 地址。", "invalid_base_url");
   }
 }
@@ -224,9 +231,10 @@ export function normalizeBaseUrl(value: string): string {
 
 export function sanitizeConnectionState(input: unknown, fallback: ProviderConnectionState): ProviderConnectionState {
   if (!isRecord(input)) return { ...fallback };
-  const status = input.status === "available" || input.status === "unavailable" || input.status === "untested"
-    ? input.status
-    : fallback.status;
+  const status =
+    input.status === "available" || input.status === "unavailable" || input.status === "untested"
+      ? input.status
+      : fallback.status;
   return {
     status,
     ...(typeof input.checkedAt === "string" && { checkedAt: input.checkedAt }),
@@ -246,7 +254,9 @@ export function sanitizeInstalledModels(
 ): Partial<Record<ModelKey, InstalledModelSettings>> {
   const out = cloneJson(fallback);
   if (!isRecord(input)) return out;
-  for (const [rawKey, value] of Object.entries(input).sort(([a], [b]) => modelKeyMigrationPriority(a) - modelKeyMigrationPriority(b))) {
+  for (const [rawKey, value] of Object.entries(input).sort(
+    ([a], [b]) => modelKeyMigrationPriority(a) - modelKeyMigrationPriority(b),
+  )) {
     const key = normalizeModelKey(rawKey);
     if (!key || !isRecord(value)) continue;
     out[key] = sanitizeInstalledModel(value, out[key] ?? { enabled: false, addedAt: BUILTIN_MODEL_ADDED_AT });
@@ -259,7 +269,11 @@ export function sanitizeInstalledModel(input: unknown, fallback: InstalledModelS
   return {
     enabled: typeof value.enabled === "boolean" ? value.enabled : fallback.enabled,
     addedAt: typeof value.addedAt === "string" && value.addedAt ? value.addedAt : fallback.addedAt,
-    ...(typeof value.connectionId === "string" ? { connectionId: value.connectionId } : fallback.connectionId ? { connectionId: fallback.connectionId } : {}),
+    ...(typeof value.connectionId === "string"
+      ? { connectionId: value.connectionId }
+      : fallback.connectionId
+        ? { connectionId: fallback.connectionId }
+        : {}),
     ...(typeof value.customLabel === "string" && value.customLabel.trim() && { customLabel: value.customLabel.trim() }),
   };
 }
@@ -267,7 +281,9 @@ export function sanitizeInstalledModel(input: unknown, fallback: InstalledModelS
 export function sanitizeCustomModels(input: unknown): Partial<Record<ModelKey, ModelDefinition>> {
   const out: Partial<Record<ModelKey, ModelDefinition>> = {};
   if (!isRecord(input)) return out;
-  for (const [rawKey, value] of Object.entries(input).sort(([a], [b]) => modelKeyMigrationPriority(a) - modelKeyMigrationPriority(b))) {
+  for (const [rawKey, value] of Object.entries(input).sort(
+    ([a], [b]) => modelKeyMigrationPriority(a) - modelKeyMigrationPriority(b),
+  )) {
     const key = normalizeModelKey(rawKey);
     // Official Flash facts replace retired/alias catalog records; connection-specific models keep their own keys.
     if (key === DEEPSEEK_FLASH_KEY) continue;
@@ -282,9 +298,14 @@ export function sanitizeCustomModels(input: unknown): Partial<Record<ModelKey, M
 export function isValidModelDefinition(value: unknown, key: ModelKey): value is ModelDefinition {
   if (!isRecord(value)) return false;
   const normalized = normalizeModelKey(value.key);
-  return normalized === key && value.provider === key.slice(0, key.indexOf(":")) &&
+  return (
+    normalized === key &&
+    value.provider === key.slice(0, key.indexOf(":")) &&
     (value.api === "openai-completions" || value.api === "openai-responses" || value.api === "anthropic-messages") &&
-    typeof value.apiModel === "string" && value.apiModel.length > 0 && typeof value.label === "string";
+    typeof value.apiModel === "string" &&
+    value.apiModel.length > 0 &&
+    typeof value.label === "string"
+  );
 }
 
 export function sanitizeTaskModels(input: unknown): TaskModelSettings {
@@ -299,19 +320,25 @@ export function sanitizeTaskModels(input: unknown): TaskModelSettings {
   };
 }
 
-export function sanitizePurposeThinking(input: unknown): { thinking: NonNullable<TaskModelSettings["thinking"]> } | undefined {
+export function sanitizePurposeThinking(
+  input: unknown,
+): { thinking: NonNullable<TaskModelSettings["thinking"]> } | undefined {
   if (!isRecord(input)) return undefined;
-  const thinking = Object.fromEntries(PURPOSE_IDS.flatMap((id) => isThinkingLevel(input[id]) ? [[id, input[id]]] : []));
+  const thinking = Object.fromEntries(
+    PURPOSE_IDS.flatMap((id) => (isThinkingLevel(input[id]) ? [[id, input[id]]] : [])),
+  );
   return Object.keys(thinking).length ? { thinking } : undefined;
 }
 
 export function sanitizeModelOverridesMap(input: unknown): Partial<Record<ModelKey, ModelOverrides>> {
   if (!isRecord(input)) return {};
-  return Object.fromEntries(Object.entries(input).flatMap(([rawKey, value]) => {
-    const key = normalizeModelKey(rawKey);
-    const overrides = sanitizeModelOverrides(value);
-    return key && !isEmptyFacts(overrides) ? [[key, overrides]] : [];
-  }));
+  return Object.fromEntries(
+    Object.entries(input).flatMap(([rawKey, value]) => {
+      const key = normalizeModelKey(rawKey);
+      const overrides = sanitizeModelOverrides(value);
+      return key && !isEmptyFacts(overrides) ? [[key, overrides]] : [];
+    }),
+  );
 }
 
 export function sanitizeAgentV2(input: unknown, fallback: AgentSettingsV2): AgentSettingsV2 {
@@ -320,10 +347,18 @@ export function sanitizeAgentV2(input: unknown, fallback: AgentSettingsV2): Agen
   const maxTokens = value.maxTokens;
   return {
     systemPromptPath: sanitizeSystemPromptPath(value.systemPromptPath, fallback.systemPromptPath),
-    temperature: typeof temperature === "number" && Number.isFinite(temperature) && temperature >= 0 && temperature <= 2
-      ? temperature : temperature === null ? null : fallback.temperature,
-    maxTokens: typeof maxTokens === "number" && Number.isFinite(maxTokens) && maxTokens >= 1
-      ? Math.floor(maxTokens) : maxTokens === null ? null : fallback.maxTokens,
+    temperature:
+      typeof temperature === "number" && Number.isFinite(temperature) && temperature >= 0 && temperature <= 2
+        ? temperature
+        : temperature === null
+          ? null
+          : fallback.temperature,
+    maxTokens:
+      typeof maxTokens === "number" && Number.isFinite(maxTokens) && maxTokens >= 1
+        ? Math.floor(maxTokens)
+        : maxTokens === null
+          ? null
+          : fallback.maxTokens,
     disabledTools: Array.isArray(value.disabledTools)
       ? value.disabledTools.filter((item): item is string => typeof item === "string")
       : [...fallback.disabledTools],
@@ -352,8 +387,16 @@ export function isModelId(value: unknown): value is ModelId {
 }
 
 export function isConnectionErrorKind(value: unknown): value is ProviderConnectionState["errorKind"] {
-  return value === "proxy" || value === "network" || value === "timeout" || value === "auth" ||
-    value === "rate_limit" || value === "insufficient_balance" || value === "invalid_request" || value === "server";
+  return (
+    value === "proxy" ||
+    value === "network" ||
+    value === "timeout" ||
+    value === "auth" ||
+    value === "rate_limit" ||
+    value === "insufficient_balance" ||
+    value === "invalid_request" ||
+    value === "server"
+  );
 }
 
 export function redactProxyUrl(value: string | null): string | null {
@@ -378,7 +421,13 @@ export function sanitizeSpeechSettings(value: unknown): SpeechSettings {
   return {
     ...DEFAULT_SPEECH_SETTINGS,
     model: isSpeechModel(input.model) ? input.model : DEFAULT_SPEECH_SETTINGS.model,
-    voiceId: typeof input.voiceId === "string" && input.voiceId.trim() ? input.voiceId.trim().slice(0, 200) : DEFAULT_SPEECH_SETTINGS.voiceId,
-    speed: typeof input.speed === "number" && Number.isFinite(input.speed) && input.speed >= 0.5 && input.speed <= 2 ? input.speed : 1,
+    voiceId:
+      typeof input.voiceId === "string" && input.voiceId.trim()
+        ? input.voiceId.trim().slice(0, 200)
+        : DEFAULT_SPEECH_SETTINGS.voiceId,
+    speed:
+      typeof input.speed === "number" && Number.isFinite(input.speed) && input.speed >= 0.5 && input.speed <= 2
+        ? input.speed
+        : 1,
   };
 }

@@ -5,7 +5,14 @@ import { Button } from "../../ui/Button";
 import { cn } from "../../ui/cn";
 import { PATH_INITIAL_ROWS, PATH_ROW_STEP, type ContextPathVisibility } from "./context-paths-model";
 import { ContextPathList } from "./ContextPathList";
-import { CARD_CLASS, CARD_HEAD_CLASS, CARD_META_CLASS, CARD_TITLE_CLASS, ROW_FOCUS_CLASS, TRACK_CLASS } from "./ContextPanelParts";
+import {
+  CARD_CLASS,
+  CARD_HEAD_CLASS,
+  CARD_META_CLASS,
+  CARD_TITLE_CLASS,
+  ROW_FOCUS_CLASS,
+  TRACK_CLASS,
+} from "./ContextPanelParts";
 import { useContextPaths } from "./use-context-paths";
 
 const LABEL: Record<ContextPathVisibility, string> = { active: "活跃", sleeping: "睡眠" };
@@ -14,7 +21,12 @@ const LABEL: Record<ContextPathVisibility, string> = { active: "活跃", sleepin
  * 「路径」卡片（front-Context面板规范.md §4）：周期和活跃 / 睡眠两格统计始终显示，
  * 两格兼当切换；下面的列表默认收起，点开关才按版本分页读取。
  */
-export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: {
+export function ContextPaths({
+  sessionId,
+  disclosure,
+  workspaceRoot,
+  onStale,
+}: {
   sessionId: string;
   disclosure: ContextDisclosureSummary | undefined;
   workspaceRoot?: string;
@@ -22,14 +34,25 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
 }) {
   const [visibility, setVisibility] = useState<ContextPathVisibility>("active");
   const [expanded, setExpanded] = useState(false);
-  const [rows, setRows] = useState<Record<ContextPathVisibility, number>>({ active: PATH_INITIAL_ROWS, sleeping: PATH_INITIAL_ROWS });
+  const [rows, setRows] = useState<Record<ContextPathVisibility, number>>({
+    active: PATH_INITIAL_ROWS,
+    sleeping: PATH_INITIAL_ROWS,
+  });
   const ready = disclosure?.status === "ready" ? disclosure : null;
-  const { list, loadMore, retry } = useContextPaths({ sessionId, disclosure, visibility, enabled: expanded && ready !== null, onStale });
+  const { list, loadMore, retry } = useContextPaths({
+    sessionId,
+    disclosure,
+    visibility,
+    enabled: expanded && ready !== null,
+    onStale,
+  });
 
   if (!ready) {
     return (
       <section className={CARD_CLASS} aria-label="路径">
-        <div className={CARD_HEAD_CLASS}><span className={CARD_TITLE_CLASS}>路径</span></div>
+        <div className={CARD_HEAD_CLASS}>
+          <span className={CARD_TITLE_CLASS}>路径</span>
+        </div>
         <p className="m-0 px-3 pb-3 pt-1.5 text-act-xs text-text-faint">当前会话没有路径记录。</p>
       </section>
     );
@@ -42,7 +65,7 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
   const hidden = Math.max(0, total - shown.length);
   const showMore = () => {
     const next = rows[visibility] + PATH_ROW_STEP;
-    setRows(current => ({ ...current, [visibility]: next }));
+    setRows((current) => ({ ...current, [visibility]: next }));
     if (list && next > list.paths.length) loadMore();
   };
 
@@ -53,53 +76,123 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
         <span className={CARD_META_CLASS}>第 {ready.cycle} 压缩周期</span>
       </div>
       <div className="mx-3 mt-2 grid grid-cols-2 gap-1.5">
-        <SummaryCell selected={visibility === "active"} onSelect={() => setVisibility("active")} label="活跃"
-          value={<>{ready.activeCount}<small className="ml-0.5 text-act-xxs font-normal text-text-faint">/ {ready.activeLimit}</small></>}>
+        <SummaryCell
+          selected={visibility === "active"}
+          onSelect={() => setVisibility("active")}
+          label="活跃"
+          value={
+            <>
+              {ready.activeCount}
+              <small className="ml-0.5 text-act-xxs font-normal text-text-faint">/ {ready.activeLimit}</small>
+            </>
+          }
+        >
           <span className={cn("mt-1.5 block h-1 overflow-hidden rounded-full", TRACK_CLASS)}>
-            <i className={cn("block h-full rounded-full", full ? "bg-warning" : "bg-success")} style={{ width: `${Math.min(100, (ready.activeCount / Math.max(1, ready.activeLimit)) * 100)}%` }} />
+            <i
+              className={cn("block h-full rounded-full", full ? "bg-warning" : "bg-success")}
+              style={{ width: `${Math.min(100, (ready.activeCount / Math.max(1, ready.activeLimit)) * 100)}%` }}
+            />
           </span>
         </SummaryCell>
-        <SummaryCell selected={visibility === "sleeping"} onSelect={() => setVisibility("sleeping")} label="睡眠" sleeping
-          value={ready.sleepingCount.toLocaleString()} />
+        <SummaryCell
+          selected={visibility === "sleeping"}
+          onSelect={() => setVisibility("sleeping")}
+          label="睡眠"
+          sleeping
+          value={ready.sleepingCount.toLocaleString()}
+        />
       </div>
-      {full ? <p className="m-0 mx-3 mt-2 rounded-act-md bg-warning-soft px-2.5 py-1.5 text-act-xxs text-warning">活跃路径已满 {ready.activeLimit} 条，之后新出现的路径会先进入睡眠。</p> : null}
+      {full ? (
+        <p className="m-0 mx-3 mt-2 rounded-act-md bg-warning-soft px-2.5 py-1.5 text-act-xxs text-warning">
+          活跃路径已满 {ready.activeLimit} 条，之后新出现的路径会先进入睡眠。
+        </p>
+      ) : null}
       {ready.activeCount + ready.sleepingCount === 0 ? (
         <p className="m-0 px-3 pb-3 pt-2.5 text-center text-act-xs text-text-faint">还没有记录到文件路径。</p>
       ) : (
         <>
           <div className="flex items-center gap-1.5 px-3 pb-1 pt-2">
             {/* 列表开关是一行小字，和明细分类行同类的原生按钮。 */}
-            <button type="button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}
-              className={cn("-ml-1.5 inline-flex items-center gap-1 rounded-act-sm border-0 bg-transparent py-0.5 pl-1 pr-1.5 text-act-xxs text-text-muted [cursor:pointer] hover:bg-hover-overlay hover:text-text-main", ROW_FOCUS_CLASS)}>
-              <ChevronRight size={12} aria-hidden="true" className={cn("shrink-0 text-text-faint transition-transform duration-(--motion-fast)", expanded && "rotate-90")} />
-              <span className="tabular-nums">{expanded ? `${LABEL[visibility]} · 已显示 ${shown.length} / ${total.toLocaleString()}` : `显示${LABEL[visibility]}路径 · ${count.toLocaleString()} 条`}</span>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((value) => !value)}
+              className={cn(
+                "-ml-1.5 inline-flex items-center gap-1 rounded-act-sm border-0 bg-transparent py-0.5 pl-1 pr-1.5 text-act-xxs text-text-muted [cursor:pointer] hover:bg-hover-overlay hover:text-text-main",
+                ROW_FOCUS_CLASS,
+              )}
+            >
+              <ChevronRight
+                size={12}
+                aria-hidden="true"
+                className={cn(
+                  "shrink-0 text-text-faint transition-transform duration-(--motion-fast)",
+                  expanded && "rotate-90",
+                )}
+              />
+              <span className="tabular-nums">
+                {expanded
+                  ? `${LABEL[visibility]} · 已显示 ${shown.length} / ${total.toLocaleString()}`
+                  : `显示${LABEL[visibility]}路径 · ${count.toLocaleString()} 条`}
+              </span>
             </button>
           </div>
           {expanded ? (
             <div className="pb-2">
               {list?.error ? (
-                <div role="alert" className="mx-3 my-1.5 flex items-center gap-2 rounded-act-md bg-danger-soft px-2.5 py-1.5 text-act-xs text-danger">
-                  <span className="min-w-0 flex-1" title={list.error}>{LABEL[visibility]}路径读取失败。</span>
-                  <Button variant="secondary" size="xs" onClick={retry}>重试</Button>
+                <div
+                  role="alert"
+                  className="mx-3 my-1.5 flex items-center gap-2 rounded-act-md bg-danger-soft px-2.5 py-1.5 text-act-xs text-danger"
+                >
+                  <span className="min-w-0 flex-1" title={list.error}>
+                    {LABEL[visibility]}路径读取失败。
+                  </span>
+                  <Button variant="secondary" size="xs" onClick={retry}>
+                    重试
+                  </Button>
                 </div>
               ) : null}
-              {shown.length ? <ContextPathList paths={shown} cycle={ready.cycle} workspaceRoot={workspaceRoot} /> : null}
-              {!list?.loaded && !list?.error ? <p className="m-0 px-3 py-1.5 text-act-xs text-text-faint">正在读取{LABEL[visibility]}路径…</p> : null}
-              {list?.loaded && !list.paths.length && !list.error ? <p className="m-0 px-3 py-1.5 text-act-xs text-text-faint">没有{LABEL[visibility]}路径。</p> : null}
+              {shown.length ? (
+                <ContextPathList paths={shown} cycle={ready.cycle} workspaceRoot={workspaceRoot} />
+              ) : null}
+              {!list?.loaded && !list?.error ? (
+                <p className="m-0 px-3 py-1.5 text-act-xs text-text-faint">正在读取{LABEL[visibility]}路径…</p>
+              ) : null}
+              {list?.loaded && !list.paths.length && !list.error ? (
+                <p className="m-0 px-3 py-1.5 text-act-xs text-text-faint">没有{LABEL[visibility]}路径。</p>
+              ) : null}
               {list?.loaded && hidden > 0 && !list.error ? (
-                <Button variant="ghost" size="xs" className="ml-4 mt-1" busy={list.loading} disabled={list.loading} onClick={showMore}>
-                  {list.loading ? "正在读取…" : `再显示 ${Math.min(PATH_ROW_STEP, hidden)} 项（共 ${total.toLocaleString()}）`}
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="ml-4 mt-1"
+                  busy={list.loading}
+                  disabled={list.loading}
+                  onClick={showMore}
+                >
+                  {list.loading
+                    ? "正在读取…"
+                    : `再显示 ${Math.min(PATH_ROW_STEP, hidden)} 项（共 ${total.toLocaleString()}）`}
                 </Button>
               ) : null}
             </div>
-          ) : <div className="h-1.5" />}
+          ) : (
+            <div className="h-1.5" />
+          )}
         </>
       )}
     </section>
   );
 }
 
-function SummaryCell({ selected, onSelect, label, value, sleeping, children }: {
+function SummaryCell({
+  selected,
+  onSelect,
+  label,
+  value,
+  sleeping,
+  children,
+}: {
   selected: boolean;
   onSelect: () => void;
   label: string;
@@ -109,14 +202,24 @@ function SummaryCell({ selected, onSelect, label, value, sleeping, children }: {
 }) {
   return (
     // 两格统计兼当列表切换，整格可点，Button 原语的尺寸和底色不适合。浅底色块，选中的换成面板底色加一圈深色细线（规范 §4）。
-    <button type="button" aria-pressed={selected} onClick={onSelect}
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onSelect}
       className={cn(
         "flex flex-col justify-start rounded-act-md border-0 bg-surface-subtle px-2.5 pb-2 pt-[7px] text-left [cursor:pointer] hover:bg-hover-overlay",
         "aria-pressed:bg-surface aria-pressed:shadow-[inset_0_0_0_1px_var(--act-color-border-strong)]",
         ROW_FOCUS_CLASS,
-      )}>
+      )}
+    >
       <span className="flex items-center gap-1.5 text-act-xxs text-text-faint">
-        <span aria-hidden="true" className={cn("size-[7px] shrink-0 rounded-full", sleeping ? "border-[1.5px] border-line-strong" : "bg-success")} />
+        <span
+          aria-hidden="true"
+          className={cn(
+            "size-[7px] shrink-0 rounded-full",
+            sleeping ? "border-[1.5px] border-line-strong" : "bg-success",
+          )}
+        />
         {label}
       </span>
       <span className="mt-px block text-act-lg font-semibold tabular-nums tracking-tight text-text-main">{value}</span>

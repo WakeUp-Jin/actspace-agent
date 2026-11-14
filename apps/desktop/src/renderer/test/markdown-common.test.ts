@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { CALLOUT_LABEL, parseCalloutMarker } from "../components/markdown-common/callouts";
-import { classifyLinkTarget, dirnameOf, parseInlinePath, resolveWorkspacePath } from "../components/markdown-common/paths";
+import {
+  classifyLinkTarget,
+  dirnameOf,
+  parseInlinePath,
+  resolveWorkspacePath,
+} from "../components/markdown-common/paths";
 
 describe("parseInlinePath", () => {
   it.each([
     ["src/app.ts", { path: "src/app.ts" }],
-    ["apps/desktop/src/renderer/components/messages/MarkdownProse.tsx", { path: "apps/desktop/src/renderer/components/messages/MarkdownProse.tsx" }],
+    [
+      "apps/desktop/src/renderer/components/messages/MarkdownProse.tsx",
+      { path: "apps/desktop/src/renderer/components/messages/MarkdownProse.tsx" },
+    ],
     ["README.md", { path: "README.md" }],
     ["package.json", { path: "package.json" }],
     ["docs/设计/方案.md", { path: "docs/设计/方案.md" }],
@@ -43,7 +51,10 @@ describe("parseInlinePath", () => {
 
 describe("parseInlinePath 的 absolute 选项", () => {
   it("认出绝对路径并原样返回，交给 resolveWorkspacePath 判断是否在工作区内", () => {
-    expect(parseInlinePath("/work/repo/src/a.ts:12", { absolute: true })).toEqual({ path: "/work/repo/src/a.ts", line: 12 });
+    expect(parseInlinePath("/work/repo/src/a.ts:12", { absolute: true })).toEqual({
+      path: "/work/repo/src/a.ts",
+      line: 12,
+    });
     expect(parseInlinePath("C:\\repo\\src\\a.ts", { absolute: true })).toEqual({ path: "C:/repo/src/a.ts" });
     expect(parseInlinePath("/work/repo/Makefile.mk", { absolute: true })).toEqual({ path: "/work/repo/Makefile.mk" });
     expect(resolveWorkspacePath("/work/repo/src/a.ts", { workspaceRoot: "/work/repo" })).toBe("src/a.ts");
@@ -63,7 +74,10 @@ describe("parseInlinePath 的 absolute 选项", () => {
 describe("classifyLinkTarget", () => {
   it("区分锚点、外链、本地、不可点", () => {
     expect(classifyLinkTarget("#安装")).toEqual({ kind: "anchor", id: "安装" });
-    expect(classifyLinkTarget("https://example.com/x?y=1")).toEqual({ kind: "external", url: "https://example.com/x?y=1" });
+    expect(classifyLinkTarget("https://example.com/x?y=1")).toEqual({
+      kind: "external",
+      url: "https://example.com/x?y=1",
+    });
     expect(classifyLinkTarget("mailto:a@b.c")).toEqual({ kind: "external", url: "mailto:a@b.c" });
     expect(classifyLinkTarget("javascript:alert(1)")).toEqual({ kind: "blocked" });
     expect(classifyLinkTarget("data:text/html,x")).toEqual({ kind: "blocked" });

@@ -5,11 +5,15 @@ import { createDesktopSessionBridge } from "../session/desktop-session-bridge";
 function bridgeFixture() {
   const setObservedSessions = vi.fn();
   const store = new ClientSessionStore();
-  const bridge = createDesktopSessionBridge({
-    getSessionProjectionSnapshot: () => new Promise<never>(() => undefined),
-    onSessionLiveEvent: () => () => undefined,
-    setObservedSessions,
-  }, store, { retryDelaysMs: [] });
+  const bridge = createDesktopSessionBridge(
+    {
+      getSessionProjectionSnapshot: () => new Promise<never>(() => undefined),
+      onSessionLiveEvent: () => () => undefined,
+      setObservedSessions,
+    },
+    store,
+    { retryDelaysMs: [] },
+  );
   return { bridge, store, setObservedSessions };
 }
 
@@ -50,9 +54,18 @@ describe("observed Session report", () => {
 
   it("works without a reporter (web and tests)", () => {
     const store = new ClientSessionStore();
-    const bridge = createDesktopSessionBridge({ getSessionProjectionSnapshot: () => new Promise<never>(() => undefined), onSessionLiveEvent: () => () => undefined }, store);
+    const bridge = createDesktopSessionBridge(
+      {
+        getSessionProjectionSnapshot: () => new Promise<never>(() => undefined),
+        onSessionLiveEvent: () => () => undefined,
+      },
+      store,
+    );
     bridge.start();
-    expect(() => { store.select("a"); bridge.watch("b")(); }).not.toThrow();
+    expect(() => {
+      store.select("a");
+      bridge.watch("b")();
+    }).not.toThrow();
     bridge.dispose();
   });
 });

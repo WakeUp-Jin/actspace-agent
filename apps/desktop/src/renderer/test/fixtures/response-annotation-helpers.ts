@@ -30,8 +30,17 @@ export function clearSelection() {
 }
 
 /** jsdom 不做布局，Range 没有矩形。给所有 Range 一个固定矩形，返回还原函数。 */
-export function stubRangeRects(rect: { top: number; left: number; width: number; height: number } = { top: 200, left: 100, width: 120, height: 18 }) {
-  const domRect = { ...rect, x: rect.left, y: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height, toJSON: () => rect } as DOMRect;
+export function stubRangeRects(
+  rect: { top: number; left: number; width: number; height: number } = { top: 200, left: 100, width: 120, height: 18 },
+) {
+  const domRect = {
+    ...rect,
+    x: rect.left,
+    y: rect.top,
+    right: rect.left + rect.width,
+    bottom: rect.top + rect.height,
+    toJSON: () => rect,
+  } as DOMRect;
   const proto = Range.prototype as unknown as Record<string, unknown>;
   const originalBounding = proto.getBoundingClientRect;
   const originalRects = proto.getClientRects;
@@ -57,7 +66,9 @@ export function makeAnnotation(overrides: Partial<ResponseAnnotationReference> =
 }
 
 /** 全部动作都是 vi.fn 的批注 context，给只关心调用的组件测试用。 */
-export function createAnnotationContextValue(overrides: Partial<ResponseAnnotationContextValue> = {}): ResponseAnnotationContextValue {
+export function createAnnotationContextValue(
+  overrides: Partial<ResponseAnnotationContextValue> = {},
+): ResponseAnnotationContextValue {
   return {
     drafts: [],
     canAnnotate: () => true,

@@ -15,7 +15,13 @@ function workspace(id: string, label: string, path: string, order: number): Work
 
 const WORKSPACES = [workspace("ws-a", "alpha", "/w/alpha", 0), workspace("ws-b", "beta", "/w/beta", 1)];
 
-function session(id: string, title: string, root: string, minutes: number, extra: Partial<SessionListItem> = {}): SessionListItem {
+function session(
+  id: string,
+  title: string,
+  root: string,
+  minutes: number,
+  extra: Partial<SessionListItem> = {},
+): SessionListItem {
   return { id, title, workspaceRoot: root, updatedAt: minutesAgo(minutes), agentRunCount: 1, ...extra };
 }
 
@@ -45,7 +51,9 @@ function renderSidebar(overrides: Partial<Parameters<typeof TestSidebar>[0]> = {
 }
 
 function rowTitles(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll(".session-row .session-row-title")).map((node) => node.textContent ?? "");
+  return Array.from(container.querySelectorAll(".session-row .session-row-title")).map(
+    (node) => node.textContent ?? "",
+  );
 }
 
 async function pickView(name: string) {
@@ -147,9 +155,13 @@ describe("Sidebar views", () => {
 
   it("shows archived sessions in their workspace with a restore action", async () => {
     setupBridge({
-      "sessions.list": async (input?: { archived?: boolean }) => input?.archived
-        ? [session("x1", "Archived alpha", "/w/alpha", 30, { archived: true }), session("x2", "Removed workspace", "/w/gone", 30, { archived: true })]
-        : [],
+      "sessions.list": async (input?: { archived?: boolean }) =>
+        input?.archived
+          ? [
+              session("x1", "Archived alpha", "/w/alpha", 30, { archived: true }),
+              session("x2", "Removed workspace", "/w/gone", 30, { archived: true }),
+            ]
+          : [],
     });
     const { onRestoreSession } = renderSidebar();
     await pickView("全部对话");
@@ -196,7 +208,6 @@ describe("Sidebar views", () => {
     expect(screen.getByRole("button", { name: "beta" })).toHaveAttribute("aria-expanded", "false");
   });
 });
-
 
 it("restores search focus on explicit close but respects outside focus", async () => {
   renderSidebar();

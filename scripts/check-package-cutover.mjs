@@ -16,9 +16,19 @@ const retired = ["kairos:", "plugins:fs-watch:", "/eval", "@actspace/agent-core"
 
 async function walk(path) {
   let entries;
-  try { entries = await readdir(path, { withFileTypes: true }); } catch { return; }
+  try {
+    entries = await readdir(path, { withFileTypes: true });
+  } catch {
+    return;
+  }
   for (const entry of entries) {
-    if (entry.name === "node_modules" || entry.name.startsWith("dist") || entry.name === ".tmp" || entry.name === ".astro") continue;
+    if (
+      entry.name === "node_modules" ||
+      entry.name.startsWith("dist") ||
+      entry.name === ".tmp" ||
+      entry.name === ".astro"
+    )
+      continue;
     const target = join(path, entry.name);
     if (entry.isDirectory()) await walk(target);
     else if (sourceExtensions.test(entry.name)) await scanFile(target);
@@ -31,16 +41,25 @@ async function scanFile(path) {
   // Test fixtures intentionally contain retired package names to exercise the
   // documentation checker; they are not runtime reachability edges.
   if (label.startsWith("scripts/test/")) return;
-  if (!label.endsWith("scripts/check-package-cutover.mjs") && !label.endsWith("scripts/check-v2-legacy-removal.mjs") && !label.endsWith("scripts/check-package-boundaries.mjs")) {
+  if (
+    !label.endsWith("scripts/check-package-cutover.mjs") &&
+    !label.endsWith("scripts/check-v2-legacy-removal.mjs") &&
+    !label.endsWith("scripts/check-package-boundaries.mjs")
+  ) {
     if (source.includes("@actspace/agent-runtime")) findings.monolith.push(label);
-    if (/packages\/agent-runtime\/src\//.test(source) || /@actspace\/[^"']+\/src\//.test(source)) findings.deepImports.push(label);
+    if (/packages\/agent-runtime\/src\//.test(source) || /@actspace\/[^"']+\/src\//.test(source))
+      findings.deepImports.push(label);
     // Relative imports (`../plugins/plugin-switches`, `../api/plugins`) point at modules inside the
     // current package, not at the retired workspace `plugins/` directory.
     const withoutRelativeImports = source.replace(/["'`]\.{1,2}\/[^"'`]*["'`]/g, "");
-    if (/(?:^|[\\/])plugins(?:[\\/]|['"])/.test(withoutRelativeImports) && !source.includes("browser-bridge")) findings.genericPlugins.push(label);
+    if (/(?:^|[\\/])plugins(?:[\\/]|['"])/.test(withoutRelativeImports) && !source.includes("browser-bridge"))
+      findings.genericPlugins.push(label);
     // Tests may use retired names as plain fixture data (for example "/eval" as a sandbox path).
     const isTest = /(?:^|[\\/])test[\\/]/.test(label) || /\.test\.[cm]?[jt]sx?$/.test(label);
-    if (!isTest) for (const token of retired) if (token === "/eval" ? /\/eval(?=[\s/\x22\x27`]|$)/u.test(source) : source.includes(token)) findings.retiredPaths.push(`${label}: ${token}`);
+    if (!isTest)
+      for (const token of retired)
+        if (token === "/eval" ? /\/eval(?=[\s/\x22\x27`]|$)/u.test(source) : source.includes(token))
+          findings.retiredPaths.push(`${label}: ${token}`);
   }
 }
 

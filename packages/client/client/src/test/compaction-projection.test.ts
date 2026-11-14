@@ -4,13 +4,53 @@ import { projectChatEvents } from "../sessions/chat.js";
 
 function snapshot(sessionId: string, throughJournalSeq: number): RuntimeSessionSnapshot {
   return {
-    kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-08-30T00:00:00.000Z", updatedAt: "2026-08-30T00:00:00.000Z", workspaceRoot: null, throughJournalSeq, permissionMode: "default", accessState: "read-write",
-    agentForm: "agent", agentMode: "chat", agentModeRevision: 1, metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null }, activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } }, lineage: null,
+    kind: "session-snapshot",
+    schemaVersion: 1,
+    sessionId,
+    createdAt: "2026-08-30T00:00:00.000Z",
+    updatedAt: "2026-08-30T00:00:00.000Z",
+    workspaceRoot: null,
+    throughJournalSeq,
+    permissionMode: "default",
+    accessState: "read-write",
+    agentForm: "agent",
+    agentMode: "chat",
+    agentModeRevision: 1,
+    metadata: { title: null, pinned: false, archived: false },
+    messages: [],
+    tools: [],
+    pendingInbox: [],
+    todos: [],
+    delegations: [],
+    usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
+    activity: {
+      turnCount: 0,
+      completedTurnCount: 0,
+      stepCount: 0,
+      activeTurnId: null,
+      activeStepId: null,
+      compactionCount: 0,
+      activeCompactionId: null,
+      lastCompactionSummary: null,
+      timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 },
+    },
+    lineage: null,
   };
 }
 
 function event(type: string, seq: number, time: string, data: SessionEventEnvelopeV1["data"]): SessionEventEnvelopeV1 {
-  return { recordKind: "event", seq, type, eventVersion: 1, criticality: "required", time, source: { ownerPluginId: "@actspace/core" }, data, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
+  return {
+    recordKind: "event",
+    seq,
+    type,
+    eventVersion: 1,
+    criticality: "required",
+    time,
+    source: { ownerPluginId: "@actspace/core" },
+    data,
+    surface: null,
+    provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
+  };
 }
 
 describe("durable compaction duration", () => {
@@ -23,10 +63,16 @@ describe("durable compaction duration", () => {
   ])("projects duration $value as $expected after replay", ({ value, expected }) => {
     const journal = [
       event("compaction/start", 0, "2026-09-30T00:00:00.000Z", { compactionId: "c", start: 0, end: 4 }),
-      event("compaction/end", 1, "2026-09-30T00:00:00.016Z", { compactionId: "c", ...(value === undefined ? {} : { durationMs: value }) }),
+      event("compaction/end", 1, "2026-09-30T00:00:00.016Z", {
+        compactionId: "c",
+        ...(value === undefined ? {} : { durationMs: value }),
+      }),
     ];
     expect(projectChatEvents(snapshot("s", 1), journal)).toEqual([
-      expect.objectContaining({ type: "context_compaction", payload: expect.objectContaining({ durationMs: expected }) }),
+      expect.objectContaining({
+        type: "context_compaction",
+        payload: expect.objectContaining({ durationMs: expected }),
+      }),
     ]);
   });
 });
@@ -35,10 +81,27 @@ describe("durable compaction stats", () => {
   it("projects trigger and token counts recorded on compaction/end", () => {
     const journal = [
       event("compaction/start", 0, "2026-10-25T00:00:00.000Z", { compactionId: "c", start: 2, end: 30 }),
-      event("compaction/end", 1, "2026-10-25T00:00:23.000Z", { compactionId: "c", durationMs: 23_000, trigger: "auto", beforeTokens: 182_000, afterTokens: 9_100, beforeEstimated: true }),
+      event("compaction/end", 1, "2026-10-25T00:00:23.000Z", {
+        compactionId: "c",
+        durationMs: 23_000,
+        trigger: "auto",
+        beforeTokens: 182_000,
+        afterTokens: 9_100,
+        beforeEstimated: true,
+      }),
     ];
     const [projected] = projectChatEvents(snapshot("s", 1), journal);
-    expect(projected?.payload).toEqual(expect.objectContaining({ compactionId: "c", trigger: "auto", beforeTokens: 182_000, afterTokens: 9_100, beforeEstimated: true, triggerTokens: 182_000, removedCount: 28 }));
+    expect(projected?.payload).toEqual(
+      expect.objectContaining({
+        compactionId: "c",
+        trigger: "auto",
+        beforeTokens: 182_000,
+        afterTokens: 9_100,
+        beforeEstimated: true,
+        triggerTokens: 182_000,
+        removedCount: 28,
+      }),
+    );
   });
 
   it("leaves token counts out for journals written before they were recorded", () => {

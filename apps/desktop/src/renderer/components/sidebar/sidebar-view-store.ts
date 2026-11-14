@@ -1,7 +1,11 @@
 import { useSyncExternalStore } from "react";
 import {
-  defaultSidebarViewState, parseSidebarViewState,
-  type SidebarArchivedFilter, type SidebarGroupBy, type SidebarSort, type SidebarViewState,
+  defaultSidebarViewState,
+  parseSidebarViewState,
+  type SidebarArchivedFilter,
+  type SidebarGroupBy,
+  type SidebarSort,
+  type SidebarViewState,
 } from "./sidebar-view";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
@@ -31,7 +35,11 @@ export function createSidebarViewStore(storage: () => StorageLike | undefined): 
   // 记下缓存对应的原始字符串：存储被别处改掉或清空（测试之间）时重新解析，没变时返回同一个对象。
   let cachedRaw: string | null | undefined;
   const readRaw = (): string | null | undefined => {
-    try { return storage()?.getItem(SIDEBAR_VIEW_STORAGE_KEY); } catch { return cachedRaw; }
+    try {
+      return storage()?.getItem(SIDEBAR_VIEW_STORAGE_KEY);
+    } catch {
+      return cachedRaw;
+    }
   };
   const read = (): SidebarViewState => {
     const raw = readRaw();
@@ -47,7 +55,12 @@ export function createSidebarViewStore(storage: () => StorageLike | undefined): 
   const write = (next: SidebarViewState) => {
     cache = next;
     const raw = JSON.stringify(next);
-    try { storage()?.setItem(SIDEBAR_VIEW_STORAGE_KEY, raw); cachedRaw = raw; } catch { /* 存不下时只保留在内存里。 */ }
+    try {
+      storage()?.setItem(SIDEBAR_VIEW_STORAGE_KEY, raw);
+      cachedRaw = raw;
+    } catch {
+      /* 存不下时只保留在内存里。 */
+    }
     for (const listener of [...listeners]) listener();
   };
   const update = (fn: (state: SidebarViewState) => SidebarViewState) => {
@@ -57,22 +70,42 @@ export function createSidebarViewStore(storage: () => StorageLike | undefined): 
   };
   return {
     get: read,
-    subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    setGroupBy: (groupBy) => update((state) => state.options.groupBy === groupBy ? state : { ...state, options: { ...state.options, groupBy } }),
-    setSort: (sort, snapshot) => update((state) => state.options.sort === sort ? state : {
-      ...state,
-      options: { ...state.options, sort },
-      orders: sort === "manual" ? { ...snapshot } : {},
-    }),
-    setArchived: (archived) => update((state) => state.options.archived === archived ? state : { ...state, options: { ...state.options, archived } }),
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setGroupBy: (groupBy) =>
+      update((state) =>
+        state.options.groupBy === groupBy ? state : { ...state, options: { ...state.options, groupBy } },
+      ),
+    setSort: (sort, snapshot) =>
+      update((state) =>
+        state.options.sort === sort
+          ? state
+          : {
+              ...state,
+              options: { ...state.options, sort },
+              orders: sort === "manual" ? { ...snapshot } : {},
+            },
+      ),
+    setArchived: (archived) =>
+      update((state) =>
+        state.options.archived === archived ? state : { ...state, options: { ...state.options, archived } },
+      ),
     resetOptions: () => update((state) => ({ ...state, options: defaultSidebarViewState().options, orders: {} })),
-    setOrder: (account, order, snapshot) => update((state) => ({
-      ...state,
-      options: { ...state.options, sort: "manual" },
-      orders: { ...(state.options.sort === "manual" ? state.orders : snapshot), [account]: order },
-    })),
+    setOrder: (account, order, snapshot) =>
+      update((state) => ({
+        ...state,
+        options: { ...state.options, sort: "manual" },
+        orders: { ...(state.options.sort === "manual" ? state.orders : snapshot), [account]: order },
+      })),
     toggle: (map, key) => update((state) => ({ ...state, [map]: withFlag(state[map], key, !state[map][key]) })),
-    setFlag: (map, key, value) => update((state) => Boolean(state[map][key]) === value ? state : { ...state, [map]: withFlag(state[map], key, value) }),
+    setFlag: (map, key, value) =>
+      update((state) =>
+        Boolean(state[map][key]) === value ? state : { ...state, [map]: withFlag(state[map], key, value) },
+      ),
   };
 }
 
@@ -83,7 +116,9 @@ function withFlag(flags: Record<string, boolean>, key: string, value: boolean): 
   return next;
 }
 
-export const sidebarViewStore = createSidebarViewStore(() => typeof window === "undefined" ? undefined : window.localStorage);
+export const sidebarViewStore = createSidebarViewStore(() =>
+  typeof window === "undefined" ? undefined : window.localStorage,
+);
 
 export function useSidebarView(store: SidebarViewStore = sidebarViewStore): SidebarViewState {
   return useSyncExternalStore(store.subscribe, store.get, store.get);

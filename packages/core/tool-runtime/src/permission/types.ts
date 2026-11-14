@@ -41,7 +41,12 @@ export type GlobalBoundaryDecision =
 
 export type ToolPermissionDecision =
   | { readonly kind: "allow" }
-  | { readonly kind: "ask"; readonly reason: string; readonly risk: "low" | "medium" | "high"; readonly reusable?: boolean }
+  | {
+      readonly kind: "ask";
+      readonly reason: string;
+      readonly risk: "low" | "medium" | "high";
+      readonly reusable?: boolean;
+    }
   | { readonly kind: "deny"; readonly code: string; readonly reason: string };
 
 export type PermissionReason = {

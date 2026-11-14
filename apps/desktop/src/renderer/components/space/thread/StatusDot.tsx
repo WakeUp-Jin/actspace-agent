@@ -11,5 +11,11 @@ const DOT_CLASS: Record<MemberStatus, string> = {
 };
 
 export function StatusDot({ status, className = "" }: { status: MemberStatus; className?: string }) {
-  return <span role="img" aria-label={STATUS_LABEL[status]} className={`inline-block size-1.5 shrink-0 rounded-act-pill ${DOT_CLASS[status]} ${className}`} />;
+  return (
+    <span
+      role="img"
+      aria-label={STATUS_LABEL[status]}
+      className={`inline-block size-1.5 shrink-0 rounded-act-pill ${DOT_CLASS[status]} ${className}`}
+    />
+  );
 }

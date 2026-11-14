@@ -38,9 +38,24 @@ export type RightPanelTab = { id: string } & (
   | { kind: "docs"; title: string; select?: string; line?: number }
   | { kind: "review"; title: string; workspaceRoot?: string; scope: "uncommitted"; refreshKey?: number }
   // 某一轮的改动快照（轮尾改动卡点开）；index 是要选中的文件，revision 每次点击递增，让同一 Tab 重新跳到该文件。
-  | { kind: "turnReview"; title: string; changes: TurnChanges; index: number; revision: number; sessionId: string | null; workspaceRoot?: string }
+  | {
+      kind: "turnReview";
+      title: string;
+      changes: TurnChanges;
+      index: number;
+      revision: number;
+      sessionId: string | null;
+      workspaceRoot?: string;
+    }
   // 侧边对话：只在它的主会话下显示。继承轮数等打开时才知道的事实随 tab 带着，重新打开时由会话窗口推算。
-  | { kind: "sideChat"; title: string; sessionId: string; parentSessionId: string; inheritedTurnCount?: number; runningTurnExcluded?: boolean }
+  | {
+      kind: "sideChat";
+      title: string;
+      sessionId: string;
+      parentSessionId: string;
+      inheritedTurnCount?: number;
+      runningTurnExcluded?: boolean;
+    }
 );
 
 /** 打开右侧「子 Agent」并选中一个子智能体（`agentId`，老会话是子会话 id）；`revision` 让同一个目标能再次触发。 */
@@ -59,15 +74,19 @@ const FILE_TAB_KINDS: ReadonlySet<RightPanelTabKind> = new Set<RightPanelTabKind
 export function isWorkspaceFileTab(tab: RightPanelTab | null | undefined): boolean {
   if (!tab) return false;
   if (FILE_TAB_KINDS.has(tab.kind)) {
-    return typeof (tab as WorkspaceFileMeta).relativePath === "string"
-      && ((tab as WorkspaceFileMeta).relativePath as string).length > 0;
+    return (
+      typeof (tab as WorkspaceFileMeta).relativePath === "string" &&
+      ((tab as WorkspaceFileMeta).relativePath as string).length > 0
+    );
   }
   return false;
 }
 
 /** 工作区文件 Tab 的稳定 id，renderer 各处必须用同一个函数生成，避免拼错导致去重失效。 */
 export function workspaceFileTabId(relativePath: string, target?: WorkspaceFileTarget): string {
-  return target ? `file:${JSON.stringify([target.hostId ?? "local", target.workspaceRoot ?? null, relativePath])}` : `file:${relativePath}`;
+  return target
+    ? `file:${JSON.stringify([target.hostId ?? "local", target.workspaceRoot ?? null, relativePath])}`
+    : `file:${relativePath}`;
 }
 
 /** 「文档」面板当前打开的那一篇：原文、草稿和读盘时的新鲜度基线。 */
@@ -100,7 +119,10 @@ export function isDocsDocDirty(doc: DocsDocState | null | undefined): boolean {
 
 /** 最近一次取回的 Markdown 清单（属于 `root`）。 */
 export type DocsListing = {
-  root: string; files: readonly string[]; truncated: boolean; source: "git" | "walk";
+  root: string;
+  files: readonly string[];
+  truncated: boolean;
+  source: "git" | "walk";
   /** 截断时没走完的顶层目录。 */
   incompleteDirs?: readonly string[];
   /** 这份清单是用户点「继续加载」后用放大的上限取的；之后的刷新沿用。 */
@@ -186,7 +208,9 @@ export function RightPanelProvider({
 }) {
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [tabs, setTabs] = useState<RightPanelTab[]>(() => initialTabs ?? createDefaultTabs());
-  const [activeTabId, setActiveTabId] = useState<string | null>(() => (initialTabs ?? createDefaultTabs())[0]?.id ?? null);
+  const [activeTabId, setActiveTabId] = useState<string | null>(
+    () => (initialTabs ?? createDefaultTabs())[0]?.id ?? null,
+  );
   const [expandedDirs, setExpandedDirs] = useState<ReadonlySet<string>>(() => new Set<string>());
   const [docsSelectedPath, setDocsSelectedPath] = useState<string | null>(null);
   const [docsDoc, setDocsDocState] = useState<DocsDocState | null>(null);
@@ -213,57 +237,66 @@ export function RightPanelProvider({
   const getDocsDoc = useCallback(() => docsDocRef.current, []);
   const clearDocsPendingLine = useCallback(() => setDocsPendingLine(null), []);
 
-  const selectDocsPath = useCallback((path: string | null, line?: number) => {
-    const current = docsDocRef.current;
-    const requestLine = () => {
-      if (path && line !== undefined && Number.isFinite(line) && line >= 1) {
-        pendingLineId.current += 1;
-        setDocsPendingLine({ path, line: Math.trunc(line), id: pendingLineId.current });
-      } else {
-        setDocsPendingLine(null);
-      }
-    };
-    const apply = () => {
-      requestLine();
-      setDocsSelectedPath(path);
-      setDocsDoc(null);
-      setDocsMode("preview");
-      if (path) {
-        setExpandedDirs((dirs) => {
-          const missing = ancestorDirs(path).filter((dir) => !dirs.has(dir));
-          return missing.length === 0 ? dirs : new Set([...dirs, ...missing]);
-        });
-      }
-    };
-    if (isDocsDocDirty(current)) {
-      // 同一篇不动它（草稿还在）；换到另一篇要先问。
-      if (path === current?.relativePath) {
-        // 草稿还在，不重读；带行号的请求仍要滚过去。
+  const selectDocsPath = useCallback(
+    (path: string | null, line?: number) => {
+      const current = docsDocRef.current;
+      const requestLine = () => {
+        if (path && line !== undefined && Number.isFinite(line) && line >= 1) {
+          pendingLineId.current += 1;
+          setDocsPendingLine({ path, line: Math.trunc(line), id: pendingLineId.current });
+        } else {
+          setDocsPendingLine(null);
+        }
+      };
+      const apply = () => {
         requestLine();
+        setDocsSelectedPath(path);
+        setDocsDoc(null);
+        setDocsMode("preview");
+        if (path) {
+          setExpandedDirs((dirs) => {
+            const missing = ancestorDirs(path).filter((dir) => !dirs.has(dir));
+            return missing.length === 0 ? dirs : new Set([...dirs, ...missing]);
+          });
+        }
+      };
+      if (isDocsDocDirty(current)) {
+        // 同一篇不动它（草稿还在）；换到另一篇要先问。
+        if (path === current?.relativePath) {
+          // 草稿还在，不重读；带行号的请求仍要滚过去。
+          requestLine();
+          return;
+        }
+        setDocsPendingLeave({ run: apply });
         return;
       }
-      setDocsPendingLeave({ run: apply });
-      return;
-    }
-    apply();
-  }, [setDocsDoc]);
+      apply();
+    },
+    [setDocsDoc],
+  );
 
-  const openTab = useCallback((tab: RightPanelTab) => {
-    // 「打开并选中」是一次性请求，不存进 Tab，免得 Tab 重放时重复选中。
-    const stored: RightPanelTab = tab.kind === "docs" && (tab.select !== undefined || tab.line !== undefined) ? { id: tab.id, kind: "docs", title: tab.title } : tab;
-    setTabs((current) => {
-      const existingIndex = current.findIndex((item) => item.id === stored.id);
-      if (existingIndex === -1) {
-        return [...current, stored];
-      }
-      const next = current.slice();
-      next[existingIndex] = stored;
-      return next;
-    });
-    setActiveTabId(stored.id);
-    setIsOpen(true);
-    if (tab.kind === "docs" && tab.select !== undefined) selectDocsPath(tab.select, tab.line);
-  }, [selectDocsPath]);
+  const openTab = useCallback(
+    (tab: RightPanelTab) => {
+      // 「打开并选中」是一次性请求，不存进 Tab，免得 Tab 重放时重复选中。
+      const stored: RightPanelTab =
+        tab.kind === "docs" && (tab.select !== undefined || tab.line !== undefined)
+          ? { id: tab.id, kind: "docs", title: tab.title }
+          : tab;
+      setTabs((current) => {
+        const existingIndex = current.findIndex((item) => item.id === stored.id);
+        if (existingIndex === -1) {
+          return [...current, stored];
+        }
+        const next = current.slice();
+        next[existingIndex] = stored;
+        return next;
+      });
+      setActiveTabId(stored.id);
+      setIsOpen(true);
+      if (tab.kind === "docs" && tab.select !== undefined) selectDocsPath(tab.select, tab.line);
+    },
+    [selectDocsPath],
+  );
 
   const replaceTab = useCallback((tab: RightPanelTab) => {
     setTabs((current) => {
@@ -332,27 +365,35 @@ export function RightPanelProvider({
 
   const refreshDocs = useCallback(() => setDocsRefreshKey((key) => key + 1), []);
 
-  const syncDocsRoot = useCallback((nextRoot: string | undefined) => {
-    const current = docsRootRef.current;
-    if (current.known && current.root === nextRoot) return;
-    docsRootRef.current = { known: true, root: nextRoot };
-    if (!current.known) return;
-    // 未保存的草稿不能随换根丢掉：先暂存，切回同一个根时恢复。
-    const leaving = docsDocRef.current;
-    if (current.root && leaving && leaving.status === "ready" && isDocsDocDirty(leaving)) {
-      stashDocsDraft(current.root, leaving.relativePath, { original: leaving.original, draft: leaving.draft, mtimeMs: leaving.mtimeMs, size: leaving.size });
-    }
-    // 新根下如果有暂存的草稿，直接重新选中那一篇（读盘后由 use-docs-draft 套回草稿）。
-    const restorePath = nextRoot ? latestStashedDocsPath(nextRoot) : null;
-    setExpandedDirs(new Set<string>(restorePath ? ancestorDirs(restorePath) : []));
-    setDocsSelectedPath(restorePath);
-    setDocsDoc(null);
-    setDocsMode("preview");
-    setDocsListing(null);
-    setDocsPendingLeave(null);
-    setDocsPendingLine(null);
-    setDocsRefreshKey((key) => key + 1);
-  }, [setDocsDoc]);
+  const syncDocsRoot = useCallback(
+    (nextRoot: string | undefined) => {
+      const current = docsRootRef.current;
+      if (current.known && current.root === nextRoot) return;
+      docsRootRef.current = { known: true, root: nextRoot };
+      if (!current.known) return;
+      // 未保存的草稿不能随换根丢掉：先暂存，切回同一个根时恢复。
+      const leaving = docsDocRef.current;
+      if (current.root && leaving && leaving.status === "ready" && isDocsDocDirty(leaving)) {
+        stashDocsDraft(current.root, leaving.relativePath, {
+          original: leaving.original,
+          draft: leaving.draft,
+          mtimeMs: leaving.mtimeMs,
+          size: leaving.size,
+        });
+      }
+      // 新根下如果有暂存的草稿，直接重新选中那一篇（读盘后由 use-docs-draft 套回草稿）。
+      const restorePath = nextRoot ? latestStashedDocsPath(nextRoot) : null;
+      setExpandedDirs(new Set<string>(restorePath ? ancestorDirs(restorePath) : []));
+      setDocsSelectedPath(restorePath);
+      setDocsDoc(null);
+      setDocsMode("preview");
+      setDocsListing(null);
+      setDocsPendingLeave(null);
+      setDocsPendingLine(null);
+      setDocsRefreshKey((key) => key + 1);
+    },
+    [setDocsDoc],
+  );
 
   const requestDocsLeave = useCallback((run: () => void) => {
     if (isDocsDocDirty(docsDocRef.current)) setDocsPendingLeave({ run });
@@ -360,17 +401,20 @@ export function RightPanelProvider({
   }, []);
   const clearDocsPendingLeave = useCallback(() => setDocsPendingLeave(null), []);
 
-  const requestCloseTab = useCallback((id: string) => {
-    if (id !== "docs") {
-      closeTab(id);
-      return;
-    }
-    requestDocsLeave(() => {
-      setDocsDoc(null);
-      setDocsExpanded(false);
-      closeTab(id);
-    });
-  }, [closeTab, requestDocsLeave, setDocsDoc]);
+  const requestCloseTab = useCallback(
+    (id: string) => {
+      if (id !== "docs") {
+        closeTab(id);
+        return;
+      }
+      requestDocsLeave(() => {
+        setDocsDoc(null);
+        setDocsExpanded(false);
+        closeTab(id);
+      });
+    },
+    [closeTab, requestDocsLeave, setDocsDoc],
+  );
 
   const value = useMemo<RightPanelContextValue>(() => {
     const active = tabs.find((tab) => tab.id === activeTabId) ?? null;

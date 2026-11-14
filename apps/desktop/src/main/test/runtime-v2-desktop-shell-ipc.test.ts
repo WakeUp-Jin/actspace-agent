@@ -50,23 +50,46 @@ describe("runtime v2 desktop shell IPC", () => {
     const snapshotSpy = vi.spyOn(ReviewGitEngine.prototype, "getSnapshot").mockImplementation(realSnapshot);
     const trusted = trustedWindow();
     const registration = registerRuntimeDesktopShell({
-      roots: { dataRoot: root, sessionRoot: join(root, "sessions-v2"), logRoot: join(root, "logs"), tmpRoot: join(root, "tmp"), defaultWorkspaceRoot: registered, workspaceRoot: registered },
+      roots: {
+        dataRoot: root,
+        sessionRoot: join(root, "sessions-v2"),
+        logRoot: join(root, "logs"),
+        tmpRoot: join(root, "tmp"),
+        defaultWorkspaceRoot: registered,
+        workspaceRoot: registered,
+      },
       getMainWindow: () => trusted.window as never,
       listSessions: async () => [{ workspaceRoot: workspace }],
     });
-    const invoke = (channel: string, workspaceId?: string) => handlers.get(channel)!(trusted.event, { workspaceRoot: workspace, workspaceId, selection: { kind: "uncommitted" } }) as Promise<ReviewGetSnapshotResult>;
+    const invoke = (channel: string, workspaceId?: string) =>
+      handlers.get(channel)!(trusted.event, {
+        workspaceRoot: workspace,
+        workspaceId,
+        selection: { kind: "uncommitted" },
+      }) as Promise<ReviewGetSnapshotResult>;
     try {
       const initial = await invoke(RUNTIME_FIXED_RENDERER_CHANNELS.getReviewSnapshot);
       if (!initial.ok) throw new Error(initial.message);
       if (operation === "refresh") {
         await writeFile(join(workspace, "sample.txt"), "after\n");
         const refreshed = await invoke(RUNTIME_FIXED_RENDERER_CHANNELS.refreshReviewSnapshot);
-        expect(refreshed).toMatchObject({ ok: true, snapshot: { workspaceRoot: initial.snapshot.workspaceRoot, files: [expect.objectContaining({ path: "sample.txt" })] } });
+        expect(refreshed).toMatchObject({
+          ok: true,
+          snapshot: {
+            workspaceRoot: initial.snapshot.workspaceRoot,
+            files: [expect.objectContaining({ path: "sample.txt" })],
+          },
+        });
         if (refreshed.ok) expect(refreshed.snapshot.generation).toBeGreaterThan(initial.snapshot.generation);
       } else {
         // A valid root must not silently override an unrelated explicit identity.
-        expect(await invoke(RUNTIME_FIXED_RENDERER_CHANNELS.getReviewSnapshot, "unknown-workspace")).toMatchObject({ ok: false, code: "invalid_workspace" });
-        expect(await invoke(RUNTIME_FIXED_RENDERER_CHANNELS.refreshReviewSnapshot, "session-root:wrong")).toMatchObject({ ok: false, code: "invalid_workspace" });
+        expect(await invoke(RUNTIME_FIXED_RENDERER_CHANNELS.getReviewSnapshot, "unknown-workspace")).toMatchObject({
+          ok: false,
+          code: "invalid_workspace",
+        });
+        expect(await invoke(RUNTIME_FIXED_RENDERER_CHANNELS.refreshReviewSnapshot, "session-root:wrong")).toMatchObject(
+          { ok: false, code: "invalid_workspace" },
+        );
       }
     } finally {
       registration.dispose();
@@ -74,67 +97,93 @@ describe("runtime v2 desktop shell IPC", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
-  it.each([false, true])("refreshSnapshot reads outside writes, bumps the generation, and broadcasts reviewChanged (Session-only root: %s)", async (sessionOnly) => {
-    handlers.clear();
-    const root = await mkdtemp(join(tmpdir(), "review-external-write-"));
-    const workspace = join(root, "workspace");
-    await mkdir(workspace);
-    const registeredRoot = sessionOnly ? join(root, "registered") : workspace;
-    await mkdir(registeredRoot, { recursive: true });
-    const git = (args: string[]) => promisify(execFile)("git", args, { cwd: workspace });
-    await git(["init", "-b", "main"]);
-    await writeFile(join(workspace, "sample.txt"), "before\n");
-    await git(["add", "."]);
-    await git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixture"]);
-    // Exercise the real Git snapshot below the IPC boundary, without a worker fixture.
-    const realEngine = new ReviewGitEngine();
-    const realSnapshot = realEngine.getSnapshot.bind(realEngine);
-    const snapshotSpy = vi.spyOn(ReviewGitEngine.prototype, "getSnapshot").mockImplementation(realSnapshot);
-    const trusted = trustedWindow();
-    const send = vi.spyOn(trusted.window.webContents, "send");
-    const registration = registerRuntimeDesktopShell({
-      roots: { dataRoot: root, sessionRoot: join(root, "sessions-v2"), logRoot: join(root, "logs"), tmpRoot: join(root, "tmp"), defaultWorkspaceRoot: registeredRoot, workspaceRoot: registeredRoot },
-      getMainWindow: () => trusted.window as never,
-      listSessions: async () => sessionOnly ? [{ workspaceRoot: workspace }] : [],
-    });
-    const invoke = (channel: string) => handlers.get(channel)!(trusted.event, { workspaceRoot: workspace, selection: { kind: "uncommitted" } }) as Promise<{ ok: boolean; snapshot: { generation: number; files: { path: string }[] } }>;
-    const snapshot = () => invoke(RUNTIME_FIXED_RENDERER_CHANNELS.getReviewSnapshot);
-    const refresh = () => invoke(RUNTIME_FIXED_RENDERER_CHANNELS.refreshReviewSnapshot);
-    try {
-      const before = await snapshot();
-      expect(before.snapshot.files).toEqual([]);
-      await writeFile(join(workspace, "sample.txt"), "before\nafter\n");
-      // 没有实时监听：不经过 refresh，读到的还是旧缓存，也没有任何广播。
-      await new Promise(resolve => setTimeout(resolve, 250));
-      expect(send).not.toHaveBeenCalled();
-      expect((await snapshot()).snapshot.files).toEqual([]);
+  it.each([false, true])(
+    "refreshSnapshot reads outside writes, bumps the generation, and broadcasts reviewChanged (Session-only root: %s)",
+    async (sessionOnly) => {
+      handlers.clear();
+      const root = await mkdtemp(join(tmpdir(), "review-external-write-"));
+      const workspace = join(root, "workspace");
+      await mkdir(workspace);
+      const registeredRoot = sessionOnly ? join(root, "registered") : workspace;
+      await mkdir(registeredRoot, { recursive: true });
+      const git = (args: string[]) => promisify(execFile)("git", args, { cwd: workspace });
+      await git(["init", "-b", "main"]);
+      await writeFile(join(workspace, "sample.txt"), "before\n");
+      await git(["add", "."]);
+      await git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixture"]);
+      // Exercise the real Git snapshot below the IPC boundary, without a worker fixture.
+      const realEngine = new ReviewGitEngine();
+      const realSnapshot = realEngine.getSnapshot.bind(realEngine);
+      const snapshotSpy = vi.spyOn(ReviewGitEngine.prototype, "getSnapshot").mockImplementation(realSnapshot);
+      const trusted = trustedWindow();
+      const send = vi.spyOn(trusted.window.webContents, "send");
+      const registration = registerRuntimeDesktopShell({
+        roots: {
+          dataRoot: root,
+          sessionRoot: join(root, "sessions-v2"),
+          logRoot: join(root, "logs"),
+          tmpRoot: join(root, "tmp"),
+          defaultWorkspaceRoot: registeredRoot,
+          workspaceRoot: registeredRoot,
+        },
+        getMainWindow: () => trusted.window as never,
+        listSessions: async () => (sessionOnly ? [{ workspaceRoot: workspace }] : []),
+      });
+      const invoke = (channel: string) =>
+        handlers.get(channel)!(trusted.event, {
+          workspaceRoot: workspace,
+          selection: { kind: "uncommitted" },
+        }) as Promise<{ ok: boolean; snapshot: { generation: number; files: { path: string }[] } }>;
+      const snapshot = () => invoke(RUNTIME_FIXED_RENDERER_CHANNELS.getReviewSnapshot);
+      const refresh = () => invoke(RUNTIME_FIXED_RENDERER_CHANNELS.refreshReviewSnapshot);
+      try {
+        const before = await snapshot();
+        expect(before.snapshot.files).toEqual([]);
+        await writeFile(join(workspace, "sample.txt"), "before\nafter\n");
+        // 没有实时监听：不经过 refresh，读到的还是旧缓存，也没有任何广播。
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        expect(send).not.toHaveBeenCalled();
+        expect((await snapshot()).snapshot.files).toEqual([]);
 
-      const after = await refresh();
-      expect(after.snapshot.generation).toBeGreaterThan(before.snapshot.generation);
-      expect(after.snapshot.files.map(file => file.path)).toContain("sample.txt");
-      expect(send).toHaveBeenCalledWith(RUNTIME_FIXED_RENDERER_CHANNELS.reviewChanged, expect.objectContaining({ generation: after.snapshot.generation, reason: "refresh" }));
-      const count = send.mock.calls.length;
-      await snapshot();
-      expect(send).toHaveBeenCalledTimes(count);
-      registration.dispose();
-      await writeFile(join(workspace, "sample.txt"), "after dispose\n");
-      await new Promise(resolve => setTimeout(resolve, 250));
-      expect(send).toHaveBeenCalledTimes(count);
-    } finally {
-      registration.dispose();
-      snapshotSpy.mockRestore();
-      await rm(root, { recursive: true, force: true });
-    }
-  });
+        const after = await refresh();
+        expect(after.snapshot.generation).toBeGreaterThan(before.snapshot.generation);
+        expect(after.snapshot.files.map((file) => file.path)).toContain("sample.txt");
+        expect(send).toHaveBeenCalledWith(
+          RUNTIME_FIXED_RENDERER_CHANNELS.reviewChanged,
+          expect.objectContaining({ generation: after.snapshot.generation, reason: "refresh" }),
+        );
+        const count = send.mock.calls.length;
+        await snapshot();
+        expect(send).toHaveBeenCalledTimes(count);
+        registration.dispose();
+        await writeFile(join(workspace, "sample.txt"), "after dispose\n");
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        expect(send).toHaveBeenCalledTimes(count);
+      } finally {
+        registration.dispose();
+        snapshotSpy.mockRestore();
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
   it("rejects calls when the main window is missing", async () => {
     handlers.clear();
     const registration = registerRuntimeDesktopShell({
-      roots: { dataRoot: "/data", sessionRoot: "/data/sessions-v2", logRoot: "/logs", tmpRoot: "/tmp", defaultWorkspaceRoot: "/workspace", workspaceRoot: "/workspace" },
+      roots: {
+        dataRoot: "/data",
+        sessionRoot: "/data/sessions-v2",
+        logRoot: "/logs",
+        tmpRoot: "/tmp",
+        defaultWorkspaceRoot: "/workspace",
+        workspaceRoot: "/workspace",
+      },
       getMainWindow: () => undefined,
       listSessions: async () => [],
     });
     const { event } = trustedWindow();
-    await expect(Promise.resolve().then(() => handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.listWorkspaces)!(event))).rejects.toThrow("Untrusted shell sender");
+    await expect(
+      Promise.resolve().then(() => handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.listWorkspaces)!(event)),
+    ).rejects.toThrow("Untrusted shell sender");
     registration.dispose();
   });
 
@@ -148,20 +197,54 @@ describe("runtime v2 desktop shell IPC", () => {
     await Promise.all([workspace, worktree, outside].map((dir) => writeFile(join(dir, "a.md"), dir)));
     const trusted = trustedWindow();
     const registration = registerRuntimeDesktopShell({
-      roots: { dataRoot, sessionRoot: join(dataRoot, "sessions-v2"), logRoot: join(dataRoot, "logs"), tmpRoot: join(dataRoot, "tmp"), defaultWorkspaceRoot: workspace, workspaceRoot: workspace },
+      roots: {
+        dataRoot,
+        sessionRoot: join(dataRoot, "sessions-v2"),
+        logRoot: join(dataRoot, "logs"),
+        tmpRoot: join(dataRoot, "tmp"),
+        defaultWorkspaceRoot: workspace,
+        workspaceRoot: workspace,
+      },
       getMainWindow: () => trusted.window as never,
       listSessions: async () => [{ workspaceRoot: worktree }],
     });
-    const read = (workspaceRoot?: string) => Promise.resolve().then(() => handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.readWorkspaceFile)!(trusted.event, { workspaceRoot, relativePath: "a.md" }));
+    const read = (workspaceRoot?: string) =>
+      Promise.resolve().then(() =>
+        handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.readWorkspaceFile)!(trusted.event, {
+          workspaceRoot,
+          relativePath: "a.md",
+        }),
+      );
     try {
       expect(await read(workspace)).toMatchObject({ content: workspace });
       expect(await read()).toMatchObject({ content: workspace });
       expect(await read(worktree)).toMatchObject({ content: worktree });
       await expect(read(outside)).rejects.toThrow("workspace_not_registered");
       await expect(read("/")).rejects.toThrow("workspace_not_registered");
-      await expect(Promise.resolve().then(() => handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.listWorkspaceMarkdownFiles)!(trusted.event, { workspaceRoot: outside }))).rejects.toThrow("workspace_not_registered");
-      await expect(Promise.resolve().then(() => handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.writeWorkspaceMarkdownFile)!(trusted.event, { workspaceRoot: outside, relativePath: "a.md", content: "x" }))).rejects.toThrow("workspace_not_registered");
-      await expect(Promise.resolve().then(() => handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.statWorkspaceFile)!(trusted.event, { workspaceRoot: outside, relativePath: "a.md" }))).rejects.toThrow("workspace_not_registered");
+      await expect(
+        Promise.resolve().then(() =>
+          handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.listWorkspaceMarkdownFiles)!(trusted.event, {
+            workspaceRoot: outside,
+          }),
+        ),
+      ).rejects.toThrow("workspace_not_registered");
+      await expect(
+        Promise.resolve().then(() =>
+          handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.writeWorkspaceMarkdownFile)!(trusted.event, {
+            workspaceRoot: outside,
+            relativePath: "a.md",
+            content: "x",
+          }),
+        ),
+      ).rejects.toThrow("workspace_not_registered");
+      await expect(
+        Promise.resolve().then(() =>
+          handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.statWorkspaceFile)!(trusted.event, {
+            workspaceRoot: outside,
+            relativePath: "a.md",
+          }),
+        ),
+      ).rejects.toThrow("workspace_not_registered");
     } finally {
       registration.dispose();
       await rm(dataRoot, { recursive: true, force: true });

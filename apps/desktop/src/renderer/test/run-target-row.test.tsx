@@ -8,14 +8,40 @@ import { describeReadiness } from "../target/readiness";
 import { capabilitiesOf, type RunTarget } from "../target/run-target";
 
 const LOCAL: RunTarget = { kind: "local", branch: "main" };
-const REMOTE: RunTarget = { kind: "remote", hostId: "dev", hostName: "dev-box", workspaceId: "api", workspaceName: "api-server" };
-const HOSTS: HostConnection[] = [{ id: "dev", hostId: "dev", name: "dev-box", state: "connected", endpoint: { kind: "wss", url: "wss://dev" } }];
-const DESCRIPTION = { state: "ready", workspaces: [{ id: "api", name: "api-server", path: "/srv/api" }, { id: "web", name: "web", path: "/srv/web" }], models: [], defaultModel: "" };
+const REMOTE: RunTarget = {
+  kind: "remote",
+  hostId: "dev",
+  hostName: "dev-box",
+  workspaceId: "api",
+  workspaceName: "api-server",
+};
+const HOSTS: HostConnection[] = [
+  { id: "dev", hostId: "dev", name: "dev-box", state: "connected", endpoint: { kind: "wss", url: "wss://dev" } },
+];
+const DESCRIPTION = {
+  state: "ready",
+  workspaces: [
+    { id: "api", name: "api-server", path: "/srv/api" },
+    { id: "web", name: "web", path: "/srv/web" },
+  ],
+  models: [],
+  defaultModel: "",
+};
 
-function renderRow(overrides: Partial<Omit<RunTargetRowProps, "openField" | "onOpenChange" | "local">> & { local?: Partial<RunTargetRowProps["local"]> } = {}) {
+function renderRow(
+  overrides: Partial<Omit<RunTargetRowProps, "openField" | "onOpenChange" | "local">> & {
+    local?: Partial<RunTargetRowProps["local"]>;
+  } = {},
+) {
   const calls = {
-    onSelectHost: vi.fn(), onSelectRemoteWorkspace: vi.fn(), onConnectHost: vi.fn(),
-    onSelectWorkspace: vi.fn(), onUseExistingWorkspace: vi.fn(), onCreateWorkspaceFolder: vi.fn(), onSelectBranch: vi.fn(), onSelectRunLocation: vi.fn(),
+    onSelectHost: vi.fn(),
+    onSelectRemoteWorkspace: vi.fn(),
+    onConnectHost: vi.fn(),
+    onSelectWorkspace: vi.fn(),
+    onUseExistingWorkspace: vi.fn(),
+    onCreateWorkspaceFolder: vi.fn(),
+    onSelectBranch: vi.fn(),
+    onSelectRunLocation: vi.fn(),
   };
   const target = overrides.target ?? LOCAL;
   function Harness() {
@@ -33,7 +59,10 @@ function renderRow(overrides: Partial<Omit<RunTargetRowProps, "openField" | "onO
         onSelectRemoteWorkspace={calls.onSelectRemoteWorkspace}
         onConnectHost={calls.onConnectHost}
         local={{
-          workspaces: [{ value: "/work/actspace", label: "actspace" }, { value: "/work/wiki", label: "wiki" }],
+          workspaces: [
+            { value: "/work/actspace", label: "actspace" },
+            { value: "/work/wiki", label: "wiki" },
+          ],
           selectedWorkspaceRoot: "/work/actspace",
           workspaceLabel: "actspace",
           branchLabel: "main",
@@ -62,9 +91,20 @@ describe("RunTargetRow", () => {
     const user = userEvent.setup();
     const calls = renderRow();
     const row = screen.getByLabelText("初始工作区与运行位置选择");
-    expect(within(row).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["选择工作区", "选择分支", "选择运行位置"]);
+    expect(
+      within(row)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual(["选择工作区", "选择分支", "选择运行位置"]);
     for (const button of within(row).getAllByRole("button")) {
-      expect(button).toHaveClass("h-7", "text-act-sm", "text-text-muted", "hover:text-text-main", "hover:bg-hover-overlay", "rounded-act-sm");
+      expect(button).toHaveClass(
+        "h-7",
+        "text-act-sm",
+        "text-text-muted",
+        "hover:text-text-main",
+        "hover:bg-hover-overlay",
+        "rounded-act-sm",
+      );
       expect(button).toHaveAttribute("aria-haspopup", "menu");
     }
     expect(screen.getByRole("button", { name: "选择运行位置" })).toHaveTextContent("本机");
@@ -136,6 +176,10 @@ describe("RunTargetRow", () => {
   it("shows only the run location for Chat", () => {
     renderRow({ target: REMOTE, remoteDescription: DESCRIPTION, locationOnly: true });
     const row = screen.getByLabelText("初始工作区与运行位置选择");
-    expect(within(row).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["选择运行位置"]);
+    expect(
+      within(row)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual(["选择运行位置"]);
   });
 });

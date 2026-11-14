@@ -1,7 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { coreEvent, type CoreEventDataMap, type RuntimeAgentMode, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
+import {
+  coreEvent,
+  type CoreEventDataMap,
+  type RuntimeAgentMode,
+  type RuntimeJsonValue,
+} from "@actspace/shared/runtime-v2";
 import type { RuntimeHostDescriptor } from "@actspace/shared/runtime-v2";
-import { ContextEngine, surfaceMessage, requestRecords, describeContextContent, type RequestRecords, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context-engine";
+import {
+  ContextEngine,
+  surfaceMessage,
+  requestRecords,
+  describeContextContent,
+  type RequestRecords,
+  type ContextEngineOptions,
+  type ContextSourceRegistry,
+  type ContextSource,
+} from "@actspace/context-engine";
 import { estimateMessage, estimateRequestInput } from "@actspace/shared";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
 import type { LlmServiceContract, PreparedLlmCall } from "@actspace/llm-service";
@@ -14,18 +28,42 @@ import { settleOpenTurnWork, type SessionHandle } from "@actspace/session-persis
 import type { ToolCallInput, ToolPreparedEnvironment } from "@actspace/tool-runtime";
 import type { ToolRuntimeContract } from "@actspace/tool-runtime";
 import type { ToolExecutionResult } from "@actspace/tool-runtime";
-import { allowedAgentModeTools, createAgentEventDispatcher, defaultAgentSubject, type AgentDescriptor, type AgentSubject, type AgentEventDispatcher, type AgentHookInput } from "@actspace/agent";
+import {
+  allowedAgentModeTools,
+  createAgentEventDispatcher,
+  defaultAgentSubject,
+  type AgentDescriptor,
+  type AgentSubject,
+  type AgentEventDispatcher,
+  type AgentHookInput,
+} from "@actspace/agent";
 import type { ContextCompactor } from "@actspace/context-engine";
 import { AgentRuntimeError } from "@actspace/agent";
 import type { MainAgentInbox } from "@actspace/agent";
 import type { RunTurnResult } from "@actspace/agent";
-import { ACTSPACE_SERVICE_IDS, getService, serviceView, type CordisContext, type AgentNotification } from "@actspace/cordis-adapter";
+import {
+  ACTSPACE_SERVICE_IDS,
+  getService,
+  serviceView,
+  type CordisContext,
+  type AgentNotification,
+} from "@actspace/cordis-adapter";
 import type { AgentRequestPlan, AgentRequestRecovery } from "./hooks.js";
 import { toolBatchOutputChars } from "./tool-output-budget.js";
 
-export type RunTurnInput = { readonly content: RuntimeJsonValue; readonly messageId?: string; readonly agentRunId?: string; readonly model?: string; readonly mode?: RuntimeAgentMode; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly keepPendingOnAbort?: boolean; readonly selectedSkillIds?: readonly string[];
+export type RunTurnInput = {
+  readonly content: RuntimeJsonValue;
+  readonly messageId?: string;
+  readonly agentRunId?: string;
+  readonly model?: string;
+  readonly mode?: RuntimeAgentMode;
+  readonly thinkingEnabled?: boolean;
+  readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort;
+  readonly keepPendingOnAbort?: boolean;
+  readonly selectedSkillIds?: readonly string[];
   /** Host wake turn: no user message; the first Step claims pending background notifications. */
-  readonly wake?: boolean };
+  readonly wake?: boolean;
+};
 type LiveIdentity = {
   readonly parentSessionId?: string;
   readonly parentCallId?: string;
@@ -38,21 +76,65 @@ type LiveIdentity = {
 type StreamPayload =
   | { readonly kind: "assistant-delta"; readonly message: string }
   | { readonly kind: "reasoning-delta"; readonly message: string }
-  | { readonly kind: "tool-call-delta"; readonly callId: string; readonly name: string; readonly argumentsDelta: string };
-export type AgentLoopLiveEvent = LiveIdentity & (
-  | (StreamPayload & { readonly requestId: string; readonly messageId: string })
-  | { readonly kind: "run-state"; readonly message: string; readonly requestId?: string; readonly model?: string; readonly failure?: LlmFailure }
-  | { readonly kind: "tool-prepared"; readonly requestId: string; readonly callId: string; readonly name: string; readonly arguments: RuntimeJsonValue }
-  | { readonly kind: "tool-started"; readonly requestId: string; readonly callId: string; readonly name: string }
-  | { readonly kind: "tool-finished"; readonly requestId: string; readonly callId: string; readonly name: string; readonly result: ToolExecutionResult; readonly resultEventId: string }
-  | { readonly kind: "compaction-started" }
-  | { readonly kind: "compaction-finished"; readonly removedCount: number; readonly durationMs: number; readonly compactionId?: string; readonly trigger?: "manual" | "auto"; readonly beforeTokens?: number; readonly afterTokens?: number; readonly beforeEstimated?: true }
-  | { readonly kind: "compaction-failed"; readonly message: string }
-  | { readonly kind: "inbox-claimed"; readonly messageId: string; readonly source?: import("@actspace/agent").InboxSource; readonly notice?: import("@actspace/agent").InboxNotice; readonly content?: string; readonly opensTurn?: boolean }
-);
+  | {
+      readonly kind: "tool-call-delta";
+      readonly callId: string;
+      readonly name: string;
+      readonly argumentsDelta: string;
+    };
+export type AgentLoopLiveEvent = LiveIdentity &
+  (
+    | (StreamPayload & { readonly requestId: string; readonly messageId: string })
+    | {
+        readonly kind: "run-state";
+        readonly message: string;
+        readonly requestId?: string;
+        readonly model?: string;
+        readonly failure?: LlmFailure;
+      }
+    | {
+        readonly kind: "tool-prepared";
+        readonly requestId: string;
+        readonly callId: string;
+        readonly name: string;
+        readonly arguments: RuntimeJsonValue;
+      }
+    | { readonly kind: "tool-started"; readonly requestId: string; readonly callId: string; readonly name: string }
+    | {
+        readonly kind: "tool-finished";
+        readonly requestId: string;
+        readonly callId: string;
+        readonly name: string;
+        readonly result: ToolExecutionResult;
+        readonly resultEventId: string;
+      }
+    | { readonly kind: "compaction-started" }
+    | {
+        readonly kind: "compaction-finished";
+        readonly removedCount: number;
+        readonly durationMs: number;
+        readonly compactionId?: string;
+        readonly trigger?: "manual" | "auto";
+        readonly beforeTokens?: number;
+        readonly afterTokens?: number;
+        readonly beforeEstimated?: true;
+      }
+    | { readonly kind: "compaction-failed"; readonly message: string }
+    | {
+        readonly kind: "inbox-claimed";
+        readonly messageId: string;
+        readonly source?: import("@actspace/agent").InboxSource;
+        readonly notice?: import("@actspace/agent").InboxNotice;
+        readonly content?: string;
+        readonly opensTurn?: boolean;
+      }
+  );
 type WithoutSession<T> = T extends unknown ? Omit<T, "sessionId"> : never;
 
-export type LoopExecutionConfiguration = Pick<RunTurnInput, "model" | "thinkingEnabled" | "reasoningEffort" | "selectedSkillIds">;
+export type LoopExecutionConfiguration = Pick<
+  RunTurnInput,
+  "model" | "thinkingEnabled" | "reasoningEffort" | "selectedSkillIds"
+>;
 /** 一个 Step 里各次请求（首次和重试）共用的输入。 */
 type StepRequestInput = {
   readonly agentRunId: string;
@@ -69,7 +151,11 @@ type StepRequestInput = {
 /** 已写下请求记录、等待派发的一次请求。 */
 type StepRequest = {
   readonly requestId: string;
-  readonly converted: { readonly context: import("@actspace/context-engine").Context; readonly engine: ContextEngine; readonly input: import("@actspace/context-engine").LlmInput };
+  readonly converted: {
+    readonly context: import("@actspace/context-engine").Context;
+    readonly engine: ContextEngine;
+    readonly input: import("@actspace/context-engine").LlmInput;
+  };
   readonly prepared: PreparedLlmCall;
   /** 这一步首次请求的 prepared call；首次请求时就是 `prepared`。 */
   readonly origin: PreparedLlmCall;
@@ -81,19 +167,26 @@ type StepRequest = {
 };
 /** Host-owned queue port. claim() commits user Surface facts before returning. */
 export interface LoopInputSource {
-  claim(agentRunId: string): Promise<{ readonly messageIds: readonly string[]; readonly configuration: LoopExecutionConfiguration }>;
+  claim(
+    agentRunId: string,
+  ): Promise<{ readonly messageIds: readonly string[]; readonly configuration: LoopExecutionConfiguration }>;
   hasPending(agentRunId: string): boolean;
 }
 
 /** Loop 用到的 `session.checkpoint`：只要 flush。 */
-export const LOOP_CHECKPOINT_VIEW = serviceView<{ flush(input: { readonly sessionId: string; readonly throughSeq: number; readonly reason: string }): Promise<void> }>(ACTSPACE_SERVICE_IDS.sessionCheckpoint);
+export const LOOP_CHECKPOINT_VIEW = serviceView<{
+  flush(input: { readonly sessionId: string; readonly throughSeq: number; readonly reason: string }): Promise<void>;
+}>(ACTSPACE_SERVICE_IDS.sessionCheckpoint);
 export type AgentLoopOptions = {
   readonly descriptor: AgentDescriptor;
   readonly scope: AgentScope;
   readonly session: SessionHandle;
   readonly inbox: MainAgentInbox;
   readonly inputSource?: LoopInputSource;
-  readonly observeContextToolResult?: (session: SessionHandle, event: import("@actspace/session-journal").SessionEventEnvelopeV1) => Promise<void>;
+  readonly observeContextToolResult?: (
+    session: SessionHandle,
+    event: import("@actspace/session-journal").SessionEventEnvelopeV1,
+  ) => Promise<void>;
   readonly contextSources: ContextSourceRegistry;
   readonly contextExtensions?: () => readonly ContextSource[];
   readonly createContextEngine?: (options: ContextEngineOptions) => ContextEngine;
@@ -120,23 +213,51 @@ export class AgentLoop {
   #idle: Promise<void> | null = null;
   #resolveIdle: (() => void) | null = null;
   #accepting = true;
-  constructor(private readonly options: AgentLoopOptions) { this.#events = createAgentEventDispatcher(this.options.context, this.options.scope, this.options.agentSubject ?? defaultAgentSubject(this.options.scope)); }
-  get active(): boolean { return this.#active !== null; }
+  constructor(private readonly options: AgentLoopOptions) {
+    this.#events = createAgentEventDispatcher(
+      this.options.context,
+      this.options.scope,
+      this.options.agentSubject ?? defaultAgentSubject(this.options.scope),
+    );
+  }
+  get active(): boolean {
+    return this.#active !== null;
+  }
   /** The immutable live subject shared by every dispatch from this loop. */
-  get subject(): AgentSubject { return this.#events.subject; }
-  async waitForIdle(): Promise<void> { await this.#idle; }
-  abort(reason = "host-abort"): boolean { if (this.#active === null) return false; this.#active.abort(reason); return true; }
-  quiesce(): void { this.#accepting = false; this.abort("runtime-shutdown"); }
+  get subject(): AgentSubject {
+    return this.#events.subject;
+  }
+  async waitForIdle(): Promise<void> {
+    await this.#idle;
+  }
+  abort(reason = "host-abort"): boolean {
+    if (this.#active === null) return false;
+    this.#active.abort(reason);
+    return true;
+  }
+  quiesce(): void {
+    this.#accepting = false;
+    this.abort("runtime-shutdown");
+  }
 
   async runTurn(input: RunTurnInput): Promise<RunTurnResult> {
     if (!this.#accepting) throw new AgentRuntimeError("TURN_ABORTED", "Agent Loop is quiescing.");
-    if (this.#active !== null) throw new AgentRuntimeError("TURN_ALREADY_ACTIVE", "This Session already has an active turn.");
-    const controller = new AbortController(); this.#active = controller; this.#idle = new Promise<void>((resolve) => { this.#resolveIdle = resolve; });
-    const agentRunId = input.agentRunId ?? randomUUID(); const turnId = randomUUID(); let stepCount = 0; let finalText = "";
+    if (this.#active !== null)
+      throw new AgentRuntimeError("TURN_ALREADY_ACTIVE", "This Session already has an active turn.");
+    const controller = new AbortController();
+    this.#active = controller;
+    this.#idle = new Promise<void>((resolve) => {
+      this.#resolveIdle = resolve;
+    });
+    const agentRunId = input.agentRunId ?? randomUUID();
+    const turnId = randomUUID();
+    let stepCount = 0;
+    let finalText = "";
     let turnStartSeq: number | null = null;
     try {
       // A notification read by an earlier Run leaves nothing to deliver; settle without a turn.
-      if (input.wake && !this.options.inbox.hasPendingNotifications()) return Object.freeze({ agentRunId, turnId, reason: "completed", steps: 0, finalText });
+      if (input.wake && !this.options.inbox.hasPendingNotifications())
+        return Object.freeze({ agentRunId, turnId, reason: "completed", steps: 0, finalText });
       this.notify("agent/session-start", { agentRunId, turnId, sessionId: this.options.session.header.sessionId });
       this.notify("agent/status", { agentRunId, turnId, status: "started" });
       this.emitLive({ kind: "run-state", agentRunId, turnId, message: "started" });
@@ -146,33 +267,98 @@ export class AgentLoop {
       const modeRevision = currentAgentModeRevision(this.options.session.journal.latestEvents(["agent/mode-set"]));
       const modeRuntime = await this.options.modeRuntime?.(mode);
       const compaction = modeRuntime?.compaction ?? this.options.compaction;
-      turnStartSeq = (await this.options.session.append(coreEvent("turn/start", { turnId, agentRunId, mode, modeRevision }))).seq;
+      turnStartSeq = (
+        await this.options.session.append(coreEvent("turn/start", { turnId, agentRunId, mode, modeRevision }))
+      ).seq;
       const turnEnvironment = this.options.toolEnvironment(this.options.session);
-      const configuredPermissionMode = typeof turnEnvironment.permissionMode === "function" ? turnEnvironment.permissionMode() : turnEnvironment.permissionMode ?? "default";
-      if (turnEnvironment.permissionModeExplicit && currentPermissionMode(this.options.session.journal.latestEvents(["permission/mode-set"])) !== configuredPermissionMode) {
-        await this.options.session.append(coreEvent("permission/mode-set", { mode: configuredPermissionMode, changedAt: new Date().toISOString(), source: "host" }));
+      const configuredPermissionMode =
+        typeof turnEnvironment.permissionMode === "function"
+          ? turnEnvironment.permissionMode()
+          : (turnEnvironment.permissionMode ?? "default");
+      if (
+        turnEnvironment.permissionModeExplicit &&
+        currentPermissionMode(this.options.session.journal.latestEvents(["permission/mode-set"])) !==
+          configuredPermissionMode
+      ) {
+        await this.options.session.append(
+          coreEvent("permission/mode-set", {
+            mode: configuredPermissionMode,
+            changedAt: new Date().toISOString(),
+            source: "host",
+          }),
+        );
       }
-      if (!input.wake && !hasUserMessage(this.options.session, messageId)) await this.options.session.append(coreEvent("user/message", { messageId, agentRunId, turnId, content: input.content }, { surface: { kind: "append" } }));
+      if (!input.wake && !hasUserMessage(this.options.session, messageId))
+        await this.options.session.append(
+          coreEvent(
+            "user/message",
+            { messageId, agentRunId, turnId, content: input.content },
+            { surface: { kind: "append" } },
+          ),
+        );
       // 旧 journal 的插入记录不能进入新 Run；当前用户输入仅由 Host Task 管理。
-      for (const item of this.options.inbox.pending()) if (item.source === "steer" || item.target === "next-turn") await this.options.inbox.discard(item.messageId, "stale-steer");
+      for (const item of this.options.inbox.pending())
+        if (item.source === "steer" || item.target === "next-turn")
+          await this.options.inbox.discard(item.messageId, "stale-steer");
       while (stepCount < this.options.descriptor.maxSteps) {
         if (controller.signal.aborted) throw new AgentRuntimeError("TURN_ABORTED", "Turn was aborted.");
         if (this.options.inputSource) {
           const consumed = await this.options.inputSource.claim(agentRunId);
           if (consumed.messageIds.length) configuration = consumed.configuration;
-          for (const messageId of consumed.messageIds) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId, source: "steer" });
+          for (const messageId of consumed.messageIds)
+            this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId, source: "steer" });
         }
         const opensTurn = input.wake === true && stepCount === 0;
-        for (const item of await this.options.inbox.claim({ opensTurn })) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId: item.messageId, ...(item.source === undefined ? {} : { source: item.source }), ...(item.notice ? { notice: item.notice, content: typeof item.content === "string" ? item.content : JSON.stringify(item.content), opensTurn } : {}) });
-        const stepId = randomUUID(); stepCount += 1;
-        const preStepInput: AgentHookInput<"agent/pre-step"> = { agentRunId, turnId, stepId, stepIndex: stepCount, mode };
+        for (const item of await this.options.inbox.claim({ opensTurn }))
+          this.emitLive({
+            kind: "inbox-claimed",
+            agentRunId,
+            turnId,
+            messageId: item.messageId,
+            ...(item.source === undefined ? {} : { source: item.source }),
+            ...(item.notice
+              ? {
+                  notice: item.notice,
+                  content: typeof item.content === "string" ? item.content : JSON.stringify(item.content),
+                  opensTurn,
+                }
+              : {}),
+          });
+        const stepId = randomUUID();
+        stepCount += 1;
+        const preStepInput: AgentHookInput<"agent/pre-step"> = {
+          agentRunId,
+          turnId,
+          stepId,
+          stepIndex: stepCount,
+          mode,
+        };
         const preStep = await this.#events.waterfall("agent/pre-step", preStepInput, () => preStepInput);
         this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "step-started" });
         // 监听器的返回值只确认是对象，里面的值没有逐个检查。
-        await this.options.session.append(coreEvent("step/start", { turnId, stepId, agentRunId, stepIndex: stepCount, ...(isRecord(preStep) ? { metadata: preStep as RuntimeJsonValue } : {}) }));
+        await this.options.session.append(
+          coreEvent("step/start", {
+            turnId,
+            stepId,
+            agentRunId,
+            stepIndex: stepCount,
+            ...(isRecord(preStep) ? { metadata: preStep as RuntimeJsonValue } : {}),
+          }),
+        );
         // 最后一步（main 与 subagent 一样）不给工具，留给总结，避免步数打满后没有任何回复。
         const budgetSummary = stepCount === this.options.descriptor.maxSteps;
-        const step: StepRequestInput = { agentRunId, turnId, stepId, mode, modeRevision, configuration, tools: budgetSummary ? [] : this.toolDefinitions(mode), budgetSummary, compaction, signal: controller.signal };
+        const step: StepRequestInput = {
+          agentRunId,
+          turnId,
+          stepId,
+          mode,
+          modeRevision,
+          configuration,
+          tools: budgetSummary ? [] : this.toolDefinitions(mode),
+          budgetSummary,
+          compaction,
+          signal: controller.signal,
+        };
         let request = await this.openRequest(step, 1);
         const retryPolicy = request.origin.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY;
         let output: Awaited<ReturnType<typeof collectStream>> | undefined;
@@ -180,8 +366,20 @@ export class AgentLoop {
         while (output === undefined) {
           const { requestId, prepared } = request;
           try {
-            this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, requestId, message: "request-started", model: prepared.request.model });
-            const stream = await this.#events.waterfall("llm/stream", { requestId, turnId, stepId, request: prepared.request, signal: controller.signal }, () => prepared.dispatch());
+            this.emitLive({
+              kind: "run-state",
+              agentRunId,
+              turnId,
+              stepId,
+              requestId,
+              message: "request-started",
+              model: prepared.request.model,
+            });
+            const stream = await this.#events.waterfall(
+              "llm/stream",
+              { requestId, turnId, stepId, request: prepared.request, signal: controller.signal },
+              () => prepared.dispatch(),
+            );
             // 监听器的返回值没有检查是不是流：读它时出错，和流中途断掉一样按这次请求失败处理。
             output = await collectStream(stream as AsyncIterable<LlmStreamEvent>, controller.signal, async (event) => {
               // Stream deltas are live-only: the settled assistant/message is the durable fact (agent-spec-live-assistant-stream.md).
@@ -198,23 +396,67 @@ export class AgentLoop {
             if (!prepared.dispatched) prepared.release();
           }
           if (output.failure === null) break;
-          const recovery = requestRecoveryOf(await this.#events.waterfall("agent/request-error", { requestId, turnId, stepId, attempt, failure: output.failure }, () => undefined));
-          const delayMs = recovery?.kind === "abort" || output.aborted || output.sawObservableDelta ? null : recovery?.kind === "retry" ? (recovery.delayMs ?? retryDelay(retryPolicy, output.failure, attempt)) : retryDelay(retryPolicy, output.failure, attempt);
+          const recovery = requestRecoveryOf(
+            await this.#events.waterfall(
+              "agent/request-error",
+              { requestId, turnId, stepId, attempt, failure: output.failure },
+              () => undefined,
+            ),
+          );
+          const delayMs =
+            recovery?.kind === "abort" || output.aborted || output.sawObservableDelta
+              ? null
+              : recovery?.kind === "retry"
+                ? (recovery.delayMs ?? retryDelay(retryPolicy, output.failure, attempt))
+                : retryDelay(retryPolicy, output.failure, attempt);
           if (delayMs === null) {
             // Failed partial tool calls must never enter the model surface or execute.
-            const partialContent = output.content.filter(block => block.type !== "tool-call");
-            await this.options.session.append(coreEvent("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content: partialContent, finishReason: output.aborted ? "aborted" : "failed", usage: output.usage, ...firstToken(output) }, partialContent.length > 0 ? { surface: { kind: "append" } } : undefined));
-            await this.options.session.append(coreEvent("step/end", { turnId, stepId, reason: output.aborted ? "aborted" : "failed" }));
-            throw new AgentRuntimeError(output.aborted ? "TURN_ABORTED" : "AGENT_SETUP_FAILED", output.failure.message, output.failure);
+            const partialContent = output.content.filter((block) => block.type !== "tool-call");
+            await this.options.session.append(
+              coreEvent(
+                "assistant/message",
+                {
+                  messageId: output.messageId,
+                  requestId,
+                  turnId,
+                  stepId,
+                  content: partialContent,
+                  finishReason: output.aborted ? "aborted" : "failed",
+                  usage: output.usage,
+                  ...firstToken(output),
+                },
+                partialContent.length > 0 ? { surface: { kind: "append" } } : undefined,
+              ),
+            );
+            await this.options.session.append(
+              coreEvent("step/end", { turnId, stepId, reason: output.aborted ? "aborted" : "failed" }),
+            );
+            throw new AgentRuntimeError(
+              output.aborted ? "TURN_ABORTED" : "AGENT_SETUP_FAILED",
+              output.failure.message,
+              output.failure,
+            );
           }
           const retryId = randomUUID();
-          await this.options.session.append(coreEvent("llm/retry", { requestId, retryId, attempt, nextAttempt: attempt + 1, delayMs, failure: output.failure, usage: output.usage }));
+          await this.options.session.append(
+            coreEvent("llm/retry", {
+              requestId,
+              retryId,
+              attempt,
+              nextAttempt: attempt + 1,
+              delayMs,
+              failure: output.failure,
+              usage: output.usage,
+            }),
+          );
           await this.checkpoint("before-llm-dispatch");
-          if (!await cancellableDelay(delayMs, controller.signal)) {
+          if (!(await cancellableDelay(delayMs, controller.signal))) {
             await this.options.session.append(coreEvent("step/end", { turnId, stepId, reason: "aborted" }));
             throw new AgentRuntimeError("TURN_ABORTED", "LLM retry wait aborted.");
           }
-          await this.options.session.append(coreEvent("llm/retry-started", { requestId, retryId, attempt: attempt + 1 }));
+          await this.options.session.append(
+            coreEvent("llm/retry-started", { requestId, retryId, attempt: attempt + 1 }),
+          );
           await this.checkpoint("before-llm-dispatch");
           attempt += 1;
           request = await this.openRequest(step, attempt, request);
@@ -222,21 +464,71 @@ export class AgentLoop {
         }
         const { requestId, prepared, converted } = request;
         // Empty content still settles the request before its Step can end.
-        finalText = output.text || output.content.filter((block) => block.type === "text").map((block) => block.text).join("");
-        await this.options.session.append(coreEvent("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content: output.content, finishReason: output.stopReason ?? (output.aborted ? "aborted" : "completed"), usage: output.usage, ...firstToken(output) }, { surface: { kind: "append" } }));
-        if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, request.visibleToolNames, request.model, this.toolBatchOutputChars(prepared.request, request.estimate, output));
-        await this.options.session.append(coreEvent("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
+        finalText =
+          output.text ||
+          output.content
+            .filter((block) => block.type === "text")
+            .map((block) => block.text)
+            .join("");
+        await this.options.session.append(
+          coreEvent(
+            "assistant/message",
+            {
+              messageId: output.messageId,
+              requestId,
+              turnId,
+              stepId,
+              content: output.content,
+              finishReason: output.stopReason ?? (output.aborted ? "aborted" : "completed"),
+              usage: output.usage,
+              ...firstToken(output),
+            },
+            { surface: { kind: "append" } },
+          ),
+        );
+        if (output.toolCalls.length > 0)
+          await this.runTools(
+            output.toolCalls,
+            { agentRunId, turnId, stepId, requestId },
+            controller.signal,
+            request.visibleToolNames,
+            request.model,
+            this.toolBatchOutputChars(prepared.request, request.estimate, output),
+          );
+        await this.options.session.append(
+          coreEvent("step/end", {
+            turnId,
+            stepId,
+            reason: output.toolCalls.length > 0 ? "tool-use" : "completed",
+            usage: output.usage,
+          }),
+        );
         await this.checkpoint("before-next-step");
-        const updated = await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
+        const updated = await this.publishContext(converted.engine, converted.context.request, {
+          agentRunId,
+          turnId,
+          stepId,
+        });
         if (compaction !== undefined && !controller.signal.aborted) {
           // Include this Step's tool bodies: the previous Provider usage cannot
           // account for results produced after that request completed.
-          const manifest = describeContextContent({ ...updated, content: { ...updated.content, conversation: this.options.session.journal.surface } }).manifest;
+          const manifest = describeContextContent({
+            ...updated,
+            content: { ...updated.content, conversation: this.options.session.journal.surface },
+          }).manifest;
           const actual = compactionUsage(output.usage, prepared.request.contextWindow ?? null);
-          const calls = new Set(output.toolCalls.map(call => call.callId));
-          const toolTokens = manifest.entries.filter(entry => entry.kind === "tool-result" && calls.has(entry.trajectoryRef?.callId ?? "")).reduce((sum, entry) => sum + entry.estimatedTokens, 0);
-          const usage = { contextWindow: prepared.request.contextWindow ?? null,
-            inputTokens: Math.max(manifest.totalEstimatedTokens - (actual?.outputTokens ?? 0), (actual?.inputTokens ?? 0) + toolTokens), outputTokens: actual?.outputTokens ?? 0 };
+          const calls = new Set(output.toolCalls.map((call) => call.callId));
+          const toolTokens = manifest.entries
+            .filter((entry) => entry.kind === "tool-result" && calls.has(entry.trajectoryRef?.callId ?? ""))
+            .reduce((sum, entry) => sum + entry.estimatedTokens, 0);
+          const usage = {
+            contextWindow: prepared.request.contextWindow ?? null,
+            inputTokens: Math.max(
+              manifest.totalEstimatedTokens - (actual?.outputTokens ?? 0),
+              (actual?.inputTokens ?? 0) + toolTokens,
+            ),
+            outputTokens: actual?.outputTokens ?? 0,
+          };
           const before = this.options.session.lastSeq;
           const compacted = await this.autoCompact(compaction, usage, { agentRunId, turnId }, controller.signal);
           if (compacted || this.options.session.lastSeq !== before) {
@@ -246,7 +538,8 @@ export class AgentLoop {
         }
         controller.signal.throwIfAborted();
         // 模型写最后回复时用户插入了消息或后台任务发来通知：回合不结束，下一步开头读到它（仍受 maxSteps 约束）。
-        const steerPending = this.options.inputSource?.hasPending(agentRunId) || this.options.inbox.hasPendingNotifications();
+        const steerPending =
+          this.options.inputSource?.hasPending(agentRunId) || this.options.inbox.hasPendingNotifications();
         if (output.toolCalls.length === 0 && !budgetSummary && !steerPending) {
           await this.#events.serial("agent/turn-stopping", { agentRunId, turnId, reason: "completed", stepCount });
           await this.options.session.append(coreEvent("turn/end", { turnId, reason: "completed" }));
@@ -264,30 +557,75 @@ export class AgentLoop {
       return Object.freeze({ agentRunId, turnId, reason: "step-limit", steps: stepCount, finalText });
     } catch (error) {
       const cause = error instanceof AgentRuntimeError && isRecord(error.cause) ? error.cause : undefined;
-      const failure = { ...normalizeLlmFailure(error, 1), ...(cause as LlmFailure | undefined), message: redactLlmText(error instanceof Error ? error.message : String(error)).slice(0, 2000) };
+      const failure = {
+        ...normalizeLlmFailure(error, 1),
+        ...(cause as LlmFailure | undefined),
+        message: redactLlmText(error instanceof Error ? error.message : String(error)).slice(0, 2000),
+      };
       let settlementFailure: unknown;
       if (this.options.session.durabilityState !== "blocked") {
         try {
-          if (!input.keepPendingOnAbort) await this.options.inbox.discardAll(controller.signal.aborted ? "turn-aborted" : "turn-failed");
+          if (!input.keepPendingOnAbort)
+            await this.options.inbox.discardAll(controller.signal.aborted ? "turn-aborted" : "turn-failed");
           // 一条记录没写进去（过大、带敏感字段名、钩子抛错）时，这个回合里已开始的请求和工具调用没有结果，
           // Step 和 Turn 结束不了，会话会卡住直到重启。先把它们了结，下面才能正常收尾。
           const open = this.options.session.journal.validation.relations;
-          if (turnStartSeq !== null && open.openTurnId === turnId && (open.openRequestIds.length > 0 || open.openToolCallIds.length > 0)) await settleOpenTurnWork(this.options.session, turnStartSeq);
+          if (
+            turnStartSeq !== null &&
+            open.openTurnId === turnId &&
+            (open.openRequestIds.length > 0 || open.openToolCallIds.length > 0)
+          )
+            await settleOpenTurnWork(this.options.session, turnStartSeq);
           const relations = this.options.session.journal.validation.relations;
-          if (relations.openStepId !== null && relations.openRequestIds.length === 0 && relations.openToolCallIds.length === 0) await this.options.session.append(coreEvent("step/end", { turnId, stepId: relations.openStepId, reason: "interrupted" }));
-          if (this.options.session.journal.validation.relations.openTurnId === turnId && this.options.session.journal.validation.relations.openStepId === null) await this.options.session.append(coreEvent("turn/end", { turnId, reason: controller.signal.aborted ? "aborted" : "failed", ...(controller.signal.aborted ? {} : { failure }) }));
+          if (
+            relations.openStepId !== null &&
+            relations.openRequestIds.length === 0 &&
+            relations.openToolCallIds.length === 0
+          )
+            await this.options.session.append(
+              coreEvent("step/end", { turnId, stepId: relations.openStepId, reason: "interrupted" }),
+            );
+          if (
+            this.options.session.journal.validation.relations.openTurnId === turnId &&
+            this.options.session.journal.validation.relations.openStepId === null
+          )
+            await this.options.session.append(
+              coreEvent("turn/end", {
+                turnId,
+                reason: controller.signal.aborted ? "aborted" : "failed",
+                ...(controller.signal.aborted ? {} : { failure }),
+              }),
+            );
           await this.checkpoint("after-turn-settled");
-        } catch (caught) { settlementFailure = caught; }
+        } catch (caught) {
+          settlementFailure = caught;
+        }
       }
       if (!controller.signal.aborted) this.notify("agent/error", { agentRunId, turnId, error: failure.message });
       this.notify("agent/status", { agentRunId, turnId, status: controller.signal.aborted ? "aborted" : "failed" });
-      this.emitLive({ kind: "run-state", agentRunId, turnId, message: controller.signal.aborted ? "aborted" : "failed", ...(controller.signal.aborted ? {} : { failure }) });
-      if (settlementFailure !== undefined) throw new AggregateError([error, settlementFailure], "Agent turn failed and its settlement checkpoint also failed.", { cause: error });
+      this.emitLive({
+        kind: "run-state",
+        agentRunId,
+        turnId,
+        message: controller.signal.aborted ? "aborted" : "failed",
+        ...(controller.signal.aborted ? {} : { failure }),
+      });
+      if (settlementFailure !== undefined)
+        throw new AggregateError(
+          [error, settlementFailure],
+          "Agent turn failed and its settlement checkpoint also failed.",
+          { cause: error },
+        );
       if (controller.signal.aborted && this.options.session.durabilityState !== "blocked") {
         return Object.freeze({ agentRunId, turnId, reason: "aborted", steps: stepCount, finalText });
       }
       throw error;
-    } finally { this.#active = null; this.#resolveIdle?.(); this.#resolveIdle = null; this.#idle = null; }
+    } finally {
+      this.#active = null;
+      this.#resolveIdle?.();
+      this.#resolveIdle = null;
+      this.#idle = null;
+    }
   }
 
   /** 一个 Step 里的一次请求，首次和重试共用：组装上下文、准备调用、写下请求记录。派发由调用方做。 */
@@ -296,49 +634,143 @@ export class AgentLoop {
     const sessionId = this.options.session.header.sessionId;
     const runtime = { mode, selectedSkillIds: configuration.selectedSkillIds ?? [], budgetSummary };
     // 路由和模型在这一步的首次请求定下，重试沿用（agent-llm-core-pi.md §13）：重试的上下文按定下的模型组装，钩子看到的也是它。
-    const target = previous === undefined
-      ? { routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model }
-      : { routeId: previous.routeId, model: previous.model };
-    let candidate = this.candidate({
-      sessionId,
-      turnId,
-      stepId,
-      scope: this.options.scope,
-      surface: this.options.session.journal.surface.entries.map((entry) => surfaceMessage(entry.node)),
-      hostFacts: { agentRunId: step.agentRunId, agentMode: mode, hostKind: this.options.host.hostKind, invocationId: this.options.host.invocationId, workspaceRoot: this.options.session.header.cwd ?? this.options.host.workspaceRef ?? this.options.toolEnvironment(this.options.session).workspaceRoot },
-      selectedSkillIds: Object.freeze(mode === "chat" ? [] : [...(configuration.selectedSkillIds ?? [])]),
-    }, step.tools as unknown as RuntimeJsonValue[], target);
+    const target =
+      previous === undefined
+        ? { routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model }
+        : { routeId: previous.routeId, model: previous.model };
+    let candidate = this.candidate(
+      {
+        sessionId,
+        turnId,
+        stepId,
+        scope: this.options.scope,
+        surface: this.options.session.journal.surface.entries.map((entry) => surfaceMessage(entry.node)),
+        hostFacts: {
+          agentRunId: step.agentRunId,
+          agentMode: mode,
+          hostKind: this.options.host.hostKind,
+          invocationId: this.options.host.invocationId,
+          workspaceRoot:
+            this.options.session.header.cwd ??
+            this.options.host.workspaceRef ??
+            this.options.toolEnvironment(this.options.session).workspaceRoot,
+        },
+        selectedSkillIds: Object.freeze(mode === "chat" ? [] : [...(configuration.selectedSkillIds ?? [])]),
+      },
+      step.tools as unknown as RuntimeJsonValue[],
+      target,
+    );
     const requestId = randomUUID();
-    let converted = await this.contextInput(candidate, requestId, { cacheRetention: mode === "chat" ? "long" : "short", ...(configuration.thinkingEnabled === undefined ? {} : { reasoning: configuration.thinkingEnabled }), ...(configuration.reasoningEffort === undefined ? {} : { reasoningEffort: configuration.reasoningEffort }) }, runtime);
+    let converted = await this.contextInput(
+      candidate,
+      requestId,
+      {
+        cacheRetention: mode === "chat" ? "long" : "short",
+        ...(configuration.thinkingEnabled === undefined ? {} : { reasoning: configuration.thinkingEnabled }),
+        ...(configuration.reasoningEffort === undefined ? {} : { reasoningEffort: configuration.reasoningEffort }),
+      },
+      runtime,
+    );
     let llmInput = converted.input;
     const visibleToolNames = new Set(llmInput.tools.map((tool) => tool.name));
     // 重试和首次请求一样经过 agent/request，attempt 让钩子分得清是第几次。消息和工具每次都按钩子的返回值来，路由和模型只有首次请求采纳。
-    const requestInput: AgentHookInput<"agent/request"> = { requestId, turnId, stepId, ...target, attempt, messages: llmInput.messages, tools: llmInput.tools };
+    const requestInput: AgentHookInput<"agent/request"> = {
+      requestId,
+      turnId,
+      stepId,
+      ...target,
+      attempt,
+      messages: llmInput.messages,
+      tools: llmInput.tools,
+    };
     const plan = requestPlanOf(await this.#events.waterfall("agent/request", requestInput, () => requestInput));
-    const routeId = previous === undefined ? plan.routeId ?? target.routeId : target.routeId;
-    const model = previous === undefined ? plan.model ?? target.model : target.model;
+    const routeId = previous === undefined ? (plan.routeId ?? target.routeId) : target.routeId;
+    const model = previous === undefined ? (plan.model ?? target.model) : target.model;
     let messages = plan.messages ?? llmInput.messages;
     if (routeId !== llmInput.routeId || model !== llmInput.model) {
       candidate = { ...candidate, requestOptions: { routeId, model } };
       converted = await this.contextInput(candidate, requestId, llmInput.options, runtime);
       llmInput = converted.input;
-      messages = [...llmInput.messages.filter(message => message.role === "system"), ...messages.filter(message => message.role !== "system")];
+      messages = [
+        ...llmInput.messages.filter((message) => message.role === "system"),
+        ...messages.filter((message) => message.role !== "system"),
+      ];
     }
-    const tools = budgetSummary ? [] : plan.tools ?? llmInput.tools;
+    const tools = budgetSummary ? [] : (plan.tools ?? llmInput.tools);
     // 重试从首次请求的 registration 和适配器调用派生，不重新取路由：同名路由中途换成新的，这一步也不会换到新连接上。
-    const prepared = previous === undefined
-      ? await this.options.llm.prepareAsync({ requestId, sessionId, routeId, model, messages, tools, options: llmInput.options, signal: step.signal })
-      : await this.options.llm.prepareCapturedAsync(previous.origin.registration, { ...previous.origin.request, requestId, messages, tools }, step.signal, previous.origin.preparedAdapterCall);
+    const prepared =
+      previous === undefined
+        ? await this.options.llm.prepareAsync({
+            requestId,
+            sessionId,
+            routeId,
+            model,
+            messages,
+            tools,
+            options: llmInput.options,
+            signal: step.signal,
+          })
+        : await this.options.llm.prepareCapturedAsync(
+            previous.origin.registration,
+            { ...previous.origin.request, requestId, messages, tools },
+            step.signal,
+            previous.origin.preparedAdapterCall,
+          );
     const origin = previous?.origin ?? prepared;
     // 准备好之后、派发之前出任何错都释放：没派发的调用不会自己归还 lease，路由注销会等到超时后报错。
     try {
-      const estimate = this.checkContextCapacity({ ...converted.input, messages: prepared.request.messages, tools: prepared.request.tools, options: prepared.request.options }, prepared.request.contextWindow ?? null, () => prepared.release());
+      const estimate = this.checkContextCapacity(
+        {
+          ...converted.input,
+          messages: prepared.request.messages,
+          tools: prepared.request.tools,
+          options: prepared.request.options,
+        },
+        prepared.request.contextWindow ?? null,
+        () => prepared.release(),
+      );
       const contextWindow = prepared.request.contextWindow ?? null;
-      converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${prepared.request.routeId}/${prepared.request.model}`, label: prepared.request.model, contextWindow, autoCompactAtTokens: step.compaction?.threshold?.(contextWindow) ?? null }) };
-      const metadata: PreparedRequestMetadata = { route: prepared.request.routeId, model: prepared.request.model, registrationId: origin.registration.registrationId, adapterVersion: origin.registration.adapter.adapterVersion, defaults: origin.request.options as RuntimeJsonValue, retryPolicy: retryPolicySnapshot(origin.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY) as unknown as RuntimeJsonValue, contextWindow };
-      const records = requestRecords(converted.context, { ...prepared.request, sessionId }, metadata as unknown as RuntimeJsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest);
+      converted = {
+        ...converted,
+        context: await converted.engine.recordPrepared(converted.context, {
+          modelKey: `${prepared.request.routeId}/${prepared.request.model}`,
+          label: prepared.request.model,
+          contextWindow,
+          autoCompactAtTokens: step.compaction?.threshold?.(contextWindow) ?? null,
+        }),
+      };
+      const metadata: PreparedRequestMetadata = {
+        route: prepared.request.routeId,
+        model: prepared.request.model,
+        registrationId: origin.registration.registrationId,
+        adapterVersion: origin.registration.adapter.adapterVersion,
+        defaults: origin.request.options as RuntimeJsonValue,
+        retryPolicy: retryPolicySnapshot(
+          origin.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY,
+        ) as unknown as RuntimeJsonValue,
+        contextWindow,
+      };
+      const records = requestRecords(
+        converted.context,
+        { ...prepared.request, sessionId },
+        metadata as unknown as RuntimeJsonValue,
+        this.options.compositionDigest,
+        this.options.hostCapabilityDigest,
+      );
       await converted.engine.bindRequest(converted.context);
-      await this.options.session.append(coreEvent("request/header", { requestId, turnId, stepId, routeId: prepared.request.routeId, model: prepared.request.model, contextWindow, attempt, agentMode: mode, agentModeRevision: step.modeRevision }));
+      await this.options.session.append(
+        coreEvent("request/header", {
+          requestId,
+          turnId,
+          stepId,
+          routeId: prepared.request.routeId,
+          model: prepared.request.model,
+          contextWindow,
+          attempt,
+          agentMode: mode,
+          agentModeRevision: step.modeRevision,
+        }),
+      );
       await this.appendRequestRecords(records, { requestId, turnId, stepId });
       await this.checkpoint("before-llm-dispatch");
       return { requestId, converted, prepared, origin, routeId, model, estimate, visibleToolNames };
@@ -348,21 +780,69 @@ export class AgentLoop {
     }
   }
 
-  private candidate(input: import("@actspace/prompt").AssemblyInput, tools: readonly RuntimeJsonValue[], requestOptions: RuntimeJsonValue): import("@actspace/prompt").LogicalRequestCandidate {
+  private candidate(
+    input: import("@actspace/prompt").AssemblyInput,
+    tools: readonly RuntimeJsonValue[],
+    requestOptions: RuntimeJsonValue,
+  ): import("@actspace/prompt").LogicalRequestCandidate {
     input.scope.assertActive();
-    return { sessionId: input.sessionId, turnId: input.turnId, stepId: input.stepId, messages: input.surface, tools, requestOptions,
-      systemSections: [], modelFacts: [], facts: [{ host: input.hostFacts }], renderedSystemPrompt: "", contributorProvenance: [] };
+    return {
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      stepId: input.stepId,
+      messages: input.surface,
+      tools,
+      requestOptions,
+      systemSections: [],
+      modelFacts: [],
+      facts: [{ host: input.hostFacts }],
+      renderedSystemPrompt: "",
+      contributorProvenance: [],
+    };
   }
 
-  private async contextInput(candidate: import("@actspace/prompt").LogicalRequestCandidate, requestId: string, options: import("@actspace/llm-service").LlmRequestOptions, runtime: { mode: RuntimeAgentMode; selectedSkillIds: readonly string[]; budgetSummary: boolean }) {
-    const model = isRecord(candidate.requestOptions) && typeof candidate.requestOptions.model === "string" ? candidate.requestOptions.model : this.options.descriptor.model;
-    const request = { sessionId: candidate.sessionId, logicalAgentScopeId: this.options.agentSubject?.agentId ?? this.options.scope.agentId, turnId: candidate.turnId, stepId: candidate.stepId, requestId,
-      routeId: isRecord(candidate.requestOptions) && typeof candidate.requestOptions.routeId === "string" ? candidate.requestOptions.routeId : this.options.descriptor.routeId, model, options };
+  private async contextInput(
+    candidate: import("@actspace/prompt").LogicalRequestCandidate,
+    requestId: string,
+    options: import("@actspace/llm-service").LlmRequestOptions,
+    runtime: { mode: RuntimeAgentMode; selectedSkillIds: readonly string[]; budgetSummary: boolean },
+  ) {
+    const model =
+      isRecord(candidate.requestOptions) && typeof candidate.requestOptions.model === "string"
+        ? candidate.requestOptions.model
+        : this.options.descriptor.model;
+    const request = {
+      sessionId: candidate.sessionId,
+      logicalAgentScopeId: this.options.agentSubject?.agentId ?? this.options.scope.agentId,
+      turnId: candidate.turnId,
+      stepId: candidate.stepId,
+      requestId,
+      routeId:
+        isRecord(candidate.requestOptions) && typeof candidate.requestOptions.routeId === "string"
+          ? candidate.requestOptions.routeId
+          : this.options.descriptor.routeId,
+      model,
+      options,
+    };
     const configuration: ContextEngineOptions = {
-      resolve: input => ({
+      resolve: (input) => ({
         request: input,
-        content: { system: { sections: [], modelFacts: [] }, conversation: this.options.session.journal.surface, supplements: [], tools: candidate.tools as unknown as readonly LlmToolDefinition[] },
-        status: { throughJournalSeq: this.options.session.lastSeq, cycle: 0, paths: [], facts: candidate.facts, plugins: { "actspace.loop": { ...runtime, hostFacts: candidate.facts[0] ?? {} }, "actspace.context.compaction": { summaries: compactionSummaries(this.options.session.journal.surface) } } },
+        content: {
+          system: { sections: [], modelFacts: [] },
+          conversation: this.options.session.journal.surface,
+          supplements: [],
+          tools: candidate.tools as unknown as readonly LlmToolDefinition[],
+        },
+        status: {
+          throughJournalSeq: this.options.session.lastSeq,
+          cycle: 0,
+          paths: [],
+          facts: candidate.facts,
+          plugins: {
+            "actspace.loop": { ...runtime, hostFacts: candidate.facts[0] ?? {} },
+            "actspace.context.compaction": { summaries: compactionSummaries(this.options.session.journal.surface) },
+          },
+        },
       }),
       session: this.options.session,
       sources: this.options.contextSources,
@@ -370,40 +850,76 @@ export class AgentLoop {
       resolveArtifact: this.options.toolEnvironment(this.options.session).resolveArtifact,
     };
     const engine = this.options.createContextEngine?.(configuration) ?? new ContextEngine(configuration);
-    if (runtime.budgetSummary) await engine.insert("actspace.context-conversation", `execution-budget:${candidate.stepId}`, budgetSummaryNotice(this.options.descriptor.kind), "request", candidate.turnId);
+    if (runtime.budgetSummary)
+      await engine.insert(
+        "actspace.context-conversation",
+        `execution-budget:${candidate.stepId}`,
+        budgetSummaryNotice(this.options.descriptor.kind),
+        "request",
+        candidate.turnId,
+      );
     const replayThrough = this.options.session.durableSeq ?? this.options.session.lastSeq;
-    const context = engine.getInstance(request) === undefined ? await engine.getContext(request) : await engine.reconcile(request, replayThrough);
+    const context =
+      engine.getInstance(request) === undefined
+        ? await engine.getContext(request)
+        : await engine.reconcile(request, replayThrough);
     return { context, engine, input: await engine.toLlmInput(context) };
   }
 
   private toolDefinitions(mode: RuntimeAgentMode): readonly LlmToolDefinition[] {
     const available = this.options.tools.registry.listDefinitions();
-    const modeTools = this.options.descriptor.kind === "subagent"
-      ? new Set(available.map(definition => definition.name))
-      : allowedAgentModeTools(mode, available);
+    const modeTools =
+      this.options.descriptor.kind === "subagent"
+        ? new Set(available.map((definition) => definition.name))
+        : allowedAgentModeTools(mode, available);
     return available
-      .filter((definition) => modeTools.has(definition.name)
-        && (this.options.toolScopeToken === undefined || this.options.descriptor.kind === "subagent" || this.options.scope.tools.get(definition.name)?.value === definition.pluginId)
-        && (this.options.allowedToolNames?.has(definition.name) ?? true))
-      .map((definition) => ({ name: definition.name, definitionVersion: definition.definitionVersion, definitionDigest: definition.definitionDigest, description: definition.description, inputSchema: definition.inputSchema as RuntimeJsonValue }));
+      .filter(
+        (definition) =>
+          modeTools.has(definition.name) &&
+          (this.options.toolScopeToken === undefined ||
+            this.options.descriptor.kind === "subagent" ||
+            this.options.scope.tools.get(definition.name)?.value === definition.pluginId) &&
+          (this.options.allowedToolNames?.has(definition.name) ?? true),
+      )
+      .map((definition) => ({
+        name: definition.name,
+        definitionVersion: definition.definitionVersion,
+        definitionDigest: definition.definitionDigest,
+        description: definition.description,
+        inputSchema: definition.inputSchema as RuntimeJsonValue,
+      }));
   }
   /** 提示词、工具与日志里最近一条 digest 不同时才写；比较对象是日志，所以恢复会话后不会重写（agent-spec-request-record.md §3）。 */
-  private async appendRequestRecords(records: RequestRecords, ids: { requestId: string; turnId: string; stepId: string }): Promise<void> {
+  private async appendRequestRecords(
+    records: RequestRecords,
+    ids: { requestId: string; turnId: string; stepId: string },
+  ): Promise<void> {
     const journal = this.options.session.journal;
-    const latestDigest = (type: string) => { const data = journal.latestEvent(type)?.data; return isRecord(data) ? data.digest : undefined; };
-    if (latestDigest("request/system-prompt") !== records.systemPrompt.digest) await this.options.session.append(coreEvent("request/system-prompt", { ...ids, ...records.systemPrompt }));
-    if (latestDigest("request/tools") !== records.tools.digest) await this.options.session.append(coreEvent("request/tools", { ...ids, ...records.tools }));
+    const latestDigest = (type: string) => {
+      const data = journal.latestEvent(type)?.data;
+      return isRecord(data) ? data.digest : undefined;
+    };
+    if (latestDigest("request/system-prompt") !== records.systemPrompt.digest)
+      await this.options.session.append(coreEvent("request/system-prompt", { ...ids, ...records.systemPrompt }));
+    if (latestDigest("request/tools") !== records.tools.digest)
+      await this.options.session.append(coreEvent("request/tools", { ...ids, ...records.tools }));
     await this.options.session.append(coreEvent("request/context", { ...ids, snapshot: records.snapshot }));
   }
 
   /** 返回这次请求输入的估算 token 数；窗口大小未知时不检查，返回 null。 */
-  private checkContextCapacity(input: import("@actspace/context-engine").LlmInput, capacity: number | null, release: () => void): number | null {
+  private checkContextCapacity(
+    input: import("@actspace/context-engine").LlmInput,
+    capacity: number | null,
+    release: () => void,
+  ): number | null {
     if (capacity === null || !Number.isFinite(capacity) || capacity <= 0) return null;
     const estimate = estimateRequestInput(input);
     const reserve = Math.max(0, input.options.maxTokens ?? 0);
     if (estimate >= capacity || estimate + reserve > capacity) {
       release();
-      throw new Error(`Context exceeds model capacity (${estimate} estimated input tokens + ${reserve} requested output tokens / ${capacity}). Reduce input or compact the conversation before continuing.`);
+      throw new Error(
+        `Context exceeds model capacity (${estimate} estimated input tokens + ${reserve} requested output tokens / ${capacity}). Reduce input or compact the conversation before continuing.`,
+      );
     }
     return estimate;
   }
@@ -412,7 +928,16 @@ export class AgentLoop {
    * 这一批工具调用给模型的输出合计最多多少字符（见 toolBatchOutputChars）。窗口大小未知时返回 undefined。
    * 每个有工具调用的 Step 算一次：只估算系统提示词、工具定义和这条助手消息，对话消息只按角色筛一遍、不读内容。
    */
-  private toolBatchOutputChars(request: { readonly messages: readonly LlmMessage[]; readonly tools: readonly LlmToolDefinition[]; readonly options: { readonly maxTokens?: number }; readonly contextWindow?: number | null }, requestEstimate: number | null, output: { readonly content: readonly LlmContentBlock[]; readonly usage: RuntimeJsonValue }): number | undefined {
+  private toolBatchOutputChars(
+    request: {
+      readonly messages: readonly LlmMessage[];
+      readonly tools: readonly LlmToolDefinition[];
+      readonly options: { readonly maxTokens?: number };
+      readonly contextWindow?: number | null;
+    },
+    requestEstimate: number | null,
+    output: { readonly content: readonly LlmContentBlock[]; readonly usage: RuntimeJsonValue },
+  ): number | undefined {
     const contextWindow = request.contextWindow ?? null;
     if (contextWindow === null || requestEstimate === null) return undefined;
     const assistant = estimateMessage(output.content);
@@ -421,14 +946,28 @@ export class AgentLoop {
     return toolBatchOutputChars({
       contextWindow,
       maxOutputTokens: Math.max(0, request.options.maxTokens ?? 0),
-      usedTokens: Math.max(requestEstimate + assistant, reported === null ? 0 : reported.inputTokens + reported.outputTokens),
-      keptTokens: estimateRequestInput({ messages: request.messages.filter((message) => message.role === "system"), tools: request.tools }) + assistant,
+      usedTokens: Math.max(
+        requestEstimate + assistant,
+        reported === null ? 0 : reported.inputTokens + reported.outputTokens,
+      ),
+      keptTokens:
+        estimateRequestInput({
+          messages: request.messages.filter((message) => message.role === "system"),
+          tools: request.tools,
+        }) + assistant,
     });
   }
 
-  private async publishContext(engine: ContextEngine, request: import("@actspace/context-engine").ContextRequest, ids: { agentRunId: string; turnId: string; stepId: string }) {
+  private async publishContext(
+    engine: ContextEngine,
+    request: import("@actspace/context-engine").ContextRequest,
+    ids: { agentRunId: string; turnId: string; stepId: string },
+  ) {
     const before = this.options.session.lastSeq;
-    const context = await engine.reconcile({ ...request, requestId: `context:${ids.turnId}:${ids.stepId}` }, this.options.session.durableSeq ?? this.options.session.lastSeq);
+    const context = await engine.reconcile(
+      { ...request, requestId: `context:${ids.turnId}:${ids.stepId}` },
+      this.options.session.durableSeq ?? this.options.session.lastSeq,
+    );
     // Sources can write supplement facts. Publish only after these are durable.
     if (this.options.session.lastSeq > before) await this.checkpoint("before-next-step");
     this.emitLive({ kind: "run-state", ...ids, message: "context-updated" });
@@ -436,7 +975,12 @@ export class AgentLoop {
   }
 
   /** One attempt per safe point; failed summaries keep the original Surface. */
-  private async autoCompact(compaction: ContextCompactor, usage: import("@actspace/context-engine").CompactionUsage, ids: { agentRunId: string; turnId: string }, signal: AbortSignal): Promise<boolean> {
+  private async autoCompact(
+    compaction: ContextCompactor,
+    usage: import("@actspace/context-engine").CompactionUsage,
+    ids: { agentRunId: string; turnId: string },
+    signal: AbortSignal,
+  ): Promise<boolean> {
     let startedAt: number | null = null;
     let removedCount = 0;
     let outcome: import("@actspace/context-engine").CompactionOutcome | null = null;
@@ -448,39 +992,80 @@ export class AgentLoop {
           removedCount = entryCount;
           this.emitLive({ kind: "compaction-started", ...ids });
         },
-        onFinished: (value) => { outcome = value; },
+        onFinished: (value) => {
+          outcome = value;
+        },
       });
       if (compacted && startedAt !== null) {
-        const { entryCount: _entryCount, ...recorded } = (outcome ?? {}) as Partial<import("@actspace/context-engine").CompactionOutcome>;
-        this.emitLive({ kind: "compaction-finished", ...ids, removedCount, durationMs: Date.now() - startedAt, ...recorded });
+        const { entryCount: _entryCount, ...recorded } = (outcome ?? {}) as Partial<
+          import("@actspace/context-engine").CompactionOutcome
+        >;
+        this.emitLive({
+          kind: "compaction-finished",
+          ...ids,
+          removedCount,
+          durationMs: Date.now() - startedAt,
+          ...recorded,
+        });
       }
       return compacted;
     } catch (error) {
       if (signal.aborted || this.options.session.durabilityState === "blocked") throw error;
-      this.emitLive({ kind: "compaction-failed", ...ids, message: redactLlmText(error instanceof Error ? error.message : String(error)).slice(0, 500) });
+      this.emitLive({
+        kind: "compaction-failed",
+        ...ids,
+        message: redactLlmText(error instanceof Error ? error.message : String(error)).slice(0, 500),
+      });
       return false;
     }
   }
   private emitLive(event: WithoutSession<AgentLoopLiveEvent>): void {
     const lineage = this.options.session.header.lineage;
-    try { this.options.onLiveEvent?.(Object.freeze({ ...event, sessionId: this.options.session.header.sessionId, ...(lineage?.origin === "delegation" ? { parentSessionId: lineage.parentSessionId, parentCallId: lineage.parentCallId } : {}), workspaceRoot: this.options.toolEnvironment(this.options.session).workspaceRoot })); }
-    catch { /* Observers must not change execution or journal outcomes. */ }
+    try {
+      this.options.onLiveEvent?.(
+        Object.freeze({
+          ...event,
+          sessionId: this.options.session.header.sessionId,
+          ...(lineage?.origin === "delegation"
+            ? { parentSessionId: lineage.parentSessionId, parentCallId: lineage.parentCallId }
+            : {}),
+          workspaceRoot: this.options.toolEnvironment(this.options.session).workspaceRoot,
+        }),
+      );
+    } catch {
+      /* Observers must not change execution or journal outcomes. */
+    }
   }
   private notify(type: AgentNotification, payload: unknown): void {
     this.#events.emit(type, this.recordPayload(payload));
   }
-  private async checkpoint(reason: "before-llm-dispatch" | "before-tool-body" | "before-next-step" | "after-turn-settled"): Promise<void> {
+  private async checkpoint(
+    reason: "before-llm-dispatch" | "before-tool-body" | "before-next-step" | "after-turn-settled",
+  ): Promise<void> {
     if (this.options.context === undefined) {
       await this.options.session.flush(this.options.session.lastSeq);
       return;
     }
     const checkpoint = getService(this.options.context, LOOP_CHECKPOINT_VIEW);
     if (!checkpoint) throw new Error("Required service session.checkpoint is missing.");
-    await checkpoint.flush({ sessionId: this.options.session.header.sessionId, throughSeq: this.options.session.lastSeq, reason });
+    await checkpoint.flush({
+      sessionId: this.options.session.header.sessionId,
+      throughSeq: this.options.session.lastSeq,
+      reason,
+    });
   }
-  private recordPayload<T>(payload: T): Readonly<Record<string, unknown>> { return isRecord(payload) ? payload : {}; }
+  private recordPayload<T>(payload: T): Readonly<Record<string, unknown>> {
+    return isRecord(payload) ? payload : {};
+  }
 
-  private async runTools(calls: readonly CollectedToolCall[], ids: { agentRunId: string; turnId: string; stepId: string; requestId: string }, signal: AbortSignal, visibleToolNames: ReadonlySet<string>, mainModel?: string, modelOutputBatchChars?: number): Promise<readonly ToolExecutionResult[]> {
+  private async runTools(
+    calls: readonly CollectedToolCall[],
+    ids: { agentRunId: string; turnId: string; stepId: string; requestId: string },
+    signal: AbortSignal,
+    visibleToolNames: ReadonlySet<string>,
+    mainModel?: string,
+    modelOutputBatchChars?: number,
+  ): Promise<readonly ToolExecutionResult[]> {
     const unavailable = calls.find((call) => !visibleToolNames.has(call.name));
     if (unavailable !== undefined) {
       // The assistant message already contains every call. Settle the whole
@@ -488,74 +1073,260 @@ export class AgentLoop {
       const results: ToolExecutionResult[] = [];
       for (const call of calls) {
         const summary = `Tool batch rejected: ${unavailable.name} is not visible in this Agent scope. No tools in this batch were executed.`;
-        const result: ToolExecutionResult = { callId: call.callId, pluginId: "@actspace/core", name: call.name,
-          registrationId: "scope-rejected", definitionVersion: 1, definitionDigest: "scope-rejected",
-          status: "denied", summary, modelOutput: [{ type: "text", text: summary }], detail: [], artifacts: [],
-          finalizerFailures: [], dispatched: false };
-        await this.options.session.append(coreEvent("tool/call", { ...ids, callId: call.callId, pluginId: result.pluginId, name: call.name, args: parseArgs(call.arguments) }));
-        const event = await this.options.session.append(coreEvent("tool/result", { callId: call.callId, pluginId: result.pluginId, name: call.name, status: result.status, summary, modelOutput: result.modelOutput, detail: [], artifacts: [], failure: null, renderer: null }, {
-          surface: { kind: "append" },
-        }));
-        this.emitLive({ kind: "tool-finished", ...ids, callId: call.callId, name: call.name, result, resultEventId: `v2-${event.seq}` });
+        const result: ToolExecutionResult = {
+          callId: call.callId,
+          pluginId: "@actspace/core",
+          name: call.name,
+          registrationId: "scope-rejected",
+          definitionVersion: 1,
+          definitionDigest: "scope-rejected",
+          status: "denied",
+          summary,
+          modelOutput: [{ type: "text", text: summary }],
+          detail: [],
+          artifacts: [],
+          finalizerFailures: [],
+          dispatched: false,
+        };
+        await this.options.session.append(
+          coreEvent("tool/call", {
+            ...ids,
+            callId: call.callId,
+            pluginId: result.pluginId,
+            name: call.name,
+            args: parseArgs(call.arguments),
+          }),
+        );
+        const event = await this.options.session.append(
+          coreEvent(
+            "tool/result",
+            {
+              callId: call.callId,
+              pluginId: result.pluginId,
+              name: call.name,
+              status: result.status,
+              summary,
+              modelOutput: result.modelOutput,
+              detail: [],
+              artifacts: [],
+              failure: null,
+              renderer: null,
+            },
+            {
+              surface: { kind: "append" },
+            },
+          ),
+        );
+        this.emitLive({
+          kind: "tool-finished",
+          ...ids,
+          callId: call.callId,
+          name: call.name,
+          result,
+          resultEventId: `v2-${event.seq}`,
+        });
         this.notify("tools/result", result);
         results.push(result);
       }
       return results;
     }
-    const resolvedCalls = calls.map((call) => ({ call, definition: this.options.tools.registry.capture(call.name).definition }));
+    const resolvedCalls = calls.map((call) => ({
+      call,
+      definition: this.options.tools.registry.capture(call.name).definition,
+    }));
     for (const { call, definition } of resolvedCalls) {
       const args = parseArgs(call.arguments);
-      await this.options.session.append(coreEvent("tool/call", { ...ids, callId: call.callId, pluginId: definition.pluginId, name: definition.name, args }));
+      await this.options.session.append(
+        coreEvent("tool/call", {
+          ...ids,
+          callId: call.callId,
+          pluginId: definition.pluginId,
+          name: definition.name,
+          args,
+        }),
+      );
       this.emitLive({ kind: "tool-prepared", ...ids, callId: call.callId, name: definition.name, arguments: args });
     }
     const base = this.options.toolEnvironment(this.options.session);
-    const environment: ToolPreparedEnvironment = { ...base, mainModel, modelOutputBatchChars, allowedToolNames: visibleToolNames, agentScopeToken: this.options.toolScopeToken, context: this.options.context, eventCarrier: this.#events.carrier,
+    const environment: ToolPreparedEnvironment = {
+      ...base,
+      mainModel,
+      modelOutputBatchChars,
+      allowedToolNames: visibleToolNames,
+      agentScopeToken: this.options.toolScopeToken,
+      context: this.options.context,
+      eventCarrier: this.#events.carrier,
       onExecutionStarted: (call) => {
         this.emitLive({ kind: "tool-started", ...ids, callId: call.callId, name: call.name });
-        try { base.onExecutionStarted?.(call); } catch { /* Isolate optional observers. */ }
-      }, notifyAgent: async (content) => { await this.options.inbox.enqueue(content); }, journal: {
-      recordDispatch: async (fact) => { await this.options.session.append(coreEvent("tool-workflow/run-start", fact)); },
-      checkpointBeforeBody: async () => { await this.checkpoint("before-tool-body"); },
-      recordPermission: async (type, data) => { await this.options.session.append(coreEvent(type, data)); },
-      commitResult: async (result) => {
-        const data: CoreEventDataMap["tool/result"] = { ...(result.approvalMode ? { approvalMode: result.approvalMode } : {}), ...(result.approvalReason ? { approvalReason: result.approvalReason } : {}), callId: result.callId, pluginId: result.pluginId, name: result.name, status: result.status, summary: result.summary, modelOutput: result.modelOutput, detail: result.detail, artifacts: result.artifacts, failure: result.failure ?? null, renderer: result.renderer ?? null };
-        // 节点由 surfaceNode 从 data 推出：tool-${callId}、modelOutput、status !== "completed"（agent-spec-surface-derived.md §4.2）。
-        const event = await this.options.session.append(coreEvent("tool/result", data, { surface: { kind: "append" } }));
-        await this.options.observeContextToolResult?.(this.options.session, event);
-        this.emitLive({ kind: "tool-finished", ...ids, callId: result.callId, name: result.name, result, resultEventId: `v2-${event.seq}` });
-        this.notify("tools/result", data);
+        try {
+          base.onExecutionStarted?.(call);
+        } catch {
+          /* Isolate optional observers. */
+        }
       },
-    } };
-    const inputs: ToolCallInput[] = resolvedCalls.map(({ call, definition }) => ({ callId: call.callId, name: definition.name, arguments: parseArgs(call.arguments), sessionId: this.options.session.header.sessionId, agentId: this.subject.agentId, ...ids, signal }));
+      notifyAgent: async (content) => {
+        await this.options.inbox.enqueue(content);
+      },
+      journal: {
+        recordDispatch: async (fact) => {
+          await this.options.session.append(coreEvent("tool-workflow/run-start", fact));
+        },
+        checkpointBeforeBody: async () => {
+          await this.checkpoint("before-tool-body");
+        },
+        recordPermission: async (type, data) => {
+          await this.options.session.append(coreEvent(type, data));
+        },
+        commitResult: async (result) => {
+          const data: CoreEventDataMap["tool/result"] = {
+            ...(result.approvalMode ? { approvalMode: result.approvalMode } : {}),
+            ...(result.approvalReason ? { approvalReason: result.approvalReason } : {}),
+            callId: result.callId,
+            pluginId: result.pluginId,
+            name: result.name,
+            status: result.status,
+            summary: result.summary,
+            modelOutput: result.modelOutput,
+            detail: result.detail,
+            artifacts: result.artifacts,
+            failure: result.failure ?? null,
+            renderer: result.renderer ?? null,
+          };
+          // 节点由 surfaceNode 从 data 推出：tool-${callId}、modelOutput、status !== "completed"（agent-spec-surface-derived.md §4.2）。
+          const event = await this.options.session.append(
+            coreEvent("tool/result", data, { surface: { kind: "append" } }),
+          );
+          await this.options.observeContextToolResult?.(this.options.session, event);
+          this.emitLive({
+            kind: "tool-finished",
+            ...ids,
+            callId: result.callId,
+            name: result.name,
+            result,
+            resultEventId: `v2-${event.seq}`,
+          });
+          this.notify("tools/result", data);
+        },
+      },
+    };
+    const inputs: ToolCallInput[] = resolvedCalls.map(({ call, definition }) => ({
+      callId: call.callId,
+      name: definition.name,
+      arguments: parseArgs(call.arguments),
+      sessionId: this.options.session.header.sessionId,
+      agentId: this.subject.agentId,
+      ...ids,
+      signal,
+    }));
     return this.options.tools.executeBatch(inputs, environment);
   }
 }
 
 type CollectedToolCall = { readonly callId: string; readonly name: string; readonly arguments: string };
 type StreamDelta = { readonly messageId: string; readonly live: StreamPayload };
-async function collectStream(stream: AsyncIterable<LlmStreamEvent>, signal: AbortSignal, emit: (event: StreamDelta) => void | Promise<void>): Promise<{ messageId: string; text: string; content: readonly LlmContentBlock[]; toolCalls: readonly CollectedToolCall[]; usage: RuntimeJsonValue; stopReason: string | null; failure: LlmFailure | null; aborted: boolean; sawObservableDelta: boolean; firstTokenAt: string | null }> {
+async function collectStream(
+  stream: AsyncIterable<LlmStreamEvent>,
+  signal: AbortSignal,
+  emit: (event: StreamDelta) => void | Promise<void>,
+): Promise<{
+  messageId: string;
+  text: string;
+  content: readonly LlmContentBlock[];
+  toolCalls: readonly CollectedToolCall[];
+  usage: RuntimeJsonValue;
+  stopReason: string | null;
+  failure: LlmFailure | null;
+  aborted: boolean;
+  sawObservableDelta: boolean;
+  firstTokenAt: string | null;
+}> {
   const messageId = randomUUID();
   let firstTokenAt: string | null = null;
-  const observed = (delta: string) => { if (delta.length > 0 && firstTokenAt === null) firstTokenAt = new Date().toISOString(); return delta.length > 0; };
-  let text = ""; let content: readonly LlmContentBlock[] = []; let usage: RuntimeJsonValue = {}; let stopReason: string | null = null; let failure: LlmFailure | null = null; let aborted = false; let sawObservableDelta = false; const calls = new Map<string, CollectedToolCall>();
+  const observed = (delta: string) => {
+    if (delta.length > 0 && firstTokenAt === null) firstTokenAt = new Date().toISOString();
+    return delta.length > 0;
+  };
+  let text = "";
+  let content: readonly LlmContentBlock[] = [];
+  let usage: RuntimeJsonValue = {};
+  let stopReason: string | null = null;
+  let failure: LlmFailure | null = null;
+  let aborted = false;
+  let sawObservableDelta = false;
+  const calls = new Map<string, CollectedToolCall>();
   try {
     for await (const event of stream) {
-      if (event.type === "text-delta") { sawObservableDelta = observed(event.text) || sawObservableDelta; text += event.text; await emit({ messageId, live: { kind: "assistant-delta", message: event.text } }); }
-      if (event.type === "reasoning-delta") { sawObservableDelta = observed(event.text) || sawObservableDelta; await emit({ messageId, live: { kind: "reasoning-delta", message: event.text } }); }
-      if (event.type === "tool-call-delta") { sawObservableDelta = observed(event.argumentsDelta) || sawObservableDelta; const prior = calls.get(event.callId); calls.set(event.callId, { callId: event.callId, name: event.name || prior?.name || "", arguments: `${prior?.arguments ?? ""}${event.argumentsDelta}` }); await emit({ messageId, live: { kind: "tool-call-delta", callId: event.callId, name: event.name || prior?.name || "", argumentsDelta: event.argumentsDelta } }); }
-      if (event.type === "done") { usage = event.usage as unknown as RuntimeJsonValue; stopReason = event.stopReason; content = event.content; for (const block of event.content) if (block.type === "tool-call") calls.set(block.callId, { callId: block.callId, name: block.name, arguments: block.arguments }); }
-      if ((event.type === "error" || event.type === "aborted") && event.usage) usage = event.usage as unknown as RuntimeJsonValue;
+      if (event.type === "text-delta") {
+        sawObservableDelta = observed(event.text) || sawObservableDelta;
+        text += event.text;
+        await emit({ messageId, live: { kind: "assistant-delta", message: event.text } });
+      }
+      if (event.type === "reasoning-delta") {
+        sawObservableDelta = observed(event.text) || sawObservableDelta;
+        await emit({ messageId, live: { kind: "reasoning-delta", message: event.text } });
+      }
+      if (event.type === "tool-call-delta") {
+        sawObservableDelta = observed(event.argumentsDelta) || sawObservableDelta;
+        const prior = calls.get(event.callId);
+        calls.set(event.callId, {
+          callId: event.callId,
+          name: event.name || prior?.name || "",
+          arguments: `${prior?.arguments ?? ""}${event.argumentsDelta}`,
+        });
+        await emit({
+          messageId,
+          live: {
+            kind: "tool-call-delta",
+            callId: event.callId,
+            name: event.name || prior?.name || "",
+            argumentsDelta: event.argumentsDelta,
+          },
+        });
+      }
+      if (event.type === "done") {
+        usage = event.usage as unknown as RuntimeJsonValue;
+        stopReason = event.stopReason;
+        content = event.content;
+        for (const block of event.content)
+          if (block.type === "tool-call")
+            calls.set(block.callId, { callId: block.callId, name: block.name, arguments: block.arguments });
+      }
+      if ((event.type === "error" || event.type === "aborted") && event.usage)
+        usage = event.usage as unknown as RuntimeJsonValue;
       if (event.type === "error") failure = event.failure;
-      if (event.type === "aborted") { failure = { kind: "abort", message: event.reason, retryable: false, attempt: 1 }; aborted = true; }
-      if (signal.aborted) { failure = { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 }; aborted = true; break; }
+      if (event.type === "aborted") {
+        failure = { kind: "abort", message: event.reason, retryable: false, attempt: 1 };
+        aborted = true;
+      }
+      if (signal.aborted) {
+        failure = { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 };
+        aborted = true;
+        break;
+      }
     }
   } catch (error) {
-    failure = signal.aborted ? { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 } : normalizeLlmFailure(error, 1);
+    failure = signal.aborted
+      ? { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 }
+      : normalizeLlmFailure(error, 1);
     aborted = signal.aborted || failure.kind === "abort";
   }
-  if (signal.aborted) { failure = { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 }; aborted = true; }
+  if (signal.aborted) {
+    failure = { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 };
+    aborted = true;
+  }
   if (content.length === 0 && text.length > 0) content = Object.freeze([{ type: "text", text }]);
-  return { messageId, text, content, toolCalls: Object.freeze([...calls.values()]), usage, stopReason, failure, aborted, sawObservableDelta, firstTokenAt };
+  return {
+    messageId,
+    text,
+    content,
+    toolCalls: Object.freeze([...calls.values()]),
+    usage,
+    stopReason,
+    failure,
+    aborted,
+    sawObservableDelta,
+    firstTokenAt,
+  };
 }
 /** First visible output of the request (text, reasoning or tool arguments); omitted when nothing streamed. */
 function firstToken(output: { readonly firstTokenAt: string | null }): { firstTokenAt?: string } {
@@ -564,8 +1335,14 @@ function firstToken(output: { readonly firstTokenAt: string | null }): { firstTo
 function cancellableDelay(delayMs: number, signal: AbortSignal): Promise<boolean> {
   if (signal.aborted) return Promise.resolve(false);
   return new Promise((resolve) => {
-    const timer = setTimeout(() => { signal.removeEventListener("abort", onAbort); resolve(true); }, delayMs);
-    const onAbort = () => { clearTimeout(timer); resolve(false); };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, delayMs);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
     signal.addEventListener("abort", onAbort, { once: true });
   });
 }
@@ -575,17 +1352,40 @@ function normalizeLlmFailure(error: unknown, attempt: number): LlmFailure {
   return Object.freeze({ kind: "unknown", message, retryable: false, attempt });
 }
 function failedStreamOutput(failure: LlmFailure): Awaited<ReturnType<typeof collectStream>> {
-  return { messageId: randomUUID(), text: "", content: Object.freeze([]), toolCalls: Object.freeze([]), usage: {}, stopReason: null, failure, aborted: failure.kind === "abort", sawObservableDelta: false, firstTokenAt: null };
+  return {
+    messageId: randomUUID(),
+    text: "",
+    content: Object.freeze([]),
+    toolCalls: Object.freeze([]),
+    usage: {},
+    stopReason: null,
+    failure,
+    aborted: failure.kind === "abort",
+    sawObservableDelta: false,
+    firstTokenAt: null,
+  };
 }
-function parseArgs(value: string): RuntimeJsonValue { try { const parsed = JSON.parse(value); return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}; } catch { return {}; } }
-function currentAgentModeRevision(events: readonly { readonly type: string; readonly data: RuntimeJsonValue }[]): number {
+function parseArgs(value: string): RuntimeJsonValue {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+function currentAgentModeRevision(
+  events: readonly { readonly type: string; readonly data: RuntimeJsonValue }[],
+): number {
   for (let index = events.length - 1; index >= 0; index--) {
     const event = events[index];
-    if (event.type === "agent/mode-set" && isRecord(event.data) && typeof event.data.revision === "number") return event.data.revision;
+    if (event.type === "agent/mode-set" && isRecord(event.data) && typeof event.data.revision === "number")
+      return event.data.revision;
   }
   return 0;
 }
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> { return value !== null && typeof value === "object" && !Array.isArray(value); }
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
 // 干预点的监听器来自单独构建的插件，编译期的类型约束不到运行时拿到的值。下面两个函数按契约逐个字段检查，形状不对的字段当作没给。
 function requestPlanOf(value: unknown): AgentRequestPlan {
   if (!isRecord(value)) return {};
@@ -593,44 +1393,72 @@ function requestPlanOf(value: unknown): AgentRequestPlan {
     routeId: typeof value.routeId === "string" ? value.routeId : undefined,
     model: typeof value.model === "string" ? value.model : undefined,
     // 两个数组只确认是数组，元素没有逐个检查。
-    messages: Array.isArray(value.messages) ? value.messages as readonly LlmMessage[] : undefined,
-    tools: Array.isArray(value.tools) ? value.tools as readonly LlmToolDefinition[] : undefined,
+    messages: Array.isArray(value.messages) ? (value.messages as readonly LlmMessage[]) : undefined,
+    tools: Array.isArray(value.tools) ? (value.tools as readonly LlmToolDefinition[]) : undefined,
   };
 }
 function requestRecoveryOf(value: unknown): AgentRequestRecovery | undefined {
   if (!isRecord(value)) return undefined;
   if (value.kind === "abort") return { kind: "abort" };
-  if (value.kind === "retry") return { kind: "retry", delayMs: typeof value.delayMs === "number" ? value.delayMs : undefined };
+  if (value.kind === "retry")
+    return { kind: "retry", delayMs: typeof value.delayMs === "number" ? value.delayMs : undefined };
   return undefined;
 }
-function compactionUsage(value: RuntimeJsonValue, contextWindow: number | null): import("@actspace/context-engine").CompactionUsage | null {
+function compactionUsage(
+  value: RuntimeJsonValue,
+  contextWindow: number | null,
+): import("@actspace/context-engine").CompactionUsage | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Readonly<Record<string, RuntimeJsonValue>>;
-  const inputTokens = record.inputTokens; const outputTokens = record.outputTokens;
+  const inputTokens = record.inputTokens;
+  const outputTokens = record.outputTokens;
   if (typeof inputTokens !== "number" || typeof outputTokens !== "number") return null;
   const cacheRead = typeof record.cacheReadTokens === "number" ? record.cacheReadTokens : 0;
   const cacheWrite = typeof record.cacheWriteTokens === "number" ? record.cacheWriteTokens : 0;
-  if (![inputTokens, outputTokens, cacheRead, cacheWrite].every(value => Number.isFinite(value) && value >= 0)) return null;
+  if (![inputTokens, outputTokens, cacheRead, cacheWrite].every((value) => Number.isFinite(value) && value >= 0))
+    return null;
   return { inputTokens: inputTokens + cacheRead + cacheWrite, outputTokens, contextWindow };
 }
 /** 压缩摘要清单直接来自 surface 条目上记的 compactionId（每次请求都跑，不能回头读 surface/replaced 事件）。 */
-function compactionSummaries(surface: import("@actspace/session-journal").SessionSurfaceView): readonly { readonly messageId: string; readonly compactionId: string }[] {
+function compactionSummaries(
+  surface: import("@actspace/session-journal").SessionSurfaceView,
+): readonly { readonly messageId: string; readonly compactionId: string }[] {
   const summaries: { messageId: string; compactionId: string }[] = [];
-  for (const entry of surface.entries) if (entry.compactionId !== undefined) summaries.push({ messageId: entry.node.messageId, compactionId: entry.compactionId });
+  for (const entry of surface.entries)
+    if (entry.compactionId !== undefined)
+      summaries.push({ messageId: entry.node.messageId, compactionId: entry.compactionId });
   return summaries;
 }
 const USER_MESSAGE_IDS = Symbol("user-message-ids");
 function hasUserMessage(session: SessionHandle, messageId: string): boolean {
-  const ids = session.journal.project(USER_MESSAGE_IDS, () => new Set<string>(), (prior, event) => {
-    if (event.type !== "user/message" || !isRecord(event.data) || typeof event.data.messageId !== "string") return prior;
-    const next = new Set(prior); next.add(event.data.messageId); return next;
-  });
-  return ids.has(messageId) || session.journal.surface.entries.some(entry => entry.node.kind === "user" && entry.node.messageId === messageId);
+  const ids = session.journal.project(
+    USER_MESSAGE_IDS,
+    () => new Set<string>(),
+    (prior, event) => {
+      if (event.type !== "user/message" || !isRecord(event.data) || typeof event.data.messageId !== "string")
+        return prior;
+      const next = new Set(prior);
+      next.add(event.data.messageId);
+      return next;
+    },
+  );
+  return (
+    ids.has(messageId) ||
+    session.journal.surface.entries.some((entry) => entry.node.kind === "user" && entry.node.messageId === messageId)
+  );
 }
 
-function currentPermissionMode(events: readonly import("@actspace/session-journal").SessionEventEnvelopeV1[]): "default" | "full-access" | "auto-review" {
+function currentPermissionMode(
+  events: readonly import("@actspace/session-journal").SessionEventEnvelopeV1[],
+): "default" | "full-access" | "auto-review" {
   let mode: "default" | "full-access" | "auto-review" = "default";
-  for (const event of events) if (event.type === "permission/mode-set" && isRecord(event.data) && (event.data.mode === "default" || event.data.mode === "full-access" || event.data.mode === "auto-review")) mode = event.data.mode;
+  for (const event of events)
+    if (
+      event.type === "permission/mode-set" &&
+      isRecord(event.data) &&
+      (event.data.mode === "default" || event.data.mode === "full-access" || event.data.mode === "auto-review")
+    )
+      mode = event.data.mode;
   return mode;
 }
 

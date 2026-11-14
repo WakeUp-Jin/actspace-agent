@@ -16,8 +16,12 @@ export type PythonRuntimeForBash = {
  * so a layer installed while a Session runs is picked up by its next command; a Host that tracks the download itself
  * passes its own getter.
  */
-export function pythonRuntimeForBash(runtime: PythonRuntime, extension: string | (() => string | undefined)): PythonRuntimeForBash {
-  const extensionSitePackages = typeof extension === "function" ? extension : () => installedExtensionSitePackages(extension, runtime.manifest);
+export function pythonRuntimeForBash(
+  runtime: PythonRuntime,
+  extension: string | (() => string | undefined),
+): PythonRuntimeForBash {
+  const extensionSitePackages =
+    typeof extension === "function" ? extension : () => installedExtensionSitePackages(extension, runtime.manifest);
   return Object.freeze({
     version: runtime.manifest.python.version,
     shimDirectory: runtime.shimDirectory,

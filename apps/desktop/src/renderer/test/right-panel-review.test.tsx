@@ -42,10 +42,14 @@ describe("Review workbench", () => {
     expect(screen.queryByRole("button", { name: "Run AI Review" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "审查选项" }));
     expect(await screen.findByRole("menuitem", { name: "刷新" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitemcheckbox", { name: "自动换行" }).querySelector(".lucide-arrow-right-from-line")).not.toBeNull();
+    expect(
+      screen.getByRole("menuitemcheckbox", { name: "自动换行" }).querySelector(".lucide-arrow-right-from-line"),
+    ).not.toBeNull();
     expect(screen.getByRole("menuitem", { name: "不加载完整文件" }).querySelector("svg")).toHaveClass("lucide-file");
     expect(screen.getByRole("menuitemcheckbox", { name: "启用富预览" }).querySelector(".lucide-image")).not.toBeNull();
-    expect(screen.getByRole("menuitemcheckbox", { name: "显示词级差异" }).querySelector(".lucide-file-diff")).not.toBeNull();
+    expect(
+      screen.getByRole("menuitemcheckbox", { name: "显示词级差异" }).querySelector(".lucide-file-diff"),
+    ).not.toBeNull();
     expect(screen.getByRole("menuitemcheckbox", { name: "隐藏空白差异" }).querySelector(".lucide-eye")).not.toBeNull();
     expect(screen.queryByRole("menuitem", { name: "复制 git apply 命令" })).not.toBeInTheDocument();
     await user.keyboard("{Escape}");
@@ -90,8 +94,12 @@ describe("Review workbench", () => {
     act(() => within(toolbar).getByRole("button", { name: "切换为并排差异" }).focus());
     Object.defineProperties(scroll, { clientWidth: { value: 389 }, scrollWidth: { value: 470 } });
     vi.spyOn(scroll, "getBoundingClientRect").mockImplementation(() => new DOMRect(100, 50, 389, 44));
-    vi.spyOn(last, "getBoundingClientRect").mockImplementation(() => new DOMRect(443.7 - scroll.scrollLeft, 56, 116, 32));
-    vi.spyOn(scope, "getBoundingClientRect").mockImplementation(() => new DOMRect(110.3 - scroll.scrollLeft, 56, 76, 32));
+    vi.spyOn(last, "getBoundingClientRect").mockImplementation(
+      () => new DOMRect(443.7 - scroll.scrollLeft, 56, 116, 32),
+    );
+    vi.spyOn(scope, "getBoundingClientRect").mockImplementation(
+      () => new DOMRect(110.3 - scroll.scrollLeft, 56, 76, 32),
+    );
 
     await user.tab();
     expect(last).toHaveFocus();
@@ -112,22 +120,25 @@ describe("Review workbench", () => {
     { width: 470, content: 470, right: 460, expected: 0 },
     { width: 389, content: 470, right: 380, expected: 0 },
     { width: 389, content: 470, right: 470, expected: 81 },
-  ])("keeps toolbar focus scrolling within its own bounds ($width/$content/$right)", async ({ width, content, right, expected }) => {
-    setupBridge(reviewBridge(dirtySnapshot()));
-    render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
-    await screen.findByText("apps/desktop/src/renderer/App.tsx");
-    const toolbar = screen.getByLabelText("审查工具栏");
-    const scroll = toolbar.querySelector<HTMLElement>("[data-review-toolbar-scroll]")!;
-    const last = within(toolbar).getByRole("button", { name: "显示文件列表" });
-    Object.defineProperties(scroll, { clientWidth: { value: width }, scrollWidth: { value: content } });
-    vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue(new DOMRect(100, 50, width, 44));
-    vi.spyOn(last, "getBoundingClientRect").mockReturnValue(new DOMRect(100 + right - 116, 56, 116, 32));
+  ])(
+    "keeps toolbar focus scrolling within its own bounds ($width/$content/$right)",
+    async ({ width, content, right, expected }) => {
+      setupBridge(reviewBridge(dirtySnapshot()));
+      render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
+      await screen.findByText("apps/desktop/src/renderer/App.tsx");
+      const toolbar = screen.getByLabelText("审查工具栏");
+      const scroll = toolbar.querySelector<HTMLElement>("[data-review-toolbar-scroll]")!;
+      const last = within(toolbar).getByRole("button", { name: "显示文件列表" });
+      Object.defineProperties(scroll, { clientWidth: { value: width }, scrollWidth: { value: content } });
+      vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue(new DOMRect(100, 50, width, 44));
+      vi.spyOn(last, "getBoundingClientRect").mockReturnValue(new DOMRect(100 + right - 116, 56, 116, 32));
 
-    act(() => last.focus());
-    expect(last).toHaveFocus();
-    expect(scroll.scrollLeft).toBe(expected);
-    expect(document.documentElement.scrollLeft).toBe(0);
-  });
+      act(() => last.focus());
+      expect(last).toHaveFocus();
+      expect(scroll.scrollLeft).toBe(expected);
+      expect(document.documentElement.scrollLeft).toBe(0);
+    },
+  );
 
   it("ignores focus inside a portalled toolbar menu", async () => {
     const user = userEvent.setup();
@@ -153,7 +164,13 @@ describe("Review workbench", () => {
   });
 
   it("says the folder is not a Git repository instead of showing an empty review", async () => {
-    setupBridge(reviewBridge({ ...emptySnapshot(), status: "notAvailable", warnings: [{ kind: "unsupported", message: "当前目录不是 Git 仓库。" }] }));
+    setupBridge(
+      reviewBridge({
+        ...emptySnapshot(),
+        status: "notAvailable",
+        warnings: [{ kind: "unsupported", message: "当前目录不是 Git 仓库。" }],
+      }),
+    );
     render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
 
     expect(await screen.findByRole("heading", { name: "当前目录不是 Git 仓库" })).toBeInTheDocument();
@@ -226,8 +243,16 @@ describe("Review workbench", () => {
     bridge["review.listCommits"].mockResolvedValue({
       ok: true as const,
       commits: [
-        { sha: "a".repeat(40), subject: "fix: keep commit history read-only", authoredAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString() },
-        { sha: "b".repeat(40), subject: "feat: add Review scopes", authoredAt: new Date(Date.now() - 24 * 60 * 60_000).toISOString() },
+        {
+          sha: "a".repeat(40),
+          subject: "fix: keep commit history read-only",
+          authoredAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
+        },
+        {
+          sha: "b".repeat(40),
+          subject: "feat: add Review scopes",
+          authoredAt: new Date(Date.now() - 24 * 60 * 60_000).toISOString(),
+        },
       ],
     });
     setupBridge(bridge);
@@ -235,16 +260,25 @@ describe("Review workbench", () => {
 
     expect(await screen.findByText("apps/desktop/src/renderer/App.tsx")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "审查范围" }));
-    await user.click(within(await screen.findByRole("menu", { name: "审查范围选项" })).getByRole("menuitem", { name: "已提交" }));
+    await user.click(
+      within(await screen.findByRole("menu", { name: "审查范围选项" })).getByRole("menuitem", { name: "已提交" }),
+    );
 
     const commits = await screen.findByRole("menu", { name: "最近提交" });
-    expect(bridge["review.listCommits"]).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", sessionId: "session-1" });
+    expect(bridge["review.listCommits"]).toHaveBeenCalledWith({
+      workspaceRoot: "/tmp/workspace",
+      sessionId: "session-1",
+    });
     expect(within(commits).queryByRole("textbox")).not.toBeInTheDocument();
     await user.click(within(commits).getByRole("menuitem", { name: /fix: keep commit history read-only/ }));
     expect(screen.queryByRole("menu", { name: "最近提交" })).not.toBeInTheDocument();
-    await waitFor(() => expect(bridge["review.getSnapshot"]).toHaveBeenCalledWith(expect.objectContaining({
-      selection: { kind: "commit", sha: "a".repeat(40) },
-    })));
+    await waitFor(() =>
+      expect(bridge["review.getSnapshot"]).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selection: { kind: "commit", sha: "a".repeat(40) },
+        }),
+      ),
+    );
   });
 
   it("uses a dedicated file-list view and keeps split diff disabled in a narrow Review panel", async () => {
@@ -266,14 +300,35 @@ describe("Review workbench", () => {
     expect(await screen.findByText("apps/desktop/src/renderer/App.tsx")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "切换为并排差异" })).toHaveAttribute("aria-disabled", "true");
     await user.click(screen.getByRole("button", { name: "显示文件列表" }));
-    expect(screen.getByRole("complementary", { name: "已变更文件" }).closest('[data-review-files-layout="compact"]')).toBeInTheDocument();
+    expect(
+      screen.getByRole("complementary", { name: "已变更文件" }).closest('[data-review-files-layout="compact"]'),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("main", { name: "变更差异视图" })).not.toBeInTheDocument();
   });
 
   it("opens Review from the object menu inside the right panel and keeps chat visible", async () => {
     const user = userEvent.setup();
     setupBridge(reviewBridge(emptySnapshot()));
-    render(<RightPanelProvider initialOpen><TestWorkbenchLayout sessions={[{ id: "session-review", title: "Review menu", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-review" title="Review menu" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
+    render(
+      <RightPanelProvider initialOpen>
+        <TestWorkbenchLayout
+          sessions={[
+            {
+              id: "session-review",
+              title: "Review menu",
+              updatedAt: new Date().toISOString(),
+              agentRunCount: 0,
+              workspaceRoot: "/tmp/workspace",
+            },
+          ]}
+          activeSessionId="session-review"
+          title="Review menu"
+          messages={[]}
+          contextSnapshot={null}
+          selectedWorkspaceRoot="/tmp/workspace"
+        />
+      </RightPanelProvider>,
+    );
     await user.click(screen.getByRole("button", { name: "新建右侧面板对象" }));
     await user.click(screen.getByRole("menuitem", { name: "改动" }));
     expect(await screen.findByRole("region", { name: "工作区变更审查" })).toBeInTheDocument();
@@ -287,7 +342,26 @@ describe("Review workbench", () => {
   it("opens Review from the right panel launcher", async () => {
     const user = userEvent.setup();
     setupBridge(reviewBridge(emptySnapshot()));
-    render(<RightPanelProvider initialOpen><TestWorkbenchLayout sessions={[{ id: "session-launcher", title: "Review launcher", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-launcher" title="Review launcher" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
+    render(
+      <RightPanelProvider initialOpen>
+        <TestWorkbenchLayout
+          sessions={[
+            {
+              id: "session-launcher",
+              title: "Review launcher",
+              updatedAt: new Date().toISOString(),
+              agentRunCount: 0,
+              workspaceRoot: "/tmp/workspace",
+            },
+          ]}
+          activeSessionId="session-launcher"
+          title="Review launcher"
+          messages={[]}
+          contextSnapshot={null}
+          selectedWorkspaceRoot="/tmp/workspace"
+        />
+      </RightPanelProvider>,
+    );
     await user.click(screen.getByRole("button", { name: "改动" }));
     expect(await screen.findByRole("region", { name: "工作区变更审查" })).toBeInTheDocument();
   });
@@ -296,11 +370,26 @@ describe("Review workbench", () => {
     // 15 T6：WorkbenchLayout 按 capabilities.review / workspacePanels 判断，不再看有没有 hostId。
     const user = userEvent.setup();
     setupBridge(reviewBridge(emptySnapshot()));
-    const props = { sessions: [], activeSessionId: null, title: "Remote", messages: [], contextSnapshot: null, selectedWorkspaceRoot: "/tmp/workspace" };
-    const { unmount } = render(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} /></RightPanelProvider>);
+    const props = {
+      sessions: [],
+      activeSessionId: null,
+      title: "Remote",
+      messages: [],
+      contextSnapshot: null,
+      selectedWorkspaceRoot: "/tmp/workspace",
+    };
+    const { unmount } = render(
+      <RightPanelProvider initialOpen>
+        <TestWorkbenchLayout {...props} />
+      </RightPanelProvider>,
+    );
     expect(screen.getByRole("button", { name: "查看工作区环境" })).toBeInTheDocument();
     unmount();
-    render(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} runTarget={{ kind: "remote", hostId: "server", hostName: "Cloud" }} /></RightPanelProvider>);
+    render(
+      <RightPanelProvider initialOpen>
+        <TestWorkbenchLayout {...props} runTarget={{ kind: "remote", hostId: "server", hostName: "Cloud" }} />
+      </RightPanelProvider>,
+    );
     expect(screen.queryByRole("button", { name: "查看工作区环境" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "改动" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "新建右侧面板对象" }));
@@ -313,25 +402,61 @@ describe("Review workbench", () => {
     const bridge = reviewBridge(emptySnapshot());
     setupBridge(bridge);
     const props = {
-      sessions: [{ id: "session-workspace", title: "Workspace review", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace-a" }],
+      sessions: [
+        {
+          id: "session-workspace",
+          title: "Workspace review",
+          updatedAt: new Date().toISOString(),
+          agentRunCount: 0,
+          workspaceRoot: "/tmp/workspace-a",
+        },
+      ],
       activeSessionId: "session-workspace",
       title: "Workspace review",
       messages: [],
       contextSnapshot: null,
       runTarget: { kind: "local" as const, workspaceRoot: "/tmp/workspace-a" },
     };
-    const { rerender } = render(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-a" /></RightPanelProvider>);
+    const { rerender } = render(
+      <RightPanelProvider initialOpen>
+        <TestWorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-a" />
+      </RightPanelProvider>,
+    );
     await user.click(screen.getByRole("button", { name: "改动" }));
-    await waitFor(() => expect(bridge["review.refreshSnapshot"]).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-a" })));
+    await waitFor(() =>
+      expect(bridge["review.refreshSnapshot"]).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceRoot: "/tmp/workspace-a" }),
+      ),
+    );
 
-    rerender(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-b" /></RightPanelProvider>);
-    expect(bridge["review.refreshSnapshot"]).not.toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" }));
+    rerender(
+      <RightPanelProvider initialOpen>
+        <TestWorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-b" />
+      </RightPanelProvider>,
+    );
+    expect(bridge["review.refreshSnapshot"]).not.toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" }),
+    );
 
-    rerender(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} runTarget={{ kind: "local", workspaceRoot: "/tmp/workspace-b" }} selectedWorkspaceRoot="/tmp/workspace-b" /></RightPanelProvider>);
-    expect(bridge["review.refreshSnapshot"]).not.toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" }));
+    rerender(
+      <RightPanelProvider initialOpen>
+        <TestWorkbenchLayout
+          {...props}
+          runTarget={{ kind: "local", workspaceRoot: "/tmp/workspace-b" }}
+          selectedWorkspaceRoot="/tmp/workspace-b"
+        />
+      </RightPanelProvider>,
+    );
+    expect(bridge["review.refreshSnapshot"]).not.toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" }),
+    );
     await user.click(screen.getByRole("button", { name: "新建右侧面板对象" }));
     await user.click(screen.getByRole("menuitem", { name: "改动" }));
-    await waitFor(() => expect(bridge["review.refreshSnapshot"]).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" })));
+    await waitFor(() =>
+      expect(bridge["review.refreshSnapshot"]).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" }),
+      ),
+    );
     expect(screen.getAllByRole("tab", { name: "改动" })).toHaveLength(2);
   });
 
@@ -384,7 +509,10 @@ describe("Review workbench", () => {
     const wrap = await screen.findByRole("menuitemcheckbox", { name: "自动换行" });
     const before = wrap.getAttribute("aria-checked");
     await user.click(wrap);
-    expect(screen.getByRole("menuitemcheckbox", { name: "自动换行" })).toHaveAttribute("aria-checked", before === "true" ? "false" : "true");
+    expect(screen.getByRole("menuitemcheckbox", { name: "自动换行" })).toHaveAttribute(
+      "aria-checked",
+      before === "true" ? "false" : "true",
+    );
     expect(screen.getByRole("menu")).toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
@@ -402,11 +530,12 @@ describe("Review workbench", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "跳转到文件" })).toHaveFocus());
 
     await user.click(screen.getByRole("button", { name: "跳转到文件" }));
-    const jump = screen.getByPlaceholderText("跳转到文件…").closest<HTMLElement>("[data-radix-popper-content-wrapper]")!;
+    const jump = screen
+      .getByPlaceholderText("跳转到文件…")
+      .closest<HTMLElement>("[data-radix-popper-content-wrapper]")!;
     await user.click(within(jump).getByRole("button", { name: "apps/desktop/src/renderer/App.tsx" }));
     expect(screen.queryByPlaceholderText("跳转到文件…")).not.toBeInTheDocument();
   });
-
 });
 
 function capabilities() {
@@ -414,11 +543,45 @@ function capabilities() {
 }
 
 function emptySnapshot(): ReviewSnapshot {
-  return { id: "empty", generation: 1, workspaceId: "ws", workspaceRoot: "/tmp/workspace", selection: { kind: "uncommitted" }, baseline: { kind: "git-ref", label: "HEAD" }, target: { label: "Working tree" }, status: "empty", files: [], totals: { files: 0, additions: 0, deletions: 0, changedLines: 0, estimatedChangedBytes: 0 }, capabilities: capabilities(), loadPolicy: { mode: "all-files" }, queryOptions: { ignoreWhitespaceChanges: false }, generatedAt: new Date().toISOString() };
+  return {
+    id: "empty",
+    generation: 1,
+    workspaceId: "ws",
+    workspaceRoot: "/tmp/workspace",
+    selection: { kind: "uncommitted" },
+    baseline: { kind: "git-ref", label: "HEAD" },
+    target: { label: "Working tree" },
+    status: "empty",
+    files: [],
+    totals: { files: 0, additions: 0, deletions: 0, changedLines: 0, estimatedChangedBytes: 0 },
+    capabilities: capabilities(),
+    loadPolicy: { mode: "all-files" },
+    queryOptions: { ignoreWhitespaceChanges: false },
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 function dirtySnapshot(): ReviewSnapshot {
-  return { ...emptySnapshot(), id: "dirty", status: "ready", files: [{ id: "app", path: "apps/desktop/src/renderer/App.tsx", status: "modified", additions: 2, deletions: 1, binary: false, renderKind: "text", source: "workingTree", diffLoadStatus: "idle", fingerprint: "fp" }], totals: { files: 1, additions: 2, deletions: 1, changedLines: 3, estimatedChangedBytes: 256 } };
+  return {
+    ...emptySnapshot(),
+    id: "dirty",
+    status: "ready",
+    files: [
+      {
+        id: "app",
+        path: "apps/desktop/src/renderer/App.tsx",
+        status: "modified",
+        additions: 2,
+        deletions: 1,
+        binary: false,
+        renderKind: "text",
+        source: "workingTree",
+        diffLoadStatus: "idle",
+        fingerprint: "fp",
+      },
+    ],
+    totals: { files: 1, additions: 2, deletions: 1, changedLines: 3, estimatedChangedBytes: 256 },
+  };
 }
 
 function cappedSnapshot(): ReviewSnapshot {
@@ -426,10 +589,7 @@ function cappedSnapshot(): ReviewSnapshot {
   return {
     ...snapshot,
     id: "capped",
-    files: [
-      snapshot.files[0],
-      { ...snapshot.files[0], id: "second", path: "src/second.ts", fingerprint: "second" },
-    ],
+    files: [snapshot.files[0], { ...snapshot.files[0], id: "second", path: "src/second.ts", fingerprint: "second" }],
     totals: { files: 2, additions: 4, deletions: 2, changedLines: 6, estimatedChangedBytes: 13 * 1024 * 1024 },
     loadPolicy: { mode: "single-file", reason: "changed-bytes" },
     warnings: [{ kind: "capped", message: "This diff is large, showing one file at a time." }],
@@ -437,17 +597,49 @@ function cappedSnapshot(): ReviewSnapshot {
 }
 
 function fileDiff(fileId = "app", path = "apps/desktop/src/renderer/App.tsx", snapshotId = "dirty"): ReviewFileDiff {
-  return { snapshotId, generation: 1, fileId, path, hunks: [{ id: `hunk-${fileId}`, header: "@@ -1,2 +1,3 @@", oldStart: 1, oldLines: 2, newStart: 1, newLines: 3, lines: [{ id: `context-${fileId}`, kind: "context", oldLine: 1, newLine: 1, text: "const value = maybe();" }, { id: `old-${fileId}`, kind: "deletion", oldLine: 2, text: "return value?.name;" }, { id: `new-${fileId}`, kind: "addition", newLine: 2, text: "return value.name;" }, { id: `new2-${fileId}`, kind: "addition", newLine: 3, text: "// reviewed" }] }], oldContentAvailable: true, newContentAvailable: true, partial: false, patchFingerprint: `patch-${fileId}` };
+  return {
+    snapshotId,
+    generation: 1,
+    fileId,
+    path,
+    hunks: [
+      {
+        id: `hunk-${fileId}`,
+        header: "@@ -1,2 +1,3 @@",
+        oldStart: 1,
+        oldLines: 2,
+        newStart: 1,
+        newLines: 3,
+        lines: [
+          { id: `context-${fileId}`, kind: "context", oldLine: 1, newLine: 1, text: "const value = maybe();" },
+          { id: `old-${fileId}`, kind: "deletion", oldLine: 2, text: "return value?.name;" },
+          { id: `new-${fileId}`, kind: "addition", newLine: 2, text: "return value.name;" },
+          { id: `new2-${fileId}`, kind: "addition", newLine: 3, text: "// reviewed" },
+        ],
+      },
+    ],
+    oldContentAvailable: true,
+    newContentAvailable: true,
+    partial: false,
+    patchFingerprint: `patch-${fileId}`,
+  };
 }
 
 function reviewBridge(snapshot: ReviewSnapshot) {
   return {
     "review.getSnapshot": vi.fn(async () => ({ ok: true as const, snapshot })),
     "review.refreshSnapshot": vi.fn(async () => ({ ok: true as const, snapshot })),
-    "review.getFileDiffs": vi.fn(async (input: { requests: Array<{ fileId: string }> }) => ({ ok: true as const, outcomes: input.requests.map((request) => {
-      const file = snapshot.files.find((candidate) => candidate.id === request.fileId);
-      return { fileId: request.fileId, status: "ready" as const, diff: fileDiff(request.fileId, file?.path, snapshot.id) };
-    }) })),
+    "review.getFileDiffs": vi.fn(async (input: { requests: Array<{ fileId: string }> }) => ({
+      ok: true as const,
+      outcomes: input.requests.map((request) => {
+        const file = snapshot.files.find((candidate) => candidate.id === request.fileId);
+        return {
+          fileId: request.fileId,
+          status: "ready" as const,
+          diff: fileDiff(request.fileId, file?.path, snapshot.id),
+        };
+      }),
+    })),
     "review.getFileContents": vi.fn(async (_input: { fileIds: string[] }) => ({ ok: true as const, outcomes: [] })),
     "review.listBranches": vi.fn(async () => ({ ok: true as const, branches: [] })),
     "review.listCommits": vi.fn(async () => ({ ok: true as const, commits: [] as ReviewCommit[] })),

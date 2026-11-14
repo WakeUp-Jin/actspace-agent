@@ -2,7 +2,12 @@ import type { EffectiveModel, ModelFacts, ModelOverrides } from "./model-layers"
 import { MODEL_REASONING_EFFORTS, type ModelApi, type ModelKey, type ModelReasoningEffort } from "./model-config";
 import type { UsableModelView } from "./ipc";
 import type { ThinkingLevel } from "./model-thinking-profiles";
-import type { ProviderConnectionErrorKind, ProviderConnectionState, ProviderProxySettings, CustomConnectionResolvedAuth } from "./settings";
+import type {
+  ProviderConnectionErrorKind,
+  ProviderConnectionState,
+  ProviderProxySettings,
+  CustomConnectionResolvedAuth,
+} from "./settings";
 
 /**
  * 设置 › 模型 的 IPC 契约：连接（统一形状）、连接下的模型（有效值 + 用户修改）、用途表。
@@ -176,15 +181,24 @@ export interface ModelsHostPort {
 }
 
 /** Hosts without a model list (tests, remote hosts) still publish the port. */
-export const EMPTY_MODELS_HOST_PORT: ModelsHostPort = Object.freeze({ listUsableModels: () => Object.freeze([]), subagentDefaultModel: () => null });
+export const EMPTY_MODELS_HOST_PORT: ModelsHostPort = Object.freeze({
+  listUsableModels: () => Object.freeze([]),
+  subagentDefaultModel: () => null,
+});
 
 /** CLI hosts run one configured model; the list holds just it (empty when none was named). */
 export function currentModelHostPort(model: string | undefined): ModelsHostPort {
-  const models: readonly UsableModelSummary[] = Object.freeze(model ? [Object.freeze({ key: model, label: model, reasoningEfforts: Object.freeze([]), thinkingDefault: false })] : []);
+  const models: readonly UsableModelSummary[] = Object.freeze(
+    model
+      ? [Object.freeze({ key: model, label: model, reasoningEfforts: Object.freeze([]), thinkingDefault: false })]
+      : [],
+  );
   return Object.freeze({ listUsableModels: () => models, subagentDefaultModel: () => null });
 }
 
-export function usableModelSummary(view: Pick<UsableModelView, "key" | "label" | "connectionLabel" | "thinkingDefault" | "capabilities">): UsableModelSummary {
+export function usableModelSummary(
+  view: Pick<UsableModelView, "key" | "label" | "connectionLabel" | "thinkingDefault" | "capabilities">,
+): UsableModelSummary {
   const efforts = view.capabilities.reasoningEfforts;
   const defaultEffort = view.capabilities.reasoningDefaultEffort;
   return Object.freeze({

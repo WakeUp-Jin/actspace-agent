@@ -11,7 +11,8 @@ export function sessionsRoot(dataRoot: string): string {
 }
 
 export function transcriptPath(dataRoot: string, sessionId: string): string {
-  if (!SESSION_ID.test(sessionId) || sessionId === "." || sessionId === "..") throw new Error("Session id is not path-safe.");
+  if (!SESSION_ID.test(sessionId) || sessionId === "." || sessionId === "..")
+    throw new Error("Session id is not path-safe.");
   return join(sessionsRoot(dataRoot), sessionId, TRANSCRIPT_FILE_NAME);
 }
 
@@ -48,5 +49,9 @@ export function isBashLogReadPath(dataRoot: string, canonicalPath: string): bool
 }
 
 function canonical(path: string): string {
-  try { return existsSync(path) ? realpathSync(path) : resolve(path); } catch { return resolve(path); }
+  try {
+    return existsSync(path) ? realpathSync(path) : resolve(path);
+  } catch {
+    return resolve(path);
+  }
 }

@@ -1,13 +1,28 @@
 import { Check, Copy, Minimize2 } from "lucide-react";
 import {
-  useEffect, useId, useLayoutEffect, useRef, useState,
-  type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from "react";
 import { cn } from "./cn";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "./Menu";
 import {
-  ARRAY_PREVIEW_LIMIT, OBJECT_PREVIEW_LIMIT, PREVIEW_DEPTH_LIMIT, bracketOf, copyText, entriesOf, fieldText, isExpandableValue, pathId,
-  type CopyMode, type JsonPath,
+  ARRAY_PREVIEW_LIMIT,
+  OBJECT_PREVIEW_LIMIT,
+  PREVIEW_DEPTH_LIMIT,
+  bracketOf,
+  copyText,
+  entriesOf,
+  fieldText,
+  isExpandableValue,
+  pathId,
+  type CopyMode,
+  type JsonPath,
 } from "./json-tree-model";
 
 // 只读 JSON 检查器树（移植自 DeepSeek Harness JsonTree）。顶层始终展开，子对象 / 数组默认折叠并显示摘要；
@@ -20,11 +35,21 @@ function primitiveValue(value: unknown, preview = false): ReactNode {
   if (typeof value === "string") return <span className={c("stringValue")}>{JSON.stringify(value)}</span>;
   if (typeof value === "boolean") return <span className={c("keywordValue")}>{String(value)}</span>;
   if (typeof value === "number") return <span className={c("numberValue")}>{String(value)}</span>;
-  if (typeof value === "bigint") return <span className={c(preview ? "otherValue" : "numberValue")}>{preview ? value.toString() : `${value.toString()}n`}</span>;
+  if (typeof value === "bigint")
+    return (
+      <span className={c(preview ? "otherValue" : "numberValue")}>
+        {preview ? value.toString() : `${value.toString()}n`}
+      </span>
+    );
   if (value instanceof Date) return <span className={c("otherValue")}>{value.toISOString()}</span>;
-  if (typeof value === "function") return <span className={c("otherValue")}>{preview ? value.name || "Function" : "function() { }"}</span>;
+  if (typeof value === "function")
+    return <span className={c("otherValue")}>{preview ? value.name || "Function" : "function() { }"}</span>;
   if (typeof value === "undefined") return <span className={c("otherValue")}>undefined</span>;
-  return <span className={c("otherValue")}>{preview ? (value as symbol).description ?? "Symbol" : (value as symbol).toString()}</span>;
+  return (
+    <span className={c("otherValue")}>
+      {preview ? ((value as symbol).description ?? "Symbol") : (value as symbol).toString()}
+    </span>
+  );
 }
 
 function previewValue(value: unknown, depth: number): ReactNode {
@@ -36,15 +61,22 @@ function previewValue(value: unknown, depth: number): ReactNode {
   return (
     <>
       <span className={c("punctuation")}>{open}</span>
-      {depth >= PREVIEW_DEPTH_LIMIT
-        ? <span className={c("previewEllipsis")}>…</span>
-        : entries.slice(0, limit).map(([key, item], index) => (
+      {depth >= PREVIEW_DEPTH_LIMIT ? (
+        <span className={c("previewEllipsis")}>…</span>
+      ) : (
+        entries.slice(0, limit).map(([key, item], index) => (
           <span key={key}>
             {index > 0 && <span className={c("punctuation")}>, </span>}
-            {!array && (<><span className={c("previewProperty")}>{key}</span><span className={c("punctuation")}>: </span></>)}
+            {!array && (
+              <>
+                <span className={c("previewProperty")}>{key}</span>
+                <span className={c("punctuation")}>: </span>
+              </>
+            )}
             {previewValue(item, depth + 1)}
           </span>
-        ))}
+        ))
+      )}
       {depth < PREVIEW_DEPTH_LIMIT && entries.length > limit && <span className={c("previewEllipsis")}>, …</span>}
       <span className={c("punctuation")}>{close}</span>
     </>
@@ -80,18 +112,37 @@ function CopyAction({ path, value, persistent = false }: { path: JsonPath; value
   };
   const title = state === "copied" ? "已复制" : state === "failed" ? "复制失败" : object ? "复制 JSON" : "复制值";
   const items: readonly (readonly [CopyMode, string])[] = object
-    ? [["prettyJson", "复制 JSON（格式化）"], ["json", "复制 JSON（紧凑）"], ["path", "复制路径"]]
-    : [["value", "复制值"], ["json", "复制 JSON"], ["path", "复制路径"]];
+    ? [
+        ["prettyJson", "复制 JSON（格式化）"],
+        ["json", "复制 JSON（紧凑）"],
+        ["path", "复制路径"],
+      ]
+    : [
+        ["value", "复制值"],
+        ["json", "复制 JSON"],
+        ["path", "复制路径"],
+      ];
   return (
     <span className={c("copySlot")} data-persistent={persistent || undefined}>
       <Menu>
         <MenuTrigger asChild>
-          <button type="button" className={c("actionButton")} data-json-copy-button data-state={state} aria-label={title} title={title}>
+          <button
+            type="button"
+            className={c("actionButton")}
+            data-json-copy-button
+            data-state={state}
+            aria-label={title}
+            title={title}
+          >
             {state === "copied" ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
           </button>
         </MenuTrigger>
         <MenuContent align="end">
-          {items.map(([mode, label]) => <MenuItem key={mode} onSelect={() => void copy(mode)}>{label}</MenuItem>)}
+          {items.map(([mode, label]) => (
+            <MenuItem key={mode} onSelect={() => void copy(mode)}>
+              {label}
+            </MenuItem>
+          ))}
         </MenuContent>
       </Menu>
     </span>
@@ -100,15 +151,31 @@ function CopyAction({ path, value, persistent = false }: { path: JsonPath; value
 
 function Field({ field, onToggle }: { field: string | undefined; onToggle?: () => void }) {
   if (field === undefined) return null;
-  return <span className={cn(c("label"), onToggle && c("clickableLabel"))} onClick={onToggle}>{fieldText(field)}:</span>;
+  return (
+    <span className={cn(c("label"), onToggle && c("clickableLabel"))} onClick={onToggle}>
+      {fieldText(field)}:
+    </span>
+  );
 }
 
 function Comma({ last }: { last: boolean }) {
   return last ? null : <span className={c("punctuation")}>,</span>;
 }
 
-function JsonString({ lines, field, last, path, copyable, value }: {
-  lines: number; field: string | undefined; last: boolean; path: JsonPath; copyable: boolean; value: string;
+function JsonString({
+  lines,
+  field,
+  last,
+  path,
+  copyable,
+  value,
+}: {
+  lines: number;
+  field: string | undefined;
+  last: boolean;
+  path: JsonPath;
+  copyable: boolean;
+  value: string;
 }) {
   const contentsId = useId();
   const contentRef = useRef<HTMLSpanElement>(null);
@@ -133,11 +200,30 @@ function JsonString({ lines, field, last, path, copyable, value }: {
     const fieldId = `${contentsId}-field`;
     return (
       <div className={c("stringField")} data-expanded>
-        {field !== undefined && <span id={fieldId} className={c("label")}>{fieldText(field)}:</span>}
-        <pre id={contentsId} className={c("stringRaw")} tabIndex={0} aria-labelledby={field === undefined ? undefined : fieldId}>{value}</pre>
+        {field !== undefined && (
+          <span id={fieldId} className={c("label")}>
+            {fieldText(field)}:
+          </span>
+        )}
+        <pre
+          id={contentsId}
+          className={c("stringRaw")}
+          tabIndex={0}
+          aria-labelledby={field === undefined ? undefined : fieldId}
+        >
+          {value}
+        </pre>
         <Comma last={last} />
         <div className={c("stringActions")}>
-          <button type="button" className={c("actionButton")} aria-label="收起" title="收起" aria-expanded aria-controls={contentsId} onClick={() => setExpanded(false)}>
+          <button
+            type="button"
+            className={c("actionButton")}
+            aria-label="收起"
+            title="收起"
+            aria-expanded
+            aria-controls={contentsId}
+            onClick={() => setExpanded(false)}
+          >
             <Minimize2 size={12} aria-hidden="true" />
           </button>
           {copyable && <CopyAction path={path} value={value} persistent />}
@@ -152,7 +238,14 @@ function JsonString({ lines, field, last, path, copyable, value }: {
         <span ref={contentRef} id={contentsId} className={c("stringText")}>
           {truncated && (
             <span className={c("stringToggleSlot")}>
-              <button type="button" className={c("stringToggle")} aria-label="展开" aria-expanded={false} aria-controls={contentsId} onClick={() => setExpanded(true)}>
+              <button
+                type="button"
+                className={c("stringToggle")}
+                aria-label="展开"
+                aria-expanded={false}
+                aria-controls={contentsId}
+                onClick={() => setExpanded(true)}
+              >
                 <span aria-hidden="true">…</span>展开
               </button>
             </span>
@@ -167,8 +260,14 @@ function JsonString({ lines, field, last, path, copyable, value }: {
 }
 
 type NodeProps = {
-  lines: number; field?: string; last: boolean; path: JsonPath; value: unknown; copyable: boolean;
-  tabStopId: string | null; onClaimTabStop: (id: string) => void;
+  lines: number;
+  field?: string;
+  last: boolean;
+  path: JsonPath;
+  value: unknown;
+  copyable: boolean;
+  tabStopId: string | null;
+  onClaimTabStop: (id: string) => void;
 };
 
 function JsonNode({ lines, field, last, path, value, copyable, tabStopId, onClaimTabStop }: NodeProps) {
@@ -211,9 +310,14 @@ function JsonNode({ lines, field, last, path, value, copyable, tabStopId, onClai
     return row(
       <>
         <Field field={field} />
-        {container
-          ? (<><span className={c("punctuation")}>{open}</span><span className={c("punctuation")}>{close}</span></>)
-          : primitiveValue(value)}
+        {container ? (
+          <>
+            <span className={c("punctuation")}>{open}</span>
+            <span className={c("punctuation")}>{close}</span>
+          </>
+        ) : (
+          primitiveValue(value)
+        )}
         <Comma last={last} />
       </>,
     );
@@ -242,9 +346,15 @@ function JsonNode({ lines, field, last, path, value, copyable, tabStopId, onClai
         <ul id={contentsId} role="group" className={c("children")}>
           {entries.map(([key, item], index) => (
             <JsonNode
-              key={key} lines={lines} field={key} value={item} copyable={copyable}
+              key={key}
+              lines={lines}
+              field={key}
+              value={item}
+              copyable={copyable}
               path={[...path, Array.isArray(value) ? index : key]}
-              last={index === entries.length - 1} tabStopId={tabStopId} onClaimTabStop={onClaimTabStop}
+              last={index === entries.length - 1}
+              tabStopId={tabStopId}
+              onClaimTabStop={onClaimTabStop}
             />
           ))}
         </ul>
@@ -266,7 +376,13 @@ export type JsonTreeProps = {
   className?: string;
 };
 
-export function JsonTree({ data, label = "JSON", collapsedStringLines = 12, copyable = true, className }: JsonTreeProps) {
+export function JsonTree({
+  data,
+  label = "JSON",
+  collapsedStringLines = 12,
+  copyable = true,
+  className,
+}: JsonTreeProps) {
   const rootEntries = isExpandableValue(data) ? entriesOf(data) : [];
   const firstExpandable = rootEntries.findIndex(([, value]) => isExpandableValue(value) && entriesOf(value).length > 0);
   const firstEntry = rootEntries[firstExpandable];
@@ -279,7 +395,15 @@ export function JsonTree({ data, label = "JSON", collapsedStringLines = 12, copy
     return (
       <div className={cn(c("root"), className)} style={style}>
         <div aria-label={label} className={c("container")} role="tree">
-          <JsonNode lines={collapsedStringLines} value={data} path={[]} last copyable={copyable} tabStopId={null} onClaimTabStop={setTabStopId} />
+          <JsonNode
+            lines={collapsedStringLines}
+            value={data}
+            path={[]}
+            last
+            copyable={copyable}
+            tabStopId={null}
+            onClaimTabStop={setTabStopId}
+          />
         </div>
       </div>
     );
@@ -295,9 +419,15 @@ export function JsonTree({ data, label = "JSON", collapsedStringLines = 12, copy
         <div aria-label={label} className={cn(c("container"), c("expandedTopLevelContainer"))} role="tree">
           {rootEntries.map(([key, value], index) => (
             <JsonNode
-              key={key} lines={collapsedStringLines} field={key} value={value} copyable={copyable}
-              path={[Array.isArray(data) ? index : key]} last={index === rootEntries.length - 1}
-              tabStopId={tabStopId} onClaimTabStop={setTabStopId}
+              key={key}
+              lines={collapsedStringLines}
+              field={key}
+              value={value}
+              copyable={copyable}
+              path={[Array.isArray(data) ? index : key]}
+              last={index === rootEntries.length - 1}
+              tabStopId={tabStopId}
+              onClaimTabStop={setTabStopId}
             />
           ))}
         </div>

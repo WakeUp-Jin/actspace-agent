@@ -53,8 +53,14 @@ export type ToolResultBounds = {
  * 结果提交前的最后一道：超过上限的部分截短，状态和失败码不动（副作用已经发生）。
  * 没有超限时原样返回同一个对象。
  */
-export async function boundToolResult(result: ToolExecutionResult, bounds: ToolResultBounds): Promise<ToolExecutionResult> {
-  const maxChars = typeof bounds.modelOutputChars === "number" && Number.isFinite(bounds.modelOutputChars) ? Math.max(TOOL_RESULT_MODEL_OUTPUT_MIN_CHARS, Math.floor(bounds.modelOutputChars)) : undefined;
+export async function boundToolResult(
+  result: ToolExecutionResult,
+  bounds: ToolResultBounds,
+): Promise<ToolExecutionResult> {
+  const maxChars =
+    typeof bounds.modelOutputChars === "number" && Number.isFinite(bounds.modelOutputChars)
+      ? Math.max(TOOL_RESULT_MODEL_OUTPUT_MIN_CHARS, Math.floor(bounds.modelOutputChars))
+      : undefined;
   let next: ToolExecutionResult = result;
   const summary = capToolResultText(result.summary);
   if (summary !== result.summary) next = { ...next, summary };
@@ -67,10 +73,20 @@ export async function boundToolResult(result: ToolExecutionResult, bounds: ToolR
     const { renderer: _dropped, ...rest } = next;
     next = rest;
   }
-  if (!fitsJsonBytes(result.detail, TOOL_RESULT_DETAIL_BYTES)) next = { ...next, detail: Object.freeze(boundDetail(result.detail)) };
-  if (!fitsJsonBytes(result.modelOutput, TOOL_RESULT_MODEL_OUTPUT_BYTES) || (maxChars !== undefined && toolModelOutputChars(result.modelOutput) > maxChars)) {
+  if (!fitsJsonBytes(result.detail, TOOL_RESULT_DETAIL_BYTES))
+    next = { ...next, detail: Object.freeze(boundDetail(result.detail)) };
+  if (
+    !fitsJsonBytes(result.modelOutput, TOOL_RESULT_MODEL_OUTPUT_BYTES) ||
+    (maxChars !== undefined && toolModelOutputChars(result.modelOutput) > maxChars)
+  ) {
     const bounded = await boundModelOutput(result.modelOutput, maxChars, bounds.saveFullOutput);
-    next = { ...next, modelOutput: Object.freeze(bounded.modelOutput), artifacts: Object.freeze(bounded.saved === undefined ? [...result.artifacts] : [...result.artifacts, bounded.saved]) };
+    next = {
+      ...next,
+      modelOutput: Object.freeze(bounded.modelOutput),
+      artifacts: Object.freeze(
+        bounded.saved === undefined ? [...result.artifacts] : [...result.artifacts, bounded.saved],
+      ),
+    };
   }
   return next === result ? result : Object.freeze(next);
 }
@@ -86,7 +102,13 @@ type ArtifactBlock = Extract<ToolModelOutputBlock, { type: "artifact" }>;
 /** 给模型的输出按上下文估算的口径有多少字符：文本和 json 的文字，加上每个文件引用渲染后的大致长度。 */
 export function toolModelOutputChars(blocks: readonly ToolModelOutputBlock[]): number {
   let chars = 0;
-  for (const block of blocks) chars += block.type === "text" ? block.text.length : block.type === "json" ? (JSON.stringify(block.value) ?? "null").length : REFERENCE_CHARS;
+  for (const block of blocks)
+    chars +=
+      block.type === "text"
+        ? block.text.length
+        : block.type === "json"
+          ? (JSON.stringify(block.value) ?? "null").length
+          : REFERENCE_CHARS;
   return chars;
 }
 
@@ -113,21 +135,39 @@ export class ToolOutputBudget {
     const share = Math.floor(this.#remaining / Math.max(1, this.#pending));
     const allowance = this.#remaining - others * Math.min(TOOL_BATCH_PENDING_CALL_CHARS, share);
     // 额度再小，截短后的结果也有 TOOL_RESULT_MODEL_OUTPUT_MIN_CHARS 那么长（boundToolResult）。
-    this.#remaining = Math.max(0, this.#remaining - Math.min(Math.max(0, wanted), Math.max(allowance, TOOL_RESULT_MODEL_OUTPUT_MIN_CHARS)));
+    this.#remaining = Math.max(
+      0,
+      this.#remaining - Math.min(Math.max(0, wanted), Math.max(allowance, TOOL_RESULT_MODEL_OUTPUT_MIN_CHARS)),
+    );
     this.#pending = others;
     return allowance;
   }
 }
 
-async function boundModelOutput(blocks: readonly ToolModelOutputBlock[], maxChars: number | undefined, save: (text: string) => Promise<ToolArtifactRef>): Promise<{ readonly modelOutput: ToolModelOutputBlock[]; readonly saved?: ToolArtifactRef }> {
+async function boundModelOutput(
+  blocks: readonly ToolModelOutputBlock[],
+  maxChars: number | undefined,
+  save: (text: string) => Promise<ToolArtifactRef>,
+): Promise<{ readonly modelOutput: ToolModelOutputBlock[]; readonly saved?: ToolArtifactRef }> {
   const maxBytes = TOOL_RESULT_MODEL_OUTPUT_BYTES;
   // 模型看到的 json 块本来就是序列化后的文本（context-engine 的转换），所以按文本合并。
-  const full = blocks.flatMap((block) => block.type === "text" ? [block.text] : block.type === "json" ? [JSON.stringify(block.value) ?? "null"] : []).join("\n");
+  const full = blocks
+    .flatMap((block) =>
+      block.type === "text" ? [block.text] : block.type === "json" ? [JSON.stringify(block.value) ?? "null"] : [],
+    )
+    .join("\n");
   const references = blocks.filter((block): block is ArtifactBlock => block.type === "artifact");
   // 引用本身就占掉一半以上时不再逐个列给模型；它们仍在 result.artifacts 里。
-  const listed = fitsJsonBytes(references, Math.floor(maxBytes / 2)) && (maxChars === undefined || references.length * REFERENCE_CHARS <= maxChars / 2) ? references : [];
+  const listed =
+    fitsJsonBytes(references, Math.floor(maxBytes / 2)) &&
+    (maxChars === undefined || references.length * REFERENCE_CHARS <= maxChars / 2)
+      ? references
+      : [];
   const byteHead = headWithinJsonBytes(full, maxBytes - NOTE_RESERVE - (listed.length === 0 ? 0 : jsonBytes(listed)));
-  const charHead = maxChars === undefined ? byteHead : sliceWholeChars(byteHead, Math.max(0, maxChars - NOTE_RESERVE - listed.length * REFERENCE_CHARS));
+  const charHead =
+    maxChars === undefined
+      ? byteHead
+      : sliceWholeChars(byteHead, Math.max(0, maxChars - NOTE_RESERVE - listed.length * REFERENCE_CHARS));
   // 说明里写的是真正起作用的那个限制。
   const windowLimited = charHead.length < byteHead.length;
   let head = charHead;
@@ -137,7 +177,11 @@ async function boundModelOutput(blocks: readonly ToolModelOutputBlock[], maxChar
     // 最后四分之一里有换行就停在整行上。
     const lineEnd = head.lastIndexOf("\n");
     if (lineEnd > head.length * 0.75) head = head.slice(0, lineEnd);
-    try { saved = await save(full); } catch { saved = undefined; }
+    try {
+      saved = await save(full);
+    } catch {
+      saved = undefined;
+    }
   }
   const totalBytes = Buffer.byteLength(full, "utf8");
   const compose = (shown: string): ToolModelOutputBlock[] => {
@@ -146,15 +190,26 @@ async function boundModelOutput(blocks: readonly ToolModelOutputBlock[], maxChar
       const what = windowLimited
         ? `this tool returned ${full.length} characters and the context window has room for about ${maxChars}. The first ${shown.length} characters are shown.`
         : `this tool returned ${totalBytes} bytes, more than one result can hold. The first ${Buffer.byteLength(shown, "utf8")} bytes are shown.`;
-      notes.push(`[Output truncated: ${what} ${saved === undefined ? "The full output could not be saved." : "The full output was saved as a file."}]`);
+      notes.push(
+        `[Output truncated: ${what} ${saved === undefined ? "The full output could not be saved." : "The full output was saved as a file."}]`,
+      );
     }
-    if (listed.length < references.length) notes.push(`[${references.length} file references are not listed here: together they do not fit in one result.]`);
+    if (listed.length < references.length)
+      notes.push(`[${references.length} file references are not listed here: together they do not fit in one result.]`);
     const text = shown.length === 0 ? notes.join("\n") : notes.length === 0 ? shown : `${shown}\n\n${notes.join("\n")}`;
-    return [{ type: "text", text }, ...listed, ...(saved === undefined ? [] : [{ type: "artifact" as const, artifact: saved, label: "Full tool output" }])];
+    return [
+      { type: "text", text },
+      ...listed,
+      ...(saved === undefined ? [] : [{ type: "artifact" as const, artifact: saved, label: "Full tool output" }]),
+    ];
   };
   let modelOutput = compose(head);
   // 预留的位置万一不够：序列化后每个 UTF-16 单元至少占 1 字节，按超出的量去掉开头的末尾，一定在变小。
-  const excess = (): number => Math.max(jsonBytes(modelOutput) - maxBytes, maxChars === undefined ? 0 : toolModelOutputChars(modelOutput) - maxChars);
+  const excess = (): number =>
+    Math.max(
+      jsonBytes(modelOutput) - maxBytes,
+      maxChars === undefined ? 0 : toolModelOutputChars(modelOutput) - maxChars,
+    );
   for (let over = excess(); over > 0 && head.length > 0; over = excess()) {
     head = sliceWholeChars(head, Math.max(0, head.length - over));
     modelOutput = compose(head);
@@ -167,8 +222,14 @@ function boundDetail(detail: readonly ToolDetailBlock[]): ToolDetailBlock[] {
   // 逐块处理：放不下的块换成一句说明，后面放得下的小块（比如计数）照常保留。
   return detail.slice(0, DETAIL_MAX_BLOCKS).map((block) => {
     const bytes = jsonBytes(block) + 1;
-    if (used + bytes <= TOOL_RESULT_DETAIL_BYTES) { used += bytes; return block; }
-    const marker: ToolDetailBlock = { label: sliceWholeChars(block.label, DETAIL_LABEL_CHARS), value: `[Detail omitted: ${bytes} bytes is over the size limit for one tool result.]` };
+    if (used + bytes <= TOOL_RESULT_DETAIL_BYTES) {
+      used += bytes;
+      return block;
+    }
+    const marker: ToolDetailBlock = {
+      label: sliceWholeChars(block.label, DETAIL_LABEL_CHARS),
+      value: `[Detail omitted: ${bytes} bytes is over the size limit for one tool result.]`,
+    };
     used += jsonBytes(marker) + 1;
     return marker;
   });

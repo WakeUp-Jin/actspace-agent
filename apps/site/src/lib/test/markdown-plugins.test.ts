@@ -29,15 +29,23 @@ describe("CJK spacing", () => {
       ],
     };
     spaceHastTree(tree);
-    expect(tree.children.map((node) => ("value" in node ? node.value : node.children[0].value))).toEqual(["调用 ", "a中b", " 工具"]);
+    expect(tree.children.map((node) => ("value" in node ? node.value : node.children[0].value))).toEqual([
+      "调用 ",
+      "a中b",
+      " 工具",
+    ]);
   });
 });
 
 describe("prose structure plugins", () => {
   it("turns image-only paragraphs into figures and emoji paragraphs into callouts", async () => {
     const { code } = await render("![流程图](https://example.com/a.png)\n\n💡 记得**保存**\n\n- 💡 列表里不转\n");
-    expect(code).toContain('<figure><img src="https://example.com/a.png" alt="流程图"><figcaption>流程图</figcaption></figure>');
-    expect(code).toContain('<div class="callout"><span class="ico" aria-hidden="true">💡</span><div>记得<strong>保存</strong></div></div>');
+    expect(code).toContain(
+      '<figure><img src="https://example.com/a.png" alt="流程图"><figcaption>流程图</figcaption></figure>',
+    );
+    expect(code).toContain(
+      '<div class="callout"><span class="ico" aria-hidden="true">💡</span><div>记得<strong>保存</strong></div></div>',
+    );
     expect(code).toContain("<li>💡 列表里不转</li>");
   });
 
@@ -49,7 +57,10 @@ describe("prose structure plugins", () => {
   });
 
   it("splits manual heading numbers but keeps heading text and slugs", async () => {
-    const { code, metadata } = await render("## 2、Agent设计\n\n## 产品理念\n", new URL("file:///site/src/content/docs/a.md"));
+    const { code, metadata } = await render(
+      "## 2、Agent设计\n\n## 产品理念\n",
+      new URL("file:///site/src/content/docs/a.md"),
+    );
     expect(code).toContain('<span class="hn">2<span class="hn-sep">、</span></span><span class="ht">Agent设计</span>');
     expect(metadata.headings.map((heading) => [heading.slug, heading.text])).toEqual([
       ["2agent设计", "2、Agent设计"],
@@ -58,14 +69,21 @@ describe("prose structure plugins", () => {
   });
 
   it("marks Chinese-numeral heading numbers so the blog can style them like digits", async () => {
-    const { code, metadata } = await render("## 一、发现\n\n### 1.1、定义\n", new URL("file:///site/src/content/blog/a.md"));
-    expect(code).toContain('<span class="hn hn-cjk">一<span class="hn-sep">、</span></span><span class="ht">发现</span>');
+    const { code, metadata } = await render(
+      "## 一、发现\n\n### 1.1、定义\n",
+      new URL("file:///site/src/content/blog/a.md"),
+    );
+    expect(code).toContain(
+      '<span class="hn hn-cjk">一<span class="hn-sep">、</span></span><span class="ht">发现</span>',
+    );
     expect(code).toContain('<span class="hn">1.1<span class="hn-sep">、</span></span><span class="ht">定义</span>');
     expect(metadata.headings.map((heading) => heading.text)).toEqual(["一、发现", "1.1、定义"]);
   });
 
   it("recovers bold that CommonMark leaves as literal asterisks next to CJK punctuation", async () => {
-    const { code } = await render("将**元信息（名称+描述）**加载到上下文中\n\n- 要**查找子目录，**这个才有效\n\n算式 2 ** 3 ** 4 不动，`a**b**c` 也不动\n");
+    const { code } = await render(
+      "将**元信息（名称+描述）**加载到上下文中\n\n- 要**查找子目录，**这个才有效\n\n算式 2 ** 3 ** 4 不动，`a**b**c` 也不动\n",
+    );
     expect(code).toContain("<p>将<strong>元信息（名称+描述）</strong>加载到上下文中</p>");
     expect(code).toContain("<li>要<strong>查找子目录，</strong>这个才有效</li>");
     expect(code).toContain("算式 2 ** 3 ** 4 不动");
@@ -79,9 +97,13 @@ describe("prose structure plugins", () => {
 
   it("wraps highlighted code in a card with language, line count, hidden copy button and gutter", async () => {
     const { code } = await render("```ts\nconst a = 1;\nconst b = 2;\n```\n\n文字`code`文字\n");
-    expect(code).toContain('<div class="code" data-lang="ts"><div class="code-bar"><span class="code-lang">TypeScript</span><span class="code-lines">2 行</span>');
+    expect(code).toContain(
+      '<div class="code" data-lang="ts"><div class="code-bar"><span class="code-lang">TypeScript</span><span class="code-lines">2 行</span>',
+    );
     expect(code).toContain('<button type="button" class="code-copy" aria-label="复制代码" hidden>复制</button>');
-    expect(code).toContain('<div class="code-gutter" aria-hidden="true">1\n2</div><pre class="astro-code actspace-paper"');
+    expect(code).toContain(
+      '<div class="code-gutter" aria-hidden="true">1\n2</div><pre class="astro-code actspace-paper"',
+    );
     expect(code).not.toMatch(/<pre[^>]*style=/);
     expect(code).toContain("const</span>");
     expect(code).toContain("文字 <code>code</code> 文字");

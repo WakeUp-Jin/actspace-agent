@@ -3,7 +3,8 @@ import { allComposedElements, elementBox, isEditable, isEnabled, isInViewport, i
 import { actionPoint, normalizeTarget, resolveAll, waitForState, waitForStrict } from "./locator";
 import type { ClipboardPayloadItem, LocatorParams, RuntimeAPI } from "./types";
 
-const INTERACTABLE_SELECTOR = "a,button,input,textarea,select,summary,details,label,img,video,audio,[role],[onclick],[contenteditable=true],[tabindex],[draggable=true]";
+const INTERACTABLE_SELECTOR =
+  "a,button,input,textarea,select,summary,details,label,img,video,audio,[role],[onclick],[contenteditable=true],[tabindex],[draggable=true]";
 const SNAPSHOT_LIMIT_MAX = 1000;
 const PAGE_LIMIT_DEFAULT = 200;
 const PAGE_LIMIT_MAX = 1000;
@@ -14,10 +15,15 @@ export function createRuntime(version: string, buildHash: string): RuntimeAPI {
 
   const invoke = async (action: string, params: LocatorParams = {}): Promise<unknown> => {
     switch (action) {
-      case "point": return actionPoint(normalizeTarget(params), params.timeoutMs, params.localCoordinates);
-      case "frame_element": return waitForStrict(normalizeTarget(params), { timeoutMs: params.timeoutMs });
+      case "point":
+        return actionPoint(normalizeTarget(params), params.timeoutMs, params.localCoordinates);
+      case "frame_element":
+        return waitForStrict(normalizeTarget(params), { timeoutMs: params.timeoutMs });
       case "frame_offset": {
-        const frame = await waitForStrict(normalizeTarget(params), { timeoutMs: params.timeoutMs, actionable: params.scrollIntoView !== false });
+        const frame = await waitForStrict(normalizeTarget(params), {
+          timeoutMs: params.timeoutMs,
+          actionable: params.scrollIntoView !== false,
+        });
         if (frame.tagName.toLowerCase() !== "iframe") throw new Error("frame_not_found");
         const rect = frame.getBoundingClientRect();
         return {
@@ -33,7 +39,8 @@ export function createRuntime(version: string, buildHash: string): RuntimeAPI {
       }
       case "focus": {
         const element = await waitForStrict(normalizeTarget(params), { timeoutMs: params.timeoutMs });
-        if (!("focus" in element) || typeof (element as HTMLElement).focus !== "function") throw new Error("element_not_focusable");
+        if (!("focus" in element) || typeof (element as HTMLElement).focus !== "function")
+          throw new Error("element_not_focusable");
         (element as HTMLElement).focus();
         return {};
       }
@@ -44,10 +51,13 @@ export function createRuntime(version: string, buildHash: string): RuntimeAPI {
         const selections = params.selections ?? [];
         const selected: string[] = [];
         for (const option of Array.from(select.options)) {
-          const match = selections.some((selection) => selection.value === option.value
-            || selection.label === option.label
-            || selection.valueOrLabel === option.value
-            || selection.valueOrLabel === option.label);
+          const match = selections.some(
+            (selection) =>
+              selection.value === option.value ||
+              selection.label === option.label ||
+              selection.valueOrLabel === option.value ||
+              selection.valueOrLabel === option.label,
+          );
           option.selected = match;
           if (match) selected.push(option.value);
         }
@@ -82,7 +92,10 @@ export function createRuntime(version: string, buildHash: string): RuntimeAPI {
       case "all_text_contents": {
         const target = normalizeTarget(params);
         await waitForState(target, "attached", params.timeoutMs);
-        return paginate(resolveAll(target).map((element) => element.textContent ?? ""), params);
+        return paginate(
+          resolveAll(target).map((element) => element.textContent ?? ""),
+          params,
+        );
       }
       case "read_all": {
         const target = normalizeTarget(params);
@@ -92,8 +105,10 @@ export function createRuntime(version: string, buildHash: string): RuntimeAPI {
             ? Array.from(element.querySelectorAll(params.relativeSelector))
             : [element];
           return relative.map((candidate) => ({
-            attributes: Object.fromEntries(Array.from(candidate.attributes).map((attribute) => [attribute.name, attribute.value])),
-            inner_text: "innerText" in candidate ? (candidate as HTMLElement).innerText ?? "" : "",
+            attributes: Object.fromEntries(
+              Array.from(candidate.attributes).map((attribute) => [attribute.name, attribute.value]),
+            ),
+            inner_text: "innerText" in candidate ? ((candidate as HTMLElement).innerText ?? "") : "",
             text_content: candidate.textContent ?? "",
             role: computedRole(candidate),
             accessible_name: accessibleName(candidate) || undefined,
@@ -105,18 +120,22 @@ export function createRuntime(version: string, buildHash: string): RuntimeAPI {
         const element = await waitForStrict(normalizeTarget(params), { timeoutMs: params.timeoutMs });
         return { value: element.getAttribute(params.name ?? "") };
       }
-      case "is_visible": return { value: resolveAll(normalizeTarget(params)).some(isVisible) };
+      case "is_visible":
+        return { value: resolveAll(normalizeTarget(params)).some(isVisible) };
       case "is_enabled": {
         const element = await waitForStrict(normalizeTarget(params), { timeoutMs: params.timeoutMs });
         return { value: isEnabled(element) };
       }
-      case "count": return { count: resolveAll(normalizeTarget(params)).length };
+      case "count":
+        return { count: resolveAll(normalizeTarget(params)).length };
       case "wait_for": {
         await waitForState(normalizeTarget(params), params.state ?? "visible", params.timeoutMs);
         return {};
       }
-      case "dom_snapshot": return { dom_snapshot: document.body?.innerText || document.body?.textContent || "" };
-      case "element_info": return { elements: elementsAtPoint(params).map(describe) };
+      case "dom_snapshot":
+        return { dom_snapshot: document.body?.innerText || document.body?.textContent || "" };
+      case "element_info":
+        return { elements: elementsAtPoint(params).map(describe) };
       case "visible_dom": {
         snapshotGeneration += 1;
         snapshotNodes = new Map();
@@ -137,7 +156,8 @@ export function createRuntime(version: string, buildHash: string): RuntimeAPI {
           nodes,
         };
       }
-      case "node_point": return pointForElement(snapshotNode(snapshotNodes, params.nodeId));
+      case "node_point":
+        return pointForElement(snapshotNode(snapshotNodes, params.nodeId));
       case "node_scroll": {
         const element = snapshotNode(snapshotNodes, params.nodeId);
         if ("scrollBy" in element && typeof (element as HTMLElement).scrollBy === "function") {
@@ -147,14 +167,24 @@ export function createRuntime(version: string, buildHash: string): RuntimeAPI {
         }
         return {};
       }
-      case "download_media_at_point": return triggerDownload(document.elementFromPoint(params.x ?? 0, params.y ?? 0));
-      case "download_media_selector": return triggerDownload(await waitForStrict(normalizeTarget(params), { timeoutMs: params.timeoutMs }));
-      case "node_download_media": return triggerDownload(snapshotNode(snapshotNodes, params.nodeId));
-      case "clipboard_read_text": return { text: await navigator.clipboard.readText() };
-      case "clipboard_write_text": await navigator.clipboard.writeText(params.text ?? ""); return {};
-      case "clipboard_read": return readClipboard();
-      case "clipboard_write": await writeClipboard(params.items ?? []); return {};
-      default: throw new Error(`invalid_locator_action: ${action}`);
+      case "download_media_at_point":
+        return triggerDownload(document.elementFromPoint(params.x ?? 0, params.y ?? 0));
+      case "download_media_selector":
+        return triggerDownload(await waitForStrict(normalizeTarget(params), { timeoutMs: params.timeoutMs }));
+      case "node_download_media":
+        return triggerDownload(snapshotNode(snapshotNodes, params.nodeId));
+      case "clipboard_read_text":
+        return { text: await navigator.clipboard.readText() };
+      case "clipboard_write_text":
+        await navigator.clipboard.writeText(params.text ?? "");
+        return {};
+      case "clipboard_read":
+        return readClipboard();
+      case "clipboard_write":
+        await writeClipboard(params.items ?? []);
+        return {};
+      default:
+        throw new Error(`invalid_locator_action: ${action}`);
     }
   };
 
@@ -165,9 +195,15 @@ function setNativeValue(element: Element, value: string): void {
   const tagName = element.tagName.toLowerCase();
   const view = element.ownerDocument.defaultView;
   if (tagName === "input") {
-    Object.getOwnPropertyDescriptor(view?.HTMLInputElement.prototype ?? HTMLInputElement.prototype, "value")?.set?.call(element, value);
+    Object.getOwnPropertyDescriptor(view?.HTMLInputElement.prototype ?? HTMLInputElement.prototype, "value")?.set?.call(
+      element,
+      value,
+    );
   } else if (tagName === "textarea") {
-    Object.getOwnPropertyDescriptor(view?.HTMLTextAreaElement.prototype ?? HTMLTextAreaElement.prototype, "value")?.set?.call(element, value);
+    Object.getOwnPropertyDescriptor(
+      view?.HTMLTextAreaElement.prototype ?? HTMLTextAreaElement.prototype,
+      "value",
+    )?.set?.call(element, value);
   } else if (Boolean((element as HTMLElement).isContentEditable)) {
     (element as HTMLElement).textContent = value;
   } else {
@@ -194,7 +230,8 @@ function pointForElement(element: Element) {
 }
 
 function describe(element: Element) {
-  const rawText = ("innerText" in element ? (element as HTMLElement).innerText : element.textContent) || element.textContent || "";
+  const rawText =
+    ("innerText" in element ? (element as HTMLElement).innerText : element.textContent) || element.textContent || "";
   const text = rawText.trim().replace(/\s+/g, " ");
   return {
     tagName: element.tagName.toLowerCase(),
@@ -216,9 +253,12 @@ function describe(element: Element) {
 function elementsAtPoint(params: LocatorParams): Element[] {
   const x = params.x ?? 0;
   const y = params.y ?? 0;
-  const values = typeof document.elementsFromPoint === "function"
-    ? document.elementsFromPoint(x, y)
-    : document.elementFromPoint(x, y) ? [document.elementFromPoint(x, y)!] : [];
+  const values =
+    typeof document.elementsFromPoint === "function"
+      ? document.elementsFromPoint(x, y)
+      : document.elementFromPoint(x, y)
+        ? [document.elementFromPoint(x, y)!]
+        : [];
   return values.slice(0, 10).filter((element) => params.includeNonInteractable || isVisible(element));
 }
 
@@ -293,12 +333,13 @@ async function writeClipboard(items: ClipboardPayloadItem[]): Promise<void> {
       }
       const binary = atob(entry.base64 || "");
       if (binary.length > 1024 * 1024) throw new Error("clipboard_item_too_large");
-      values[mimeType] = new Blob([Uint8Array.from(binary, (character) => character.charCodeAt(0))], { type: mimeType });
+      values[mimeType] = new Blob([Uint8Array.from(binary, (character) => character.charCodeAt(0))], {
+        type: mimeType,
+      });
     }
     const rawPresentationStyle = item.presentationStyle || item.presentation_style;
-    const presentationStyle: PresentationStyle = rawPresentationStyle === "inline" || rawPresentationStyle === "attachment"
-      ? rawPresentationStyle
-      : "unspecified";
+    const presentationStyle: PresentationStyle =
+      rawPresentationStyle === "inline" || rawPresentationStyle === "attachment" ? rawPresentationStyle : "unspecified";
     return new ClipboardItem(values, { presentationStyle });
   });
   await navigator.clipboard.write(clipboardItems);

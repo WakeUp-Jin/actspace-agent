@@ -63,8 +63,22 @@ export type SessionListItem = {
   sideChatCount?: number;
 };
 
-export type SessionListPageInput = { hostId?: string; workspaceRoot?: string; pinned?: boolean; after?: string; search?: string; limit?: number };
-export type SessionListPage = { nextCursor?: string; items: SessionListItem[]; groups: { hostId?: string; workspaceRoot: string; pinned: boolean; hasMore: boolean }[]; indexing: boolean; failed: number; readModel?: UsageReadModelInfo };
+export type SessionListPageInput = {
+  hostId?: string;
+  workspaceRoot?: string;
+  pinned?: boolean;
+  after?: string;
+  search?: string;
+  limit?: number;
+};
+export type SessionListPage = {
+  nextCursor?: string;
+  items: SessionListItem[];
+  groups: { hostId?: string; workspaceRoot: string; pinned: boolean; hasMore: boolean }[];
+  indexing: boolean;
+  failed: number;
+  readModel?: UsageReadModelInfo;
+};
 
 export type SessionListInput = {
   /** 缺省为 false：普通会话列表只返回未归档会话。 */

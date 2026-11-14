@@ -24,10 +24,22 @@ export function disabledBrowserBridgeStatus(): BrowserBridgeStatus {
 }
 
 export function disabledEnglishLearningState(): EnglishLearningState {
-  return { enabled: false, targetSessionId: null, revision: 0, promptStatus: "off", speechStatus: "unsupported", queuedSegments: 0, hasApiKey: false, notice: "英语学习插件未开启，请在 扩展 › 插件 中开启后重启。", error: null };
+  return {
+    enabled: false,
+    targetSessionId: null,
+    revision: 0,
+    promptStatus: "off",
+    speechStatus: "unsupported",
+    queuedSegments: 0,
+    hasApiKey: false,
+    notice: "英语学习插件未开启，请在 扩展 › 插件 中开启后重启。",
+    error: null,
+  };
 }
 
-const reject = (): never => { throw new Error(PLUGIN_DISABLED_MESSAGE); };
+const reject = (): never => {
+  throw new Error(PLUGIN_DISABLED_MESSAGE);
+};
 
 export function registerDisabledBrowserBridgeIpc(ipc: IpcRegistrar): void {
   const bridge = contract.browserBridge;
@@ -45,7 +57,10 @@ export function registerDisabledBrowserBridgeIpc(ipc: IpcRegistrar): void {
 }
 
 export function registerDisabledEnglishLearningIpc(options: { getMainWindow: () => BrowserWindow | null }): () => void {
-  const ipc = createIpcRegistrar({ getWindow: options.getMainWindow, untrustedMessage: "无效的英语辅助学习请求来源。" });
+  const ipc = createIpcRegistrar({
+    getWindow: options.getMainWindow,
+    untrustedMessage: "无效的英语辅助学习请求来源。",
+  });
   ipc.handle(contract.englishLearning.getState, () => disabledEnglishLearningState());
   ipc.handle(contract.englishLearning.setTarget, reject);
   ipc.handle(contract.englishLearning.stopSpeech, reject);

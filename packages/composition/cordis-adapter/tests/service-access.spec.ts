@@ -28,8 +28,12 @@ describe("service access by definition", () => {
 
   it("reports a missing required service with the consumer's name and the service id", () => {
     const ctx = new CordisContextClass();
-    expect(() => requireService(ctx, CLOCK, "Agent factory plugin")).toThrow(new Error("Agent factory plugin requires fixture.clock."));
-    expect(() => requireService(undefined, CLOCK, "Fixture consumer")).toThrow(new Error("Fixture consumer requires fixture.clock."));
+    expect(() => requireService(ctx, CLOCK, "Agent factory plugin")).toThrow(
+      new Error("Agent factory plugin requires fixture.clock."),
+    );
+    expect(() => requireService(undefined, CLOCK, "Fixture consumer")).toThrow(
+      new Error("Fixture consumer requires fixture.clock."),
+    );
   });
 
   it("treats a context without get or provide as having no services", () => {
@@ -43,8 +47,12 @@ describe("service access by definition", () => {
     const store = new Map<string, unknown>();
     const ctx = {
       store,
-      get(this: { store: Map<string, unknown> }, name: string) { return this.store.get(name); },
-      provide(this: { store: Map<string, unknown> }, name: string, value?: unknown) { this.store.set(name, value); },
+      get(this: { store: Map<string, unknown> }, name: string) {
+        return this.store.get(name);
+      },
+      provide(this: { store: Map<string, unknown> }, name: string, value?: unknown) {
+        this.store.set(name, value);
+      },
     };
     provideService(ctx, CLOCK, { now: () => 7 });
     expect([...store.keys()]).toEqual(["fixture.clock"]);
@@ -54,7 +62,12 @@ describe("service access by definition", () => {
   it("reads a leased service by the key's id", () => {
     const asked: string[] = [];
     const clock: Clock = { now: () => 3 };
-    const lease = { getService: <TService>(name: string) => { asked.push(name); return (name === "fixture.clock" ? clock : undefined) as TService | undefined; } };
+    const lease = {
+      getService: <TService>(name: string) => {
+        asked.push(name);
+        return (name === "fixture.clock" ? clock : undefined) as TService | undefined;
+      },
+    };
     expect(getLeasedService(lease, CLOCK)).toBe(clock);
     expect(getLeasedService(lease, serviceKey<Clock>("fixture.other"))).toBeUndefined();
     expect(asked).toEqual(["fixture.clock", "fixture.other"]);

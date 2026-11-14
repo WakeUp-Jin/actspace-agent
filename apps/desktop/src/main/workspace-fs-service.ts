@@ -126,7 +126,13 @@ export async function readWorkspaceFile(
   } catch (error) {
     // Windows 打开目录直接报 EISDIR；POSIX 能打开目录，交给下面的 isDirectory() 判断。
     const code = (error as NodeJS.ErrnoException).code;
-    return { relativePath: inside.rel, renderKind: "external", size: 0, mtimeMs: 0, error: code === "EISDIR" ? "not_a_file" : "not_found" };
+    return {
+      relativePath: inside.rel,
+      renderKind: "external",
+      size: 0,
+      mtimeMs: 0,
+      error: code === "EISDIR" ? "not_a_file" : "not_found",
+    };
   }
   try {
     let size: number;
@@ -227,7 +233,11 @@ function byPath(a: string, b: string): number {
 
 /** 扩展名大小写不敏感（`README.MD`、`a.Markdown` 也算）。 */
 const GIT_MARKDOWN_PATHSPECS = [":(icase)*.md", ":(icase)*.markdown"];
-const GIT_LIST_OPTIONS = { timeoutMs: GIT_LIST_TIMEOUT_MS, maxOutputChars: GIT_LIST_MAX_OUTPUT_CHARS, env: { LC_ALL: "C" } };
+const GIT_LIST_OPTIONS = {
+  timeoutMs: GIT_LIST_TIMEOUT_MS,
+  maxOutputChars: GIT_LIST_MAX_OUTPUT_CHARS,
+  env: { LC_ALL: "C" },
+};
 
 type MarkdownLimits = { maxFiles: number; maxEntries: number };
 type MarkdownListing = { files: string[]; truncated: boolean; incompleteDirs?: string[] };
@@ -243,7 +253,10 @@ function topLevelDirs(paths: Iterable<string>): string[] {
 }
 
 /** 在 `cwd` 里用 `git ls-files` 列 Markdown；不是仓库、没有 git、超时返回 null。路径相对 `cwd`。 */
-async function gitMarkdownNames(cwd: string, runGit: GitRunner): Promise<{ names: string[]; outputTruncated: boolean } | null> {
+async function gitMarkdownNames(
+  cwd: string,
+  runGit: GitRunner,
+): Promise<{ names: string[]; outputTruncated: boolean } | null> {
   const result = await runGit(
     ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...GIT_MARKDOWN_PATHSPECS],
     { cwd, ...GIT_LIST_OPTIONS },
@@ -251,7 +264,10 @@ async function gitMarkdownNames(cwd: string, runGit: GitRunner): Promise<{ names
   if (result.startError || result.timedOut || result.exitCode !== 0) return null;
   // 已被 git 跟踪、但磁盘上已经删掉的文件仍在 `--cached` 里，要排除掉（点开只会读取失败）。
   const deleted = new Set<string>();
-  const deletedResult = await runGit(["ls-files", "-z", "--deleted", "--", ...GIT_MARKDOWN_PATHSPECS], { cwd, ...GIT_LIST_OPTIONS });
+  const deletedResult = await runGit(["ls-files", "-z", "--deleted", "--", ...GIT_MARKDOWN_PATHSPECS], {
+    cwd,
+    ...GIT_LIST_OPTIONS,
+  });
   if (!deletedResult.startError && !deletedResult.timedOut && deletedResult.exitCode === 0) {
     for (const name of deletedResult.stdout.split("\0")) if (name.length > 0) deleted.add(name);
   }
@@ -259,10 +275,17 @@ async function gitMarkdownNames(cwd: string, runGit: GitRunner): Promise<{ names
   // 输出被截断时最后一项可能只有半截路径，丢掉。
   if (result.truncated) names.pop();
   // 再按扩展名核对一次，保证两种来源的判定口径一致（都不区分大小写）。
-  return { names: [...new Set(names.filter((name) => name.length > 0 && MARKDOWN_NAME.test(name)))], outputTruncated: result.truncated };
+  return {
+    names: [...new Set(names.filter((name) => name.length > 0 && MARKDOWN_NAME.test(name)))],
+    outputTruncated: result.truncated,
+  };
 }
 
-async function listMarkdownViaGit(root: string, runGit: GitRunner, limits: MarkdownLimits): Promise<MarkdownListing | null> {
+async function listMarkdownViaGit(
+  root: string,
+  runGit: GitRunner,
+  limits: MarkdownLimits,
+): Promise<MarkdownListing | null> {
   const listed = await gitMarkdownNames(root, runGit);
   if (!listed) return null;
   const unique = listed.names.sort(byPath);

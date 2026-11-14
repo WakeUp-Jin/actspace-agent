@@ -32,7 +32,12 @@ export function KeepActorCard({ aid, state }: { aid: string; state: KeepState })
     <div className={CARD_CLASS} data-keep-state={state}>
       <div className={`space-grow ${stage} size-10 shrink-0`} aria-hidden="true">
         <img className={`space-grow-from ${IMAGE_CLASS}`} src={ballFor(aid)} alt="" draggable={false} />
-        <img className={`space-grow-to ${IMAGE_CLASS}`} src={companionFor(actor?.growImg ?? actor?.img ?? 1)} alt="" draggable={false} />
+        <img
+          className={`space-grow-to ${IMAGE_CLASS}`}
+          src={companionFor(actor?.growImg ?? actor?.img ?? 1)}
+          alt=""
+          draggable={false}
+        />
         {SPARKS.map((s) => (
           <i key={s.i} className="space-spark" style={{ "--i": s.i, "--x": s.x, "--y": s.y } as CSSProperties} />
         ))}
@@ -42,7 +47,9 @@ export function KeepActorCard({ aid, state }: { aid: string; state: KeepState })
           <p className="min-w-0 flex-1 text-act-sm leading-relaxed text-text-main">
             留下了。<b className="font-semibold">{name}</b>现在在名册里，以后可以直接找它。
           </p>
-          <Button variant="ghost" size="sm" onClick={goRoster}>去名册</Button>
+          <Button variant="ghost" size="sm" onClick={goRoster}>
+            去名册
+          </Button>
         </>
       ) : (
         <>
@@ -52,8 +59,12 @@ export function KeepActorCard({ aid, state }: { aid: string; state: KeepState })
           </div>
           {state === "ask" ? (
             <div className="flex shrink-0 gap-1.5">
-              <Button variant="ghost" size="sm" onClick={() => declineActor(aid)}>不用</Button>
-              <Button variant="primary" size="sm" onClick={() => keepActor(aid)}>留下</Button>
+              <Button variant="ghost" size="sm" onClick={() => declineActor(aid)}>
+                不用
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => keepActor(aid)}>
+                留下
+              </Button>
             </div>
           ) : null}
         </>

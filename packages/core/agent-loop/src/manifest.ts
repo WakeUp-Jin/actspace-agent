@@ -1,2 +1,18 @@
 import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
-export const manifest = defineBuiltinPluginManifest({ display: { title: "CLI 循环", description: "命令行装配里使用的 Agent 主循环", scope: "global", defaultEnabled: true, canDisable: false }, pluginId: "actspace.core.agent-loop", version: "0.1.0", name: "ActSpace Agent Loop", entry: { entryId: "core.agent-loop", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: [], contributions: { services: ["core.agent-loop"], tools: [], prompts: [], events: [] } });
+export const manifest = defineBuiltinPluginManifest({
+  display: {
+    title: "CLI 循环",
+    description: "命令行装配里使用的 Agent 主循环",
+    scope: "global",
+    defaultEnabled: true,
+    canDisable: false,
+  },
+  pluginId: "actspace.core.agent-loop",
+  version: "0.1.0",
+  name: "ActSpace Agent Loop",
+  entry: { entryId: "core.agent-loop", behavior: "./plugin.js" },
+  host: { required: [], optional: [] },
+  frontend: null,
+  injects: [],
+  contributions: { services: ["core.agent-loop"], tools: [], prompts: [], events: [] },
+});

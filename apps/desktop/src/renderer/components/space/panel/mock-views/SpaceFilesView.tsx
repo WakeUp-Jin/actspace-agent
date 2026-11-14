@@ -26,7 +26,11 @@ export function SpaceFilesView({ roots }: { roots: string[] }) {
         <label className={FILTER_WRAP_CLASS}>
           <Search size={12} className="shrink-0 text-text-faint" aria-hidden="true" />
           <input
-            className={FILTER_INPUT_CLASS} type="text" value={query} placeholder="过滤文件…" aria-label="过滤文件名"
+            className={FILTER_INPUT_CLASS}
+            type="text"
+            value={query}
+            placeholder="过滤文件…"
+            aria-label="过滤文件名"
             onChange={(event) => setFileQuery(event.target.value)}
           />
         </label>
@@ -41,21 +45,41 @@ export function SpaceFilesView({ roots }: { roots: string[] }) {
           // 保留原生 <button>：缩进行，和 WorkspaceFileTree 的行同一套样式。
           return r.dir ? (
             <button
-              key={r.path} type="button" style={indent} aria-expanded={expanded}
-              className={`${ROW_CLASS} ${r.root ? "font-medium text-text-main" : ""}`} onClick={() => toggleFileDir(r.path)}
+              key={r.path}
+              type="button"
+              style={indent}
+              aria-expanded={expanded}
+              className={`${ROW_CLASS} ${r.root ? "font-medium text-text-main" : ""}`}
+              onClick={() => toggleFileDir(r.path)}
             >
-              <ChevronRight size={13} className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`} aria-hidden="true" />
-              {expanded ? <FolderOpen size={14} className="shrink-0" aria-hidden="true" /> : <Folder size={14} className="shrink-0" aria-hidden="true" />}
-              <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" title={r.name}>{r.name}</span>
+              <ChevronRight
+                size={13}
+                className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+                aria-hidden="true"
+              />
+              {expanded ? (
+                <FolderOpen size={14} className="shrink-0" aria-hidden="true" />
+              ) : (
+                <Folder size={14} className="shrink-0" aria-hidden="true" />
+              )}
+              <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" title={r.name}>
+                {r.name}
+              </span>
             </button>
           ) : (
             <button
-              key={r.path} type="button" style={indent} aria-current={selected === r.path}
-              className={`${ROW_CLASS} ${selected === r.path ? "bg-selected font-semibold text-text-main" : ""}`} onClick={() => openFile(r.path)}
+              key={r.path}
+              type="button"
+              style={indent}
+              aria-current={selected === r.path}
+              className={`${ROW_CLASS} ${selected === r.path ? "bg-selected font-semibold text-text-main" : ""}`}
+              onClick={() => openFile(r.path)}
             >
               <span className="inline-block w-[13px] shrink-0" aria-hidden="true" />
               <File size={14} className="shrink-0" aria-hidden="true" />
-              <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" title={r.path}>{r.name}</span>
+              <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" title={r.path}>
+                {r.name}
+              </span>
             </button>
           );
         })}

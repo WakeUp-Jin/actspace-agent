@@ -4,19 +4,54 @@ import { collectPresentedFiles, collectTurnChanges, parseUnifiedDiff } from "../
 
 type DiffBlock = Extract<MessageBlock, { kind: "write_diff" | "edit_diff" }>;
 
-function diffBlock(kind: DiffBlock["kind"], path: string, diff: string, additions: number, deletions: number, status: DiffBlock["status"] = "completed"): DiffBlock {
-  return { kind, id: `${kind}-${path}-${additions}-${deletions}`, filePath: path.split("/").pop(), outputPath: `/work/${path}`, outputRelativePath: path, additions, deletions, diff, createdAt: "now", status } as DiffBlock;
+function diffBlock(
+  kind: DiffBlock["kind"],
+  path: string,
+  diff: string,
+  additions: number,
+  deletions: number,
+  status: DiffBlock["status"] = "completed",
+): DiffBlock {
+  return {
+    kind,
+    id: `${kind}-${path}-${additions}-${deletions}`,
+    filePath: path.split("/").pop(),
+    outputPath: `/work/${path}`,
+    outputRelativePath: path,
+    additions,
+    deletions,
+    diff,
+    createdAt: "now",
+    status,
+  } as DiffBlock;
 }
 
 function deleteBlock(path: string): MessageBlock {
-  return { kind: "delete", id: `delete-${path}`, filePath: path.split("/").pop()!, outputPath: `/work/${path}`, outputRelativePath: path, displayText: `Deleted ${path}`, createdAt: "now", status: "completed" };
+  return {
+    kind: "delete",
+    id: `delete-${path}`,
+    filePath: path.split("/").pop()!,
+    outputPath: `/work/${path}`,
+    outputRelativePath: path,
+    displayText: `Deleted ${path}`,
+    createdAt: "now",
+    status: "completed",
+  };
 }
 
-function presentBlock(files: { path: string; description?: string }[], status: "completed" | "failed" = "completed"): MessageBlock {
+function presentBlock(
+  files: { path: string; description?: string }[],
+  status: "completed" | "failed" = "completed",
+): MessageBlock {
   return {
     kind: "present",
     id: `present-${files.map((file) => file.path).join(",")}-${status}`,
-    files: files.map((file) => ({ path: file.path, outputPath: `/work/${file.path}`, outputRelativePath: file.path, ...(file.description ? { description: file.description } : {}) })),
+    files: files.map((file) => ({
+      path: file.path,
+      outputPath: `/work/${file.path}`,
+      outputRelativePath: file.path,
+      ...(file.description ? { description: file.description } : {}),
+    })),
     displayText: "Presented",
     createdAt: "now",
     status,
@@ -36,10 +71,15 @@ const editDiff = [
 
 describe("parseUnifiedDiff", () => {
   it("parses hunk headers and keeps file headers out of the lines", () => {
-    expect(parseUnifiedDiff(editDiff)).toEqual([{
-      oldStart: 3, oldLines: 4, newStart: 3, newLines: 4,
-      lines: [" const a = 1;", "-const b = 2;", "+const b = 3;", " ", " export { a, b };"],
-    }]);
+    expect(parseUnifiedDiff(editDiff)).toEqual([
+      {
+        oldStart: 3,
+        oldLines: 4,
+        newStart: 3,
+        newLines: 4,
+        lines: [" const a = 1;", "-const b = 2;", "+const b = 3;", " ", " export { a, b };"],
+      },
+    ]);
   });
 
   it("treats content that looks like a file header inside a hunk as a deletion", () => {
@@ -54,11 +94,19 @@ describe("collectTurnChanges", () => {
   });
 
   it("strips the phantom empty line of a newly created file", () => {
-    const created = diffBlock("write_diff", "notes.md", "--- a/notes.md\n+++ b/notes.md\n@@ -1,1 +1,2 @@\n-\n+# Notes\n+body", 2, 1);
+    const created = diffBlock(
+      "write_diff",
+      "notes.md",
+      "--- a/notes.md\n+++ b/notes.md\n@@ -1,1 +1,2 @@\n-\n+# Notes\n+body",
+      2,
+      1,
+    );
     const changes = collectTurnChanges([created]);
     expect(changes).toMatchObject({ additions: 2, deletions: 0 });
     expect(changes?.files[0]).toMatchObject({ path: "notes.md", created: true, deleted: false });
-    expect(changes?.files[0].hunks).toEqual([{ oldStart: 0, oldLines: 0, newStart: 1, newLines: 2, lines: ["+# Notes", "+body"] }]);
+    expect(changes?.files[0].hunks).toEqual([
+      { oldStart: 0, oldLines: 0, newStart: 1, newLines: 2, lines: ["+# Notes", "+body"] },
+    ]);
   });
 
   it("recognises a created file whose content ends with a newline", () => {
@@ -67,9 +115,22 @@ describe("collectTurnChanges", () => {
   });
 
   it("reads a truncated diff: the note line is not a diff line and the real counts come from the block", () => {
-    const note = "[Output truncated at 64,000 characters: this diff shows 2 of 50000 added lines. The file was written in full.]";
-    const endsWithNewline = diffBlock("write_diff", "log.txt", `--- a/log.txt\n+++ b/log.txt\n@@ -1,1 +1,50001 @@\n+entry\n+entry\n \n${note}`, 50_000, 0);
-    const noNewline = diffBlock("write_diff", "big.txt", `--- a/big.txt\n+++ b/big.txt\n@@ -1,1 +1,50000 @@\n-\n+line-1\n+line-2\n${note}`, 50_000, 1);
+    const note =
+      "[Output truncated at 64,000 characters: this diff shows 2 of 50000 added lines. The file was written in full.]";
+    const endsWithNewline = diffBlock(
+      "write_diff",
+      "log.txt",
+      `--- a/log.txt\n+++ b/log.txt\n@@ -1,1 +1,50001 @@\n+entry\n+entry\n \n${note}`,
+      50_000,
+      0,
+    );
+    const noNewline = diffBlock(
+      "write_diff",
+      "big.txt",
+      `--- a/big.txt\n+++ b/big.txt\n@@ -1,1 +1,50000 @@\n-\n+line-1\n+line-2\n${note}`,
+      50_000,
+      1,
+    );
     const changes = collectTurnChanges([endsWithNewline, noNewline]);
     expect(changes).toMatchObject({ additions: 100_000, deletions: 0 });
     expect(changes?.files).toMatchObject([
@@ -122,10 +183,26 @@ describe("legacy delete previews", () => {
   it("drops a file created this turn when an old delete preview carries only its basename", () => {
     const changes = collectTurnChanges([
       {
-        kind: "write_diff", id: "w", filePath: "tmp-test-orders.mjs", outputPath: "/workspace/tmp-test-orders.mjs", outputRelativePath: "tmp-test-orders.mjs",
-        additions: 1, deletions: 0, diff: "--- a/tmp-test-orders.mjs\n+++ b/tmp-test-orders.mjs\n@@ -1,1 +1,1 @@\n-\n+run()", collapsedLines: 0, status: "completed", createdAt: "2026-10-13T00:00:01.000Z",
+        kind: "write_diff",
+        id: "w",
+        filePath: "tmp-test-orders.mjs",
+        outputPath: "/workspace/tmp-test-orders.mjs",
+        outputRelativePath: "tmp-test-orders.mjs",
+        additions: 1,
+        deletions: 0,
+        diff: "--- a/tmp-test-orders.mjs\n+++ b/tmp-test-orders.mjs\n@@ -1,1 +1,1 @@\n-\n+run()",
+        collapsedLines: 0,
+        status: "completed",
+        createdAt: "2026-10-13T00:00:01.000Z",
       },
-      { kind: "delete", id: "d", filePath: "tmp-test-orders.mjs", displayText: "Deleted tmp-test-orders.mjs", status: "completed", createdAt: "2026-10-13T00:00:02.000Z" },
+      {
+        kind: "delete",
+        id: "d",
+        filePath: "tmp-test-orders.mjs",
+        displayText: "Deleted tmp-test-orders.mjs",
+        status: "completed",
+        createdAt: "2026-10-13T00:00:02.000Z",
+      },
     ]);
     expect(changes).toBeNull();
   });

@@ -61,7 +61,9 @@ export function invokeWithDefault<I, O>(channel: string, defaultInput: I): Defau
 }
 
 export function event<P = void>(channel: string, defaultPayload?: P): EventSpec<P> {
-  return Object.freeze(defaultPayload === undefined ? { kind: "event", channel } : { kind: "event", channel, defaultPayload });
+  return Object.freeze(
+    defaultPayload === undefined ? { kind: "event", channel } : { kind: "event", channel, defaultPayload },
+  );
 }
 
 export function send<I>(channel: string): SendSpec<I> {
@@ -75,12 +77,17 @@ export function local<F extends (...args: never[]) => unknown>(): LocalSpec<F> {
 type InvokeArgs<I> = [I] extends [void] ? [] : undefined extends I ? [input?: I] : [input: I];
 
 export type BridgeMethod<S> =
-  S extends DefaultedInvokeSpec<infer I, infer O> ? (input?: I) => Promise<O>
-  : S extends InvokeSpec<infer I, infer O> ? (...args: InvokeArgs<I>) => Promise<O>
-  : S extends EventSpec<infer P> ? (listener: (payload: P) => void) => () => void
-  : S extends SendSpec<infer I> ? (input: I) => void
-  : S extends LocalSpec<infer F> ? F
-  : never;
+  S extends DefaultedInvokeSpec<infer I, infer O>
+    ? (input?: I) => Promise<O>
+    : S extends InvokeSpec<infer I, infer O>
+      ? (...args: InvokeArgs<I>) => Promise<O>
+      : S extends EventSpec<infer P>
+        ? (listener: (payload: P) => void) => () => void
+        : S extends SendSpec<infer I>
+          ? (input: I) => void
+          : S extends LocalSpec<infer F>
+            ? F
+            : never;
 
 export type BridgeOf<C extends BridgeContract> = {
   readonly [D in keyof C]: { readonly [M in keyof C[D]]: BridgeMethod<C[D][M]> };

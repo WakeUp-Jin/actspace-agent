@@ -24,11 +24,16 @@ export function useSessionObservation(sessionId: string): SessionObservation {
   const previous = useRef<SessionObserver | null>(null);
 
   useEffect(() => {
-    if (!connection) { previous.current?.dispose(); return; }
+    if (!connection) {
+      previous.current?.dispose();
+      return;
+    }
     const before = previous.current;
     const next = new SessionObserver(connection, sessionId, {
-      onError: error => store.reportError(error),
-      ...(before && before.sessionId === sessionId ? { carry: before.getState(), ...(before.epoch === connection.epoch ? { store: before.store } : {}) } : {}),
+      onError: (error) => store.reportError(error),
+      ...(before && before.sessionId === sessionId
+        ? { carry: before.getState(), ...(before.epoch === connection.epoch ? { store: before.store } : {}) }
+        : {}),
     });
     before?.dispose();
     previous.current = next;
@@ -37,9 +42,15 @@ export function useSessionObservation(sessionId: string): SessionObservation {
     return () => next.dispose();
   }, [connection, sessionId, store]);
 
-  const state = useSyncExternalStore(observer ? observer.subscribe : never, observer ? observer.getState : () => EMPTY_OBSERVATION);
+  const state = useSyncExternalStore(
+    observer ? observer.subscribe : never,
+    observer ? observer.getState : () => EMPTY_OBSERVATION,
+  );
   const loadOlder = useCallback(() => (observer ? observer.loadOlder() : Promise.resolve()), [observer]);
   const refresh = useCallback(() => (observer ? observer.refresh() : Promise.resolve()), [observer]);
-  const applyTasks = useCallback<SessionObserver["applyTasks"]>(snapshot => observer?.applyTasks(snapshot), [observer]);
+  const applyTasks = useCallback<SessionObserver["applyTasks"]>(
+    (snapshot) => observer?.applyTasks(snapshot),
+    [observer],
+  );
   return { ...state, disconnected: connection === null, loadOlder, applyTasks, refresh };
 }

@@ -39,9 +39,12 @@ function deferredBridge() {
   const getSnapshot = vi.fn((input: unknown) => pending(input));
   const refreshSnapshot = vi.fn((input: unknown) => pending(input));
   const handle = setupBridge({ "review.getSnapshot": getSnapshot, "review.refreshSnapshot": refreshSnapshot });
-  const notify = (workspaceId: string) => act(() => handle.emit("reviewChanged", { workspaceId, generation: 2, reason: "refresh" }));
+  const notify = (workspaceId: string) =>
+    act(() => handle.emit("reviewChanged", { workspaceId, generation: 2, reason: "refresh" }));
   const settle = async (index: number, result: ReviewGetSnapshotResult) => {
-    await act(async () => { calls[index].resolve(result); });
+    await act(async () => {
+      calls[index].resolve(result);
+    });
   };
   return { calls, started, getSnapshot, refreshSnapshot, notify, settle };
 }
@@ -108,10 +111,9 @@ describe("useReviewSummary", () => {
 
   it("drops a slow response from the previous target after switching", async () => {
     const bridge = deferredBridge();
-    const { result, rerender } = renderHook(
-      ({ root }) => useReviewSummary({ workspaceRoot: root, sessionId: null }),
-      { initialProps: { root: "/tmp/a" } },
-    );
+    const { result, rerender } = renderHook(({ root }) => useReviewSummary({ workspaceRoot: root, sessionId: null }), {
+      initialProps: { root: "/tmp/a" },
+    });
     rerender({ root: "/tmp/b" });
     expect(result.current.reviewSummary).toEqual({ status: "loading" });
     expect(bridge.started).toHaveBeenCalledTimes(2);
@@ -133,11 +135,15 @@ describe("useReviewSummary", () => {
     expect(bridge.refreshSnapshot).toHaveBeenCalledTimes(1);
 
     // 模拟 Agent 一轮结束：App 调用 refreshReviewSummary()。
-    act(() => { void result.current.refreshReviewSummary(); });
+    act(() => {
+      void result.current.refreshReviewSummary();
+    });
     expect(bridge.refreshSnapshot).toHaveBeenCalledTimes(2);
     await bridge.settle(1, snapshot("ws-current", 2));
 
-    act(() => { void result.current.refreshReviewSummary(false); });
+    act(() => {
+      void result.current.refreshReviewSummary(false);
+    });
     expect(bridge.getSnapshot).toHaveBeenCalledTimes(1);
     await bridge.settle(2, snapshot("ws-current", 2));
   });
@@ -147,8 +153,12 @@ describe("useReviewSummary", () => {
     const { result } = renderHook(() => useReviewSummary({ workspaceRoot: "/tmp/current", sessionId: null }));
     await bridge.settle(0, snapshot("ws-current", 1));
 
-    act(() => { void result.current.refreshReviewSummary(false); });
-    act(() => { void result.current.refreshReviewSummary(); });
+    act(() => {
+      void result.current.refreshReviewSummary(false);
+    });
+    act(() => {
+      void result.current.refreshReviewSummary();
+    });
     expect(bridge.started).toHaveBeenCalledTimes(2);
     await bridge.settle(1, snapshot("ws-current", 2));
     expect(bridge.started).toHaveBeenCalledTimes(3);
@@ -160,10 +170,14 @@ describe("useReviewSummary", () => {
     const bridge = deferredBridge();
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { result } = renderHook(() => useReviewSummary({ workspaceRoot: "/tmp/current", sessionId: null }));
-    await act(async () => { bridge.calls[0].reject(new Error("git failed")); });
+    await act(async () => {
+      bridge.calls[0].reject(new Error("git failed"));
+    });
     expect(result.current.reviewSummary).toEqual({ status: "failed", reason: "command_failed" });
 
-    act(() => { void result.current.refreshReviewSummary(); });
+    act(() => {
+      void result.current.refreshReviewSummary();
+    });
     await bridge.settle(1, snapshot("ws-current", 1));
     await waitFor(() => expect(result.current.reviewSummary).toMatchObject({ status: "changes", additions: 1 }));
   });

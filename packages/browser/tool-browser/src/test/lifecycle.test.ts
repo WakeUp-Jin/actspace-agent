@@ -8,7 +8,7 @@ describe("browser tools plugin", () => {
     const ctx = new CordisContextClass();
     ctx.provide("tools.runtime", new ToolRuntime());
     ctx.provide("actspace.host.tools.browser", { ready: false, dispose: async () => undefined });
-    await ctx.plugin({ apply: inner => apply(inner as never) });
+    await ctx.plugin({ apply: (inner) => apply(inner as never) });
     expect(ctx.get("tools.browser")).toMatchObject({ available: false, registrations: [] });
     await ctx.fiber.dispose();
   });
@@ -17,8 +17,27 @@ describe("browser tools plugin", () => {
 it("allows Harness retirement to leave the Host-owned browser alive", async () => {
   const { apply } = await import("../plugin.js");
   const { ToolRuntime } = await import("@actspace/tool-runtime");
-  let closed = 0; const cleanup: Array<() => unknown> = [];
-  apply({ get: name => name === "tools.runtime" ? new ToolRuntime() : { ready: false, dispose: async () => { closed++; } }, provide: () => undefined, effect: factory => { cleanup.push(factory() as () => unknown); return () => undefined; } }, { disposeHost: false });
+  let closed = 0;
+  const cleanup: Array<() => unknown> = [];
+  apply(
+    {
+      get: (name) =>
+        name === "tools.runtime"
+          ? new ToolRuntime()
+          : {
+              ready: false,
+              dispose: async () => {
+                closed++;
+              },
+            },
+      provide: () => undefined,
+      effect: (factory) => {
+        cleanup.push(factory() as () => unknown);
+        return () => undefined;
+      },
+    },
+    { disposeHost: false },
+  );
   for (const dispose of cleanup) await dispose();
   expect(closed).toBe(0);
 });

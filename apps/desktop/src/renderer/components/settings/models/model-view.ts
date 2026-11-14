@@ -13,18 +13,40 @@ import {
 
 /** 设置 › 模型的格式化与判断。纯函数，组件只管排版。 */
 
-export type PurposeMeta = { id: PurposeId; label: string; description: string; follow?: PurposeId; followLabel?: string; needImage?: boolean; noThinking?: boolean };
+export type PurposeMeta = {
+  id: PurposeId;
+  label: string;
+  description: string;
+  follow?: PurposeId;
+  followLabel?: string;
+  needImage?: boolean;
+  noThinking?: boolean;
+};
 
 // 自动审批不设时由后端退回会话默认模型（不是轻量任务），这里照实写。
 export const PURPOSES: readonly PurposeMeta[] = [
   { id: "chat", label: "会话默认", description: "新会话一开始用的模型" },
   { id: "utility", label: "轻量任务", description: "起标题、写摘要、压缩上下文", follow: "chat" },
   { id: "autoReview", label: "自动审批", description: "判断工具调用能否自动放行", follow: "chat" },
-  { id: "subagent", label: "子智能体", description: "子智能体不指定模型时用它", follow: "chat", followLabel: "跟随主智能体", noThinking: true },
+  {
+    id: "subagent",
+    label: "子智能体",
+    description: "子智能体不指定模型时用它",
+    follow: "chat",
+    followLabel: "跟随主智能体",
+    noThinking: true,
+  },
   { id: "vision", label: "看图", description: "当前模型看不了图时，由它代看", follow: "chat", needImage: true },
 ];
 
-export const LEVEL_LABELS: Record<ThinkingLevel, string> = { off: "关", low: "低", medium: "中", high: "高", xhigh: "超高", max: "最高" };
+export const LEVEL_LABELS: Record<ThinkingLevel, string> = {
+  off: "关",
+  low: "低",
+  medium: "中",
+  high: "高",
+  xhigh: "超高",
+  max: "最高",
+};
 
 export type ThinkingKind = "unknown" | "none" | "toggle" | "always" | "levels" | "mandatory";
 
@@ -120,7 +142,8 @@ export function modelMeta(effective: EffectiveModel): string {
   const thinking = effective.thinking;
   const kind = thinkingKind(thinking);
   if (kind === "toggle") parts.push(thinking!.default === "off" ? "思考关" : "思考开");
-  else if (kind === "levels" || kind === "mandatory") parts.push(thinking!.default === "off" ? "思考关" : `思考${LEVEL_LABELS[thinking!.default ?? "medium"]}`);
+  else if (kind === "levels" || kind === "mandatory")
+    parts.push(thinking!.default === "off" ? "思考关" : `思考${LEVEL_LABELS[thinking!.default ?? "medium"]}`);
   else if (kind === "always") parts.push("始终思考");
   if (canSeeImages(effective)) parts.push("看图");
   return parts.join(" · ");
@@ -156,7 +179,11 @@ export function rateMultiplierNote(effective: EffectiveModel): string | null {
   return effective.ratesScaled && effective.multiplier !== 1 ? `×${formatMultiplier(effective.multiplier)}` : null;
 }
 
-export function withOverride<K extends keyof ModelOverrides>(overrides: ModelOverrides | null, field: K, value: ModelOverrides[K] | undefined): ModelOverrides | null {
+export function withOverride<K extends keyof ModelOverrides>(
+  overrides: ModelOverrides | null,
+  field: K,
+  value: ModelOverrides[K] | undefined,
+): ModelOverrides | null {
   const next: ModelOverrides = { ...(overrides ?? {}) };
   if (value === undefined) delete next[field];
   else next[field] = value;
@@ -175,14 +202,21 @@ export function toggleLevel(thinking: ModelThinking | null, level: ThinkingLevel
 export type PickerGroup = { connection: ConnectionView; models: ConnectionModelView[] };
 
 /** 选择器左栏：模型按连接分组；看图只列能看图的。 */
-export function pickerGroups(connections: readonly ConnectionView[], purpose: PurposeMeta, query: string): PickerGroup[] {
+export function pickerGroups(
+  connections: readonly ConnectionView[],
+  purpose: PurposeMeta,
+  query: string,
+): PickerGroup[] {
   const q = query.trim().toLowerCase();
   return connections
     .filter((connection) => connection.enabled)
     .map((connection) => ({
       connection,
-      models: connection.models.filter((model) => (!purpose.needImage || canSeeImages(model.effective))
-        && (!q || model.apiModel.toLowerCase().includes(q) || model.effective.label.toLowerCase().includes(q))),
+      models: connection.models.filter(
+        (model) =>
+          (!purpose.needImage || canSeeImages(model.effective)) &&
+          (!q || model.apiModel.toLowerCase().includes(q) || model.effective.label.toLowerCase().includes(q)),
+      ),
     }))
     .filter((group) => group.models.length > 0);
 }
@@ -196,11 +230,18 @@ export function findModel(connections: readonly ConnectionView[], key: string | 
   return null;
 }
 
-export function purposeSummary(connections: readonly ConnectionView[], binding: PurposeBinding): { label: string; level: string; missing: boolean } | null {
+export function purposeSummary(
+  connections: readonly ConnectionView[],
+  binding: PurposeBinding,
+): { label: string; level: string; missing: boolean } | null {
   if (!binding.model) return null;
   const model = findModel(connections, binding.model);
   if (!model) return { label: "模型已不可用，重新选择", level: "", missing: true };
-  return { label: model.effective.label, level: purposeLevelLabel(model.effective.thinking, binding.thinking), missing: false };
+  return {
+    label: model.effective.label,
+    level: purposeLevelLabel(model.effective.thinking, binding.thinking),
+    missing: false,
+  };
 }
 
 const FAMILY_LOGOS: readonly [RegExp, ProviderLogoKey][] = [
@@ -219,6 +260,9 @@ const FAMILY_LOGOS: readonly [RegExp, ProviderLogoKey][] = [
 
 /** 模型家族 mark：按目录 id（没有就按原始 id）前缀认，认不出返回 null。 */
 export function familyLogo(model: { apiModel: string; effective: EffectiveModel }): ProviderLogoKey | null {
-  const id = (model.effective.catalog?.exact ? model.effective.catalog.apiModel : model.apiModel).split("/").pop()!.toLowerCase();
+  const id = (model.effective.catalog?.exact ? model.effective.catalog.apiModel : model.apiModel)
+    .split("/")
+    .pop()!
+    .toLowerCase();
   return FAMILY_LOGOS.find(([pattern]) => pattern.test(id))?.[1] ?? null;
 }

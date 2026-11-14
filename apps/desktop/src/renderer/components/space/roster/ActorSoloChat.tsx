@@ -4,7 +4,8 @@ import type { SoloMessage } from "../model/types";
 
 const COLUMN_CLASS =
   "mx-auto flex w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] min-w-0 flex-col gap-5 pb-6";
-const CHIP_CLASS = "inline-flex h-5 items-center whitespace-nowrap rounded-act-xs bg-surface-subtle px-[7px] text-act-xs text-text-muted";
+const CHIP_CLASS =
+  "inline-flex h-5 items-center whitespace-nowrap rounded-act-xs bg-surface-subtle px-[7px] text-act-xs text-text-muted";
 
 function SoloBubble({ message }: { message: SoloMessage }) {
   if (message.k === "user") {
@@ -18,7 +19,11 @@ function SoloBubble({ message }: { message: SoloMessage }) {
   return (
     <div className="text-act-md leading-relaxed text-text-main">
       {message.typing ? (
-        <span className="space-typing" role="status" aria-label="正在输入"><i /><i /><i /></span>
+        <span className="space-typing" role="status" aria-label="正在输入">
+          <i />
+          <i />
+          <i />
+        </span>
       ) : (
         <p className="m-0 break-words">
           {streaming ? message.plain.slice(0, message.shown ?? 0) : message.t}
@@ -44,11 +49,17 @@ export function ActorSoloChat() {
         <p className="m-0 max-w-[40ch] text-act-sm text-text-muted">{actor.scene}</p>
         {actor.abilities.length ? (
           <div className="flex flex-wrap justify-center gap-1.5">
-            {actor.abilities.map((ability) => <span key={ability} className={CHIP_CLASS}>{ability}</span>)}
+            {actor.abilities.map((ability) => (
+              <span key={ability} className={CHIP_CLASS}>
+                {ability}
+              </span>
+            ))}
           </div>
         ) : null}
       </div>
-      {messages.map((message, index) => <SoloBubble key={index} message={message} />)}
+      {messages.map((message, index) => (
+        <SoloBubble key={index} message={message} />
+      ))}
     </div>
   );
 }

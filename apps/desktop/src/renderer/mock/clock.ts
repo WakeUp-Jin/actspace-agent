@@ -19,6 +19,14 @@ let liveSeq = 0;
 export function emitLiveMessage(clock: MockClock, sessionId: string, message: string): void {
   clock.emit("sessionLive", {
     emittedAt: new Date().toISOString(),
-    event: { kind: "runtime-live", schemaVersion: 1, runtimeInstanceId: "mock-runtime", liveSeq: ++liveSeq, throughJournalSeq: -1, sessionId, message },
+    event: {
+      kind: "runtime-live",
+      schemaVersion: 1,
+      runtimeInstanceId: "mock-runtime",
+      liveSeq: ++liveSeq,
+      throughJournalSeq: -1,
+      sessionId,
+      message,
+    },
   });
 }

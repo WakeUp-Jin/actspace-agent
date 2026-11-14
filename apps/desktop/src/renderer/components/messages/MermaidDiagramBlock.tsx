@@ -37,7 +37,11 @@ function initialState(source: string, themeId: MermaidThemeId): RenderState {
  * it can be copied, shown in place of the diagram, and is shown automatically
  * when rendering fails, so a bad diagram never hides what the model wrote.
  */
-export function MermaidDiagramBlock({ source, themeId, sourceView }: {
+export function MermaidDiagramBlock({
+  source,
+  themeId,
+  sourceView,
+}: {
   source: string;
   themeId: MermaidThemeId;
   /** Highlighted source code (the fence's <code> element). */
@@ -61,13 +65,17 @@ export function MermaidDiagramBlock({ source, themeId, sourceView }: {
     }
     setState({ status: "loading" });
     renderMermaid(source, themeId).then(
-      (result) => { if (!cancelled) setState({ status: "ready", result }); },
+      (result) => {
+        if (!cancelled) setState({ status: "ready", result });
+      },
       (error: unknown) => {
         if (cancelled) return;
         setState({ status: "error", message: error instanceof MermaidRenderError ? error.message : "图表渲染失败" });
       },
     );
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [source, themeId]);
 
   useEffect(() => () => window.clearTimeout(noticeTimer.current), []);
@@ -81,9 +89,15 @@ export function MermaidDiagramBlock({ source, themeId, sourceView }: {
   const copySource = async () => {
     try {
       await navigator.clipboard?.writeText(source);
-      flash(() => setCopied(true), () => setCopied(false));
+      flash(
+        () => setCopied(true),
+        () => setCopied(false),
+      );
     } catch {
-      flash(() => setNotice("复制失败"), () => setNotice(null));
+      flash(
+        () => setNotice("复制失败"),
+        () => setNotice(null),
+      );
     }
   };
 
@@ -92,7 +106,10 @@ export function MermaidDiagramBlock({ source, themeId, sourceView }: {
     try {
       await downloadMermaidPng(state.result, theme);
     } catch {
-      flash(() => setNotice("导出失败"), () => setNotice(null));
+      flash(
+        () => setNotice("导出失败"),
+        () => setNotice(null),
+      );
     }
   };
 
@@ -107,7 +124,11 @@ export function MermaidDiagramBlock({ source, themeId, sourceView }: {
           mermaid
         </span>
         <div className="flex items-center gap-0.5">
-          {notice ? <span role="status" className="mr-1 font-sans text-text-muted">{notice}</span> : null}
+          {notice ? (
+            <span role="status" className="mr-1 font-sans text-text-muted">
+              {notice}
+            </span>
+          ) : null}
           {state.status !== "error" ? (
             <IconButton
               size="xs"
@@ -131,7 +152,10 @@ export function MermaidDiagramBlock({ source, themeId, sourceView }: {
       </div>
 
       {state.status === "error" ? (
-        <p role="alert" className="m-0 flex items-center gap-1.5 border-b border-line px-3 py-2 font-sans text-act-xs text-text-muted">
+        <p
+          role="alert"
+          className="m-0 flex items-center gap-1.5 border-b border-line px-3 py-2 font-sans text-act-xs text-text-muted"
+        >
           <TriangleExclamationPoint size={13} aria-hidden="true" className="shrink-0 text-warning" />
           无法渲染图表：{state.message}，已显示源码。
         </p>
@@ -142,14 +166,24 @@ export function MermaidDiagramBlock({ source, themeId, sourceView }: {
       ) : state.status === "ready" ? (
         <div
           className={CANVAS_CLASS}
-          style={{ background: theme.canvas, "--mermaid-min-width": `${Math.round(state.result.width * MIN_INLINE_SCALE)}px` } as CSSProperties}
+          style={
+            {
+              background: theme.canvas,
+              "--mermaid-min-width": `${Math.round(state.result.width * MIN_INLINE_SCALE)}px`,
+            } as CSSProperties
+          }
           role="img"
           aria-label={`Mermaid 图表：${state.result.diagramType}`}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG is produced by the strict Mermaid config and sanitized again in mermaid-renderer.
           dangerouslySetInnerHTML={{ __html: instantiateMermaidSvg(state.result, instanceId) }}
         />
       ) : (
-        <div className={`${CANVAS_CLASS} items-center`} style={{ background: theme.canvas, color: theme.muted }} role="status" aria-busy="true">
+        <div
+          className={`${CANVAS_CLASS} items-center`}
+          style={{ background: theme.canvas, color: theme.muted }}
+          role="status"
+          aria-busy="true"
+        >
           <span className="text-act-xs">正在渲染图表…</span>
         </div>
       )}

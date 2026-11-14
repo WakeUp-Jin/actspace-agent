@@ -5,16 +5,15 @@ vi.mock("electron", () => ({ shell: { openExternal: vi.fn() } }));
 import { isSafeExternalUrl, openExternalSafely } from "../platform-actions";
 
 describe("openExternalSafely", () => {
-  it.each([
-    "https://github.com/acme/repo/pull/1",
-    "http://127.0.0.1:3000/",
-    "mailto:someone@example.com",
-  ])("opens %s", async (url) => {
-    const open = vi.fn(async () => undefined);
-    expect(isSafeExternalUrl(url)).toBe(true);
-    expect(await openExternalSafely(url, open)).toBe(true);
-    expect(open).toHaveBeenCalledWith(url);
-  });
+  it.each(["https://github.com/acme/repo/pull/1", "http://127.0.0.1:3000/", "mailto:someone@example.com"])(
+    "opens %s",
+    async (url) => {
+      const open = vi.fn(async () => undefined);
+      expect(isSafeExternalUrl(url)).toBe(true);
+      expect(await openExternalSafely(url, open)).toBe(true);
+      expect(open).toHaveBeenCalledWith(url);
+    },
+  );
 
   it.each([
     "file:///etc/passwd",

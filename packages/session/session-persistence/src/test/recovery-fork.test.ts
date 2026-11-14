@@ -7,7 +7,12 @@ import { join } from "node:path";
 import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { createCompactionTransaction, createCoreCodecRegistry } from "@actspace/session-journal";
 import type { SessionEventCandidateV1 } from "@actspace/session-journal";
-import { applySessionRecovery, classifySessionRecoveryAccess, planSessionRecovery, settleOpenTurnWork } from "../recovery.js";
+import {
+  applySessionRecovery,
+  classifySessionRecoveryAccess,
+  planSessionRecovery,
+  settleOpenTurnWork,
+} from "../recovery.js";
 import { SessionStore } from "../session-store.js";
 
 const roots: string[] = [];
@@ -21,7 +26,11 @@ async function temporaryRoot(): Promise<string> {
   return root;
 }
 
-function candidate(type: string, data: RuntimeJsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
+function candidate(
+  type: string,
+  data: RuntimeJsonValue,
+  extra: Partial<SessionEventCandidateV1> = {},
+): SessionEventCandidateV1 {
   return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null, ...extra };
 }
 
@@ -36,7 +45,12 @@ function createdWith(registry: ReturnType<typeof createCoreCodecRegistry>) {
 }
 
 function headerInput(registry: ReturnType<typeof createCoreCodecRegistry>, sessionId: string) {
-  return { sessionId, createdAt: "2026-08-22T12:00:00.000Z", lineage: null, createdWith: createdWith(registry) } as const;
+  return {
+    sessionId,
+    createdAt: "2026-08-22T12:00:00.000Z",
+    lineage: null,
+    createdWith: createdWith(registry),
+  } as const;
 }
 
 describe("conservative Session recovery", () => {
@@ -46,7 +60,16 @@ describe("conservative Session recovery", () => {
     { accessState: "corrupt", integrity: "complete", expected: "forensic-required" },
     { accessState: "read-write", integrity: "repair-required", expected: "read-only" },
   ])("classifies $accessState Journal as $expected", ({ accessState, integrity, expected }) => {
-    expect(classifySessionRecoveryAccess({ header: {} as never, events: [], accessState: accessState as never, validation: {} as never, integrity: integrity as never, revision: "test" })).toBe(expected);
+    expect(
+      classifySessionRecoveryAccess({
+        header: {} as never,
+        events: [],
+        accessState: accessState as never,
+        validation: {} as never,
+        integrity: integrity as never,
+        revision: "test",
+      }),
+    ).toBe(expected);
   });
 
   it.each([
@@ -55,7 +78,10 @@ describe("conservative Session recovery", () => {
   ])("records $expected for an interrupted tool", async ({ dispatched, expected }) => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    const store = new SessionStore(
+      { registry },
+      new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }),
+    );
     const session = await store.create(headerInput(registry, `tool-${expected}`));
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await session.append(candidate("step/start", { turnId: "turn-1", stepId: "step-1" }));
@@ -64,7 +90,11 @@ describe("conservative Session recovery", () => {
     await session.flush();
 
     const plan = await applySessionRecovery(session);
-    expect(plan?.candidates.some((event) => event.type === "tool/recovery-outcome" && (event.data as { outcome?: string }).outcome === expected)).toBe(true);
+    expect(
+      plan?.candidates.some(
+        (event) => event.type === "tool/recovery-outcome" && (event.data as { outcome?: string }).outcome === expected,
+      ),
+    ).toBe(true);
     expect(planSessionRecovery(session.journal.events)).toBeNull();
     expect(session.journal.validation.relations.openTurnId).toBeNull();
     expect(session.journal.surface.entries.at(-1)?.node).toMatchObject({ kind: "tool-result", callId: "call-1" });
@@ -74,17 +104,37 @@ describe("conservative Session recovery", () => {
   it("settles a request whose context record was never written", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    const store = new SessionStore(
+      { registry },
+      new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }),
+    );
     const session = await store.create(headerInput(registry, "header-only"));
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await session.append(candidate("step/start", { turnId: "turn-1", stepId: "step-1" }));
-    const header = await session.append(candidate("request/header", { requestId: "request-1", turnId: "turn-1", stepId: "step-1" }));
+    const header = await session.append(
+      candidate("request/header", { requestId: "request-1", turnId: "turn-1", stepId: "step-1" }),
+    );
     await session.flush();
 
     const plan = await applySessionRecovery(session);
-    expect(plan?.candidates.map((event) => event.type)).toEqual(["recovery/start", "request/context", "assistant/message", "step/end", "turn/end", "recovery/committed"]);
-    expect(plan?.candidates[1]).toMatchObject({ data: { requestId: "request-1", turnId: "turn-1", stepId: "step-1", repairId: plan?.repairId }, provenance: { sourceEventSeqs: [header.seq] } });
-    expect(session.journal.validation.relations).toMatchObject({ openTurnId: null, openStepId: null, openRequestIds: [], openToolCallIds: [] });
+    expect(plan?.candidates.map((event) => event.type)).toEqual([
+      "recovery/start",
+      "request/context",
+      "assistant/message",
+      "step/end",
+      "turn/end",
+      "recovery/committed",
+    ]);
+    expect(plan?.candidates[1]).toMatchObject({
+      data: { requestId: "request-1", turnId: "turn-1", stepId: "step-1", repairId: plan?.repairId },
+      provenance: { sourceEventSeqs: [header.seq] },
+    });
+    expect(session.journal.validation.relations).toMatchObject({
+      openTurnId: null,
+      openStepId: null,
+      openRequestIds: [],
+      openToolCallIds: [],
+    });
     expect(planSessionRecovery(session.journal.events)).toBeNull();
     await session.close();
   });
@@ -92,7 +142,10 @@ describe("conservative Session recovery", () => {
   it("settles open requests and tools of a running turn and leaves the turn to its caller", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    const store = new SessionStore(
+      { registry },
+      new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }),
+    );
     const session = await store.create(headerInput(registry, "live-settlement"));
     await session.append(candidate("turn/start", { turnId: "turn-0" }));
     await session.append(candidate("turn/end", { turnId: "turn-0", reason: "completed" }));
@@ -106,9 +159,25 @@ describe("conservative Session recovery", () => {
 
     const plan = await settleOpenTurnWork(session, turnStart.seq);
     expect(plan?.sourceBoundarySeq).toBe(before);
-    expect(plan?.candidates.map((event) => event.type)).toEqual(["recovery/start", "request/context", "assistant/message", "tool/recovery-outcome", "tool/recovery-outcome", "recovery/committed"]);
-    expect(plan?.candidates.filter((event) => event.type === "tool/recovery-outcome").map((event) => (event.data as { outcome?: string }).outcome)).toEqual(["outcome-unknown", "not-started"]);
-    expect(session.journal.validation.relations).toMatchObject({ openTurnId: "turn-1", openStepId: "step-1", openRequestIds: [], openToolCallIds: [] });
+    expect(plan?.candidates.map((event) => event.type)).toEqual([
+      "recovery/start",
+      "request/context",
+      "assistant/message",
+      "tool/recovery-outcome",
+      "tool/recovery-outcome",
+      "recovery/committed",
+    ]);
+    expect(
+      plan?.candidates
+        .filter((event) => event.type === "tool/recovery-outcome")
+        .map((event) => (event.data as { outcome?: string }).outcome),
+    ).toEqual(["outcome-unknown", "not-started"]);
+    expect(session.journal.validation.relations).toMatchObject({
+      openTurnId: "turn-1",
+      openStepId: "step-1",
+      openRequestIds: [],
+      openToolCallIds: [],
+    });
 
     await session.append(candidate("step/end", { turnId: "turn-1", stepId: "step-1", reason: "interrupted" }));
     await session.append(candidate("turn/end", { turnId: "turn-1", reason: "failed" }));
@@ -119,7 +188,10 @@ describe("conservative Session recovery", () => {
   it("writes nothing for a running turn that has no open request or tool", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    const store = new SessionStore(
+      { registry },
+      new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }),
+    );
     const session = await store.create(headerInput(registry, "live-nothing-open"));
     const turnStart = await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await session.append(candidate("step/start", { turnId: "turn-1", stepId: "step-1" }));
@@ -134,7 +206,10 @@ describe("conservative Session recovery", () => {
   it("resumes an uncommitted repair transaction without duplicating its start", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    const store = new SessionStore(
+      { registry },
+      new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }),
+    );
     const session = await store.create(headerInput(registry, "repair-resume"));
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await session.append(candidate("recovery/start", { repairId: "repair-existing", sourceBoundarySeq: 0 }));
@@ -155,7 +230,10 @@ describe("conservative Session recovery", () => {
   it("preserves torn bytes before publishing a repaired complete Journal", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    const store = new SessionStore(
+      { registry },
+      new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }),
+    );
     const session = await store.create(headerInput(registry, "torn-repair"));
     await session.close();
     const original = await readFile(sessionFileLayout(dataRoot, session.header.sessionId).journalPath);
@@ -175,20 +253,44 @@ describe("cold fork and compaction provenance", () => {
   it("forks a persisted balanced prefix and rejects an open boundary", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    const store = new SessionStore(
+      { registry },
+      new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }),
+    );
     const parent = await store.create(headerInput(registry, "parent"));
     await parent.append(candidate("turn/start", { turnId: "turn-1" }));
     await parent.append(candidate("turn/end", { turnId: "turn-1", reason: "completed" }));
     await parent.flush();
-    await expect(store.fork({ parentSessionId: "parent", boundarySeq: 0, newSessionId: "invalid-child", createdAt: "2026-08-22T12:01:00.000Z", createdWith: createdWith(registry) })).rejects.toThrow("balanced");
+    await expect(
+      store.fork({
+        parentSessionId: "parent",
+        boundarySeq: 0,
+        newSessionId: "invalid-child",
+        createdAt: "2026-08-22T12:01:00.000Z",
+        createdWith: createdWith(registry),
+      }),
+    ).rejects.toThrow("balanced");
     await parent.close();
 
-    const child = await store.fork({ parentSessionId: "parent", boundarySeq: 1, newSessionId: "child", createdAt: "2026-08-22T12:02:00.000Z", createdWith: createdWith(registry) });
+    const child = await store.fork({
+      parentSessionId: "parent",
+      boundarySeq: 1,
+      newSessionId: "child",
+      createdAt: "2026-08-22T12:02:00.000Z",
+      createdWith: createdWith(registry),
+    });
     expect(child.header.lineage).toMatchObject({ parentSessionId: "parent", parentBoundarySeq: 1, origin: "fork" });
     expect(child.journal.events).toHaveLength(2);
     await child.close();
 
-    const side = await store.fork({ parentSessionId: "parent", boundarySeq: 1, newSessionId: "side", createdAt: "2026-08-22T12:03:00.000Z", createdWith: createdWith(registry), origin: "side-chat" });
+    const side = await store.fork({
+      parentSessionId: "parent",
+      boundarySeq: 1,
+      newSessionId: "side",
+      createdAt: "2026-08-22T12:03:00.000Z",
+      createdWith: createdWith(registry),
+      origin: "side-chat",
+    });
     expect(side.header.lineage).toMatchObject({ parentSessionId: "parent", origin: "side-chat" });
     await side.close();
     const reopened = await store.open("side");
@@ -199,12 +301,29 @@ describe("cold fork and compaction provenance", () => {
   it("compacts Surface by appending one provenance-complete replacement", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
-    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    const store = new SessionStore(
+      { registry },
+      new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }),
+    );
     const session = await store.create(headerInput(registry, "compact"));
-    await session.append(candidate("user/message", { messageId: "u1", content: "one" }, { surface: { kind: "append" } }));
-    await session.append(candidate("assistant/message", { messageId: "a1", content: "two" }, { surface: { kind: "append" } }));
+    await session.append(
+      candidate("user/message", { messageId: "u1", content: "one" }, { surface: { kind: "append" } }),
+    );
+    await session.append(
+      candidate("assistant/message", { messageId: "a1", content: "two" }, { surface: { kind: "append" } }),
+    );
     const before = session.journal.events;
-    const transaction = createCompactionTransaction({ surface: session.journal.surface, start: 0, end: 2, summary: { kind: "user", messageId: "summary", content: "condensed" }, compactionId: "compact-1", contributorIds: ["summary-provider"], summaryDigest: "sha256-summary", replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test" });
+    const transaction = createCompactionTransaction({
+      surface: session.journal.surface,
+      start: 0,
+      end: 2,
+      summary: { kind: "user", messageId: "summary", content: "condensed" },
+      compactionId: "compact-1",
+      contributorIds: ["summary-provider"],
+      summaryDigest: "sha256-summary",
+      replacedTokens: { conversation: 0, summarizedConversation: 0 },
+      estimatorVersion: "test",
+    });
     await session.append(transaction[0] as SessionEventCandidateV1);
     await session.append(transaction[1] as SessionEventCandidateV1);
     await session.append(transaction[2] as SessionEventCandidateV1);

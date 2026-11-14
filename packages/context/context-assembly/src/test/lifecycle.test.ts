@@ -14,7 +14,7 @@ function options(scope: AgentScope) {
 describe("context assembly plugin lifecycle", () => {
   it("provides the registry with the configured required kinds and disposes it", async () => {
     const ctx = new CordisContextClass();
-    await ctx.plugin({ apply: inner => apply(inner as never, { required: ["system"] }) });
+    await ctx.plugin({ apply: (inner) => apply(inner as never, { required: ["system"] }) });
     expect((ctx.get("context.assembly") as ContextAssemblyService).requiredKinds).toEqual(["system"]);
     await ctx.fiber.dispose();
     expect(ctx.get("context.assembly")).toBeUndefined();
@@ -32,10 +32,15 @@ describe("context assembly", () => {
     assembly.register({ kind: "background-tasks", roles: ["main"], create: () => source("context-background-tasks") });
     expect(assembly.kinds()).toEqual(["system", "conversation", "background-tasks"]);
     expect(assembly.kinds("subagent")).toEqual(["system", "conversation"]);
-    const main = new AgentScope("main:test"), child = new AgentScope("child:test");
+    const main = new AgentScope("main:test"),
+      child = new AgentScope("child:test");
     const mainSources = assembly.sourcesFor("main", options(main));
     const childSources = assembly.sourcesFor("subagent", options(child));
-    expect([...mainSources.owners()]).toEqual(["test.context-system", "test.context-conversation", "test.context-background-tasks"]);
+    expect([...mainSources.owners()]).toEqual([
+      "test.context-system",
+      "test.context-conversation",
+      "test.context-background-tasks",
+    ]);
     expect([...childSources.owners()]).toEqual(["test.context-system", "test.context-conversation"]);
     await main.dispose();
     expect([...mainSources.owners()]).toEqual([]);
@@ -45,17 +50,27 @@ describe("context assembly", () => {
   it("fails the agent when a required kind is missing for its role and rejects duplicate kinds", () => {
     const assembly = new ContextAssembly(["system"]);
     const remove = assembly.register({ kind: "system", roles: ["main"], create: () => source("context-system") });
-    expect(() => assembly.register({ kind: "system", create: () => source("other") })).toThrow(/Duplicate context source system/);
-    expect(() => assembly.sourcesFor("subagent", options(new AgentScope("child")))).toThrow(/Required context source system is unavailable/);
+    expect(() => assembly.register({ kind: "system", create: () => source("other") })).toThrow(
+      /Duplicate context source system/,
+    );
+    expect(() => assembly.sourcesFor("subagent", options(new AgentScope("child")))).toThrow(
+      /Required context source system is unavailable/,
+    );
     remove();
     expect(assembly.kinds()).toEqual([]);
-    expect(() => assembly.register({ kind: "x", roles: ["owner" as never], create: () => source("x") })).toThrow(/Unknown agent role/);
+    expect(() => assembly.register({ kind: "x", roles: ["owner" as never], create: () => source("x") })).toThrow(
+      /Unknown agent role/,
+    );
   });
   it("runs tool-result observers in registration order until one is removed", async () => {
     const assembly = new ContextAssembly([]);
     const seen: string[] = [];
-    const removeFirst = assembly.registerToolResultObserver(() => { seen.push("first"); });
-    assembly.registerToolResultObserver(async () => { seen.push("second"); });
+    const removeFirst = assembly.registerToolResultObserver(() => {
+      seen.push("first");
+    });
+    assembly.registerToolResultObserver(async () => {
+      seen.push("second");
+    });
     await assembly.observeToolResult({} as never, {} as never);
     removeFirst();
     await assembly.observeToolResult({} as never, {} as never);
@@ -63,10 +78,10 @@ describe("context assembly", () => {
   });
   it("publish registers with the assembly, provides context.source.<kind>, and undoes both on dispose", async () => {
     const ctx = new CordisContextClass();
-    await ctx.plugin({ apply: inner => apply(inner as never, { required: [] }) });
+    await ctx.plugin({ apply: (inner) => apply(inner as never, { required: [] }) });
     const assembly = ctx.get("context.assembly") as ContextAssemblyService;
     const create = vi.fn(() => source("context-rules"));
-    const fiber = ctx.plugin({ apply: inner => publish(inner as never, "rules", create, ["main", "fork"]) });
+    const fiber = ctx.plugin({ apply: (inner) => publish(inner as never, "rules", create, ["main", "fork"]) });
     await fiber;
     expect(ctx.get("context.source.rules")).toEqual({ create });
     expect(assembly.kinds("main")).toEqual(["rules"]);

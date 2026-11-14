@@ -60,12 +60,43 @@ export interface BrowserBridgeStatus {
   lastError?: string;
 }
 
-export type BrowserConnectionState = "disconnected" | "preparing" | "awaiting_extension" | "awaiting_selection" | "connecting" | "waiting_for_idle" | "connected" | "reconnecting" | "update_required" | "blocked" | "error";
-export type BrowserConnectionLayer = "hostFile" | "registration" | "extension" | "socketProtocol" | "runtime" | "tools" | "probe";
+export type BrowserConnectionState =
+  | "disconnected"
+  | "preparing"
+  | "awaiting_extension"
+  | "awaiting_selection"
+  | "connecting"
+  | "waiting_for_idle"
+  | "connected"
+  | "reconnecting"
+  | "update_required"
+  | "blocked"
+  | "error";
+export type BrowserConnectionLayer =
+  | "hostFile"
+  | "registration"
+  | "extension"
+  | "socketProtocol"
+  | "runtime"
+  | "tools"
+  | "probe";
 export type BrowserLayerObservation = { status: "ok" | "pending" | "unknown" | "failed"; observedAt: string };
 export type BrowserComponentVersions = { host?: string; extension?: string; protocol?: string };
-export type BrowserConnectionAction = "connect" | "disconnect" | "retry" | "repairHost" | "prepareUpdate" | "openExtensions" | "revealExtensionDirectory";
-export type BrowserConnectionError = "HOST_MISSING" | "REGISTRATION_INVALID" | "VERSION_INCOMPATIBLE" | "INSTANCE_CONFLICT" | "PROBE_FAILED" | "CHECK_FAILED";
+export type BrowserConnectionAction =
+  | "connect"
+  | "disconnect"
+  | "retry"
+  | "repairHost"
+  | "prepareUpdate"
+  | "openExtensions"
+  | "revealExtensionDirectory";
+export type BrowserConnectionError =
+  | "HOST_MISSING"
+  | "REGISTRATION_INVALID"
+  | "VERSION_INCOMPATIBLE"
+  | "INSTANCE_CONFLICT"
+  | "PROBE_FAILED"
+  | "CHECK_FAILED";
 
 export type BrowserBridgeInstallResult = {
   ok: boolean;

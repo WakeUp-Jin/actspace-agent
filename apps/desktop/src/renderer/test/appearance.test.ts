@@ -50,7 +50,14 @@ describe("appearance storage", () => {
   it("defaults the accent palette for preferences saved before it existed", () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ version: 1, theme: "dark", uiFontId: "system", codeFontId: "fira", uiFontSize: 14, codeFontSize: 13 }),
+      JSON.stringify({
+        version: 1,
+        theme: "dark",
+        uiFontId: "system",
+        codeFontId: "fira",
+        uiFontSize: 14,
+        codeFontSize: 13,
+      }),
     );
     const prefs = loadAppearance();
     expect(prefs.accentPalette).toBe("default");

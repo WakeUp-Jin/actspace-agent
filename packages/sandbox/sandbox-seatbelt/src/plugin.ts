@@ -5,6 +5,7 @@ import { createSeatbeltBackend } from "./backend.js";
 export function apply(ctx: CordisContext): void {
   const sandbox = getService(ctx, SANDBOX_SERVICE);
   const host = getService(ctx, SANDBOX_HOST_PORT);
-  if (!sandbox || !host) throw new Error(`sandbox-seatbelt requires ${SANDBOX_SERVICE_ID} and ${SANDBOX_HOST_PORT_ID}.`);
+  if (!sandbox || !host)
+    throw new Error(`sandbox-seatbelt requires ${SANDBOX_SERVICE_ID} and ${SANDBOX_HOST_PORT_ID}.`);
   ctx.effect?.(() => sandbox.register(createSeatbeltBackend(host)), "sandbox-seatbelt");
 }

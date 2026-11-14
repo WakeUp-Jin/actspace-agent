@@ -1,7 +1,13 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Grid2x2Plus, Plus } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
-import { NAV_SECTION_ACTIONS_CLASS, NAV_SECTION_CLASS, NAV_SECTION_LABEL_BASE_CLASS, NAV_SECTION_TITLE_CLASS, SIDEBAR_BUTTON_RESET_CLASS } from "../sidebar/styles";
+import {
+  NAV_SECTION_ACTIONS_CLASS,
+  NAV_SECTION_CLASS,
+  NAV_SECTION_LABEL_BASE_CLASS,
+  NAV_SECTION_TITLE_CLASS,
+  SIDEBAR_BUTTON_RESET_CLASS,
+} from "../sidebar/styles";
 import { ActorAvatar, SpaceAvatar, actorImage } from "./avatar/ActorAvatar";
 import { nameOf, rosterActors, waitCount } from "./model/selectors";
 import { useSpaceDemoActions, useSpaceDemoState } from "./model/use-space-demo";
@@ -14,19 +20,27 @@ import { useSpaceDemoActions, useSpaceDemoState } from "./model/use-space-demo";
 
 const REVEAL_CLASS = "opacity-0 group-hover/nav-title:opacity-100 group-focus-within/nav-title:opacity-100";
 const DEMO_TAG_CLASS = "rounded-act-xs bg-info-soft px-1 text-act-xxs leading-4 font-medium text-on-info";
-const ROW_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} grid min-h-9 w-full min-w-0 grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 rounded-act-md px-2 text-left text-act-sm font-medium text-text-muted transition-[background,color] duration-(--motion-fast) ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main focus-visible:outline-2 focus-visible:outline-focus-ring`;
+const ROW_CLASS = `${SIDEBAR_BUTTON_RESET_CLASS} grid min-h-9 w-full min-w-0 grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 rounded-act-md px-2 text-left text-act-sm font-medium text-text-muted transition-[background,color] duration-(--motion-fast) ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main focus-visible:outline-2 focus-visible:outline-focus-ring`;
 // 用 aria-current 变体：基础类里的 bg-transparent 在样式表里排在 bg-sidebar-selected 之后，直接加类会被盖掉。
 const ROW_ACTIVE_CLASS = "aria-[current=page]:bg-sidebar-selected aria-[current=page]:text-text-main";
-const PRIMARY_ACTIVE_CLASS = "aria-[current=page]:bg-selected aria-[current=page]:font-semibold aria-[current=page]:text-text-main";
-const SOLO_ROW_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} grid min-h-9 w-full min-w-0 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2 rounded-act-md px-2 text-left text-act-sm font-medium text-text-muted transition-[background,color] duration-(--motion-fast) ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main focus-visible:outline-2 focus-visible:outline-focus-ring`;
+const PRIMARY_ACTIVE_CLASS =
+  "aria-[current=page]:bg-selected aria-[current=page]:font-semibold aria-[current=page]:text-text-main";
+const SOLO_ROW_CLASS = `${SIDEBAR_BUTTON_RESET_CLASS} grid min-h-9 w-full min-w-0 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2 rounded-act-md px-2 text-left text-act-sm font-medium text-text-muted transition-[background,color] duration-(--motion-fast) ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main focus-visible:outline-2 focus-visible:outline-focus-ring`;
 const NAME_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap";
-const WAIT_BADGE_CLASS = "min-w-4 rounded-act-pill bg-warning-soft px-1 text-center text-act-xxs leading-4 font-semibold text-on-warning";
+const WAIT_BADGE_CLASS =
+  "min-w-4 rounded-act-pill bg-warning-soft px-1 text-center text-act-xxs leading-4 font-semibold text-on-warning";
 const COUNT_CLASS = "text-act-xs leading-4 font-medium text-text-faint";
 const STACK_IMG_CLASS = "h-3 w-3 rounded-act-xs object-cover ring-1 ring-sidebar";
 
-export function NewSpaceAction({ className, labelClassName, onNewSpace }: { className: string; labelClassName: string; onNewSpace: () => void }) {
+export function NewSpaceAction({
+  className,
+  labelClassName,
+  onNewSpace,
+}: {
+  className: string;
+  labelClassName: string;
+  onNewSpace: () => void;
+}) {
   return (
     <button className={className} type="button" onClick={onNewSpace}>
       <Grid2x2Plus size={14} />
@@ -77,7 +91,15 @@ export function ActorRosterAction({
   );
 }
 
-export function SpaceSidebarSection({ inSpace, onEnter, onNewSpace }: { inSpace: boolean; onEnter: () => void; onNewSpace: () => void }) {
+export function SpaceSidebarSection({
+  inSpace,
+  onEnter,
+  onNewSpace,
+}: {
+  inSpace: boolean;
+  onEnter: () => void;
+  onNewSpace: () => void;
+}) {
   const state = useSpaceDemoState();
   const { switchSpace } = useSpaceDemoActions();
   const [collapsed, setCollapsed] = useState(false);
@@ -85,15 +107,27 @@ export function SpaceSidebarSection({ inSpace, onEnter, onNewSpace }: { inSpace:
   return (
     <section className={NAV_SECTION_CLASS} aria-label="Space">
       <div className={NAV_SECTION_TITLE_CLASS}>
-        <button className={`${NAV_SECTION_LABEL_BASE_CLASS} text-act-xs`} type="button" onClick={toggle} aria-expanded={!collapsed}>
+        <button
+          className={`${NAV_SECTION_LABEL_BASE_CLASS} text-act-xs`}
+          type="button"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+        >
           <span>Space</span>
-          <span className={DEMO_TAG_CLASS} title="开发中演示，数据是模拟的">演示</span>
+          <span className={DEMO_TAG_CLASS} title="开发中演示，数据是模拟的">
+            演示
+          </span>
         </button>
         <div className={NAV_SECTION_ACTIONS_CLASS}>
           <IconButton className={REVEAL_CLASS} size="xs" label="新建 Space" onClick={onNewSpace}>
             <Plus size={13} aria-hidden="true" />
           </IconButton>
-          <IconButton className={REVEAL_CLASS} size="xs" label={collapsed ? "展开 Space" : "收起 Space"} onClick={toggle}>
+          <IconButton
+            className={REVEAL_CLASS}
+            size="xs"
+            label={collapsed ? "展开 Space" : "收起 Space"}
+            onClick={toggle}
+          >
             {collapsed ? <ChevronRight size={13} aria-hidden="true" /> : <ChevronDown size={13} aria-hidden="true" />}
           </IconButton>
         </div>
@@ -116,7 +150,13 @@ export function SpaceSidebarSection({ inSpace, onEnter, onNewSpace }: { inSpace:
               >
                 <SpaceAvatar space={space} size={18} />
                 <span className={NAME_CLASS}>{space.name}</span>
-                {wait > 0 ? <span className={WAIT_BADGE_CLASS} title={`${wait} 个 Actor 等你决定`}>{wait}</span> : <span />}
+                {wait > 0 ? (
+                  <span className={WAIT_BADGE_CLASS} title={`${wait} 个 Actor 等你决定`}>
+                    {wait}
+                  </span>
+                ) : (
+                  <span />
+                )}
               </button>
             );
           })}

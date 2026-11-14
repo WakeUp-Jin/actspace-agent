@@ -6,7 +6,8 @@ import { SettingGroup, SettingRow, SettingsSelect } from "../SettingsPrimitives"
 import type { SectionProps } from "./shared";
 
 const OPTIONS = PERMISSION_MODES.map((mode) => ({ value: mode, label: permissionModeLabel(mode) }));
-const isPermissionMode = (value: string): value is PermissionMode => (PERMISSION_MODES as readonly string[]).includes(value);
+const isPermissionMode = (value: string): value is PermissionMode =>
+  (PERMISSION_MODES as readonly string[]).includes(value);
 
 /** 新建会话写入的权限模式。只影响之后新建的会话；已有会话在输入框下方的状态行单独切换。 */
 export function SessionDefaultsSection({ settingsV4, onUpdateNamespace }: SectionProps) {
@@ -17,7 +18,8 @@ export function SessionDefaultsSection({ settingsV4, onUpdateNamespace }: Sectio
 
   /** 成功返回 null，失败返回原因（确认框里显示）。 */
   const save = async (mode: PermissionMode): Promise<string | null> => {
-    setSaving(true); setError(null);
+    setSaving(true);
+    setError(null);
     try {
       await onUpdateNamespace({ namespace: "general", patch: { defaultPermissionMode: mode } });
       return null;
@@ -25,7 +27,9 @@ export function SessionDefaultsSection({ settingsV4, onUpdateNamespace }: Sectio
       const message = cause instanceof Error ? cause.message : "无法保存默认权限";
       setError(message);
       return message;
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -33,7 +37,7 @@ export function SessionDefaultsSection({ settingsV4, onUpdateNamespace }: Sectio
       <SettingRow
         title="默认权限"
         description="只影响之后新建的会话。已有会话在输入框下方单独切换。"
-        control={(
+        control={
           <SettingsSelect
             value={current}
             options={OPTIONS}
@@ -41,13 +45,20 @@ export function SessionDefaultsSection({ settingsV4, onUpdateNamespace }: Sectio
             disabled={!settingsV4 || saving}
             onChange={(value) => {
               if (!isPermissionMode(value) || value === current) return;
-              if (value === "full-access") { setConfirmFull(true); return; }
+              if (value === "full-access") {
+                setConfirmFull(true);
+                return;
+              }
               void save(value);
             }}
           />
-        )}
+        }
       />
-      {error && !confirmFull ? <p role="alert" className="text-act-xs text-on-danger">{error}</p> : null}
+      {error && !confirmFull ? (
+        <p role="alert" className="text-act-xs text-on-danger">
+          {error}
+        </p>
+      ) : null}
       {confirmFull ? (
         <ConfirmDialog
           title={FULL_ACCESS_CONFIRM.title}

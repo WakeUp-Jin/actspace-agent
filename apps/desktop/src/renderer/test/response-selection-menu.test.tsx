@@ -20,15 +20,33 @@ function Reply({ id, content }: { id: string; content: string }) {
 
 type ReplyFixture = { id: string; content: string; live?: boolean };
 
-function Harness({ onAddAnnotation, replies }: { onAddAnnotation: (annotation: ResponseAnnotationReference) => void; replies: ReplyFixture[] }) {
+function Harness({
+  onAddAnnotation,
+  replies,
+}: {
+  onAddAnnotation: (annotation: ResponseAnnotationReference) => void;
+  replies: ReplyFixture[];
+}) {
   const scrollRef = useRef<HTMLElement | null>(null);
   // 和 ConversationView 一样按块判断：durable 回复带 sourceSeq，live 回复没有。
-  const blocks: MessageBlock[] = replies.map((reply, index) => ({ kind: "assistant", id: reply.id, content: reply.content, createdAt: "2026-10-06T00:00:00.000Z", ...(reply.live ? {} : { sourceSeq: index }) }));
+  const blocks: MessageBlock[] = replies.map((reply, index) => ({
+    kind: "assistant",
+    id: reply.id,
+    content: reply.content,
+    createdAt: "2026-10-06T00:00:00.000Z",
+    ...(reply.live ? {} : { sourceSeq: index }),
+  }));
   const annotatable = annotatableMessageIds(blocks);
   return (
     <section ref={scrollRef} data-testid="scroller">
-      {replies.map((reply) => <Reply key={reply.id} {...reply} />)}
-      <ResponseSelectionMenu scrollContainerRef={scrollRef} canAnnotate={(id) => annotatable.has(id)} onAddAnnotation={onAddAnnotation} />
+      {replies.map((reply) => (
+        <Reply key={reply.id} {...reply} />
+      ))}
+      <ResponseSelectionMenu
+        scrollContainerRef={scrollRef}
+        canAnnotate={(id) => annotatable.has(id)}
+        onAddAnnotation={onAddAnnotation}
+      />
     </section>
   );
 }
@@ -63,21 +81,25 @@ describe("ResponseSelectionMenu", () => {
     const { onAddAnnotation } = setup();
     selectText(screen.getByTestId("v2-3"), "第二段");
     const add = await screen.findByRole("menuitem", { name: "添加到对话" });
-    await waitFor(() => expect(screen.getByRole("menu", { name: "回复选区操作" })).toHaveAttribute("data-side", "bottom"));
+    await waitFor(() =>
+      expect(screen.getByRole("menu", { name: "回复选区操作" })).toHaveAttribute("data-side", "bottom"),
+    );
     // 选区最后一行（100–220, 200–218）的右下角，下移 6px。
     expect(screen.getByRole("menu").parentElement!.style.transform).toBe("translate(220px, 224px)");
     // 不抢焦点，键盘扩选不被打断。
     expect(document.activeElement).toBe(document.body);
 
     await userEvent.click(add);
-    expect(onAddAnnotation).toHaveBeenCalledWith(expect.objectContaining({
-      assistantMessageId: "v2-3",
-      selectedText: "第二段",
-      startOffset: 6,
-      endOffset: 9,
-      prefixContext: "第一段内容\n",
-      suffixContext: "的正文",
-    }));
+    expect(onAddAnnotation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assistantMessageId: "v2-3",
+        selectedText: "第二段",
+        startOffset: 6,
+        endOffset: 9,
+        prefixContext: "第一段内容\n",
+        suffixContext: "的正文",
+      }),
+    );
     expect(document.getSelection()?.rangeCount).toBe(0);
     expect(screen.queryByRole("menu")).toBeNull();
   });
@@ -91,18 +113,26 @@ describe("ResponseSelectionMenu", () => {
   });
 
   it.each([
-    ["a streaming reply that has no durable sourceSeq yet", [{ id: "turn:run-1:assistant:0", content: "流式中的回复", live: true }], "流式中的回复"],
+    [
+      "a streaming reply that has no durable sourceSeq yet",
+      [{ id: "turn:run-1:assistant:0", content: "流式中的回复", live: true }],
+      "流式中的回复",
+    ],
   ])("does not offer the menu for %s", async (_name, replies, text) => {
     setup(replies);
     selectText(screen.getByTestId(replies[0].id), text);
-    await act(async () => { await new Promise((resolve) => window.requestAnimationFrame(resolve)); });
+    await act(async () => {
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    });
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
   it("does not offer the menu for a selection that spans two replies", async () => {
     setup();
     selectText(screen.getByTestId("v2-3"), "第二段", "另一条", screen.getByTestId("v2-7"));
-    await act(async () => { await new Promise((resolve) => window.requestAnimationFrame(resolve)); });
+    await act(async () => {
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    });
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
@@ -110,14 +140,18 @@ describe("ResponseSelectionMenu", () => {
     setup();
     // 代码块被语法高亮拆成多个 token，选中其中一个 token 即可。
     selectText(screen.getByTestId("v2-3").querySelector("pre")!, "code");
-    await act(async () => { await new Promise((resolve) => window.requestAnimationFrame(resolve)); });
+    await act(async () => {
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    });
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
   it("does not offer the menu when the selection exceeds the selected-text limit", async () => {
     setup([{ id: "v2-9", content: `${"长".repeat(8001)}尾` }]);
     selectText(screen.getByTestId("v2-9"), "长", "尾");
-    await act(async () => { await new Promise((resolve) => window.requestAnimationFrame(resolve)); });
+    await act(async () => {
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    });
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
@@ -156,7 +190,9 @@ describe("ResponseSelectionMenu", () => {
     const reply = screen.getByTestId("v2-3");
     fireEvent.pointerDown(reply);
     selectText(reply, "第二段");
-    await act(async () => { await new Promise((resolve) => window.requestAnimationFrame(resolve)); });
+    await act(async () => {
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    });
     expect(screen.queryByRole("menu")).toBeNull();
 
     fireEvent.pointerUp(reply);

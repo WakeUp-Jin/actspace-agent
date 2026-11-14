@@ -17,11 +17,28 @@ export async function createChildSession(options: {
   readonly onEvent?: (event: SessionEventEnvelopeV1) => void;
 }): Promise<SessionHandle> {
   const seedDigest = createHash("sha256").update(options.prompt).digest("hex");
-  return options.store.create({
-    sessionId: options.childSessionId,
-    createdAt: options.createdAt,
-    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-    lineage: { parentSessionId: options.parent.header.sessionId, parentBoundarySeq: options.parent.lastSeq, parentCallId: options.parentCallId, seedDigest, origin: "delegation", delegationDepth: 1 },
-    createdWith: { profileId: "base", presetId: options.presetId, runtimeContractVersion: "2", manifestDigest: options.manifestDigest, plugins: options.plugins, codecSetDigest: options.store.options.registry.digest },
-  }, options.onEvent ? { onEvent: options.onEvent } : {});
+  return options.store.create(
+    {
+      sessionId: options.childSessionId,
+      createdAt: options.createdAt,
+      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+      lineage: {
+        parentSessionId: options.parent.header.sessionId,
+        parentBoundarySeq: options.parent.lastSeq,
+        parentCallId: options.parentCallId,
+        seedDigest,
+        origin: "delegation",
+        delegationDepth: 1,
+      },
+      createdWith: {
+        profileId: "base",
+        presetId: options.presetId,
+        runtimeContractVersion: "2",
+        manifestDigest: options.manifestDigest,
+        plugins: options.plugins,
+        codecSetDigest: options.store.options.registry.digest,
+      },
+    },
+    options.onEvent ? { onEvent: options.onEvent } : {},
+  );
 }

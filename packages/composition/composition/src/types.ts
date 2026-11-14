@@ -1,8 +1,22 @@
 import type { JsonValue, PluginManifest } from "@actspace/cordis-adapter";
 import type { CompositionEntry, PatchOperationResult } from "@actspace/bundle";
-export type ServiceAdmission = { readonly serviceId: string; readonly providerEntryId: string; readonly providerPluginId: string; readonly required: boolean };
-export type CodecAdmission = { readonly module: string; readonly eventTypes: readonly string[]; readonly pluginId: string; readonly required: boolean };
-export type CompositionDiagnostic = { readonly severity: "warning" | "error" | "info"; readonly message: string; readonly entryId?: string };
+export type ServiceAdmission = {
+  readonly serviceId: string;
+  readonly providerEntryId: string;
+  readonly providerPluginId: string;
+  readonly required: boolean;
+};
+export type CodecAdmission = {
+  readonly module: string;
+  readonly eventTypes: readonly string[];
+  readonly pluginId: string;
+  readonly required: boolean;
+};
+export type CompositionDiagnostic = {
+  readonly severity: "warning" | "error" | "info";
+  readonly message: string;
+  readonly entryId?: string;
+};
 export type ResolvedComposition = {
   readonly schemaVersion: 1;
   readonly profileId: string;

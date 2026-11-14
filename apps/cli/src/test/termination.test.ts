@@ -6,7 +6,7 @@ describe("CLI termination budget", () => {
   it("aborts late controls and force-cleans owned processes before exiting on timeout", () => {
     vi.useFakeTimers();
     const calls: string[] = [];
-    const termination = new CliTermination(code => calls.push(`exit:${code}`));
+    const termination = new CliTermination((code) => calls.push(`exit:${code}`));
     termination.signal("SIGTERM");
     termination.addCleanup(() => calls.push("cleanup"));
     termination.setAbort(() => calls.push("abort"));
@@ -19,9 +19,14 @@ describe("CLI termination budget", () => {
     vi.useFakeTimers();
     const exit = vi.fn();
     const termination = new CliTermination(exit);
-    const cleanup = vi.fn(); termination.addCleanup(cleanup);
-    termination.signal("SIGINT"); termination.signal("SIGTERM");
-    expect(cleanup).toHaveBeenCalledOnce(); expect(exit).toHaveBeenCalledWith(130);
-    termination.dispose(); vi.runAllTimers(); expect(exit).toHaveBeenCalledOnce();
+    const cleanup = vi.fn();
+    termination.addCleanup(cleanup);
+    termination.signal("SIGINT");
+    termination.signal("SIGTERM");
+    expect(cleanup).toHaveBeenCalledOnce();
+    expect(exit).toHaveBeenCalledWith(130);
+    termination.dispose();
+    vi.runAllTimers();
+    expect(exit).toHaveBeenCalledOnce();
   });
 });

@@ -44,7 +44,11 @@ export const BUILTIN_PROVIDER_BY_BASE_URL: Readonly<Record<string, string>> = Ob
 
 /** Comparable form of a Base URL: parsed, without a trailing slash. Invalid input returns null. */
 export function normalizeBuiltinBaseUrl(baseUrl: string): string | null {
-  try { return new URL(baseUrl.trim()).toString().replace(/\/$/, ""); } catch { return null; }
+  try {
+    return new URL(baseUrl.trim()).toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
 }
 
 /** The built-in provider whose model address equals this Base URL exactly, if any. */
@@ -94,18 +98,26 @@ export function loadBuiltinProvider(providerId: string): Promise<PiAiBuiltinProv
 
 async function importBuiltinProvider(providerId: string): Promise<PiAiBuiltinProvider> {
   const specifier: string = `@earendil-works/pi-ai/providers/${providerId}`;
-  const module = await import(specifier) as Record<string, unknown>;
-  const factory = Object.entries(module).find(([name, value]) => name.endsWith("Provider") && typeof value === "function")?.[1] as (() => PiAiBuiltinProvider) | undefined;
+  const module = (await import(specifier)) as Record<string, unknown>;
+  const factory = Object.entries(module).find(
+    ([name, value]) => name.endsWith("Provider") && typeof value === "function",
+  )?.[1] as (() => PiAiBuiltinProvider) | undefined;
   if (factory === undefined) throw new Error(`pi-ai built-in provider ${providerId} has no provider factory.`);
   const provider = factory();
-  if (provider.id !== providerId) throw new Error(`pi-ai built-in provider module ${providerId} returned ${provider.id}.`);
+  if (provider.id !== providerId)
+    throw new Error(`pi-ai built-in provider module ${providerId} returned ${provider.id}.`);
   return provider;
 }
 
 /** Chat model of the built-in provider with this id on one of ActSpace's wire protocols. */
-export function builtinChatModel(provider: PiAiBuiltinProvider, modelId: string): (PiAiBuiltinModel & { readonly api: PiAiWireRoute }) | undefined {
+export function builtinChatModel(
+  provider: PiAiBuiltinProvider,
+  modelId: string,
+): (PiAiBuiltinModel & { readonly api: PiAiWireRoute }) | undefined {
   const model = provider.getModels().find((entry) => entry.id === modelId && (entry.type ?? "chat") === "chat");
-  return model !== undefined && isWireRoute(model.api) ? model as PiAiBuiltinModel & { readonly api: PiAiWireRoute } : undefined;
+  return model !== undefined && isWireRoute(model.api)
+    ? (model as PiAiBuiltinModel & { readonly api: PiAiWireRoute })
+    : undefined;
 }
 
 function isWireRoute(api: string): api is PiAiWireRoute {

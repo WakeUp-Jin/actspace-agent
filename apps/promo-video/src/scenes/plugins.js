@@ -25,7 +25,8 @@ const racks = groups
   })
   .join("");
 
-const wire = (row, path) => `<path class="wire" style="${at(FIRST_RACK - 0.05 + row * RACK_GAP)}" d="${path}" pathLength="1"/>`;
+const wire = (row, path) =>
+  `<path class="wire" style="${at(FIRST_RACK - 0.05 + row * RACK_GAP)}" d="${path}" pathLength="1"/>`;
 
 export const plugins = {
   id: "plugins",

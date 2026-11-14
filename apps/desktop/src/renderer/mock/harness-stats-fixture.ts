@@ -29,7 +29,14 @@ import type {
  * 时间范围和会话类型按比例缩放计数；版本筛选决定指标卡看哪个版本；其余筛选不影响数据。
  * `?mock=harness-stats` 直接打开到这个页面（见 components/harness-stats/dev-start.ts）。
  */
-export const MOCK_HARNESS_STATS_SYNC: HarnessStatsSyncStatus = { phase: "idle", completedSessions: 0, totalSessions: 0, eventsRead: 0, dataVersion: 1, failedSessions: 0 };
+export const MOCK_HARNESS_STATS_SYNC: HarnessStatsSyncStatus = {
+  phase: "idle",
+  completedSessions: 0,
+  totalSessions: 0,
+  eventsRead: 0,
+  dataVersion: 1,
+  failedSessions: 0,
+};
 
 const HARNESS_ID = "default";
 const REQUESTS = 3842;
@@ -43,19 +50,76 @@ function scaleOf(filter: HarnessStatsFilter): number {
   return range * session;
 }
 /** 插件运行时只按时间和版本统计。 */
-const rangeScale = (filter: HarnessStatsFilter) => ({ day: 1 / 30, week: 7 / 30, month: 1, total: 2.6 }[filter.range]);
+const rangeScale = (filter: HarnessStatsFilter) => ({ day: 1 / 30, week: 7 / 30, month: 1, total: 2.6 })[filter.range];
 
 /* ------------------------------------------------------------ 版本 */
 
-type VersionSeed = { requests: number; ctx: number; over: number; fail: number; dup: number; trunc: number; brk: number; reread: number; discHit: number; plugins: number };
+type VersionSeed = {
+  requests: number;
+  ctx: number;
+  over: number;
+  fail: number;
+  dup: number;
+  trunc: number;
+  brk: number;
+  reread: number;
+  discHit: number;
+  plugins: number;
+};
 const VERSION_SEED: ReadonlyArray<readonly [number, VersionSeed]> = [
-  [10, { requests: 1904, ctx: 53.9, over: 22.6, fail: 0.052, dup: 0.047, trunc: 0.081, brk: 0.142, reread: 0.21, discHit: 0.64, plugins: 16 }],
-  [11, { requests: 2638, ctx: 51.3, over: 20.9, fail: 0.048, dup: 0.041, trunc: 0.074, brk: 0.131, reread: 0.18, discHit: 0.67, plugins: 17 }],
-  [12, { requests: 1204, ctx: 48.2, over: 18.4, fail: 0.041, dup: 0.032, trunc: 0.066, brk: 0.098, reread: 0.12, discHit: 0.71, plugins: 18 }],
+  [
+    10,
+    {
+      requests: 1904,
+      ctx: 53.9,
+      over: 22.6,
+      fail: 0.052,
+      dup: 0.047,
+      trunc: 0.081,
+      brk: 0.142,
+      reread: 0.21,
+      discHit: 0.64,
+      plugins: 16,
+    },
+  ],
+  [
+    11,
+    {
+      requests: 2638,
+      ctx: 51.3,
+      over: 20.9,
+      fail: 0.048,
+      dup: 0.041,
+      trunc: 0.074,
+      brk: 0.131,
+      reread: 0.18,
+      discHit: 0.67,
+      plugins: 17,
+    },
+  ],
+  [
+    12,
+    {
+      requests: 1204,
+      ctx: 48.2,
+      over: 18.4,
+      fail: 0.041,
+      dup: 0.032,
+      trunc: 0.066,
+      brk: 0.098,
+      reread: 0.12,
+      discHit: 0.71,
+      plugins: 18,
+    },
+  ],
 ];
 const keyOf = (revision: number) => `${HARNESS_ID}@${revision}`;
 const CURRENT_REVISION = keyOf(12);
-const DESCRIPTIONS: Record<number, string> = { 10: "工具描述精简前", 11: "规则拆分、environment 每轮注入", 12: "工具描述精简，按需加载 notebook" };
+const DESCRIPTIONS: Record<number, string> = {
+  10: "工具描述精简前",
+  11: "规则拆分、environment 每轮注入",
+  12: "工具描述精简，按需加载 notebook",
+};
 
 /** 新版本在前，与主进程一致。 */
 function revisions(scale: number): HarnessRevisionInfo[] {
@@ -117,9 +181,19 @@ const TOOL_SEED: ReadonlyArray<readonly [string, string, number, number, number,
   ["notebook_edit", "notebook", 0, 650, 0, 0, 0],
 ];
 const FAILURE_CODES: Record<string, ReadonlyArray<readonly [string, number]>> = {
-  bash: [["exit-nonzero", 0.83], ["timeout", 0.12], ["denied", 0.05]],
-  edit_file: [["no-match", 0.7], ["not-found", 0.3]],
-  web_fetch: [["http-4xx", 0.67], ["timeout", 0.33]],
+  bash: [
+    ["exit-nonzero", 0.83],
+    ["timeout", 0.12],
+    ["denied", 0.05],
+  ],
+  edit_file: [
+    ["no-match", 0.7],
+    ["not-found", 0.3],
+  ],
+  web_fetch: [
+    ["http-4xx", 0.67],
+    ["timeout", 0.33],
+  ],
 };
 const PLUGIN_SOURCE: Record<string, HarnessPluginSource> = { notebook: "user", "review-helper": "evolved" };
 const sourceOf = (pluginId: string): HarnessPluginSource => PLUGIN_SOURCE[pluginId] ?? "builtin";
@@ -135,7 +209,9 @@ function toolRows(scale: number): HarnessToolRow[] {
       exposures: requests,
       calls: scaled,
       failed,
-      failureCodes: (FAILURE_CODES[name] ?? []).map(([code, share]) => ({ code, count: Math.round(failed * share) })).filter((item) => item.count > 0),
+      failureCodes: (FAILURE_CODES[name] ?? [])
+        .map(([code, share]) => ({ code, count: Math.round(failed * share) }))
+        .filter((item) => item.count > 0),
       schemaTokens: tokens,
       truncated: Math.round(truncated * scale),
       repeated: Math.round(repeated * scale),
@@ -147,7 +223,15 @@ function usagePlugins(tools: readonly HarnessToolRow[], scale: number): HarnessU
   const map = new Map<string, { -readonly [K in keyof HarnessUsagePluginRow]: HarnessUsagePluginRow[K] }>();
   for (const tool of tools) {
     const id = tool.pluginId ?? "unknown";
-    const row = map.get(id) ?? { pluginId: id, source: sourceOf(id), tools: [], calls: 0, failed: 0, schemaTokens: 0, exposures: 0 };
+    const row = map.get(id) ?? {
+      pluginId: id,
+      source: sourceOf(id),
+      tools: [],
+      calls: 0,
+      failed: 0,
+      schemaTokens: 0,
+      exposures: 0,
+    };
     row.tools = [...row.tools, tool.name];
     row.calls += tool.calls;
     row.failed += tool.failed;
@@ -155,7 +239,15 @@ function usagePlugins(tools: readonly HarnessToolRow[], scale: number): HarnessU
     row.exposures = Math.max(row.exposures, tool.exposures);
     map.set(id, row);
   }
-  map.set("review-helper", { pluginId: "review-helper", source: "evolved", tools: ["review_diff"], calls: Math.round(12 * scale), failed: 0, schemaTokens: 380, exposures: Math.round(REQUESTS * scale) });
+  map.set("review-helper", {
+    pluginId: "review-helper",
+    source: "evolved",
+    tools: ["review_diff"],
+    calls: Math.round(12 * scale),
+    failed: 0,
+    schemaTokens: 380,
+    exposures: Math.round(REQUESTS * scale),
+  });
   return [...map.values()];
 }
 
@@ -183,19 +275,60 @@ function skillRows(scale: number): HarnessSkillRow[] {
 
 function usageVs(scale: number): HarnessStatsUsageVs {
   const tools = toolRows(scale);
-  return { requests: Math.round(REQUESTS * scale), tools, plugins: usagePlugins(tools, scale), skills: skillRows(scale) };
+  return {
+    requests: Math.round(REQUESTS * scale),
+    tools,
+    plugins: usagePlugins(tools, scale),
+    skills: skillRows(scale),
+  };
 }
 
 /* ------------------------------------------------------------ 上下文 */
 
 // [类别, 平均 k token, 来源：[id, k token, 变化率 %]]
-const CONTEXT_SEED: ReadonlyArray<readonly [string, number, ReadonlyArray<readonly [string, number, number, HarnessSourceRow["kind"]]>]> = [
-  ["systemPrompt", 4.1, [["core/system-prompt", 3.6, 0, "section"], ["core/model-facts", 0.5, 4, "model-facts"]]],
-  ["tools", 9.8, [["tools · shell", 1.4, 0, "tools"], ["tools · filesystem-write", 1.6, 0, "tools"], ["tools · plugin-manager", 1.4, 0, "tools"], ["tools · subagent", 1.4, 2, "tools"], ["tools · filesystem-read", 1.2, 0, "tools"], ["tools · 其他 6 个插件", 2.8, 1, "tools"]]],
-  ["rules", 2.6, [["AGENTS.md", 1.8, 1, "supplement"], ["environment", 0.3, 61, "supplement"], ["context/active-paths", 0.5, 34, "supplement"]]],
+const CONTEXT_SEED: ReadonlyArray<
+  readonly [string, number, ReadonlyArray<readonly [string, number, number, HarnessSourceRow["kind"]]>]
+> = [
+  [
+    "systemPrompt",
+    4.1,
+    [
+      ["core/system-prompt", 3.6, 0, "section"],
+      ["core/model-facts", 0.5, 4, "model-facts"],
+    ],
+  ],
+  [
+    "tools",
+    9.8,
+    [
+      ["tools · shell", 1.4, 0, "tools"],
+      ["tools · filesystem-write", 1.6, 0, "tools"],
+      ["tools · plugin-manager", 1.4, 0, "tools"],
+      ["tools · subagent", 1.4, 2, "tools"],
+      ["tools · filesystem-read", 1.2, 0, "tools"],
+      ["tools · 其他 6 个插件", 2.8, 1, "tools"],
+    ],
+  ],
+  [
+    "rules",
+    2.6,
+    [
+      ["AGENTS.md", 1.8, 1, "supplement"],
+      ["environment", 0.3, 61, "supplement"],
+      ["context/active-paths", 0.5, 34, "supplement"],
+    ],
+  ],
   ["skills", 1.9, [["core/skills-catalog", 1.9, 3, "skills"]]],
   ["summarizedConversation", 3.2, [["compaction/summary", 3.2, 9, "other"]]],
-  ["conversation", 26.6, [["用户消息", 2.1, 100, "other"], ["模型回复", 6.4, 100, "other"], ["工具结果", 18.1, 100, "other"]]],
+  [
+    "conversation",
+    26.6,
+    [
+      ["用户消息", 2.1, 100, "other"],
+      ["模型回复", 6.4, 100, "other"],
+      ["工具结果", 18.1, 100, "other"],
+    ],
+  ],
 ];
 export const MOCK_CHURN_SOURCE_KEY = "rules:environment";
 
@@ -205,17 +338,19 @@ function context(scale: number): HarnessStatsContext {
     requests,
     buckets: CONTEXT_SEED.map(([bucket, avg]) => ({ bucket, avgTokens: avg * 1000 })),
     avgEstimatedTokens: CONTEXT_SEED.reduce((sum, [, avg]) => sum + avg, 0) * 1000,
-    sources: CONTEXT_SEED.flatMap(([bucket, , sources]) => sources.map(([id, avg, change, kind]) => ({
-      key: `${bucket}:${id}`,
-      kind,
-      bucket,
-      owner: kind === "tools" ? id.replace("tools · ", "") : null,
-      id,
-      appearances: requests,
-      avgTokens: avg * 1000,
-      // 对话每次都变，不算变化率。
-      changeRate: bucket === "conversation" ? null : change / 100,
-    }))),
+    sources: CONTEXT_SEED.flatMap(([bucket, , sources]) =>
+      sources.map(([id, avg, change, kind]) => ({
+        key: `${bucket}:${id}`,
+        kind,
+        bucket,
+        owner: kind === "tools" ? id.replace("tools · ", "") : null,
+        id,
+        appearances: requests,
+        avgTokens: avg * 1000,
+        // 对话每次都变，不算变化率。
+        changeRate: bucket === "conversation" ? null : change / 100,
+      })),
+    ),
   };
 }
 
@@ -316,8 +451,22 @@ function plugins(filter: HarnessStatsFilter): HarnessStatsPlugins {
     rows,
     services: [
       { providerPluginId: "core", service: "session", method: "append", calls: sc(41_200), errors: 0, p95Ms: 2 },
-      { providerPluginId: "core", service: "tools.runtime", method: "execute", calls: sc(4400), errors: sc(12), p95Ms: 8100 },
-      { providerPluginId: "context-engine", service: "context", method: "estimate", calls: sc(3800), errors: 0, p95Ms: 16 },
+      {
+        providerPluginId: "core",
+        service: "tools.runtime",
+        method: "execute",
+        calls: sc(4400),
+        errors: sc(12),
+        p95Ms: 8100,
+      },
+      {
+        providerPluginId: "context-engine",
+        service: "context",
+        method: "estimate",
+        calls: sc(3800),
+        errors: 0,
+        p95Ms: 16,
+      },
       { providerPluginId: "sandbox", service: "sandbox", method: "exec", calls: sc(3200), errors: sc(4), p95Ms: 7600 },
       { providerPluginId: "notebook", service: "notebook.kernel", method: "", calls: 0, errors: 0, p95Ms: null },
       { providerPluginId: "web", service: "web.cache", method: "", calls: 0, errors: 0, p95Ms: null },
@@ -339,10 +488,38 @@ function flags(scale: number): HarnessFlag[] {
   const calls = Math.round(3214 * scale);
   const failed = Math.round(calls * 0.053);
   return [
-    { rule: "tool-costly-unused", level: "warn", title: "notebook_edit 占用高、使用少", detail: `定义约 650 token，出现在 ${Math.round(REQUESTS * scale).toLocaleString("zh-CN")} 次请求里，只调用 0 次（0.0%）`, category: "占用 vs 使用", target: { card: "usage-vs", tab: "tools", key: "notebook_edit" } },
-    { rule: "plugin-load-failure", level: "error", title: "插件加载失败：review-helper", detail: `自进化插件，最近一次失败：${LOAD_ERROR}。`, category: "插件运行时", target: { card: "runtime", tab: "load", key: "review-helper" } },
-    { rule: "tool-failure-rate", level: "error", title: "工具失败率高：bash 5.3%", detail: `${calls.toLocaleString("zh-CN")} 次调用里失败 ${failed} 次，大多是退出码非 0。`, category: "工具明细", target: { card: "detail", tab: "tools", key: "bash" } },
-    { rule: "context-churn", level: "info", title: "上下文来源变化频繁：environment", detail: "61% 的请求里内容和上一次不同，会让缓存失效。", category: "上下文来源", target: { card: "sources", tab: "rules", key: MOCK_CHURN_SOURCE_KEY } },
+    {
+      rule: "tool-costly-unused",
+      level: "warn",
+      title: "notebook_edit 占用高、使用少",
+      detail: `定义约 650 token，出现在 ${Math.round(REQUESTS * scale).toLocaleString("zh-CN")} 次请求里，只调用 0 次（0.0%）`,
+      category: "占用 vs 使用",
+      target: { card: "usage-vs", tab: "tools", key: "notebook_edit" },
+    },
+    {
+      rule: "plugin-load-failure",
+      level: "error",
+      title: "插件加载失败：review-helper",
+      detail: `自进化插件，最近一次失败：${LOAD_ERROR}。`,
+      category: "插件运行时",
+      target: { card: "runtime", tab: "load", key: "review-helper" },
+    },
+    {
+      rule: "tool-failure-rate",
+      level: "error",
+      title: "工具失败率高：bash 5.3%",
+      detail: `${calls.toLocaleString("zh-CN")} 次调用里失败 ${failed} 次，大多是退出码非 0。`,
+      category: "工具明细",
+      target: { card: "detail", tab: "tools", key: "bash" },
+    },
+    {
+      rule: "context-churn",
+      level: "info",
+      title: "上下文来源变化频繁：environment",
+      detail: "61% 的请求里内容和上一次不同，会让缓存失效。",
+      category: "上下文来源",
+      target: { card: "sources", tab: "rules", key: MOCK_CHURN_SOURCE_KEY },
+    },
   ];
 }
 
@@ -350,30 +527,54 @@ function overview(filter: HarnessStatsFilter, scale: number): HarnessStatsOvervi
   const list = revisions(scale);
   const current = filter.revision ?? list[0].key;
   const index = list.findIndex((item) => item.key === current);
-  const previous = index >= 0 ? list[index + 1]?.key ?? null : null;
-  return { flags: flags(scale), current, previous, metrics: metricsFor(current, scale), previousMetrics: previous ? metricsFor(previous, scale) : null };
+  const previous = index >= 0 ? (list[index + 1]?.key ?? null) : null;
+  return {
+    flags: flags(scale),
+    current,
+    previous,
+    metrics: metricsFor(current, scale),
+    previousMetrics: previous ? metricsFor(previous, scale) : null,
+  };
 }
 
 function versions(input: HarnessStatsQueryInput, scale: number): HarnessStatsVersions {
   const to = input.compare?.to ?? keyOf(12);
   const from = input.compare?.from ?? keyOf(11);
-  return { revisions: revisions(scale), from, to, fromMetrics: metricsFor(from, scale), toMetrics: metricsFor(to, scale) };
+  return {
+    revisions: revisions(scale),
+    from,
+    to,
+    fromMetrics: metricsFor(from, scale),
+    toMetrics: metricsFor(to, scale),
+  };
 }
 
 function options(): HarnessStatsOptions {
-  return { modes: ["default", "plan", "auto"], models: ["claude-sonnet-5-5", "claude-opus-5-5", "gpt-5.2"], revisions: revisions(2.6 * 1.3), currentRevision: CURRENT_REVISION };
+  return {
+    modes: ["default", "plan", "auto"],
+    models: ["claude-sonnet-5-5", "claude-opus-5-5", "gpt-5.2"],
+    revisions: revisions(2.6 * 1.3),
+    currentRevision: CURRENT_REVISION,
+  };
 }
 
 function dataFor(input: HarnessStatsQueryInput): HarnessStatsData {
   const scale = scaleOf(input.filter);
   switch (input.kind) {
-    case "options": return { kind: "options", value: options() };
-    case "overview": return { kind: "overview", value: overview(input.filter, scale) };
-    case "usage-vs": return { kind: "usage-vs", value: usageVs(scale) };
-    case "context": return { kind: "context", value: context(scale) };
-    case "disclosure": return { kind: "disclosure", value: disclosure(scale) };
-    case "plugins": return { kind: "plugins", value: plugins(input.filter) };
-    case "versions": return { kind: "versions", value: versions(input, scale) };
+    case "options":
+      return { kind: "options", value: options() };
+    case "overview":
+      return { kind: "overview", value: overview(input.filter, scale) };
+    case "usage-vs":
+      return { kind: "usage-vs", value: usageVs(scale) };
+    case "context":
+      return { kind: "context", value: context(scale) };
+    case "disclosure":
+      return { kind: "disclosure", value: disclosure(scale) };
+    case "plugins":
+      return { kind: "plugins", value: plugins(input.filter) };
+    case "versions":
+      return { kind: "versions", value: versions(input, scale) };
   }
 }
 

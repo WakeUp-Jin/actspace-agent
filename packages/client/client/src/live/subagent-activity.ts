@@ -11,11 +11,20 @@ export class SubagentActivity {
   model: string | undefined;
   accept(event: AgentLiveEvent): string {
     if (event.kind === "tool-prepared") {
-      const args = event.arguments && typeof event.arguments === "object" && !Array.isArray(event.arguments) ? event.arguments as Readonly<Record<string, unknown>> : {};
+      const args =
+        event.arguments && typeof event.arguments === "object" && !Array.isArray(event.arguments)
+          ? (event.arguments as Readonly<Record<string, unknown>>)
+          : {};
       const path = typeof args.path === "string" ? args.path.split(/[\\/]/).filter(Boolean).at(-1) : undefined;
       const detail = safeDetail(event.name === "grep" || event.name === "glob" ? args.pattern : path);
-      const verb = ({ read_file: "读取", list_directory: "查看目录", grep: "搜索", glob: "查找" } as Record<string, string>)[event.name] ?? "执行工具";
-      this.tools.set(event.callId, { active: `正在${verb}${detail ? ` · ${detail}` : ""}`, recent: `刚${verb}${detail ? ` ${detail}` : ""}` });
+      const verb =
+        ({ read_file: "读取", list_directory: "查看目录", grep: "搜索", glob: "查找" } as Record<string, string>)[
+          event.name
+        ] ?? "执行工具";
+      this.tools.set(event.callId, {
+        active: `正在${verb}${detail ? ` · ${detail}` : ""}`,
+        recent: `刚${verb}${detail ? ` ${detail}` : ""}`,
+      });
     } else if (event.kind === "tool-started") {
       if (!this.tools.has(event.callId)) this.tools.set(event.callId, { active: "正在执行工具", recent: "刚执行工具" });
     } else if (event.kind === "tool-finished") {
@@ -31,7 +40,14 @@ export class SubagentActivity {
       if (["completed", "failed", "aborted", "step-limit"].includes(event.message)) {
         this.tools.clear();
         this.recent = "";
-        this.label = event.message === "completed" ? "正在交回结果" : event.message === "step-limit" ? "达到执行步数上限" : event.message === "aborted" ? "已停止" : "执行失败";
+        this.label =
+          event.message === "completed"
+            ? "正在交回结果"
+            : event.message === "step-limit"
+              ? "达到执行步数上限"
+              : event.message === "aborted"
+                ? "已停止"
+                : "执行失败";
       }
     }
     const active = [...this.tools.values()];
@@ -43,6 +59,14 @@ export class SubagentActivity {
 
 function safeDetail(value: unknown): string {
   // Hide credential-shaped values, not ordinary names such as token-usage.ts.
-  if (typeof value !== "string" || /(?:api[_-]?key|secret|password|token)\s*[=:]\s*\S|bearer\s+\S|\bsk-[a-z0-9_-]{16,}/i.test(value)) return "";
-  return value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 72);
+  if (
+    typeof value !== "string" ||
+    /(?:api[_-]?key|secret|password|token)\s*[=:]\s*\S|bearer\s+\S|\bsk-[a-z0-9_-]{16,}/i.test(value)
+  )
+    return "";
+  return value
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 72);
 }

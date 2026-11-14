@@ -261,4 +261,3 @@ export interface SpaceDemoStore {
   /** 清掉所有挂起的定时器，测试和卸载时用 */
   dispose(): void;
 }
-

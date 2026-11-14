@@ -3,7 +3,11 @@ import * as nodePath from "node:path";
 import { basename, dirname, join, resolve } from "node:path";
 import { isLexicallyInside, type WorkspaceRegistry } from "@actspace/shared";
 import type { AppDataRoots } from "./app-paths";
-import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection, type WorkspaceRegistryOptions } from "./workspace-registry-service";
+import {
+  readWorkspaceRegistry,
+  resolveRegisteredWorkspaceSelection,
+  type WorkspaceRegistryOptions,
+} from "./workspace-registry-service";
 
 export const WORKSPACE_NOT_REGISTERED = "workspace_not_registered";
 
@@ -39,14 +43,22 @@ export async function resolveWorkspaceAccess(
   const realRequested = await realpathOrNull(requested);
   if (!realRequested) throw new WorkspaceAccessError(requested);
 
-  if (await matchesAny(registry.items.map((item) => item.path), realRequested)) return realRequested;
+  if (
+    await matchesAny(
+      registry.items.map((item) => item.path),
+      realRequested,
+    )
+  )
+    return realRequested;
   // 会话列表只在 registry 没命中时才读，绝大多数请求走不到这里。
   if (await matchesAny(await deps.listSessionWorkspaceRoots(), realRequested)) return realRequested;
   throw new WorkspaceAccessError(requested);
 }
 
 async function matchesAny(candidates: readonly (string | null | undefined)[], realRequested: string): Promise<boolean> {
-  const unique = new Set(candidates.filter((path): path is string => typeof path === "string" && path.trim().length > 0));
+  const unique = new Set(
+    candidates.filter((path): path is string => typeof path === "string" && path.trim().length > 0),
+  );
   for (const candidate of unique) {
     if ((await realpathOrNull(candidate)) === realRequested) return true;
   }
@@ -83,7 +95,9 @@ export function createWorkspaceAccessDeps(
  * （不做 realpath，侧栏按这个字符串给会话分组）。
  */
 export async function registeredWorkspaceRoot(options: WorkspaceRegistryOptions, requested?: string): Promise<string> {
-  const resolved = await resolveRegisteredWorkspaceSelection(options, { workspaceRoot: requested ?? options.defaultWorkspaceRoot });
+  const resolved = await resolveRegisteredWorkspaceSelection(options, {
+    workspaceRoot: requested ?? options.defaultWorkspaceRoot,
+  });
   if (resolved.ok === false) throw new Error(resolved.error);
   return resolved.workspaceRoot;
 }

@@ -20,7 +20,8 @@ const ALLOWED = [/^main\.tsx$/, /^api\/bridge\.ts$/, /^mock\//, /^test\//];
 const BRIDGE_IMPORT_ALLOWED = [/^api\//, /^main\.tsx$/, /^bridge-bootstrap\.ts$/, /^mock\//, /^test\//];
 
 /** 相对路径导入 `…/api/bridge`：`from "…"`、`import("…")`、`vi.mock("…")` 之外的裸 `import "…"`。 */
-const BRIDGE_IMPORT_PATTERN = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["'`]((?:\.{1,2}\/)+(?:[\w.-]+\/)*api\/bridge(?:\.ts)?)["'`]/g;
+const BRIDGE_IMPORT_PATTERN =
+  /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["'`]((?:\.{1,2}\/)+(?:[\w.-]+\/)*api\/bridge(?:\.ts)?)["'`]/g;
 
 const ACCESS_PATTERNS = [
   /(?<=[\w$)\]])\s*\??\.\s*(actspace(?:Hosts)?)(?![\w$-])/g,

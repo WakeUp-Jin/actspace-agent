@@ -13,7 +13,10 @@ const INPUT_CLASS =
 
 function lastLineRectOf(range: Range | null): DOMRect | null {
   if (!range) return null;
-  const rects = typeof range.getClientRects === "function" ? Array.from(range.getClientRects()).filter((rect) => rect.width > 0) : [];
+  const rects =
+    typeof range.getClientRects === "function"
+      ? Array.from(range.getClientRects()).filter((rect) => rect.width > 0)
+      : [];
   return rects[rects.length - 1] ?? null;
 }
 
@@ -84,7 +87,9 @@ function CommentPopover({
 
   // 锚在原文最后一行左下方（左移 4px 与文字对齐）。contextElement 让 Radix 跟着消息区滚动重新定位。
   const range = resolveRange(draft);
-  const anchorRef = useRef<{ getBoundingClientRect: () => DOMRect; contextElement?: Element }>({ getBoundingClientRect: () => new DOMRect() });
+  const anchorRef = useRef<{ getBoundingClientRect: () => DOMRect; contextElement?: Element }>({
+    getBoundingClientRect: () => new DOMRect(),
+  });
   anchorRef.current = {
     getBoundingClientRect: () => {
       const rect = lastLineRectOf(resolveRange(draft));
@@ -101,7 +106,11 @@ function CommentPopover({
       const rect = lastLineRectOf(resolveRange(draft));
       const viewport = scrollContainerRef.current?.getBoundingClientRect();
       const visible = rect !== null && (!viewport || (rect.bottom > viewport.top && rect.top < viewport.bottom));
-      setPlacement((current) => (current.anchored === (rect !== null) && current.visible === visible ? current : { anchored: rect !== null, visible }));
+      setPlacement((current) =>
+        current.anchored === (rect !== null) && current.visible === visible
+          ? current
+          : { anchored: rect !== null, visible },
+      );
     };
     const schedule = () => {
       if (frame === null) frame = window.requestAnimationFrame(measure);
@@ -180,7 +189,8 @@ function CommentPopover({
             value={value}
             onChange={(event) => setValue(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229) return;
+              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229)
+                return;
               event.preventDefault();
               submit();
             }}

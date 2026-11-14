@@ -5,25 +5,41 @@ import type { SettingsService } from "../settings-service";
 import type { DesktopRuntimeRegistry } from "./runtime-registry";
 import { createIpcRegistrar } from "../ipc/registry";
 
-export function registerEnglishLearningIpc(options: { registry: DesktopRuntimeRegistry; settings: SettingsService; getMainWindow: () => BrowserWindow | null }): () => void {
+export function registerEnglishLearningIpc(options: {
+  registry: DesktopRuntimeRegistry;
+  settings: SettingsService;
+  getMainWindow: () => BrowserWindow | null;
+}): () => void {
   const { registry, settings } = options;
   const ipc = createIpcRegistrar({
     getWindow: options.getMainWindow,
     untrustedMessage: "无效的英语辅助学习请求来源。",
     // 内部错误不透传给 renderer，统一成一句可操作的提示。
     middleware: async (_call, next) => {
-      try { return await next(); }
-      catch { throw new Error("英语辅助学习操作失败，请检查会话与配置后重试。"); }
+      try {
+        return await next();
+      } catch {
+        throw new Error("英语辅助学习操作失败，请检查会话与配置后重试。");
+      }
     },
   });
   ipc.handle(contract.englishLearning.getState, () => registry.englishLearning().getState());
   ipc.handle(contract.englishLearning.setTarget, async (value: unknown) => {
     if (!value || typeof value !== "object") throw new Error("请选择有效会话。");
     const input = value as EnglishLearningTargetInput;
-    if (typeof input.enabled !== "boolean" || (input.sessionId !== null && (typeof input.sessionId !== "string" || input.sessionId.length > 200)) || (input.enabled && !input.sessionId)) throw new Error("请选择有效会话。");
+    if (
+      typeof input.enabled !== "boolean" ||
+      (input.sessionId !== null && (typeof input.sessionId !== "string" || input.sessionId.length > 200)) ||
+      (input.enabled && !input.sessionId)
+    )
+      throw new Error("请选择有效会话。");
     return registry.setEnglishLearningTarget(input, async () => {
       const snapshot = settings.getV4();
-      await settings.updateNamespaceV4({ expectedRevision: snapshot.revision, namespace: "general", patch: { englishLearning: { lastSessionId: input.sessionId } } });
+      await settings.updateNamespaceV4({
+        expectedRevision: snapshot.revision,
+        namespace: "general",
+        patch: { englishLearning: { lastSessionId: input.sessionId } },
+      });
     });
   });
   ipc.handle(contract.englishLearning.stopSpeech, () => registry.englishLearning().stop());

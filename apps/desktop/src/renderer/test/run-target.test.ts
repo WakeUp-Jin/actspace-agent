@@ -2,8 +2,27 @@ import { describe, expect, it } from "vitest";
 import { capabilitiesOf, localExecutionRoot, type RunTarget } from "../target/run-target";
 
 const local: RunTarget = { kind: "local", workspaceRoot: "/repo", branch: "main" };
-const worktree: RunTarget = { kind: "local", workspaceRoot: "/repo-wt", branch: "feature", worktree: { kind: "worktree", sourceWorkspaceRoot: "/repo", workspaceRoot: "/repo-wt", baseBranch: "main", branch: "feature", baseCommit: "abc", createdAt: "2026-10-06T00:00:00Z" } };
-const remote: RunTarget = { kind: "remote", hostId: "server", hostName: "Cloud", workspaceId: "w1", workspaceName: "api" };
+const worktree: RunTarget = {
+  kind: "local",
+  workspaceRoot: "/repo-wt",
+  branch: "feature",
+  worktree: {
+    kind: "worktree",
+    sourceWorkspaceRoot: "/repo",
+    workspaceRoot: "/repo-wt",
+    baseBranch: "main",
+    branch: "feature",
+    baseCommit: "abc",
+    createdAt: "2026-10-06T00:00:00Z",
+  },
+};
+const remote: RunTarget = {
+  kind: "remote",
+  hostId: "server",
+  hostName: "Cloud",
+  workspaceId: "w1",
+  workspaceName: "api",
+};
 
 describe("capabilitiesOf", () => {
   it("uses the worktree execution root and never a local fallback for a remote target", () => {
@@ -14,7 +33,8 @@ describe("capabilitiesOf", () => {
   });
   it("enables everything for a local Git workspace and keeps attachments to images", () => {
     const capabilities = capabilitiesOf(local, { gitStatus: "ready" });
-    for (const key of ["newWorktree", "branchSwitch", "localFileOpen", "workspacePanels", "review"] as const) expect(capabilities[key]).toEqual({ enabled: true });
+    for (const key of ["newWorktree", "branchSwitch", "localFileOpen", "workspacePanels", "review"] as const)
+      expect(capabilities[key]).toEqual({ enabled: true });
     expect(capabilities.attachments).toEqual({ images: true, files: false });
   });
 
@@ -25,7 +45,10 @@ describe("capabilitiesOf", () => {
     expect(capabilities.branchSwitch.enabled).toBe(false);
     expect(capabilities.workspacePanels.enabled).toBe(true);
     expect(capabilitiesOf(local, { gitStatus: "no_head" }).branchSwitch.enabled).toBe(true);
-    expect(capabilitiesOf(local, { gitStatus: "no_head" }).newWorktree).toEqual({ enabled: false, reason: "需要先创建提交" });
+    expect(capabilitiesOf(local, { gitStatus: "no_head" }).newWorktree).toEqual({
+      enabled: false,
+      reason: "需要先创建提交",
+    });
   });
 
   it("treats a worktree session like the local machine", () => {
@@ -35,7 +58,8 @@ describe("capabilitiesOf", () => {
   it("disables local-only actions on a remote target and says why", () => {
     const capabilities = capabilitiesOf(remote, { gitStatus: "ready" });
     expect(capabilities.newWorktree).toEqual({ enabled: false, reason: "远端机器暂不支持" });
-    for (const key of ["branchSwitch", "localFileOpen", "workspacePanels", "review"] as const) expect(capabilities[key]).toEqual({ enabled: false, reason: "远端机器暂不支持" });
+    for (const key of ["branchSwitch", "localFileOpen", "workspacePanels", "review"] as const)
+      expect(capabilities[key]).toEqual({ enabled: false, reason: "远端机器暂不支持" });
     expect(capabilities.attachments).toEqual({ images: true, files: true });
   });
 

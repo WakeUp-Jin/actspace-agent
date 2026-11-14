@@ -70,7 +70,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   const latest = useRef({ value, mode, readOnly, host, onChange, onSave, onRevealed });
   latest.current = { value, mode, readOnly, host, onChange, onSave, onRevealed };
 
-  const outline = useRef<{ listeners: Set<(items: OutlineItem[]) => void>; last: OutlineItem[] }>({ listeners: new Set(), last: [] });
+  const outline = useRef<{ listeners: Set<(items: OutlineItem[]) => void>; last: OutlineItem[] }>({
+    listeners: new Set(),
+    last: [],
+  });
   const notifyOutline = () => {
     const view = viewRef.current;
     const state = outline.current;
@@ -148,24 +151,30 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     latest.current.onRevealed?.();
   }, [revealId, revealTarget]);
 
-  useImperativeHandle(ref, () => ({
-    getOutline: () => (viewRef.current ? getOutline(viewRef.current.state) : []),
-    subscribeOutline(listener) {
-      const state = outline.current;
-      if (state.listeners.size === 0 && viewRef.current) state.last = getOutline(viewRef.current.state);
-      state.listeners.add(listener);
-      return () => { state.listeners.delete(listener); };
-    },
-    scrollToHeading(item) {
-      if (viewRef.current) scrollToPos(viewRef.current, item.from, { smooth: true, margin: 12 });
-    },
-    scrollToLine(line) {
-      if (viewRef.current) scrollToLine(viewRef.current, line);
-    },
-    focus() {
-      viewRef.current?.focus();
-    },
-  }), []);
+  useImperativeHandle(
+    ref,
+    () => ({
+      getOutline: () => (viewRef.current ? getOutline(viewRef.current.state) : []),
+      subscribeOutline(listener) {
+        const state = outline.current;
+        if (state.listeners.size === 0 && viewRef.current) state.last = getOutline(viewRef.current.state);
+        state.listeners.add(listener);
+        return () => {
+          state.listeners.delete(listener);
+        };
+      },
+      scrollToHeading(item) {
+        if (viewRef.current) scrollToPos(viewRef.current, item.from, { smooth: true, margin: 12 });
+      },
+      scrollToLine(line) {
+        if (viewRef.current) scrollToLine(viewRef.current, line);
+      },
+      focus() {
+        viewRef.current?.focus();
+      },
+    }),
+    [],
+  );
 
   return (
     <>

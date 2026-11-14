@@ -5,7 +5,14 @@ import { SessionDefaultsSection } from "../components/settings/sections/SessionD
 import type { SectionProps } from "../components/settings/sections/shared";
 
 function renderSection(defaultPermissionMode?: string, onUpdateNamespace = vi.fn(async () => undefined)) {
-  const props = { settingsV4: { version: 4, revision: "r", settings: { general: defaultPermissionMode ? { defaultPermissionMode } : {} } }, onUpdateNamespace } as unknown as SectionProps;
+  const props = {
+    settingsV4: {
+      version: 4,
+      revision: "r",
+      settings: { general: defaultPermissionMode ? { defaultPermissionMode } : {} },
+    },
+    onUpdateNamespace,
+  } as unknown as SectionProps;
   render(<SessionDefaultsSection {...props} />);
   return { onUpdateNamespace };
 }
@@ -17,7 +24,10 @@ describe("设置 → 通用 → 新会话默认权限", () => {
     expect(select).toHaveTextContent("自动");
     await userEvent.click(select);
     await userEvent.click(screen.getByRole("option", { name: "替我审批" }));
-    expect(onUpdateNamespace).toHaveBeenCalledWith({ namespace: "general", patch: { defaultPermissionMode: "auto-review" } });
+    expect(onUpdateNamespace).toHaveBeenCalledWith({
+      namespace: "general",
+      patch: { defaultPermissionMode: "auto-review" },
+    });
     expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
@@ -33,12 +43,20 @@ describe("设置 → 通用 → 新会话默认权限", () => {
     await userEvent.click(screen.getByRole("combobox", { name: "新会话默认权限" }));
     await userEvent.click(screen.getByRole("option", { name: "完全权限" }));
     await userEvent.click(await screen.findByRole("button", { name: "开启" }));
-    expect(onUpdateNamespace).toHaveBeenCalledWith({ namespace: "general", patch: { defaultPermissionMode: "full-access" } });
+    expect(onUpdateNamespace).toHaveBeenCalledWith({
+      namespace: "general",
+      patch: { defaultPermissionMode: "full-access" },
+    });
     await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   });
 
   it("keeps the dialog open with the reason when saving fails", async () => {
-    renderSection("default", vi.fn(async () => { throw new Error("磁盘只读"); }));
+    renderSection(
+      "default",
+      vi.fn(async () => {
+        throw new Error("磁盘只读");
+      }),
+    );
     await userEvent.click(screen.getByRole("combobox", { name: "新会话默认权限" }));
     await userEvent.click(screen.getByRole("option", { name: "完全权限" }));
     await userEvent.click(await screen.findByRole("button", { name: "开启" }));

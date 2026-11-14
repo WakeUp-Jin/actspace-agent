@@ -3,7 +3,12 @@ import { PLUGIN_CATALOG } from "../plugin-catalog.js";
 
 /** An optional service is injected when present; `fallback` states what the entry does without it. */
 export type DefaultHarnessOptionalInject = { readonly id: string; readonly fallback: string };
-export type DefaultHarnessEntry = readonly [id: string, provides: readonly string[], injects: readonly string[], optionalInjects?: readonly DefaultHarnessOptionalInject[]];
+export type DefaultHarnessEntry = readonly [
+  id: string,
+  provides: readonly string[],
+  injects: readonly string[],
+  optionalInjects?: readonly DefaultHarnessOptionalInject[],
+];
 
 /** Plugin id of the kernel artifact: every Harness entry that is not a tool plugin (`isHarnessToolPlugin`). */
 export const DEFAULT_HARNESS_KERNEL_ID = "actspace.default-harness";
@@ -16,15 +21,16 @@ const OPTIONAL_INJECT_FALLBACKS: Readonly<Record<string, string>> = Object.freez
 });
 
 function optionalInjects(entryId: string, ids: readonly string[]): readonly DefaultHarnessOptionalInject[] {
-  return ids.map(id => {
+  return ids.map((id) => {
     const fallback = OPTIONAL_INJECT_FALLBACKS[id];
-    if (fallback === undefined) throw new Error(`Plugin ${entryId} has optional inject ${id} without a documented fallback.`);
+    if (fallback === undefined)
+      throw new Error(`Plugin ${entryId} has optional inject ${id} without a documented fallback.`);
     return { id, fallback };
   });
 }
 
 export const DEFAULT_HARNESS_ENTRIES: readonly DefaultHarnessEntry[] = Object.freeze(
-  PLUGIN_CATALOG.filter(entry => entry.loaders.includes("harness")).map((entry): DefaultHarnessEntry => {
+  PLUGIN_CATALOG.filter((entry) => entry.loaders.includes("harness")).map((entry): DefaultHarnessEntry => {
     const behavior = entry.manifest.behaviors[0];
     const optional = optionalInjects(entry.id, behavior.optionalInjects ?? []);
     return optional.length === 0

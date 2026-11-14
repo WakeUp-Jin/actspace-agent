@@ -32,21 +32,24 @@ describe("writeArtifacts", () => {
         },
       ],
       finalText: "Done",
-      contextSnapshots: [{
-        id: "001-final",
-        kind: "final",
-        messageCount: 1,
-        tokenEstimate: 2,
-        compacted: false,
-        toolCallIds: [],
-        messages: [{ role: "user", content: "Say hi", timestamp: 1 }],
-      }],
+      contextSnapshots: [
+        {
+          id: "001-final",
+          kind: "final",
+          messageCount: 1,
+          tokenEstimate: 2,
+          compacted: false,
+          toolCallIds: [],
+          messages: [{ role: "user", content: "Say hi", timestamp: 1 }],
+        },
+      ],
     });
 
     await expect(readFile(join(outDir, "result.json"), "utf8")).resolves.toContain('"ok": true');
     await expect(readFile(join(outDir, "trace.jsonl"), "utf8")).resolves.toContain('"source":"runtime"');
     await expect(readFile(join(outDir, "final-response.md"), "utf8")).resolves.toBe("Done");
-    await expect(readFile(join(outDir, "context-snapshots", "001-final.json"), "utf8"))
-      .resolves.toContain('"messageCount": 1');
+    await expect(readFile(join(outDir, "context-snapshots", "001-final.json"), "utf8")).resolves.toContain(
+      '"messageCount": 1',
+    );
   });
 });

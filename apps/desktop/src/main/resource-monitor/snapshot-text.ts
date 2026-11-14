@@ -23,7 +23,8 @@ export function formatKiB(kib: number): string {
 /** `footprint` 输出里每个进程的标题行：`Name [pid]: 64-bit    Footprint: 187 MB (16384 bytes per page)`。 */
 export function parseFootprint(stdout: string): Map<number, string> {
   const result = new Map<number, string>();
-  for (const match of stdout.matchAll(/\[(\d+)\]:.*?Footprint:\s*([\d.]+\s*[KMG]?B)/g)) result.set(Number(match[1]), match[2]!.replace(/\s+/g, " "));
+  for (const match of stdout.matchAll(/\[(\d+)\]:.*?Footprint:\s*([\d.]+\s*[KMG]?B)/g))
+    result.set(Number(match[1]), match[2]!.replace(/\s+/g, " "));
   return result;
 }
 
@@ -47,13 +48,17 @@ export function formatResourceSnapshot(context: SnapshotContext): string {
   ];
   for (const group of sample.groups) {
     const unavailable = group.id === "agent" && !sample.agentProcessesAvailable;
-    lines.push(unavailable
-      ? `${RESOURCE_GROUP_LABELS[group.id]}  —（当前平台不统计）`
-      : `${RESOURCE_GROUP_LABELS[group.id]}  CPU ${formatCpu(group.cpuPercent)} · 内存 ${formatKiB(group.rssKiB)}`);
+    lines.push(
+      unavailable
+        ? `${RESOURCE_GROUP_LABELS[group.id]}  —（当前平台不统计）`
+        : `${RESOURCE_GROUP_LABELS[group.id]}  CPU ${formatCpu(group.cpuPercent)} · 内存 ${formatKiB(group.rssKiB)}`,
+    );
     for (const row of group.processes) {
       const footprint = context.footprint instanceof Map ? context.footprint.get(row.pid) : undefined;
       const name = row.count > 1 ? `${row.label} ×${row.count}` : row.label;
-      lines.push(`  ${name}  pid ${row.pid}  CPU ${formatCpu(row.cpuPercent)} · RSS ${formatKiB(row.rssKiB)}${footprint ? ` · footprint ${footprint}` : ""}`);
+      lines.push(
+        `  ${name}  pid ${row.pid}  CPU ${formatCpu(row.cpuPercent)} · RSS ${formatKiB(row.rssKiB)}${footprint ? ` · footprint ${footprint}` : ""}`,
+      );
     }
   }
   if (context.footprint instanceof Error) lines.push("", `footprint 读取失败：${context.footprint.message}`);

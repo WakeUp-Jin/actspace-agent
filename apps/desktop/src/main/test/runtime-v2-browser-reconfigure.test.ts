@@ -9,7 +9,9 @@ import { DesktopRuntimeRegistry, type DesktopRuntimeRegistryOptions } from "../r
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => { resolve = done; });
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
   return { promise, resolve };
 }
 
@@ -26,41 +28,96 @@ describe("Browser Runtime restart admission", () => {
     const dataRoot = await mkdtemp("/tmp/actspace-reconfigure-");
     rootsToRemove.push(dataRoot);
     let bridgeReady = blockedHarness;
-    const browser = { socketPath: "/tmp/test-browser.sock", getStatus: vi.fn(async () => ({ runState: "ready", bridgeReady })), setRuntimeReady: vi.fn() };
+    const browser = {
+      socketPath: "/tmp/test-browser.sock",
+      getStatus: vi.fn(async () => ({ runState: "ready", bridgeReady })),
+      setRuntimeReady: vi.fn(),
+    };
     const approvals = new PendingApprovalRegistry();
     const app = {
       updateSessionPermissionMode: vi.fn(async () => ({ throughJournalSeq: 2 })),
       taskCommand: vi.fn(async (_input: unknown) => ({ snapshot: {} })),
       submitTask: vi.fn(async () => ({ task: {} })),
-      browserAvailable: () => { if (blockedHarness) throw Object.assign(new Error("Harness recovery blocked"), { code: "RECOVERY_BLOCKED" }); return bridgeReady; },
+      browserAvailable: () => {
+        if (blockedHarness) throw Object.assign(new Error("Harness recovery blocked"), { code: "RECOVERY_BLOCKED" });
+        return bridgeReady;
+      },
       listSessions: vi.fn(async () => []),
       subscribeSessionProjection: vi.fn(() => vi.fn()),
       isIdleForReconfigure: vi.fn(async () => true),
       inspectSession: vi.fn(async () => ({ sessionId: "session", throughJournalSeq: 1 })),
       resumeMainSession: vi.fn(async () => ({ sessionId: "session", throughJournalSeq: 1 })),
     };
-    const learning = { getState: vi.fn(() => ({ enabled: true, targetSessionId: "session" })), subscribe: vi.fn(() => vi.fn()), dispose: vi.fn(async () => {}), enableSession: vi.fn(async () => {}) };
+    const learning = {
+      getState: vi.fn(() => ({ enabled: true, targetSessionId: "session" })),
+      subscribe: vi.fn(() => vi.fn()),
+      dispose: vi.fn(async () => {}),
+      enableSession: vi.fn(async () => {}),
+    };
     const shutdown = vi.fn(async () => {});
-    bootDesktopRuntime.mockImplementation(async () => ({ browserReady: bridgeReady, profile: {
-      context: { get: (name: string) => name === "desktop.app" ? app : name === "english-learning" ? learning : name === "tools.browser" ? { available: bridgeReady, registrations: [1], definitions: [1] } : undefined },
-      getState: () => ({ state: "ready", runtimeInstanceId: "test" }), shutdown,
-    } }));
-    const registry = new DesktopRuntimeRegistry({ roots: { dataRoot, workspaceRoot: join(dataRoot, "workspace"), defaultWorkspaceRoot: join(dataRoot, "workspace") }, ...(omitBrowser ? {} : { browser }), approvals, loadModule: async () => ({}) } as unknown as DesktopRuntimeRegistryOptions);
+    bootDesktopRuntime.mockImplementation(async () => ({
+      browserReady: bridgeReady,
+      profile: {
+        context: {
+          get: (name: string) =>
+            name === "desktop.app"
+              ? app
+              : name === "english-learning"
+                ? learning
+                : name === "tools.browser"
+                  ? { available: bridgeReady, registrations: [1], definitions: [1] }
+                  : undefined,
+        },
+        getState: () => ({ state: "ready", runtimeInstanceId: "test" }),
+        shutdown,
+      },
+    }));
+    const registry = new DesktopRuntimeRegistry({
+      roots: {
+        dataRoot,
+        workspaceRoot: join(dataRoot, "workspace"),
+        defaultWorkspaceRoot: join(dataRoot, "workspace"),
+      },
+      ...(omitBrowser ? {} : { browser }),
+      approvals,
+      loadModule: async () => ({}),
+    } as unknown as DesktopRuntimeRegistryOptions);
     registries.push(registry);
     await registry.boot();
-    return { registry, app, browser, approvals, learning, shutdown, connect: () => { bridgeReady = true; } };
+    return {
+      registry,
+      app,
+      browser,
+      approvals,
+      learning,
+      shutdown,
+      connect: () => {
+        bridgeReady = true;
+      },
+    };
   }
 
   it("leaves pending requests for Runtime policy re-evaluation when permission mode changes", async () => {
     const { registry, app, approvals } = await setup();
-    const pending = approvals.waitForDecision({ id: "pending", toolName: "bash", args: {}, summary: "test", reason: "test", sessionId: "session", agentRunId: "run", createdAt: Date.now() });
+    const pending = approvals.waitForDecision({
+      id: "pending",
+      toolName: "bash",
+      args: {},
+      summary: "test",
+      reason: "test",
+      sessionId: "session",
+      agentRunId: "run",
+      createdAt: Date.now(),
+    });
     try {
       await registry.updateSessionPermissionMode("session", "full-access");
       expect(app.updateSessionPermissionMode).toHaveBeenCalledWith("session", "full-access");
       expect(approvals.size).toBe(1);
       approvals.abortRequest("pending");
       await expect(pending).resolves.toMatchObject({ decision: "abort" });
-    } finally { approvals.expireAll(); }
+    } finally {
+      approvals.expireAll();
+    }
   });
 
   it("keeps the Host application available when Harness recovery blocks execution", async () => {
@@ -95,9 +152,10 @@ describe("Browser Runtime restart admission", () => {
     const gate = deferred<any>();
     if (operation === "submit") fixture.app.submitTask.mockReturnValueOnce(gate.promise);
     else fixture.app.taskCommand.mockReturnValueOnce(gate.promise);
-    const pending = operation === "submit"
-      ? fixture.registry.submitTask("session", "submission", "hello")
-      : fixture.registry.taskCommand({ op: "snapshot", sessionId: "session" });
+    const pending =
+      operation === "submit"
+        ? fixture.registry.submitTask("session", "submission", "hello")
+        : fixture.registry.taskCommand({ op: "snapshot", sessionId: "session" });
     expect(await fixture.registry.refreshBrowser()).toBe(false);
     expect(fixture.shutdown).not.toHaveBeenCalled();
     gate.resolve(operation === "submit" ? { task: {} } : { snapshot: {} });
@@ -109,12 +167,17 @@ describe("Browser Runtime restart admission", () => {
     const fixture = await setup();
     const entered = deferred<void>();
     const release = deferred<void>();
-    fixture.shutdown.mockImplementationOnce(async () => { entered.resolve(); await release.promise; });
+    fixture.shutdown.mockImplementationOnce(async () => {
+      entered.resolve();
+      await release.promise;
+    });
     fixture.registry.subscribeEnglishLearning(() => {});
     fixture.connect();
     const switching = fixture.registry.refreshBrowser();
     await entered.promise;
-    await expect(fixture.registry.submitTask("session", "submission", "blocked")).rejects.toThrow("reconnecting Chrome");
+    await expect(fixture.registry.submitTask("session", "submission", "blocked")).rejects.toThrow(
+      "reconnecting Chrome",
+    );
     expect(fixture.app.submitTask).not.toHaveBeenCalled();
     expect(bootDesktopRuntime).toHaveBeenCalledTimes(1);
     release.resolve();

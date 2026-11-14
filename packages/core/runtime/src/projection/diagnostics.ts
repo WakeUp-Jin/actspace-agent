@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { RuntimeDiagnostic, RuntimeDiagnosticSeverity, RuntimeDiagnosticSource, RuntimeDiagnosticsSnapshot, RuntimeJsonValue } from "@actspace/shared/runtime-v2";
+import type {
+  RuntimeDiagnostic,
+  RuntimeDiagnosticSeverity,
+  RuntimeDiagnosticSource,
+  RuntimeDiagnosticsSnapshot,
+  RuntimeJsonValue,
+} from "@actspace/shared/runtime-v2";
 import { redactProjectionText, toSafeJson } from "./redaction.js";
 
 export type DiagnosticInput = {
@@ -59,7 +65,12 @@ export class DiagnosticsCollector {
   }
 
   snapshot(): RuntimeDiagnosticsSnapshot {
-    return Object.freeze({ kind: "runtime-diagnostics", schemaVersion: 1, runtimeInstanceId: this.runtimeInstanceId, diagnostics: Object.freeze([...this.#diagnostics]) });
+    return Object.freeze({
+      kind: "runtime-diagnostics",
+      schemaVersion: 1,
+      runtimeInstanceId: this.runtimeInstanceId,
+      diagnostics: Object.freeze([...this.#diagnostics]),
+    });
   }
 
   #seenId(key: string): string {

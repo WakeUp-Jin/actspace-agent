@@ -22,17 +22,32 @@ const NOTE_CLASS = "m-0 px-3 py-1.5 text-center text-act-xxs text-text-faint";
  * 当前上下文、会话统计、路径、上下文明细、趋势、事件、Bash 命令七块。只看占用，会话原文在轨迹里读。
  * 后端 `describeContextPanel` 未实现时是过渡视图：没有对比、趋势和事件，底部写明。
  */
-export function ContextPanel({ sessionId, contextRevision, contextState, workspaceRoot }: {
+export function ContextPanel({
+  sessionId,
+  contextRevision,
+  contextState,
+  workspaceRoot,
+}: {
   sessionId: string | null;
   contextRevision?: number;
   contextState?: ContextState | null;
   workspaceRoot?: string;
 }) {
-  const { data, loading, error, retry, refresh, paging, loadMore } = useContextPanel({ sessionId, revision: contextRevision, fallbackState: contextState ?? null });
+  const { data, loading, error, retry, refresh, paging, loadMore } = useContextPanel({
+    sessionId,
+    revision: contextRevision,
+    fallbackState: contextState ?? null,
+  });
   const [focus, setFocus] = useState<string | null>(null);
   const [compare, setCompare] = useState(true);
   const view = data?.view ?? null;
-  const categories = useMemo(() => (view ? buildCategories(view, { compare: compare && view.previous !== null && view.previous.comparable !== false }) : []), [view, compare]);
+  const categories = useMemo(
+    () =>
+      view
+        ? buildCategories(view, { compare: compare && view.previous !== null && view.previous.comparable !== false })
+        : [],
+    [view, compare],
+  );
 
   if (!sessionId) return <div className={EMPTY_CLASS}>还没有上下文。</div>;
   const errorBar = error ? <ErrorBar message={error} onRetry={retry} /> : null;
@@ -50,7 +65,11 @@ export function ContextPanel({ sessionId, contextRevision, contextState, workspa
     <div className={BODY_CLASS} data-context-source={data?.source}>
       {errorBar}
       {status === "stale" || status === "recovering" ? (
-        <p className="mx-3 mb-0 mt-3 rounded-act-md bg-warning-soft px-2.5 py-2 text-act-xxs text-warning">{view.current.basis === "last-request" ? "当前 Context 尚未加载，以下显示最近请求输入。" : "上下文正在重建，数字可能滞后。"}</p>
+        <p className="mx-3 mb-0 mt-3 rounded-act-md bg-warning-soft px-2.5 py-2 text-act-xxs text-warning">
+          {view.current.basis === "last-request"
+            ? "当前 Context 尚未加载，以下显示最近请求输入。"
+            : "上下文正在重建，数字可能滞后。"}
+        </p>
       ) : null}
       {status === "unavailable" ? (
         <div className={EMPTY_CLASS}>当前没有可展示的上下文。</div>
@@ -58,18 +77,43 @@ export function ContextPanel({ sessionId, contextRevision, contextState, workspa
         <ContextOverview view={view} categories={categories} focus={focus} onFocus={setFocus} />
       )}
       {view.history?.error ? <ErrorBar message={view.history.error} onRetry={retry} /> : null}
-      {view.history?.status === "syncing" || view.history?.status === "rebuilding" ? <p className={NOTE_CLASS}>历史索引同步中（已处理 {Math.max(0, view.history.indexedThroughSeq + 1)} / {Math.max(0, view.history.targetThroughSeq + 1)} 条记录），完整统计稍后显示。</p> : null}
+      {view.history?.status === "syncing" || view.history?.status === "rebuilding" ? (
+        <p className={NOTE_CLASS}>
+          历史索引同步中（已处理 {Math.max(0, view.history.indexedThroughSeq + 1)} /{" "}
+          {Math.max(0, view.history.targetThroughSeq + 1)} 条记录），完整统计稍后显示。
+        </p>
+      ) : null}
       <ContextStats stats={view.stats} />
-      {data?.source === "backend" ? <ContextPaths sessionId={sessionId} disclosure={view.disclosure} workspaceRoot={workspaceRoot} onStale={refresh} /> : null}
+      {data?.source === "backend" ? (
+        <ContextPaths
+          sessionId={sessionId}
+          disclosure={view.disclosure}
+          workspaceRoot={workspaceRoot}
+          onStale={refresh}
+        />
+      ) : null}
       {status === "unavailable" ? null : (
-        <ContextBrowser view={view} categories={categories} compare={compare} onCompareChange={setCompare} focus={focus} paging={paging} onLoadMore={loadMore} />
+        <ContextBrowser
+          view={view}
+          categories={categories}
+          compare={compare}
+          onCompareChange={setCompare}
+          focus={focus}
+          paging={paging}
+          onLoadMore={loadMore}
+        />
       )}
       {data?.source === "backend" ? (
         <>
           <ContextTrend points={view.trend} />
           <ContextEvents events={view.events} />
           {view.bash ? <ContextBash stats={view.bash} /> : null}
-          {view.limits?.trend.truncated || view.limits?.events.truncated ? <p className={NOTE_CLASS}>展示最近 {view.limits.trend.returnedCount} 次请求、{view.limits.events.returnedCount} 个事件；会话统计包含全部历史。</p> : null}
+          {view.limits?.trend.truncated || view.limits?.events.truncated ? (
+            <p className={NOTE_CLASS}>
+              展示最近 {view.limits.trend.returnedCount} 次请求、{view.limits.events.returnedCount}{" "}
+              个事件；会话统计包含全部历史。
+            </p>
+          ) : null}
         </>
       ) : (
         <p className={NOTE_CLASS}>趋势、事件、路径和 Bash 命令需要后端数据，暂未提供</p>
@@ -81,15 +125,22 @@ export function ContextPanel({ sessionId, contextRevision, contextState, workspa
 
 function ErrorBar({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div role="alert" className="mx-3 mt-3 flex items-start gap-2 rounded-act-md bg-danger-soft px-2.5 py-1.5 text-act-xs text-danger">
+    <div
+      role="alert"
+      className="mx-3 mt-3 flex items-start gap-2 rounded-act-md bg-danger-soft px-2.5 py-1.5 text-act-xs text-danger"
+    >
       <div className="min-w-0 flex-1">
         <p className="m-0">上下文读取失败，请重试。</p>
         <details className="mt-1">
-          <summary className="cursor-pointer focus-visible:outline-2 focus-visible:outline-focus-ring">错误详情</summary>
+          <summary className="cursor-pointer focus-visible:outline-2 focus-visible:outline-focus-ring">
+            错误详情
+          </summary>
           <p className="m-0 mt-1 whitespace-pre-wrap break-all">{message}</p>
         </details>
       </div>
-      <Button variant="secondary" size="xs" className="shrink-0" onClick={onRetry}>重试</Button>
+      <Button variant="secondary" size="xs" className="shrink-0" onClick={onRetry}>
+        重试
+      </Button>
     </div>
   );
 }

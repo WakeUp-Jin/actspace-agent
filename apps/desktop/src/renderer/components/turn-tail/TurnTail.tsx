@@ -13,7 +13,13 @@ import { useShowTurnCodeChanges } from "../conversation/display-settings";
  * 轮尾：本轮代码改动卡 →「present」交付卡 → 生成的图片，排在最终回复之后、回复操作之前。
  * 改动卡可在设置「显示本轮代码改动」里关掉；交付卡和图片不受影响。
  */
-export function TurnTail({ turnId, turnNumber, messages, sessionId, workspaceRoot }: {
+export function TurnTail({
+  turnId,
+  turnNumber,
+  messages,
+  sessionId,
+  workspaceRoot,
+}: {
   turnId: string;
   /** 从 1 开始的轮次；历史没加载全时为空，Review 标签改叫「本轮改动」。 */
   turnNumber?: number;
@@ -56,8 +62,18 @@ export function TurnTail({ turnId, turnNumber, messages, sessionId, workspaceRoo
   return (
     <>
       <div className="mx-[var(--conversation-text-inset)] mt-3 flex min-w-0 flex-col gap-2.5" data-turn-tail>
-        {visibleChanges ? <TurnChangesCard changes={visibleChanges} onOpenReview={openReview} onFileContextMenu={(file) => void showFileMenu(file)} /> : null}
-        {menuError ? <p className="m-0 text-act-xs leading-4 text-danger" role="alert">{menuError}</p> : null}
+        {visibleChanges ? (
+          <TurnChangesCard
+            changes={visibleChanges}
+            onOpenReview={openReview}
+            onFileContextMenu={(file) => void showFileMenu(file)}
+          />
+        ) : null}
+        {menuError ? (
+          <p className="m-0 text-act-xs leading-4 text-danger" role="alert">
+            {menuError}
+          </p>
+        ) : null}
         <TurnDeliverables files={presented} sessionId={sessionId} workspaceRoot={workspaceRoot} />
       </div>
       <TurnOutputArtifacts messages={messages} sessionId={sessionId} />

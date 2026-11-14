@@ -5,12 +5,30 @@ import { LlmRuntimeService } from "../service.js";
 import type { LlmStreamEvent } from "../stream.js";
 
 describe("LLM service plugin", () => {
-
   it("owns routes through a real Cordis Service and releases provider registrations with the fiber", async () => {
     const ctx = new CordisContextClass();
     const host = {
       credentials: { resolve: async () => ({ apiKey: "test" }) },
-      routes: [{ routeId: "test", providerId: "fixture", modelPattern: "*", credentialRef: "fixture", defaults: {}, adapter: { adapterVersion: "fixture", dispatch: async function* (): AsyncIterable<LlmStreamEvent> { yield { type: "done", stopReason: "stop", usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }, content: [] }; } } }],
+      routes: [
+        {
+          routeId: "test",
+          providerId: "fixture",
+          modelPattern: "*",
+          credentialRef: "fixture",
+          defaults: {},
+          adapter: {
+            adapterVersion: "fixture",
+            dispatch: async function* (): AsyncIterable<LlmStreamEvent> {
+              yield {
+                type: "done",
+                stopReason: "stop",
+                usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+                content: [],
+              };
+            },
+          },
+        },
+      ],
     };
     ctx.provide(LLM_HOST_PORT_ID, host);
     await ctx.plugin({ apply: (inner) => apply(inner as never) });

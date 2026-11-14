@@ -37,7 +37,12 @@ export function isVisible(element: Element): boolean {
   if (!element.isConnected) return false;
   if (element.hasAttribute("hidden") || element.getAttribute("aria-hidden") === "true") return false;
   const style = element.ownerDocument.defaultView?.getComputedStyle(element) ?? getComputedStyle(element);
-  if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse" || Number(style.opacity) === 0) {
+  if (
+    style.display === "none" ||
+    style.visibility === "hidden" ||
+    style.visibility === "collapse" ||
+    Number(style.opacity) === 0
+  ) {
     return false;
   }
   const rect = element.getBoundingClientRect();
@@ -54,7 +59,8 @@ export function isEnabled(element: Element): boolean {
   if (element.getAttribute("aria-disabled") === "true" || element.closest('[aria-disabled="true"]')) return false;
   if ("disabled" in element && Boolean((element as Element & { disabled?: boolean }).disabled)) return false;
   const disabledFieldset = element.closest("fieldset:disabled");
-  if (disabledFieldset && !element.closest("legend")?.isSameNode(disabledFieldset.querySelector("legend"))) return false;
+  if (disabledFieldset && !element.closest("legend")?.isSameNode(disabledFieldset.querySelector("legend")))
+    return false;
   return true;
 }
 
@@ -64,7 +70,10 @@ export function isEditable(element: Element): boolean {
   if (tagName === "textarea") return !(element as HTMLTextAreaElement).readOnly;
   if (tagName === "input") {
     const input = element as HTMLInputElement;
-    return !input.readOnly && !["button", "checkbox", "file", "hidden", "image", "radio", "reset", "submit"].includes(input.type);
+    return (
+      !input.readOnly &&
+      !["button", "checkbox", "file", "hidden", "image", "radio", "reset", "submit"].includes(input.type)
+    );
   }
   return Boolean((element as HTMLElement).isContentEditable);
 }
@@ -115,8 +124,9 @@ export function composedText(element: Element, excludedSubtree?: Element): strin
     const isElementNode = node.nodeType === 1;
     const isShadowRootNode = node.nodeType === 11 && "host" in node;
     if (!isElementNode && !isShadowRootNode) return;
-    const nodeElement = isElementNode ? node as Element : undefined;
-    if (nodeElement && (nodeElement.hasAttribute("hidden") || nodeElement.getAttribute("aria-hidden") === "true")) return;
+    const nodeElement = isElementNode ? (node as Element) : undefined;
+    if (nodeElement && (nodeElement.hasAttribute("hidden") || nodeElement.getAttribute("aria-hidden") === "true"))
+      return;
     if (nodeElement?.tagName.toLowerCase() === "slot" && "assignedNodes" in nodeElement) {
       const assigned = (nodeElement as HTMLSlotElement).assignedNodes({ flatten: true });
       for (const assignedNode of assigned.length > 0 ? assigned : Array.from(node.childNodes)) visit(assignedNode);
@@ -174,8 +184,10 @@ export function delay(milliseconds: number): Promise<void> {
 
 function sameBox(left: ElementBox, right: ElementBox): boolean {
   const epsilon = 0.25;
-  return Math.abs(left.x - right.x) <= epsilon
-    && Math.abs(left.y - right.y) <= epsilon
-    && Math.abs(left.width - right.width) <= epsilon
-    && Math.abs(left.height - right.height) <= epsilon;
+  return (
+    Math.abs(left.x - right.x) <= epsilon &&
+    Math.abs(left.y - right.y) <= epsilon &&
+    Math.abs(left.width - right.width) <= epsilon &&
+    Math.abs(left.height - right.height) <= epsilon
+  );
 }

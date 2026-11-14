@@ -13,8 +13,22 @@ import {
 } from "../components/right-panel/side-chat/side-chat-transcript";
 
 const createdAt = "2026-10-21T00:00:00.000Z";
-const user = (id: string, content: string, sourceSeq?: number, runId?: string): MessageBlock => ({ kind: "user", id, content, createdAt, sourceSeq, runId });
-const assistant = (id: string, sourceSeq?: number, runId?: string): MessageBlock => ({ kind: "assistant", id, content: id, createdAt, sourceSeq, runId });
+const user = (id: string, content: string, sourceSeq?: number, runId?: string): MessageBlock => ({
+  kind: "user",
+  id,
+  content,
+  createdAt,
+  sourceSeq,
+  runId,
+});
+const assistant = (id: string, sourceSeq?: number, runId?: string): MessageBlock => ({
+  kind: "assistant",
+  id,
+  content: id,
+  createdAt,
+  sourceSeq,
+  runId,
+});
 
 function eventWindow(types: readonly string[], fromSeq = 0, turnOffset = 0): RuntimeEventWindow {
   return {
@@ -48,7 +62,16 @@ describe("side chat transcript", () => {
   });
 
   it("counts inherited turns from the side chat's own window", () => {
-    const window = eventWindow(["turn/start", "user/message", "assistant/message", "turn/start", "user/message", "assistant/message", "turn/start", "user/message"]);
+    const window = eventWindow([
+      "turn/start",
+      "user/message",
+      "assistant/message",
+      "turn/start",
+      "user/message",
+      "assistant/message",
+      "turn/start",
+      "user/message",
+    ]);
     expect(countInheritedTurns(window, 5)).toBe(2);
     expect(countInheritedTurns(eventWindow(["turn/start", "user/message"], 4, 3), 5)).toBe(4);
     // 窗口已经从分叉点之后开始：数不出来。
@@ -63,7 +86,9 @@ describe("side chat transcript", () => {
   });
 
   it("titles a side chat by its own title, then its first question", () => {
-    expect(sideChatTitleFromMessages([assistant("a"), user("u", "  这个函数\n为什么慢？ ")])).toBe("这个函数 为什么慢？");
+    expect(sideChatTitleFromMessages([assistant("a"), user("u", "  这个函数\n为什么慢？ ")])).toBe(
+      "这个函数 为什么慢？",
+    );
     expect(sideChatTitleFromMessages([user("u", "x".repeat(60))])).toHaveLength(40);
     expect(sideChatTitleFromMessages([])).toBeNull();
     expect(sideChatOwnTitle("梳理插件加载", "梳理插件加载")).toBeNull();

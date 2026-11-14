@@ -26,7 +26,16 @@ import type { DesktopBridge } from "@actspace/shared/desktop-bridge";
 type MockModel = { key: ModelKey; apiModel: string; providerFacts: ModelFacts; overrides: ModelOverrides | null };
 type MockConnection = Omit<ConnectionView, "models" | "defaultBaseUrl"> & { models: MockModel[] };
 
-function entry(sourceProviderId: string, apiModel: string, name: string, contextWindow: number, maxOutput: number, rates: [number, number, number | null], reasoning: boolean, image = false): ModelCatalogEntry {
+function entry(
+  sourceProviderId: string,
+  apiModel: string,
+  name: string,
+  contextWindow: number,
+  maxOutput: number,
+  rates: [number, number, number | null],
+  reasoning: boolean,
+  image = false,
+): ModelCatalogEntry {
   return {
     source: "models.dev",
     sourceProviderId,
@@ -63,24 +72,52 @@ const PROVIDER_LISTS: Record<string, string[]> = {
   deepseek: ["deepseek-chat", "deepseek-reasoner"],
   kimi: ["kimi-k2-0905-preview"],
   zai: ["glm-4.6"],
-  openrouter: ["anthropic/claude-sonnet-4-5", "anthropic/claude-haiku-4-5", "openai/gpt-5", "openai/gpt-5-mini", "google/gemini-2.5-pro", "deepseek/deepseek-chat", "moonshotai/kimi-k2-0905", "z-ai/glm-4.6", "qwen/qwen3-coder-plus"],
+  openrouter: [
+    "anthropic/claude-sonnet-4-5",
+    "anthropic/claude-haiku-4-5",
+    "openai/gpt-5",
+    "openai/gpt-5-mini",
+    "google/gemini-2.5-pro",
+    "deepseek/deepseek-chat",
+    "moonshotai/kimi-k2-0905",
+    "z-ai/glm-4.6",
+    "qwen/qwen3-coder-plus",
+  ],
   custom: ["claude-sonnet-4-5", "claude-sonnet-4-5-20250929", "gpt-5-mini", "qwen3-coder-plus"],
 };
 
 /** OpenRouter 的 /models 自带名称、上下文和价格。 */
 const OPENROUTER_FACTS: Record<string, ModelFacts> = {
-  "google/gemini-2.5-pro": { label: "Gemini 2.5 Pro", contextWindow: 1_048_576, rates: { input: 1.25, output: 10, cacheRead: null, cacheWrite: null } },
-  "moonshotai/kimi-k2-0905": { label: "Kimi K2 0905", contextWindow: 262_144, rates: { input: 0.6, output: 2.5, cacheRead: null, cacheWrite: null } },
-  "qwen/qwen3-coder-plus": { label: "Qwen3 Coder Plus", contextWindow: 1_000_000, rates: { input: 1, output: 5, cacheRead: null, cacheWrite: null } },
+  "google/gemini-2.5-pro": {
+    label: "Gemini 2.5 Pro",
+    contextWindow: 1_048_576,
+    rates: { input: 1.25, output: 10, cacheRead: null, cacheWrite: null },
+  },
+  "moonshotai/kimi-k2-0905": {
+    label: "Kimi K2 0905",
+    contextWindow: 262_144,
+    rates: { input: 0.6, output: 2.5, cacheRead: null, cacheWrite: null },
+  },
+  "qwen/qwen3-coder-plus": {
+    label: "Qwen3 Coder Plus",
+    contextWindow: 1_000_000,
+    rates: { input: 1, output: 5, cacheRead: null, cacheWrite: null },
+  },
 };
 
-const keyFor = (connectionId: string, apiModel: string) => `${connectionId.split(":")[0]}:connection/${encodeURIComponent(connectionId)}/${encodeURIComponent(apiModel)}` as ModelKey;
+const keyFor = (connectionId: string, apiModel: string) =>
+  `${connectionId.split(":")[0]}:connection/${encodeURIComponent(connectionId)}/${encodeURIComponent(apiModel)}` as ModelKey;
 const checkedAt = () => new Date().toISOString();
 
 function seed(): { connections: MockConnection[]; purposes: PurposesView } {
   const relay = "custom:relay-1";
-  const model = (connectionId: string, apiModel: string, patch: Partial<MockModel> = {}): MockModel =>
-    ({ key: keyFor(connectionId, apiModel), apiModel, providerFacts: {}, overrides: null, ...patch });
+  const model = (connectionId: string, apiModel: string, patch: Partial<MockModel> = {}): MockModel => ({
+    key: keyFor(connectionId, apiModel),
+    apiModel,
+    providerFacts: {},
+    overrides: null,
+    ...patch,
+  });
   const connections: MockConnection[] = [
     {
       connectionId: "deepseek:default",
@@ -95,10 +132,7 @@ function seed(): { connections: MockConnection[]; purposes: PurposesView } {
       multiplier: 1,
       proxy: { enabled: false, url: null },
       balance: true,
-      models: [
-        model("deepseek:default", "deepseek-chat"),
-        model("deepseek:default", "deepseek-reasoner"),
-      ],
+      models: [model("deepseek:default", "deepseek-chat"), model("deepseek:default", "deepseek-reasoner")],
     },
     {
       connectionId: relay,
@@ -149,7 +183,12 @@ function seed(): { connections: MockConnection[]; purposes: PurposesView } {
   };
 }
 
-function effectiveFor(connection: Pick<MockConnection, "templateId" | "protocol" | "multiplier">, apiModel: string, providerFacts: ModelFacts = {}, overrides?: ModelOverrides | null) {
+function effectiveFor(
+  connection: Pick<MockConnection, "templateId" | "protocol" | "multiplier">,
+  apiModel: string,
+  providerFacts: ModelFacts = {},
+  overrides?: ModelOverrides | null,
+) {
   return resolveEffectiveModel({
     apiModel,
     protocol: connection.protocol,
@@ -179,7 +218,11 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
       })),
     })),
   });
-  const ok = (connectionId?: string): ModelConnectionsResult => ({ ok: true, view: view(), ...(connectionId ? { connectionId } : {}) });
+  const ok = (connectionId?: string): ModelConnectionsResult => ({
+    ok: true,
+    view: view(),
+    ...(connectionId ? { connectionId } : {}),
+  });
   const fail = (message: string): ModelConnectionsResult => ({ ok: false, error: { code: "invalid_input", message } });
   const find = (connectionId: string) => state.connections.find((item) => item.connectionId === connectionId);
   const findModel = (key: ModelKey) => {
@@ -190,13 +233,16 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
     return null;
   };
   const clearPurposes = (keys: readonly ModelKey[]) => {
-    for (const purpose of PURPOSE_IDS) if (state.purposes[purpose].model && keys.includes(state.purposes[purpose].model)) state.purposes[purpose] = { model: null, thinking: state.purposes[purpose].thinking };
+    for (const purpose of PURPOSE_IDS)
+      if (state.purposes[purpose].model && keys.includes(state.purposes[purpose].model))
+        state.purposes[purpose] = { model: null, thinking: state.purposes[purpose].thinking };
   };
   const addModels = (connection: MockConnection, models: readonly ConnectionModelInput[]) => {
     for (const input of models) {
       const existing = connection.models.find((model) => model.apiModel === input.apiModel);
       if (existing) {
-        if (input.providerFacts && Object.keys(input.providerFacts).length > 0) existing.providerFacts = structuredClone(input.providerFacts);
+        if (input.providerFacts && Object.keys(input.providerFacts).length > 0)
+          existing.providerFacts = structuredClone(input.providerFacts);
         continue;
       }
       connection.models.push({
@@ -208,9 +254,24 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
     }
   };
 
-  const probe = (templateId: string, protocol: ModelApi, multiplier: number, apiKey: string, existing?: MockConnection): ConnectionProbeResult => {
+  const probe = (
+    templateId: string,
+    protocol: ModelApi,
+    multiplier: number,
+    apiKey: string,
+    existing?: MockConnection,
+  ): ConnectionProbeResult => {
     const base = { checkedAt: checkedAt() };
-    if (apiKey.includes("badkey")) return { ...base, ok: false, message: "API Key 无效（401）。检查 Key 是否复制完整。", errorKind: "auth", statusCode: 401, listSource: "none", models: [] };
+    if (apiKey.includes("badkey"))
+      return {
+        ...base,
+        ok: false,
+        message: "API Key 无效（401）。检查 Key 是否复制完整。",
+        errorKind: "auth",
+        statusCode: 401,
+        listSource: "none",
+        models: [],
+      };
     const scope = { templateId, protocol, multiplier };
     const listed = (ids: readonly string[], source: "provider" | "catalog"): ConnectionProbeResult => ({
       ...base,
@@ -218,13 +279,22 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
       message: "连接成功",
       listSource: source,
       models: ids.map((apiModel) => {
-        const providerFacts = source === "provider" ? OPENROUTER_FACTS[apiModel] ?? {} : {};
-        return { apiModel, providerFacts, effective: effectiveFor(scope, apiModel, providerFacts), added: Boolean(existing?.models.some((model) => model.apiModel === apiModel)) };
+        const providerFacts = source === "provider" ? (OPENROUTER_FACTS[apiModel] ?? {}) : {};
+        return {
+          apiModel,
+          providerFacts,
+          effective: effectiveFor(scope, apiModel, providerFacts),
+          added: Boolean(existing?.models.some((model) => model.apiModel === apiModel)),
+        };
       }),
     });
     if (apiKey.includes("nolist")) return { ...base, ok: true, message: "连接成功", listSource: "none", models: [] };
     const catalogProvider = findProviderTemplate(templateId)?.catalogProvider;
-    if (apiKey.includes("catalog") && catalogProvider) return listed(CATALOG.entries.filter((item) => item.sourceProviderId === catalogProvider).map((item) => item.apiModel), "catalog");
+    if (apiKey.includes("catalog") && catalogProvider)
+      return listed(
+        CATALOG.entries.filter((item) => item.sourceProviderId === catalogProvider).map((item) => item.apiModel),
+        "catalog",
+      );
     return listed(PROVIDER_LISTS[templateId] ?? PROVIDER_LISTS.custom, "provider");
   };
 
@@ -233,12 +303,26 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
     probe: async (input) => {
       if (input.kind === "draft") {
         const template = findProviderTemplate(input.draft.templateId);
-        return probe(input.draft.templateId, input.draft.protocol ?? template?.protocol ?? "openai-completions", 1, input.draft.apiKey);
+        return probe(
+          input.draft.templateId,
+          input.draft.protocol ?? template?.protocol ?? "openai-completions",
+          1,
+          input.draft.apiKey,
+        );
       }
       const connection = find(input.connectionId);
-      if (!connection) return { ok: false, message: "连接不存在。", checkedAt: checkedAt(), listSource: "none", models: [] };
-      const result = probe(connection.templateId, connection.protocol, connection.multiplier, connection.hasApiKey ? (connection.label.includes("无列表") ? "nolist" : "saved") : "badkey", connection);
-      connection.lastConnection = result.ok ? { status: "available", checkedAt: result.checkedAt } : { status: "unavailable", checkedAt: result.checkedAt, errorKind: result.errorKind, message: result.message };
+      if (!connection)
+        return { ok: false, message: "连接不存在。", checkedAt: checkedAt(), listSource: "none", models: [] };
+      const result = probe(
+        connection.templateId,
+        connection.protocol,
+        connection.multiplier,
+        connection.hasApiKey ? (connection.label.includes("无列表") ? "nolist" : "saved") : "badkey",
+        connection,
+      );
+      connection.lastConnection = result.ok
+        ? { status: "available", checkedAt: result.checkedAt }
+        : { status: "unavailable", checkedAt: result.checkedAt, errorKind: result.errorKind, message: result.message };
       return result;
     },
     create: async (input) => {
@@ -248,7 +332,8 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
       const connectionId = relay ? `custom:relay-${nextId++}` : `${template.id}:default`;
       // 内置连接还没填 Key 时只是个空位，填 Key 等于第一次添加。
       const placeholder = find(connectionId);
-      if (placeholder?.hasApiKey) return { ok: false, error: { code: "connection_exists", message: `${template.label} 已经添加过了。` } };
+      if (placeholder?.hasApiKey)
+        return { ok: false, error: { code: "connection_exists", message: `${template.label} 已经添加过了。` } };
       if (placeholder) state.connections = state.connections.filter((item) => item !== placeholder);
       const connection: MockConnection = {
         connectionId,
@@ -275,7 +360,8 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
       if (!connection) return fail("连接不存在。");
       Object.assign(connection, Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)));
       if (apiKey) connection.hasApiKey = true;
-      if (managementKey !== undefined && connection.hasManagementKey !== undefined) connection.hasManagementKey = Boolean(managementKey);
+      if (managementKey !== undefined && connection.hasManagementKey !== undefined)
+        connection.hasManagementKey = Boolean(managementKey);
       return ok(connectionId);
     },
     remove: async ({ connectionId }) => {
@@ -307,8 +393,15 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
     preview: async ({ apiModel, connectionId, templateId, protocol, multiplier, overrides }) => {
       const connection = connectionId ? find(connectionId) : undefined;
       const template = findProviderTemplate(templateId);
-      const scope = connection ?? { templateId: templateId ?? "custom", protocol: protocol ?? template?.protocol ?? "openai-completions", multiplier: multiplier ?? 1 };
-      return { effective: effectiveFor(scope, apiModel, {}, overrides), added: Boolean(connection?.models.some((model) => model.apiModel === apiModel)) };
+      const scope = connection ?? {
+        templateId: templateId ?? "custom",
+        protocol: protocol ?? template?.protocol ?? "openai-completions",
+        multiplier: multiplier ?? 1,
+      };
+      return {
+        effective: effectiveFor(scope, apiModel, {}, overrides),
+        added: Boolean(connection?.models.some((model) => model.apiModel === apiModel)),
+      };
     },
     updatePurposes: async (patch) => {
       for (const purpose of PURPOSE_IDS) if (patch[purpose]) state.purposes[purpose] = structuredClone(patch[purpose]);
@@ -316,8 +409,20 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
     },
     getBalance: async ({ connectionId }) => {
       const connection = find(connectionId);
-      const provider = connection?.templateId === "kimi" ? "kimi" : connection?.templateId === "openrouter" ? "openrouter" : "deepseek";
-      return { provider, isConfigured: Boolean(connection?.hasApiKey), isAvailable: true, generatedAt: checkedAt(), displayBalance: provider === "openrouter" ? { amount: "12.40", currency: "USD" } : { amount: "86.52", currency: "CNY" } };
+      const provider =
+        connection?.templateId === "kimi"
+          ? "kimi"
+          : connection?.templateId === "openrouter"
+            ? "openrouter"
+            : "deepseek";
+      return {
+        provider,
+        isConfigured: Boolean(connection?.hasApiKey),
+        isAvailable: true,
+        generatedAt: checkedAt(),
+        displayBalance:
+          provider === "openrouter" ? { amount: "12.40", currency: "USD" } : { amount: "86.52", currency: "CNY" },
+      };
     },
   };
 }

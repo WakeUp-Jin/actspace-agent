@@ -74,10 +74,7 @@ export function TurnActions({
   const [menuOpen, setMenuOpen] = useState(false);
   const onForkSession = useContext(SessionActionsContext)?.onForkSession;
   const latestAssistantMessage = assistantMessages[assistantMessages.length - 1];
-  const copyText = useMemo(
-    () => assistantMessages.map((message) => message.content).join("\n\n"),
-    [assistantMessages]
-  );
+  const copyText = useMemo(() => assistantMessages.map((message) => message.content).join("\n\n"), [assistantMessages]);
 
   if (!latestAssistantMessage) {
     return null;
@@ -94,7 +91,10 @@ export function TurnActions({
   const forkLabel = turnActive ? "请等待当前轮次结束后再分叉" : "分叉会话";
 
   return (
-    <div className={cn(TURN_ACTIONS_CLASS, !revealAlways && TURN_ACTIONS_HOVER_REVEAL_CLASS)} data-turn-actions-reveal={revealAlways ? "always" : "hover"}>
+    <div
+      className={cn(TURN_ACTIONS_CLASS, !revealAlways && TURN_ACTIONS_HOVER_REVEAL_CLASS)}
+      data-turn-actions-reveal={revealAlways ? "always" : "hover"}
+    >
       <Tooltip>
         <TooltipTrigger asChild>
           <button
@@ -120,14 +120,25 @@ export function TurnActions({
           <TooltipContent>更多操作</TooltipContent>
         </Tooltip>
         <MenuContent side="top" align="start" className="w-[178px]">
-          <MenuItem disabled={forkDisabled} title={forkLabel} onSelect={() => { if (!forkDisabled) onForkSession(sessionId, forkTurnId); }}>分叉会话</MenuItem>
+          <MenuItem
+            disabled={forkDisabled}
+            title={forkLabel}
+            onSelect={() => {
+              if (!forkDisabled) onForkSession(sessionId, forkTurnId);
+            }}
+          >
+            分叉会话
+          </MenuItem>
           <MenuItem onSelect={() => void handleCopy(copyText)}>复制消息</MenuItem>
           <MenuItem onSelect={() => void handleCopy(latestAssistantMessage.id)}>复制请求 ID</MenuItem>
         </MenuContent>
       </Menu>
       <span className={TURN_ACTIONS_END_CLASS}>
         {completeTurn ? <TurnUsagePill usage={latestAssistantMessage.usage} /> : null}
-        <span className={TURN_TIME_CLASS} aria-label={`回复时间：${formatMessageTime(latestAssistantMessage.createdAt)}`}>
+        <span
+          className={TURN_TIME_CLASS}
+          aria-label={`回复时间：${formatMessageTime(latestAssistantMessage.createdAt)}`}
+        >
           {formatMessageTime(latestAssistantMessage.createdAt)}
         </span>
       </span>

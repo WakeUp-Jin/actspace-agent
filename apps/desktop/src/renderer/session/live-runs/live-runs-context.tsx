@@ -17,7 +17,12 @@ const noStore = () => () => undefined;
  */
 export function useRequestOutputs(sessionId: string | null): ReadonlyMap<string, RequestLiveOutput> {
   const store = useContext(LiveRunsContext);
-  const cache = useRef<{ store: LiveRunStore; sessionId: string; view: LiveRunView; value: ReadonlyMap<string, RequestLiveOutput> } | null>(null);
+  const cache = useRef<{
+    store: LiveRunStore;
+    sessionId: string;
+    view: LiveRunView;
+    value: ReadonlyMap<string, RequestLiveOutput>;
+  } | null>(null);
   const getSnapshot = useCallback(() => {
     if (store === null || sessionId === null) return NONE;
     const view = store.view(sessionId);

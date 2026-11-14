@@ -180,7 +180,9 @@ describe("workspace environment service", () => {
     if (!gitAvailable) return;
     expect(result).toMatchObject({ ok: true, commitCreated: true, branch: "main" });
     expect((await git(roots.workspaceRoot, ["status", "--porcelain"])).stdout).toBe("");
-    expect((await git(roots.workspaceRoot, ["show", "--pretty=", "--name-status", "HEAD"])).stdout).toContain("A\tnew.txt");
+    expect((await git(roots.workspaceRoot, ["show", "--pretty=", "--name-status", "HEAD"])).stdout).toContain(
+      "A\tnew.txt",
+    );
     expect(await readFile(join(roots.workspaceRoot, "tracked.txt"), "utf8")).toBe("after\n");
   });
 
@@ -193,7 +195,9 @@ describe("workspace environment service", () => {
 
     if (!gitAvailable) return;
     expect(result).toMatchObject({ ok: true, commitCreated: true });
-    expect((await git(roots.workspaceRoot, ["log", "-1", "--pretty=%s"])).stdout.trim()).toBe("Update workspace changes");
+    expect((await git(roots.workspaceRoot, ["log", "-1", "--pretty=%s"])).stdout.trim()).toBe(
+      "Update workspace changes",
+    );
   });
 
   it("commits only staged files when unstaged changes are excluded", async () => {
@@ -210,7 +214,9 @@ describe("workspace environment service", () => {
 
     if (!gitAvailable) return;
     expect(result).toMatchObject({ ok: true, commitCreated: true });
-    expect((await git(roots.workspaceRoot, ["show", "--pretty=", "--name-only", "HEAD"])).stdout.trim()).toBe("staged.txt");
+    expect((await git(roots.workspaceRoot, ["show", "--pretty=", "--name-only", "HEAD"])).stdout.trim()).toBe(
+      "staged.txt",
+    );
     expect((await git(roots.workspaceRoot, ["status", "--porcelain"])).stdout).toContain(" M unstaged.txt");
   });
 
@@ -225,7 +231,12 @@ describe("workspace environment service", () => {
     const result = await commitWorkspaceChanges({ branchName: "actspace/detached-work" }, roots);
 
     if (!gitAvailable) return;
-    expect(result).toMatchObject({ ok: true, branch: "actspace/detached-work", branchCreated: true, commitCreated: true });
+    expect(result).toMatchObject({
+      ok: true,
+      branch: "actspace/detached-work",
+      branchCreated: true,
+      commitCreated: true,
+    });
     expect((await git(roots.workspaceRoot, ["branch", "--show-current"])).stdout.trim()).toBe("actspace/detached-work");
   });
 
@@ -253,7 +264,9 @@ describe("workspace environment service", () => {
 
     if (!gitAvailable) return;
     expect(result).toMatchObject({ ok: true, pushed: true, remote: "origin", upstreamSet: true });
-    expect((await git(roots.workspaceRoot, ["rev-parse", "--abbrev-ref", "@{upstream}"])).stdout.trim()).toBe("origin/main");
+    expect((await git(roots.workspaceRoot, ["rev-parse", "--abbrev-ref", "@{upstream}"])).stdout.trim()).toBe(
+      "origin/main",
+    );
   });
 
   it("creates, commits, and pushes a new branch as one requested action", async () => {
@@ -279,7 +292,9 @@ describe("workspace environment service", () => {
       pushed: true,
       remote: "origin",
     });
-    expect((await git(remoteRoot, ["show-ref", "--verify", "refs/heads/actspace/pushed-work"])).stdout).toContain("refs/heads/actspace/pushed-work");
+    expect((await git(remoteRoot, ["show-ref", "--verify", "refs/heads/actspace/pushed-work"])).stdout).toContain(
+      "refs/heads/actspace/pushed-work",
+    );
   });
 
   it("requires an explicit remote when more than one is configured", async () => {
@@ -315,7 +330,11 @@ describe("workspace environment service", () => {
     if (!gitAvailable) return;
     expect(result).toMatchObject({ ok: false, error: "remote_required" });
     expect(result.commitCreated).toBeUndefined();
-    expect((await git(roots.workspaceRoot, ["rev-parse", "--verify", "HEAD"]).then(() => true).catch(() => false))).toBe(false);
+    expect(
+      await git(roots.workspaceRoot, ["rev-parse", "--verify", "HEAD"])
+        .then(() => true)
+        .catch(() => false),
+    ).toBe(false);
   });
 
   it("reports a created commit when the following push fails", async () => {
@@ -345,7 +364,14 @@ describe("workspace environment service", () => {
   // 15 T13：run-git 把 startError 改成 { code, message } 后，git 缺失（ENOENT）和非仓库的判断不变。
   it("treats a git start error with code ENOENT as Git being unavailable", async () => {
     const roots = await makeRoots();
-    const missing: GitRunner = async () => ({ stdout: "", stderr: "", exitCode: null, timedOut: false, truncated: false, startError: { code: "ENOENT", message: "spawn git ENOENT" } });
+    const missing: GitRunner = async () => ({
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      timedOut: false,
+      truncated: false,
+      startError: { code: "ENOENT", message: "spawn git ENOENT" },
+    });
 
     const snapshot = await getWorkspaceEnvironment({}, roots, missing);
     expect(snapshot.git).toMatchObject({ available: false, repository: false });
@@ -355,7 +381,14 @@ describe("workspace environment service", () => {
 
   it("keeps Git available but not a repository for other start errors", async () => {
     const roots = await makeRoots();
-    const denied: GitRunner = async () => ({ stdout: "", stderr: "", exitCode: null, timedOut: false, truncated: false, startError: { code: "EACCES", message: "spawn git EACCES" } });
+    const denied: GitRunner = async () => ({
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      timedOut: false,
+      truncated: false,
+      startError: { code: "EACCES", message: "spawn git EACCES" },
+    });
 
     const snapshot = await getWorkspaceEnvironment({}, roots, denied);
     expect(snapshot.git).toMatchObject({ available: true, repository: false });

@@ -10,11 +10,20 @@ import { compactionSession } from "./session-fixture.js";
 type Session = Awaited<ReturnType<typeof compactionSession>>;
 
 function assistant(session: Session, messageId: string, content: string, usage?: Record<string, unknown>) {
-  return session.append({ type: "assistant/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId, content, ...(usage ? { usage } : {}) } as never, surface: { kind: "append" } });
+  return session.append({
+    type: "assistant/message",
+    eventVersion: 1,
+    source: { ownerPluginId: "@actspace/core" },
+    data: { messageId, content, ...(usage ? { usage } : {}) } as never,
+    surface: { kind: "append" },
+  });
 }
 
 function compactionSpan(session: Session) {
-  return session.journal.events.find(event => event.type === "compaction/start")!.data as { start: number; end: number };
+  return session.journal.events.find((event) => event.type === "compaction/start")!.data as {
+    start: number;
+    end: number;
+  };
 }
 
 describe("Compaction", () => {
@@ -42,32 +51,69 @@ describe("Compaction", () => {
   it("does not commit any compaction facts when summarization fails", async () => {
     const session = await compactionSession();
     try {
-      const plugin = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, { summarize: async () => { throw Error("utility unavailable"); } });
+      const plugin = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, {
+        summarize: async () => {
+          throw Error("utility unavailable");
+        },
+      });
       await expect(plugin.compact(session)).rejects.toThrow("utility unavailable");
       expect(session.journal.events).toHaveLength(5);
       expect(session.journal.surface.entries).toHaveLength(5);
-    } finally { await session.close(); }
+    } finally {
+      await session.close();
+    }
   });
 
   it("omits runtime context blocks from deterministic summaries", async () => {
-    const summary = await new DeterministicCompactionSummarizer().summarize([{
-      node: { kind: "user", messageId: "message-1", content: [{ type: "text", text: "hello" }, { type: "runtime-context", context: { agentMode: "plan" } }] },
-      sourceSeq: 0,
-    } as never], { sessionId: "session-1" });
+    const summary = await new DeterministicCompactionSummarizer().summarize(
+      [
+        {
+          node: {
+            kind: "user",
+            messageId: "message-1",
+            content: [
+              { type: "text", text: "hello" },
+              { type: "runtime-context", context: { agentMode: "plan" } },
+            ],
+          },
+          sourceSeq: 0,
+        } as never,
+      ],
+      { sessionId: "session-1" },
+    );
     expect(summary.content).toContain("hello");
     expect(summary.content).not.toContain("runtime-context");
     expect(summary.content).not.toContain("agentMode");
   });
 
   it("keeps file references and quoted replies in deterministic summaries", async () => {
-    const summary = await new DeterministicCompactionSummarizer().summarize([{
-      node: { kind: "user", messageId: "message-1", content: [
-        { type: "text", text: "hello" },
-        { type: "file-reference", relativePath: "src/a.ts", displayName: "a.ts" },
-        { type: "response-excerpt", annotationId: "ann", assistantMessageId: "v2-3", selectedText: "quoted line", startOffset: 0, endOffset: 11, prefixContext: "", suffixContext: "", comment: "why" },
-      ] },
-      sourceSeq: 0,
-    } as never], { sessionId: "session-1" });
+    const summary = await new DeterministicCompactionSummarizer().summarize(
+      [
+        {
+          node: {
+            kind: "user",
+            messageId: "message-1",
+            content: [
+              { type: "text", text: "hello" },
+              { type: "file-reference", relativePath: "src/a.ts", displayName: "a.ts" },
+              {
+                type: "response-excerpt",
+                annotationId: "ann",
+                assistantMessageId: "v2-3",
+                selectedText: "quoted line",
+                startOffset: 0,
+                endOffset: 11,
+                prefixContext: "",
+                suffixContext: "",
+                comment: "why",
+              },
+            ],
+          },
+          sourceSeq: 0,
+        } as never,
+      ],
+      { sessionId: "session-1" },
+    );
     expect(summary.content).toContain("src/a.ts");
     expect(summary.content).toContain("quoted line");
     expect(summary.content).toContain("why");
@@ -77,24 +123,55 @@ describe("Compaction", () => {
     const registry = createCoreCodecRegistry();
     const session = SessionHandle.createEphemeral({
       registry,
-      header: createSessionHeader({ sessionId: "session", createdAt: "2026-08-23T00:00:00.000Z", lineage: null, createdWith: { profileId: "base", runtimeContractVersion: "actspace.runtime.v2", manifestDigest: "manifest", plugins: [{ id: "@actspace/core", version: "2.0.0" }], codecSetDigest: registry.digest } }),
+      header: createSessionHeader({
+        sessionId: "session",
+        createdAt: "2026-08-23T00:00:00.000Z",
+        lineage: null,
+        createdWith: {
+          profileId: "base",
+          runtimeContractVersion: "actspace.runtime.v2",
+          manifestDigest: "manifest",
+          plugins: [{ id: "@actspace/core", version: "2.0.0" }],
+          codecSetDigest: registry.digest,
+        },
+      }),
       now: () => "2026-08-23T00:00:00.000Z",
     });
     for (let index = 0; index < 5; index += 1) {
-      await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `m-${index}`, content: `message-${index}` }, surface: { kind: "append" } });
+      await session.append({
+        type: "user/message",
+        eventVersion: 1,
+        source: { ownerPluginId: "@actspace/core" },
+        data: { messageId: `m-${index}`, content: `message-${index}` },
+        surface: { kind: "append" },
+      });
     }
-    const plugin = new CompactionPlugin({ ...DEFAULT_COMPACTION_POLICY, reserveTokens: 0, triggerRatio: 0.5 }, new DeterministicCompactionSummarizer());
+    const plugin = new CompactionPlugin(
+      { ...DEFAULT_COMPACTION_POLICY, reserveTokens: 0, triggerRatio: 0.5 },
+      new DeterministicCompactionSummarizer(),
+    );
     const started: number[] = [];
-    const observer = { onStarted: ({ entryCount }: { entryCount: number }) => { started.push(entryCount); } };
-    expect(await plugin.maybeCompact(session, { inputTokens: 10, outputTokens: 0, contextWindow: 10 }, observer)).toBe(true);
+    const observer = {
+      onStarted: ({ entryCount }: { entryCount: number }) => {
+        started.push(entryCount);
+      },
+    };
+    expect(await plugin.maybeCompact(session, { inputTokens: 10, outputTokens: 0, contextWindow: 10 }, observer)).toBe(
+      true,
+    );
     await expect(plugin.compact(session, observer)).resolves.toBe(false);
     // Only the compaction that chose a region notifies; the skipped one stays silent.
     expect(started).toEqual([4]);
     expect(session.journal.events).toHaveLength(9);
     expect(session.journal.events[7]?.type).toBe("surface/replaced");
     // 被替换的 4 条消息按统一算法估算，写在替换事件上。
-    const replaced = session.journal.events.slice(0, 4).reduce((sum, event) => sum + estimateConversationNode(surfaceNode(event)!), 0);
-    expect(session.journal.events[7]?.data).toMatchObject({ replacedTokens: { conversation: replaced, summarizedConversation: 0 }, estimatorVersion: ESTIMATOR_VERSION });
+    const replaced = session.journal.events
+      .slice(0, 4)
+      .reduce((sum, event) => sum + estimateConversationNode(surfaceNode(event)!), 0);
+    expect(session.journal.events[7]?.data).toMatchObject({
+      replacedTokens: { conversation: replaced, summarizedConversation: 0 },
+      estimatorVersion: ESTIMATOR_VERSION,
+    });
     expect(session.journal.surface.entries).toHaveLength(2);
     await session.close();
   });
@@ -103,15 +180,35 @@ describe("Compaction", () => {
     const registry = createCoreCodecRegistry();
     const session = SessionHandle.createEphemeral({
       registry,
-      header: createSessionHeader({ sessionId: "chat", createdAt: "2026-09-24T00:00:00.000Z", lineage: null, createdWith: { profileId: "base", presetId: "actspace.chat", runtimeContractVersion: "actspace.runtime.v2", manifestDigest: "manifest", plugins: [{ id: "@actspace/core", version: "2.0.0" }], codecSetDigest: registry.digest } }),
+      header: createSessionHeader({
+        sessionId: "chat",
+        createdAt: "2026-09-24T00:00:00.000Z",
+        lineage: null,
+        createdWith: {
+          profileId: "base",
+          presetId: "actspace.chat",
+          runtimeContractVersion: "actspace.runtime.v2",
+          manifestDigest: "manifest",
+          plugins: [{ id: "@actspace/core", version: "2.0.0" }],
+          codecSetDigest: registry.digest,
+        },
+      }),
       now: () => "2026-09-24T00:00:00.000Z",
     });
     for (let index = 0; index < 5; index += 1) {
-      await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `m-${index}`, content: `message-${index}` }, surface: { kind: "append" } });
+      await session.append({
+        type: "user/message",
+        eventVersion: 1,
+        source: { ownerPluginId: "@actspace/core" },
+        data: { messageId: `m-${index}`, content: `message-${index}` },
+        surface: { kind: "append" },
+      });
     }
     let ratio = 0.95;
-    const plugin = new CompactionPlugin({ ...DEFAULT_COMPACTION_POLICY, reserveTokens: 0, minimumRegionEntries: 4 }, new DeterministicCompactionSummarizer())
-      .withTriggerRatio(() => ratio);
+    const plugin = new CompactionPlugin(
+      { ...DEFAULT_COMPACTION_POLICY, reserveTokens: 0, minimumRegionEntries: 4 },
+      new DeterministicCompactionSummarizer(),
+    ).withTriggerRatio(() => ratio);
     expect(await plugin.maybeCompact(session, { inputTokens: 80, outputTokens: 0, contextWindow: 100 })).toBe(false);
     ratio = 0.5;
     expect(await plugin.maybeCompact(session, { inputTokens: 80, outputTokens: 0, contextWindow: 100 })).toBe(true);
@@ -120,7 +217,12 @@ describe("Compaction", () => {
 
   it("records measured before tokens on manual compaction right after a request", async () => {
     const session = await compactionSession();
-    await assistant(session, "a-1", "reply-1", { inputTokens: 100, outputTokens: 20, cacheReadTokens: 30, cacheWriteTokens: 0 });
+    await assistant(session, "a-1", "reply-1", {
+      inputTokens: 100,
+      outputTokens: 20,
+      cacheReadTokens: 30,
+      cacheWriteTokens: 0,
+    });
     const plugin = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, { summarize: async () => ({ content: "summary" }) });
     expect(await plugin.compact(session)).toBe(true);
     const { start, end } = compactionSpan(session);
@@ -135,23 +237,50 @@ describe("Compaction", () => {
     const session = await compactionSession();
     await assistant(session, "a-1", "reply-1", { inputTokens: 120, outputTokens: 15 });
     await assistant(session, "a-2", "reply-2");
-    await assistant(session, "a-3", "reply-3", { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, cost: null, costCurrency: null, source: "unknown" });
+    await assistant(session, "a-3", "reply-3", {
+      inputTokens: null,
+      outputTokens: null,
+      cacheReadTokens: null,
+      cacheWriteTokens: null,
+      reasoningTokens: null,
+      cost: null,
+      costCurrency: null,
+      source: "unknown",
+    });
     const plugin = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, { summarize: async () => ({ content: "summary" }) });
     expect(await plugin.compact(session)).toBe(true);
     // 135 measured + "reply-2" and "reply-3" (2 text + 4 block + 4 message = 10 each) appended after that request.
-    expect(session.journal.events.at(-1)!.data).toMatchObject({ trigger: "manual", beforeTokens: 155, beforeEstimated: true });
+    expect(session.journal.events.at(-1)!.data).toMatchObject({
+      trigger: "manual",
+      beforeTokens: 155,
+      beforeEstimated: true,
+    });
     await session.close();
   });
 
   it("records auto before tokens from the journal instead of the trigger pressure", async () => {
     const session = await compactionSession();
     await assistant(session, "a-1", "reply-1", { inputTokens: 100, outputTokens: 50 });
-    await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "late", content: "x".repeat(400) }, surface: { kind: "append" } });
+    await session.append({
+      type: "user/message",
+      eventVersion: 1,
+      source: { ownerPluginId: "@actspace/core" },
+      data: { messageId: "late", content: "x".repeat(400) },
+      surface: { kind: "append" },
+    });
     const finished = vi.fn();
     const plugin = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, { summarize: async () => ({ content: "summary" }) });
-    expect(await plugin.maybeCompact(session, { inputTokens: 90_000, outputTokens: 1_000, contextWindow: 100_000 }, { onFinished: finished })).toBe(true);
+    expect(
+      await plugin.maybeCompact(
+        session,
+        { inputTokens: 90_000, outputTokens: 1_000, contextWindow: 100_000 },
+        { onFinished: finished },
+      ),
+    ).toBe(true);
     const { start, end } = compactionSpan(session);
-    const removed = session.journal.events.filter(event => event.seq < 7 && event.surface?.kind === "append").slice(start, end)
+    const removed = session.journal.events
+      .filter((event) => event.seq < 7 && event.surface?.kind === "append")
+      .slice(start, end)
       .reduce((sum, event) => sum + estimateConversationNode(surfaceNode(event)!), 0);
     // 150 measured + the late 400-char message (100 + 4 + 4); the summary is 10.
     const stats = { trigger: "auto", beforeTokens: 258, afterTokens: 258 - removed + 10, beforeEstimated: true };
@@ -162,14 +291,27 @@ describe("Compaction", () => {
 
   it("chains a second compaction from the previous after count", async () => {
     const session = await compactionSession();
-    for (let index = 5; index < 10; index += 1) await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `m-${index}`, content: `message-${index}` }, surface: { kind: "append" } });
+    for (let index = 5; index < 10; index += 1)
+      await session.append({
+        type: "user/message",
+        eventVersion: 1,
+        source: { ownerPluginId: "@actspace/core" },
+        data: { messageId: `m-${index}`, content: `message-${index}` },
+        surface: { kind: "append" },
+      });
     await assistant(session, "a-1", "reply-1", { inputTokens: 900, outputTokens: 100 });
-    const plugin = new CompactionPlugin({ ...DEFAULT_COMPACTION_POLICY, reserveTokens: 0, minimumRegionEntries: 2 }, { summarize: async () => ({ content: "summary" }) });
+    const plugin = new CompactionPlugin(
+      { ...DEFAULT_COMPACTION_POLICY, reserveTokens: 0, minimumRegionEntries: 2 },
+      { summarize: async () => ({ content: "summary" }) },
+    );
     expect(await plugin.compact(session)).toBe(true);
     const first = session.journal.events.at(-1)!.data as { afterTokens: number };
     expect(await plugin.compact(session)).toBe(true);
     // No request ran in between, so the measured 1000 no longer describes the context.
-    expect(session.journal.events.at(-1)!.data).toMatchObject({ beforeTokens: first.afterTokens, beforeEstimated: true });
+    expect(session.journal.events.at(-1)!.data).toMatchObject({
+      beforeTokens: first.afterTokens,
+      beforeEstimated: true,
+    });
     await session.close();
   });
 

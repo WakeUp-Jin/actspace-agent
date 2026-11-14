@@ -1,7 +1,17 @@
-import { SessionError, createSessionHeader, type CreateSessionHeaderInput, type EventCodecRegistry, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import {
+  SessionError,
+  createSessionHeader,
+  type CreateSessionHeaderInput,
+  type EventCodecRegistry,
+  type SessionEventEnvelopeV1,
+} from "@actspace/session-journal";
 
 export type SessionForkArtifactPort = {
-  copyForSession(parentSessionId: string, childSessionId: string, artifactId: string): Promise<{ readonly artifactId: string }>;
+  copyForSession(
+    parentSessionId: string,
+    childSessionId: string,
+    artifactId: string,
+  ): Promise<{ readonly artifactId: string }>;
   deleteForSession(sessionId: string, artifactId: string): Promise<void>;
 };
 export type SessionPersistenceCreateOptions = {
@@ -14,6 +24,7 @@ export type SessionPersistenceCreateOptions = {
 export type SessionPersistenceOpenOptions = SessionPersistenceCreateOptions;
 export function createPersistedSessionHeader(input: CreateSessionHeaderInput, registry: EventCodecRegistry) {
   const header = createSessionHeader(input);
-  if (header.createdWith.codecSetDigest !== registry.digest) throw new SessionError("INVALID_HEADER", "Header codecSetDigest does not match the boot registry.");
+  if (header.createdWith.codecSetDigest !== registry.digest)
+    throw new SessionError("INVALID_HEADER", "Header codecSetDigest does not match the boot registry.");
   return header;
 }

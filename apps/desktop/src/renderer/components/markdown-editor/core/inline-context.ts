@@ -22,7 +22,16 @@ export interface InlineCtx {
 export type InlineHandler = (ctx: InlineCtx, node: SyntaxNodeRef) => false | void;
 
 export function createCtx(state: EditorState, from: number, to: number): InlineCtx {
-  return { state, doc: state.doc, focused: isEditorFocused(state), pathCtx: pathContextOf(state), from, to, out: [], atomic: [] };
+  return {
+    state,
+    doc: state.doc,
+    focused: isEditorFocused(state),
+    pathCtx: pathContextOf(state),
+    from,
+    to,
+    out: [],
+    atomic: [],
+  };
 }
 
 const HIDE = Decoration.replace({});
@@ -43,7 +52,13 @@ export function replaceWith(ctx: InlineCtx, from: number, to: number, deco: Deco
   ctx.atomic.push(range);
 }
 
-export function mark(ctx: InlineCtx, from: number, to: number, className: string, attributes?: Record<string, string>): void {
+export function mark(
+  ctx: InlineCtx,
+  from: number,
+  to: number,
+  className: string,
+  attributes?: Record<string, string>,
+): void {
   if (to <= from) return;
   ctx.out.push(Decoration.mark({ class: className, attributes }).range(from, to));
 }
@@ -60,7 +75,12 @@ export function lineClass(ctx: InlineCtx, pos: number, className: string, attrib
 }
 
 /** 逐行处理 [from, to]，只处理落在可见范围里的行（大代码块、大表格不用全算）。 */
-export function forEachLine(ctx: InlineCtx, from: number, to: number, fn: (line: { from: number; to: number; number: number }) => void): void {
+export function forEachLine(
+  ctx: InlineCtx,
+  from: number,
+  to: number,
+  fn: (line: { from: number; to: number; number: number }) => void,
+): void {
   const start = ctx.doc.lineAt(Math.max(from, ctx.from)).number;
   const end = ctx.doc.lineAt(Math.min(to, ctx.to)).number;
   for (let n = start; n <= end; n++) fn(ctx.doc.line(n));

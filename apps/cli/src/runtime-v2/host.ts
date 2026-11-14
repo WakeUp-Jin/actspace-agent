@@ -3,35 +3,106 @@ import { join } from "node:path";
 import { loadRuntimeModule } from "./loader";
 import { profileService } from "./profile-service";
 import type { HostConfig } from "@actspace/agent-host";
-import { HostModelRouter, createNodeToolHostServices, resolveNodeHostNonoPath, resolveNodeHostPython } from "@actspace/agent-host/node-ports";
+import {
+  HostModelRouter,
+  createNodeToolHostServices,
+  resolveNodeHostNonoPath,
+  resolveNodeHostPython,
+} from "@actspace/agent-host/node-ports";
 import { CLI_REPO_ROOT } from "./host-adapter";
 import { currentModelHostPort, MODELS_HOST_PORT_ID } from "@actspace/shared";
-const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<typeof import("@actspace/agent-host")>;
+const dynamicImport = new Function("specifier", "return import(specifier)") as (
+  specifier: string,
+) => Promise<typeof import("@actspace/agent-host")>;
 
 export async function startRemoteHost(config: HostConfig, options: { mock?: boolean; forceExit?: () => void } = {}) {
   const [runtime, hostModule] = await Promise.all([loadRuntimeModule(), dynamicImport("@actspace/agent-host")]);
   return hostModule.bootstrapHost(config, {
     forceExit: options.forceExit,
-    log: message => { process.stderr.write(`${message}\n`); },
+    log: (message) => {
+      process.stderr.write(`${message}\n`);
+    },
     bootRuntime: async ({ artifacts, approvals, readArtifact, resolveArtifact, onLiveEvent }) => {
-      const capabilities = ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const;
+      const capabilities = [
+        "filesystem.read",
+        "filesystem.write",
+        "network",
+        "approval",
+        "credential",
+        "process",
+      ] as const;
       const workspaceRoot = config.workspaces[0].path;
-      const host = { hostKind: "host" as const, runtimeContract: "actspace.runtime.v2" as const, invocationId: randomUUID(), workspaceRef: workspaceRoot, capabilityCeiling: capabilities };
-      const capabilitySet = { ids: capabilities, has: (id: string) => (capabilities as readonly string[]).includes(id), get: <T>(id: string): T => { throw new Error(`Unavailable capability ${id}`); } };
+      const host = {
+        hostKind: "host" as const,
+        runtimeContract: "actspace.runtime.v2" as const,
+        invocationId: randomUUID(),
+        workspaceRef: workspaceRoot,
+        capabilityCeiling: capabilities,
+      };
+      const capabilitySet = {
+        ids: capabilities,
+        has: (id: string) => (capabilities as readonly string[]).includes(id),
+        get: <T>(id: string): T => {
+          throw new Error(`Unavailable capability ${id}`);
+        },
+      };
       const router = new HostModelRouter(config, { mock: options.mock, readArtifact });
-      const routes = [{ routeId: "default", providerId: "host", modelPattern: "*", credentialRef: "host-router", defaults: {}, adapter: router }];
+      const routes = [
+        {
+          routeId: "default",
+          providerId: "host",
+          modelPattern: "*",
+          credentialRef: "host-router",
+          defaults: {},
+          adapter: router,
+        },
+      ];
       const credentials = { resolve: async () => ({}) };
-      const hostServices = runtime.createRuntimeHostServices({ descriptor: host, dataRoot: config.dataRoot, workspaceRoot, toolEnvironment: { hostCapabilities: new Set(capabilities), capabilitySet }, services: {
-        "actspace.host.remote": {}, "host.approval": approvals, "host.artifacts": artifacts,
-        [MODELS_HOST_PORT_ID]: currentModelHostPort(config.defaultModel),
-        [runtime.LLM_HOST_PORT_ID]: { credentials, routes },
-        [runtime.HEADLESS_HOST_PORT_ID]: { enabled: false },
-        [runtime.PROMPT_HOST_PORT_ID]: { workspaceRoot, resolveUserSource: () => runtime.prepareUserPromptSource(config.dataRoot), resolveSource: (root: string) => runtime.prepareRuntimePromptSource({ dataRoot: config.dataRoot, workspaceRoot: root }) },
-        ...createNodeToolHostServices({ nonoPath: resolveNodeHostNonoPath(process.env, CLI_REPO_ROOT), python: resolveNodeHostPython(process.env, CLI_REPO_ROOT, config.dataRoot), workspaceRoot, tmpRoot: join(config.dataRoot, "runtime/tmp"), model: config.defaultModel, readArtifact, resolveArtifact }),
-      } });
-      const profile = await runtime.bootProfileRuntime({ host, dataRoot: config.dataRoot, hostServices, gracefulShutdownMs: 10000, finalShutdownMs: 4000,
+      const hostServices = runtime.createRuntimeHostServices({
+        descriptor: host,
+        dataRoot: config.dataRoot,
+        workspaceRoot,
+        toolEnvironment: { hostCapabilities: new Set(capabilities), capabilitySet },
+        services: {
+          "actspace.host.remote": {},
+          "host.approval": approvals,
+          "host.artifacts": artifacts,
+          [MODELS_HOST_PORT_ID]: currentModelHostPort(config.defaultModel),
+          [runtime.LLM_HOST_PORT_ID]: { credentials, routes },
+          [runtime.HEADLESS_HOST_PORT_ID]: { enabled: false },
+          [runtime.PROMPT_HOST_PORT_ID]: {
+            workspaceRoot,
+            resolveUserSource: () => runtime.prepareUserPromptSource(config.dataRoot),
+            resolveSource: (root: string) =>
+              runtime.prepareRuntimePromptSource({ dataRoot: config.dataRoot, workspaceRoot: root }),
+          },
+          ...createNodeToolHostServices({
+            nonoPath: resolveNodeHostNonoPath(process.env, CLI_REPO_ROOT),
+            python: resolveNodeHostPython(process.env, CLI_REPO_ROOT, config.dataRoot),
+            workspaceRoot,
+            tmpRoot: join(config.dataRoot, "runtime/tmp"),
+            model: config.defaultModel,
+            readArtifact,
+            resolveArtifact,
+          }),
+        },
+      });
+      const profile = await runtime.bootProfileRuntime({
+        host,
+        dataRoot: config.dataRoot,
+        hostServices,
+        gracefulShutdownMs: 10000,
+        finalShutdownMs: 4000,
         composition: runtime.createProfileComposition(runtime.RUNTIME_PROFILE_IDS.host, host),
-        toolEnvironment: { workspaceRoot, permissionMode: "default", hostCapabilities: new Set(capabilities), capabilitySet, approvalBroker: approvals, createArtifact: input => artifacts.create(input), resolveArtifact },
+        toolEnvironment: {
+          workspaceRoot,
+          permissionMode: "default",
+          hostCapabilities: new Set(capabilities),
+          capabilitySet,
+          approvalBroker: approvals,
+          createArtifact: (input) => artifacts.create(input),
+          resolveArtifact,
+        },
         cordis: { configPath: runtime.runtimeCordisConfigPath(), admission: await runtime.inspectCordisAdmission() },
         onLiveEvent,
       });
@@ -44,18 +115,21 @@ export async function startRemoteHost(config: HostConfig, options: { mock?: bool
           application,
           beginDrain: () => agentRuntime.runs.service.beginDrain(),
           waitForOwnedRuns: () => agentRuntime.runs.service.waitForOwnedRuns(),
-          backgroundTask: async sessionId => agentRuntime.backgroundTasks.hasRunning(sessionId),
+          backgroundTask: async (sessionId) => agentRuntime.backgroundTasks.hasRunning(sessionId),
           activeSubagents: () => agentRuntime.subagents.activeCount,
           recovery: () => agentRuntime.harnesses.inspect(),
-          subscribeTasks: listener => {
+          subscribeTasks: (listener) => {
             const remove = profile.context.on?.("agent/tasks-updated", listener);
-            return typeof remove === "function" ? remove as () => void : () => {};
+            return typeof remove === "function" ? (remove as () => void) : () => {};
           },
           shutdown: () => profile.shutdown(),
         };
       } catch (error) {
-        try { await profile.shutdown(); }
-        catch (cleanupError) { throw new AggregateError([error, cleanupError], "Host Runtime assembly failed"); }
+        try {
+          await profile.shutdown();
+        } catch (cleanupError) {
+          throw new AggregateError([error, cleanupError], "Host Runtime assembly failed");
+        }
         throw error;
       }
     },

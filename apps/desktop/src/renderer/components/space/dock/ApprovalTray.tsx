@@ -17,12 +17,24 @@ export function ApprovalTray() {
   const open = state.trayOpen && list.length > 0;
   return (
     <div aria-live="polite" className="empty:hidden">
-      {open ? <TrayCard list={list} index={Math.min(state.trayIdx, list.length - 1)} actors={state.actors} actions={actions} /> : null}
+      {open ? (
+        <TrayCard
+          list={list}
+          index={Math.min(state.trayIdx, list.length - 1)}
+          actors={state.actors}
+          actions={actions}
+        />
+      ) : null}
     </div>
   );
 }
 
-function TrayCard({ list, index, actors, actions }: {
+function TrayCard({
+  list,
+  index,
+  actors,
+  actions,
+}: {
   list: SpaceMember[];
   index: number;
   actors: Record<string, RosterActor>;
@@ -35,19 +47,33 @@ function TrayCard({ list, index, actors, actions }: {
       <ActorAvatar id={member.id} actor={actors[member.id]} size={22} />
       <div className="min-w-0 flex-1">
         <div className="text-act-sm font-medium text-text-main">{name}想运行一条命令</div>
-        <div className="truncate font-mono text-act-xs text-text-muted" title={member.approval?.cmd}>{member.approval?.cmd}</div>
+        <div className="truncate font-mono text-act-xs text-text-muted" title={member.approval?.cmd}>
+          {member.approval?.cmd}
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         {list.length > 1 ? (
           <>
-            <IconButton label="上一个" size="xs" onClick={actions.trayPrev}><ChevronLeft size={14} aria-hidden="true" /></IconButton>
-            <span className="text-act-xs text-text-muted tabular-nums">{index + 1}/{list.length}</span>
-            <IconButton label="下一个" size="xs" onClick={actions.trayNext}><ChevronRight size={14} aria-hidden="true" /></IconButton>
+            <IconButton label="上一个" size="xs" onClick={actions.trayPrev}>
+              <ChevronLeft size={14} aria-hidden="true" />
+            </IconButton>
+            <span className="text-act-xs text-text-muted tabular-nums">
+              {index + 1}/{list.length}
+            </span>
+            <IconButton label="下一个" size="xs" onClick={actions.trayNext}>
+              <ChevronRight size={14} aria-hidden="true" />
+            </IconButton>
           </>
         ) : null}
-        <Button variant="ghost" size="xs" onClick={() => actions.trayView(member.id)}>查看</Button>
-        <Button variant="secondary" size="xs" onClick={() => actions.deny(member.id)}>拒绝</Button>
-        <Button variant="primary" size="xs" onClick={() => actions.approve(member.id)}>运行</Button>
+        <Button variant="ghost" size="xs" onClick={() => actions.trayView(member.id)}>
+          查看
+        </Button>
+        <Button variant="secondary" size="xs" onClick={() => actions.deny(member.id)}>
+          拒绝
+        </Button>
+        <Button variant="primary" size="xs" onClick={() => actions.approve(member.id)}>
+          运行
+        </Button>
       </div>
     </div>
   );

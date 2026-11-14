@@ -20,7 +20,13 @@ export function OpenFileFallbackProvider({ children }: { children: ReactNode }) 
   return (
     <OpenFileFallbackContext.Provider value={open}>
       {children}
-      {target ? <OpenFileFallbackDialog key={`${target.workspaceRoot}\u0000${target.relativePath}`} target={target} onClose={() => setTarget(null)} /> : null}
+      {target ? (
+        <OpenFileFallbackDialog
+          key={`${target.workspaceRoot}\u0000${target.relativePath}`}
+          target={target}
+          onClose={() => setTarget(null)}
+        />
+      ) : null}
     </OpenFileFallbackContext.Provider>
   );
 }

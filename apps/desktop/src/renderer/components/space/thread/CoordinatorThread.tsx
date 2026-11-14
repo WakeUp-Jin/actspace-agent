@@ -15,7 +15,11 @@ function MemoryNote({ message }: { message: Extract<CoordinatorMessage, { k: "me
       <span className={`min-w-0 flex-1 pt-px [overflow-wrap:anywhere] ${gone ? "text-text-faint line-through" : ""}`}>
         记下了「<b className="font-medium text-text-main">{message.t}</b>」{gone ? " · 已撤销" : ""}
       </span>
-      {gone ? null : <Button variant="ghost" size="xs" onClick={() => undoMemory(message.mid)}>撤销</Button>}
+      {gone ? null : (
+        <Button variant="ghost" size="xs" onClick={() => undoMemory(message.mid)}>
+          撤销
+        </Button>
+      )}
     </div>
   );
 }
@@ -47,7 +51,9 @@ function CoordinatorMessageView({ message }: { message: CoordinatorMessage }) {
 export function CoordinatorThread({ msgs }: { msgs: readonly CoordinatorMessage[] }) {
   return (
     <>
-      {msgs.map((m, i) => <CoordinatorMessageView key={i} message={m} />)}
+      {msgs.map((m, i) => (
+        <CoordinatorMessageView key={i} message={m} />
+      ))}
     </>
   );
 }

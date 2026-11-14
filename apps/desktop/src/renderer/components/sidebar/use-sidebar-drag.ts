@@ -25,43 +25,62 @@ export function useSidebarDrag(onReorder: SidebarReorder) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [drop, setDrop] = useState<DropState | null>(null);
 
-  const clear = useCallback(() => { setDrag(null); setDrop(null); }, []);
+  const clear = useCallback(() => {
+    setDrag(null);
+    setDrop(null);
+  }, []);
 
-  const rowDrag = useCallback((account: string, id: string): RowDrag => ({
-    draggable: true,
-    onDragStart: (event) => {
-      event.stopPropagation();
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", id);
-      setDrag({ account, id });
-    },
-    onDragOver: (event) => {
-      if (!drag || drag.account !== account) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (drag.id === id) { if (drop) setDrop(null); return; }
-      event.dataTransfer.dropEffect = "move";
-      const rect = event.currentTarget.getBoundingClientRect();
-      const after = event.clientY > rect.top + rect.height / 2;
-      if (drop?.id !== id || drop.after !== after) setDrop({ id, after });
-    },
-    onDrop: (event) => {
-      if (!drag || drag.account !== account) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (drag.id !== id && drop?.id === id) onReorder(account, drag.id, id, drop.after);
-      clear();
-    },
-    onDragEnd: clear,
-    dropPosition: drag && drag.account === account && drop?.id === id ? (drop.after ? "after" : "before") : null,
-    isDragging: drag?.account === account && drag.id === id,
-  }), [clear, drag, drop, onReorder]);
+  const rowDrag = useCallback(
+    (account: string, id: string): RowDrag => ({
+      draggable: true,
+      onDragStart: (event) => {
+        event.stopPropagation();
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", id);
+        setDrag({ account, id });
+      },
+      onDragOver: (event) => {
+        if (!drag || drag.account !== account) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (drag.id === id) {
+          if (drop) setDrop(null);
+          return;
+        }
+        event.dataTransfer.dropEffect = "move";
+        const rect = event.currentTarget.getBoundingClientRect();
+        const after = event.clientY > rect.top + rect.height / 2;
+        if (drop?.id !== id || drop.after !== after) setDrop({ id, after });
+      },
+      onDrop: (event) => {
+        if (!drag || drag.account !== account) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (drag.id !== id && drop?.id === id) onReorder(account, drag.id, id, drop.after);
+        clear();
+      },
+      onDragEnd: clear,
+      dropPosition: drag && drag.account === account && drop?.id === id ? (drop.after ? "after" : "before") : null,
+      isDragging: drag?.account === account && drag.id === id,
+    }),
+    [clear, drag, drop, onReorder],
+  );
 
   /** 挂在整个列表容器上：拖到行与行的空隙里不显示「禁止」光标。 */
-  const containerProps = useMemo(() => ({
-    onDragOver: (event: DragEvent<HTMLElement>) => { if (drag) event.preventDefault(); },
-    onDrop: (event: DragEvent<HTMLElement>) => { if (drag) { event.preventDefault(); clear(); } },
-  }), [clear, drag]);
+  const containerProps = useMemo(
+    () => ({
+      onDragOver: (event: DragEvent<HTMLElement>) => {
+        if (drag) event.preventDefault();
+      },
+      onDrop: (event: DragEvent<HTMLElement>) => {
+        if (drag) {
+          event.preventDefault();
+          clear();
+        }
+      },
+    }),
+    [clear, drag],
+  );
 
   return { rowDrag, containerProps, dragging: drag !== null };
 }

@@ -14,7 +14,9 @@ export function SpaceThread() {
   const member = tab === COORD_TAB ? undefined : findMember(space, tab);
 
   const last = space.msgs[space.msgs.length - 1];
-  const lastKey = last ? `${last.k}:${"shown" in last ? last.shown : ""}:${"typing" in last ? last.typing : ""}:${"state" in last ? last.state : ""}` : "";
+  const lastKey = last
+    ? `${last.k}:${"shown" in last ? last.shown : ""}:${"typing" in last ? last.typing : ""}:${"state" in last ? last.state : ""}`
+    : "";
   const followKey = member
     ? `${member.transcript.length}:${member.status}:${member.denied ? 1 : 0}`
     : `${space.msgs.length}:${lastKey}`;
@@ -22,13 +24,20 @@ export function SpaceThread() {
 
   const blank = !member && space.msgs.length === 0;
   return (
-    <div ref={ref} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto" data-space-thread={member ? "actor" : blank ? "blank" : "coord"}>
+    <div
+      ref={ref}
+      onScroll={onScroll}
+      className="min-h-0 flex-1 overflow-y-auto"
+      data-space-thread={member ? "actor" : blank ? "blank" : "coord"}
+    >
       {member ? (
         <ActorThread member={member} actor={state.actors[member.id]} />
       ) : blank ? (
         <SpaceBlank space={space} />
       ) : (
-        <ThreadColumn><CoordinatorThread msgs={space.msgs} /></ThreadColumn>
+        <ThreadColumn>
+          <CoordinatorThread msgs={space.msgs} />
+        </ThreadColumn>
       )}
     </div>
   );

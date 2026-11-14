@@ -196,10 +196,39 @@ export type PresentedFile = {
 
 export type ToolUiPreview =
   | { kind: "read"; filePath: string; range?: string; displayText: string; resultPreview?: string[] }
-  | { kind: "search"; query: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }
-  | { kind: "grep"; pattern: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }
-  | { kind: "glob"; pattern: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }
-  | { kind: "web_search"; mode: "query" | "url"; query?: string; url?: string; displayText: string; resultUrls?: string[]; contentPreview?: string }
+  | {
+      kind: "search";
+      query: string;
+      scope?: string;
+      resultCount?: number;
+      displayText: string;
+      resultPreview?: string[];
+    }
+  | {
+      kind: "grep";
+      pattern: string;
+      scope?: string;
+      resultCount?: number;
+      displayText: string;
+      resultPreview?: string[];
+    }
+  | {
+      kind: "glob";
+      pattern: string;
+      scope?: string;
+      resultCount?: number;
+      displayText: string;
+      resultPreview?: string[];
+    }
+  | {
+      kind: "web_search";
+      mode: "query" | "url";
+      query?: string;
+      url?: string;
+      displayText: string;
+      resultUrls?: string[];
+      contentPreview?: string;
+    }
   | { kind: "media_analysis"; mediaName: string; mediaKind: "image" | "video" | "media"; displayText: string }
   | {
       kind: "image_generation";
@@ -258,7 +287,12 @@ export type ToolUiPreview =
       status?: "pending" | "running" | "completed" | "failed" | "denied";
       approvalRequestId?: string;
     }
-  | { kind: "present"; files: PresentedFile[]; displayText: string; status?: "running" | "completed" | "failed" | "denied" }
+  | {
+      kind: "present";
+      files: PresentedFile[];
+      displayText: string;
+      status?: "running" | "completed" | "failed" | "denied";
+    }
   | BashPreview
   | AgentToolPreview
   | TodoUiPreview
@@ -267,14 +301,7 @@ export type ToolUiPreview =
 /** `send_message` 与停止子智能体的 `task_stop`（老会话 `interrupt_agent`）行：动词加目标子智能体，点目标名打开它（设计 05 §1）。 */
 export type SubagentToolLink = { agentId: string; verb: string; target: string };
 
-export type BashStatus =
-  | "pending"
-  | "running"
-  | "success"
-  | "failed"
-  | "denied"
-  | "expired"
-  | "cancelled";
+export type BashStatus = "pending" | "running" | "success" | "failed" | "denied" | "expired" | "cancelled";
 
 export type BashPreview = {
   kind: "bash";

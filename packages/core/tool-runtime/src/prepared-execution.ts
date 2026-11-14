@@ -1,10 +1,26 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { ApprovalReason, ApprovalResourceSummary, CoreEventDataMap, GrantAudience, GrantSuggestion, PermissionMode, RuntimeJsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
+import type {
+  ApprovalReason,
+  ApprovalResourceSummary,
+  CoreEventDataMap,
+  GrantAudience,
+  GrantSuggestion,
+  PermissionMode,
+  RuntimeJsonValue,
+  SessionGrant,
+} from "@actspace/shared/runtime-v2";
 import type { ToolActivationLease } from "./activation-lease.js";
 import { materializeToolArguments } from "./argument-validator.js";
 import type { ApprovalBroker, ApprovalRequest } from "@actspace/approval";
 import { canonicalJson } from "./definition.js";
-import type { ToolArtifactOwner, ToolArtifactRef, ToolBodyResult, ToolCapabilitySet, ToolExecutionContext, ToolProgressUpdate } from "./executor.js";
+import type {
+  ToolArtifactOwner,
+  ToolArtifactRef,
+  ToolBodyResult,
+  ToolCapabilitySet,
+  ToolExecutionContext,
+  ToolProgressUpdate,
+} from "./executor.js";
 import type { ToolArgumentsPatch, ToolExecutePatch } from "./hooks.js";
 import { enforceCoreToolGuards } from "./core-guards.js";
 import { ToolRuntimeError, type ToolFailure } from "./errors.js";
@@ -15,7 +31,19 @@ import type { CapturedToolRegistration } from "./registry.js";
 import type { ToolExecutionResult } from "./result.js";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { waterfallDispatch } from "@actspace/cordis-adapter";
-import { grantCoversProcess, matchingProcessGrant, canonicalizeFileResource, combinePermissionDecisions, evaluateGlobalBoundary, isPathWithin, sessionGrantsCoverResources, type OnceApproval, type ToolGrantSuggestion, type ToolPermissionDecision, type ToolResource } from "./permission/index.js";
+import {
+  grantCoversProcess,
+  matchingProcessGrant,
+  canonicalizeFileResource,
+  combinePermissionDecisions,
+  evaluateGlobalBoundary,
+  isPathWithin,
+  sessionGrantsCoverResources,
+  type OnceApproval,
+  type ToolGrantSuggestion,
+  type ToolPermissionDecision,
+  type ToolResource,
+} from "./permission/index.js";
 
 /** 3 hours: a user who steps away should still find the approval card when they return. */
 const DEFAULT_APPROVAL_TIMEOUT_MS = 3 * 60 * 60_000;
@@ -38,7 +66,12 @@ export type ToolCallInput = {
 export type ToolDispatchFact = CoreEventDataMap["tool-workflow/run-start"];
 
 /** 工具执行过程中由 Tool Runtime 记的权限事件；每种事件的 `data` 见 shared 的 `CoreEventDataMap`。 */
-export type ToolPermissionEventType = "permission/asked" | "permission/decided" | "permission/scope-denied" | "permission/grant-added" | "permission/grant-used";
+export type ToolPermissionEventType =
+  | "permission/asked"
+  | "permission/decided"
+  | "permission/scope-denied"
+  | "permission/grant-added"
+  | "permission/grant-used";
 
 export interface ToolJournalPort {
   recordDispatch(fact: ToolDispatchFact): Promise<void>;
@@ -47,10 +80,18 @@ export interface ToolJournalPort {
   recordPermission?<T extends ToolPermissionEventType>(type: T, data: CoreEventDataMap[T]): Promise<void>;
 }
 
-export type AutoReviewInput = { readonly callId: string; readonly model?: string; readonly workspaceRoot: string; readonly action: unknown; readonly signal: AbortSignal };
+export type AutoReviewInput = {
+  readonly callId: string;
+  readonly model?: string;
+  readonly workspaceRoot: string;
+  readonly action: unknown;
+  readonly signal: AbortSignal;
+};
 export type ToolPreparedEnvironment = {
   readonly mainModel?: string;
-  readonly autoReview?: (input: AutoReviewInput) => Promise<{ readonly approved: boolean; readonly reason?: string | null }>;
+  readonly autoReview?: (
+    input: AutoReviewInput,
+  ) => Promise<{ readonly approved: boolean; readonly reason?: string | null }>;
 
   /** Bound by the owning Agent Loop; production Tool Runtime rejects missing scopes. */
   readonly allowedToolNames?: ReadonlySet<string>;
@@ -89,15 +130,17 @@ export type ToolPreparedEnvironment = {
   readonly trustedGrantAudiences?: ReadonlySet<string>;
   readonly journal: ToolJournalPort;
   readonly onExecutionStarted?: (call: { readonly callId: string; readonly name: string }) => void;
-  readonly reportProgress?: (update: ToolProgressUpdate & {
-    readonly sessionId: string;
-    readonly agentRunId: string;
-    readonly turnId: string;
-    readonly stepId: string;
-    readonly callId: string;
-    readonly pluginId: string;
-    readonly name: string;
-  }) => void;
+  readonly reportProgress?: (
+    update: ToolProgressUpdate & {
+      readonly sessionId: string;
+      readonly agentRunId: string;
+      readonly turnId: string;
+      readonly stepId: string;
+      readonly callId: string;
+      readonly pluginId: string;
+      readonly name: string;
+    },
+  ) => void;
   readonly notifyAgent?: (content: RuntimeJsonValue) => Promise<void>;
   /** Cordis scope carrier shared with the owning Agent Loop. */
   readonly eventCarrier?: object;
@@ -128,7 +171,9 @@ export class PreparedToolExecution {
   readonly definitionDigest: string;
   readonly concurrency: "exclusive" | "parallel";
   readonly #controller = new AbortController();
-  readonly #onCallerAbort = (): void => { this.#controller.abort(this.input.signal?.reason); };
+  readonly #onCallerAbort = (): void => {
+    this.#controller.abort(this.input.signal?.reason);
+  };
   readonly #lease: ToolActivationLease;
   #args: Readonly<Record<string, RuntimeJsonValue>> | undefined;
   #finalizers: Array<() => Promise<void>> = [];
@@ -172,24 +217,53 @@ export class PreparedToolExecution {
     try {
       if (this.environment.allowedToolNames !== undefined && !this.environment.allowedToolNames.has(this.name)) {
         const reason = `Tool ${this.name} is outside this Agent scope.`;
-        await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: "TOOL_SCOPE_DENIED", reason });
-        return this.#rememberTerminal(this.#failureResult("denied", { code: "TOOL_SCOPE_DENIED", message: reason, retryable: false, phase: "policy" }));
+        await this.#recordPermission("permission/scope-denied", {
+          callId: this.callId,
+          code: "TOOL_SCOPE_DENIED",
+          reason,
+        });
+        return this.#rememberTerminal(
+          this.#failureResult("denied", {
+            code: "TOOL_SCOPE_DENIED",
+            message: reason,
+            retryable: false,
+            phase: "policy",
+          }),
+        );
       }
       const blocked = this.environment.blockedToolMessage?.(this.name);
       if (blocked !== undefined) {
-        await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: "SUBAGENT_TOOL_BLOCKED", reason: blocked });
-        return this.#rememberTerminal(this.#failureResult("denied", { code: "SUBAGENT_TOOL_BLOCKED", message: blocked, retryable: false, phase: "policy" }));
+        await this.#recordPermission("permission/scope-denied", {
+          callId: this.callId,
+          code: "SUBAGENT_TOOL_BLOCKED",
+          reason: blocked,
+        });
+        return this.#rememberTerminal(
+          this.#failureResult("denied", {
+            code: "SUBAGENT_TOOL_BLOCKED",
+            message: blocked,
+            retryable: false,
+            phase: "policy",
+          }),
+        );
       }
       this.#checkToolScope();
       this.#args = materializeToolArguments(this.registration.definition.inputSchema, this.input.arguments);
       if (this.environment.context !== undefined) {
-        const transformed = await waterfallDispatch(this.environment.context, "tools/pre-execute", {
-          callId: this.callId,
-          name: this.name,
-          args: this.#args,
-          definitionDigest: this.definitionDigest,
-        }, () => ({ callId: this.callId, name: this.name, args: this.#args, definitionDigest: this.definitionDigest }), this.environment.eventCarrier);
-        if (isArgsPatch(transformed)) this.#args = materializeToolArguments(this.registration.definition.inputSchema, transformed.args);
+        const transformed = await waterfallDispatch(
+          this.environment.context,
+          "tools/pre-execute",
+          {
+            callId: this.callId,
+            name: this.name,
+            args: this.#args,
+            definitionDigest: this.definitionDigest,
+          },
+          () => ({ callId: this.callId, name: this.name, args: this.#args, definitionDigest: this.definitionDigest }),
+          this.environment.eventCarrier,
+        );
+        if (isArgsPatch(transformed))
+          this.#args = materializeToolArguments(this.registration.definition.inputSchema, transformed.args);
       }
       enforceCoreToolGuards({
         definition: this.registration.definition,
@@ -206,28 +280,51 @@ export class PreparedToolExecution {
         this.#approvalReason = undefined;
         this.#onceApproval = undefined;
         this.#admittedBySessionGrant = false;
-        this.#resources = Object.freeze(await this.registration.permission.extractResources(this.#args, {
+        this.#resources = Object.freeze(
+          await this.registration.permission.extractResources(this.#args, {
+            mode,
+            workspaceRoot: this.environment.workspaceRoot,
+            canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot),
+          }),
+        );
+        const global = evaluateGlobalBoundary(
           mode,
-          workspaceRoot: this.environment.workspaceRoot,
-          canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot),
-        }));
-        const global = evaluateGlobalBoundary(mode, this.environment.workspaceRoot, this.#resources, this.environment.isHostReadablePath, this.environment.isHostWritablePath);
+          this.environment.workspaceRoot,
+          this.#resources,
+          this.environment.isHostReadablePath,
+          this.environment.isHostWritablePath,
+        );
         const tool = await this.registration.permission.evaluate(this.#args, this.#resources, {
           mode,
           workspaceRoot: this.environment.workspaceRoot,
           hostCapabilities: [...this.environment.hostCapabilities].sort(),
         });
         const globalWithGrant = this.#resolveGlobalGrant(global, tool);
-        const processGrant = global.kind === "pass" && tool.kind === "ask" && tool.reusable === true ? this.#processGrant() : undefined;
+        const processGrant =
+          global.kind === "pass" && tool.kind === "ask" && tool.reusable === true ? this.#processGrant() : undefined;
         if (processGrant) this.#admittedBySessionGrant = true;
         if (this.#admittedBySessionGrant) this.#approvalMode = "session";
         const permission = combinePermissionDecisions(globalWithGrant, processGrant ? { kind: "allow" } : tool);
         if (permission.kind === "deny") {
-          await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: permission.code, reason: permission.reason });
-          return this.#rememberTerminal(this.#failureResult("denied", { code: permission.code || "POLICY_DENIED", message: permission.reason, retryable: false, phase: "policy" }));
+          await this.#recordPermission("permission/scope-denied", {
+            callId: this.callId,
+            code: permission.code,
+            reason: permission.reason,
+          });
+          return this.#rememberTerminal(
+            this.#failureResult("denied", {
+              code: permission.code || "POLICY_DENIED",
+              message: permission.reason,
+              retryable: false,
+              phase: "policy",
+            }),
+          );
         }
         if (permission.kind === "ask") {
-          const approval = await this.#requestApproval(mode, permission.reasons.map(({ code, message, risk, reusable }) => ({ code, message, risk, reusable })));
+          const approval = await this.#requestApproval(
+            mode,
+            permission.reasons.map(({ code, message, risk, reusable }) => ({ code, message, risk, reusable })),
+          );
           if (approval === "mode-changed") continue;
           if (!isOnceApproval(approval)) return this.#rememberTerminal(this.#failureResult("denied", approval));
           this.#onceApproval = approval;
@@ -237,35 +334,83 @@ export class PreparedToolExecution {
       }
       this.#admittedMode = mode;
       const usedGrant = this.#admittedBySessionGrant ? this.#processGrant() : undefined;
-      if (this.#admittedBySessionGrant && this.#resources.some(resource => resource.kind === "process") && !usedGrant) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "Session Grant is no longer available.", retryable: true, phase: "approval" });
-      if (usedGrant && !this.environment.journal.recordPermission) throw new ToolRuntimeError({ code: "GRANT_AUDIT_UNAVAILABLE", message: "Session Grant audit is unavailable.", retryable: false, phase: "approval" });
-      if (usedGrant) await this.#recordPermission("permission/grant-used", {
-        schemaVersion: 1, grantId: usedGrant.grantId, sessionId: this.input.sessionId,
-        agentId: this.input.agentId ?? `main:${this.input.sessionId}`, callId: this.callId,
-        pluginId: this.pluginId, toolName: this.name,
-        commandDigest: (this.#resources[0] as Extract<ToolResource, { kind: "process" }>).commandDigest,
-        usedAt: new Date().toISOString(),
+      if (this.#admittedBySessionGrant && this.#resources.some((resource) => resource.kind === "process") && !usedGrant)
+        throw new ToolRuntimeError({
+          code: "GRANT_REVOKED",
+          message: "Session Grant is no longer available.",
+          retryable: true,
+          phase: "approval",
+        });
+      if (usedGrant && !this.environment.journal.recordPermission)
+        throw new ToolRuntimeError({
+          code: "GRANT_AUDIT_UNAVAILABLE",
+          message: "Session Grant audit is unavailable.",
+          retryable: false,
+          phase: "approval",
+        });
+      if (usedGrant)
+        await this.#recordPermission("permission/grant-used", {
+          schemaVersion: 1,
+          grantId: usedGrant.grantId,
+          sessionId: this.input.sessionId,
+          agentId: this.input.agentId ?? `main:${this.input.sessionId}`,
+          callId: this.callId,
+          pluginId: this.pluginId,
+          toolName: this.name,
+          commandDigest: (this.#resources[0] as Extract<ToolResource, { kind: "process" }>).commandDigest,
+          usedAt: new Date().toISOString(),
+        });
+      await this.environment.journal.recordDispatch({
+        callId: this.callId,
+        pluginId: this.pluginId,
+        name: this.name,
+        registrationId: this.registrationId,
+        definitionVersion: this.definitionVersion,
+        definitionDigest: this.definitionDigest,
       });
-      await this.environment.journal.recordDispatch({ callId: this.callId, pluginId: this.pluginId, name: this.name, registrationId: this.registrationId, definitionVersion: this.definitionVersion, definitionDigest: this.definitionDigest });
       try {
         await this.environment.journal.checkpointBeforeBody();
       } catch {
-        return this.#rememberTerminal(this.#failureResult("failed", { code: "CHECKPOINT_FAILED", message: "Tool dispatch could not pass its durability checkpoint.", retryable: true, phase: "checkpoint" }));
+        return this.#rememberTerminal(
+          this.#failureResult("failed", {
+            code: "CHECKPOINT_FAILED",
+            message: "Tool dispatch could not pass its durability checkpoint.",
+            retryable: true,
+            phase: "checkpoint",
+          }),
+        );
       }
       this.#checkToolScope();
-      if (usedGrant && this.#processGrant()?.grantId !== usedGrant.grantId) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "Session Grant changed before execution.", retryable: true, phase: "approval" });
+      if (usedGrant && this.#processGrant()?.grantId !== usedGrant.grantId)
+        throw new ToolRuntimeError({
+          code: "GRANT_REVOKED",
+          message: "Session Grant changed before execution.",
+          retryable: true,
+          phase: "approval",
+        });
       this.#checkAdmittedMode();
       this.#stage = Object.freeze({ kind: "body" });
       return this.#stage;
     } catch (error) {
       const failure = toFailure(error, this.#controller.signal.aborted ? "guard" : "prepare");
-      return this.#rememberTerminal(this.#failureResult(failure.code === "TOOL_ABORTED" ? "aborted" : failure.code.includes("DENIED") ? "denied" : "failed", failure));
+      return this.#rememberTerminal(
+        this.#failureResult(
+          failure.code === "TOOL_ABORTED" ? "aborted" : failure.code.includes("DENIED") ? "denied" : "failed",
+          failure,
+        ),
+      );
     }
   }
 
   async runBody(): Promise<ToolBodyResult> {
     const stage = await this.stage();
-    if (stage.kind !== "body") throw new ToolRuntimeError({ code: "TOOL_ALREADY_EXECUTED", message: "Prepared call has no body stage.", retryable: false, phase: "body" });
+    if (stage.kind !== "body")
+      throw new ToolRuntimeError({
+        code: "TOOL_ALREADY_EXECUTED",
+        message: "Prepared call has no body stage.",
+        retryable: false,
+        phase: "body",
+      });
     if (this.#body !== undefined) return this.#body;
     const context: ToolExecutionContext = {
       pluginId: this.pluginId,
@@ -281,43 +426,66 @@ export class PreparedToolExecution {
       stepId: this.input.stepId,
       signal: this.#controller.signal,
       capabilities: this.environment.capabilitySet,
-      reportProgress: (update) => this.environment.reportProgress?.({
-        ...update,
-        sessionId: this.input.sessionId,
-        agentRunId: this.input.agentRunId,
-        turnId: this.input.turnId,
-        stepId: this.input.stepId,
-        callId: this.callId,
-        pluginId: this.pluginId,
-        name: this.name,
-      }),
-      ...(this.environment.approvalBroker === undefined ? {} : { requestApproval: this.environment.approvalBroker.requestApproval.bind(this.environment.approvalBroker) }),
+      reportProgress: (update) =>
+        this.environment.reportProgress?.({
+          ...update,
+          sessionId: this.input.sessionId,
+          agentRunId: this.input.agentRunId,
+          turnId: this.input.turnId,
+          stepId: this.input.stepId,
+          callId: this.callId,
+          pluginId: this.pluginId,
+          name: this.name,
+        }),
+      ...(this.environment.approvalBroker === undefined
+        ? {}
+        : { requestApproval: this.environment.approvalBroker.requestApproval.bind(this.environment.approvalBroker) }),
       ...(this.environment.notifyAgent === undefined ? {} : { notifyAgent: this.environment.notifyAgent }),
       ...(this.environment.backgroundAllowed === false ? { backgroundAllowed: false } : {}),
-      createArtifact: (input) => this.environment.createArtifact({
-        ...input,
-        owner: { sessionId: this.input.sessionId, callId: this.callId, pluginId: this.pluginId, name: this.name },
-      }),
+      createArtifact: (input) =>
+        this.environment.createArtifact({
+          ...input,
+          owner: { sessionId: this.input.sessionId, callId: this.callId, pluginId: this.pluginId, name: this.name },
+        }),
       defer: (finalizer) => this.#finalizers.push(finalizer),
     };
     try {
       const invoke = async () => {
         this.#checkToolScope();
         this.#checkAdmittedMode();
-        try { this.environment.onExecutionStarted?.({ callId: this.callId, name: this.name }); } catch { /* Observers cannot affect tool execution. */ }
+        try {
+          this.environment.onExecutionStarted?.({ callId: this.callId, name: this.name });
+        } catch {
+          /* Observers cannot affect tool execution. */
+        }
         return this.registration.executor.execute(this.#args ?? {}, context);
       };
       if (this.environment.context === undefined) this.#body = await invoke();
       else {
-        const intercepted = await waterfallDispatch(this.environment.context, "tools/execute", { context, execute: invoke }, () => ({ context, execute: invoke }), this.environment.eventCarrier);
+        const intercepted = await waterfallDispatch(
+          this.environment.context,
+          "tools/execute",
+          { context, execute: invoke },
+          () => ({ context, execute: invoke }),
+          this.environment.eventCarrier,
+        );
         this.#body = isExecutePatch(intercepted) ? await intercepted.execute() : await invoke();
       }
     } catch (error) {
       this.#body = {
         status: "failed",
-        modelOutput: [{ type: "text", text: this.#controller.signal.aborted ? "Tool execution was aborted." : "Tool execution failed." }],
+        modelOutput: [
+          {
+            type: "text",
+            text: this.#controller.signal.aborted ? "Tool execution was aborted." : "Tool execution failed.",
+          },
+        ],
         summary: this.#controller.signal.aborted ? "Aborted" : "Execution failed",
-        failure: { code: this.#controller.signal.aborted ? "TOOL_ABORTED" : "TOOL_EXECUTION_FAILED", message: redactToolText(error instanceof Error ? error.message : String(error)), retryable: this.#controller.signal.aborted },
+        failure: {
+          code: this.#controller.signal.aborted ? "TOOL_ABORTED" : "TOOL_EXECUTION_FAILED",
+          message: redactToolText(error instanceof Error ? error.message : String(error)),
+          retryable: this.#controller.signal.aborted,
+        },
       };
     }
     return this.#body;
@@ -335,19 +503,36 @@ export class PreparedToolExecution {
     const finalizerFailures: ToolFailure[] = [];
     if (this.environment.context !== undefined) {
       try {
-        const transformed = await waterfallDispatch(this.environment.context, "tools/post-execute", body, () => body, this.environment.eventCarrier);
+        const transformed = await waterfallDispatch(
+          this.environment.context,
+          "tools/post-execute",
+          body,
+          () => body,
+          this.environment.eventCarrier,
+        );
         // Presentation can change; completed/failed execution facts cannot.
         if (isToolBodyResult(transformed)) body = { ...transformed, ...outcome };
-      } catch (error) { finalizerFailures.push(toFailure(error, "finalize")); }
+      } catch (error) {
+        finalizerFailures.push(toFailure(error, "finalize"));
+      }
     }
     for (const finalizer of [...this.#finalizers].reverse()) {
-      try { await finalizer(); } catch (error) { finalizerFailures.push(toFailure(error, "finalize")); }
+      try {
+        await finalizer();
+      } catch (error) {
+        finalizerFailures.push(toFailure(error, "finalize"));
+      }
     }
     // 超过上限的部分在这里截短；完整输出转存成这次调用拥有的文件（agent-spec-tool-runtime-abi.md §7.7）。
     const result = this.#normalizeBody({ ...body, ...outcome }, finalizerFailures);
     return boundToolResult(result, {
       modelOutputChars: this.#takeOutputAllowance(result),
-      saveFullOutput: (text) => this.environment.createArtifact({ bytes: Buffer.from(text, "utf8"), mediaType: "text/plain", owner: { sessionId: this.input.sessionId, callId: this.callId, pluginId: this.pluginId, name: this.name } }),
+      saveFullOutput: (text) =>
+        this.environment.createArtifact({
+          bytes: Buffer.from(text, "utf8"),
+          mediaType: "text/plain",
+          owner: { sessionId: this.input.sessionId, callId: this.callId, pluginId: this.pluginId, name: this.name },
+        }),
     });
   }
 
@@ -359,7 +544,13 @@ export class PreparedToolExecution {
   }
 
   async execute(): Promise<ToolExecutionResult> {
-    if (this.#executed) throw new ToolRuntimeError({ code: "TOOL_ALREADY_EXECUTED", message: `Prepared tool call ${this.callId} is one-shot.`, retryable: false, phase: "prepare" });
+    if (this.#executed)
+      throw new ToolRuntimeError({
+        code: "TOOL_ALREADY_EXECUTED",
+        message: `Prepared tool call ${this.callId} is one-shot.`,
+        retryable: false,
+        phase: "prepare",
+      });
     this.#executed = true;
     try {
       const result = await this.finalize();
@@ -371,7 +562,13 @@ export class PreparedToolExecution {
   }
 
   async commit(result: ToolExecutionResult): Promise<void> {
-    if (this.#committed) throw new ToolRuntimeError({ code: "TOOL_COMMIT_FAILED", message: `Tool call ${this.callId} already committed.`, retryable: false, phase: "commit" });
+    if (this.#committed)
+      throw new ToolRuntimeError({
+        code: "TOOL_COMMIT_FAILED",
+        message: `Tool call ${this.callId} already committed.`,
+        retryable: false,
+        phase: "commit",
+      });
     this.#committed = true;
     await this.slot.commit(() => this.environment.journal.commitResult(result));
   }
@@ -387,7 +584,10 @@ export class PreparedToolExecution {
     await this.#releaseAfterUse();
   }
 
-  async #requestApproval(mode: PermissionMode, reasons: readonly RuntimeApprovalReason[]): Promise<OnceApproval | ToolFailure | "mode-changed"> {
+  async #requestApproval(
+    mode: PermissionMode,
+    reasons: readonly RuntimeApprovalReason[],
+  ): Promise<OnceApproval | ToolFailure | "mode-changed"> {
     if (mode === "auto-review") {
       const result = await this.#reviewAutomatically(mode, reasons);
       if (result === "mode-changed") return result;
@@ -395,10 +595,19 @@ export class PreparedToolExecution {
     }
     this.#approvalMode = "manual";
     if (this.environment.approvalBroker === undefined) {
-      return { code: "APPROVAL_REQUIRED", message: this.environment.approvalUnavailableMessage ?? "Host approval is required but no ApprovalBroker is available.", retryable: false, phase: "approval" };
+      return {
+        code: "APPROVAL_REQUIRED",
+        message:
+          this.environment.approvalUnavailableMessage ??
+          "Host approval is required but no ApprovalBroker is available.",
+        retryable: false,
+        phase: "approval",
+      };
     }
     const requestedAt = new Date();
-    const expiresAt = new Date(requestedAt.getTime() + (this.environment.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS));
+    const expiresAt = new Date(
+      requestedAt.getTime() + (this.environment.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS),
+    );
     const normalizedArgsDigest = createHash("sha256").update(canonicalJson(this.#args)).digest("hex");
     const grantSuggestions = await this.#grantSuggestions(reasons);
     const request: ApprovalRequest = {
@@ -426,42 +635,88 @@ export class PreparedToolExecution {
     if (this.#controller.signal.aborted) abort();
     let settled = false;
     let changed!: () => void;
-    const modeChanged = new Promise<"mode-changed">(resolve => { changed = () => {
-      if (this.#permissionMode() === mode) return;
-      // Give an already settled human decision priority over policy invalidation.
-      queueMicrotask(() => {
-        if (!settled && !this.#controller.signal.aborted && this.#permissionMode() !== mode) resolve("mode-changed");
-      });
-    }; });
+    const modeChanged = new Promise<"mode-changed">((resolve) => {
+      changed = () => {
+        if (this.#permissionMode() === mode) return;
+        // Give an already settled human decision priority over policy invalidation.
+        queueMicrotask(() => {
+          if (!settled && !this.#controller.signal.aborted && this.#permissionMode() !== mode) resolve("mode-changed");
+        });
+      };
+    });
     let unsubscribe: (() => void) | undefined;
     try {
       unsubscribe = this.environment.subscribePermissionMode?.(changed);
-      const response = this.environment.approvalBroker.requestApproval(request, requestController.signal).then(decision => { settled = true; return decision; });
+      const response = this.environment.approvalBroker
+        .requestApproval(request, requestController.signal)
+        .then((decision) => {
+          settled = true;
+          return decision;
+        });
       changed(); // Covers changes while recording the request or registering the listener.
-      let decision = await withTimeout(Promise.race([response, modeChanged]), Math.max(0, expiresAt.getTime() - Date.now()));
+      let decision = await withTimeout(
+        Promise.race([response, modeChanged]),
+        Math.max(0, expiresAt.getTime() - Date.now()),
+      );
       if (decision === "mode-changed") {
         requestController.abort("permission-mode-changed");
         const closed = await withTimeout(response, Math.max(0, expiresAt.getTime() - Date.now()));
         // A Host may have already accepted a refusal before cancellation reached it.
         if (closed.kind === "deny" && closed.code !== "aborted") decision = closed;
         else {
-          await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: "aborted", decidedAt: new Date().toISOString(), reason: "permission-mode-changed" });
+          await this.#recordPermission("permission/decided", {
+            requestId: request.requestId,
+            kind: "deny",
+            code: "aborted",
+            decidedAt: new Date().toISOString(),
+            reason: "permission-mode-changed",
+          });
           return "mode-changed";
         }
       }
       if (decision.requestId !== request.requestId) {
-        await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: "invalid-decision", decidedAt: new Date().toISOString() });
-        return { code: "APPROVAL_STALE", message: "Approval response does not match this request.", retryable: false, phase: "approval" };
+        await this.#recordPermission("permission/decided", {
+          requestId: request.requestId,
+          kind: "deny",
+          code: "invalid-decision",
+          decidedAt: new Date().toISOString(),
+        });
+        return {
+          code: "APPROVAL_STALE",
+          message: "Approval response does not match this request.",
+          retryable: false,
+          phase: "approval",
+        };
       }
       if (new Date(decision.decidedAt).getTime() > expiresAt.getTime()) {
-        await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: "timeout", decidedAt: new Date().toISOString() });
-        return { code: "APPROVAL_STALE", message: "Approval response arrived after the request expired.", retryable: false, phase: "approval" };
+        await this.#recordPermission("permission/decided", {
+          requestId: request.requestId,
+          kind: "deny",
+          code: "timeout",
+          decidedAt: new Date().toISOString(),
+        });
+        return {
+          code: "APPROVAL_STALE",
+          message: "Approval response arrived after the request expired.",
+          retryable: false,
+          phase: "approval",
+        };
       }
       if (decision.kind === "session") {
         const suggestion = grantSuggestions.find((candidate) => candidate.suggestionId === decision.suggestionId);
         if (suggestion === undefined) {
-          await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: "invalid-decision", decidedAt: new Date().toISOString() });
-          return { code: "APPROVAL_INVALID", message: "Approval selected an unknown grant suggestion.", retryable: false, phase: "approval" };
+          await this.#recordPermission("permission/decided", {
+            requestId: request.requestId,
+            kind: "deny",
+            code: "invalid-decision",
+            decidedAt: new Date().toISOString(),
+          });
+          return {
+            code: "APPROVAL_INVALID",
+            message: "Approval selected an unknown grant suggestion.",
+            retryable: false,
+            phase: "approval",
+          };
         }
         await this.#recordPermission("permission/decided", decision);
         const grant: SessionGrant = {
@@ -484,13 +739,43 @@ export class PreparedToolExecution {
       } else {
         await this.#recordPermission("permission/decided", decision);
       }
-      if (this.#approvalReason) this.#approvalReason += decision.kind === "once" || decision.kind === "session" ? "；人工允许" : "；人工未允许";
-      if (decision.kind === "deny" && decision.code === "timeout") return { code: "APPROVAL_TIMEOUT", message: APPROVAL_TIMEOUT_MESSAGE, retryable: false, phase: "approval" };
-      if (decision.kind !== "once" && decision.kind !== "session") return { code: decision.code === "broker-unavailable" ? "APPROVAL_REQUIRED" : "APPROVAL_DENIED", message: decision.code, retryable: false, phase: "approval" };
-      return { kind: "once", requestId: request.requestId, callId: this.callId, sessionId: this.input.sessionId, agentRunId: this.input.agentRunId, pluginId: this.pluginId, toolName: this.name, definitionDigest: this.definitionDigest, normalizedArgsDigest, issuedAt: decision.decidedAt, expiresAt: request.expiresAt };
+      if (this.#approvalReason)
+        this.#approvalReason += decision.kind === "once" || decision.kind === "session" ? "；人工允许" : "；人工未允许";
+      if (decision.kind === "deny" && decision.code === "timeout")
+        return { code: "APPROVAL_TIMEOUT", message: APPROVAL_TIMEOUT_MESSAGE, retryable: false, phase: "approval" };
+      if (decision.kind !== "once" && decision.kind !== "session")
+        return {
+          code: decision.code === "broker-unavailable" ? "APPROVAL_REQUIRED" : "APPROVAL_DENIED",
+          message: decision.code,
+          retryable: false,
+          phase: "approval",
+        };
+      return {
+        kind: "once",
+        requestId: request.requestId,
+        callId: this.callId,
+        sessionId: this.input.sessionId,
+        agentRunId: this.input.agentRunId,
+        pluginId: this.pluginId,
+        toolName: this.name,
+        definitionDigest: this.definitionDigest,
+        normalizedArgsDigest,
+        issuedAt: decision.decidedAt,
+        expiresAt: request.expiresAt,
+      };
     } catch {
-      await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: this.#controller.signal.aborted ? "aborted" : "timeout", decidedAt: new Date().toISOString() });
-      return { code: "APPROVAL_TIMEOUT", message: this.#controller.signal.aborted ? "Approval was aborted." : APPROVAL_TIMEOUT_MESSAGE, retryable: !!this.#controller.signal.aborted, phase: "approval" };
+      await this.#recordPermission("permission/decided", {
+        requestId: request.requestId,
+        kind: "deny",
+        code: this.#controller.signal.aborted ? "aborted" : "timeout",
+        decidedAt: new Date().toISOString(),
+      });
+      return {
+        code: "APPROVAL_TIMEOUT",
+        message: this.#controller.signal.aborted ? "Approval was aborted." : APPROVAL_TIMEOUT_MESSAGE,
+        retryable: !!this.#controller.signal.aborted,
+        phase: "approval",
+      };
     } finally {
       unsubscribe?.();
       this.#controller.signal.removeEventListener("abort", abort);
@@ -498,66 +783,172 @@ export class PreparedToolExecution {
     }
   }
 
-  async #reviewAutomatically(mode: PermissionMode, reasons: readonly RuntimeApprovalReason[]): Promise<OnceApproval | "mode-changed" | undefined> {
+  async #reviewAutomatically(
+    mode: PermissionMode,
+    reasons: readonly RuntimeApprovalReason[],
+  ): Promise<OnceApproval | "mode-changed" | undefined> {
     this.#approvalMode = "auto";
-    if (!this.environment.autoReview) { this.#approvalReason = "自动审批插件不可用，转人工审批"; return undefined; }
+    if (!this.environment.autoReview) {
+      this.#approvalReason = "自动审批插件不可用，转人工审批";
+      return undefined;
+    }
     const controller = new AbortController();
     const abort = () => controller.abort(this.#controller.signal.reason ?? "permission-mode-changed");
-    const unsubscribe = this.environment.subscribePermissionMode?.(() => { if (this.#permissionMode() !== mode) abort(); });
+    const unsubscribe = this.environment.subscribePermissionMode?.(() => {
+      if (this.#permissionMode() !== mode) abort();
+    });
     this.#controller.signal.addEventListener("abort", abort, { once: true });
     if (this.#controller.signal.aborted || this.#permissionMode() !== mode) abort();
     const interrupted = new Promise<never>((_, reject) => {
       const rejectAbort = () => reject(new Error("Review interrupted"));
-      if (controller.signal.aborted) rejectAbort(); else controller.signal.addEventListener("abort", rejectAbort, { once: true });
+      if (controller.signal.aborted) rejectAbort();
+      else controller.signal.addEventListener("abort", rejectAbort, { once: true });
     });
     try {
       if (!this.environment.autoReview) throw new Error("Reviewer unavailable");
-      const decision = await withTimeout(Promise.race([interrupted, this.environment.autoReview({ callId: this.callId, model: this.environment.mainModel, workspaceRoot: this.environment.workspaceRoot, action: { name: this.name, args: this.#args, resources: this.#resources, reasons }, signal: controller.signal })]), 30_000);
-      if (this.#controller.signal.aborted) throw new ToolRuntimeError({ code: "TOOL_ABORTED", message: "Tool approval was aborted.", retryable: true, phase: "approval" });
+      const decision = await withTimeout(
+        Promise.race([
+          interrupted,
+          this.environment.autoReview({
+            callId: this.callId,
+            model: this.environment.mainModel,
+            workspaceRoot: this.environment.workspaceRoot,
+            action: { name: this.name, args: this.#args, resources: this.#resources, reasons },
+            signal: controller.signal,
+          }),
+        ]),
+        30_000,
+      );
+      if (this.#controller.signal.aborted)
+        throw new ToolRuntimeError({
+          code: "TOOL_ABORTED",
+          message: "Tool approval was aborted.",
+          retryable: true,
+          phase: "approval",
+        });
       if (this.#permissionMode() !== mode) return "mode-changed";
       if (typeof decision.approved !== "boolean") throw new Error("Invalid review");
       this.#approvalReason = decision.reason ? redactToolText(decision.reason).slice(0, 500) : undefined;
-      if (!decision.approved) { this.#approvalReason = `自动审批未允许${this.#approvalReason ? `：${this.#approvalReason}` : ""}`; return undefined; }
+      if (!decision.approved) {
+        this.#approvalReason = `自动审批未允许${this.#approvalReason ? `：${this.#approvalReason}` : ""}`;
+        return undefined;
+      }
       this.#approvalMode = "auto";
       const now = new Date();
-      return { kind: "once", requestId: randomUUID(), callId: this.callId, sessionId: this.input.sessionId, agentRunId: this.input.agentRunId, pluginId: this.pluginId, toolName: this.name, definitionDigest: this.definitionDigest, normalizedArgsDigest: createHash("sha256").update(canonicalJson(this.#args)).digest("hex"), issuedAt: now.toISOString(), expiresAt: new Date(now.getTime() + 30_000).toISOString() };
+      return {
+        kind: "once",
+        requestId: randomUUID(),
+        callId: this.callId,
+        sessionId: this.input.sessionId,
+        agentRunId: this.input.agentRunId,
+        pluginId: this.pluginId,
+        toolName: this.name,
+        definitionDigest: this.definitionDigest,
+        normalizedArgsDigest: createHash("sha256").update(canonicalJson(this.#args)).digest("hex"),
+        issuedAt: now.toISOString(),
+        expiresAt: new Date(now.getTime() + 30_000).toISOString(),
+      };
     } catch {
-      if (this.#controller.signal.aborted) throw new ToolRuntimeError({ code: "TOOL_ABORTED", message: "Tool approval was aborted.", retryable: true, phase: "approval" });
+      if (this.#controller.signal.aborted)
+        throw new ToolRuntimeError({
+          code: "TOOL_ABORTED",
+          message: "Tool approval was aborted.",
+          retryable: true,
+          phase: "approval",
+        });
       if (this.#permissionMode() !== mode) return "mode-changed";
       this.#approvalReason = "自动审批不可用或超时，转人工审批";
       return undefined;
-    } finally { unsubscribe?.(); this.#controller.signal.removeEventListener("abort", abort); controller.abort("review-finished"); }
+    } finally {
+      unsubscribe?.();
+      this.#controller.signal.removeEventListener("abort", abort);
+      controller.abort("review-finished");
+    }
   }
 
   #checkAdmittedMode(): void {
-    if (this.#admittedMode !== this.#permissionMode()) throw new ToolRuntimeError({ code: "PERMISSION_STATE_CHANGED", message: "Permission mode changed before execution.", retryable: true, phase: "guard" });
+    if (this.#admittedMode !== this.#permissionMode())
+      throw new ToolRuntimeError({
+        code: "PERMISSION_STATE_CHANGED",
+        message: "Permission mode changed before execution.",
+        retryable: true,
+        phase: "guard",
+      });
   }
 
   async #recheck(expectedMode: PermissionMode): Promise<void> {
     this.#checkToolScope();
-    enforceCoreToolGuards({ definition: this.registration.definition, args: this.#args ?? {}, hostCapabilities: this.environment.hostCapabilities, lease: this.#lease, signal: this.#controller.signal, executorConcurrencySafe: this.registration.executor.concurrencySafe === true });
-    if (this.#permissionMode() !== expectedMode) throw new ToolRuntimeError({ code: "PERMISSION_STATE_CHANGED", message: "Permission mode changed while approval was pending.", retryable: true, phase: "guard" });
-    const resources = Object.freeze(await this.registration.permission.extractResources(this.#args ?? {}, { mode: expectedMode, workspaceRoot: this.environment.workspaceRoot, canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot) }));
-    if (canonicalJson(resources) !== canonicalJson(this.#resources)) throw new ToolRuntimeError({ code: "RESOURCE_SCOPE_CHANGED", message: "Tool resources changed while approval was pending.", retryable: true, phase: "guard" });
+    enforceCoreToolGuards({
+      definition: this.registration.definition,
+      args: this.#args ?? {},
+      hostCapabilities: this.environment.hostCapabilities,
+      lease: this.#lease,
+      signal: this.#controller.signal,
+      executorConcurrencySafe: this.registration.executor.concurrencySafe === true,
+    });
+    if (this.#permissionMode() !== expectedMode)
+      throw new ToolRuntimeError({
+        code: "PERMISSION_STATE_CHANGED",
+        message: "Permission mode changed while approval was pending.",
+        retryable: true,
+        phase: "guard",
+      });
+    const resources = Object.freeze(
+      await this.registration.permission.extractResources(this.#args ?? {}, {
+        mode: expectedMode,
+        workspaceRoot: this.environment.workspaceRoot,
+        canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot),
+      }),
+    );
+    if (canonicalJson(resources) !== canonicalJson(this.#resources))
+      throw new ToolRuntimeError({
+        code: "RESOURCE_SCOPE_CHANGED",
+        message: "Tool resources changed while approval was pending.",
+        retryable: true,
+        phase: "guard",
+      });
     if (this.#admittedBySessionGrant) {
       const audience = this.registration.permission.grantAudience;
-      if (!this.#isTrustedGrantAudience(audience) || !sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { ...this.#grantSubject(), audience })) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "The selected Session Grant no longer covers this call.", retryable: true, phase: "approval" });
+      if (
+        !this.#isTrustedGrantAudience(audience) ||
+        !sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { ...this.#grantSubject(), audience })
+      )
+        throw new ToolRuntimeError({
+          code: "GRANT_REVOKED",
+          message: "The selected Session Grant no longer covers this call.",
+          retryable: true,
+          phase: "approval",
+        });
     }
     if (this.#onceApproval !== undefined) {
-      if (this.#onceApproval.consumedAt !== undefined || Date.now() > new Date(this.#onceApproval.expiresAt).getTime()) throw new ToolRuntimeError({ code: "APPROVAL_STALE", message: "One-time approval is no longer valid.", retryable: false, phase: "approval" });
+      if (this.#onceApproval.consumedAt !== undefined || Date.now() > new Date(this.#onceApproval.expiresAt).getTime())
+        throw new ToolRuntimeError({
+          code: "APPROVAL_STALE",
+          message: "One-time approval is no longer valid.",
+          retryable: false,
+          phase: "approval",
+        });
       this.#onceApproval.consumedAt = new Date().toISOString();
     }
   }
 
   #checkToolScope(): void {
-    if ((this.environment.allowedToolNames !== undefined && !this.environment.allowedToolNames.has(this.name)) || this.environment.isToolAllowedNow?.(this.name) === false) {
-      throw new ToolRuntimeError({ code: "AGENT_MODE_DENIED", message: `Tool ${this.name} is unavailable in this Agent mode.`, retryable: false, phase: "guard" });
+    if (
+      (this.environment.allowedToolNames !== undefined && !this.environment.allowedToolNames.has(this.name)) ||
+      this.environment.isToolAllowedNow?.(this.name) === false
+    ) {
+      throw new ToolRuntimeError({
+        code: "AGENT_MODE_DENIED",
+        message: `Tool ${this.name} is unavailable in this Agent mode.`,
+        retryable: false,
+        phase: "guard",
+      });
     }
   }
 
   #permissionMode(): PermissionMode {
     const value = this.environment.permissionMode;
-    return typeof value === "function" ? value() : value ?? "default";
+    return typeof value === "function" ? value() : (value ?? "default");
   }
 
   async #recordPermission<T extends ToolPermissionEventType>(type: T, data: CoreEventDataMap[T]): Promise<void> {
@@ -566,7 +957,7 @@ export class PreparedToolExecution {
 
   #sessionGrants(): readonly SessionGrant[] {
     const grants = this.environment.sessionGrants;
-    return typeof grants === "function" ? grants() : grants ?? [];
+    return typeof grants === "function" ? grants() : (grants ?? []);
   }
 
   /** Calls may pass on Session Grants: their own (`sessionGrantCapability`) or, read-only, an owner's. */
@@ -576,7 +967,12 @@ export class PreparedToolExecution {
 
   /** The Session and agent the grants were issued to. */
   #grantSubject(): { readonly sessionId: string; readonly agentId: string } {
-    return this.environment.sessionGrantOwner ?? { sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}` };
+    return (
+      this.environment.sessionGrantOwner ?? {
+        sessionId: this.input.sessionId,
+        agentId: this.input.agentId ?? `main:${this.input.sessionId}`,
+      }
+    );
   }
 
   #processGrant(): SessionGrant | undefined {
@@ -585,11 +981,15 @@ export class PreparedToolExecution {
     return matchingProcessGrant(this.#sessionGrants(), this.#resources, { ...this.#grantSubject(), audience });
   }
 
-  #resolveGlobalGrant(global: ReturnType<typeof evaluateGlobalBoundary>, tool: ToolPermissionDecision): ReturnType<typeof evaluateGlobalBoundary> {
+  #resolveGlobalGrant(
+    global: ReturnType<typeof evaluateGlobalBoundary>,
+    tool: ToolPermissionDecision,
+  ): ReturnType<typeof evaluateGlobalBoundary> {
     if (global.kind !== "ask" || tool.kind !== "allow" || !this.#usesSessionGrants()) return global;
     const audience = this.registration.permission.grantAudience;
     if (!this.#isTrustedGrantAudience(audience) || global.reasons.some((reason) => !reason.reusable)) return global;
-    if (!sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { ...this.#grantSubject(), audience })) return global;
+    if (!sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { ...this.#grantSubject(), audience }))
+      return global;
     this.#admittedBySessionGrant = true;
     return { kind: "pass" };
   }
@@ -599,22 +999,49 @@ export class PreparedToolExecution {
     const audience = this.registration.permission.grantAudience;
     const suggest = this.registration.permission.suggestGrants;
     if (!this.#isTrustedGrantAudience(audience) || suggest === undefined) return [];
-    const drafts = await suggest(this.#args ?? {}, this.#resources, { mode: this.#permissionMode(), workspaceRoot: this.environment.workspaceRoot, hostCapabilities: [...this.environment.hostCapabilities].sort() });
-    return Object.freeze(drafts.filter((draft) => validGrantDraft(draft, this.#resources)).map((draft) => Object.freeze({ ...draft, suggestionId: randomUUID(), lifetime: "session" as const, audience })));
+    const drafts = await suggest(this.#args ?? {}, this.#resources, {
+      mode: this.#permissionMode(),
+      workspaceRoot: this.environment.workspaceRoot,
+      hostCapabilities: [...this.environment.hostCapabilities].sort(),
+    });
+    return Object.freeze(
+      drafts
+        .filter((draft) => validGrantDraft(draft, this.#resources))
+        .map((draft) =>
+          Object.freeze({ ...draft, suggestionId: randomUUID(), lifetime: "session" as const, audience }),
+        ),
+    );
   }
 
   #isTrustedGrantAudience(audience: GrantAudience | undefined): audience is GrantAudience {
-    return audience !== undefined
-      && audience.pluginId === this.pluginId
-      && this.environment.trustedGrantAudiences?.has(grantAudienceKey(audience)) === true;
+    return (
+      audience !== undefined &&
+      audience.pluginId === this.pluginId &&
+      this.environment.trustedGrantAudiences?.has(grantAudienceKey(audience)) === true
+    );
   }
 
   #normalizeBody(body: ToolBodyResult, finalizerFailures: readonly ToolFailure[]): ToolExecutionResult {
-    const invalid = (body.status === "completed" && body.failure !== undefined) || (body.status === "failed" && body.failure === undefined);
+    const invalid =
+      (body.status === "completed" && body.failure !== undefined) ||
+      (body.status === "failed" && body.failure === undefined);
     const failure = invalid
-      ? { code: "TOOL_EXECUTION_FAILED", message: "Executor returned an invalid result envelope.", retryable: false, phase: "body" as const }
-      : body.failure === undefined ? undefined : { ...body.failure, message: redactToolText(body.failure.message), phase: "body" as const };
-    const status = this.#forceOutcomeUnknown ? "outcome-unknown" : this.#controller.signal.aborted ? "aborted" : invalid ? "failed" : body.status;
+      ? {
+          code: "TOOL_EXECUTION_FAILED",
+          message: "Executor returned an invalid result envelope.",
+          retryable: false,
+          phase: "body" as const,
+        }
+      : body.failure === undefined
+        ? undefined
+        : { ...body.failure, message: redactToolText(body.failure.message), phase: "body" as const };
+    const status = this.#forceOutcomeUnknown
+      ? "outcome-unknown"
+      : this.#controller.signal.aborted
+        ? "aborted"
+        : invalid
+          ? "failed"
+          : body.status;
     const renderer = normalizeRenderer(body.renderer);
     return Object.freeze({
       ...(this.#approvalMode ? { approvalMode: this.#approvalMode } : {}),
@@ -627,7 +1054,15 @@ export class PreparedToolExecution {
       definitionVersion: this.definitionVersion,
       definitionDigest: this.definitionDigest,
       summary: redactToolText(body.summary),
-      modelOutput: Object.freeze(body.modelOutput.map((block) => block.type === "text" ? { ...block, text: redactToolText(block.text) } : block.type === "json" ? { ...block, value: redactToolValue(block.value) } : block)),
+      modelOutput: Object.freeze(
+        body.modelOutput.map((block) =>
+          block.type === "text"
+            ? { ...block, text: redactToolText(block.text) }
+            : block.type === "json"
+              ? { ...block, value: redactToolValue(block.value) }
+              : block,
+        ),
+      ),
       detail: Object.freeze((body.detail ?? []).map((block) => ({ ...block, value: redactToolValue(block.value) }))),
       artifacts: Object.freeze([...(body.artifacts ?? [])]),
       ...(renderer === undefined ? {} : { renderer }),
@@ -674,25 +1109,59 @@ export class PreparedToolExecution {
 }
 
 function normalizeRenderer(renderer: ToolBodyResult["renderer"]): NonNullable<ToolBodyResult["renderer"]> | undefined {
-  if (renderer === undefined || !renderer.id || !Number.isSafeInteger(renderer.schemaVersion) || renderer.schemaVersion < 1) return undefined;
-  return Object.freeze({ id: redactToolText(renderer.id), schemaVersion: renderer.schemaVersion, props: redactToolValue(renderer.props) });
+  if (
+    renderer === undefined ||
+    !renderer.id ||
+    !Number.isSafeInteger(renderer.schemaVersion) ||
+    renderer.schemaVersion < 1
+  )
+    return undefined;
+  return Object.freeze({
+    id: redactToolText(renderer.id),
+    schemaVersion: renderer.schemaVersion,
+    props: redactToolValue(renderer.props),
+  });
 }
 
 function isArgsPatch(value: unknown): value is Required<ToolArgumentsPatch> {
-  return value !== null && typeof value === "object" && !Array.isArray(value) && "args" in value && value.args !== null && typeof value.args === "object" && !Array.isArray(value.args);
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "args" in value &&
+    value.args !== null &&
+    typeof value.args === "object" &&
+    !Array.isArray(value.args)
+  );
 }
 
 function isToolBodyResult(value: unknown): value is ToolBodyResult {
-  return value !== null && typeof value === "object" && !Array.isArray(value) && (value as { status?: unknown }).status !== undefined && Array.isArray((value as { modelOutput?: unknown }).modelOutput);
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    (value as { status?: unknown }).status !== undefined &&
+    Array.isArray((value as { modelOutput?: unknown }).modelOutput)
+  );
 }
 
 function isExecutePatch(value: unknown): value is Required<ToolExecutePatch> {
-  return value !== null && typeof value === "object" && !Array.isArray(value) && typeof (value as { execute?: unknown }).execute === "function";
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof (value as { execute?: unknown }).execute === "function"
+  );
 }
 
 function toFailure(error: unknown, phase: ToolFailure["phase"]): ToolFailure {
   if (error instanceof ToolRuntimeError) return error.failure;
-  return { code: "TOOL_EXECUTION_FAILED", message: redactToolText(error instanceof Error ? error.message : String(error)), retryable: false, phase };
+  return {
+    code: "TOOL_EXECUTION_FAILED",
+    message: redactToolText(error instanceof Error ? error.message : String(error)),
+    retryable: false,
+    phase,
+  };
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -712,8 +1181,21 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 
 function summarizeResource(resource: ToolResource): ApprovalResourceSummary {
   return resource.kind === "file"
-    ? { kind: "file", access: resource.access, path: redactToolText(resource.canonicalPath), targetKind: resource.targetKind }
-    : { kind: "process", access: "execute", commandDigest: resource.commandDigest, cwd: redactToolText(resource.cwd), dynamic: resource.dynamic, ...(resource.noSandbox === undefined ? {} : { noSandbox: resource.noSandbox }), ...(resource.script === undefined ? {} : { script: resource.script }) };
+    ? {
+        kind: "file",
+        access: resource.access,
+        path: redactToolText(resource.canonicalPath),
+        targetKind: resource.targetKind,
+      }
+    : {
+        kind: "process",
+        access: "execute",
+        commandDigest: resource.commandDigest,
+        cwd: redactToolText(resource.cwd),
+        dynamic: resource.dynamic,
+        ...(resource.noSandbox === undefined ? {} : { noSandbox: resource.noSandbox }),
+        ...(resource.script === undefined ? {} : { script: resource.script }),
+      };
 }
 
 function isOnceApproval(value: OnceApproval | ToolFailure): value is OnceApproval {
@@ -727,10 +1209,20 @@ function validGrantDraft(draft: ToolGrantSuggestion, resources: readonly ToolRes
   }
   if (draft.action !== "file.read" && draft.action !== "file.write") return false;
   if (draft.access !== (draft.action === "file.read" ? "read" : "write")) return false;
-  if (resources.length === 0 || resources.some((resource) => resource.kind !== "file" || resource.access !== draft.access)) return false;
+  if (
+    resources.length === 0 ||
+    resources.some((resource) => resource.kind !== "file" || resource.access !== draft.access)
+  )
+    return false;
   const selector = draft.selector;
-  if (selector.kind === "exact") return resources.every((resource) => resource.kind === "file" && resource.canonicalPath === selector.canonicalPath);
-  return selector.kind === "subtree" && resources.every((resource) => resource.kind === "file" && isPathWithin(selector.canonicalRoot, resource.canonicalPath));
+  if (selector.kind === "exact")
+    return resources.every((resource) => resource.kind === "file" && resource.canonicalPath === selector.canonicalPath);
+  return (
+    selector.kind === "subtree" &&
+    resources.every(
+      (resource) => resource.kind === "file" && isPathWithin(selector.canonicalRoot, resource.canonicalPath),
+    )
+  );
 }
 
 type RuntimeApprovalReason = ApprovalReason & { readonly reusable: boolean };

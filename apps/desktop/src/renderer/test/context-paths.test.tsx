@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ContextDisclosureSummary, ContextPathsInput, ContextPathsPage } from "@actspace/shared";
 import { ContextPaths } from "../components/right-panel/context/ContextPaths";
-import { formatPathReadAgo, isContextPathRevisionError, splitContextPath } from "../components/right-panel/context/context-paths-model";
+import {
+  formatPathReadAgo,
+  isContextPathRevisionError,
+  splitContextPath,
+} from "../components/right-panel/context/context-paths-model";
 import { useContextPaths } from "../components/right-panel/context/use-context-paths";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { mockContextPaths, mockContextPathsPage, mockDisclosureSummary } from "../mock/context-paths-fixture";
@@ -14,7 +18,9 @@ const SESSION = "paths-session";
 const PATHS = mockContextPaths();
 const READY = mockDisclosureSummary(PATHS, "r1");
 
-afterEach(() => { Object.defineProperty(document, "hidden", { configurable: true, value: false }); });
+afterEach(() => {
+  Object.defineProperty(document, "hidden", { configurable: true, value: false });
+});
 
 function pathsHandler(revision = "r1") {
   return vi.fn(async (input: ContextPathsInput): Promise<ContextPathsPage> => {
@@ -24,13 +30,20 @@ function pathsHandler(revision = "r1") {
 }
 
 function renderCard(disclosure: ContextDisclosureSummary | undefined = READY, onStale = vi.fn()) {
-  render(<TooltipProvider delayDuration={0}><ContextPaths sessionId={SESSION} disclosure={disclosure} workspaceRoot={MOCK_WORKSPACE_ROOT} onStale={onStale} /></TooltipProvider>);
+  render(
+    <TooltipProvider delayDuration={0}>
+      <ContextPaths sessionId={SESSION} disclosure={disclosure} workspaceRoot={MOCK_WORKSPACE_ROOT} onStale={onStale} />
+    </TooltipProvider>,
+  );
   return { onStale };
 }
 
 describe("context-paths-model", () => {
   it("shows workspace paths relative and splits directory from name", () => {
-    expect(splitContextPath(`${MOCK_WORKSPACE_ROOT}/src/a.ts`, `${MOCK_WORKSPACE_ROOT}/`)).toEqual({ dir: "src/", name: "a.ts" });
+    expect(splitContextPath(`${MOCK_WORKSPACE_ROOT}/src/a.ts`, `${MOCK_WORKSPACE_ROOT}/`)).toEqual({
+      dir: "src/",
+      name: "a.ts",
+    });
     expect(splitContextPath("/elsewhere/b.md", MOCK_WORKSPACE_ROOT)).toEqual({ dir: "/elsewhere/", name: "b.md" });
     expect(splitContextPath("README.md")).toEqual({ dir: "", name: "README.md" });
   });
@@ -53,7 +66,11 @@ describe("useContextPaths", () => {
   it("reads nothing while disabled and the first page once enabled", async () => {
     const handler = pathsHandler();
     setupBridge({ "sessions.listContextPaths": handler });
-    const hook = renderHook(props => useContextPaths({ sessionId: SESSION, disclosure: READY, visibility: "active", onStale: () => {}, ...props }), { initialProps: { enabled: false } });
+    const hook = renderHook(
+      (props) =>
+        useContextPaths({ sessionId: SESSION, disclosure: READY, visibility: "active", onStale: () => {}, ...props }),
+      { initialProps: { enabled: false } },
+    );
     await act(async () => {});
     expect(handler).not.toHaveBeenCalled();
     hook.rerender({ enabled: true });
@@ -64,9 +81,16 @@ describe("useContextPaths", () => {
   });
 
   it("drops old pages when the revision changes and ignores a response for another revision", async () => {
-    const handler = vi.fn(async (input: ContextPathsInput) => ({ ...mockContextPathsPage(PATHS, input), revision: input.revision === "r2" ? "r-other" : input.revision }));
+    const handler = vi.fn(async (input: ContextPathsInput) => ({
+      ...mockContextPathsPage(PATHS, input),
+      revision: input.revision === "r2" ? "r-other" : input.revision,
+    }));
     setupBridge({ "sessions.listContextPaths": handler });
-    const hook = renderHook(props => useContextPaths({ sessionId: SESSION, visibility: "active", enabled: true, onStale: () => {}, ...props }), { initialProps: { disclosure: READY } });
+    const hook = renderHook(
+      (props) =>
+        useContextPaths({ sessionId: SESSION, visibility: "active", enabled: true, onStale: () => {}, ...props }),
+      { initialProps: { disclosure: READY } },
+    );
     await waitFor(() => expect(hook.result.current.list?.loaded).toBe(true));
     hook.rerender({ disclosure: mockDisclosureSummary(PATHS, "r2") });
     await waitFor(() => expect(hook.result.current.list?.error).toBe("路径版本不一致，请重试。"));
@@ -78,15 +102,25 @@ describe("useContextPaths", () => {
     const handler = vi.fn(async (input: ContextPathsInput) => {
       const page = mockContextPathsPage(PATHS, input);
       // 第二页带回一条第一页已有的路径，应当被去掉。
-      return input.cursor ? { ...page, paths: [PATHS.paths.filter(path => path.visibility === "active")[0], ...page.paths] } : page;
+      return input.cursor
+        ? { ...page, paths: [PATHS.paths.filter((path) => path.visibility === "active")[0], ...page.paths] }
+        : page;
     });
     setupBridge({ "sessions.listContextPaths": handler });
-    const hook = renderHook(() => useContextPaths({ sessionId: SESSION, disclosure: READY, visibility: "active", enabled: true, onStale: () => {} }));
+    const hook = renderHook(() =>
+      useContextPaths({
+        sessionId: SESSION,
+        disclosure: READY,
+        visibility: "active",
+        enabled: true,
+        onStale: () => {},
+      }),
+    );
     await waitFor(() => expect(hook.result.current.list?.loaded).toBe(true));
     expect(hook.result.current.list?.nextCursor).toBeDefined();
     act(() => hook.result.current.loadMore());
     await waitFor(() => expect(hook.result.current.list?.nextCursor).toBeUndefined());
-    const ids = hook.result.current.list!.paths.map(path => path.id);
+    const ids = hook.result.current.list!.paths.map((path) => path.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toHaveLength(hook.result.current.list!.total);
   });
@@ -95,7 +129,9 @@ describe("useContextPaths", () => {
     const handler = pathsHandler("r-newer");
     const onStale = vi.fn();
     setupBridge({ "sessions.listContextPaths": handler });
-    const hook = renderHook(() => useContextPaths({ sessionId: SESSION, disclosure: READY, visibility: "active", enabled: true, onStale }));
+    const hook = renderHook(() =>
+      useContextPaths({ sessionId: SESSION, disclosure: READY, visibility: "active", enabled: true, onStale }),
+    );
     await waitFor(() => expect(hook.result.current.list?.error).toMatch(/revision stale/));
     expect(onStale).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledTimes(2);
@@ -105,7 +141,15 @@ describe("useContextPaths", () => {
     Object.defineProperty(document, "hidden", { configurable: true, value: true });
     const handler = pathsHandler();
     setupBridge({ "sessions.listContextPaths": handler });
-    const hook = renderHook(() => useContextPaths({ sessionId: SESSION, disclosure: READY, visibility: "active", enabled: true, onStale: () => {} }));
+    const hook = renderHook(() =>
+      useContextPaths({
+        sessionId: SESSION,
+        disclosure: READY,
+        visibility: "active",
+        enabled: true,
+        onStale: () => {},
+      }),
+    );
     await act(async () => {});
     expect(handler).not.toHaveBeenCalled();
     Object.defineProperty(document, "hidden", { configurable: true, value: false });
@@ -123,7 +167,10 @@ describe("ContextPaths", () => {
     expect(within(card).getByText(/第 4 压缩周期/)).toBeInTheDocument();
     expect(within(card).getByRole("button", { name: /活跃\s*87/ })).toHaveAttribute("aria-pressed", "true");
     expect(within(card).getByRole("button", { name: /睡眠\s*342/ })).toBeInTheDocument();
-    expect(within(card).getByRole("button", { name: "显示活跃路径 · 87 条" })).toHaveAttribute("aria-expanded", "false");
+    expect(within(card).getByRole("button", { name: "显示活跃路径 · 87 条" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
     await act(async () => {});
     expect(handler).not.toHaveBeenCalled();
   });
@@ -134,10 +181,13 @@ describe("ContextPaths", () => {
     renderCard();
     const card = screen.getByRole("region", { name: "路径" });
     await userEvent.click(within(card).getByRole("button", { name: /显示活跃路径/ }));
-    expect(await within(card).findByRole("button", { name: "活跃 · 已显示 12 / 87" })).toHaveAttribute("aria-expanded", "true");
+    expect(await within(card).findByRole("button", { name: "活跃 · 已显示 12 / 87" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     expect(within(card).queryByRole("button", { name: "按目录" })).not.toBeInTheDocument();
     const row = card.querySelector<HTMLElement>("[data-path-id]")!;
-    const shown = PATHS.paths.find(path => path.id === row.dataset.pathId)!;
+    const shown = PATHS.paths.find((path) => path.id === row.dataset.pathId)!;
     const parts = splitContextPath(shown.path, MOCK_WORKSPACE_ROOT);
     expect(row).toHaveTextContent(`${parts.name}${parts.dir}`);
     await userEvent.click(within(card).getByRole("button", { name: "再显示 20 项（共 87）" }));
@@ -167,10 +217,15 @@ describe("ContextPaths", () => {
 
   it("shows a retryable error", async () => {
     let fail = true;
-    setupBridge({ "sessions.listContextPaths": async input => {
-      if (fail) { fail = false; throw new Error("boom"); }
-      return mockContextPathsPage(PATHS, input);
-    } });
+    setupBridge({
+      "sessions.listContextPaths": async (input) => {
+        if (fail) {
+          fail = false;
+          throw new Error("boom");
+        }
+        return mockContextPathsPage(PATHS, input);
+      },
+    });
     renderCard();
     const card = screen.getByRole("region", { name: "路径" });
     await userEvent.click(within(card).getByRole("button", { name: /显示活跃路径/ }));

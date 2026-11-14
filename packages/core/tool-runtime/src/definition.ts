@@ -50,10 +50,19 @@ export function normalizeToolDefinition(definition: ToolDefinition): NormalizedT
     throw new TypeError("resultSchemaVersion must be a positive integer.");
   }
   if (!definition.description) throw new TypeError("Tool description is required.");
-  if (!Array.isArray(definition.modes) || definition.modes.some(mode => !TOOL_MODES.has(mode)) || new Set(definition.modes).size !== definition.modes.length) {
+  if (
+    !Array.isArray(definition.modes) ||
+    definition.modes.some((mode) => !TOOL_MODES.has(mode)) ||
+    new Set(definition.modes).size !== definition.modes.length
+  ) {
     throw new TypeError("Tool modes must list distinct values from chat, plan, agent.");
   }
-  const normalized = deepFreeze({ ...definition, effects: [...definition.effects], modes: [...definition.modes], sensitiveArgumentPaths: [...definition.sensitiveArgumentPaths] });
+  const normalized = deepFreeze({
+    ...definition,
+    effects: [...definition.effects],
+    modes: [...definition.modes],
+    sensitiveArgumentPaths: [...definition.sensitiveArgumentPaths],
+  });
   const definitionDigest = createHash("sha256").update(canonicalJson(normalized)).digest("hex");
   return deepFreeze({ ...normalized, definitionDigest });
 }
@@ -62,7 +71,10 @@ export function canonicalJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   const record = value as Record<string, unknown>;
-  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
+    .join(",")}}`;
 }
 
 function deepFreeze<T>(value: T): T {

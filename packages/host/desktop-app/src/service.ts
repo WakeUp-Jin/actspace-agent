@@ -18,9 +18,13 @@ export class DesktopAppService extends AgentApplication {
     this.#llm = llm;
     this.#titles = getService(ctx, DESKTOP_TITLES_SERVICE);
   }
-  completeText(input: Parameters<typeof completeText>[1]) { return completeText(this.#llm, input); }
-  override async isIdleForReconfigure(): Promise<boolean> {
-    return !this.#titles?.busy && await super.isIdleForReconfigure() && !this.#titles?.busy;
+  completeText(input: Parameters<typeof completeText>[1]) {
+    return completeText(this.#llm, input);
   }
-  async dispose(): Promise<void> { await this.#titles?.dispose(); }
+  override async isIdleForReconfigure(): Promise<boolean> {
+    return !this.#titles?.busy && (await super.isIdleForReconfigure()) && !this.#titles?.busy;
+  }
+  async dispose(): Promise<void> {
+    await this.#titles?.dispose();
+  }
 }

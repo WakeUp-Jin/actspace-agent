@@ -7,13 +7,32 @@
   const HISTORY = 150;
   // 正常每 2 秒一条；超过 4 秒没收到才算主进程无响应，避免偶尔的抖动闪红条。
   const FROZEN_AFTER_MS = 4000;
-  const GROUP_LABELS = { main: "主进程", renderer: "界面", gpu: "GPU", utility: "其他工具进程", agent: "Agent 子进程", monitor: "监控自身" };
+  const GROUP_LABELS = {
+    main: "主进程",
+    renderer: "界面",
+    gpu: "GPU",
+    utility: "其他工具进程",
+    agent: "Agent 子进程",
+    monitor: "监控自身",
+  };
 
   const $ = (id) => document.getElementById(id);
   const el = {
-    float: $("float"), alert: $("alert"), summary: $("summary"), cpu: $("cpu"), mem: $("mem"), delay: $("delay"),
-    toggle: $("toggle"), togglePath: $("toggle-path"), close: $("close"), body: $("body"),
-    cpuChart: $("cpu-chart"), memChart: $("mem-chart"), cpuRange: $("cpu-range"), memRange: $("mem-range"), rows: $("rows"),
+    float: $("float"),
+    alert: $("alert"),
+    summary: $("summary"),
+    cpu: $("cpu"),
+    mem: $("mem"),
+    delay: $("delay"),
+    toggle: $("toggle"),
+    togglePath: $("toggle-path"),
+    close: $("close"),
+    body: $("body"),
+    cpuChart: $("cpu-chart"),
+    memChart: $("mem-chart"),
+    cpuRange: $("cpu-range"),
+    memRange: $("mem-range"),
+    rows: $("rows"),
   };
 
   let history = [];
@@ -62,7 +81,7 @@
   }
 
   function escapeHtml(text) {
-    return String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[c]);
+    return String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   }
 
   function renderTable() {
@@ -74,8 +93,9 @@
       const count = isAgent ? group.processes.reduce((total, row) => total + row.count, 0) : 0;
       const unavailable = isAgent && !latest.agentProcessesAvailable;
       const cpuClass = group.id === "main" && group.cpuPercent >= 90 ? " warn" : "";
-      html += `<tr class="${isSelf ? "self" : ""}"><td>${GROUP_LABELS[group.id]}${isAgent && !unavailable ? `<span class="sub">${count} 个</span>` : ""}</td>`
-        + `<td class="cpu num${cpuClass}">${unavailable ? "—" : fCpu(group.cpuPercent)}</td><td class="mem num">${unavailable ? "—" : group.rssKiB ? fMem(group.rssKiB) : "—"}</td></tr>`;
+      html +=
+        `<tr class="${isSelf ? "self" : ""}"><td>${GROUP_LABELS[group.id]}${isAgent && !unavailable ? `<span class="sub">${count} 个</span>` : ""}</td>` +
+        `<td class="cpu num${cpuClass}">${unavailable ? "—" : fCpu(group.cpuPercent)}</td><td class="mem num">${unavailable ? "—" : group.rssKiB ? fMem(group.rssKiB) : "—"}</td></tr>`;
       if (isAgent) {
         for (const row of group.processes.slice(0, 6)) {
           const name = row.count > 1 ? `${row.label} ×${row.count}` : row.label;

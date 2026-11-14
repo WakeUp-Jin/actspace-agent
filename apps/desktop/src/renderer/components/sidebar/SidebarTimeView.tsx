@@ -9,7 +9,8 @@ import { Button } from "../ui/Button";
 
 const TIME_GROUP_CLASS = "sidebar-time-group flex min-w-0 flex-col gap-px";
 const TIME_DATE_CLASS = "font-normal text-text-faint/70";
-const TIME_COUNT_CLASS = "min-w-4 rounded-act-pill bg-warning/15 px-1.5 text-center text-act-xxs leading-4 font-semibold text-warning";
+const TIME_COUNT_CLASS =
+  "min-w-4 rounded-act-pill bg-warning/15 px-1.5 text-center text-act-xxs leading-4 font-semibold text-warning";
 
 type SidebarTimeViewProps = {
   /** 未置顶的会话（按归档筛选过）；这里按最近更新分进各时间段。 */
@@ -29,10 +30,23 @@ type SidebarTimeViewProps = {
  * 时间段内不限条数；服务端还有没加载的会话时，在最后统一「加载更多会话」。
  */
 export function SidebarTimeView({
-  sessions, workspaces, activeSessionId, busySessionIds, sessionStatuses, collapsed, onToggle, onSelectSession, workspaceLabelOf,
+  sessions,
+  workspaces,
+  activeSessionId,
+  busySessionIds,
+  sessionStatuses,
+  collapsed,
+  onToggle,
+  onSelectSession,
+  workspaceLabelOf,
 }: SidebarTimeViewProps) {
   const buckets = useMemo(
-    () => bucketByTime(sessions, new Date(), (session) => !session.archived && needsAttention(sessionStatusOf(session.id, busySessionIds, sessionStatuses))),
+    () =>
+      bucketByTime(
+        sessions,
+        new Date(),
+        (session) => !session.archived && needsAttention(sessionStatusOf(session.id, busySessionIds, sessionStatuses)),
+      ),
     [busySessionIds, sessionStatuses, sessions],
   );
   const paging = useRemotePaging({ pinned: false, sessions });
@@ -47,11 +61,13 @@ export function SidebarTimeView({
               className={bucket.attention ? "text-warning" : undefined}
               collapsed={bucketCollapsed}
               onToggle={() => onToggle(bucket.key)}
-              label={<>
-                <span className={bucket.attention ? "text-warning" : undefined}>{bucket.label}</span>
-                {bucket.date ? <span className={TIME_DATE_CLASS}>{bucket.date}</span> : null}
-                {bucket.attention ? <span className={TIME_COUNT_CLASS}>{bucket.sessions.length}</span> : null}
-              </>}
+              label={
+                <>
+                  <span className={bucket.attention ? "text-warning" : undefined}>{bucket.label}</span>
+                  {bucket.date ? <span className={TIME_DATE_CLASS}>{bucket.date}</span> : null}
+                  {bucket.attention ? <span className={TIME_COUNT_CLASS}>{bucket.sessions.length}</span> : null}
+                </>
+              }
             />
             {bucketCollapsed ? null : (
               <SessionList
@@ -70,9 +86,22 @@ export function SidebarTimeView({
           </div>
         );
       })}
-      {paging.error ? <p role="alert" className="px-2 text-act-xs leading-4 text-text-muted">{paging.error}</p> : null}
+      {paging.error ? (
+        <p role="alert" className="px-2 text-act-xs leading-4 text-text-muted">
+          {paging.error}
+        </p>
+      ) : null}
       {paging.hasMore ? (
-        <Button className="session-list-toggle ml-5 self-start" variant="ghost" size="xs" busy={paging.loading} disabled={paging.loading} onClick={() => { void paging.loadMore(); }}>
+        <Button
+          className="session-list-toggle ml-5 self-start"
+          variant="ghost"
+          size="xs"
+          busy={paging.loading}
+          disabled={paging.loading}
+          onClick={() => {
+            void paging.loadMore();
+          }}
+        >
           {paging.loading ? "正在加载…" : "加载更多会话"}
         </Button>
       ) : null}

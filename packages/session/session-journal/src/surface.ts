@@ -56,7 +56,8 @@ export class SessionSurface {
     const shadowed = this.#entries.slice(operation.start, operation.end);
     const expected = uniqueSorted(shadowed.flatMap((entry) => entry.sourceEventSeqs));
     const supplied = uniqueSorted(operation.sourceEventSeqs);
-    if (!sameNumbers(expected, supplied)) invalid("Surface replacement must cite every shadowed source event and no unrelated event.");
+    if (!sameNumbers(expected, supplied))
+      invalid("Surface replacement must cite every shadowed source event and no unrelated event.");
     const replacement = createEntry(node, event, supplied, compactionIdOf(event) ?? node.messageId);
     this.#entries.splice(operation.start, operation.end - operation.start, replacement);
     this.#replaceGeneration += 1;
@@ -64,12 +65,20 @@ export class SessionSurface {
   }
 
   get view(): SessionSurfaceView {
-    this.#view ??= Object.freeze({ entries: Object.freeze([...this.#entries]), replaceGeneration: this.#replaceGeneration });
+    this.#view ??= Object.freeze({
+      entries: Object.freeze([...this.#entries]),
+      replaceGeneration: this.#replaceGeneration,
+    });
     return this.#view;
   }
 }
 
-function createEntry(node: SessionSurfaceNodeV1, event: SessionEventEnvelopeV1, additional: readonly number[] = [], compactionId?: string): SessionSurfaceEntry {
+function createEntry(
+  node: SessionSurfaceNodeV1,
+  event: SessionEventEnvelopeV1,
+  additional: readonly number[] = [],
+  compactionId?: string,
+): SessionSurfaceEntry {
   return Object.freeze({
     node,
     sourceEventSeqs: Object.freeze(uniqueSorted([event.seq, ...event.provenance.sourceEventSeqs, ...additional])),

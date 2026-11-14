@@ -1,4 +1,4 @@
-(function() {
+(function () {
   const VERSION = 2;
   const OVERLAY_ID = "__actspace-cursor-overlay";
   const STYLE_ID = "__actspace-cursor-style";
@@ -82,58 +82,59 @@
 
   const easeOutQuint = (value) => 1 - Math.pow(1 - value, 5);
 
-  const moveTo = (targetX, targetY) => new Promise((resolve) => {
-    const target = clampPoint(targetX, targetY);
-    if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+  const moveTo = (targetX, targetY) =>
+    new Promise((resolve) => {
+      const target = clampPoint(targetX, targetY);
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
 
-    if (currentX === null || currentY === null) {
-      const start = clampPoint(window.innerWidth / 2, window.innerHeight / 2);
-      setPosition(start.x, start.y);
-      cursor.style.opacity = "1";
-    }
+      if (currentX === null || currentY === null) {
+        const start = clampPoint(window.innerWidth / 2, window.innerHeight / 2);
+        setPosition(start.x, start.y);
+        cursor.style.opacity = "1";
+      }
 
-    const startX = currentX;
-    const startY = currentY;
-    const dx = target.x - startX;
-    const dy = target.y - startY;
-    const distance = Math.hypot(dx, dy);
-    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    const duration = reducedMotion ? 0 : Math.min(550, Math.max(180, 150 + distance * 0.42));
+      const startX = currentX;
+      const startY = currentY;
+      const dx = target.x - startX;
+      const dy = target.y - startY;
+      const distance = Math.hypot(dx, dy);
+      const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      const duration = reducedMotion ? 0 : Math.min(550, Math.max(180, 150 + distance * 0.42));
 
-    if (duration === 0 || distance < 1) {
-      setPosition(target.x, target.y);
-      cursor.style.opacity = "1";
-      animationFrame = null;
-      resolve();
-      return;
-    }
-
-    const normalX = -dy / distance;
-    const normalY = dx / distance;
-    const bend = Math.min(34, distance * 0.08) * (dx + dy >= 0 ? 1 : -1);
-    const controlX = startX + dx * 0.5 + normalX * bend;
-    const controlY = startY + dy * 0.5 + normalY * bend;
-    const startedAt = performance.now();
-
-    const frame = (now) => {
-      const progress = Math.min(1, (now - startedAt) / duration);
-      const t = easeOutQuint(progress);
-      const inverse = 1 - t;
-      const x = inverse * inverse * startX + 2 * inverse * t * controlX + t * t * target.x;
-      const y = inverse * inverse * startY + 2 * inverse * t * controlY + t * t * target.y;
-      setPosition(x, y);
-      cursor.style.opacity = "1";
-      if (progress < 1) {
-        animationFrame = requestAnimationFrame(frame);
-      } else {
+      if (duration === 0 || distance < 1) {
         setPosition(target.x, target.y);
+        cursor.style.opacity = "1";
         animationFrame = null;
         resolve();
+        return;
       }
-    };
 
-    animationFrame = requestAnimationFrame(frame);
-  });
+      const normalX = -dy / distance;
+      const normalY = dx / distance;
+      const bend = Math.min(34, distance * 0.08) * (dx + dy >= 0 ? 1 : -1);
+      const controlX = startX + dx * 0.5 + normalX * bend;
+      const controlY = startY + dy * 0.5 + normalY * bend;
+      const startedAt = performance.now();
+
+      const frame = (now) => {
+        const progress = Math.min(1, (now - startedAt) / duration);
+        const t = easeOutQuint(progress);
+        const inverse = 1 - t;
+        const x = inverse * inverse * startX + 2 * inverse * t * controlX + t * t * target.x;
+        const y = inverse * inverse * startY + 2 * inverse * t * controlY + t * t * target.y;
+        setPosition(x, y);
+        cursor.style.opacity = "1";
+        if (progress < 1) {
+          animationFrame = requestAnimationFrame(frame);
+        } else {
+          setPosition(target.x, target.y);
+          animationFrame = null;
+          resolve();
+        }
+      };
+
+      animationFrame = requestAnimationFrame(frame);
+    });
 
   const pulse = (x, y) => {
     cursor.classList.remove("__actspace-pressed");

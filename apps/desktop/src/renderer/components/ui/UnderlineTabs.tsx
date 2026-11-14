@@ -35,7 +35,13 @@ export function UnderlineTabs<T extends string>({
     listRef.current?.querySelector<HTMLButtonElement>(`[data-tab="${target.value}"]`)?.focus();
   };
   return (
-    <div ref={listRef} role="tablist" aria-label={ariaLabel} onKeyDown={onKeyDown} className="flex gap-5 overflow-x-auto border-b border-line">
+    <div
+      ref={listRef}
+      role="tablist"
+      aria-label={ariaLabel}
+      onKeyDown={onKeyDown}
+      className="flex gap-5 overflow-x-auto border-b border-line"
+    >
       {tabs.map((tab) => {
         const selected = tab.value === value;
         return (
@@ -54,7 +60,9 @@ export function UnderlineTabs<T extends string>({
             )}
           >
             {tab.label}
-            {tab.count != null ? <span className="ml-1 text-act-xs font-normal tabular-nums text-text-subtle">{tab.count}</span> : null}
+            {tab.count != null ? (
+              <span className="ml-1 text-act-xs font-normal tabular-nums text-text-subtle">{tab.count}</span>
+            ) : null}
           </button>
         );
       })}

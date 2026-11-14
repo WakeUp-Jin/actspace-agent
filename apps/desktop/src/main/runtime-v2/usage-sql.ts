@@ -7,7 +7,10 @@ const statements = new WeakMap<ProjectionDatabase, Map<string, StatementSync>>()
  * bounded LRU also covers generated time-window SQL without retaining it forever. */
 export function prepare(db: ProjectionDatabase, sql: string): StatementSync {
   let cache = statements.get(db);
-  if (!cache) { cache = new Map(); statements.set(db, cache); }
+  if (!cache) {
+    cache = new Map();
+    statements.set(db, cache);
+  }
   let statement = cache.get(sql);
   if (statement) cache.delete(sql);
   else statement = db.prepare(sql);

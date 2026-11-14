@@ -13,9 +13,13 @@ export function isDefined<T>(value: T | undefined): value is T {
 }
 
 export function isNotFoundError(error: unknown): boolean {
-  return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === "ENOENT");
+  return Boolean(
+    error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === "ENOENT",
+  );
 }
 
 export function isAlreadyExistsError(error: unknown): boolean {
-  return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === "EEXIST");
+  return Boolean(
+    error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === "EEXIST",
+  );
 }

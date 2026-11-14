@@ -1,4 +1,16 @@
-import { BookOpen, Check, ChevronLeft, ChevronRight, Image, ListTodo, LoaderCircle, MessageCircle, Paperclip, Search, type LucideIcon } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Image,
+  ListTodo,
+  LoaderCircle,
+  MessageCircle,
+  Paperclip,
+  Search,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { ComposerMode, SkillCatalogItem } from "@actspace/shared";
 import { Button } from "../ui/Button";
@@ -71,7 +83,6 @@ export type ComposerPaletteProps = {
    */
   children: ReactNode;
 };
-
 
 /**
  * Composer 的 `+` 面板：搜索、模式、文件入口、Skills ›。
@@ -183,7 +194,10 @@ function ComposerPaletteContent({
   let emptyState: ReactNode = null;
   if (page === "main") {
     const modeRows = paletteModes(mode, sessionStarted)
-      .filter((candidate) => !normalizedQuery || matches(normalizedQuery, MODE_ROWS[candidate].label, MODE_ROWS[candidate].description))
+      .filter(
+        (candidate) =>
+          !normalizedQuery || matches(normalizedQuery, MODE_ROWS[candidate].label, MODE_ROWS[candidate].description),
+      )
       .map((candidate): PaletteRow => {
         const meta = MODE_ROWS[candidate];
         const Icon = meta.icon;
@@ -205,15 +219,19 @@ function ComposerPaletteContent({
         icon: <AttachmentIcon className="shrink-0 text-text-faint" size={14} aria-hidden="true" />,
         activate: () => finish(attachment.onSelect),
       },
-      ...(skills ? [{
-        key: "entry:skills",
-        label: "Skills",
-        description: "为本轮加载技能说明",
-        icon: <BookOpen className="shrink-0 text-text-faint" size={14} aria-hidden="true" />,
-        drill: () => goTo("skills", "entry:skills"),
-        trailing: <ChevronRight size={14} aria-hidden="true" />,
-        activate: () => goTo("skills", "entry:skills"),
-      }] : []),
+      ...(skills
+        ? [
+            {
+              key: "entry:skills",
+              label: "Skills",
+              description: "为本轮加载技能说明",
+              icon: <BookOpen className="shrink-0 text-text-faint" size={14} aria-hidden="true" />,
+              drill: () => goTo("skills", "entry:skills"),
+              trailing: <ChevronRight size={14} aria-hidden="true" />,
+              activate: () => goTo("skills", "entry:skills"),
+            },
+          ]
+        : []),
     ].filter((row) => !normalizedQuery || matches(normalizedQuery, row.label, row.description));
     if (!normalizedQuery) {
       sections.push({ key: "modes", rows: modeRows }, { key: "entries", rows: entryRows });
@@ -227,7 +245,8 @@ function ComposerPaletteContent({
         { key: "entries", label: "添加", rows: entryRows },
         { key: "skills", label: "Skills", rows: skillRows },
       );
-      if (sections.every((section) => section.rows.length === 0)) emptyState = <div className={STATE_CLASS}>没有匹配的结果。</div>;
+      if (sections.every((section) => section.rows.length === 0))
+        emptyState = <div className={STATE_CLASS}>没有匹配的结果。</div>;
     }
   } else if (page === "skills" && skills) {
     if (skills.loading) {
@@ -240,14 +259,20 @@ function ComposerPaletteContent({
       emptyState = (
         <div className={`${STATE_CLASS} text-on-danger`}>
           <span>{skills.error}</span>
-          <Button variant="ghost" size="xs" onClick={skills.onRetry}>重试</Button>
+          <Button variant="ghost" size="xs" onClick={skills.onRetry}>
+            重试
+          </Button>
         </div>
       );
     } else {
-      const rows = skills.items.filter((skill) => !normalizedQuery || matches(normalizedQuery, skill.name, skill.description)).map(skillRow);
+      const rows = skills.items
+        .filter((skill) => !normalizedQuery || matches(normalizedQuery, skill.name, skill.description))
+        .map(skillRow);
       sections.push({ key: "skills", rows });
       if (rows.length === 0) {
-        emptyState = <div className={STATE_CLASS}>{skills.items.length === 0 ? "暂无已启用的 Skills" : "没有匹配的 Skills。"}</div>;
+        emptyState = (
+          <div className={STATE_CLASS}>{skills.items.length === 0 ? "暂无已启用的 Skills" : "没有匹配的 Skills。"}</div>
+        );
       }
     }
   }
@@ -331,70 +356,72 @@ function ComposerPaletteContent({
         onReturnFocus();
       }}
     >
-        <div className={SEARCH_ROW_CLASS}>
-          {page === "main" ? (
-            <Search size={14} aria-hidden="true" />
-          ) : (
-            <IconButton className="-ml-1" label="返回" tooltip={false} size="xs" tabIndex={-1} onClick={goBack}>
-              <ChevronLeft size={15} aria-hidden="true" />
-            </IconButton>
-          )}
-          <input
-            ref={inputRef}
-            className={SEARCH_INPUT_CLASS}
-            type="text"
-            role="combobox"
-            aria-expanded="true"
-            aria-controls={listboxId}
-            aria-activedescendant={activeRow ? rowId(activeRow) : undefined}
-            aria-autocomplete="list"
-            value={query}
-            placeholder={page === "main" ? "搜索 Skills、文件…" : "搜索 Skills"}
-            aria-label={page === "main" ? "搜索" : "搜索 Skills"}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={handleSearchKeyDown}
-          />
-        </div>
-        <div className={LIST_CLASS} ref={listRef} id={listboxId} role="listbox" aria-label={listLabel}>
-          {visibleSections.map((section, index) => (
-            <div key={section.key} role="group" aria-label={section.label}>
-              {section.label ? (
-                <div className={GROUP_LABEL_CLASS} aria-hidden="true">{section.label}</div>
-              ) : index > 0 ? (
-                <div className={SEPARATOR_CLASS} role="separator" />
-              ) : null}
-              {section.rows.map((row) => (
-                <div
-                  key={row.key}
-                  id={rowId(row)}
-                  className={ROW_CLASS}
-                  role="option"
-                  aria-label={row.label}
-                  aria-selected={row === activeRow}
-                  aria-disabled={row.disabled || undefined}
-                  aria-checked={row.checked}
-                  onPointerMove={() => {
-                    if (!row.disabled && activeKey !== row.key) setActiveKey(row.key);
-                  }}
-                  // 不让点击把焦点从搜索框拿走。
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    if (!row.disabled) row.activate();
-                  }}
-                >
-                  {row.icon}
-                  <span className="flex min-w-0 items-baseline gap-2">
-                    <span className={ROW_LABEL_CLASS}>{row.label}</span>
-                    {row.description ? <span className={ROW_DESCRIPTION_CLASS}>{row.description}</span> : null}
-                    {row.detail ? <span className={`${ROW_DESCRIPTION_CLASS} font-mono`}>{row.detail}</span> : null}
-                  </span>
-                  {row.trailing ? <span className={ROW_TRAILING_CLASS}>{row.trailing}</span> : null}
-                </div>
-              ))}
-            </div>
-          ))}
-          {emptyState}
-        </div>
+      <div className={SEARCH_ROW_CLASS}>
+        {page === "main" ? (
+          <Search size={14} aria-hidden="true" />
+        ) : (
+          <IconButton className="-ml-1" label="返回" tooltip={false} size="xs" tabIndex={-1} onClick={goBack}>
+            <ChevronLeft size={15} aria-hidden="true" />
+          </IconButton>
+        )}
+        <input
+          ref={inputRef}
+          className={SEARCH_INPUT_CLASS}
+          type="text"
+          role="combobox"
+          aria-expanded="true"
+          aria-controls={listboxId}
+          aria-activedescendant={activeRow ? rowId(activeRow) : undefined}
+          aria-autocomplete="list"
+          value={query}
+          placeholder={page === "main" ? "搜索 Skills、文件…" : "搜索 Skills"}
+          aria-label={page === "main" ? "搜索" : "搜索 Skills"}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={handleSearchKeyDown}
+        />
+      </div>
+      <div className={LIST_CLASS} ref={listRef} id={listboxId} role="listbox" aria-label={listLabel}>
+        {visibleSections.map((section, index) => (
+          <div key={section.key} role="group" aria-label={section.label}>
+            {section.label ? (
+              <div className={GROUP_LABEL_CLASS} aria-hidden="true">
+                {section.label}
+              </div>
+            ) : index > 0 ? (
+              <div className={SEPARATOR_CLASS} role="separator" />
+            ) : null}
+            {section.rows.map((row) => (
+              <div
+                key={row.key}
+                id={rowId(row)}
+                className={ROW_CLASS}
+                role="option"
+                aria-label={row.label}
+                aria-selected={row === activeRow}
+                aria-disabled={row.disabled || undefined}
+                aria-checked={row.checked}
+                onPointerMove={() => {
+                  if (!row.disabled && activeKey !== row.key) setActiveKey(row.key);
+                }}
+                // 不让点击把焦点从搜索框拿走。
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  if (!row.disabled) row.activate();
+                }}
+              >
+                {row.icon}
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <span className={ROW_LABEL_CLASS}>{row.label}</span>
+                  {row.description ? <span className={ROW_DESCRIPTION_CLASS}>{row.description}</span> : null}
+                  {row.detail ? <span className={`${ROW_DESCRIPTION_CLASS} font-mono`}>{row.detail}</span> : null}
+                </span>
+                {row.trailing ? <span className={ROW_TRAILING_CLASS}>{row.trailing}</span> : null}
+              </div>
+            ))}
+          </div>
+        ))}
+        {emptyState}
+      </div>
     </PopoverContent>
   );
 }

@@ -6,13 +6,37 @@ import { HEADING_TAGS, SKIP_TAGS, spacedTextValue } from "./cjk-spacing.mjs";
 /** @typedef {NonNullable<import('@astrojs/markdown-satteri').SatteriProcessorOptions['hastPlugins']>[number]} HastPlugin */
 
 const LANGUAGE_LABELS = {
-  bash: "Bash", sh: "Shell", shell: "Shell", zsh: "Shell", console: "Shell",
-  js: "JavaScript", javascript: "JavaScript", jsx: "JSX",
-  ts: "TypeScript", typescript: "TypeScript", tsx: "TSX",
-  json: "JSON", jsonc: "JSON", yaml: "YAML", yml: "YAML", toml: "TOML",
-  md: "Markdown", markdown: "Markdown", html: "HTML", xml: "XML", css: "CSS",
-  go: "Go", python: "Python", py: "Python", rust: "Rust", diff: "Diff", sql: "SQL",
-  plaintext: "Text", text: "Text", txt: "Text", plain: "Text",
+  bash: "Bash",
+  sh: "Shell",
+  shell: "Shell",
+  zsh: "Shell",
+  console: "Shell",
+  js: "JavaScript",
+  javascript: "JavaScript",
+  jsx: "JSX",
+  ts: "TypeScript",
+  typescript: "TypeScript",
+  tsx: "TSX",
+  json: "JSON",
+  jsonc: "JSON",
+  yaml: "YAML",
+  yml: "YAML",
+  toml: "TOML",
+  md: "Markdown",
+  markdown: "Markdown",
+  html: "HTML",
+  xml: "XML",
+  css: "CSS",
+  go: "Go",
+  python: "Python",
+  py: "Python",
+  rust: "Rust",
+  diff: "Diff",
+  sql: "SQL",
+  plaintext: "Text",
+  text: "Text",
+  txt: "Text",
+  plain: "Text",
 };
 const EMOJI_START = /^\s*(\p{Extended_Pictographic}️?)\s*/u;
 const HEADING_NUMBER = /^(\s*)(\d+(?:\.\d+)*|[一二三四五六七八九十]+)([、.．]\s*)/;
@@ -83,7 +107,10 @@ function splitHeadingNumber(node) {
   if (!match) return undefined;
   const remainder = first.value.slice(match[0].length);
   return h(node.tagName, node.properties ?? {}, [
-    h("span", { className: /\d/.test(match[2]) ? ["hn"] : ["hn", "hn-cjk"] }, [text(match[1] + match[2]), h("span", { className: ["hn-sep"] }, [text(match[3])])]),
+    h("span", { className: /\d/.test(match[2]) ? ["hn"] : ["hn", "hn-cjk"] }, [
+      text(match[1] + match[2]),
+      h("span", { className: ["hn-sep"] }, [text(match[3])]),
+    ]),
     h("span", { className: ["ht"] }, [...(remainder ? [text(remainder)] : []), ...rest]),
   ]);
 }
@@ -104,7 +131,9 @@ function toCodeCard(node) {
       h("button", { type: "button", className: ["code-copy"], ariaLabel: "复制代码", hidden: true }, [text("复制")]),
     ]),
     h("div", { className: ["code-body"] }, [
-      h("div", { className: ["code-gutter"], ariaHidden: "true" }, [text(Array.from({ length: lines }, (_, i) => i + 1).join("\n"))]),
+      h("div", { className: ["code-gutter"], ariaHidden: "true" }, [
+        text(Array.from({ length: lines }, (_, i) => i + 1).join("\n")),
+      ]),
       h("pre", preProps, node.children),
     ]),
   ]);
@@ -121,7 +150,12 @@ export function proseStructure() {
         if (node.tagName === "li") return strandedStrong(node);
         if (node.tagName !== "p") return splitHeadingNumber(node);
         const parent = ctx.parent(node);
-        if (parent?.type === "element" && parent.tagName === "blockquote" && !plainText(node).trim() && !node.children.some((c) => c.type === "element")) {
+        if (
+          parent?.type === "element" &&
+          parent.tagName === "blockquote" &&
+          !plainText(node).trim() &&
+          !node.children.some((c) => c.type === "element")
+        ) {
           ctx.removeNode(node);
           return undefined;
         }
@@ -139,14 +173,20 @@ export function proseCjkSpacing() {
   return {
     name: "site-prose-cjk-spacing",
     text(node, ctx) {
-      const inDocs = ctx.fileURL ? fileURLToPath(ctx.fileURL).replaceAll("\\", "/").includes("/src/content/docs/") : false;
+      const inDocs = ctx.fileURL
+        ? fileURLToPath(ctx.fileURL).replaceAll("\\", "/").includes("/src/content/docs/")
+        : false;
       for (let parent = ctx.parent(node); parent && parent.type === "element"; parent = ctx.parent(parent)) {
         if (SKIP_TAGS.has(parent.tagName) || (inDocs && HEADING_TAGS.has(parent.tagName))) return;
       }
       const parent = ctx.parent(node);
       const index = ctx.indexOf(node);
       const siblings = parent?.children ?? [];
-      const value = spacedTextValue(node.value, index ? siblings[index - 1] : undefined, index === undefined ? undefined : siblings[index + 1]);
+      const value = spacedTextValue(
+        node.value,
+        index ? siblings[index - 1] : undefined,
+        index === undefined ? undefined : siblings[index + 1],
+      );
       if (value !== node.value) ctx.setProperty(node, "value", value);
     },
   };

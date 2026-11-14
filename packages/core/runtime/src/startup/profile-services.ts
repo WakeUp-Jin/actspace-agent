@@ -30,12 +30,13 @@ export type ProfileServices = {
  * 上面每个 id 对应的服务定义。类型对不上时这里编译不过；
  * 左边的 id 是否等于右边定义自己的 id，由 `profile-services.test.ts` 核对。
  */
-export const PROFILE_SERVICE_KEYS: { readonly [K in keyof ProfileServices]: ServiceKey<ProfileServices[K]> } = Object.freeze({
-  "session.runtime": SESSION_RUNTIME_SERVICE,
-  "agent.runtime": AGENT_RUNTIME_SERVICE,
-  "headless.runner": HEADLESS_RUNNER_SERVICE,
-  "harness.control": HARNESS_CONTROL_SERVICE,
-  "host.application": HOST_APPLICATION_SERVICE,
-  "desktop.app": DESKTOP_APP_SERVICE,
-  "english-learning": ENGLISH_LEARNING_SERVICE,
-});
+export const PROFILE_SERVICE_KEYS: { readonly [K in keyof ProfileServices]: ServiceKey<ProfileServices[K]> } =
+  Object.freeze({
+    "session.runtime": SESSION_RUNTIME_SERVICE,
+    "agent.runtime": AGENT_RUNTIME_SERVICE,
+    "headless.runner": HEADLESS_RUNNER_SERVICE,
+    "harness.control": HARNESS_CONTROL_SERVICE,
+    "host.application": HOST_APPLICATION_SERVICE,
+    "desktop.app": DESKTOP_APP_SERVICE,
+    "english-learning": ENGLISH_LEARNING_SERVICE,
+  });

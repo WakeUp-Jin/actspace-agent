@@ -9,7 +9,11 @@ import {
 
 // 14 T20：未确认提交记录的读写、校验和 7 天过期清理。
 const KEY = (id: string) => `actspace:pending-submission:${id}`;
-const record = (sessionId: string, id = "sub-1") => ({ content: "{}", id, draft: { sessionId, text: `draft ${sessionId}` } });
+const record = (sessionId: string, id = "sub-1") => ({
+  content: "{}",
+  id,
+  draft: { sessionId, text: `draft ${sessionId}` },
+});
 
 describe("pending submission records", () => {
   it("writes with a createdAt stamp, reads back and clears", () => {

@@ -7,38 +7,138 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
 
-afterEach(() => { window.localStorage.clear(); });
-function fixture(ordinary = false, pendingTool?: { name: string; preview: NonNullable<PendingApprovalInfo["recovery"]>["preview"] }) {
-
+afterEach(() => {
+  window.localStorage.clear();
+});
+function fixture(
+  ordinary = false,
+  pendingTool?: { name: string; preview: NonNullable<PendingApprovalInfo["recovery"]>["preview"] },
+) {
   window.localStorage.clear();
   const now = new Date().toISOString();
-  const record: SessionRecord = { meta: { schemaVersion: 2, id: "reloaded", title: "Recover approvals", createdAt: now, updatedAt: now, agentRunCount: 1, workspaceRoot: "/tmp/workspace" }, events: [
-    { id: "question", schemaVersion: 2, sessionId: "reloaded", agentRunId: "live-run", type: "user_message", timestamp: now, payload: { content: "read the fixture" } },
-  ] };
-  let pending: PendingApprovalInfo[] = [{ requestId: "live-approval", toolName: "read_file", reason: "outside workspace", summary: "Read fixture", createdAt: Date.now(), expiresAt: Date.now() + 60_000,
-    recovery: { agentRunId: "live-run", toolCallId: "live-call", preview: { kind: "read", filePath: "/tmp/fixture.txt", displayText: "Read fixture" } } }];
-  if (pendingTool) pending = pending.map(item => ({ ...item, toolName: pendingTool.name, recovery: { ...item.recovery!, preview: pendingTool.preview } }));
+  const record: SessionRecord = {
+    meta: {
+      schemaVersion: 2,
+      id: "reloaded",
+      title: "Recover approvals",
+      createdAt: now,
+      updatedAt: now,
+      agentRunCount: 1,
+      workspaceRoot: "/tmp/workspace",
+    },
+    events: [
+      {
+        id: "question",
+        schemaVersion: 2,
+        sessionId: "reloaded",
+        agentRunId: "live-run",
+        type: "user_message",
+        timestamp: now,
+        payload: { content: "read the fixture" },
+      },
+    ],
+  };
+  let pending: PendingApprovalInfo[] = [
+    {
+      requestId: "live-approval",
+      toolName: "read_file",
+      reason: "outside workspace",
+      summary: "Read fixture",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+      recovery: {
+        agentRunId: "live-run",
+        toolCallId: "live-call",
+        preview: { kind: "read", filePath: "/tmp/fixture.txt", displayText: "Read fixture" },
+      },
+    },
+  ];
+  if (pendingTool)
+    pending = pending.map((item) => ({
+      ...item,
+      toolName: pendingTool.name,
+      recovery: { ...item.recovery!, preview: pendingTool.preview },
+    }));
   if (ordinary) pending = [];
   let listener: (event: RuntimeStreamEvent) => void = () => {};
   let liveListener: (event: unknown) => void = () => {};
   const abort = vi.fn(async () => true);
   const decide = vi.fn(async () => ({ ok: true }));
   setupBridge({
-    "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    "workspaces.list": async () => ({ version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: now, updatedAt: now }] }),
-    "sessions.list": async () => [{ id: "reloaded", title: record.meta.title, updatedAt: now, agentRunCount: 1, workspaceRoot: "/tmp/workspace" }],
+    "app.getBootstrapState": async () => ({
+      appVersion: "test",
+      dataRoot: "/tmp/test",
+      sessionRoot: "/tmp/test",
+      logRoot: "/tmp/test",
+      tmpRoot: "/tmp/test",
+      workspaceRoot: "/tmp/workspace",
+    }),
+    "workspaces.list": async () => ({
+      version: 1,
+      items: [
+        {
+          id: "default",
+          kind: "folder",
+          label: "workspace",
+          path: "/tmp/workspace",
+          order: 0,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    }),
+    "sessions.list": async () => [
+      { id: "reloaded", title: record.meta.title, updatedAt: now, agentRunCount: 1, workspaceRoot: "/tmp/workspace" },
+    ],
     "sessions.getPage": async () => recordProjectionFixture(record),
     "approvals.listPending": async () => pending,
-    ...(ordinary ? { "tasks.command": async () => ({ snapshot: { sessionId: "reloaded", revision: 1, paused: false, tasks: [], queue: [], runs: [{ runId: "live-run", state: "running" }] } }) } : {}),
-    "events.agentStream": (callback: typeof listener) => { listener = callback; return () => {}; },
-    "events.sessionLive": (callback: typeof liveListener) => { liveListener = callback; return () => {}; },
+    ...(ordinary
+      ? {
+          "tasks.command": async () => ({
+            snapshot: {
+              sessionId: "reloaded",
+              revision: 1,
+              paused: false,
+              tasks: [],
+              queue: [],
+              runs: [{ runId: "live-run", state: "running" }],
+            },
+          }),
+        }
+      : {}),
+    "events.agentStream": (callback: typeof listener) => {
+      listener = callback;
+      return () => {};
+    },
+    "events.sessionLive": (callback: typeof liveListener) => {
+      liveListener = callback;
+      return () => {};
+    },
     "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
-    "tasks.abort": abort, "approvals.submit": decide,
-    "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
+    "tasks.abort": abort,
+    "approvals.submit": decide,
+    "appearance.setUiZoom": () => {},
+    "appearance.setNativeTheme": () => {},
+    "events.shuttingDown": () => () => {},
   });
-  const emit = (event: { type: RuntimeStreamEvent["type"]; [key: string]: unknown }) => act(() => listener({ sessionId: "reloaded", agentRunId: "live-run", ...event } as RuntimeStreamEvent));
-  const view = render(<TooltipProvider><App /></TooltipProvider>);
-  return { abort, decide, emit, view, refresh: () => act(() => liveListener({ event: { sessionId: "reloaded", message: "task-queue-updated" } })), clear: () => { pending = []; }, record };
+  const emit = (event: { type: RuntimeStreamEvent["type"]; [key: string]: unknown }) =>
+    act(() => listener({ sessionId: "reloaded", agentRunId: "live-run", ...event } as RuntimeStreamEvent));
+  const view = render(
+    <TooltipProvider>
+      <App />
+    </TooltipProvider>,
+  );
+  return {
+    abort,
+    decide,
+    emit,
+    view,
+    refresh: () => act(() => liveListener({ event: { sessionId: "reloaded", message: "task-queue-updated" } })),
+    clear: () => {
+      pending = [];
+    },
+    record,
+  };
 }
 
 it("reattaches a pending approval on mount, keeps history, rejects it and settles without a local send promise", async () => {
@@ -60,9 +160,20 @@ it("does not resurrect an approval from a query overtaken by a terminal event", 
   await screen.findByRole("button", { name: "拒绝" });
   const stale = await window.actspace.approvals.listPending({ sessionId: "reloaded" });
   let release!: (value: PendingApprovalInfo[]) => void;
-  overrideBridge({ "approvals.listPending": vi.fn().mockImplementationOnce(() => new Promise(resolve => { release = resolve; })).mockResolvedValue([]) });
+  overrideBridge({
+    "approvals.listPending": vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      )
+      .mockResolvedValue([]),
+  });
   f.emit({ type: "tool_approval_resolved", toolCallId: "live-call", requestId: "live-approval", decision: "deny" });
-  f.clear(); f.emit({ type: "agent_run_finished" });
+  f.clear();
+  f.emit({ type: "agent_run_finished" });
   await waitFor(() => expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument());
   await act(async () => release(stale));
   expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument();
@@ -74,7 +185,8 @@ it("stops the original recovered run and clears the card after abort", async () 
   await screen.findByRole("button", { name: "拒绝" });
   await userEvent.click(screen.getByLabelText("停止 Agent"));
   expect(f.abort).toHaveBeenCalledWith({ sessionId: "reloaded", agentRunId: "live-run" });
-  f.clear(); f.emit({ type: "agent_run_aborted" });
+  f.clear();
+  f.emit({ type: "agent_run_aborted" });
   await waitFor(() => expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument());
   expect(screen.queryByRole("button", { name: "拒绝" })).not.toBeInTheDocument();
 });
@@ -95,7 +207,14 @@ it("does not resurrect a Run from a snapshot overtaken by its terminal stream ev
   await screen.findByLabelText("停止 Agent");
   const stale = await window.actspace.tasks.command({ sessionId: "reloaded", op: "snapshot" });
   let release!: (value: typeof stale) => void;
-  overrideBridge({ "tasks.command": vi.fn(() => new Promise<typeof stale>(resolve => { release = resolve; })) });
+  overrideBridge({
+    "tasks.command": vi.fn(
+      () =>
+        new Promise<typeof stale>((resolve) => {
+          release = resolve;
+        }),
+    ),
+  });
   f.refresh();
   f.emit({ type: "agent_run_finished" });
   await waitFor(() => expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument());
@@ -107,15 +226,28 @@ it("restores the approval card after a remote observation resets an existing run
   const f = fixture();
   await screen.findByRole("button", { name: "拒绝" });
   f.emit({ type: "agent_run_started", recoveredReset: true });
-  f.emit({ type: "tool_approval_required", toolCallId: "live-call", requestId: "live-approval", toolName: "read_file", summary: "Read fixture", reason: "outside workspace" });
+  f.emit({
+    type: "tool_approval_required",
+    toolCallId: "live-call",
+    requestId: "live-approval",
+    toolName: "read_file",
+    summary: "Read fixture",
+    reason: "outside workspace",
+  });
   const reject = await screen.findByRole("button", { name: "拒绝" });
   await userEvent.click(reject);
   expect(f.decide).toHaveBeenCalledWith({ requestId: "live-approval", decision: "deny" });
 });
 
 for (const tool of [
-  { name: "list_directory", preview: { kind: "directory_list" as const, path: "/outside/templates", displayText: "Listed templates" } },
-  { name: "plugin_manager", preview: { kind: "generic" as const, title: "plugin_manager", content: "Prepare candidate" } },
+  {
+    name: "list_directory",
+    preview: { kind: "directory_list" as const, path: "/outside/templates", displayText: "Listed templates" },
+  },
+  {
+    name: "plugin_manager",
+    preview: { kind: "generic" as const, title: "plugin_manager", content: "Prepare candidate" },
+  },
 ]) {
   it(`restores an actionable approval for ${tool.name} after reload`, async () => {
     const f = fixture(false, tool);

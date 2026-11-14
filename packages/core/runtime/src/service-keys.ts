@@ -1,4 +1,10 @@
-import { ACTSPACE_SERVICE_DEFINITIONS, ACTSPACE_SERVICE_IDS, bindServiceType, serviceKey, serviceView } from "@actspace/cordis-adapter";
+import {
+  ACTSPACE_SERVICE_DEFINITIONS,
+  ACTSPACE_SERVICE_IDS,
+  bindServiceType,
+  serviceKey,
+  serviceView,
+} from "@actspace/cordis-adapter";
 import { MODELS_HOST_PORT_ID, type ModelsHostPort } from "@actspace/shared";
 import type { ShellToolsService } from "@actspace/tool-shell";
 import type { AgentFactoryService } from "./harness/agent-factory-plugin.js";

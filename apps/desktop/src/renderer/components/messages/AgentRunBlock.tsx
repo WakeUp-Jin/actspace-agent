@@ -5,14 +5,20 @@ import { BackgroundTag } from "./BashRunBlock";
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 
 // 单行派发卡片（front-子Agent与后台任务规范 §2.1）：此刻在做什么在右侧「子 Agent」列表第二行，模型在详情顶栏，卡片里都不写。
-const BLOCK_CLASS = "message-row agent-run max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)]";
+const BLOCK_CLASS =
+  "message-row agent-run max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)]";
 const BUTTON_CLASS =
   "group/agent flex h-[34px] w-full min-w-0 items-center gap-2 rounded-act-md border border-line bg-surface-subtle pr-2.5 pl-[7px] text-left transition-[background-color,border-color,color,transform] duration-(--motion-base) ease-in-out hover:border-line-strong hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--act-color-focus-ring)] active:translate-y-px";
-const NAME_CLASS = "min-w-0 flex-1 truncate text-act-sm leading-5 text-text-muted group-hover/agent:text-text-main group-focus-visible/agent:text-text-main";
+const NAME_CLASS =
+  "min-w-0 flex-1 truncate text-act-sm leading-5 text-text-muted group-hover/agent:text-text-main group-focus-visible/agent:text-text-main";
 const TYPE_CLASS = "shrink-0 text-act-xs leading-snug text-text-faint";
 
 export function agentKindText(message: Pick<AgentMessage, "subagentKind" | "preset" | "agentKind">): string {
-  return subagentKindLabel({ ...(message.subagentKind ? { subagentKind: message.subagentKind } : {}), ...(message.preset ? { preset: message.preset } : {}), ...(message.agentKind ? { agentKind: message.agentKind } : {}) });
+  return subagentKindLabel({
+    ...(message.subagentKind ? { subagentKind: message.subagentKind } : {}),
+    ...(message.preset ? { preset: message.preset } : {}),
+    ...(message.agentKind ? { agentKind: message.agentKind } : {}),
+  });
 }
 
 export function AgentRunBlock({

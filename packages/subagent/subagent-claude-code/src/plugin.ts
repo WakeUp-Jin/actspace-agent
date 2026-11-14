@@ -15,8 +15,23 @@ export async function apply(ctx: CordisContext, config: Readonly<Record<string, 
   const backend = createClaudeCodeBackend({ config: claudeCodeConfig(config) });
   const availability = await backend.available();
   const registration = availability.ok
-    ? registerExternalSubagentTool(tools, port, backend, CLAUDE_CODE_SUBAGENT_PLUGIN_ID, sessionId => registry.list().find(agent => agent.session.header.sessionId === sessionId && agent.session.header.lineage?.origin !== "delegation")?.scope)
+    ? registerExternalSubagentTool(
+        tools,
+        port,
+        backend,
+        CLAUDE_CODE_SUBAGENT_PLUGIN_ID,
+        (sessionId) =>
+          registry
+            .list()
+            .find(
+              (agent) =>
+                agent.session.header.sessionId === sessionId && agent.session.header.lineage?.origin !== "delegation",
+            )?.scope,
+      )
     : undefined;
   ctx.provide?.("tools.subagent-claude-code", Object.freeze({ availability }));
-  ctx.effect?.(() => async () => { await registration?.dispose(); clearCommandCache("claude"); });
+  ctx.effect?.(() => async () => {
+    await registration?.dispose();
+    clearCommandCache("claude");
+  });
 }

@@ -9,6 +9,11 @@ export class CliApprovalBroker implements ApprovalBroker {
 
   async requestApproval(request: ApprovalRequest): Promise<ApprovalDecision> {
     this.approvalRequired = request;
-    return Object.freeze({ requestId: request.requestId, kind: "deny", code: "broker-unavailable", decidedAt: new Date().toISOString() });
+    return Object.freeze({
+      requestId: request.requestId,
+      kind: "deny",
+      code: "broker-unavailable",
+      decidedAt: new Date().toISOString(),
+    });
   }
 }

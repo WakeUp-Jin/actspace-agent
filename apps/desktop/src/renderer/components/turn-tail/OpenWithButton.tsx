@@ -14,11 +14,20 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 
 export type OpenWithOperation = { kind: "default" } | { kind: "application"; id: string } | { kind: "reveal" };
 
-const SPLIT_CLASS = "inline-flex h-6 flex-none items-stretch overflow-hidden rounded-act-sm border-[0.5px] border-line-strong";
+const SPLIT_CLASS =
+  "inline-flex h-6 flex-none items-stretch overflow-hidden rounded-act-sm border-[0.5px] border-line-strong";
 const HALF_CLASS =
   "inline-flex items-center justify-center border-0 bg-transparent text-act-xxs leading-4 whitespace-nowrap enabled:hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:outline-none disabled:cursor-default";
 
-export function OpenWithButton({ applications, failed, loading, pending, chooseApplication, onAction, onRefresh }: {
+export function OpenWithButton({
+  applications,
+  failed,
+  loading,
+  pending,
+  chooseApplication,
+  onAction,
+  onRefresh,
+}: {
   applications: readonly WorkspaceFileApplication[];
   failed: boolean;
   loading: boolean;
@@ -42,21 +51,37 @@ export function OpenWithButton({ applications, failed, loading, pending, chooseA
     else onAction({ kind: "default" });
   }
 
-  const icon = chooseApplication && loading && !preferred
-    ? <span className="inline-block size-[13px] flex-none rounded-act-xs bg-hover-overlay" aria-hidden="true" data-open-with-skeleton />
-    : revealDefault
-      ? <FolderOpen size={13} aria-hidden="true" />
-      : <ApplicationIcon key={preferred?.iconDataUrl} source={preferred?.iconDataUrl} size={13} />;
+  const icon =
+    chooseApplication && loading && !preferred ? (
+      <span
+        className="inline-block size-[13px] flex-none rounded-act-xs bg-hover-overlay"
+        aria-hidden="true"
+        data-open-with-skeleton
+      />
+    ) : revealDefault ? (
+      <FolderOpen size={13} aria-hidden="true" />
+    ) : (
+      <ApplicationIcon key={preferred?.iconDataUrl} source={preferred?.iconDataUrl} size={13} />
+    );
 
   return (
-    <Menu open={menuOpen && !disabled} onOpenChange={(open) => {
-      if (open) onRefresh();
-      setMenuOpen(open);
-    }}>
+    <Menu
+      open={menuOpen && !disabled}
+      onOpenChange={(open) => {
+        if (open) onRefresh();
+        setMenuOpen(open);
+      }}
+    >
       <div className={SPLIT_CLASS} data-open-with data-state={disabled ? "busy" : "idle"}>
         <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
-            <button type="button" className={`${HALF_CLASS} gap-1 px-[5px] py-[3px] text-text-main`} disabled={disabled} aria-label={primaryLabel} onClick={primary}>
+            <button
+              type="button"
+              className={`${HALF_CLASS} gap-1 px-[5px] py-[3px] text-text-main`}
+              disabled={disabled}
+              aria-label={primaryLabel}
+              onClick={primary}
+            >
               {icon}
             </button>
           </TooltipTrigger>
@@ -71,11 +96,13 @@ export function OpenWithButton({ applications, failed, loading, pending, chooseA
         </MenuTrigger>
       </div>
       <MenuContent align="end" className="min-w-44">
-        {chooseApplication ? applications.map((app) => (
-          <MenuItem key={app.id} onSelect={() => onAction({ kind: "application", id: app.id })}>
-            <ApplicationLabel app={app} defaultId={preferred?.id} />
-          </MenuItem>
-        )) : (
+        {chooseApplication ? (
+          applications.map((app) => (
+            <MenuItem key={app.id} onSelect={() => onAction({ kind: "application", id: app.id })}>
+              <ApplicationLabel app={app} defaultId={preferred?.id} />
+            </MenuItem>
+          ))
+        ) : (
           <MenuItem onSelect={() => onAction({ kind: "default" })}>
             <ExternalLink size={14} aria-hidden="true" />
             <span>用默认应用打开</span>

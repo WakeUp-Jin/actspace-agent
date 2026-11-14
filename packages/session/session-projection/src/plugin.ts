@@ -1,6 +1,11 @@
 import { SessionProjectionRegistry } from "./registry.js";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType, provideService, type CordisContext } from "@actspace/cordis-adapter";
+import {
+  ACTSPACE_SERVICE_DEFINITIONS,
+  bindServiceType,
+  provideService,
+  type CordisContext,
+} from "@actspace/cordis-adapter";
 
 export type ProjectionContributor = {
   readonly id: string;
@@ -10,10 +15,15 @@ export type ProjectionContributor = {
 export type SessionProjectionService = {
   readonly createRegistry: (accepts?: (event: SessionEventEnvelopeV1) => boolean) => SessionProjectionRegistry;
   readonly registerContributor: (contributor: ProjectionContributor) => () => void;
-  readonly applyContributors: (registry: SessionProjectionRegistry, redact: (text: string, limit?: number) => string) => void;
+  readonly applyContributors: (
+    registry: SessionProjectionRegistry,
+    redact: (text: string, limit?: number) => string,
+  ) => void;
 };
 
-export const SESSION_PROJECTION_SERVICE = bindServiceType<SessionProjectionService>(ACTSPACE_SERVICE_DEFINITIONS.sessionProjection);
+export const SESSION_PROJECTION_SERVICE = bindServiceType<SessionProjectionService>(
+  ACTSPACE_SERVICE_DEFINITIONS.sessionProjection,
+);
 
 export function createSessionProjectionService(): SessionProjectionService {
   const contributors = new Map<string, ProjectionContributor>();
@@ -24,11 +34,14 @@ export function createSessionProjectionService(): SessionProjectionService {
       if (sealed) throw new Error("Register projection contributors before restoring sessions.");
       if (contributors.has(contributor.id)) throw new Error(`Duplicate projection contributor ${contributor.id}.`);
       contributors.set(contributor.id, contributor);
-      return () => { if (contributors.get(contributor.id) === contributor) contributors.delete(contributor.id); };
+      return () => {
+        if (contributors.get(contributor.id) === contributor) contributors.delete(contributor.id);
+      };
     },
     applyContributors: (registry: SessionProjectionRegistry, redact: (text: string, limit?: number) => string) => {
       sealed = true;
-      for (const contributor of [...contributors.values()].sort((a, b) => a.id.localeCompare(b.id))) contributor.register(registry, redact);
+      for (const contributor of [...contributors.values()].sort((a, b) => a.id.localeCompare(b.id)))
+        contributor.register(registry, redact);
     },
   });
 }

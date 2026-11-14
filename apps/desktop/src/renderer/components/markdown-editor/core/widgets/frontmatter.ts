@@ -22,7 +22,9 @@ export function parseFrontmatter(source: string): FrontmatterEntry[] {
   }
   return entries.map(({ key, parts }) => {
     const simple = parts.length === 1;
-    const value = simple ? parts[0].replace(/^(["'])(.*)\1$/, "$2") : parts.filter((part, i) => i > 0 || part).join("\n");
+    const value = simple
+      ? parts[0].replace(/^(["'])(.*)\1$/, "$2")
+      : parts.filter((part, i) => i > 0 || part).join("\n");
     return [key, value] as const;
   });
 }

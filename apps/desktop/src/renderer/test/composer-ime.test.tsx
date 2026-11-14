@@ -15,7 +15,13 @@ function renderComposer(props: Partial<Parameters<typeof Composer>[0]> = {}) {
   const onModeChange = vi.fn();
   render(
     <TooltipProvider delayDuration={0}>
-      <Composer contextSnapshot={null} onSend={onSend} onModeChange={onModeChange} inputHistory={["older prompt"]} {...props} />
+      <Composer
+        contextSnapshot={null}
+        onSend={onSend}
+        onModeChange={onModeChange}
+        inputHistory={["older prompt"]}
+        {...props}
+      />
     </TooltipProvider>,
   );
   return { onSend, onModeChange, input: screen.getByRole("textbox", { name: "消息输入框" }) };

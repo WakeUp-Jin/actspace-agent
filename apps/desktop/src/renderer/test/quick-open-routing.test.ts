@@ -23,7 +23,12 @@ const automatic: QuickOpenShortcutSettings = {
 
 describe("quick open routing", () => {
   it("orders visible projects like the sidebar: latest session first, registry order as fallback", () => {
-    const workspaces = [workspace("default", 0), workspace("alpha", 1), workspace("beta", 2), { ...workspace("gamma", 3), hidden: true }];
+    const workspaces = [
+      workspace("default", 0),
+      workspace("alpha", 1),
+      workspace("beta", 2),
+      { ...workspace("gamma", 3), hidden: true },
+    ];
     const sessions: SessionListItem[] = [
       { id: "a", title: "A", workspaceId: "alpha", updatedAt: "2026-08-01T08:00:00.000Z", agentRunCount: 1 },
       { id: "b", title: "B", workspaceId: "beta", updatedAt: "2026-08-01T09:00:00.000Z", agentRunCount: 1 },
@@ -37,20 +42,26 @@ describe("quick open routing", () => {
     const sessions: SessionListItem[] = [
       { id: "session-1", title: "One", workspaceId: "alpha", updatedAt: "2026-08-01T09:00:00.000Z", agentRunCount: 1 },
     ];
-    expect(resolveQuickOpenTarget({ ...automatic, target: { kind: "session", sessionId: "session-1" } }, projects, sessions))
-      .toEqual({ kind: "session", sessionId: "session-1" });
-    expect(resolveQuickOpenTarget({ ...automatic, target: { kind: "session", sessionId: "missing" } }, projects, sessions))
-      .toEqual({ kind: "workspace", workspaceId: "alpha", workspaceRoot: "/projects/alpha" });
+    expect(
+      resolveQuickOpenTarget({ ...automatic, target: { kind: "session", sessionId: "session-1" } }, projects, sessions),
+    ).toEqual({ kind: "session", sessionId: "session-1" });
+    expect(
+      resolveQuickOpenTarget({ ...automatic, target: { kind: "session", sessionId: "missing" } }, projects, sessions),
+    ).toEqual({ kind: "workspace", workspaceId: "alpha", workspaceRoot: "/projects/alpha" });
   });
 
   it("opens an empty chat when every project has been removed", () => {
-    expect(resolveQuickOpenTarget(automatic, [{ ...workspace("default", 0), hidden: true }], [])).toEqual({ kind: "empty" });
+    expect(resolveQuickOpenTarget(automatic, [{ ...workspace("default", 0), hidden: true }], [])).toEqual({
+      kind: "empty",
+    });
   });
 
   it("turns a keyboard chord into an Electron accelerator", () => {
-    expect(acceleratorFromKeyboardEvent({ key: " ", metaKey: true, ctrlKey: false, altKey: false, shiftKey: true }))
-      .toBe("CommandOrControl+Shift+Space");
-    expect(acceleratorFromKeyboardEvent({ key: "a", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false }))
-      .toBeNull();
+    expect(
+      acceleratorFromKeyboardEvent({ key: " ", metaKey: true, ctrlKey: false, altKey: false, shiftKey: true }),
+    ).toBe("CommandOrControl+Shift+Space");
+    expect(
+      acceleratorFromKeyboardEvent({ key: "a", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false }),
+    ).toBeNull();
   });
 });

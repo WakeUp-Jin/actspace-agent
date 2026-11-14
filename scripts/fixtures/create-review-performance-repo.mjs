@@ -26,12 +26,16 @@ console.log(root);
 
 async function createLineFixture(fileCount, linesPerFile) {
   const before = Array.from({ length: linesPerFile }, (_, index) => `before ${index}`).join("\n") + "\n";
-  await Promise.all(Array.from({ length: fileCount }, (_, index) => writeFile(join(root, `file-${index}.txt`), before, "utf8")));
+  await Promise.all(
+    Array.from({ length: fileCount }, (_, index) => writeFile(join(root, `file-${index}.txt`), before, "utf8")),
+  );
   await commitBase();
-  await Promise.all(Array.from({ length: fileCount }, (_, index) => {
-    const after = Array.from({ length: linesPerFile }, (_, line) => `after ${index} ${line}`).join("\n") + "\n";
-    return writeFile(join(root, `file-${index}.txt`), after, "utf8");
-  }));
+  await Promise.all(
+    Array.from({ length: fileCount }, (_, index) => {
+      const after = Array.from({ length: linesPerFile }, (_, line) => `after ${index} ${line}`).join("\n") + "\n";
+      return writeFile(join(root, `file-${index}.txt`), after, "utf8");
+    }),
+  );
 }
 
 async function createByteFixture() {

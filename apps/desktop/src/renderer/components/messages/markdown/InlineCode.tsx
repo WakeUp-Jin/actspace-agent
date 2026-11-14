@@ -3,13 +3,23 @@ import { isAbsolutePath, resolveWorkspacePath } from "../../markdown-common/path
 import { MarkdownHostContext } from "./host";
 import { withFileIcon } from "./FileIconLead";
 
-type InlineCodeProps = ComponentPropsWithoutRef<"code"> & { node?: unknown; "data-path"?: string; "data-line"?: string };
+type InlineCodeProps = ComponentPropsWithoutRef<"code"> & {
+  node?: unknown;
+  "data-path"?: string;
+  "data-line"?: string;
+};
 
 /**
  * 行内代码；rehype-inline-paths 认出的路径变成可点的文件（强调色 + 文件图标，规范 §5.1）。
  * 宿主没有提供 openPath 时，路径按普通行内代码显示，不可点。
  */
-export function InlineCode({ node: _node, children, "data-path": rawPath, "data-line": lineText, ...props }: InlineCodeProps) {
+export function InlineCode({
+  node: _node,
+  children,
+  "data-path": rawPath,
+  "data-line": lineText,
+  ...props
+}: InlineCodeProps) {
   const { openPath, workspaceRoot } = useContext(MarkdownHostContext);
   const path = rawPath && isAbsolutePath(rawPath) ? resolveWorkspacePath(rawPath, { workspaceRoot }) : rawPath;
   if (!path || !openPath) return <code {...props}>{children}</code>;
@@ -21,7 +31,15 @@ export function InlineCode({ node: _node, children, "data-path": rawPath, "data-
     open();
   };
   return (
-    <code {...props} className="md-path" role="button" tabIndex={0} title={`在 ActSpace 中打开${line ? `（第 ${line} 行）` : ""}`} onClick={open} onKeyDown={onKeyDown}>
+    <code
+      {...props}
+      className="md-path"
+      role="button"
+      tabIndex={0}
+      title={`在 ActSpace 中打开${line ? `（第 ${line} 行）` : ""}`}
+      onClick={open}
+      onKeyDown={onKeyDown}
+    >
       {withFileIcon(children)}
     </code>
   );

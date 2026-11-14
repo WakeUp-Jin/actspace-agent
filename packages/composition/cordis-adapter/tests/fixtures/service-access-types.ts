@@ -1,5 +1,14 @@
 // 只给类型检查看的样例，不执行。`service-access.spec.ts` 编译它两遍，做法见 `../support/type-fixture.ts`。
-import { bindServiceType, getLeasedService, getService, provideService, requireService, serviceKey, serviceView, type ServiceOf } from "../../src/service-access.js";
+import {
+  bindServiceType,
+  getLeasedService,
+  getService,
+  provideService,
+  requireService,
+  serviceKey,
+  serviceView,
+  type ServiceOf,
+} from "../../src/service-access.js";
 import { ACTSPACE_SERVICE_DEFINITIONS } from "../../src/service-contract.js";
 
 type Clock = { now(): number };
@@ -9,7 +18,10 @@ const CLOCK = bindServiceType<Clock>(ACTSPACE_SERVICE_DEFINITIONS.sessionJournal
 const PORT = serviceKey<{ readonly root: string }>("fixture.host.port");
 const CLOCK_VIEW = serviceView<{ now(): unknown }>("session.journal");
 
-declare const ctx: { readonly get?: (name: string) => unknown; readonly provide?: (name: string, value?: unknown) => unknown };
+declare const ctx: {
+  readonly get?: (name: string) => unknown;
+  readonly provide?: (name: string, value?: unknown) => unknown;
+};
 declare const lease: { getService<TService>(name: string): TService | undefined };
 
 // 正例：类型从定义里带出来，调用处不用再写类型。

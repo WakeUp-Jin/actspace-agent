@@ -6,7 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const markdownSpy = vi.hoisted(() => vi.fn());
 vi.mock("../components/messages/markdown/processor", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../components/messages/markdown/processor")>();
-  return { ...actual, renderMarkdown: (...args: Parameters<typeof actual.renderMarkdown>) => { markdownSpy(args[0]); return actual.renderMarkdown(...args); } };
+  return {
+    ...actual,
+    renderMarkdown: (...args: Parameters<typeof actual.renderMarkdown>) => {
+      markdownSpy(args[0]);
+      return actual.renderMarkdown(...args);
+    },
+  };
 });
 
 import { MarkdownProse } from "../components/messages/MarkdownProse";
@@ -17,11 +23,23 @@ let frames: Array<() => void> = [];
 beforeEach(() => {
   markdownSpy.mockClear();
   frames = [];
-  vi.stubGlobal("requestAnimationFrame", (callback: () => void) => { frames.push(callback); return frames.length; });
+  vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
+    frames.push(callback);
+    return frames.length;
+  });
   vi.stubGlobal("cancelAnimationFrame", () => {});
 });
 afterEach(() => vi.unstubAllGlobals());
-const flushFrames = () => { for (let i = 0; i < 200 && frames.length > 0; i += 1) act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); }); };
+const flushFrames = () => {
+  for (let i = 0; i < 200 && frames.length > 0; i += 1)
+    act(() => {
+      const batch = frames;
+      frames = [];
+      batch.forEach((callback) => {
+        callback();
+      });
+    });
+};
 
 const renderedSources = () => markdownSpy.mock.calls.map((call) => String(call[0]));
 const countOf = (needle: string) => renderedSources().filter((source) => source.includes(needle)).length;
@@ -61,11 +79,18 @@ describe("渲染次数", () => {
   it("历史回复：父组件重渲染、props 没变时，整条回复不重渲染", () => {
     const openPath = vi.fn();
     let bump: () => void = () => {};
-    const Parent = memo(function Parent() { return null; });
+    const Parent = memo(function Parent() {
+      return null;
+    });
     function Host() {
       const [, set] = useState(0);
       bump = () => set((n) => n + 1);
-      return <><Parent /><MarkdownProse content={"历史一\n\n历史二"} onOpenWorkspaceFile={openPath} /></>;
+      return (
+        <>
+          <Parent />
+          <MarkdownProse content={"历史一\n\n历史二"} onOpenWorkspaceFile={openPath} />
+        </>
+      );
     }
     render(<Host />);
     markdownSpy.mockClear();
@@ -91,12 +116,24 @@ describe("渲染次数", () => {
 
   it("定义晚到：只重渲染引用了它的块", () => {
     const base = "见 [文档][doc]\n\n无关的一段\n\n另一段无关的";
-    const view = render(<ReplyStreamingContext.Provider value={false}><MarkdownProse content={base} /></ReplyStreamingContext.Provider>);
+    const view = render(
+      <ReplyStreamingContext.Provider value={false}>
+        <MarkdownProse content={base} />
+      </ReplyStreamingContext.Provider>,
+    );
     markdownSpy.mockClear();
-    view.rerender(<ReplyStreamingContext.Provider value={false}><MarkdownProse content={`${base}\n\n[doc]: https://example.com`} /></ReplyStreamingContext.Provider>);
+    view.rerender(
+      <ReplyStreamingContext.Provider value={false}>
+        <MarkdownProse content={`${base}\n\n[doc]: https://example.com`} />
+      </ReplyStreamingContext.Provider>,
+    );
     expect(countOf("见 [文档][doc]")).toBe(1);
     expect(countOf("无关的一段")).toBe(0);
-    expect(renderedSources().some((source) => source.includes("[doc]: https://example.com") && source.includes("见 [文档][doc]"))).toBe(true);
+    expect(
+      renderedSources().some(
+        (source) => source.includes("[doc]: https://example.com") && source.includes("见 [文档][doc]"),
+      ),
+    ).toBe(true);
   });
 
   it("脚注内容变化（脚注定义还在流式写）时，引用它的块不重渲染", () => {

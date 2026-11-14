@@ -23,12 +23,16 @@ export function PythonRuntimePanel() {
       setError("读取脚本运行时状态失败，请重试。");
     }
   }, []);
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   const installing = status?.extension.state === "installing";
   useEffect(() => {
     if (!installing) return;
-    const timer = setInterval(() => { void refresh(); }, POLL_INTERVAL_MS);
+    const timer = setInterval(() => {
+      void refresh();
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [installing, refresh]);
 
@@ -46,19 +50,31 @@ export function PythonRuntimePanel() {
 
   if (error && status === null) {
     return (
-      <div role="alert" className="flex items-center gap-3 rounded-act-md border border-line bg-surface px-3.5 py-3 text-act-xs text-text-faint">
+      <div
+        role="alert"
+        className="flex items-center gap-3 rounded-act-md border border-line bg-surface px-3.5 py-3 text-act-xs text-text-faint"
+      >
         {error}
-        <Button size="xs" onClick={() => void refresh()}>重试</Button>
+        <Button size="xs" onClick={() => void refresh()}>
+          重试
+        </Button>
       </div>
     );
   }
-  if (status === null) return <p role="status" className="px-3.5 py-3 text-act-xs text-text-faint">读取脚本运行时…</p>;
+  if (status === null)
+    return (
+      <p role="status" className="px-3.5 py-3 text-act-xs text-text-faint">
+        读取脚本运行时…
+      </p>
+    );
 
   const { runtime, extension } = status;
   return (
     <section aria-label="脚本运行时" className="grid gap-3 rounded-act-md border border-line bg-surface px-3.5 py-3.5">
       <div>
-        <p className="text-act-sm font-semibold text-text-main">{runtime ? `脚本运行时 · Python ${runtime.version}` : "脚本运行时 · 未随包"}</p>
+        <p className="text-act-sm font-semibold text-text-main">
+          {runtime ? `脚本运行时 · Python ${runtime.version}` : "脚本运行时 · 未随包"}
+        </p>
         <p className="mt-1 text-act-xs leading-relaxed text-text-faint">
           {runtime
             ? "Agent 在命令行里用 actspace-python 运行脚本，随包自带 Office / PDF 处理库，不依赖本机 Python。"
@@ -75,26 +91,44 @@ export function PythonRuntimePanel() {
             <div className="flex items-center gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-act-sm font-medium text-text-main">数据扩展</p>
-                <p className="mt-px text-act-xs text-text-faint">{extension.packages.join("、")}：数据分析与文档转 Markdown 需要，按需下载一次。</p>
+                <p className="mt-px text-act-xs text-text-faint">
+                  {extension.packages.join("、")}：数据分析与文档转 Markdown 需要，按需下载一次。
+                </p>
               </div>
-              {extension.state === "ready" ? <span className="whitespace-nowrap rounded-full bg-success-soft px-2 py-px text-act-xxs text-on-success">已安装</span>
-                : extension.state === "installing" ? (
-                  <span role="status" className="flex items-center gap-1.5 whitespace-nowrap text-act-xs text-text-muted">
-                    <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
-                    下载中{extension.progress ? ` ${extension.progress.completed}/${extension.progress.total}` : ""}
-                  </span>
-                ) : (
-                  <Button size="sm" disabled={busy} onClick={() => void install()}>{extension.state === "failed" ? "重新下载" : "下载数据扩展"}</Button>
-                )}
+              {extension.state === "ready" ? (
+                <span className="whitespace-nowrap rounded-full bg-success-soft px-2 py-px text-act-xxs text-on-success">
+                  已安装
+                </span>
+              ) : extension.state === "installing" ? (
+                <span role="status" className="flex items-center gap-1.5 whitespace-nowrap text-act-xs text-text-muted">
+                  <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
+                  下载中{extension.progress ? ` ${extension.progress.completed}/${extension.progress.total}` : ""}
+                </span>
+              ) : (
+                <Button size="sm" disabled={busy} onClick={() => void install()}>
+                  {extension.state === "failed" ? "重新下载" : "下载数据扩展"}
+                </Button>
+              )}
             </div>
-            {extension.state === "failed" && extension.error ? <p role="alert" className="text-act-xs text-on-danger">下载失败：{extension.error}</p> : null}
+            {extension.state === "failed" && extension.error ? (
+              <p role="alert" className="text-act-xs text-on-danger">
+                下载失败：{extension.error}
+              </p>
+            ) : null}
             {extension.state !== "ready" ? (
-              <p className="text-act-xs text-text-faint">离线机器：把对应的 wheel 文件放进下面的目录再点下载，校验通过的文件不会重复下载。<span className="block break-all font-mono">{extension.localWheelsDirectory}</span></p>
+              <p className="text-act-xs text-text-faint">
+                离线机器：把对应的 wheel 文件放进下面的目录再点下载，校验通过的文件不会重复下载。
+                <span className="block break-all font-mono">{extension.localWheelsDirectory}</span>
+              </p>
             ) : null}
           </div>
         </>
       ) : null}
-      {error ? <p role="alert" className="text-act-xs text-on-danger">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="text-act-xs text-on-danger">
+          {error}
+        </p>
+      ) : null}
     </section>
   );
 }

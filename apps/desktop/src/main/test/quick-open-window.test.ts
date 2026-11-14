@@ -8,9 +8,13 @@ function fakeWindow(options: { minimized?: boolean; maximized?: boolean; fullScr
     isMinimized: () => options.minimized ?? false,
     isMaximized: () => options.maximized ?? false,
     isFullScreen: () => options.fullScreen ?? false,
-    restore: vi.fn(), unmaximize: vi.fn(), setFullScreen: vi.fn(),
+    restore: vi.fn(),
+    unmaximize: vi.fn(),
+    setFullScreen: vi.fn(),
     getBounds: () => ({ x: 100, y: 100, width: 1440, height: options.height ?? 900 }),
-    setBounds: vi.fn(), show: vi.fn(), focus: vi.fn(),
+    setBounds: vi.fn(),
+    show: vi.fn(),
+    focus: vi.fn(),
   });
 }
 

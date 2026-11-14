@@ -27,24 +27,33 @@ export function useModelConnections(onChanged?: () => void) {
     void reload();
   }, [reload]);
 
-  const run = useCallback(async (mutation: () => Promise<ModelConnectionsResult>, savedText?: string | null): Promise<ModelConnectionsResult> => {
-    let result: ModelConnectionsResult;
-    try {
-      result = await mutation();
-    } catch (cause) {
-      result = { ok: false, error: { code: "write_failed", message: cause instanceof Error ? cause.message : "保存失败。" } };
-    }
-    // renderer 的 tsconfig 不是 strict，ok 字面量不收窄，用 "error" in 判断。
-    if ("error" in result) {
-      setError(result.error.message);
+  const run = useCallback(
+    async (
+      mutation: () => Promise<ModelConnectionsResult>,
+      savedText?: string | null,
+    ): Promise<ModelConnectionsResult> => {
+      let result: ModelConnectionsResult;
+      try {
+        result = await mutation();
+      } catch (cause) {
+        result = {
+          ok: false,
+          error: { code: "write_failed", message: cause instanceof Error ? cause.message : "保存失败。" },
+        };
+      }
+      // renderer 的 tsconfig 不是 strict，ok 字面量不收窄，用 "error" in 判断。
+      if ("error" in result) {
+        setError(result.error.message);
+        return result;
+      }
+      setView(result.view);
+      setError(null);
+      if (savedText !== null) notify(savedText);
+      changed.current?.();
       return result;
-    }
-    setView(result.view);
-    setError(null);
-    if (savedText !== null) notify(savedText);
-    changed.current?.();
-    return result;
-  }, [notify]);
+    },
+    [notify],
+  );
 
   return { view, error, setError, reload, run };
 }

@@ -6,11 +6,20 @@ import { COMPACTION_SYSTEM } from "../../packages/context/context-compaction/dis
 test("fixture compaction failure and recovery follow the actual compaction prompt", async () => {
   const provider = await startAgentProvider();
   try {
-    const request = (system, tools = []) => fetch(`${provider.baseUrl}/chat/completions`, {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model: "fixture-main", stream: false, tools,
-        messages: [{ role: "system", content: system }, { role: "user", content: "Summarize this history." }] }),
-    });
+    const request = (system, tools = []) =>
+      fetch(`${provider.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          model: "fixture-main",
+          stream: false,
+          tools,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: "Summarize this history." },
+          ],
+        }),
+      });
     provider.control("summary-error");
     assert.equal((await request(COMPACTION_SYSTEM)).status, 400);
     assert.equal(provider.requests.at(-1).isSummary, true);
@@ -20,5 +29,7 @@ test("fixture compaction failure and recovery follow the actual compaction promp
     const recovered = await request(COMPACTION_SYSTEM);
     assert.equal(recovered.status, 200);
     assert.match((await recovered.json()).choices[0].message.content, /Fixture summary/);
-  } finally { await provider.close(); }
+  } finally {
+    await provider.close();
+  }
 });

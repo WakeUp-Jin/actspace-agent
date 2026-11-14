@@ -31,16 +31,26 @@ describe("mock bridge", () => {
     expect(JSON.stringify(settings)).not.toContain("fixture-secret");
     for (const provider of ["deepseek", "zhipu"] as const) {
       const { revision } = await bridge.settings.getV4();
-      await bridge.settings.updateV4({ namespace: "tools", expectedRevision: revision, patch: { searchProviders: { [provider]: { enabled: true } } } });
+      await bridge.settings.updateV4({
+        namespace: "tools",
+        expectedRevision: revision,
+        patch: { searchProviders: { [provider]: { enabled: true } } },
+      });
     }
-    expect((await bridge.settings.getV4()).settings.tools.searchProviders).toEqual({ deepseek: { enabled: true }, zhipu: { enabled: true } });
+    expect((await bridge.settings.getV4()).settings.tools.searchProviders).toEqual({
+      deepseek: { enabled: true },
+      zhipu: { enabled: true },
+    });
   });
 
   it("exposes every contract member and nothing else", () => {
     const { bridge } = open();
     for (const [domain, members] of Object.entries(desktopBridgeContract)) {
       for (const member of Object.keys(members)) {
-        expect(typeof (bridge as unknown as Record<string, Record<string, unknown>>)[domain][member], `${domain}.${member}`).toBe("function");
+        expect(
+          typeof (bridge as unknown as Record<string, Record<string, unknown>>)[domain][member],
+          `${domain}.${member}`,
+        ).toBe("function");
       }
     }
     expect(Object.keys(bridge).sort()).toEqual(Object.keys(desktopBridgeContract).sort());
@@ -61,7 +71,7 @@ describe("mock bridge", () => {
     const page = await bridge.sessions.listPage();
     expect(page.items.map((item) => item.title).sort()).toEqual(["重命名", "重命名 (fork)"]);
     expect(fork.sessionId).not.toBe(created.sessionId);
-    expect((await bridge.sessions.get({ sessionId: "missing" }))).toBeNull();
+    expect(await bridge.sessions.get({ sessionId: "missing" })).toBeNull();
   });
 
   it("streams a reply for a submitted task and persists both messages", async () => {
@@ -104,8 +114,16 @@ describe("mock bridge", () => {
     bridge.events.settingsChanged(changed);
     const { revision } = await bridge.settings.getV4();
 
-    const ok = await bridge.settings.updateV4({ namespace: "tools", patch: { disabledTools: ["bash"] }, expectedRevision: revision });
-    const stale = await bridge.settings.updateV4({ namespace: "tools", patch: { disabledTools: [] }, expectedRevision: revision });
+    const ok = await bridge.settings.updateV4({
+      namespace: "tools",
+      patch: { disabledTools: ["bash"] },
+      expectedRevision: revision,
+    });
+    const stale = await bridge.settings.updateV4({
+      namespace: "tools",
+      patch: { disabledTools: [] },
+      expectedRevision: revision,
+    });
 
     expect(ok.ok).toBe(true);
     expect(stale).toMatchObject({ ok: false, code: "revision_conflict" });
@@ -113,16 +131,27 @@ describe("mock bridge", () => {
   });
 
   it("lets test handlers override defaults", async () => {
-    const { bridge } = open("empty", { app: { getBootstrapState: async () => ({ ...(await createMockBridge().bridge.app.getBootstrapState()), appVersion: "9.9.9" }) } });
+    const { bridge } = open("empty", {
+      app: {
+        getBootstrapState: async () => ({
+          ...(await createMockBridge().bridge.app.getBootstrapState()),
+          appVersion: "9.9.9",
+        }),
+      },
+    });
     expect((await bridge.app.getBootstrapState()).appVersion).toBe("9.9.9");
   });
 
   it.each(Object.keys(MOCK_SCENARIOS) as MockScenario[])("seeds the %s scenario consistently", async (scenario) => {
     const { bridge, db } = open(scenario);
     const page = await bridge.sessions.listPage();
-    for (const item of page.items) await expect(bridge.sessions.getPage({ sessionId: item.id })).resolves.toMatchObject({ sessionId: item.id });
+    for (const item of page.items)
+      await expect(bridge.sessions.getPage({ sessionId: item.id })).resolves.toMatchObject({ sessionId: item.id });
     // listPage 不返回已归档的会话（侧栏按筛选另外拉），也不返回子智能体的子会话和侧边对话（在主会话的右侧面板里）。
-    expect(page.items.length).toBe([...db.sessions.values()].filter((session) => !session.archived && !session.parentSessionId && !session.sideChat).length);
+    expect(page.items.length).toBe(
+      [...db.sessions.values()].filter((session) => !session.archived && !session.parentSessionId && !session.sideChat)
+        .length,
+    );
     if (scenario === "empty") expect(page.items).toEqual([]);
   });
 
@@ -132,7 +161,9 @@ describe("mock bridge", () => {
     bridge.events.agentStream((event) => events.push(event));
     const [pending] = await bridge.approvals.listPending();
 
-    await expect(bridge.approvals.submit({ requestId: pending.requestId, decision: "deny" })).resolves.toEqual({ ok: true });
+    await expect(bridge.approvals.submit({ requestId: pending.requestId, decision: "deny" })).resolves.toEqual({
+      ok: true,
+    });
 
     expect(events.map((event) => event.type)).toEqual(["tool_approval_resolved", "agent_run_finished"]);
     expect(await bridge.approvals.listPending()).toEqual([]);
@@ -192,16 +223,40 @@ describe("mock bridge", () => {
 
     // 新建后又被删掉的 scripts/tmp-check.mjs 不算本轮改动。
     expect(changes?.files.map((file) => file.path)).toEqual([
-      "scripts/export.ts", "docs/report.md", "src/report/build.ts", "src/report/csv.ts",
-      "src/report/chart.ts", "src/report/index.ts", "docs/summary.csv", "README.md",
+      "scripts/export.ts",
+      "docs/report.md",
+      "src/report/build.ts",
+      "src/report/csv.ts",
+      "src/report/chart.ts",
+      "src/report/index.ts",
+      "docs/summary.csv",
+      "README.md",
     ]);
-    expect(changes?.files.find((file) => file.path === "docs/report.md")).toMatchObject({ created: true, additions: 4 });
-    expect(changes?.files.find((file) => file.path === "src/report/chart.ts")).toMatchObject({ additions: 2, deletions: 1 });
-    expect(presented.map((file) => file.path)).toEqual(["docs/report.md", "docs/summary.csv", "docs/chart.json", "docs/slides.pptx", "docs/appendix.pdf"]);
+    expect(changes?.files.find((file) => file.path === "docs/report.md")).toMatchObject({
+      created: true,
+      additions: 4,
+    });
+    expect(changes?.files.find((file) => file.path === "src/report/chart.ts")).toMatchObject({
+      additions: 2,
+      deletions: 1,
+    });
+    expect(presented.map((file) => file.path)).toEqual([
+      "docs/report.md",
+      "docs/summary.csv",
+      "docs/chart.json",
+      "docs/slides.pptx",
+      "docs/appendix.pdf",
+    ]);
     // 后一次 present 的描述覆盖前一次。
     expect(presented[0].description).toBe("季度报告（更新）");
-    expect(collectTurnChanges(turns[2].messages)).toMatchObject({ additions: 1, deletions: 1, files: [{ path: "docs/report.md", created: false }] });
-    expect(collectPresentedFiles(turns[2].messages)).toMatchObject([{ path: "docs/report.md", description: "单文件改动验收：报告终稿" }]);
+    expect(collectTurnChanges(turns[2].messages)).toMatchObject({
+      additions: 1,
+      deletions: 1,
+      files: [{ path: "docs/report.md", created: false }],
+    });
+    expect(collectPresentedFiles(turns[2].messages)).toMatchObject([
+      { path: "docs/report.md", description: "单文件改动验收：报告终稿" },
+    ]);
     expect(db.sessions.get(session.id)?.messages.some((message) => message.tool?.name === "present")).toBe(true);
   });
 });

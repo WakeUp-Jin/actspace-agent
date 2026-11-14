@@ -29,10 +29,20 @@ export type SidebarViewState = {
   timeCollapsed: Record<string, boolean>;
 };
 
-export const DEFAULT_SIDEBAR_VIEW_OPTIONS: SidebarViewOptions = Object.freeze({ groupBy: "workspace", sort: "updated", archived: "hide" });
+export const DEFAULT_SIDEBAR_VIEW_OPTIONS: SidebarViewOptions = Object.freeze({
+  groupBy: "workspace",
+  sort: "updated",
+  archived: "hide",
+});
 
 export function defaultSidebarViewState(): SidebarViewState {
-  return { options: { ...DEFAULT_SIDEBAR_VIEW_OPTIONS }, orders: {}, sectionCollapsed: {}, groupCollapsed: {}, timeCollapsed: {} };
+  return {
+    options: { ...DEFAULT_SIDEBAR_VIEW_OPTIONS },
+    orders: {},
+    sectionCollapsed: {},
+    groupCollapsed: {},
+    timeCollapsed: {},
+  };
 }
 
 const GROUP_BY_VALUES: readonly SidebarGroupBy[] = ["workspace", "flat", "time"];
@@ -46,7 +56,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function pick<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
-  return typeof value === "string" && (allowed as readonly string[]).includes(value) ? value as T : fallback;
+  return typeof value === "string" && (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
 }
 
 function parseFlags(value: unknown): Record<string, boolean> {
@@ -60,7 +70,8 @@ function parseOrders(value: unknown): Record<string, string[]> {
   if (!isRecord(value)) return {};
   const orders: Record<string, string[]> = {};
   for (const [key, ids] of Object.entries(value)) {
-    if (Array.isArray(ids)) orders[key] = ids.filter((id): id is string => typeof id === "string").slice(0, MAX_ORDER_LENGTH);
+    if (Array.isArray(ids))
+      orders[key] = ids.filter((id): id is string => typeof id === "string").slice(0, MAX_ORDER_LENGTH);
   }
   return orders;
 }
@@ -83,9 +94,11 @@ export function parseSidebarViewState(raw: unknown): SidebarViewState {
 }
 
 export function isDefaultViewOptions(options: SidebarViewOptions): boolean {
-  return options.groupBy === DEFAULT_SIDEBAR_VIEW_OPTIONS.groupBy &&
+  return (
+    options.groupBy === DEFAULT_SIDEBAR_VIEW_OPTIONS.groupBy &&
     options.sort === DEFAULT_SIDEBAR_VIEW_OPTIONS.sort &&
-    options.archived === DEFAULT_SIDEBAR_VIEW_OPTIONS.archived;
+    options.archived === DEFAULT_SIDEBAR_VIEW_OPTIONS.archived
+  );
 }
 
 /** 按时间分组时只按时间排，手动顺序不生效。 */
@@ -120,7 +133,10 @@ export function orderSessions(sessions: readonly SessionListItem[], savedOrder?:
   const ordered: SessionListItem[] = [];
   for (const id of savedOrder) {
     const session = live.get(id);
-    if (session) { ordered.push(session); live.delete(id); }
+    if (session) {
+      ordered.push(session);
+      live.delete(id);
+    }
   }
   const fresh = [...live.values()].sort(compareRecency);
   const archived = sessions.filter((session) => session.archived).sort(compareRecency);
@@ -163,8 +179,10 @@ export function limitGroupSessions(
   let counted = 0;
   for (const session of sessions) {
     if (alwaysShown(session)) visible.push(session);
-    else if (counted < limit) { visible.push(session); counted++; }
-    else hidden.push(session);
+    else if (counted < limit) {
+      visible.push(session);
+      counted++;
+    } else hidden.push(session);
   }
   return { visible, hidden };
 }
@@ -198,10 +216,16 @@ export function timeBucketOf(updatedAt: string, now: Date): Omit<TimeBucket, "se
   const days = Math.round((startOfDay(now) - startOfDay(date)) / DAY_MS);
   if (days <= 0) return { key: "today", label: "今天" };
   if (days === 1) return { key: "yesterday", label: "昨天" };
-  if (days < 7) return { key: `day-${days}`, label: WEEKDAYS[date.getDay()], date: `${date.getMonth() + 1}月${date.getDate()}日` };
-  if (date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()) return { key: "month-earlier", label: "本月更早" };
-  if (date.getFullYear() === now.getFullYear()) return { key: `month-${date.getMonth() + 1}`, label: `${date.getMonth() + 1}月` };
-  return { key: `year-${date.getFullYear()}-${date.getMonth() + 1}`, label: `${date.getFullYear()}年${date.getMonth() + 1}月` };
+  if (days < 7)
+    return { key: `day-${days}`, label: WEEKDAYS[date.getDay()], date: `${date.getMonth() + 1}月${date.getDate()}日` };
+  if (date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth())
+    return { key: "month-earlier", label: "本月更早" };
+  if (date.getFullYear() === now.getFullYear())
+    return { key: `month-${date.getMonth() + 1}`, label: `${date.getMonth() + 1}月` };
+  return {
+    key: `year-${date.getFullYear()}-${date.getMonth() + 1}`,
+    label: `${date.getFullYear()}年${date.getMonth() + 1}月`,
+  };
 }
 
 /** 按时间分组：先把需要处理的会话收进最上面的「需要处理」，其余按最近更新落进各时间段。 */
@@ -212,7 +236,9 @@ export function bucketByTime(
 ): TimeBucket[] {
   const sorted = sortByRecency(sessions);
   const attention = sorted.filter(needsAttention);
-  const buckets: TimeBucket[] = attention.length ? [{ key: "attention", label: "需要处理", attention: true, sessions: attention }] : [];
+  const buckets: TimeBucket[] = attention.length
+    ? [{ key: "attention", label: "需要处理", attention: true, sessions: attention }]
+    : [];
   const byKey = new Map<string, TimeBucket>();
   for (const session of sorted) {
     if (needsAttention(session)) continue;

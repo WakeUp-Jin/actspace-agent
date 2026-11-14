@@ -1,4 +1,15 @@
-import { CONTEXT_BUCKET_REGISTRY, getContextBucketDisplay, type ContextPanelBucketKey, type ContextPanelConversationKind, type ContextPanelEntry, type ContextPanelTrendPoint, type ContextPanelUsage, type ContextPanelView, type ContextState, type ContextStateEntry } from "@actspace/shared";
+import {
+  CONTEXT_BUCKET_REGISTRY,
+  getContextBucketDisplay,
+  type ContextPanelBucketKey,
+  type ContextPanelConversationKind,
+  type ContextPanelEntry,
+  type ContextPanelTrendPoint,
+  type ContextPanelUsage,
+  type ContextPanelView,
+  type ContextState,
+  type ContextStateEntry,
+} from "@actspace/shared";
 import type { RuntimeSessionActivity, RuntimeUsageSummary } from "@actspace/shared/runtime-v2";
 
 /**
@@ -36,7 +47,8 @@ export function buildInterimPanelView(input: {
     const key = bucket.key ?? bucket.name;
     if (key) buckets[key] = bucket.tokens;
   }
-  const hasUsage = usage !== null && usage.inputTokens + usage.outputTokens + usage.cacheReadTokens + usage.cacheWriteTokens > 0;
+  const hasUsage =
+    usage !== null && usage.inputTokens + usage.outputTokens + usage.cacheReadTokens + usage.cacheWriteTokens > 0;
   return {
     source: "interim",
     view: {
@@ -45,9 +57,10 @@ export function buildInterimPanelView(input: {
       logicalAgentScopeId: "main",
       contextRevision: contextState?.throughJournalSeq ?? 0,
       throughJournalSeq: contextState?.throughJournalSeq ?? 0,
-      model: contextState && contextState.maxTokens > 0
-        ? { modelKey: "", label: "", contextWindow: contextState.maxTokens, autoCompactAtTokens: null }
-        : null,
+      model:
+        contextState && contextState.maxTokens > 0
+          ? { modelKey: "", label: "", contextWindow: contextState.maxTokens, autoCompactAtTokens: null }
+          : null,
       current: {
         totalEstimatedTokens: contextState?.totalEstimatedTokens ?? 0,
         buckets,
@@ -59,7 +72,14 @@ export function buildInterimPanelView(input: {
         turnCount: activity?.turnCount ?? 0,
         stepCount: activity?.stepCount ?? 0,
         compactionCount: activity?.compactionCount ?? 0,
-        cumulativeUsage: hasUsage ? { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, cacheReadTokens: usage.cacheReadTokens, cacheWriteTokens: usage.cacheWriteTokens } : null,
+        cumulativeUsage: hasUsage
+          ? {
+              inputTokens: usage.inputTokens,
+              outputTokens: usage.outputTokens,
+              cacheReadTokens: usage.cacheReadTokens,
+              cacheWriteTokens: usage.cacheWriteTokens,
+            }
+          : null,
         costUsd: usage?.costUsd ?? null,
       },
       trend: [],
@@ -92,16 +112,22 @@ export function buildCategories(view: ContextPanelView, options: { compare: bool
   for (const entry of view.current.entries) if (!keys.includes(entry.bucket)) keys.push(entry.bucket);
 
   return keys.map((key) => {
-    const entries: CategoryEntry[] = view.current.entries.filter((entry) => entry.bucket === key).map((entry) => {
-      const before = previousTokens.get(entry.key);
-      return { ...entry, isNew: previous !== null && before === undefined, tokenDelta: previous && before !== undefined ? entry.estimatedTokens - before : 0 };
-    });
+    const entries: CategoryEntry[] = view.current.entries
+      .filter((entry) => entry.bucket === key)
+      .map((entry) => {
+        const before = previousTokens.get(entry.key);
+        return {
+          ...entry,
+          isNew: previous !== null && before === undefined,
+          tokenDelta: previous && before !== undefined ? entry.estimatedTokens - before : 0,
+        };
+      });
     const removed: RemovedEntry[] = (previous?.entries ?? [])
       .filter((entry) => entry.bucket === key && !currentKeys.has(entry.key))
       .map((entry) => ({ ...entry, removed: true }));
     const bucketTokens = view.current.buckets[key as ContextPanelBucketKey];
     const totalTokens = bucketTokens ?? entries.reduce((sum, entry) => sum + entry.estimatedTokens, 0);
-    const previousTotal = previous ? previous.buckets[key as ContextPanelBucketKey] ?? 0 : totalTokens;
+    const previousTotal = previous ? (previous.buckets[key as ContextPanelBucketKey] ?? 0) : totalTokens;
     const previousCount = previous ? previous.entries.filter((entry) => entry.bucket === key).length : entries.length;
     return {
       key,
@@ -125,11 +151,17 @@ export function conversationFilterOf(kind: ContextPanelConversationKind | undefi
 }
 
 /** 按类型过滤，最新在前（后端按上下文顺序返回，越靠后越新）。 */
-export function conversationRows<T extends ContextPanelEntry>(entries: readonly T[], filters: readonly ConversationFilter[]): T[] {
-  const kept = filters.length === 0 ? entries : entries.filter((entry) => {
-    const filter = conversationFilterOf(entry.kind);
-    return filter !== null && filters.includes(filter);
-  });
+export function conversationRows<T extends ContextPanelEntry>(
+  entries: readonly T[],
+  filters: readonly ConversationFilter[],
+): T[] {
+  const kept =
+    filters.length === 0
+      ? entries
+      : entries.filter((entry) => {
+          const filter = conversationFilterOf(entry.kind);
+          return filter !== null && filters.includes(filter);
+        });
   return [...kept].reverse();
 }
 
@@ -159,9 +191,16 @@ export function trendLayout(points: readonly ContextPanelTrendPoint[]): TrendCol
   const peak = Math.max(0, ...points.map((point) => point.estimatedTokens));
   return points.map((point) => {
     const total = Object.values(point.buckets).reduce((sum, value) => sum + (value ?? 0), 0);
-    const segments = CONTEXT_BUCKET_REGISTRY
-      .map((bucket) => ({ key: bucket.key, colorVar: bucket.colorVar, share: total > 0 ? (point.buckets[bucket.key] ?? 0) / total : 0 }))
-      .filter((segment) => segment.share > 0);
-    return { point, height: peak > 0 ? point.estimatedTokens / peak : 0, segments, compactedBefore: point.compactedBefore !== undefined };
+    const segments = CONTEXT_BUCKET_REGISTRY.map((bucket) => ({
+      key: bucket.key,
+      colorVar: bucket.colorVar,
+      share: total > 0 ? (point.buckets[bucket.key] ?? 0) / total : 0,
+    })).filter((segment) => segment.share > 0);
+    return {
+      point,
+      height: peak > 0 ? point.estimatedTokens / peak : 0,
+      segments,
+      compactedBefore: point.compactedBefore !== undefined,
+    };
   });
 }

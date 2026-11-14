@@ -7,7 +7,13 @@ export class ReadModelScheduler {
   #streak = 0;
   run<T>(foreground: boolean, operation: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      (foreground ? this.#foreground : this.#background).push(async () => { try { resolve(await operation()); } catch (error) { reject(error); } });
+      (foreground ? this.#foreground : this.#background).push(async () => {
+        try {
+          resolve(await operation());
+        } catch (error) {
+          reject(error);
+        }
+      });
       void this.#drain();
     });
   }
@@ -20,6 +26,8 @@ export class ReadModelScheduler {
         this.#streak = front ? this.#streak + 1 : 0;
         await (front ? this.#foreground : this.#background).shift()!();
       }
-    } finally { this.#running = false; }
+    } finally {
+      this.#running = false;
+    }
   }
 }

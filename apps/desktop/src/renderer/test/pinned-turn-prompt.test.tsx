@@ -40,7 +40,17 @@ beforeEach(() => {
   rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
     const top = Number((this as HTMLElement).dataset?.top ?? 0);
     const bottom = Number((this as HTMLElement).dataset?.bottom ?? 0);
-    return { top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
+    return {
+      top,
+      bottom,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: bottom - top,
+      x: 0,
+      y: top,
+      toJSON: () => ({}),
+    } as DOMRect;
   });
 });
 afterEach(() => rectSpy.mockRestore());
@@ -86,7 +96,9 @@ describe("PinnedTurnPrompt", () => {
     expect(screen.queryByTestId("pinned-turn-prompt")).not.toBeInTheDocument();
 
     scrollTo(400);
-    const row = await screen.findByRole("button", { name: /^回到提问：macOS 拿到 profile 之后内核做了什么 第二个问题/ });
+    const row = await screen.findByRole("button", {
+      name: /^回到提问：macOS 拿到 profile 之后内核做了什么 第二个问题/,
+    });
     // 一行，没有展开面板。
     expect(row).not.toHaveAttribute("aria-expanded");
     expect(screen.getByLabelText("任务 2/5")).toBeInTheDocument();
@@ -98,7 +110,9 @@ describe("PinnedTurnPrompt", () => {
     scrollTo(400);
     await userEvent.click(await screen.findByRole("button", { name: /^回到提问/ }));
     expect(onJump).toHaveBeenCalledWith("t1");
-    expect(screen.queryByText((_, element) => element?.textContent === LONG_QUESTION && element.tagName === "DIV")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText((_, element) => element?.textContent === LONG_QUESTION && element.tagName === "DIV"),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "跳到这条提问" })).not.toBeInTheDocument();
   });
 

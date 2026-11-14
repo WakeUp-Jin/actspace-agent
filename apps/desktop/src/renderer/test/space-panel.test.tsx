@@ -21,7 +21,10 @@ function setup() {
   return userEvent.setup();
 }
 const tabNames = () => screen.queryAllByRole("tab").map((t) => t.textContent);
-const buttonLabels = (root: HTMLElement) => within(root).getAllByRole("button").map((b) => b.getAttribute("aria-label"));
+const buttonLabels = (root: HTMLElement) =>
+  within(root)
+    .getAllByRole("button")
+    .map((b) => b.getAttribute("aria-label"));
 
 beforeEach(() => run(() => actions.reset()));
 afterEach(() => {
@@ -86,11 +89,23 @@ describe("SpaceObjectMenu", () => {
   it("lists only the kinds the current context can open", async () => {
     const user = setup();
     await user.click(screen.getByRole("button", { name: "新建右侧面板对象" }));
-    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Actor", "库", "记忆", "工作区文件", "终端"]);
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+      "Actor",
+      "库",
+      "记忆",
+      "工作区文件",
+      "终端",
+    ]);
     await user.keyboard("{Escape}");
     run(() => actions.openActorTab("be"));
     await user.click(screen.getByRole("button", { name: "新建右侧面板对象" }));
-    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["工作区文件", "Review", "终端", "可视化回复", "上下文"]);
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+      "工作区文件",
+      "Review",
+      "终端",
+      "可视化回复",
+      "上下文",
+    ]);
     await user.click(screen.getByRole("menuitem", { name: "上下文" }));
     expect(tabNames()).toEqual(["Review", "终端", "上下文"]);
   });

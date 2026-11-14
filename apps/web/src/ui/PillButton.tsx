@@ -11,9 +11,21 @@ export type PillButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 /** 胶囊小按钮（审批卡、排队托盘）。样式 .pill-btn 在 styles/web.css。 */
-export const PillButton = forwardRef<HTMLButtonElement, PillButtonProps>(function PillButton({ tone = "ghost", size = "sm", busy = false, icon, className, children, disabled, type = "button", ...rest }, ref) {
+export const PillButton = forwardRef<HTMLButtonElement, PillButtonProps>(function PillButton(
+  { tone = "ghost", size = "sm", busy = false, icon, className, children, disabled, type = "button", ...rest },
+  ref,
+) {
   return (
-    <button ref={ref} type={type} data-tone={tone} data-size={size} disabled={disabled || busy} aria-busy={busy || undefined} className={cx("pill-btn", className)} {...rest}>
+    <button
+      ref={ref}
+      type={type}
+      data-tone={tone}
+      data-size={size}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
+      className={cx("pill-btn", className)}
+      {...rest}
+    >
       {busy ? <span className="spinner" aria-hidden /> : icon}
       {children}
     </button>

@@ -28,9 +28,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function asUiFontId(value: unknown): UiFontId {
-  return UI_FONT_PRESETS.some((preset) => preset.id === value)
-    ? (value as UiFontId)
-    : DEFAULT_APPEARANCE.uiFontId;
+  return UI_FONT_PRESETS.some((preset) => preset.id === value) ? (value as UiFontId) : DEFAULT_APPEARANCE.uiFontId;
 }
 
 function asCodeFontId(value: unknown): CodeFontId {
@@ -40,9 +38,7 @@ function asCodeFontId(value: unknown): CodeFontId {
 }
 
 function asTheme(value: unknown): ThemeMode {
-  return THEME_MODES.includes(value as ThemeMode)
-    ? (value as ThemeMode)
-    : DEFAULT_APPEARANCE.theme;
+  return THEME_MODES.includes(value as ThemeMode) ? (value as ThemeMode) : DEFAULT_APPEARANCE.theme;
 }
 
 function asMermaidTheme(value: unknown): MermaidThemeId {

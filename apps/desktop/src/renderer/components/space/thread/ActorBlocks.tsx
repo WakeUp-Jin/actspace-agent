@@ -8,7 +8,9 @@ import { ActorRefText } from "./ActorRef";
 /** 两侧带细线的分隔：时间、任务开始/完成、记忆同步共用。 */
 export function ThreadDivider({ children, tone = "faint" }: { children: ReactNode; tone?: "faint" | "muted" }) {
   return (
-    <div className={`flex items-center gap-2.5 py-0.5 text-act-xxs tabular-nums ${tone === "muted" ? "text-text-muted" : "text-text-faint"}`}>
+    <div
+      className={`flex items-center gap-2.5 py-0.5 text-act-xxs tabular-nums ${tone === "muted" ? "text-text-muted" : "text-text-faint"}`}
+    >
       <span className="h-px flex-1 bg-line" aria-hidden="true" />
       <span className="inline-flex items-center gap-1">{children}</span>
       <span className="h-px flex-1 bg-line" aria-hidden="true" />
@@ -20,15 +22,25 @@ function ApprovalBlock({ member }: { member: SpaceMember }) {
   const { approve, deny } = useSpaceDemoActions();
   if (member.status === "wait" && member.approval) {
     return (
-      <section aria-label="审批" className="overflow-hidden rounded-act-md border border-line bg-surface shadow-act-soft">
+      <section
+        aria-label="审批"
+        className="overflow-hidden rounded-act-md border border-line bg-surface shadow-act-soft"
+      >
         <h2 className="flex items-center gap-2 px-3.5 pb-1.5 pt-2.5 text-act-sm font-semibold text-text-main">
-          <ShieldExclamationPoint size={14} className="shrink-0 text-warning" aria-hidden="true" />想运行一条命令
+          <ShieldExclamationPoint size={14} className="shrink-0 text-warning" aria-hidden="true" />
+          想运行一条命令
         </h2>
-        <pre className="mx-3.5 whitespace-pre-wrap break-words rounded-act-sm bg-surface-subtle px-2.5 py-2 font-mono text-act-xs text-text-main">{member.approval.cmd}</pre>
+        <pre className="mx-3.5 whitespace-pre-wrap break-words rounded-act-sm bg-surface-subtle px-2.5 py-2 font-mono text-act-xs text-text-main">
+          {member.approval.cmd}
+        </pre>
         <p className="mx-3.5 mt-2 text-act-xs leading-relaxed text-text-faint">{member.approval.why}</p>
         <div className="flex flex-wrap justify-end gap-1.5 p-3">
-          <Button variant="secondary" size="sm" onClick={() => deny(member.id)}>拒绝</Button>
-          <Button variant="primary" size="sm" onClick={() => approve(member.id)}>运行</Button>
+          <Button variant="secondary" size="sm" onClick={() => deny(member.id)}>
+            拒绝
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => approve(member.id)}>
+            运行
+          </Button>
         </div>
       </section>
     );
@@ -48,9 +60,18 @@ function ApprovalBlock({ member }: { member: SpaceMember }) {
 export function ActorBlockView({ block, member }: { block: ActorBlock; member: SpaceMember }) {
   switch (block.k) {
     case "task":
-      return <ThreadDivider tone="muted">开始 · {block.t} · {block.at}</ThreadDivider>;
+      return (
+        <ThreadDivider tone="muted">
+          开始 · {block.t} · {block.at}
+        </ThreadDivider>
+      );
     case "done":
-      return <ThreadDivider tone="muted"><Check size={12} aria-hidden="true" />完成 · {block.t} · {block.at}</ThreadDivider>;
+      return (
+        <ThreadDivider tone="muted">
+          <Check size={12} aria-hidden="true" />
+          完成 · {block.t} · {block.at}
+        </ThreadDivider>
+      );
     case "brief":
       return (
         <div className="rounded-act-md bg-surface-subtle px-3 py-2.5 text-act-sm leading-relaxed text-text-main">
@@ -65,7 +86,8 @@ export function ActorBlockView({ block, member }: { block: ActorBlock; member: S
           <code className="font-mono text-text-main">{block.t}</code>
           {block.diff ? (
             <span className="tabular-nums">
-              <span className="text-operational">+{block.diff[0]}</span> <span className="text-danger">−{block.diff[1]}</span>
+              <span className="text-operational">+{block.diff[0]}</span>{" "}
+              <span className="text-danger">−{block.diff[1]}</span>
             </span>
           ) : null}
         </div>
@@ -73,7 +95,11 @@ export function ActorBlockView({ block, member }: { block: ActorBlock; member: S
     case "sync":
       return <ThreadDivider>{block.t}</ThreadDivider>;
     case "text":
-      return <p className="text-act-md leading-relaxed [overflow-wrap:anywhere]"><ActorRefText text={block.t} /></p>;
+      return (
+        <p className="text-act-md leading-relaxed [overflow-wrap:anywhere]">
+          <ActorRefText text={block.t} />
+        </p>
+      );
     case "approval":
       return <ApprovalBlock member={member} />;
   }

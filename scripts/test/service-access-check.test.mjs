@@ -35,16 +35,16 @@ const catalog = {
 test("finds a lookup by id whose result is cast, however the call is written", () => {
   const source = [
     'const tools = ctx.get?.("tools.runtime") as ToolRuntime | undefined;',
-    'const host = this.ctx.get?.(HOST_ID) as HostPort;',
+    "const host = this.ctx.get?.(HOST_ID) as HostPort;",
     'const loader = context.get("loader") as Loader | undefined;',
-    'const nested = group.ctx.get(name) as T;',
+    "const nested = group.ctx.get(name) as T;",
     'const wrapped = profile.context.get?.(idOf(kind, "x)")) as Wrapped;',
     'const forced = ctx.get?.("sandbox")! as Sandbox;',
     "const split = runtimeContext?.get?.(",
     '  "agent.runtime",',
     ")",
     "  as AgentRuntime | undefined;",
-    'const get = <T>(id: string) => ctx.get?.(id) as T | undefined;',
+    "const get = <T>(id: string) => ctx.get?.(id) as T | undefined;",
     'const parent = parentCtx.get("parent") as Parent;',
     "const root = this.rootContext.get(id) as Root;",
     // 括号里有一个不成对的引号（正则里的），下一行还有别的字符串：这一行的右括号照样找得到。
@@ -58,7 +58,7 @@ test("leaves existence checks, typed accessors, other containers and comment lin
   const source = [
     'if (ctx.get?.("actspace.host.remote") === undefined) return;',
     "const tools = getService(ctx, TOOL_RUNTIME_SERVICE);",
-    'const missing = names.filter((name) => fiber.ctx?.get?.(name) === undefined);',
+    "const missing = names.filter((name) => fiber.ctx?.get?.(name) === undefined);",
     "const cached = cache.get(key) as Entry | undefined;",
     "const rows = fullContext.get(index) ?? [];",
     'const label = ctx.get?.("x") ? "as usual" : "missing";',
@@ -93,7 +93,7 @@ test("finds direct calls of a lease's or root's getService", () => {
 test("reads every definition with its constant name and the id it was declared with", () => {
   const source = [
     'export const A = serviceKey<AService>("a.service");',
-    "export const B = serviceKey<Pick<BService, \"read\" | \"write\">>(B_SERVICE_ID);",
+    'export const B = serviceKey<Pick<BService, "read" | "write">>(B_SERVICE_ID);',
     "export const C = bindServiceType<CService>(ACTSPACE_SERVICE_DEFINITIONS.toolsRuntime);",
     "export const D_VIEW = serviceView<{ readonly flush: (sessionId: string) => Promise<void>; readonly names: Map<string, string[]> }>(ACTSPACE_SERVICE_IDS.hostSession);",
     "export const E = serviceKey<",
@@ -143,19 +143,29 @@ test("reads which definition each conformance row compares a view against", () =
 test("resolves literal ids, catalog entries and upper-case string constants, and nothing else", () => {
   const tables = collectIdTables([
     catalog,
-    { path: "packages/a/src/manifest.ts", text: 'export const A_SERVICE_ID = "a.service" as const;\nconst B_HOST_PORT_ID: string = "actspace.host.b";\nexport const C_ID = serviceId("c.service");\nconst lower = "not.a.constant";' },
+    {
+      path: "packages/a/src/manifest.ts",
+      text: 'export const A_SERVICE_ID = "a.service" as const;\nconst B_HOST_PORT_ID: string = "actspace.host.b";\nexport const C_ID = serviceId("c.service");\nconst lower = "not.a.constant";',
+    },
     { path: "packages/b/src/one.ts", text: 'const SHARED_NAME = "one";' },
     { path: "packages/b/src/two.ts", text: 'const SHARED_NAME = "two";' },
     { path: "packages/b/src/quotes.ts", text: "const SINGLE_QUOTED_ID = 'single.service';" },
     // 长得像总表的内容写在别的文件里：不算总表。
-    { path: "packages/b/src/not-the-catalog.ts", text: 'export const IDS = {\n  toolsRuntime: serviceId("other.runtime"),\n  extra: serviceId("extra.service"),\n};\nexport const DEFINITIONS = {\n  extra: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.toolsRuntime }),\n};' },
+    {
+      path: "packages/b/src/not-the-catalog.ts",
+      text: 'export const IDS = {\n  toolsRuntime: serviceId("other.runtime"),\n  extra: serviceId("extra.service"),\n};\nexport const DEFINITIONS = {\n  extra: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.toolsRuntime }),\n};',
+    },
   ]);
   assert.equal(resolveId('"a.literal"', tables), "a.literal");
   assert.equal(resolveId("'single'", tables), "single");
   assert.equal(resolveId("`plain`", tables), "plain");
   assert.equal(resolveId("ACTSPACE_SERVICE_IDS.toolsRuntime", tables), "tools.runtime");
   assert.equal(resolveId("ACTSPACE_SERVICE_DEFINITIONS.toolsRuntime", tables), "tools.runtime");
-  assert.equal(resolveId("ACTSPACE_SERVICE_DEFINITIONS.sessions", tables), "actspace.host.session", "定义的名字和它指向的 id 的名字可以不同");
+  assert.equal(
+    resolveId("ACTSPACE_SERVICE_DEFINITIONS.sessions", tables),
+    "actspace.host.session",
+    "定义的名字和它指向的 id 的名字可以不同",
+  );
   assert.equal(resolveId("ACTSPACE_SERVICE_DEFINITIONS.hostSession", tables), undefined, "总表里没有叫这个名字的定义");
   assert.equal(resolveId("ACTSPACE_SERVICE_IDS.extra", tables), undefined);
   assert.equal(resolveId("ACTSPACE_SERVICE_DEFINITIONS.extra", tables), undefined);
@@ -178,7 +188,7 @@ test("finds registrations by id, including the Service constructor", () => {
     "inner.provide(name, value);",
     "context.provide!(A_SERVICE_ID, value);",
     "provideService(ctx, TOOL_RUNTIME_SERVICE, runtime);",
-    "class Runtime extends Service { constructor(ctx: Context) { super(ctx, \"tools.runtime\"); } }",
+    'class Runtime extends Service { constructor(ctx: Context) { super(ctx, "tools.runtime"); } }',
     "class Typed extends Service { constructor(ctx: Context) { super(ctx, TOOL_RUNTIME_SERVICE.id); } }",
     "class Tree extends Service { constructor(ctx: Context) { super(ctx); } }",
     'ctx.provide?.(key.id, combine(first, "x,y"));',
@@ -203,14 +213,34 @@ test("finds registrations by id, including the Service constructor", () => {
 });
 
 test("reports casts, lease calls and registrations by id in files that are not on the list", () => {
-  const errors = auditServiceAccess([
-    catalog,
-    { path: "packages/a/src/service.ts", text: 'export const A_SERVICE_ID = "a.service";\nexport const A_SERVICE = serviceKey<AService>(A_SERVICE_ID);\nexport const TOOLS = bindServiceType<Tools>(ACTSPACE_SERVICE_DEFINITIONS.toolsRuntime);' },
-    { path: "packages/a/src/plugin.ts", text: 'ctx.provide?.(A_SERVICE_ID, service);\nctx.provide?.("a.marker", Object.freeze({}));\nctx.provide?.(`a.source.$' + '{kind}`, source);' },
-    { path: "packages/b/src/consumer.ts", text: 'const a = ctx.get?.("a.service") as AService;\n\nconst tools = lease.getService<Tools>("tools.runtime");' },
-    { path: "packages/c/src/runtime.ts", text: 'class Runtime extends Service { constructor(ctx: Context) { super(ctx, "tools.runtime"); } }' },
-    { path: "packages/c/src/clean.ts", text: "const a = getService(ctx, A_SERVICE);\nprovideService(ctx, A_SERVICE, value);\nclass Typed extends Service { constructor(ctx: Context) { super(ctx, TOOLS.id); } }" },
-  ], []);
+  const errors = auditServiceAccess(
+    [
+      catalog,
+      {
+        path: "packages/a/src/service.ts",
+        text: 'export const A_SERVICE_ID = "a.service";\nexport const A_SERVICE = serviceKey<AService>(A_SERVICE_ID);\nexport const TOOLS = bindServiceType<Tools>(ACTSPACE_SERVICE_DEFINITIONS.toolsRuntime);',
+      },
+      {
+        path: "packages/a/src/plugin.ts",
+        text:
+          'ctx.provide?.(A_SERVICE_ID, service);\nctx.provide?.("a.marker", Object.freeze({}));\nctx.provide?.(`a.source.$' +
+          "{kind}`, source);",
+      },
+      {
+        path: "packages/b/src/consumer.ts",
+        text: 'const a = ctx.get?.("a.service") as AService;\n\nconst tools = lease.getService<Tools>("tools.runtime");',
+      },
+      {
+        path: "packages/c/src/runtime.ts",
+        text: 'class Runtime extends Service { constructor(ctx: Context) { super(ctx, "tools.runtime"); } }',
+      },
+      {
+        path: "packages/c/src/clean.ts",
+        text: "const a = getService(ctx, A_SERVICE);\nprovideService(ctx, A_SERVICE, value);\nclass Typed extends Service { constructor(ctx: Context) { super(ctx, TOOLS.id); } }",
+      },
+    ],
+    [],
+  );
   assert.deepEqual(errors, [
     "packages/a/src/plugin.ts:1 按字符串 id 注册了有定义的服务 a.service",
     "packages/b/src/consumer.ts:1 按 id 取出服务后自己断言了类型",
@@ -220,10 +250,16 @@ test("reports casts, lease calls and registrations by id in files that are not o
 });
 
 test("a definition whose id cannot be read is an error", () => {
-  const errors = auditServiceAccess([
-    catalog,
-    { path: "packages/a/src/service.ts", text: 'export const A = serviceKey<AService>(idFor("a"));\nexport const B = serviceKey<BService>(ACTSPACE_SERVICE_IDS.missing);\nexport const C = serviceKey<CService>(lowerCaseName);' },
-  ], []);
+  const errors = auditServiceAccess(
+    [
+      catalog,
+      {
+        path: "packages/a/src/service.ts",
+        text: 'export const A = serviceKey<AService>(idFor("a"));\nexport const B = serviceKey<BService>(ACTSPACE_SERVICE_IDS.missing);\nexport const C = serviceKey<CService>(lowerCaseName);',
+      },
+    ],
+    [],
+  );
   assert.deepEqual(errors, [
     'packages/a/src/service.ts:1 读不出这个定义的 id（idFor("a")）',
     "packages/a/src/service.ts:2 读不出这个定义的 id（ACTSPACE_SERVICE_IDS.missing）",
@@ -232,7 +268,10 @@ test("a definition whose id cannot be read is an error", () => {
 });
 
 test("every view must be an exported constant with a conformance row", () => {
-  const provider = { path: "packages/p/src/service.ts", text: 'export const A_SERVICE = serviceKey<AService>("a.service");' };
+  const provider = {
+    path: "packages/p/src/service.ts",
+    text: 'export const A_SERVICE = serviceKey<AService>("a.service");',
+  };
   const consumer = {
     path: "packages/a/src/consumer.ts",
     text: [
@@ -274,29 +313,61 @@ test("a conformance row must compare a view with the definition registered under
       'export const C_VIEW = serviceView<{ readonly c: string }>("a.service");',
     ].join("\n"),
   };
-  const rows = (lines) => ({ path: VIEWS_FILE, text: ["type A = ServiceOf<typeof A_SERVICE>;", "export type ServiceViewConformance = {", ...lines, "};"].join("\n") });
-  const good = ["  readonly a: Covers<A, ServiceOf<typeof A_VIEW>>;", "  readonly b: Covers<ServiceOf<typeof B_SERVICE>, ServiceOf<typeof B_VIEW>>;", "  readonly c: Covers<A, ServiceOf<typeof C_VIEW>>;"];
+  const rows = (lines) => ({
+    path: VIEWS_FILE,
+    text: ["type A = ServiceOf<typeof A_SERVICE>;", "export type ServiceViewConformance = {", ...lines, "};"].join(
+      "\n",
+    ),
+  });
+  const good = [
+    "  readonly a: Covers<A, ServiceOf<typeof A_VIEW>>;",
+    "  readonly b: Covers<ServiceOf<typeof B_SERVICE>, ServiceOf<typeof B_VIEW>>;",
+    "  readonly c: Covers<A, ServiceOf<typeof C_VIEW>>;",
+  ];
   assert.deepEqual(auditServiceAccess([definitions, rows(good)], []), []);
-  assert.deepEqual(auditServiceAccess([definitions, rows([good[0], "  readonly b: Covers<A, ServiceOf<typeof B_VIEW>>;", good[2]])], []), [
-    `${VIEWS_FILE}:4 视图 B_VIEW 的 id 是 b.service，对照的 A_SERVICE 却是 a.service`,
-  ]);
-  assert.deepEqual(auditServiceAccess([definitions, rows([...good, "  readonly d: Covers<Unknown, ServiceOf<typeof A_VIEW>>;", "  readonly e: Covers<A, ServiceOf<typeof GONE_VIEW>>;"])], []), [
-    `${VIEWS_FILE}:6 读不出这一行两边的定义（A_VIEW 和 真实服务）`,
-    `${VIEWS_FILE}:7 读不出这一行两边的定义（GONE_VIEW 和 A_SERVICE）`,
-  ]);
+  assert.deepEqual(
+    auditServiceAccess(
+      [definitions, rows([good[0], "  readonly b: Covers<A, ServiceOf<typeof B_VIEW>>;", good[2]])],
+      [],
+    ),
+    [`${VIEWS_FILE}:4 视图 B_VIEW 的 id 是 b.service，对照的 A_SERVICE 却是 a.service`],
+  );
+  assert.deepEqual(
+    auditServiceAccess(
+      [
+        definitions,
+        rows([
+          ...good,
+          "  readonly d: Covers<Unknown, ServiceOf<typeof A_VIEW>>;",
+          "  readonly e: Covers<A, ServiceOf<typeof GONE_VIEW>>;",
+        ]),
+      ],
+      [],
+    ),
+    [
+      `${VIEWS_FILE}:6 读不出这一行两边的定义（A_VIEW 和 真实服务）`,
+      `${VIEWS_FILE}:7 读不出这一行两边的定义（GONE_VIEW 和 A_SERVICE）`,
+    ],
+  );
   // 两个包各有一个同名的定义、id 不同：只凭名字分不出是哪一个，按读不出来报。
-  const sameName = { path: "packages/q/src/service.ts", text: 'export const B_SERVICE = serviceKey<Other>("other.service");' };
+  const sameName = {
+    path: "packages/q/src/service.ts",
+    text: 'export const B_SERVICE = serviceKey<Other>("other.service");',
+  };
   assert.deepEqual(auditServiceAccess([definitions, sameName, rows(good)], []), [
     `${VIEWS_FILE}:4 读不出这一行两边的定义（B_VIEW 和 B_SERVICE）`,
   ]);
 });
 
 test("errors come back sorted, whichever rule found them", () => {
-  const errors = auditServiceAccess([
-    { path: "packages/z/src/view.ts", text: 'const Z_VIEW = serviceView<{ readonly z: string }>("z.service");' },
-    { path: "packages/m/src/key.ts", text: "export const M = serviceKey<MService>(idFor());" },
-    { path: "packages/a/src/consumer.ts", text: 'const z = ctx.get?.("z.service") as Z;' },
-  ], []);
+  const errors = auditServiceAccess(
+    [
+      { path: "packages/z/src/view.ts", text: 'const Z_VIEW = serviceView<{ readonly z: string }>("z.service");' },
+      { path: "packages/m/src/key.ts", text: "export const M = serviceKey<MService>(idFor());" },
+      { path: "packages/a/src/consumer.ts", text: 'const z = ctx.get?.("z.service") as Z;' },
+    ],
+    [],
+  );
   assert.deepEqual(errors, [
     "packages/a/src/consumer.ts:1 按 id 取出服务后自己断言了类型",
     "packages/m/src/key.ts:1 读不出这个定义的 id（idFor()）",

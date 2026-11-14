@@ -13,8 +13,14 @@ const events = [
 
 describe("effective request record", () => {
   it("takes the latest prompt and tools at or before the request context", () => {
-    expect(effectiveRequestRecord(events, 4)).toMatchObject({ systemPrompt: { seq: 2, data: { digest: "p1" } }, tools: { seq: 3, data: { digest: "t1" } } });
-    expect(effectiveRequestRecord(events, 7)).toMatchObject({ systemPrompt: { seq: 6, data: { digest: "p2" } }, tools: { seq: 3 } });
+    expect(effectiveRequestRecord(events, 4)).toMatchObject({
+      systemPrompt: { seq: 2, data: { digest: "p1" } },
+      tools: { seq: 3, data: { digest: "t1" } },
+    });
+    expect(effectiveRequestRecord(events, 7)).toMatchObject({
+      systemPrompt: { seq: 6, data: { digest: "p2" } },
+      tools: { seq: 3 },
+    });
     expect(effectiveRequestRecord(events)).toMatchObject({ systemPrompt: { seq: 6 } });
     expect(effectiveRequestRecord(events, 1)).toEqual({});
   });

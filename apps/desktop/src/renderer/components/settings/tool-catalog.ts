@@ -40,12 +40,31 @@ export const TOOL_ITEMS: ToolCatalogItem[] = [
   { name: "browser_debug", label: "读取控制台日志", conditional: true, group: "browser", kind: "tool" },
   { name: "browser_help", label: "浏览器操作目录", conditional: true, group: "browser", kind: "tool" },
   { name: "browser_run", label: "批量执行浏览器操作", conditional: true, group: "browser", kind: "tool" },
-  { name: "browser_capability_download", label: "允许触发下载", description: "每次仍需审批", conditional: true, group: "browser", kind: "capability" },
-  { name: "browser_capability_file_upload", label: "允许上传本地文件", description: "每次仍需审批", conditional: true, group: "browser", kind: "capability" },
-  { name: "browser_capability_clipboard_write", label: "允许写入剪贴板", description: "每次仍需审批", conditional: true, group: "browser", kind: "capability" },
+  {
+    name: "browser_capability_download",
+    label: "允许触发下载",
+    description: "每次仍需审批",
+    conditional: true,
+    group: "browser",
+    kind: "capability",
+  },
+  {
+    name: "browser_capability_file_upload",
+    label: "允许上传本地文件",
+    description: "每次仍需审批",
+    conditional: true,
+    group: "browser",
+    kind: "capability",
+  },
+  {
+    name: "browser_capability_clipboard_write",
+    label: "允许写入剪贴板",
+    description: "每次仍需审批",
+    conditional: true,
+    group: "browser",
+    kind: "capability",
+  },
 ];
 
 export const PRIMARY_TOOL_ITEMS = TOOL_ITEMS.filter((tool) => tool.group !== "browser");
-export const BROWSER_TOOL_ITEMS = TOOL_ITEMS.filter(
-  (tool) => tool.group === "browser" && tool.name !== "browser_help",
-);
+export const BROWSER_TOOL_ITEMS = TOOL_ITEMS.filter((tool) => tool.group === "browser" && tool.name !== "browser_help");

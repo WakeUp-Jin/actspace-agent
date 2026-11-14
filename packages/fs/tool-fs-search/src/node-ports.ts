@@ -4,27 +4,64 @@ import * as nodePath from "node:path";
 import { basename, isAbsolute, resolve } from "node:path";
 import { isLexicallyInside, relativePathInside, toolChildEnv } from "@actspace/shared";
 import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
-import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tool-runtime";
+import {
+  canonicalizeFileResource,
+  type ToolBodyResult,
+  type ToolExecutionContext,
+  type SessionArtifactResolver,
+} from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
 // 单次输出上限：一次宽泛的 grep 很容易命中几百行，全部进模型上下文和会话日志。截断时提示模型缩小范围。
 const MAX_SEARCH_OUTPUT_CHARS = 64_000;
-const TRUNCATED_NOTE = "\n\n[Output truncated at 64,000 characters. Narrow the search with a more specific pattern, a path, or a glob.]";
+const TRUNCATED_NOTE =
+  "\n\n[Output truncated at 64,000 characters. Narrow the search with a more specific pattern, a path, or a glob.]";
 const MAX_GREP_RESULTS = 100;
 const MAX_GLOB_RESULTS = 200;
 const RG_TIMEOUT_MS = 15_000;
-export type NodeToolPortsOptions = { readonly workspaceRoot: string; readonly ripgrepPath?: string; readonly resolveArtifact?: SessionArtifactResolver };
-export function createNodeToolPorts(options: NodeToolPortsOptions): ToolPorts { return Object.freeze({ grep: (args, context) => grepTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), options.ripgrepPath, options.resolveArtifact), glob: (args, context) => globTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), options.ripgrepPath) }); }
+export type NodeToolPortsOptions = {
+  readonly workspaceRoot: string;
+  readonly ripgrepPath?: string;
+  readonly resolveArtifact?: SessionArtifactResolver;
+};
+export function createNodeToolPorts(options: NodeToolPortsOptions): ToolPorts {
+  return Object.freeze({
+    grep: (args, context) =>
+      grepTool(
+        args,
+        context,
+        contextWorkspaceRoot(context, options.workspaceRoot),
+        options.ripgrepPath,
+        options.resolveArtifact,
+      ),
+    glob: (args, context) =>
+      globTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), options.ripgrepPath),
+  });
+}
 function contextWorkspaceRoot(context: ToolExecutionContext, fallback: string): string {
   return resolve(context.workspaceRoot || fallback);
 }
 
-async function grepTool(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext, workspaceRoot: string, ripgrepPath?: string, resolveArtifact?: SessionArtifactResolver): Promise<ToolBodyResult> {
+async function grepTool(
+  args: Readonly<Record<string, RuntimeJsonValue>>,
+  context: ToolExecutionContext,
+  workspaceRoot: string,
+  ripgrepPath?: string,
+  resolveArtifact?: SessionArtifactResolver,
+): Promise<ToolBodyResult> {
   const pattern = stringArg(args, "pattern");
   if (!pattern) return failure("INVALID_ARGUMENTS", "pattern is required");
   const pathArg = stringArg(args, "path") || ".";
   try {
     const searchPath = await resolveReadablePath(pathArg, workspaceRoot, context.sessionId, resolveArtifact, context);
-    const rgArgs = ["--line-number", "--no-heading", "--color", "never", "--max-count", String(MAX_GREP_RESULTS), ...(isWithin(workspaceRoot, searchPath) ? ["--max-filesize", "1M"] : [])];
+    const rgArgs = [
+      "--line-number",
+      "--no-heading",
+      "--color",
+      "never",
+      "--max-count",
+      String(MAX_GREP_RESULTS),
+      ...(isWithin(workspaceRoot, searchPath) ? ["--max-filesize", "1M"] : []),
+    ];
     const glob = stringArg(args, "glob");
     if (glob) rgArgs.push("--glob", glob);
     rgArgs.push("--", pattern, searchPath);
@@ -32,60 +69,102 @@ async function grepTool(args: Readonly<Record<string, RuntimeJsonValue>>, contex
     // exitCode 为 null 表示 rg 没跑起来（找不到、超时、被中止），不能当成「没有匹配」吞掉。
     if (result.exitCode === null) return failure("SEARCH_FAILED", result.error || "ripgrep did not complete.");
     if (result.exitCode === 1 || !result.stdout.trim()) return completed(`No matches found for pattern "${pattern}"`);
-    if (result.exitCode !== 0) return failure("SEARCH_FAILED", result.error || `ripgrep exited with code ${result.exitCode}`);
+    if (result.exitCode !== 0)
+      return failure("SEARCH_FAILED", result.error || `ripgrep exited with code ${result.exitCode}`);
     const lines = result.stdout.trim().split("\n").filter(Boolean);
     const normalized = lines.map((line) => normalizeSearchLine(line, workspaceRoot)).join("\n");
     const suffix = result.truncated ? TRUNCATED_NOTE : "";
-    return completed(`Found ${lines.length} match${lines.length === 1 ? "" : "es"}:\n\n${normalized}${suffix}`, `Found ${lines.length} matches`);
+    return completed(
+      `Found ${lines.length} match${lines.length === 1 ? "" : "es"}:\n\n${normalized}${suffix}`,
+      `Found ${lines.length} matches`,
+    );
   } catch (error) {
     return ioFailure("search", pathArg, error);
   }
 }
 
-async function globTool(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext, workspaceRoot: string, ripgrepPath?: string): Promise<ToolBodyResult> {
+async function globTool(
+  args: Readonly<Record<string, RuntimeJsonValue>>,
+  context: ToolExecutionContext,
+  workspaceRoot: string,
+  ripgrepPath?: string,
+): Promise<ToolBodyResult> {
   const pattern = stringArg(args, "pattern");
   if (!pattern) return failure("INVALID_ARGUMENTS", "pattern is required");
   const pathArg = stringArg(args, "path") || ".";
   try {
     const searchRoot = await resolveExistingPath(pathArg, workspaceRoot, context, "read");
-    const globPattern = pattern.startsWith("**/") || pattern.includes("/") || pattern.startsWith("!") ? pattern : `**/${pattern}`;
-    const result = await runRipgrep(ripgrepPath, ["--files", "--glob", globPattern, "--color", "never", searchRoot], workspaceRoot, context.signal);
+    const globPattern =
+      pattern.startsWith("**/") || pattern.includes("/") || pattern.startsWith("!") ? pattern : `**/${pattern}`;
+    const result = await runRipgrep(
+      ripgrepPath,
+      ["--files", "--glob", globPattern, "--color", "never", searchRoot],
+      workspaceRoot,
+      context.signal,
+    );
     // exitCode 为 null 表示 rg 没跑起来（找不到、超时、被中止），不能当成「没有匹配」吞掉。
     if (result.exitCode === null) return failure("SEARCH_FAILED", result.error || "ripgrep did not complete.");
     if (result.exitCode === 1 || !result.stdout.trim()) return completed(`No files found matching "${pattern}"`);
-    if (result.exitCode !== 0) return failure("SEARCH_FAILED", result.error || `ripgrep exited with code ${result.exitCode}`);
+    if (result.exitCode !== 0)
+      return failure("SEARCH_FAILED", result.error || `ripgrep exited with code ${result.exitCode}`);
     const paths = result.stdout.trim().split("\n").filter(Boolean);
-    const entries = await Promise.all(paths.map(async (item) => {
-      const absolute = isAbsolute(item) ? item : resolve(searchRoot, item);
-      try {
-        const fileStat = await stat(absolute);
-        return { path: displayPath(absolute, workspaceRoot), size: fileStat.size, mtimeMs: fileStat.mtimeMs };
-      } catch {
-        return { path: displayPath(absolute, workspaceRoot), size: -1, mtimeMs: 0 };
-      }
-    }));
+    const entries = await Promise.all(
+      paths.map(async (item) => {
+        const absolute = isAbsolute(item) ? item : resolve(searchRoot, item);
+        try {
+          const fileStat = await stat(absolute);
+          return { path: displayPath(absolute, workspaceRoot), size: fileStat.size, mtimeMs: fileStat.mtimeMs };
+        } catch {
+          return { path: displayPath(absolute, workspaceRoot), size: -1, mtimeMs: 0 };
+        }
+      }),
+    );
     entries.sort((left, right) => right.mtimeMs - left.mtimeMs || left.path.localeCompare(right.path));
     const limited = entries.slice(0, MAX_GLOB_RESULTS);
-    const text = limited.map((entry) => `${entry.path} | size: ${entry.size < 0 ? "unknown" : formatBytes(entry.size)} | modified: ${entry.mtimeMs > 0 ? new Date(entry.mtimeMs).toISOString() : "unknown"}`).join("\n");
-    const suffix = entries.length > MAX_GLOB_RESULTS ? `\n\n[Showing first ${MAX_GLOB_RESULTS} of ${entries.length} files.]` : result.truncated ? TRUNCATED_NOTE : "";
-    return completed(`Found ${entries.length} file${entries.length === 1 ? "" : "s"} matching "${pattern}":\n\n${text}${suffix}`, `Found ${entries.length} files`);
+    const text = limited
+      .map(
+        (entry) =>
+          `${entry.path} | size: ${entry.size < 0 ? "unknown" : formatBytes(entry.size)} | modified: ${entry.mtimeMs > 0 ? new Date(entry.mtimeMs).toISOString() : "unknown"}`,
+      )
+      .join("\n");
+    const suffix =
+      entries.length > MAX_GLOB_RESULTS
+        ? `\n\n[Showing first ${MAX_GLOB_RESULTS} of ${entries.length} files.]`
+        : result.truncated
+          ? TRUNCATED_NOTE
+          : "";
+    return completed(
+      `Found ${entries.length} file${entries.length === 1 ? "" : "s"} matching "${pattern}":\n\n${text}${suffix}`,
+      `Found ${entries.length} files`,
+    );
   } catch (error) {
     return ioFailure("glob", pathArg, error);
   }
 }
 
-async function resolveReadablePath(input: string, workspaceRoot: string, sessionId: string, resolveArtifact?: SessionArtifactResolver, context?: ToolExecutionContext): Promise<string> {
+async function resolveReadablePath(
+  input: string,
+  workspaceRoot: string,
+  sessionId: string,
+  resolveArtifact?: SessionArtifactResolver,
+  context?: ToolExecutionContext,
+): Promise<string> {
   const candidate = isAbsolute(input) ? resolve(input) : resolve(workspaceRoot, input);
   if (context?.admittedResources?.length) return resolveExistingPath(input, workspaceRoot, context, "read");
   if (isWithin(workspaceRoot, candidate)) return resolveExistingPath(input, workspaceRoot);
   if (resolveArtifact && isAbsolute(input) && /^[0-9a-f-]{36}$/i.test(basename(candidate))) {
     const artifact = await resolveArtifact(sessionId, basename(candidate));
-    if (await realpath(candidate) === artifact.path) return artifact.path;
+    if ((await realpath(candidate)) === artifact.path) return artifact.path;
   }
   throw new Error(`Path escapes workspace boundary: ${input}`);
 }
 
-async function resolveExistingPath(input: string, workspaceRoot: string, context?: ToolExecutionContext, access: "read" | "delete" = "read"): Promise<string> {
+async function resolveExistingPath(
+  input: string,
+  workspaceRoot: string,
+  context?: ToolExecutionContext,
+  access: "read" | "delete" = "read",
+): Promise<string> {
   if (context?.admittedResources?.length) return recheckAdmittedFile(input, access, workspaceRoot, context);
   const candidate = resolveWorkspacePath(input, workspaceRoot);
   const [realRoot, realCandidate] = await Promise.all([realpath(workspaceRoot), realpath(candidate)]);
@@ -93,11 +172,19 @@ async function resolveExistingPath(input: string, workspaceRoot: string, context
   return realCandidate;
 }
 
-async function recheckAdmittedFile(input: string, access: "read" | "write" | "delete", workspaceRoot: string, context: ToolExecutionContext): Promise<string> {
-  const expected = context.admittedResources?.find((resource) => resource.kind === "file" && resource.access === access);
+async function recheckAdmittedFile(
+  input: string,
+  access: "read" | "write" | "delete",
+  workspaceRoot: string,
+  context: ToolExecutionContext,
+): Promise<string> {
+  const expected = context.admittedResources?.find(
+    (resource) => resource.kind === "file" && resource.access === access,
+  );
   if (expected?.kind !== "file") throw new Error("No admitted file resource matches this operation.");
   const actual = await canonicalizeFileResource(input, access, workspaceRoot);
-  if (actual.canonicalPath !== expected.canonicalPath || actual.targetKind !== expected.targetKind) throw new Error("File scope changed after permission admission.");
+  if (actual.canonicalPath !== expected.canonicalPath || actual.targetKind !== expected.targetKind)
+    throw new Error("File scope changed after permission admission.");
   return actual.canonicalPath;
 }
 
@@ -111,13 +198,27 @@ function isWithin(root: string, candidate: string): boolean {
   return isLexicallyInside(nodePath, root, candidate, { includeRoot: true });
 }
 
-async function runRipgrep(command: string | undefined, args: readonly string[], cwd: string, signal: AbortSignal): Promise<{ readonly exitCode: number | null; readonly stdout: string; readonly error: string; readonly truncated: boolean }> {
+async function runRipgrep(
+  command: string | undefined,
+  args: readonly string[],
+  cwd: string,
+  signal: AbortSignal,
+): Promise<{
+  readonly exitCode: number | null;
+  readonly stdout: string;
+  readonly error: string;
+  readonly truncated: boolean;
+}> {
   return new Promise((resolveResult) => {
     let stdout = "";
     let stderr = "";
     let truncated = false;
     let settled = false;
-    const child = spawn(command || "rg", [...args], { cwd, env: toolChildEnv(process.env), stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(command || "rg", [...args], {
+      cwd,
+      env: toolChildEnv(process.env),
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     const finish = (exitCode: number | null, error = stderr.trim()) => {
       if (settled) return;
       settled = true;
@@ -127,30 +228,64 @@ async function runRipgrep(command: string | undefined, args: readonly string[], 
     };
     const append = (current: string, text: string) => {
       const room = MAX_SEARCH_OUTPUT_CHARS - current.length;
-      if (room <= 0) { truncated = true; return current; }
+      if (room <= 0) {
+        truncated = true;
+        return current;
+      }
       if (text.length > room) truncated = true;
       return current + text.slice(0, room);
     };
-    const abort = () => { child.kill("SIGTERM"); finish(null, "Search was aborted."); };
-    const timer = setTimeout(() => { child.kill("SIGTERM"); finish(null, `ripgrep timed out after ${RG_TIMEOUT_MS}ms`); }, RG_TIMEOUT_MS);
+    const abort = () => {
+      child.kill("SIGTERM");
+      finish(null, "Search was aborted.");
+    };
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      finish(null, `ripgrep timed out after ${RG_TIMEOUT_MS}ms`);
+    }, RG_TIMEOUT_MS);
     if (signal.aborted) abort();
     else signal.addEventListener("abort", abort, { once: true });
     // 管道按字节切块，一个多字节字符可能落在两块之间。让流自己解码，它会把没收全的字节留到下一块。
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (text: string) => { stdout = append(stdout, text); });
-    child.stderr.on("data", (text: string) => { stderr = append(stderr, text); });
-    child.on("error", (error) => finish(null, error.message.includes("ENOENT") ? "ripgrep (rg) is required for grep/glob tools but was not found." : error.message));
+    child.stdout.on("data", (text: string) => {
+      stdout = append(stdout, text);
+    });
+    child.stderr.on("data", (text: string) => {
+      stderr = append(stderr, text);
+    });
+    child.on("error", (error) =>
+      finish(
+        null,
+        error.message.includes("ENOENT")
+          ? "ripgrep (rg) is required for grep/glob tools but was not found."
+          : error.message,
+      ),
+    );
     child.on("close", (code) => finish(code));
   });
 }
 
-function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeJsonValue): ToolBodyResult {
-  return { status: "completed", modelOutput: [{ type: "text", text }], summary, ...(detail === undefined ? {} : { detail: [{ label: "result", value: detail }] }) };
+function completed(
+  text: string,
+  summary = text.split("\n", 1)[0] || "Tool completed.",
+  detail?: RuntimeJsonValue,
+): ToolBodyResult {
+  return {
+    status: "completed",
+    modelOutput: [{ type: "text", text }],
+    summary,
+    ...(detail === undefined ? {} : { detail: [{ label: "result", value: detail }] }),
+  };
 }
 
 function failure(code: string, message: string, retryable = false): ToolBodyResult {
-  return { status: "failed", modelOutput: [{ type: "text", text: message }], summary: message, failure: { code, message, retryable } };
+  return {
+    status: "failed",
+    modelOutput: [{ type: "text", text: message }],
+    summary: message,
+    failure: { code, message, retryable },
+  };
 }
 
 function ioFailure(action: string, path: string, error: unknown): ToolBodyResult {
@@ -160,7 +295,23 @@ function ioFailure(action: string, path: string, error: unknown): ToolBodyResult
   return failure("IO_ERROR", `Failed to ${action}: ${message}`);
 }
 
-function stringArg(args: Readonly<Record<string, RuntimeJsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
-function displayPath(path: string, workspaceRoot: string): string { return relativePathInside(nodePath, workspaceRoot, path) || path; }
-function normalizeSearchLine(line: string, workspaceRoot: string): string { return line.startsWith(`${workspaceRoot}/`) ? line.slice(workspaceRoot.length + 1) : line; }
-function formatBytes(size: number): string { if (size < 1024) return `${size} B`; const units = ["KB", "MB", "GB", "TB"]; let value = size / 1024; let index = 0; while (value >= 1024 && index < units.length - 1) { value /= 1024; index += 1; } return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[index]}`; }
+function stringArg(args: Readonly<Record<string, RuntimeJsonValue>>, key: string): string {
+  return typeof args[key] === "string" ? args[key] : "";
+}
+function displayPath(path: string, workspaceRoot: string): string {
+  return relativePathInside(nodePath, workspaceRoot, path) || path;
+}
+function normalizeSearchLine(line: string, workspaceRoot: string): string {
+  return line.startsWith(`${workspaceRoot}/`) ? line.slice(workspaceRoot.length + 1) : line;
+}
+function formatBytes(size: number): string {
+  if (size < 1024) return `${size} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = size / 1024;
+  let index = 0;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[index]}`;
+}

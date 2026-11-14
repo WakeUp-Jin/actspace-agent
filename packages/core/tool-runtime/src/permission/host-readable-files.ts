@@ -12,13 +12,23 @@ export const HOST_READABLE_FILES_SERVICE_ID = "actspace.host-readable-files";
  */
 export class HostReadableFiles {
   readonly #paths = new Set<string>();
-  add(path: string): void { this.#paths.add(canonical(path)); }
-  has(canonicalPath: string): boolean { return this.#paths.has(resolve(canonicalPath)); }
-  remove(path: string): void { this.#paths.delete(canonical(path)); }
+  add(path: string): void {
+    this.#paths.add(canonical(path));
+  }
+  has(canonicalPath: string): boolean {
+    return this.#paths.has(resolve(canonicalPath));
+  }
+  remove(path: string): void {
+    this.#paths.delete(canonical(path));
+  }
 }
 
 export const HOST_READABLE_FILES_SERVICE = serviceKey<HostReadableFiles>(HOST_READABLE_FILES_SERVICE_ID);
 
 function canonical(path: string): string {
-  try { return realpathSync(path); } catch { return resolve(path); }
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
 }

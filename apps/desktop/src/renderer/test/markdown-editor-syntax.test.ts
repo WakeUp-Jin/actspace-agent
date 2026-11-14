@@ -1,7 +1,12 @@
 import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
-import { collectHeadings, getOutline, findHeadingBySlug, sameOutline } from "../components/markdown-editor/core/outline";
+import {
+  collectHeadings,
+  getOutline,
+  findHeadingBySlug,
+  sameOutline,
+} from "../components/markdown-editor/core/outline";
 import { githubSlug, uniqueSlugs } from "../components/markdown-editor/core/slug";
 import { codeLanguageFor, frontmatterRange, markdownSyntax } from "../components/markdown-editor/core/syntax";
 
@@ -65,7 +70,9 @@ describe("数学扩展：块公式 $$", () => {
   });
 
   it("多行公式", () => {
-    expect(texts("前文\n\n$$\n\\begin{aligned}\na &= b\\\\\nc &= d\n\\end{aligned}\n$$\n\n后文", "MathBlock")).toHaveLength(1);
+    expect(
+      texts("前文\n\n$$\n\\begin{aligned}\na &= b\\\\\nc &= d\n\\end{aligned}\n$$\n\n后文", "MathBlock"),
+    ).toHaveLength(1);
   });
 
   it("没有结尾的 $$ 不是公式，不会吞掉后面的文档", () => {
@@ -156,7 +163,26 @@ describe("大纲（outline）", () => {
   });
 
   it("代码块、frontmatter、公式块、HTML 块里的 # 不算标题", () => {
-    const doc = ["---", "# 注释", "---", "", "```md", "## 代码里", "```", "", "$$", "## 公式里", "$$", "", "<div>", "## html", "</div>", "", "## 真标题", ""].join("\n");
+    const doc = [
+      "---",
+      "# 注释",
+      "---",
+      "",
+      "```md",
+      "## 代码里",
+      "```",
+      "",
+      "$$",
+      "## 公式里",
+      "$$",
+      "",
+      "<div>",
+      "## html",
+      "</div>",
+      "",
+      "## 真标题",
+      "",
+    ].join("\n");
     expect(getOutline(parse(doc)).map((item) => item.text)).toEqual(["真标题"]);
   });
 

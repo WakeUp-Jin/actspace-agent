@@ -4,7 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { HarnessStatsQueryInput, HarnessStatsQueryResult } from "@actspace/shared";
 import { HARNESS_STATS_QUERY_KINDS } from "@actspace/shared";
 import { HarnessStatsPage } from "../components/harness-stats/HarnessStatsPage";
-import { bucketSegments, costPerUse, fmtPoints, fmtSignedTokens, revisionLabel, usageVerdict } from "../components/harness-stats/harness-stats-format";
+import {
+  bucketSegments,
+  costPerUse,
+  fmtPoints,
+  fmtSignedTokens,
+  revisionLabel,
+  usageVerdict,
+} from "../components/harness-stats/harness-stats-format";
 import { MOCK_HARNESS_STATS_SYNC, mockHarnessStats } from "../mock/harness-stats-fixture";
 import { setupBridge } from "./helpers/bridge";
 
@@ -27,9 +34,14 @@ function install(patch?: Patch) {
 const card = (name: string) => screen.getByRole("region", { name });
 const metrics = () => screen.getByRole("region", { name: "Harness 指标" });
 const metric = (label: string) => within(metrics()).getByText(label).closest("button")!;
-const detailTab = (name: RegExp) => within(screen.getByRole("tablist", { name: "Harness 明细" })).getByRole("tab", { name });
-const header = (table: HTMLElement, label: string) => within(table).getAllByRole("columnheader").find((cell) => cell.textContent === label)!;
-const firstCell = (table: HTMLElement) => within(within(table).getAllByRole("row")[1]).getAllByRole("cell")[0].textContent;
+const detailTab = (name: RegExp) =>
+  within(screen.getByRole("tablist", { name: "Harness 明细" })).getByRole("tab", { name });
+const header = (table: HTMLElement, label: string) =>
+  within(table)
+    .getAllByRole("columnheader")
+    .find((cell) => cell.textContent === label)!;
+const firstCell = (table: HTMLElement) =>
+  within(within(table).getAllByRole("row")[1]).getAllByRole("cell")[0].textContent;
 
 async function ready() {
   render(<HarnessStatsPage />);
@@ -51,7 +63,10 @@ describe("harness-stats 格式化", () => {
     expect(revisionLabel("default@11")).toBe("@11");
   });
   it("6 类上下文按注册表顺序，用规范里的名字和 context 色", () => {
-    const segments = bucketSegments([{ bucket: "conversation", avgTokens: 700 }, { bucket: "rules", avgTokens: 300 }]);
+    const segments = bucketSegments([
+      { bucket: "conversation", avgTokens: 700 },
+      { bucket: "rules", avgTokens: 300 },
+    ]);
     expect(segments.map((item) => item.label)).toEqual(["规则与注入", "对话"]);
     expect(segments.every((item) => item.colorVar.startsWith("--act-context-"))).toBe(true);
   });
@@ -74,14 +89,25 @@ describe("Harness 统计页", () => {
     const before = queries.length;
     await userEvent.click(screen.getByRole("combobox", { name: "筛选会话类型" }));
     await userEvent.click(screen.getByRole("option", { name: "子 Agent" }));
-    await waitFor(() => expect(queries.slice(before).map((item) => item.kind).sort()).toEqual(HARNESS_STATS_QUERY_KINDS.filter((kind) => kind !== "options").sort()));
+    await waitFor(() =>
+      expect(
+        queries
+          .slice(before)
+          .map((item) => item.kind)
+          .sort(),
+      ).toEqual(HARNESS_STATS_QUERY_KINDS.filter((kind) => kind !== "options").sort()),
+    );
     expect(queries.slice(before).every((item) => item.filter.sessionKind === "child")).toBe(true);
     await userEvent.click(screen.getByRole("radio", { name: "7 天" }));
     await waitFor(() => expect(queries.at(-1)!.filter).toMatchObject({ range: "week", sessionKind: "child" }));
   });
 
   it("没有值得关注时整块不显示", async () => {
-    install((result) => result.data.kind === "overview" ? { ...result, data: { kind: "overview", value: { ...result.data.value, flags: [] } } } : result);
+    install((result) =>
+      result.data.kind === "overview"
+        ? { ...result, data: { kind: "overview", value: { ...result.data.value, flags: [] } } }
+        : result,
+    );
     render(<HarnessStatsPage />);
     await within(metrics()).findByText("比 @11 −2.5k");
     expect(screen.queryByRole("region", { name: "值得关注" })).not.toBeInTheDocument();
@@ -135,7 +161,17 @@ describe("Harness 统计页", () => {
       if (result.data.kind !== "overview") return result;
       const { metrics: current, previousMetrics: previous } = result.data.value;
       // 交换两个版本：现在比上一版本差；失败率设成相同。
-      return { ...result, data: { kind: "overview", value: { ...result.data.value, metrics: { ...previous!, toolFailureRate: 0.04 }, previousMetrics: { ...current!, toolFailureRate: 0.04 } } } };
+      return {
+        ...result,
+        data: {
+          kind: "overview",
+          value: {
+            ...result.data.value,
+            metrics: { ...previous!, toolFailureRate: 0.04 },
+            previousMetrics: { ...current!, toolFailureRate: 0.04 },
+          },
+        },
+      };
     });
     render(<HarnessStatsPage />);
     expect(await within(metrics()).findByText("比 @11 +2.5k")).toHaveClass("text-on-danger");
@@ -174,7 +210,9 @@ describe("Harness 统计页", () => {
     expect(within(list()).getAllByRole("listitem")[1]).toHaveTextContent("plugin_manager");
     expect(within(list()).getAllByRole("listitem")[1]).toHaveTextContent("占用高 · 少用");
     expect(within(list()).getAllByRole("listitem")[1]).toHaveTextContent("token / 每调用一次");
-    expect(within(list()).getAllByRole("listitem")[1]).toHaveTextContent("每次请求带着 1,350 token × 3,842 次请求 = 5.2M，调用了 2 次");
+    expect(within(list()).getAllByRole("listitem")[1]).toHaveTextContent(
+      "每次请求带着 1,350 token × 3,842 次请求 = 5.2M，调用了 2 次",
+    );
 
     await userEvent.click(within(usage).getByRole("button", { name: "显示全部 15 个" }));
     expect(within(list()).getAllByRole("listitem")).toHaveLength(15);
@@ -202,7 +240,9 @@ describe("Harness 统计页", () => {
     expect(card("最大的上下文来源")).toBeInTheDocument();
     await userEvent.click(within(card("每次请求里放了什么")).getByRole("button", { name: /工具定义/ }));
     const sources = card("来源 · 工具定义");
-    const names = within(within(sources).getByRole("list", { name: "上下文来源" })).getAllByRole("listitem").map((item) => item.textContent ?? "");
+    const names = within(within(sources).getByRole("list", { name: "上下文来源" }))
+      .getAllByRole("listitem")
+      .map((item) => item.textContent ?? "");
     expect(names).toHaveLength(6);
     expect(names.every((name) => name.startsWith("tools · "))).toBe(true);
     await userEvent.click(within(sources).getByRole("button", { name: /看全部/ }));
@@ -227,7 +267,10 @@ describe("Harness 统计页", () => {
     }
     // 压缩记录默认时间倒序：第一行是最近的一次。
     const records = screen.getByRole("table", { name: "压缩记录" });
-    const times = within(records).getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0].textContent ?? "");
+    const times = within(records)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[0].textContent ?? "");
     expect([...times].sort().reverse()).toEqual(times);
 
     await userEvent.click(detailTab(/^工具/));
@@ -249,25 +292,41 @@ describe("Harness 统计页", () => {
     expect(within(versions).getByRole("combobox", { name: "对比的新版本" })).toHaveTextContent("@12");
     const row = within(versions).getByRole("row", { name: /读取命中活跃/ });
     expect(within(row).getByText("+4 点")).toHaveAttribute("data-tone", "good");
-    expect(within(within(versions).getByRole("row", { name: /插件数/ })).getByText("+1")).toHaveAttribute("data-tone", "flat");
-    expect(within(within(versions).getByRole("row", { name: /工具失败率/ })).getByText("−0.7 点")).toHaveAttribute("data-tone", "good");
+    expect(within(within(versions).getByRole("row", { name: /插件数/ })).getByText("+1")).toHaveAttribute(
+      "data-tone",
+      "flat",
+    );
+    expect(within(within(versions).getByRole("row", { name: /工具失败率/ })).getByText("−0.7 点")).toHaveAttribute(
+      "data-tone",
+      "good",
+    );
 
     await userEvent.click(within(versions).getByRole("combobox", { name: "对比的旧版本" }));
     await userEvent.click(await screen.findByRole("option", { name: /^@10/ }));
-    await waitFor(() => expect(queries.at(-1)).toMatchObject({ kind: "versions", compare: { from: "default@10", to: "default@12" } }));
-    await waitFor(() => expect(within(card("版本对比")).getByText(/@10：1,904 次请求 · @12：1,204 次请求/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(queries.at(-1)).toMatchObject({ kind: "versions", compare: { from: "default@10", to: "default@12" } }),
+    );
+    await waitFor(() =>
+      expect(within(card("版本对比")).getByText(/@10：1,904 次请求 · @12：1,204 次请求/)).toBeInTheDocument(),
+    );
 
     await userEvent.click(screen.getByRole("radio", { name: "24 小时" }));
     await waitFor(() => expect(within(card("版本对比")).getByText(/样本偏少/)).toBeInTheDocument());
   });
 
   it("同步中显示进度，失败时显示错误并可重试", async () => {
-    install((result) => ({ ...result, sync: { ...MOCK_HARNESS_STATS_SYNC, phase: "syncing", completedSessions: 3, totalSessions: 10 } }));
+    install((result) => ({
+      ...result,
+      sync: { ...MOCK_HARNESS_STATS_SYNC, phase: "syncing", completedSessions: 3, totalSessions: 10 },
+    }));
     const view = render(<HarnessStatsPage />);
     expect(await screen.findByText(/正在补齐历史 · 已读 3 \/ 10 个会话/)).toBeInTheDocument();
     view.unmount();
     const retry = vi.fn();
-    install((result) => { retry(); return { ...result, sync: { ...MOCK_HARNESS_STATS_SYNC, phase: "failed", error: "磁盘已满" } }; });
+    install((result) => {
+      retry();
+      return { ...result, sync: { ...MOCK_HARNESS_STATS_SYNC, phase: "failed", error: "磁盘已满" } };
+    });
     render(<HarnessStatsPage />);
     expect(await screen.findByText(/统计同步失败：磁盘已满/)).toBeInTheDocument();
     const calls = retry.mock.calls.length;

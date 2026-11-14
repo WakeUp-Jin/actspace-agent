@@ -4,7 +4,12 @@ import { createHash } from "node:crypto";
 import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { ContributorRegistry } from "./registry.js";
 import type { AssemblyInput, PromptContributor } from "./contributor.js";
-import { freezeRequest, type LogicalRequestCandidate, type LogicalRequestSnapshot, type PreparedRequestMetadata } from "./request-snapshot.js";
+import {
+  freezeRequest,
+  type LogicalRequestCandidate,
+  type LogicalRequestSnapshot,
+  type PreparedRequestMetadata,
+} from "./request-snapshot.js";
 
 export type RequestAssemblerOptions = {
   readonly registry?: ContributorRegistry;
@@ -13,34 +18,72 @@ export type RequestAssemblerOptions = {
 
 export class RequestAssembler {
   readonly #registry: ContributorRegistry;
-  constructor(private readonly options: RequestAssemblerOptions) { this.#registry = options.registry ?? new ContributorRegistry(); }
+  constructor(private readonly options: RequestAssemblerOptions) {
+    this.#registry = options.registry ?? new ContributorRegistry();
+  }
 
-  async assemble(input: AssemblyInput, tools: readonly RuntimeJsonValue[], requestOptions: RuntimeJsonValue, compositionDigest: string, hostCapabilityDigest: string): Promise<LogicalRequestSnapshot> {
+  async assemble(
+    input: AssemblyInput,
+    tools: readonly RuntimeJsonValue[],
+    requestOptions: RuntimeJsonValue,
+    compositionDigest: string,
+    hostCapabilityDigest: string,
+  ): Promise<LogicalRequestSnapshot> {
     const candidate = await this.assembleCandidate(input, tools, requestOptions);
     const prepared = await this.options.prepare(candidate);
     return this.finalize(candidate, prepared, compositionDigest, hostCapabilityDigest);
   }
 
-  async assembleCandidate(input: AssemblyInput, tools: readonly RuntimeJsonValue[], requestOptions: RuntimeJsonValue): Promise<LogicalRequestCandidate> {
+  async assembleCandidate(
+    input: AssemblyInput,
+    tools: readonly RuntimeJsonValue[],
+    requestOptions: RuntimeJsonValue,
+  ): Promise<LogicalRequestCandidate> {
     input.scope.assertActive();
-    const outputs: Array<{ readonly contributor: PromptContributor; readonly output?: RuntimeJsonValue; readonly provenance: RuntimeJsonValue }> = [];
+    const outputs: Array<{
+      readonly contributor: PromptContributor;
+      readonly output?: RuntimeJsonValue;
+      readonly provenance: RuntimeJsonValue;
+    }> = [];
     for (const contributor of this.#registry.visible(input.scope)) {
       try {
         const resolved = await contributor.resolve(input);
         const output = freezeRequest(resolved.value);
-        const provenance = freezeRequest(resolved.provenance ?? { contributorId: contributor.id, ownerPluginId: contributor.ownerPluginId, layer: contributor.layer, order: contributor.order });
+        const provenance = freezeRequest(
+          resolved.provenance ?? {
+            contributorId: contributor.id,
+            ownerPluginId: contributor.ownerPluginId,
+            layer: contributor.layer,
+            order: contributor.order,
+          },
+        );
         outputs.push({ contributor, output, provenance });
       } catch (error) {
-        if (contributor.criticality === "required") throw new Error(`Required contributor ${contributor.id} failed.`, { cause: error });
-        outputs.push({ contributor, provenance: { contributorId: contributor.id, ownerPluginId: contributor.ownerPluginId, skipped: true, reason: "resolve-failed" } });
+        if (contributor.criticality === "required")
+          throw new Error(`Required contributor ${contributor.id} failed.`, { cause: error });
+        outputs.push({
+          contributor,
+          provenance: {
+            contributorId: contributor.id,
+            ownerPluginId: contributor.ownerPluginId,
+            skipped: true,
+            reason: "resolve-failed",
+          },
+        });
       }
     }
-    const systemSections = outputs.flatMap((item) => item.contributor.kind === "prompt-section" && item.output !== undefined ? [item.output] : []);
-    const modelFacts = outputs.flatMap((item) => item.contributor.kind === "model-fact" && item.output !== undefined ? [item.output] : []);
+    const systemSections = outputs.flatMap((item) =>
+      item.contributor.kind === "prompt-section" && item.output !== undefined ? [item.output] : [],
+    );
+    const modelFacts = outputs.flatMap((item) =>
+      item.contributor.kind === "model-fact" && item.output !== undefined ? [item.output] : [],
+    );
     const facts = [
       { host: input.hostFacts },
       ...modelFacts,
-      ...outputs.flatMap((item) => item.contributor.kind === "request-fact" && item.output !== undefined ? [item.output] : []),
+      ...outputs.flatMap((item) =>
+        item.contributor.kind === "request-fact" && item.output !== undefined ? [item.output] : [],
+      ),
     ];
     return freezeRequest({
       sessionId: input.sessionId,
@@ -57,8 +100,19 @@ export class RequestAssembler {
     }) as LogicalRequestCandidate;
   }
 
-  finalize(candidate: LogicalRequestCandidate, prepared: PreparedRequestMetadata, compositionDigest: string, hostCapabilityDigest: string): LogicalRequestSnapshot {
-    return freezeRequest({ ...candidate, schemaVersion: 2, compositionDigest, hostCapabilityDigest, prepared }) as LogicalRequestSnapshot;
+  finalize(
+    candidate: LogicalRequestCandidate,
+    prepared: PreparedRequestMetadata,
+    compositionDigest: string,
+    hostCapabilityDigest: string,
+  ): LogicalRequestSnapshot {
+    return freezeRequest({
+      ...candidate,
+      schemaVersion: 2,
+      compositionDigest,
+      hostCapabilityDigest,
+      prepared,
+    }) as LogicalRequestSnapshot;
   }
 }
 

@@ -64,7 +64,8 @@ async function prepareMacRuntime(identity) {
   const devExecutable = join(devApp, "Contents", "MacOS", identity.executableName);
 
   const registerWithLaunchServices = async () => {
-    const launchServices = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
+    const launchServices =
+      "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
     if (await pathExists(launchServices)) {
       run(launchServices, ["-f", devApp]);
     }
@@ -104,7 +105,9 @@ async function prepareMacRuntime(identity) {
   const stagingIssue = await runtimeIntegrityIssue(sourceApp, stagingApp, identity);
   if (stagingIssue !== null) {
     await rm(stagingApp, { recursive: true, force: true });
-    throw new Error(`Prepared Electron runtime is incomplete: ${stagingIssue}. Check the installed Electron package and rebuild it.`);
+    throw new Error(
+      `Prepared Electron runtime is incomplete: ${stagingIssue}. Check the installed Electron package and rebuild it.`,
+    );
   }
   await rm(devApp, { recursive: true, force: true });
   await rename(stagingApp, devApp);
@@ -139,10 +142,18 @@ async function main() {
   // 排查内存 / CPU 时用：ACTSPACE_INSPECT_MAIN=9229 pnpm dev。主进程 inspector 监听 127.0.0.1:9229，
   // 界面进程的 Chrome 调试端口是它 +1（9230）；两者都只绑本机。
   const inspectPort = process.env.ACTSPACE_INSPECT_MAIN;
-  const inspectArgs = inspectPort && /^\d+$/.test(inspectPort)
-    ? [`--inspect=127.0.0.1:${inspectPort}`, `--remote-debugging-port=${Number(inspectPort) + 1}`, "--remote-debugging-address=127.0.0.1"]
-    : [];
-  if (inspectArgs.length > 0) console.log(`[dev-runtime] main inspector on 127.0.0.1:${inspectPort}, renderer debugging on 127.0.0.1:${Number(inspectPort) + 1}`);
+  const inspectArgs =
+    inspectPort && /^\d+$/.test(inspectPort)
+      ? [
+          `--inspect=127.0.0.1:${inspectPort}`,
+          `--remote-debugging-port=${Number(inspectPort) + 1}`,
+          "--remote-debugging-address=127.0.0.1",
+        ]
+      : [];
+  if (inspectArgs.length > 0)
+    console.log(
+      `[dev-runtime] main inspector on 127.0.0.1:${inspectPort}, renderer debugging on 127.0.0.1:${Number(inspectPort) + 1}`,
+    );
   const child = spawn(executable, [...inspectArgs, appEntry], {
     cwd: process.cwd(),
     env: {
@@ -164,12 +175,13 @@ async function main() {
     process.exitCode = 1;
   });
   child.once("exit", (code, signal) => {
-    if (code !== 0 || signal) console.error(`[dev-runtime] Electron exited: code=${code ?? "null"} signal=${signal ?? "none"}`);
+    if (code !== 0 || signal)
+      console.error(`[dev-runtime] Electron exited: code=${code ?? "null"} signal=${signal ?? "none"}`);
     process.exitCode = code ?? (signal ? 1 : 0);
   });
 }
 
 main().catch((error) => {
-  console.error(`[dev-runtime] ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
+  console.error(`[dev-runtime] ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
   process.exitCode = 1;
 });

@@ -1,6 +1,11 @@
 import { buildTrajectorySnapshot } from "../trajectory";
 import { describe, expect, it } from "vitest";
-import { loadTrajectoryFixture, loadTrajectoryFixtureFromUrl, trajectoryFixtureName, validateTrajectoryFixture } from "../trajectory/fixtures";
+import {
+  loadTrajectoryFixture,
+  loadTrajectoryFixtureFromUrl,
+  trajectoryFixtureName,
+  validateTrajectoryFixture,
+} from "../trajectory/fixtures";
 
 describe("trajectory fixture loader", () => {
   it("requires an explicit supported query flag", () => {
@@ -16,9 +21,9 @@ describe("trajectory fixture loader", () => {
     const long = loadTrajectoryFixture("long");
     const empty = loadTrajectoryFixture("empty");
     expect(complete.nodes.length).toBeGreaterThan(40);
-    expect(running.nodes.some(node => node.eventType === "assistant/chunk")).toBe(true);
-    expect(running.nodes.some(node => node.eventType === "tool/result")).toBe(false);
-    expect(errors.nodes.some(node => node.state === "failed")).toBe(true);
+    expect(running.nodes.some((node) => node.eventType === "assistant/chunk")).toBe(true);
+    expect(running.nodes.some((node) => node.eventType === "tool/result")).toBe(false);
+    expect(errors.nodes.some((node) => node.state === "failed")).toBe(true);
     expect(long.nodes.length).toBeGreaterThan(complete.nodes.length * 4);
     expect(empty.nodes).toHaveLength(0);
     expect(empty.throughJournalSeq).toBe(-1);
@@ -30,9 +35,10 @@ describe("trajectory fixture loader", () => {
     validateTrajectoryFixture(raw);
     const runtime = buildTrajectorySnapshot(raw);
     expect(runtime.turns).toHaveLength(144);
-    expect(new Set(runtime.records.map(record => record.id)).size).toBe(runtime.records.length);
-    expect(runtime.records.filter(record => record.kind === "tool")).toHaveLength(7 * 24);
-    expect(runtime.records.filter(record => record.kind === "tool").every(record => record.durationMs === 1200)).toBe(true);
+    expect(new Set(runtime.records.map((record) => record.id)).size).toBe(runtime.records.length);
+    expect(runtime.records.filter((record) => record.kind === "tool")).toHaveLength(7 * 24);
+    expect(
+      runtime.records.filter((record) => record.kind === "tool").every((record) => record.durationMs === 1200),
+    ).toBe(true);
   });
-
 });

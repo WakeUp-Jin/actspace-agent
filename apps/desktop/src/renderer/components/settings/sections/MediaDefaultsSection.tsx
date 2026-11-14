@@ -1,5 +1,10 @@
 import { useRef, useState } from "react";
-import { DEFAULT_IMAGE_GENERATION_BASE_URL, DEFAULT_IMAGE_GENERATION_MODEL, type AppSettings, type SecretProviderId } from "@actspace/shared";
+import {
+  DEFAULT_IMAGE_GENERATION_BASE_URL,
+  DEFAULT_IMAGE_GENERATION_MODEL,
+  type AppSettings,
+  type SecretProviderId,
+} from "@actspace/shared";
 import type { SettingsSectionId } from "../SettingsNav";
 import { ImageGenerationSettingsDialog, formatImageGenerationEndpoint } from "../dialogs/ImageGenerationSettingsDialog";
 import { SettingGroup, SettingLinkRow, StatusDot } from "../SettingsPrimitives";
@@ -29,10 +34,10 @@ export function MediaDefaultsSection({
       <SettingGroup title="媒体" headingLevel={3}>
         <SettingLinkRow
           title="图片生成"
-          description={current.hasApiKey
-            ? `${current.model} · ${endpointLabel}`
-            : undefined}
-          trailing={<StatusDot tone={current.hasApiKey ? "ok" : "off"}>{current.hasApiKey ? "已配置" : "未配置"}</StatusDot>}
+          description={current.hasApiKey ? `${current.model} · ${endpointLabel}` : undefined}
+          trailing={
+            <StatusDot tone={current.hasApiKey ? "ok" : "off"}>{current.hasApiKey ? "已配置" : "未配置"}</StatusDot>
+          }
           ariaLabel={current.hasApiKey ? "编辑图片生成服务配置" : "配置图片生成服务"}
           onClick={() => {
             triggerRef.current = document.activeElement as HTMLElement | null;

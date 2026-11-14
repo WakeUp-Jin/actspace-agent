@@ -1,7 +1,16 @@
 /** 规范 §5 逐元素：每个元素在“平时 / 露出 / 失焦”三种状态下的装饰。 */
 import { describe, expect, it } from "vitest";
 import { buildInlineDecorations } from "../components/markdown-editor/core/inline";
-import { decos, hasClass, inlineDecos, isHidden, lineHas, makeState, widgetsIn, type Deco } from "./markdown-editor-helpers";
+import {
+  decos,
+  hasClass,
+  inlineDecos,
+  isHidden,
+  lineHas,
+  makeState,
+  widgetsIn,
+  type Deco,
+} from "./markdown-editor-helpers";
 
 interface Scene {
   /** 光标在文档末尾（离开所有节点）、有焦点 */
@@ -33,7 +42,12 @@ describe("标题", () => {
   it("h1–h6 对应 md-h1…md-h4（h4 以上同一档）", () => {
     const state = makeState("## a\n\n### b\n\n#### c\n\n###### d\n\n末尾", { cursor: 100, focused: false });
     const list = inlineDecos(state);
-    expect(list.filter((d) => d.kind === "line").map((d) => d.cls)).toEqual(["md-h md-h2", "md-h md-h3", "md-h md-h4", "md-h md-h4"]);
+    expect(list.filter((d) => d.kind === "line").map((d) => d.cls)).toEqual([
+      "md-h md-h2",
+      "md-h md-h3",
+      "md-h md-h4",
+      "md-h md-h4",
+    ]);
   });
 
   it("Setext：隐藏下划线那一行，光标进入露出", () => {
@@ -319,7 +333,11 @@ describe("代码块（D5）", () => {
   it("平时：围栏隐藏，首行是代码头 widget，每行是代码行", () => {
     const s = scene(text, 8);
     expect(widgetsIn(s.normal)).toEqual(["CodeHeaderWidget"]);
-    expect([lineHas(s.normal, 0, "md-code-first"), lineHas(s.normal, 6, "md-code-line"), lineHas(s.normal, 16, "md-code-last")]).toEqual([true, true, true]);
+    expect([
+      lineHas(s.normal, 0, "md-code-first"),
+      lineHas(s.normal, 6, "md-code-line"),
+      lineHas(s.normal, 16, "md-code-last"),
+    ]).toEqual([true, true, true]);
     expect(isHidden(s.normal, 16, 19)).toBe(true);
     expect(widgetsIn(s.blurred)).toEqual(["CodeHeaderWidget"]);
   });
@@ -395,12 +413,19 @@ describe("选区与可见范围", () => {
   it("只算指定范围：范围外的行不产生装饰", () => {
     const state = makeState("# 一\n\n# 二\n\n# 三\n", { cursor: 100 });
     const { decorations } = buildInlineDecorations(state, 0, 3);
-    expect(decos(decorations).filter((d) => d.kind === "line").map((d) => d.from)).toEqual([0]);
+    expect(
+      decos(decorations)
+        .filter((d) => d.kind === "line")
+        .map((d) => d.from),
+    ).toEqual([0]);
   });
 
   it("被替换的范围登记为原子范围", () => {
     const state = makeState("# 标题\n\n- a\n\n末尾", { cursor: 100 });
     const { atomic } = buildInlineDecorations(state);
-    expect(decos(atomic).map((d) => [d.from, d.to])).toEqual([[0, 2], [6, 7]]);
+    expect(decos(atomic).map((d) => [d.from, d.to])).toEqual([
+      [0, 2],
+      [6, 7],
+    ]);
   });
 });

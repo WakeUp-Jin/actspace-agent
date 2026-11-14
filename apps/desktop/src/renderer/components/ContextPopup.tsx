@@ -15,8 +15,7 @@ const CONTEXT_ROW_CLASS = "flex items-center justify-between gap-3.5";
 const CONTEXT_CLOSE_CLASS =
   "grid h-6 w-6 place-items-center rounded-full border-0 bg-surface-subtle text-text-muted transition-colors hover:bg-[var(--act-color-hover-overlay)]";
 const CONTEXT_SUMMARY_CLASS = `${CONTEXT_ROW_CLASS} py-3 pb-2 text-act-sm leading-5 text-text-muted`;
-const CONTEXT_METER_CLASS =
-  "context-meter flex h-1.5 overflow-hidden rounded-full bg-[var(--act-color-meter-track)]";
+const CONTEXT_METER_CLASS = "context-meter flex h-1.5 overflow-hidden rounded-full bg-[var(--act-color-meter-track)]";
 const CONTEXT_BUCKETS_CLASS = "context-buckets grid gap-1 py-3 pb-1";
 const CONTEXT_BUCKET_CLASS =
   "context-bucket grid grid-cols-[14px_minmax(0,1fr)_auto_36px] items-center gap-2.5 rounded-md px-1.5 py-1 text-left text-act-sm leading-5 text-text-main transition-colors";
@@ -32,7 +31,7 @@ export function ContextPopup({
   snapshot,
   contextState,
   onClose,
-  onExpand
+  onExpand,
 }: {
   /** Composer 外框：浮层贴在它上方、与它同宽。 */
   anchorRef: RefObject<HTMLElement | null>;
@@ -48,25 +47,28 @@ export function ContextPopup({
   const projectedSnapshot = projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null;
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  const stateSnapshot = contextState ? {
-    basis: contextState.basis,
-    totalTokens: contextState.totalEstimatedTokens,
-    maxTokens: contextState.maxTokens,
-    percentUsed: contextState.percentUsed,
-    compressionCount: projectionCell?.snapshot?.activity.compactionCount ?? snapshot?.compressionCount ?? 0,
-    cumulativeTokens: snapshot?.cumulativeTokens,
-    estimator: contextState.estimator,
-    buckets: contextState.buckets,
-  } satisfies ContextUsageSnapshot : null;
+  const stateSnapshot = contextState
+    ? ({
+        basis: contextState.basis,
+        totalTokens: contextState.totalEstimatedTokens,
+        maxTokens: contextState.maxTokens,
+        percentUsed: contextState.percentUsed,
+        compressionCount: projectionCell?.snapshot?.activity.compactionCount ?? snapshot?.compressionCount ?? 0,
+        cumulativeTokens: snapshot?.cumulativeTokens,
+        estimator: contextState.estimator,
+        buckets: contextState.buckets,
+      } satisfies ContextUsageSnapshot)
+    : null;
   // 会话投影是唯一来源；只有不在投影里的会话才用调用方给的状态或快照。
-  const safeSnapshot =
-    projectedSnapshot ?? stateSnapshot ?? snapshot ?? {
+  const safeSnapshot = projectedSnapshot ??
+    stateSnapshot ??
+    snapshot ?? {
       totalTokens: 0,
       maxTokens: 0,
       percentUsed: 0,
       compressionCount: 0,
       cumulativeTokens: 0,
-      buckets: []
+      buckets: [],
     };
 
   const toggleSelected = (key: string) => {
@@ -75,9 +77,13 @@ export function ContextPopup({
 
   const percentLabel = formatShare(safeSnapshot.totalTokens, safeSnapshot.maxTokens);
 
-
   return (
-    <Popover open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Popover
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <PopoverAnchor virtualRef={anchorRef as RefObject<HTMLElement>} />
       <PopoverContent
         className={CONTEXT_POPOVER_CLASS}
@@ -104,12 +110,7 @@ export function ContextPopup({
             {onExpand ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
-                    className={CONTEXT_CLOSE_CLASS}
-                    type="button"
-                    onClick={onExpand}
-                    aria-label="查看完整上下文"
-                  >
+                  <button className={CONTEXT_CLOSE_CLASS} type="button" onClick={onExpand} aria-label="查看完整上下文">
                     <Eye size={15} aria-hidden="true" />
                   </button>
                 </TooltipTrigger>
@@ -129,7 +130,8 @@ export function ContextPopup({
         <div className={CONTEXT_SUMMARY_CLASS}>
           <span>{percentLabel} 已用</span>
           <span>
-            {formatApproxTokens(safeSnapshot.totalTokens)} / {safeSnapshot.maxTokens > 0 ? formatTokenCount(safeSnapshot.maxTokens) : "—"} Token
+            {formatApproxTokens(safeSnapshot.totalTokens)} /{" "}
+            {safeSnapshot.maxTokens > 0 ? formatTokenCount(safeSnapshot.maxTokens) : "—"} Token
           </span>
         </div>
         <div className={CONTEXT_METER_CLASS}>
@@ -137,8 +139,7 @@ export function ContextPopup({
             const key = bucket.key ?? bucket.name ?? "conversation";
             const display = getContextBucketDisplay(key);
             // 段宽相对「上下文总容量(maxTokens)」而非「已用总量」，未用部分留作灰色轨道。
-            const width =
-              safeSnapshot.maxTokens > 0 ? `${(bucket.tokens / safeSnapshot.maxTokens) * 100}%` : "0%";
+            const width = safeSnapshot.maxTokens > 0 ? `${(bucket.tokens / safeSnapshot.maxTokens) * 100}%` : "0%";
             const dimmed = selectedKey !== null && selectedKey !== key;
             return (
               <button
@@ -148,7 +149,7 @@ export function ContextPopup({
                 style={{
                   width,
                   background: `var(${display.colorVar})`,
-                  opacity: dimmed ? 0.3 : 1
+                  opacity: dimmed ? 0.3 : 1,
                 }}
                 aria-pressed={selectedKey === key}
                 aria-label={`${contextBucketLabel(key)} ${formatApproxTokens(bucket.tokens)} Token`}
@@ -175,7 +176,9 @@ export function ContextPopup({
                 <span className={BUCKET_SWATCH_CLASS} style={{ background: `var(${display.colorVar})` }} />
                 <span className="truncate">{contextBucketLabel(key)}</span>
                 <strong className={CONTEXT_BUCKET_VALUE_CLASS}>{formatApproxTokens(bucket.tokens)}</strong>
-                <span className="text-right text-act-xs tabular-nums text-text-faint">{formatShare(bucket.tokens, safeSnapshot.totalTokens)}</span>
+                <span className="text-right text-act-xs tabular-nums text-text-faint">
+                  {formatShare(bucket.tokens, safeSnapshot.totalTokens)}
+                </span>
               </button>
             );
           })}

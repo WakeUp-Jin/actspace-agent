@@ -4,13 +4,32 @@ import type { ModelCatalogEntry, ModelCatalogPriceOverride } from "../model-cata
 import { catalogEntryKey, compareCatalogEntries, mergeModelCatalog } from "../model-catalog-merge";
 import { MODEL_CATALOG_PRICE_OVERRIDES } from "../model-catalog-overrides";
 
-const entry = (sourceProviderId: string, apiModel: string, input: number | null, patch: Partial<ModelCatalogEntry> = {}): ModelCatalogEntry => ({
-  source: "models.dev", sourceProviderId, apiModel, name: apiModel, currency: "USD",
+const entry = (
+  sourceProviderId: string,
+  apiModel: string,
+  input: number | null,
+  patch: Partial<ModelCatalogEntry> = {},
+): ModelCatalogEntry => ({
+  source: "models.dev",
+  sourceProviderId,
+  apiModel,
+  name: apiModel,
+  currency: "USD",
   rates: { input, output: 2, cacheRead: null, cacheWrite: null },
-  unsupportedBilling: false, contextWindow: 1000, maxOutput: 100, input: ["text"], reasoning: false, ...patch,
+  unsupportedBilling: false,
+  contextWindow: 1000,
+  maxOutput: 100,
+  input: ["text"],
+  reasoning: false,
+  ...patch,
 });
 const override = (sourceProviderId: string, apiModel: string, input: number): ModelCatalogPriceOverride => ({
-  source: "models.dev", sourceProviderId, apiModel, rates: { input, output: 3, cacheRead: null, cacheWrite: null }, sourceUrl: "https://example.test/pricing", checkedAt: "2026-11-08",
+  source: "models.dev",
+  sourceProviderId,
+  apiModel,
+  rates: { input, output: 3, cacheRead: null, cacheWrite: null },
+  sourceUrl: "https://example.test/pricing",
+  checkedAt: "2026-11-08",
 });
 
 describe("mergeModelCatalog", () => {
@@ -18,15 +37,31 @@ describe("mergeModelCatalog", () => {
     const previous = [entry("openai", "a", 1), entry("openai", "gone", 5)];
     const fetched = [entry("openai", "a", 9, { name: "A renamed", contextWindow: 2 }), entry("openai", "new", 4)];
     const { entries, report } = mergeModelCatalog(previous, fetched, []);
-    expect(entries.map(catalogEntryKey)).toEqual(["models.dev/openai/a", "models.dev/openai/gone", "models.dev/openai/new"]);
+    expect(entries.map(catalogEntryKey)).toEqual([
+      "models.dev/openai/a",
+      "models.dev/openai/gone",
+      "models.dev/openai/new",
+    ]);
     expect(entries[0]).toEqual(previous[0]);
-    expect(report).toMatchObject({ added: ["models.dev/openai/new"], kept: 2, delisted: ["models.dev/openai/gone"], overridden: [] });
+    expect(report).toMatchObject({
+      added: ["models.dev/openai/new"],
+      kept: 2,
+      delisted: ["models.dev/openai/gone"],
+      overridden: [],
+    });
     expect(report.locked).toEqual([{ key: "models.dev/openai/a", from: previous[0].rates, to: fetched[0].rates }]);
   });
 
   it("keeps the same model under different providers separate", () => {
-    const { entries, report } = mergeModelCatalog([entry("openai", "m", 1)], [entry("openai", "m", 1), entry("opencode-go", "m", 7)], []);
-    expect(entries.map((row) => [row.sourceProviderId, row.rates.input])).toEqual([["openai", 1], ["opencode-go", 7]]);
+    const { entries, report } = mergeModelCatalog(
+      [entry("openai", "m", 1)],
+      [entry("openai", "m", 1), entry("opencode-go", "m", 7)],
+      [],
+    );
+    expect(entries.map((row) => [row.sourceProviderId, row.rates.input])).toEqual([
+      ["openai", 1],
+      ["opencode-go", 7],
+    ]);
     expect(report.locked).toEqual([]);
   });
 
@@ -42,7 +77,9 @@ describe("mergeModelCatalog", () => {
   });
 
   it("rejects an override that names a missing entry, and duplicate existing keys", () => {
-    expect(() => mergeModelCatalog([entry("openai", "a", 1)], null, [override("openai", "missing", 1)])).toThrow(/missing/);
+    expect(() => mergeModelCatalog([entry("openai", "a", 1)], null, [override("openai", "missing", 1)])).toThrow(
+      /missing/,
+    );
     expect(() => mergeModelCatalog([entry("openai", "a", 1), entry("openai", "a", 2)], null, [])).toThrow(/Duplicate/);
   });
 
@@ -58,7 +95,9 @@ describe("generated catalog", () => {
     expect([...rows].sort(compareCatalogEntries)).toEqual(rows);
     expect(new Set(rows.map(catalogEntryKey)).size).toBe(rows.length);
     for (const item of MODEL_CATALOG_PRICE_OVERRIDES) {
-      expect(rows.find((row) => catalogEntryKey(row) === catalogEntryKey(item))?.rates, catalogEntryKey(item)).toEqual(item.rates);
+      expect(rows.find((row) => catalogEntryKey(row) === catalogEntryKey(item))?.rates, catalogEntryKey(item)).toEqual(
+        item.rates,
+      );
       expect(item.sourceUrl).toMatch(/^https:\/\//);
       expect(item.checkedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }

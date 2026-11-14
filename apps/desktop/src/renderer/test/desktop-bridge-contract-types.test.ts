@@ -8,13 +8,19 @@ import type { DesktopBridge } from "@actspace/shared/desktop-bridge";
 describe("desktop bridge contract types", () => {
   it("declares window.actspace from the contract", () => {
     expectTypeOf<Window["actspace"]>().toEqualTypeOf<DesktopBridge>();
-    expectTypeOf<DesktopBridge["hosts"]["call"]>().parameter(0).toEqualTypeOf<import("@actspace/shared/desktop-bridge").HostCallInput>();
+    expectTypeOf<DesktopBridge["hosts"]["call"]>()
+      .parameter(0)
+      .toEqualTypeOf<import("@actspace/shared/desktop-bridge").HostCallInput>();
   });
 
   it("derives call signatures from the spec kind", () => {
     expectTypeOf<DesktopBridge["app"]["getBootstrapState"]>().parameters.toEqualTypeOf<[]>();
-    expectTypeOf<DesktopBridge["sessions"]["listPage"]>().parameter(0).toEqualTypeOf<import("@actspace/shared").SessionListPageInput | undefined>();
-    expectTypeOf<DesktopBridge["dialogs"]["selectFiles"]>().parameters.toEqualTypeOf<[input?: { remote?: boolean } | undefined]>();
+    expectTypeOf<DesktopBridge["sessions"]["listPage"]>()
+      .parameter(0)
+      .toEqualTypeOf<import("@actspace/shared").SessionListPageInput | undefined>();
+    expectTypeOf<DesktopBridge["dialogs"]["selectFiles"]>().parameters.toEqualTypeOf<
+      [input?: { remote?: boolean } | undefined]
+    >();
     expectTypeOf<DesktopBridge["tasks"]["abort"]>().returns.toEqualTypeOf<Promise<boolean>>();
     expectTypeOf<DesktopBridge["appearance"]["setNativeTheme"]>().returns.toEqualTypeOf<void>();
   });

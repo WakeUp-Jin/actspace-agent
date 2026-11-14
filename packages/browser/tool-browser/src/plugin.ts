@@ -3,7 +3,14 @@ import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tool-runtim
 import { BROWSER_TOOL_DEFINITIONS } from "./definitions.js";
 import { browserCommandMetadata } from "./generated-actions.js";
 import type { BrowserCapability } from "./host-port.js";
-import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType, getService, provideService, serviceKey, type CordisContext } from "@actspace/cordis-adapter";
+import {
+  ACTSPACE_SERVICE_DEFINITIONS,
+  bindServiceType,
+  getService,
+  provideService,
+  serviceKey,
+  type CordisContext,
+} from "@actspace/cordis-adapter";
 
 export const BROWSER_TOOLS_HOST_PORT_ID = "actspace.host.tools.browser" as const;
 export const BROWSER_TOOLS_HOST_PORT = serviceKey<BrowserCapability>(BROWSER_TOOLS_HOST_PORT_ID);
@@ -16,48 +23,91 @@ export type BrowserToolsService = {
 };
 export const BROWSER_TOOLS_SERVICE = bindServiceType<BrowserToolsService>(ACTSPACE_SERVICE_DEFINITIONS.browserTools);
 
-export function registerBrowserTools(runtime: ToolRuntimeContract, browser: BrowserCapability): readonly ReturnType<ToolRuntimeContract["register"]>[] {
-  return Object.freeze(BROWSER_TOOL_DEFINITIONS.map((definition) => runtime.register({
-    definition,
-    executor: { concurrencySafe: definition.concurrency === "read-only", execute: commandExecutor(definition.name, browser) },
-    permission: browserPermission(definition.name),
-  })));
+export function registerBrowserTools(
+  runtime: ToolRuntimeContract,
+  browser: BrowserCapability,
+): readonly ReturnType<ToolRuntimeContract["register"]>[] {
+  return Object.freeze(
+    BROWSER_TOOL_DEFINITIONS.map((definition) =>
+      runtime.register({
+        definition,
+        executor: {
+          concurrencySafe: definition.concurrency === "read-only",
+          execute: commandExecutor(definition.name, browser),
+        },
+        permission: browserPermission(definition.name),
+      }),
+    ),
+  );
 }
 
 function browserPermission(name: string) {
   return Object.freeze({
     extractResources: () => [],
-    evaluate: (args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>, _resources: readonly unknown[], context: { readonly mode: string }) => {
+    evaluate: (
+      args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>,
+      _resources: readonly unknown[],
+      context: { readonly mode: string },
+    ) => {
       if (name === "browser_help") return { kind: "allow" as const };
       const commands = name === "browser_run" ? batchCommands(args.actions) : [singleCommand(name, args.action)];
-      if (commands.some((command) => command === undefined)) return { kind: "deny" as const, code: "BROWSER_COMMAND_UNKNOWN", reason: "Browser command is not present in the canonical registry." };
+      if (commands.some((command) => command === undefined))
+        return {
+          kind: "deny" as const,
+          code: "BROWSER_COMMAND_UNKNOWN",
+          reason: "Browser command is not present in the canonical registry.",
+        };
       if (commands.some((command) => command?.readOnly !== true) && context.mode !== "full-access") {
-        return { kind: "ask" as const, reason: "Allow this Browser action to change Chrome content or state?", risk: commands.some((command) => command?.riskLevel === "high") ? "high" as const : "medium" as const };
+        return {
+          kind: "ask" as const,
+          reason: "Allow this Browser action to change Chrome content or state?",
+          risk: commands.some((command) => command?.riskLevel === "high") ? ("high" as const) : ("medium" as const),
+        };
       }
       return { kind: "allow" as const };
     },
   });
 }
 
-function singleCommand(localName: string, action: import("@actspace/shared/runtime-v2").RuntimeJsonValue | undefined): (typeof browserCommandMetadata)[number] | undefined {
+function singleCommand(
+  localName: string,
+  action: import("@actspace/shared/runtime-v2").RuntimeJsonValue | undefined,
+): (typeof browserCommandMetadata)[number] | undefined {
   const category = localName.replace(/^browser_/, "");
-  return typeof action === "string" ? browserCommandMetadata.find((command) => command.category === category && command.action === action) : undefined;
+  return typeof action === "string"
+    ? browserCommandMetadata.find((command) => command.category === category && command.action === action)
+    : undefined;
 }
 
-function batchCommands(value: import("@actspace/shared/runtime-v2").RuntimeJsonValue | undefined): readonly ((typeof browserCommandMetadata)[number] | undefined)[] {
+function batchCommands(
+  value: import("@actspace/shared/runtime-v2").RuntimeJsonValue | undefined,
+): readonly ((typeof browserCommandMetadata)[number] | undefined)[] {
   if (!Array.isArray(value) || value.length === 0) return [undefined];
   return value.map((item) => {
     if (item === null || typeof item !== "object" || Array.isArray(item)) return undefined;
     const record = item as Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>;
-    return typeof record.category === "string" && typeof record.action === "string" ? browserCommandMetadata.find((command) => command.category === record.category && command.action === record.action) : undefined;
+    return typeof record.category === "string" && typeof record.action === "string"
+      ? browserCommandMetadata.find(
+          (command) => command.category === record.category && command.action === record.action,
+        )
+      : undefined;
   });
 }
 
-type BrowserToolHandler = (args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
+type BrowserToolHandler = (
+  args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>,
+  context: ToolExecutionContext,
+) => Promise<ToolBodyResult>;
 
 function commandExecutor(name: string, browser: BrowserCapability): BrowserToolHandler {
   return async (args, context) => {
-    if (!browser.ready) return { status: "failed", modelOutput: [{ type: "text", text: "Browser Bridge is unavailable." }], summary: "Browser unavailable", failure: { code: "BROWSER_UNAVAILABLE", message: "Browser Bridge is unavailable.", retryable: true } };
+    if (!browser.ready)
+      return {
+        status: "failed",
+        modelOutput: [{ type: "text", text: "Browser Bridge is unavailable." }],
+        summary: "Browser unavailable",
+        failure: { code: "BROWSER_UNAVAILABLE", message: "Browser Bridge is unavailable.", retryable: true },
+      };
     return browser.command(name, args, context);
   };
 }
@@ -67,11 +117,24 @@ export function apply(ctx: CordisContext, config: { readonly disposeHost?: boole
   const browser = getService(ctx, BROWSER_TOOLS_HOST_PORT);
   if (runtime === undefined) throw new Error("Browser Tools plugin requires tools.runtime.");
   const registrations = browser?.ready ? registerBrowserTools(runtime, browser) : [];
-  provideService(ctx, BROWSER_TOOLS_SERVICE, Object.freeze({ available: browser?.ready === true, registrations, definitions: BROWSER_TOOL_DEFINITIONS }));
-  ctx.effect?.(() => async () => {
-    const results = await Promise.allSettled([...registrations].reverse().map((registration) => registration.dispose()));
-    if (config.disposeHost !== false) await browser?.dispose?.();
-    const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
-    if (failures.length > 0) throw new AggregateError(failures.map((failure) => failure.reason), "Browser Tools cleanup failed.");
-  }, "browser-tools");
+  provideService(
+    ctx,
+    BROWSER_TOOLS_SERVICE,
+    Object.freeze({ available: browser?.ready === true, registrations, definitions: BROWSER_TOOL_DEFINITIONS }),
+  );
+  ctx.effect?.(
+    () => async () => {
+      const results = await Promise.allSettled(
+        [...registrations].reverse().map((registration) => registration.dispose()),
+      );
+      if (config.disposeHost !== false) await browser?.dispose?.();
+      const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+      if (failures.length > 0)
+        throw new AggregateError(
+          failures.map((failure) => failure.reason),
+          "Browser Tools cleanup failed.",
+        );
+    },
+    "browser-tools",
+  );
 }

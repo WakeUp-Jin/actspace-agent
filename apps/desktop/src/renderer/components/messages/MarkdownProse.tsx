@@ -47,7 +47,13 @@ function settledText(text: string, floor: number): string {
  * 4. 内容不是追加（变短或被改写）；
  * 另外，还没有任何已解析内容时（尾巴没有地方接）也立即推进。
  */
-function shouldAdvance(parsed: ParseState, visible: string, now: number, caughtUp: boolean, fenceOpen: boolean): boolean {
+function shouldAdvance(
+  parsed: ParseState,
+  visible: string,
+  now: number,
+  caughtUp: boolean,
+  fenceOpen: boolean,
+): boolean {
   if (visible === parsed.text) return false;
   if (caughtUp || !visible.startsWith(parsed.text) || !parsed.text.trim()) return true;
   const lineStart = parsed.text.lastIndexOf("\n") + 1;
@@ -67,12 +73,23 @@ function shouldAdvance(parsed: ParseState, visible: string, now: number, caughtU
  * 宿主能力走 `MarkdownHostContext`；`onOpenWorkspaceFile` 提供 `openPath`，没有就不可点。
  * `writing`：这条回复是否正在写（平滑输出、末尾渐显、光标）；不传时跟随所在轮是否在流式。
  */
-export const MarkdownProse = memo(function MarkdownProse({ content, writing, onOpenWorkspaceFile }: { content: string; writing?: boolean; onOpenWorkspaceFile?: (path: string, line?: number) => void }) {
+export const MarkdownProse = memo(function MarkdownProse({
+  content,
+  writing,
+  onOpenWorkspaceFile,
+}: {
+  content: string;
+  writing?: boolean;
+  onOpenWorkspaceFile?: (path: string, line?: number) => void;
+}) {
   const id = useId();
   const prefix = useMemo(() => `user-content-${id.replace(/:/g, "")}-`, [id]);
   const pipelines = useMemo(() => createPipelineCache(prefix), [prefix]);
   const outerHost = useContext(MarkdownHostContext);
-  const host = useMemo<MarkdownHost>(() => (onOpenWorkspaceFile ? { ...outerHost, openPath: onOpenWorkspaceFile } : outerHost), [outerHost, onOpenWorkspaceFile]);
+  const host = useMemo<MarkdownHost>(
+    () => (onOpenWorkspaceFile ? { ...outerHost, openPath: onOpenWorkspaceFile } : outerHost),
+    [outerHost, onOpenWorkspaceFile],
+  );
 
   // 版面稳定（mermaid 保持代码块、表格固定列宽）按整轮算：所在轮仍在流式，或平滑输出还有积压没放完。
   // 末尾渐显和光标只给正在写的回复：一轮里已经写完、后面接着工具的回复不带（规范 §7.1）。
@@ -88,9 +105,15 @@ export const MarkdownProse = memo(function MarkdownProse({ content, writing, onO
   const previousLast = merged.current[merged.current.length - 1];
   const fenceOpen = previousLast !== undefined && isOpenFence(previousLast.source);
   // 写完（没有末尾效果了）：直接推进到全文，最后完整解析一次（规范 §3.5）。
-  const visible = !tail ? smooth.text : fenceOpen || !smooth.text.startsWith(parsed.current.text) ? smooth.text : settledText(smooth.text, parsed.current.text.length);
+  const visible = !tail
+    ? smooth.text
+    : fenceOpen || !smooth.text.startsWith(parsed.current.text)
+      ? smooth.text
+      : settledText(smooth.text, parsed.current.text.length);
   const now = performance.now();
-  if (!tail ? visible !== parsed.current.text : shouldAdvance(parsed.current, visible, now, !smooth.backlog, fenceOpen)) {
+  if (
+    !tail ? visible !== parsed.current.text : shouldAdvance(parsed.current, visible, now, !smooth.backlog, fenceOpen)
+  ) {
     parsed.current = { text: visible, at: now };
   }
   const parsedText = parsed.current.text;
@@ -121,7 +144,10 @@ export const MarkdownProse = memo(function MarkdownProse({ content, writing, onO
   // 原样尾巴：只接在最后一块上。最后一块是不显示的链接定义时，尾巴也不显示（光标仍在上一块末尾）。
   const tailText = liveIndex === blocks.length - 1 ? visible.slice(parsedText.length) : "";
   const tailLead = tailText ? /[ \t]*$/.exec(parsedText)![0] : "";
-  const streamTail = useMemo<StreamTail>(() => (tailText ? { text: tailText, lead: tailLead } : NO_TAIL), [tailText, tailLead]);
+  const streamTail = useMemo<StreamTail>(
+    () => (tailText ? { text: tailText, lead: tailLead } : NO_TAIL),
+    [tailText, tailLead],
+  );
 
   return (
     <div className="markdown-prose act-code-hl" data-streaming={streaming ? "true" : undefined}>
@@ -131,8 +157,19 @@ export const MarkdownProse = memo(function MarkdownProse({ content, writing, onO
             <FootnoteNumbersContext.Provider value={footnoteNumbers}>
               <PipelineContext.Provider value={pipelines}>
                 <StreamTailContext.Provider value={streamTail}>
-                  {blocks.map((block, index) => (block.definition ? null : <MarkdownBlockView key={block.start} block={block} defs={definitions.blockDefs[index] ?? ""} live={index === liveIndex} />))}
-                  {definitions.footnotes ? <FootnoteSection source={definitions.footnotes.source} live={footnotesLive} /> : null}
+                  {blocks.map((block, index) =>
+                    block.definition ? null : (
+                      <MarkdownBlockView
+                        key={block.start}
+                        block={block}
+                        defs={definitions.blockDefs[index] ?? ""}
+                        live={index === liveIndex}
+                      />
+                    ),
+                  )}
+                  {definitions.footnotes ? (
+                    <FootnoteSection source={definitions.footnotes.source} live={footnotesLive} />
+                  ) : null}
                 </StreamTailContext.Provider>
               </PipelineContext.Provider>
             </FootnoteNumbersContext.Provider>

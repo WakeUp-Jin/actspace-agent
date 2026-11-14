@@ -1,14 +1,6 @@
-import {
-  normalizeModelKey,
-  type ModelDefinition,
-  type ModelKey,
-  type ModelSelectionId,
-} from "./model-config";
+import { normalizeModelKey, type ModelDefinition, type ModelKey, type ModelSelectionId } from "./model-config";
 import { PROVIDER_IDS, type ProviderId } from "./provider-config";
-import type {
-  InstalledModelSettings,
-  ProviderConnectionState,
-} from "./settings";
+import type { InstalledModelSettings, ProviderConnectionState } from "./settings";
 
 export type ModelPurpose = "chat" | "utility" | "vision";
 
@@ -72,7 +64,9 @@ export function resolveConfiguredModel(
   const installed = snapshot.installedModels[key];
   if (!installed) return { ok: false, key, definition, reason: "model_not_installed" };
   const customConnection = installed.connectionId && installed.connectionId !== `${definition.provider}:default`;
-  const provider = customConnection ? snapshot.connections?.[installed.connectionId!] : snapshot.providers[definition.provider];
+  const provider = customConnection
+    ? snapshot.connections?.[installed.connectionId!]
+    : snapshot.providers[definition.provider];
   if (!provider || (customConnection && "providerId" in provider && provider.providerId !== definition.provider)) {
     return { ok: false, key, definition, reason: "connection_unavailable" };
   }

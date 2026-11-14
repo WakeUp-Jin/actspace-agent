@@ -19,7 +19,8 @@ export function installWheel(archive: Buffer, sitePackages: string): number {
     const destination = join(sitePackages, ...target.split("/"));
     mkdirSync(dirname(destination), { recursive: true });
     writeFileSync(destination, entry.read());
-    if (process.platform !== "win32") chmodSync(destination, entry.mode !== undefined && (entry.mode & 0o111) !== 0 ? 0o755 : 0o644);
+    if (process.platform !== "win32")
+      chmodSync(destination, entry.mode !== undefined && (entry.mode & 0o111) !== 0 ? 0o755 : 0o644);
     written += 1;
   }
   return written;
@@ -27,7 +28,8 @@ export function installWheel(archive: Buffer, sitePackages: string): number {
 
 /** The site-packages-relative path an archive entry installs to, or undefined when it is skipped. */
 export function installPath(name: string): string | undefined {
-  if (name.length === 0 || name.startsWith("/") || name.includes("\\") || name.includes("\0")) throw new Error(`Wheel entry has an unsafe path: ${JSON.stringify(name)}`);
+  if (name.length === 0 || name.startsWith("/") || name.includes("\\") || name.includes("\0"))
+    throw new Error(`Wheel entry has an unsafe path: ${JSON.stringify(name)}`);
   const data = DATA_DIRECTORY.exec(name);
   let relative = name;
   if (data !== null) {
@@ -36,7 +38,8 @@ export function installPath(name: string): string | undefined {
   }
   const segments = relative.split("/").filter((segment) => segment.length > 0);
   if (segments.length === 0) return undefined;
-  if (segments.some((segment) => segment === "..")) throw new Error(`Wheel entry escapes its directory: ${JSON.stringify(name)}`);
+  if (segments.some((segment) => segment === ".."))
+    throw new Error(`Wheel entry escapes its directory: ${JSON.stringify(name)}`);
   if (segments.some((segment) => SKIPPED_SEGMENTS.has(segment))) return undefined;
   return segments.join("/");
 }

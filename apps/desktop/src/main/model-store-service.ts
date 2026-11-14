@@ -46,38 +46,61 @@ export class ModelStoreService {
     const catalog = this.catalog();
     // 每个字段的有效值在这里算一次（用户 > 服务商 > 目录），运行时、对话框、设置页都读这一份。
     const definitions = Object.fromEntries(
-      [...BUILTIN_MODEL_LIST, ...CURATED_OPENROUTER_MODEL_LIST, ...Object.values(stored.customModels).filter(isDefined)]
-        .map((original) => {
-          const definition = original.provider === "deepseek" && original.source === "builtin" ? deepSeekModelDefinition(original.apiModel, this.now().toISOString()) ?? original : original;
-          const connectionId = stored.installedModels[definition.key]?.connectionId ?? `${definition.provider}:default`;
-          const connection = connections[connectionId];
-          const protocol = connection && connectionId !== `${definition.provider}:default` ? connection.protocol ?? "openai-completions" : definition.api;
-          const template = templateForConnection(connection ?? { connectionId, providerId: definition.provider });
-          const effective = resolveEffectiveModel({
-            apiModel: definition.apiModel,
-            protocol,
-            catalog,
-            catalogProvider: template.catalogProvider,
-            providerFacts: providerFactsOf(definition),
-            overrides: stored.modelOverrides[definition.key],
-            multiplier: connection?.defaultPricingMultiplier ?? 1,
-          });
-          return [definition.key, clone(applyEffectiveToDefinition(definition, effective, protocol))];
-        }),
+      [
+        ...BUILTIN_MODEL_LIST,
+        ...CURATED_OPENROUTER_MODEL_LIST,
+        ...Object.values(stored.customModels).filter(isDefined),
+      ].map((original) => {
+        const definition =
+          original.provider === "deepseek" && original.source === "builtin"
+            ? (deepSeekModelDefinition(original.apiModel, this.now().toISOString()) ?? original)
+            : original;
+        const connectionId = stored.installedModels[definition.key]?.connectionId ?? `${definition.provider}:default`;
+        const connection = connections[connectionId];
+        const protocol =
+          connection && connectionId !== `${definition.provider}:default`
+            ? (connection.protocol ?? "openai-completions")
+            : definition.api;
+        const template = templateForConnection(connection ?? { connectionId, providerId: definition.provider });
+        const effective = resolveEffectiveModel({
+          apiModel: definition.apiModel,
+          protocol,
+          catalog,
+          catalogProvider: template.catalogProvider,
+          providerFacts: providerFactsOf(definition),
+          overrides: stored.modelOverrides[definition.key],
+          multiplier: connection?.defaultPricingMultiplier ?? 1,
+        });
+        return [definition.key, clone(applyEffectiveToDefinition(definition, effective, protocol))];
+      }),
     ) as ModelSnapshot["definitions"];
     return {
-      connections: Object.fromEntries(Object.values(connections).filter((connection) => connection.connectionId !== `${connection.providerId}:default`).map((connection) => [connection.connectionId, {
-        providerId: connection.providerId,
-        displayName: connection.displayName,
-        enabled: connection.enabled,
-        hasApiKey: !("code" in this.settings.getConnectionRuntimeConfig(connection.providerId, connection.connectionId)),
-        lastConnection: connection.lastConnection,
-      }])),
-      providers: Object.fromEntries(Object.entries(view.providers).map(([provider, state]) => [provider, {
-        enabled: state.enabled ?? true,
-        hasApiKey: state.hasApiKey,
-        lastConnection: state.lastConnection ?? { status: "untested" },
-      }])) as ModelSnapshot["providers"],
+      connections: Object.fromEntries(
+        Object.values(connections)
+          .filter((connection) => connection.connectionId !== `${connection.providerId}:default`)
+          .map((connection) => [
+            connection.connectionId,
+            {
+              providerId: connection.providerId,
+              displayName: connection.displayName,
+              enabled: connection.enabled,
+              hasApiKey: !(
+                "code" in this.settings.getConnectionRuntimeConfig(connection.providerId, connection.connectionId)
+              ),
+              lastConnection: connection.lastConnection,
+            },
+          ]),
+      ),
+      providers: Object.fromEntries(
+        Object.entries(view.providers).map(([provider, state]) => [
+          provider,
+          {
+            enabled: state.enabled ?? true,
+            hasApiKey: state.hasApiKey,
+            lastConnection: state.lastConnection ?? { status: "untested" },
+          },
+        ]),
+      ) as ModelSnapshot["providers"],
       definitions,
       installedModels: clone(stored.installedModels),
     };
@@ -131,7 +154,6 @@ export class ModelStoreService {
     }
     if (Object.keys(additions).length > 0) await this.settings.updateModelStorage({ installedModels: additions });
   }
-
 }
 
 function clone<T>(value: T): T {

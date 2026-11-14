@@ -8,11 +8,9 @@ export type ConversationTurnNavigationItem = {
   pending: boolean;
 };
 
-const RAIL_CLASS =
-  "pointer-events-none absolute left-2 top-1/2 z-30 -translate-y-1/2";
+const RAIL_CLASS = "pointer-events-none absolute left-2 top-1/2 z-30 -translate-y-1/2";
 const RAIL_STACK_CLASS = "flex flex-col gap-0.5";
-const RAIL_STACK_DENSE_CLASS =
-  "flex h-[min(260px,55vh)] flex-col";
+const RAIL_STACK_DENSE_CLASS = "flex h-[min(260px,55vh)] flex-col";
 const MARKER_BUTTON_CLASS =
   "group pointer-events-auto flex w-8 items-center border-0 bg-transparent pl-1 focus-visible:outline-none";
 const MARKER_BUTTON_DEFAULT_CLASS = "h-3.5";
@@ -76,7 +74,10 @@ export function ConversationTurnRail({
                   onBlur={() => setFocusedIndex(null)}
                   onClick={() => onNavigate(item.id)}
                 >
-                  <span className={`${MARKER_CLASS} ${markerWidth}${active ? ` ${MARKER_ACTIVE_CLASS}` : ""}`} aria-hidden="true" />
+                  <span
+                    className={`${MARKER_CLASS} ${markerWidth}${active ? ` ${MARKER_ACTIVE_CLASS}` : ""}`}
+                    aria-hidden="true"
+                  />
                 </button>
               </TooltipTrigger>
               <TooltipContent

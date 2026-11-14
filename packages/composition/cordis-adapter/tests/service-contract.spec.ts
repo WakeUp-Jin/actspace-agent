@@ -15,7 +15,9 @@ describe("Cordis Service ABI", () => {
   it("describes real Cordis services without a second provider registry", () => {
     expect(ACTSPACE_SERVICE_IDS.sessionStore).toBe("session.store");
     expect(ACTSPACE_SERVICE_DEFINITIONS.agentLoop.id).toBe("agent.loop");
-    expect(ACTSPACE_SERVICE_ROLE_METADATA.find(role => role.definitionId === "session.storage")?.providerId).toBe("session.storage:jsonl");
+    expect(ACTSPACE_SERVICE_ROLE_METADATA.find((role) => role.definitionId === "session.storage")?.providerId).toBe(
+      "session.storage:jsonl",
+    );
   });
 
   it("rejects manifest service declarations that drift from behavior metadata", () => {
@@ -29,11 +31,33 @@ describe("Cordis Service ABI", () => {
       contributions: { services: ["fixture.service"], tools: [], prompts: [], events: [] },
     });
     expect(() => validatePluginManifest(manifest)).not.toThrow();
-    const drifted = Object.freeze({ ...manifest, contributions: Object.freeze({ ...manifest.contributions, services: ["fixture.other"] }) });
+    const drifted = Object.freeze({
+      ...manifest,
+      contributions: Object.freeze({ ...manifest.contributions, services: ["fixture.other"] }),
+    });
     expect(() => validatePluginManifest(drifted)).toThrow(/undeclared service/);
-    const second = defineBuiltinPluginManifest({ pluginId: "fixture.second", version: "1", name: "second", entry: { entryId: "fixture.second", behavior: "./second.js", enabled: false }, host: { required: [], optional: [] }, frontend: null, contributions: { services: ["fixture.second"], tools: [], prompts: [], events: [] } });
-    expect(() => validatePluginManifest({ ...manifest, behaviors: [...manifest.behaviors, ...second.behaviors], contributions: { ...manifest.contributions, services: ["fixture.service", "fixture.second"] } })).not.toThrow();
-    expect(() => validatePluginManifest({ ...manifest, contributions: { ...manifest.contributions, services: ["fixture.service", "fixture.unowned"] } })).toThrow(/without a behavior provider/);
+    const second = defineBuiltinPluginManifest({
+      pluginId: "fixture.second",
+      version: "1",
+      name: "second",
+      entry: { entryId: "fixture.second", behavior: "./second.js", enabled: false },
+      host: { required: [], optional: [] },
+      frontend: null,
+      contributions: { services: ["fixture.second"], tools: [], prompts: [], events: [] },
+    });
+    expect(() =>
+      validatePluginManifest({
+        ...manifest,
+        behaviors: [...manifest.behaviors, ...second.behaviors],
+        contributions: { ...manifest.contributions, services: ["fixture.service", "fixture.second"] },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validatePluginManifest({
+        ...manifest,
+        contributions: { ...manifest.contributions, services: ["fixture.service", "fixture.unowned"] },
+      }),
+    ).toThrow(/without a behavior provider/);
   });
 
   it("registers a real Service and disposes its ctx.effect exactly once", async () => {
@@ -65,7 +89,9 @@ describe("Cordis Service ABI", () => {
   it("fails closed for invalid Config and apply errors", async () => {
     const fixture = createServiceLifecycleFixtures();
     const configContext = new CordisContextClass();
-    await expect(configContext.plugin(fixture.ConfigService, { enabled: false })).rejects.toThrow(/enabled must be true/);
+    await expect(configContext.plugin(fixture.ConfigService, { enabled: false })).rejects.toThrow(
+      /enabled must be true/,
+    );
     await configContext.fiber.dispose();
 
     const failureContext = new CordisContextClass();
@@ -77,11 +103,15 @@ describe("Cordis Service ABI", () => {
   it("keeps a dependency cycle unresolved instead of constructing either Service", async () => {
     class CycleA extends CordisService {
       static inject = Object.freeze(["fixture.cycle.b"]);
-      constructor(ctx: CordisServiceContext) { super(ctx, "fixture.cycle.a"); }
+      constructor(ctx: CordisServiceContext) {
+        super(ctx, "fixture.cycle.a");
+      }
     }
     class CycleB extends CordisService {
       static inject = Object.freeze(["fixture.cycle.a"]);
-      constructor(ctx: CordisServiceContext) { super(ctx, "fixture.cycle.b"); }
+      constructor(ctx: CordisServiceContext) {
+        super(ctx, "fixture.cycle.b");
+      }
     }
     const ctx = new CordisContextClass();
     const first = ctx.plugin(CycleA);

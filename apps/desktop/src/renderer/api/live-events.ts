@@ -21,7 +21,11 @@ export function createLiveEventHub(source: LiveSource): LiveEventHub {
   let release: (() => void) | null = null;
   const deliver: LiveListener = (envelope) => {
     for (const listener of [...listeners]) {
-      try { listener(envelope); } catch (error) { console.error("Live event listener failed", error); }
+      try {
+        listener(envelope);
+      } catch (error) {
+        console.error("Live event listener failed", error);
+      }
     }
   };
   const subscribe = (listener: LiveListener) => {
@@ -43,7 +47,10 @@ export function createLiveEventHub(source: LiveSource): LiveEventHub {
   };
   return {
     subscribe,
-    onMessage: (message, listener) => subscribe((envelope) => { if (envelope.event.message === message) listener(envelope); }),
+    onMessage: (message, listener) =>
+      subscribe((envelope) => {
+        if (envelope.event.message === message) listener(envelope);
+      }),
   };
 }
 

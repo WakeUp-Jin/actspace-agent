@@ -19,39 +19,40 @@ export function useComposerSkills({ workspaceRoot, selected, onSelectedChange }:
   const loadedWorkspaceRef = useRef<string | null>(null);
   const requestRef = useRef(0);
 
-  const load = useCallback(async (forceReload = false) => {
-    const workspaceKey = workspaceRoot ?? "__default__";
-    if (!forceReload && loadedWorkspaceRef.current === workspaceKey) return;
-    loadedWorkspaceRef.current = workspaceKey;
-    const requestId = requestRef.current + 1;
-    requestRef.current = requestId;
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await skillsApi.list({ workspaceRoot: workspaceRoot ?? undefined });
-      if (requestRef.current !== requestId) return;
-      setItems(result.items
-        .filter((skill) => skill.enabledForAgent && !skill.shadowed && skill.status === "available")
-        .sort((left, right) => {
-          if (left.scope !== right.scope) return left.scope === "project" ? -1 : 1;
-          return left.name.localeCompare(right.name);
-        }));
-    } catch (loadError) {
-      if (requestRef.current !== requestId) return;
-      loadedWorkspaceRef.current = null;
-      console.error("Failed to list Skills", loadError);
-      setError("加载 Skills 失败。");
-    } finally {
-      if (requestRef.current === requestId) setLoading(false);
-    }
-  }, [workspaceRoot]);
+  const load = useCallback(
+    async (forceReload = false) => {
+      const workspaceKey = workspaceRoot ?? "__default__";
+      if (!forceReload && loadedWorkspaceRef.current === workspaceKey) return;
+      loadedWorkspaceRef.current = workspaceKey;
+      const requestId = requestRef.current + 1;
+      requestRef.current = requestId;
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await skillsApi.list({ workspaceRoot: workspaceRoot ?? undefined });
+        if (requestRef.current !== requestId) return;
+        setItems(
+          result.items
+            .filter((skill) => skill.enabledForAgent && !skill.shadowed && skill.status === "available")
+            .sort((left, right) => {
+              if (left.scope !== right.scope) return left.scope === "project" ? -1 : 1;
+              return left.name.localeCompare(right.name);
+            }),
+        );
+      } catch (loadError) {
+        if (requestRef.current !== requestId) return;
+        loadedWorkspaceRef.current = null;
+        console.error("Failed to list Skills", loadError);
+        setError("加载 Skills 失败。");
+      } finally {
+        if (requestRef.current === requestId) setLoading(false);
+      }
+    },
+    [workspaceRoot],
+  );
 
   function toggle(name: string) {
-    onSelectedChange?.(
-      selected.includes(name)
-        ? selected.filter((skill) => skill !== name)
-        : [...selected, name],
-    );
+    onSelectedChange?.(selected.includes(name) ? selected.filter((skill) => skill !== name) : [...selected, name]);
   }
 
   return { items, loading, error, load, toggle };

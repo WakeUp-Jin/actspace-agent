@@ -43,41 +43,79 @@ export function createCoreContributors(options: CoreContributorOptions): readonl
     contributor(options.scopeId, "core/safety", "core", 10, "prompt-section", chat ? chatSafety() : coreSafety()),
     contributor(options.scopeId, "core/agent-descriptor", "profile", 0, "model-fact", { agent: options.agent }),
   ];
-  if (!chat && options.deliverables) contributors.push(contributor(options.scopeId, "core/output-choice", "core", 20, "prompt-section", coreOutputChoice()));
+  if (!chat && options.deliverables)
+    contributors.push(
+      contributor(options.scopeId, "core/output-choice", "core", 20, "prompt-section", coreOutputChoice()),
+    );
   const scripting = options.scripting;
   if (!chat && scripting) {
-    contributors.push(contributor(options.scopeId, "core/scripting", "core", 30, "prompt-section", coreScripting(scripting.python !== undefined)));
-    contributors.push(Object.freeze({
-      id: "host/scripting-facts", ownerPluginId: "@actspace/core", scopeId: options.scopeId, kind: "model-fact", layer: "host", order: 15, criticality: "required",
-      resolve: (input) => ({ value: scriptingFacts(scripting, input.sessionId), provenance: { contributorId: "host/scripting-facts", ownerPluginId: "@actspace/core", layer: "host", order: 15 } }),
-    } satisfies PromptContributor));
+    contributors.push(
+      contributor(
+        options.scopeId,
+        "core/scripting",
+        "core",
+        30,
+        "prompt-section",
+        coreScripting(scripting.python !== undefined),
+      ),
+    );
+    contributors.push(
+      Object.freeze({
+        id: "host/scripting-facts",
+        ownerPluginId: "@actspace/core",
+        scopeId: options.scopeId,
+        kind: "model-fact",
+        layer: "host",
+        order: 15,
+        criticality: "required",
+        resolve: (input) => ({
+          value: scriptingFacts(scripting, input.sessionId),
+          provenance: {
+            contributorId: "host/scripting-facts",
+            ownerPluginId: "@actspace/core",
+            layer: "host",
+            order: 15,
+          },
+        }),
+      } satisfies PromptContributor),
+    );
   }
-  if (!chat) contributors.push(
-    contributor(options.scopeId, "host/workspace-facts", "host", 0, "model-fact", {
-      workspaceRoot: options.workspaceRoot,
-      workspaceRef: options.host.workspaceRef ?? null,
-      hostKind: options.host.hostKind,
-    }),
-    contributor(options.scopeId, "host/capabilities", "host", 10, "model-fact", {
-      capabilities: [...options.host.capabilityCeiling].sort(),
-      runtimeContract: options.host.runtimeContract,
-    }),
-  );
-  const instructions = chat ? options.instructions.filter((instruction) => instruction.id === "host/user-instructions") : options.instructions;
-  for (const [index, instruction] of instructions.entries()) {
-    contributors.push(Object.freeze({
-      id: instruction.id,
-      ownerPluginId: HOST_INSTRUCTION_OWNER,
-      scopeId: options.scopeId,
-      kind: "prompt-section",
-      layer: "host",
-      order: 20 + index,
-      criticality: "required",
-      resolve: () => ({
-        value: { title: instruction.title, content: instruction.content },
-        provenance: { contributorId: instruction.id, ownerPluginId: HOST_INSTRUCTION_OWNER, path: instruction.path, contentDigest: instruction.contentDigest },
+  if (!chat)
+    contributors.push(
+      contributor(options.scopeId, "host/workspace-facts", "host", 0, "model-fact", {
+        workspaceRoot: options.workspaceRoot,
+        workspaceRef: options.host.workspaceRef ?? null,
+        hostKind: options.host.hostKind,
       }),
-    }));
+      contributor(options.scopeId, "host/capabilities", "host", 10, "model-fact", {
+        capabilities: [...options.host.capabilityCeiling].sort(),
+        runtimeContract: options.host.runtimeContract,
+      }),
+    );
+  const instructions = chat
+    ? options.instructions.filter((instruction) => instruction.id === "host/user-instructions")
+    : options.instructions;
+  for (const [index, instruction] of instructions.entries()) {
+    contributors.push(
+      Object.freeze({
+        id: instruction.id,
+        ownerPluginId: HOST_INSTRUCTION_OWNER,
+        scopeId: options.scopeId,
+        kind: "prompt-section",
+        layer: "host",
+        order: 20 + index,
+        criticality: "required",
+        resolve: () => ({
+          value: { title: instruction.title, content: instruction.content },
+          provenance: {
+            contributorId: instruction.id,
+            ownerPluginId: HOST_INSTRUCTION_OWNER,
+            path: instruction.path,
+            contentDigest: instruction.contentDigest,
+          },
+        }),
+      }),
+    );
   }
   if (!chat) {
     contributors.push(createSkillCatalogContributor(options.skills, options.scopeId));
@@ -86,7 +124,14 @@ export function createCoreContributors(options: CoreContributorOptions): readonl
   return Object.freeze(contributors);
 }
 
-function contributor(scopeId: string, id: string, layer: PromptContributor["layer"], order: number, kind: PromptContributor["kind"], value: RuntimeJsonValue): PromptContributor {
+function contributor(
+  scopeId: string,
+  id: string,
+  layer: PromptContributor["layer"],
+  order: number,
+  kind: PromptContributor["kind"],
+  value: RuntimeJsonValue,
+): PromptContributor {
   return Object.freeze({
     id,
     ownerPluginId: "@actspace/core",
@@ -153,12 +198,15 @@ function scriptingFacts(scripting: ScriptingFacts, sessionId: string): RuntimeJs
   const python = scripting.python;
   return {
     scratchDirectory: scripting.scratchDirectory(sessionId),
-    python: python === undefined ? null : {
-      command: "actspace-python",
-      version: python.version,
-      corePackages: [...python.corePackages],
-      dataExtension: { packages: [...python.extensionPackages], installed: python.extensionInstalled() },
-    },
+    python:
+      python === undefined
+        ? null
+        : {
+            command: "actspace-python",
+            version: python.version,
+            corePackages: [...python.corePackages],
+            dataExtension: { packages: [...python.extensionPackages], installed: python.extensionInstalled() },
+          },
   };
 }
 

@@ -13,7 +13,13 @@ import { useDocsListing } from "./use-docs-listing";
 
 /** workspace 绝对路径的末段目录名，用作树顶和路径里的根标签。 */
 function workspaceLabelOf(workspaceRoot: string | undefined): string {
-  return workspaceRoot?.replace(/[/\\]+$/, "").split(/[/\\]/).filter(Boolean).at(-1) ?? "工作区";
+  return (
+    workspaceRoot
+      ?.replace(/[/\\]+$/, "")
+      .split(/[/\\]/)
+      .filter(Boolean)
+      .at(-1) ?? "工作区"
+  );
 }
 
 export function DocsPanel({

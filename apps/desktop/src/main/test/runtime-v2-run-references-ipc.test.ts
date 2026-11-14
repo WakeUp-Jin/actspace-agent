@@ -4,10 +4,17 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { RUNTIME_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 const { handlers } = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => any>() }));
-vi.mock("electron", () => ({ dialog: {}, nativeImage: {}, nativeTheme: {}, ipcMain: {
-  handle: (channel: string, listener: (...args: any[]) => any) => handlers.set(channel, listener),
-  removeHandler: (channel: string) => handlers.delete(channel), on: vi.fn(), removeListener: vi.fn(),
-} }));
+vi.mock("electron", () => ({
+  dialog: {},
+  nativeImage: {},
+  nativeTheme: {},
+  ipcMain: {
+    handle: (channel: string, listener: (...args: any[]) => any) => handlers.set(channel, listener),
+    removeHandler: (channel: string) => handlers.delete(channel),
+    on: vi.fn(),
+    removeListener: vi.fn(),
+  },
+}));
 import { registerFixedRendererIpc, type FixedRendererIpcOptions } from "../runtime-v2/fixed-renderer-ipc";
 import { trustedWindow } from "./ipc-sender-fixture";
 
@@ -25,33 +32,63 @@ afterEach(async () => {
 });
 
 const annotation = {
-  annotationId: "ann_1", assistantMessageId: "v2-5", selectedText: "关键句", startOffset: 0, endOffset: 3, prefixContext: "", suffixContext: "。", comment: "为什么",
+  annotationId: "ann_1",
+  assistantMessageId: "v2-5",
+  selectedText: "关键句",
+  startOffset: 0,
+  endOffset: 3,
+  prefixContext: "",
+  suffixContext: "。",
+  comment: "为什么",
 };
 
 function setup(overrides: { agentForm?: "agent" | "chat"; journal?: Record<number, unknown> } = {}) {
   const tasks: { submissionId: string; content: unknown }[] = [];
   const submitTask = vi.fn(async (_sessionId: string, submissionId: string, content: unknown) => {
-    if (!tasks.some(task => task.submissionId === submissionId)) tasks.push({ submissionId: submissionId, content: content });
+    if (!tasks.some((task) => task.submissionId === submissionId))
+      tasks.push({ submissionId: submissionId, content: content });
     return { snapshot: { sessionId: "s" }, reason: "completed", finalText: "" };
   });
   const importAttachment = vi.fn(async () => ({ artifactId: "art-1", mimeType: "image/png", name: "shot.png" }));
-  const journal = overrides.journal ?? { 5: { seq: 5, type: "assistant/message", data: { messageId: "m", content: "关键句。" }, surface: { kind: "append" } } };
+  const journal = overrides.journal ?? {
+    5: {
+      seq: 5,
+      type: "assistant/message",
+      data: { messageId: "m", content: "关键句。" },
+      surface: { kind: "append" },
+    },
+  };
   const readSessionProjection = vi.fn(async ({ beforeSeq }: { beforeSeq: number }) => ({
     window: { events: journal[beforeSeq - 1] ? [journal[beforeSeq - 1]] : [] },
   }));
   const registration = registerFixedRendererIpc({
     roots: { dataRoot: "/tmp/run-references", workspaceRoot: workspace },
     registry: {
-      subscribe: () => () => {}, subscribeRendererStream: () => () => {},
-      inspectSession: async () => ({ agentForm: overrides.agentForm ?? "agent", workspaceRoot: workspace, throughJournalSeq: 9 }),
-      importAttachment, submitTask, readSessionProjection, rollbackImportedAttachments: vi.fn(),
+      subscribe: () => () => {},
+      subscribeRendererStream: () => () => {},
+      inspectSession: async () => ({
+        agentForm: overrides.agentForm ?? "agent",
+        workspaceRoot: workspace,
+        throughJournalSeq: 9,
+      }),
+      importAttachment,
+      submitTask,
+      readSessionProjection,
+      rollbackImportedAttachments: vi.fn(),
       taskCommand: async () => ({ snapshot: { tasks } }),
     },
     settings: { subscribeV4Changes: () => () => {} },
     getMainWindow: () => trusted.window,
   } as unknown as FixedRendererIpcOptions);
   const handler = handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.submitTask)!;
-  return { registration, submitTask, importAttachment, readSessionProjection, run: (input: Record<string, unknown>) => handler(trusted.event, { sessionId: "s", submissionId: "r", userInput: "看这里", ...input }) };
+  return {
+    registration,
+    submitTask,
+    importAttachment,
+    readSessionProjection,
+    run: (input: Record<string, unknown>) =>
+      handler(trusted.event, { sessionId: "s", submissionId: "r", userInput: "看这里", ...input }),
+  };
 }
 
 it("writes text, file references, excerpts and attachments as ordered content blocks", async () => {
@@ -63,13 +100,21 @@ it("writes text, file references, excerpts and attachments as ordered content bl
       attachments: [{ id: "img", kind: "image", name: "shot.png", path: "/fixture/shot.png" }],
     });
     expect(readSessionProjection).toHaveBeenCalledWith({ sessionId: "s", beforeSeq: 6, maxWindowEvents: 1 });
-    expect(submitTask).toHaveBeenCalledWith("s", "r", expect.objectContaining({ prepared: [
-      { type: "text", text: "看这里" },
-      { type: "file-reference", relativePath: "src/a.ts", displayName: "a.ts" },
-      { type: "response-excerpt", ...annotation },
-      { type: "artifact", artifact: { artifactId: "art-1", mediaType: "image/png" }, label: "shot.png" },
-    ] }));
-  } finally { registration.dispose(); }
+    expect(submitTask).toHaveBeenCalledWith(
+      "s",
+      "r",
+      expect.objectContaining({
+        prepared: [
+          { type: "text", text: "看这里" },
+          { type: "file-reference", relativePath: "src/a.ts", displayName: "a.ts" },
+          { type: "response-excerpt", ...annotation },
+          { type: "artifact", artifact: { artifactId: "art-1", mediaType: "image/png" }, label: "shot.png" },
+        ],
+      }),
+    );
+  } finally {
+    registration.dispose();
+  }
 });
 
 it("keeps plain string content when there are no references or attachments", async () => {
@@ -78,72 +123,146 @@ it("keeps plain string content when there are no references or attachments", asy
     await run({ fileReferences: [], responseAnnotations: [] });
     expect(submitTask).toHaveBeenCalledWith("s", "r", expect.objectContaining({ prepared: "看这里" }));
     expect(readSessionProjection).not.toHaveBeenCalledWith(expect.objectContaining({ maxWindowEvents: 1 }));
-  } finally { registration.dispose(); }
+  } finally {
+    registration.dispose();
+  }
 });
 
 it("sends an excerpt without any typed text", async () => {
   const { registration, submitTask, run } = setup();
   try {
     await run({ userInput: "", responseAnnotations: [annotation] });
-    expect(submitTask).toHaveBeenCalledWith("s", "r", expect.objectContaining({ prepared: [{ type: "response-excerpt", ...annotation }] }));
-  } finally { registration.dispose(); }
+    expect(submitTask).toHaveBeenCalledWith(
+      "s",
+      "r",
+      expect.objectContaining({ prepared: [{ type: "response-excerpt", ...annotation }] }),
+    );
+  } finally {
+    registration.dispose();
+  }
 });
 
 it.each([
-  ["a missing file", { fileReferences: [{ relativePath: "src/missing.ts", displayName: "missing.ts" }] }, { code: "file_not_found", kind: "file", index: 0, relativePath: "src/missing.ts" }],
-  ["an escaping path", { fileReferences: [{ relativePath: "../etc/passwd", displayName: "passwd" }] }, { code: "invalid_reference", kind: "file", index: 0, relativePath: "../etc/passwd" }],
-  ["an unknown reply", { responseAnnotations: [{ ...annotation, assistantMessageId: "v2-7" }] }, { code: "annotation_source_missing", kind: "annotation", index: 0 }],
-  ["a reply beyond the journal", { responseAnnotations: [{ ...annotation, assistantMessageId: "v2-99" }] }, { code: "annotation_source_missing", kind: "annotation", index: 0 }],
-  ["a malformed reply id", { responseAnnotations: [{ ...annotation, assistantMessageId: "turn:r:assistant" }] }, { code: "annotation_source_missing", kind: "annotation", index: 0 }],
+  [
+    "a missing file",
+    { fileReferences: [{ relativePath: "src/missing.ts", displayName: "missing.ts" }] },
+    { code: "file_not_found", kind: "file", index: 0, relativePath: "src/missing.ts" },
+  ],
+  [
+    "an escaping path",
+    { fileReferences: [{ relativePath: "../etc/passwd", displayName: "passwd" }] },
+    { code: "invalid_reference", kind: "file", index: 0, relativePath: "../etc/passwd" },
+  ],
+  [
+    "an unknown reply",
+    { responseAnnotations: [{ ...annotation, assistantMessageId: "v2-7" }] },
+    { code: "annotation_source_missing", kind: "annotation", index: 0 },
+  ],
+  [
+    "a reply beyond the journal",
+    { responseAnnotations: [{ ...annotation, assistantMessageId: "v2-99" }] },
+    { code: "annotation_source_missing", kind: "annotation", index: 0 },
+  ],
+  [
+    "a malformed reply id",
+    { responseAnnotations: [{ ...annotation, assistantMessageId: "turn:r:assistant" }] },
+    { code: "annotation_source_missing", kind: "annotation", index: 0 },
+  ],
 ])("rejects %s before importing attachments or starting a turn", async (_label, input, issue) => {
   const { registration, submitTask, importAttachment, run } = setup();
   try {
-    const result = await run({ ...input, attachments: [{ id: "img", kind: "image", name: "shot.png", path: "/fixture/shot.png" }] });
-    expect(JSON.parse(JSON.stringify(result))).toEqual({ status: "submission-failed", acknowledgement: "rejected", message: "消息引用已失效，请检查后重试。", referenceIssue: issue });
+    const result = await run({
+      ...input,
+      attachments: [{ id: "img", kind: "image", name: "shot.png", path: "/fixture/shot.png" }],
+    });
+    expect(JSON.parse(JSON.stringify(result))).toEqual({
+      status: "submission-failed",
+      acknowledgement: "rejected",
+      message: "消息引用已失效，请检查后重试。",
+      referenceIssue: issue,
+    });
     expect(importAttachment).not.toHaveBeenCalled();
     expect(submitTask).not.toHaveBeenCalled();
-  } finally { registration.dispose(); }
+  } finally {
+    registration.dispose();
+  }
 });
 
 it("rejects a user message id used as a reply source", async () => {
-  const { registration, submitTask, run } = setup({ journal: { 5: { seq: 5, type: "agent/inbox/spliced", data: { operation: "claim", messageId: "u", content: "hi" }, surface: { kind: "append" } } } });
+  const { registration, submitTask, run } = setup({
+    journal: {
+      5: {
+        seq: 5,
+        type: "agent/inbox/spliced",
+        data: { operation: "claim", messageId: "u", content: "hi" },
+        surface: { kind: "append" },
+      },
+    },
+  });
   try {
-    expect(await run({ responseAnnotations: [annotation] })).toMatchObject({ status: "submission-failed", referenceIssue: { code: "annotation_source_missing" } });
+    expect(await run({ responseAnnotations: [annotation] })).toMatchObject({
+      status: "submission-failed",
+      referenceIssue: { code: "annotation_source_missing" },
+    });
     expect(submitTask).not.toHaveBeenCalled();
-  } finally { registration.dispose(); }
+  } finally {
+    registration.dispose();
+  }
 });
 
 it("accepts a compacted assistant reply but rejects a compacted user message", async () => {
-  const replaced = (kind: "assistant" | "user") => ({ 5: { seq: 5, type: "surface/replaced", data: { node: { kind, messageId: "m", content: "关键句。" } }, surface: { kind: "replace", start: 0, end: 1, sourceEventSeqs: [2] } } });
+  const replaced = (kind: "assistant" | "user") => ({
+    5: {
+      seq: 5,
+      type: "surface/replaced",
+      data: { node: { kind, messageId: "m", content: "关键句。" } },
+      surface: { kind: "replace", start: 0, end: 1, sourceEventSeqs: [2] },
+    },
+  });
   const accepted = setup({ journal: replaced("assistant") });
   try {
     await accepted.run({ responseAnnotations: [annotation] });
     expect(accepted.submitTask).toHaveBeenCalledTimes(1);
-  } finally { accepted.registration.dispose(); }
+  } finally {
+    accepted.registration.dispose();
+  }
   const rejected = setup({ journal: replaced("user") });
   try {
-    expect(await rejected.run({ responseAnnotations: [annotation] })).toMatchObject({ status: "submission-failed", referenceIssue: { code: "annotation_source_missing" } });
+    expect(await rejected.run({ responseAnnotations: [annotation] })).toMatchObject({
+      status: "submission-failed",
+      referenceIssue: { code: "annotation_source_missing" },
+    });
     expect(rejected.submitTask).not.toHaveBeenCalled();
-  } finally { rejected.registration.dispose(); }
+  } finally {
+    rejected.registration.dispose();
+  }
 });
 
 it("rejects file references in Chat sessions but still accepts excerpts there", async () => {
   const { registration, submitTask, run } = setup({ agentForm: "chat" });
   try {
-    expect(await run({ fileReferences: [{ relativePath: "src/a.ts", displayName: "a.ts" }] })).toMatchObject({ status: "submission-failed", referenceIssue: { code: "file_references_not_allowed", kind: "file" } });
+    expect(await run({ fileReferences: [{ relativePath: "src/a.ts", displayName: "a.ts" }] })).toMatchObject({
+      status: "submission-failed",
+      referenceIssue: { code: "file_references_not_allowed", kind: "file" },
+    });
     expect(submitTask).not.toHaveBeenCalled();
     await run({ responseAnnotations: [annotation] });
     expect(submitTask).toHaveBeenCalledTimes(1);
-  } finally { registration.dispose(); }
+  } finally {
+    registration.dispose();
+  }
 });
 
 it("reuses accepted attachment content across an uncertain result retry and rejects ID reuse with different content", async () => {
   const { registration, run, importAttachment, submitTask } = setup();
   try {
     const input = { attachments: [{ id: "img", kind: "image", name: "shot.png", path: "/fixture/shot.png" }] };
-    await run(input); await run(input);
+    await run(input);
+    await run(input);
     expect(importAttachment).toHaveBeenCalledTimes(1);
     expect(submitTask.mock.calls[1][2]).toEqual(submitTask.mock.calls[0][2]);
     await expect(run({ ...input, userInput: "different" })).rejects.toThrow("SUBMISSION_CONFLICT");
-  } finally { registration.dispose(); }
+  } finally {
+    registration.dispose();
+  }
 });

@@ -13,7 +13,12 @@ export class ToolActivationLease {
 
   assertUsable(): void {
     if (this.#released || !this.isRegistrationUsable()) {
-      throw new ToolRuntimeError({ code: "TOOL_REGISTRATION_DRAINING", message: `Tool registration ${this.registrationId} is unavailable.`, retryable: true, phase: "guard" });
+      throw new ToolRuntimeError({
+        code: "TOOL_REGISTRATION_DRAINING",
+        message: `Tool registration ${this.registrationId} is unavailable.`,
+        retryable: true,
+        phase: "guard",
+      });
     }
   }
 
@@ -31,15 +36,28 @@ export class ToolRegistrationLeaseOwner {
 
   constructor(readonly registrationId: string) {}
 
-  get state(): ToolRegistrationState { return this.#state; }
-  get leaseCount(): number { return this.#leases; }
+  get state(): ToolRegistrationState {
+    return this.#state;
+  }
+  get leaseCount(): number {
+    return this.#leases;
+  }
 
   acquire(): ToolActivationLease {
     if (this.#state !== "active") {
-      throw new ToolRuntimeError({ code: "TOOL_REGISTRATION_DRAINING", message: `Tool registration ${this.registrationId} is ${this.#state}.`, retryable: true, phase: "prepare" });
+      throw new ToolRuntimeError({
+        code: "TOOL_REGISTRATION_DRAINING",
+        message: `Tool registration ${this.registrationId} is ${this.#state}.`,
+        retryable: true,
+        phase: "prepare",
+      });
     }
     this.#leases += 1;
-    return new ToolActivationLease(this.registrationId, () => this.#release(), () => this.#state !== "disposed");
+    return new ToolActivationLease(
+      this.registrationId,
+      () => this.#release(),
+      () => this.#state !== "disposed",
+    );
   }
 
   beginDrain(): void {
@@ -56,7 +74,18 @@ export class ToolRegistrationLeaseOwner {
         await Promise.race([
           new Promise<void>((resolve) => this.#waiters.add(resolve)),
           new Promise<never>((_, reject) => {
-            timer = setTimeout(() => reject(new ToolRuntimeError({ code: "TOOL_REGISTRATION_DRAINING", message: `Timed out draining ${this.registrationId} with ${this.#leases} lease(s).`, retryable: false, phase: "finalize" })), timeoutMs);
+            timer = setTimeout(
+              () =>
+                reject(
+                  new ToolRuntimeError({
+                    code: "TOOL_REGISTRATION_DRAINING",
+                    message: `Timed out draining ${this.registrationId} with ${this.#leases} lease(s).`,
+                    retryable: false,
+                    phase: "finalize",
+                  }),
+                ),
+              timeoutMs,
+            );
             timer.unref?.();
           }),
         ]);

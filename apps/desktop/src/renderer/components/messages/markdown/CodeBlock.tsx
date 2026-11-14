@@ -14,11 +14,52 @@ import { parseCodeTitle } from "./remark-code-meta";
 const FOLD_OVER_LINES = 22;
 
 const LANGUAGE_LABEL: Record<string, string> = {
-  ts: "TypeScript", typescript: "TypeScript", tsx: "TSX", js: "JavaScript", javascript: "JavaScript", jsx: "JSX", mjs: "JavaScript", cjs: "JavaScript",
-  bash: "Shell", sh: "Shell", zsh: "Shell", shell: "Shell", console: "Shell", json: "JSON", jsonc: "JSON", py: "Python", python: "Python",
-  css: "CSS", scss: "SCSS", html: "HTML", xml: "XML", yaml: "YAML", yml: "YAML", toml: "TOML", rust: "Rust", rs: "Rust", go: "Go",
-  java: "Java", kotlin: "Kotlin", swift: "Swift", c: "C", cpp: "C++", csharp: "C#", cs: "C#", ruby: "Ruby", rb: "Ruby", php: "PHP",
-  diff: "Diff", sql: "SQL", md: "Markdown", markdown: "Markdown", dockerfile: "Dockerfile", graphql: "GraphQL", text: "文本", txt: "文本", plaintext: "文本",
+  ts: "TypeScript",
+  typescript: "TypeScript",
+  tsx: "TSX",
+  js: "JavaScript",
+  javascript: "JavaScript",
+  jsx: "JSX",
+  mjs: "JavaScript",
+  cjs: "JavaScript",
+  bash: "Shell",
+  sh: "Shell",
+  zsh: "Shell",
+  shell: "Shell",
+  console: "Shell",
+  json: "JSON",
+  jsonc: "JSON",
+  py: "Python",
+  python: "Python",
+  css: "CSS",
+  scss: "SCSS",
+  html: "HTML",
+  xml: "XML",
+  yaml: "YAML",
+  yml: "YAML",
+  toml: "TOML",
+  rust: "Rust",
+  rs: "Rust",
+  go: "Go",
+  java: "Java",
+  kotlin: "Kotlin",
+  swift: "Swift",
+  c: "C",
+  cpp: "C++",
+  csharp: "C#",
+  cs: "C#",
+  ruby: "Ruby",
+  rb: "Ruby",
+  php: "PHP",
+  diff: "Diff",
+  sql: "SQL",
+  md: "Markdown",
+  markdown: "Markdown",
+  dockerfile: "Dockerfile",
+  graphql: "GraphQL",
+  text: "文本",
+  txt: "文本",
+  plaintext: "文本",
 };
 
 /**
@@ -37,7 +78,7 @@ function rememberStreamed(key: string, previous: string | undefined) {
 }
 
 function languageLabel(language: string | undefined): string {
-  return language ? LANGUAGE_LABEL[language.toLowerCase()] ?? language : "文本";
+  return language ? (LANGUAGE_LABEL[language.toLowerCase()] ?? language) : "文本";
 }
 
 /** 围栏还没闭合时的行数：去掉末尾换行再数。 */
@@ -54,13 +95,21 @@ function CodeTitle({ title }: { title: string }) {
   const path = hit && resolveWorkspacePath(hit.path, { workspaceRoot });
   if (hit && path && openPath) {
     return (
-      <PlainButton className="md-code-title is-path" title={`在 ActSpace 中打开 ${title}`} onClick={() => (hit.line ? openPath(path, hit.line) : openPath(path))}>
+      <PlainButton
+        className="md-code-title is-path"
+        title={`在 ActSpace 中打开 ${title}`}
+        onClick={() => (hit.line ? openPath(path, hit.line) : openPath(path))}
+      >
         <FileText size={12} aria-hidden="true" />
         <span>{title}</span>
       </PlainButton>
     );
   }
-  return <span className="md-code-title"><span>{title}</span></span>;
+  return (
+    <span className="md-code-title">
+      <span>{title}</span>
+    </span>
+  );
 }
 
 /**
@@ -105,17 +154,32 @@ export function CodeBlock({ children, node: _node, ...rest }: PreProps) {
   };
 
   return (
-    <div className="markdown-code-shell md-code" data-folded={folded ? "true" : undefined} data-wrap={wrap ? "true" : undefined} data-live={fenceOpen ? "true" : undefined}>
+    <div
+      className="markdown-code-shell md-code"
+      data-folded={folded ? "true" : undefined}
+      data-wrap={wrap ? "true" : undefined}
+      data-live={fenceOpen ? "true" : undefined}
+    >
       <div className="markdown-code-toolbar md-code-head">
         <span className="md-code-lang">{languageLabel(language)}</span>
         {title ? <CodeTitle title={title} /> : null}
         <span className="md-code-spacer" />
         {fenceOpen ? (
-          <span className="md-code-live" role="status"><i aria-hidden="true" />写入中 · {lines} 行</span>
+          <span className="md-code-live" role="status">
+            <i aria-hidden="true" />
+            写入中 · {lines} 行
+          </span>
         ) : (
           <span className="md-code-actions">
-            <PlainButton className="md-code-btn" aria-label="自动换行" aria-pressed={wrap} title="自动换行" onClick={() => setWrap((value) => !value)}>
-              <TextWrap size={13} aria-hidden="true" /><span>换行</span>
+            <PlainButton
+              className="md-code-btn"
+              aria-label="自动换行"
+              aria-pressed={wrap}
+              title="自动换行"
+              onClick={() => setWrap((value) => !value)}
+            >
+              <TextWrap size={13} aria-hidden="true" />
+              <span>换行</span>
             </PlainButton>
             <PlainButton className="md-code-btn" aria-label="复制代码" title="复制" onClick={() => void copy()}>
               {copied ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
@@ -125,7 +189,9 @@ export function CodeBlock({ children, node: _node, ...rest }: PreProps) {
         )}
       </div>
       <div className="md-code-body">
-        <pre {...rest} className="markdown-code-block">{children}</pre>
+        <pre {...rest} className="markdown-code-block">
+          {children}
+        </pre>
       </div>
       {foldable ? (
         <PlainButton className="md-code-fold" aria-expanded={!folded} onClick={() => setExpanded((value) => !value)}>

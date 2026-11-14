@@ -18,17 +18,22 @@ describe("CodeRenderView", () => {
   const scrollToDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollTo");
   beforeEach(() => {
     // jsdom has no layout. Supply viewport and wrapped-row measurements to the real virtualizer.
-    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) { return this.hasAttribute("data-index") ? 20 : 600; });
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.hasAttribute("data-index") ? 20 : 600;
+    });
     vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(400);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(600);
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
     vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
       return Number(this.querySelector<HTMLElement>("[data-code-total-lines]")?.dataset.codeTotalLines ?? 30) * 20;
     });
-    Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: function (options: ScrollToOptions) {
-      this.scrollTop = options.top ?? this.scrollTop;
-      fireEvent.scroll(this);
-    } });
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: function (options: ScrollToOptions) {
+        this.scrollTop = options.top ?? this.scrollTop;
+        fireEvent.scroll(this);
+      },
+    });
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -143,7 +148,7 @@ describe("CodeRenderView", () => {
     const setData = vi.fn();
     fireEvent.copy(view, { clipboardData: { setData } });
     expect(setData).toHaveBeenLastCalledWith("text/plain", lines.join("\n"));
-    const other = lines.map(line => line.replace("中文", "另一个"));
+    const other = lines.map((line) => line.replace("中文", "另一个"));
     rerender(<CodeRenderView content={other.join("\n")} language="typescript" />);
     setData.mockClear();
     fireEvent.copy(screen.getByLabelText("文件内容"), { clipboardData: { setData } });
@@ -156,20 +161,30 @@ describe("CodeRenderView", () => {
 
   it("does not reclaim an external native selection when the code window rerenders", () => {
     const content = Array.from({ length: 5000 }, (_, index) => `line ${index}`).join("\n");
-    const { container, rerender } = render(<><p tabIndex={0}>outside text</p><CodeRenderView content={content} /></>);
+    const { container, rerender } = render(
+      <>
+        <p tabIndex={0}>outside text</p>
+        <CodeRenderView content={content} />
+      </>,
+    );
     const view = screen.getByLabelText("文件内容");
     act(() => view.focus());
     fireEvent.keyDown(view, { key: "a", ctrlKey: true });
     const outside = screen.getByText("outside text");
     act(() => outside.focus());
     document.getSelection()!.setBaseAndExtent(outside.firstChild!, 0, outside.firstChild!, 7);
-    rerender(<><p tabIndex={0}>outside text</p><CodeRenderView content={content} /></>);
+    rerender(
+      <>
+        <p tabIndex={0}>outside text</p>
+        <CodeRenderView content={content} />
+      </>,
+    );
     expect(document.getSelection()!.toString()).toBe("outside");
     expect(container.querySelectorAll("[data-line-index]").length).toBeLessThan(300);
   });
 
   it("renders a huge single line safely without blocking on syntax highlighting", () => {
-    const content = '<img src=x onerror=alert(1)>'.repeat(12000);
+    const content = "<img src=x onerror=alert(1)>".repeat(12000);
     const { container } = render(<CodeRenderView content={content} language="html" />);
     expect(container.querySelector("img")).toBeNull();
     expect(lineTexts(container)).toEqual([content]);

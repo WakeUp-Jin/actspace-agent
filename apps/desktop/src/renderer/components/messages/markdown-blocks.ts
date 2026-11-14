@@ -53,13 +53,21 @@ export function splitMarkdownBlocks(content: string, previous?: MarkdownBlockSpl
   for (const node of nodes) {
     const cut = from + node.end;
     if (cut <= cursor) continue;
-    tail.push({ start: cursor, source: content.slice(cursor, cut), ...(node.definition ? { definition: node.definition } : {}) });
+    tail.push({
+      start: cursor,
+      source: content.slice(cursor, cut),
+      ...(node.definition ? { definition: node.definition } : {}),
+    });
     cursor = cut;
   }
   if (cursor < content.length) {
     // 末尾只剩空白时并进最后一块，避免出现空块。
     const last = tail.pop();
-    tail.push(last ? { ...last, source: last.source + content.slice(cursor) } : { start: cursor, source: content.slice(cursor) });
+    tail.push(
+      last
+        ? { ...last, source: last.source + content.slice(cursor) }
+        : { start: cursor, source: content.slice(cursor) },
+    );
   }
 
   const freezeBefore = Math.max(0, tail.length - LIVE_BLOCK_COUNT);
@@ -89,12 +97,20 @@ type DefinitionNode = { type: string; identifier?: string; label?: string | null
 
 function definitionOf(node: DefinitionNode): BlockDefinition | undefined {
   if ((node.type !== "definition" && node.type !== "footnoteDefinition") || !node.identifier) return undefined;
-  return { kind: node.type === "definition" ? "link" : "footnote", id: normalizeLabel(node.identifier), label: node.label ?? node.identifier };
+  return {
+    kind: node.type === "definition" ? "link" : "footnote",
+    id: normalizeLabel(node.identifier),
+    label: node.label ?? node.identifier,
+  };
 }
 
 /** 标签规范化：空白折叠、忽略大小写（与 micromark 一致），引用方和定义方都按它比较。 */
 export function normalizeLabel(label: string): string {
-  return label.replace(/[\t\n\r ]+/g, " ").trim().toLowerCase().toUpperCase();
+  return label
+    .replace(/[\t\n\r ]+/g, " ")
+    .trim()
+    .toLowerCase()
+    .toUpperCase();
 }
 
 function topLevelNodes(markdown: string): TopLevelNode[] {

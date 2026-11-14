@@ -11,9 +11,18 @@ import type {
 import type { ReviewFileDiffOutcome } from "@actspace/shared";
 
 export type ReviewWorkerRequest =
-  | { id: number; type: "git"; args: string[]; options: { cwd: string; timeoutMs: number; maxOutputChars: number; input?: string } }
+  | {
+      id: number;
+      type: "git";
+      args: string[];
+      options: { cwd: string; timeoutMs: number; maxOutputChars: number; input?: string };
+    }
   | { id: number; type: "parse"; input: ReviewPatchParseInput }
-  | { id: number; type: "cat-file"; input: { cwd: string; requests: Array<{ key: string; spec: string }>; maxBytes: number } }
+  | {
+      id: number;
+      type: "cat-file";
+      input: { cwd: string; requests: Array<{ key: string; spec: string }>; maxBytes: number };
+    }
   | { id: number; type: "cancel"; targetId: number };
 
 export type ReviewWorkerResponse =
@@ -37,12 +46,19 @@ export class ReviewGitWorkerClient {
 
   readonly runGit: ReviewGitCommandRunner = async (args, options) => {
     try {
-      return await this.request<ReviewGitCommandResult>({ type: "git", args, options: {
-        cwd: options.cwd,
-        timeoutMs: options.timeoutMs,
-        maxOutputChars: options.maxOutputChars,
-        input: options.input,
-      } }, options.signal);
+      return await this.request<ReviewGitCommandResult>(
+        {
+          type: "git",
+          args,
+          options: {
+            cwd: options.cwd,
+            timeoutMs: options.timeoutMs,
+            maxOutputChars: options.maxOutputChars,
+            input: options.input,
+          },
+        },
+        options.signal,
+      );
     } catch (error) {
       return {
         stdout: "",
@@ -57,10 +73,14 @@ export class ReviewGitWorkerClient {
 
   readonly parsePatches: ReviewPatchParser = (input) => this.request<ReviewFileDiffOutcome[]>({ type: "parse", input });
 
-  readonly loadGitObjects: ReviewGitObjectLoader = (input) => this.request<ReviewGitObjectOutcome[]>({
-    type: "cat-file",
-    input: { cwd: input.cwd, requests: input.requests, maxBytes: input.maxBytes },
-  }, input.signal);
+  readonly loadGitObjects: ReviewGitObjectLoader = (input) =>
+    this.request<ReviewGitObjectOutcome[]>(
+      {
+        type: "cat-file",
+        input: { cwd: input.cwd, requests: input.requests, maxBytes: input.maxBytes },
+      },
+      input.signal,
+    );
 
   dispose(): void {
     this.disposed = true;
@@ -69,11 +89,13 @@ export class ReviewGitWorkerClient {
     this.worker = undefined;
   }
 
-  private request<T>(request:
-    | Omit<Extract<ReviewWorkerRequest, { type: "git" }>, "id">
-    | Omit<Extract<ReviewWorkerRequest, { type: "parse" }>, "id">
-    | Omit<Extract<ReviewWorkerRequest, { type: "cat-file" }>, "id">,
-  signal?: AbortSignal): Promise<T> {
+  private request<T>(
+    request:
+      | Omit<Extract<ReviewWorkerRequest, { type: "git" }>, "id">
+      | Omit<Extract<ReviewWorkerRequest, { type: "parse" }>, "id">
+      | Omit<Extract<ReviewWorkerRequest, { type: "cat-file" }>, "id">,
+    signal?: AbortSignal,
+  ): Promise<T> {
     if (this.disposed) return Promise.reject(new Error("Review worker is unavailable."));
     if (signal?.aborted) return Promise.reject(new Error("Review request was cancelled."));
     const worker = this.ensureWorker();
@@ -109,7 +131,8 @@ export class ReviewGitWorkerClient {
     });
     worker.on("error", (error) => this.handleWorkerFailure(worker, error));
     worker.on("exit", (code) => {
-      if (!this.disposed && code !== 0) this.handleWorkerFailure(worker, new Error(`Review worker exited with code ${code}.`));
+      if (!this.disposed && code !== 0)
+        this.handleWorkerFailure(worker, new Error(`Review worker exited with code ${code}.`));
     });
     return worker;
   }

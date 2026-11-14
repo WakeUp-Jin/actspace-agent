@@ -10,7 +10,9 @@ const ts = createRequire(new URL("../packages/util/shared/package.json", import.
 const root = resolve(import.meta.dirname, "..");
 const src = (file) => resolve(root, "packages/util/shared/src", file);
 const loadTs = async (file) => {
-  const { outputText } = ts.transpileModule(await readFile(src(file), "utf8"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
+  const { outputText } = ts.transpileModule(await readFile(src(file), "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  });
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 };
 const { normalizeModelCatalog } = await loadTs("model-catalog-normalize.ts");
@@ -37,7 +39,12 @@ if (!offline) {
 
 const { entries, report } = mergeModelCatalog(previous.entries, fetched, MODEL_CATALOG_PRICE_OVERRIDES);
 const contentHash = createHash("sha256").update(JSON.stringify(entries)).digest("hex");
-const snapshot = { schemaVersion: 1, generatedAt: contentHash === previous.contentHash ? previous.generatedAt : new Date().toISOString(), contentHash, entries };
+const snapshot = {
+  schemaVersion: 1,
+  generatedAt: contentHash === previous.contentHash ? previous.generatedAt : new Date().toISOString(),
+  contentHash,
+  entries,
+};
 // 一行一个模型，diff 能直接看出新增了哪些模型、改了哪些价格。
 const body = `{\n  "schemaVersion": ${snapshot.schemaVersion},\n  "generatedAt": ${JSON.stringify(snapshot.generatedAt)},\n  "contentHash": ${JSON.stringify(contentHash)},\n  "entries": [\n${entries.map((entry) => `    ${JSON.stringify(entry)}`).join(",\n")}\n  ]\n}`;
 const text = `${HEADER}${body};\n`;
@@ -47,14 +54,23 @@ if (changed) {
   await rename(`${target}.tmp`, target);
 }
 
-const rates = (r) => `in ${r.input ?? "-"} / out ${r.output ?? "-"} / cache r ${r.cacheRead ?? "-"} w ${r.cacheWrite ?? "-"}`;
+const rates = (r) =>
+  `in ${r.input ?? "-"} / out ${r.output ?? "-"} / cache r ${r.cacheRead ?? "-"} w ${r.cacheWrite ?? "-"}`;
 const lines = [
   `模型目录${offline ? "（离线，只应用改价清单）" : ""}：共 ${entries.length} 条，${changed ? "已写入" : "无变化，未写入"}（${contentHash.slice(0, 12)}）`,
   `  新增 ${report.added.length}，保留 ${report.kept}，上游改价但已锁定 ${report.locked.length}，上游已下架但保留 ${report.delisted.length}，改价清单覆盖 ${report.overridden.length}`,
 ];
-const section = (title, items) => { if (items.length) lines.push(`\n${title}`, ...items.map((item) => `  ${item}`)); };
+const section = (title, items) => {
+  if (items.length) lines.push(`\n${title}`, ...items.map((item) => `  ${item}`));
+};
 section("新增：", report.added);
-section("上游价格变了，已锁定（要采用就写进 model-catalog-overrides.ts）：", report.locked.map((c) => `${c.key}: ${rates(c.from)} → ${rates(c.to)}`));
+section(
+  "上游价格变了，已锁定（要采用就写进 model-catalog-overrides.ts）：",
+  report.locked.map((c) => `${c.key}: ${rates(c.from)} → ${rates(c.to)}`),
+);
 section("上游已下架，保留：", report.delisted);
-section("改价清单覆盖：", report.overridden.map((c) => `${c.key}: ${rates(c.from)} → ${rates(c.to)}`));
+section(
+  "改价清单覆盖：",
+  report.overridden.map((c) => `${c.key}: ${rates(c.from)} → ${rates(c.to)}`),
+);
 console.log(lines.join("\n"));

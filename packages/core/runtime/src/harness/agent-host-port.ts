@@ -10,10 +10,16 @@ export const AGENT_RUNTIME_HOST_PORT_ID = "actspace.host.agent" as const;
  * candidate's data root is fresh and thrown away). `executionDigest`, when given, must match the mounted Harness;
  * it includes the Host contract, so it only matches selections prepared for this same kind of Host.
  */
-export type PinnedHarness = { readonly description: import("@actspace/harness-control").SelectionDescription; readonly executionDigest?: string };
+export type PinnedHarness = {
+  readonly description: import("@actspace/harness-control").SelectionDescription;
+  readonly executionDigest?: string;
+};
 export class PinnedHarnessError extends Error {
   readonly code = "HARNESS_SELECTION_INVALID";
-  constructor(message: string, options?: ErrorOptions) { super(message, options); this.name = "PinnedHarnessError"; }
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "PinnedHarnessError";
+  }
 }
 
 export type AgentRuntimeHostPort = {
@@ -27,7 +33,9 @@ export type AgentRuntimeHostPort = {
   readonly onSandboxStatus?: (status: import("@actspace/sandbox/types").SandboxStatus | undefined) => void;
   readonly disabledHarnessEntries?: readonly string[];
   /** Settings of default Harness entries, merged over each manifest's `config`. */
-  readonly harnessEntryConfig?: Readonly<Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>>>;
+  readonly harnessEntryConfig?: Readonly<
+    Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>>
+  >;
   readonly pinnedHarness?: PinnedHarness;
   readonly host: RuntimeHostDescriptor;
   /** The main Agent form the Host composed from its plugin catalog (`main-agent-form.ts`); the Harness binds its members. */

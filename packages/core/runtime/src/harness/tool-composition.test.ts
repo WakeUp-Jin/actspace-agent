@@ -12,30 +12,85 @@ import { createRuntimeHostServices } from "../startup/host-services.js";
 
 it("boots the checked-in tree with shell and Todo disabled, leaves file tools available, and requires restart", async () => {
   const root = await mkdtemp(join(tmpdir(), "tool-composition-"));
-  const host = { hostKind: "cli-run" as const, capabilityCeiling: ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const, runtimeContract: "actspace.runtime.v2" as const, invocationId: "test" };
-  const composition = createProfileComposition(RUNTIME_PROFILE_IDS.headless, host, { invocationPatch: {
-    id: "tools-disabled", provenance: "test", operations: [
-      { id: "shell", kind: "disable", target: "tools.shell-tools" },
-      { id: "todo", kind: "disable", target: "tools.todo" },
-    ],
-  } });
-  const env = { workspaceRoot: root, hostCapabilities: new Set<string>(host.capabilityCeiling), capabilitySet: { ids: host.capabilityCeiling, has: () => true, get: <T>() => ({}) as T }, createArtifact: async () => { throw new Error("unused"); } };
+  const host = {
+    hostKind: "cli-run" as const,
+    capabilityCeiling: ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const,
+    runtimeContract: "actspace.runtime.v2" as const,
+    invocationId: "test",
+  };
+  const composition = createProfileComposition(RUNTIME_PROFILE_IDS.headless, host, {
+    invocationPatch: {
+      id: "tools-disabled",
+      provenance: "test",
+      operations: [
+        { id: "shell", kind: "disable", target: "tools.shell-tools" },
+        { id: "todo", kind: "disable", target: "tools.todo" },
+      ],
+    },
+  });
+  const env = {
+    workspaceRoot: root,
+    hostCapabilities: new Set<string>(host.capabilityCeiling),
+    capabilitySet: { ids: host.capabilityCeiling, has: () => true, get: <T>() => ({}) as T },
+    createArtifact: async () => {
+      throw new Error("unused");
+    },
+  };
   const mounted: string[] = [];
   const onProcesses = vi.fn();
   const ports = {
-    ...Object.fromEntries(PLUGIN_CATALOG.filter(item => item.manifest.behaviors[0].injects?.some(id => String(id) === `actspace.host.tools.${item.id}`)).map(item => [
-      `actspace.host.tools.${item.id}`, { createPorts: () => { mounted.push(item.id); return {}; } },
-    ])),
+    ...Object.fromEntries(
+      PLUGIN_CATALOG.filter((item) =>
+        item.manifest.behaviors[0].injects?.some((id) => String(id) === `actspace.host.tools.${item.id}`),
+      ).map((item) => [
+        `actspace.host.tools.${item.id}`,
+        {
+          createPorts: () => {
+            mounted.push(item.id);
+            return {};
+          },
+        },
+      ]),
+    ),
     "actspace.host.filesystem": { workspaceRoot: root },
     "actspace.host.process": { workspaceRoot: root, tmpRoot: join(root, "tmp"), onProcesses },
   };
   let profile: Awaited<ReturnType<typeof bootProfileRuntime>> | undefined;
   try {
     const cleanup = vi.fn(async () => {});
-    const options: Parameters<typeof bootProfileRuntime>[0] = { host, dataRoot: root, toolEnvironment: env, composition, disposePlugins: cleanup,
-      hostServices: createRuntimeHostServices({ descriptor: host, dataRoot: root, workspaceRoot: root, toolEnvironment: env, services: {
-        ...ports, "actspace.host.llm": { credentials: { resolve: async () => ({}) }, routes: [{ routeId: "test", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async () => { throw new Error("No model calls in this test."); } } }] },
-      } }),
+    const options: Parameters<typeof bootProfileRuntime>[0] = {
+      host,
+      dataRoot: root,
+      toolEnvironment: env,
+      composition,
+      disposePlugins: cleanup,
+      hostServices: createRuntimeHostServices({
+        descriptor: host,
+        dataRoot: root,
+        workspaceRoot: root,
+        toolEnvironment: env,
+        services: {
+          ...ports,
+          "actspace.host.llm": {
+            credentials: { resolve: async () => ({}) },
+            routes: [
+              {
+                routeId: "test",
+                providerId: "test",
+                modelPattern: "*",
+                credentialRef: "test",
+                defaults: {},
+                adapter: {
+                  adapterVersion: "test",
+                  dispatch: async () => {
+                    throw new Error("No model calls in this test.");
+                  },
+                },
+              },
+            ],
+          },
+        },
+      }),
       cordis: { configPath: runtimeCordisConfigPath(), admission: await inspectCordisAdmission() },
     };
     profile = await bootProfileRuntime(options);
@@ -44,22 +99,26 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
     const lease = await runtime.harnesses.acquire("main");
     const previousDigest = lease.executionDigest;
     const tools = lease.getService<ToolRuntime>("tools.runtime")!;
-    const names = tools.registry.listDefinitions().map(item => item.name);
+    const names = tools.registry.listDefinitions().map((item) => item.name);
     expect(names).toContain("read_file");
     expect(names).not.toContain("bash");
     expect(names).not.toContain("todo_read");
     expect(mounted).toContain("web-tools");
     expect(onProcesses).not.toHaveBeenCalled();
     const assembly = lease.getService<import("@actspace/context-assembly").ContextAssemblyService>("context.assembly")!;
-    expect(assembly.kinds("main")).toEqual(expect.arrayContaining(["system", "rules", "skills", "runtime", "conversation", "tools", "background-tasks"]));
+    expect(assembly.kinds("main")).toEqual(
+      expect.arrayContaining(["system", "rules", "skills", "runtime", "conversation", "tools", "background-tasks"]),
+    );
     expect(assembly.kinds("main")).not.toContain("subagents");
     expect(assembly.kinds("subagent")).not.toContain("background-tasks");
-    expect(profile.context.get!("session.journal")).toMatchObject({ registry: expect.objectContaining({ digest: expect.any(String) }) });
+    expect(profile.context.get!("session.journal")).toMatchObject({
+      registry: expect.objectContaining({ digest: expect.any(String) }),
+    });
     const journal = profile.context.get!("session.journal") as { registry: { list(): readonly { type: string }[] } };
-    expect(journal.registry.list().some(codec => codec.type === "plugin/actspace.todo/todo-write")).toBe(false);
+    expect(journal.registry.list().some((codec) => codec.type === "plugin/actspace.todo/todo-write")).toBe(false);
     profile.requestRestart("Tool composition changed", "profile", "next-digest");
     expect(profile.getState().restart).toMatchObject({ required: true, candidateDigest: "next-digest" });
-    expect(tools.registry.listDefinitions().map(item => item.name)).toEqual(names);
+    expect(tools.registry.listDefinitions().map((item) => item.name)).toEqual(names);
     await lease.release();
     cleanup.mockRejectedValueOnce(new Error("cleanup failed once"));
     const first = profile.shutdown();
@@ -70,8 +129,15 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
     profile = undefined;
     expect(() => tools.registry.capture("read_file")).toThrow(/not active/);
     // A pristine builtin upgrades to the new Host ceiling; it must not reuse the old execution environment.
-    profile = await bootProfileRuntime({ ...options, host: { ...host, capabilityCeiling: ["filesystem.read"] },
-      authorizeHarness: async request => ({ ...request, actor: "maintenance-test", decisionId: "repair", expiresAt: Date.now() + 10000 }),
+    profile = await bootProfileRuntime({
+      ...options,
+      host: { ...host, capabilityCeiling: ["filesystem.read"] },
+      authorizeHarness: async (request) => ({
+        ...request,
+        actor: "maintenance-test",
+        decisionId: "repair",
+        expiresAt: Date.now() + 10000,
+      }),
     });
     const restored = profile.context.get!("harness.control") as import("@actspace/harness-control").HarnessControl;
     expect(restored).toBeDefined();
@@ -84,8 +150,9 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
         description: { composition: { hostCapabilities: ["filesystem.read"] } },
       });
       expect(restored.inspect().blocked).toBe("");
-    } finally { await upgraded.release(); }
-
+    } finally {
+      await upgraded.release();
+    }
   } finally {
     await profile?.shutdown();
     await rm(root, { recursive: true, force: true });

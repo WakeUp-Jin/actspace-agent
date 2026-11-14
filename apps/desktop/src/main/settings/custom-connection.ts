@@ -7,7 +7,10 @@ import type {
   SettingsV4ConnectionSettings,
 } from "@actspace/shared";
 
-export function resolvePromptCacheMode(protocol: ModelApi, value?: CustomConnectionPromptCacheMode): CustomConnectionPromptCacheMode {
+export function resolvePromptCacheMode(
+  protocol: ModelApi,
+  value?: CustomConnectionPromptCacheMode,
+): CustomConnectionPromptCacheMode {
   if (protocol !== "anthropic-messages") return "off";
   return value === "off" ? "off" : "short";
 }

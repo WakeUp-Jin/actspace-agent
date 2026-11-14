@@ -21,19 +21,26 @@ function Shell() {
   const route = useRoute();
   const wide = useWide();
   const newSession = useNewSessionOpen();
-  useEffect(() => { store.start(); }, [store]);
+  useEffect(() => {
+    store.start();
+  }, [store]);
 
   // 没有可用 token（首次、吊销、登录失效）时只显示连接页。
   if (route.name === "connect" || !state.host?.token) return <ConnectPage />;
 
   const selected = route.name === "session" ? route.sessionId : null;
   const list = <SessionListPane selectedSessionId={selected} />;
-  const page = route.name === "session" ? <SessionDetail key={route.sessionId} sessionId={route.sessionId} /> : route.name === "settings" ? <SettingsPage /> : null;
+  const page =
+    route.name === "session" ? (
+      <SessionDetail key={route.sessionId} sessionId={route.sessionId} />
+    ) : route.name === "settings" ? (
+      <SettingsPage />
+    ) : null;
   return (
     <Layout
       wide={wide}
       list={list}
-      detail={wide ? page ?? <EmptyDetail /> : page}
+      detail={wide ? (page ?? <EmptyDetail />) : page}
       overlay={newSession ? <NewSessionPanel onClose={closeNewSession} /> : null}
     />
   );
@@ -41,7 +48,9 @@ function Shell() {
 
 /** store 由入口创建并活过整个页面：StrictMode 开发期会卸载再挂载一次，不能在卸载时 dispose。 */
 export function App({ store }: { readonly store: ConnectionStore }) {
-  useEffect(() => { applyTheme(readTheme()); }, []);
+  useEffect(() => {
+    applyTheme(readTheme());
+  }, []);
   return (
     <ConnectionContext.Provider value={store}>
       <ToastProvider>

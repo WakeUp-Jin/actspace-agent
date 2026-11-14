@@ -1,9 +1,9 @@
 // 首屏插件舞台：任务推进时点亮用到的插件，插件可悬停查看说明、点击开关。
 // 只在舞台进入视口时播放；离开视口或切到后台就停表，回来从头播。
-const SVG_NS = 'http://www.w3.org/2000/svg';
-const NARROW = '(max-width: 1180px)';
+const SVG_NS = "http://www.w3.org/2000/svg";
+const NARROW = "(max-width: 1180px)";
 
-type Side = 'l' | 'r' | 'b' | 't';
+type Side = "l" | "r" | "b" | "t";
 
 export interface PluginStage {
   draw(): void;
@@ -27,7 +27,10 @@ const roundedPath = (points: [number, number][]) => {
     const inLen = Math.hypot(cx - px, cy - py);
     const outLen = Math.hypot(nx - cx, ny - cy);
     const r = Math.min(CORNER, inLen / 2, outLen / 2);
-    if (r < 0.5) { d += `L${cx} ${cy}`; continue; }
+    if (r < 0.5) {
+      d += `L${cx} ${cy}`;
+      continue;
+    }
     const ax = cx - ((cx - px) / inLen) * r;
     const ay = cy - ((cy - py) / inLen) * r;
     const bx = cx + ((nx - cx) / outLen) * r;
@@ -44,18 +47,20 @@ export function createPluginStage(
   count: HTMLElement | null,
   onToggle?: (name: string, off: boolean, used: boolean) => void,
 ): PluginStage {
-  const svg = root.querySelector<SVGSVGElement>('svg.stage-lines')!;
-  const tip = root.querySelector<HTMLElement>('.tip')!;
-  const mods = [...root.querySelectorAll<HTMLButtonElement>('.m')];
+  const svg = root.querySelector<SVGSVGElement>("svg.stage-lines")!;
+  const tip = root.querySelector<HTMLElement>(".tip")!;
+  const mods = [...root.querySelectorAll<HTMLButtonElement>(".m")];
   const disabled = new Set<string>();
   const used = new Set<string>();
   const mod = (name: string) => mods.find((m) => m.dataset.m === name)!;
 
   const sync = () => {
-    svg.querySelectorAll<SVGGElement>('g').forEach((g) => {
+    svg.querySelectorAll<SVGGElement>("g").forEach((g) => {
       const m = mod(g.dataset.m!);
-      if (m.dataset.st) g.dataset.st = m.dataset.st; else delete g.dataset.st;
-      if (disabled.has(g.dataset.m!)) g.dataset.off = ''; else delete g.dataset.off;
+      if (m.dataset.st) g.dataset.st = m.dataset.st;
+      else delete g.dataset.st;
+      if (disabled.has(g.dataset.m!)) g.dataset.off = "";
+      else delete g.dataset.off;
     });
     if (count) count.textContent = String(mods.filter((m) => m.dataset.st).length);
   };
@@ -71,34 +76,52 @@ export function createPluginStage(
     for (const m of mods) {
       const a = m.getBoundingClientRect();
       const side = m.dataset.side as Side;
-      let d: string; let ex: number; let ey: number;
-      if (side === 'l' || side === 'r') {
-        const sx = x(side === 'l' ? a.right : a.left);
+      let d: string;
+      let ex: number;
+      let ey: number;
+      if (side === "l" || side === "r") {
+        const sx = x(side === "l" ? a.right : a.left);
         const sy = y(a.top + a.height / 2);
-        ex = x(side === 'l' ? b.left : b.right);
+        ex = x(side === "l" ? b.left : b.right);
         ey = clamp(sy, y(b.top) + 16, y(b.bottom) - 16);
         const mx = (sx + ex) / 2;
-        d = Math.abs(sy - ey) < 1 ? `M${sx} ${sy}H${ex}` : roundedPath([[sx, sy], [mx, sy], [mx, ey], [ex, ey]]);
+        d =
+          Math.abs(sy - ey) < 1
+            ? `M${sx} ${sy}H${ex}`
+            : roundedPath([
+                [sx, sy],
+                [mx, sy],
+                [mx, ey],
+                [ex, ey],
+              ]);
       } else {
         const sx = x(a.left + a.width / 2);
-        const sy = y(side === 'b' ? a.top : a.bottom);
+        const sy = y(side === "b" ? a.top : a.bottom);
         ex = clamp(sx, x(b.left) + 16, x(b.right) - 16);
-        ey = y(side === 'b' ? b.bottom : b.top);
+        ey = y(side === "b" ? b.bottom : b.top);
         const my = (sy + ey) / 2;
-        d = Math.abs(sx - ex) < 1 ? `M${sx} ${sy}V${ey}` : roundedPath([[sx, sy], [sx, my], [ex, my], [ex, ey]]);
+        d =
+          Math.abs(sx - ex) < 1
+            ? `M${sx} ${sy}V${ey}`
+            : roundedPath([
+                [sx, sy],
+                [sx, my],
+                [ex, my],
+                [ex, ey],
+              ]);
       }
-      const g = document.createElementNS(SVG_NS, 'g');
+      const g = document.createElementNS(SVG_NS, "g");
       g.dataset.m = m.dataset.m;
-      for (const cls of ['base', 'flow']) {
-        const path = document.createElementNS(SVG_NS, 'path');
-        path.setAttribute('class', cls);
-        path.setAttribute('d', d);
+      for (const cls of ["base", "flow"]) {
+        const path = document.createElementNS(SVG_NS, "path");
+        path.setAttribute("class", cls);
+        path.setAttribute("d", d);
         g.append(path);
       }
-      const dot = document.createElementNS(SVG_NS, 'circle');
-      dot.setAttribute('cx', String(ex));
-      dot.setAttribute('cy', String(ey));
-      dot.setAttribute('r', '2.5');
+      const dot = document.createElementNS(SVG_NS, "circle");
+      dot.setAttribute("cx", String(ex));
+      dot.setAttribute("cy", String(ey));
+      dot.setAttribute("r", "2.5");
       g.append(dot);
       svg.append(g);
     }
@@ -110,15 +133,21 @@ export function createPluginStage(
     off: (name) => disabled.has(name),
     light(names) {
       api.settle();
-      for (const name of names) { used.add(name); if (!disabled.has(name)) mod(name).dataset.st = 'on'; }
+      for (const name of names) {
+        used.add(name);
+        if (!disabled.has(name)) mod(name).dataset.st = "on";
+      }
       sync();
     },
     settle() {
-      for (const m of mods) if (m.dataset.st === 'on') m.dataset.st = 'done';
+      for (const m of mods) if (m.dataset.st === "on") m.dataset.st = "done";
       sync();
     },
     all(names) {
-      for (const name of names) { used.add(name); if (!disabled.has(name)) mod(name).dataset.st = 'done'; }
+      for (const name of names) {
+        used.add(name);
+        if (!disabled.has(name)) mod(name).dataset.st = "done";
+      }
       sync();
     },
     clear() {
@@ -129,41 +158,59 @@ export function createPluginStage(
   };
 
   const showTip = (m: HTMLButtonElement) => {
-    const [name, text] = (m.dataset.tip ?? '').split('|');
+    const [name, text] = (m.dataset.tip ?? "").split("|");
     const sr = root.getBoundingClientRect();
     const a = m.getBoundingClientRect();
-    const b = document.createElement('b');
+    const b = document.createElement("b");
     b.textContent = name;
-    tip.replaceChildren(b, ` · ${text}${disabled.has(m.dataset.m!) ? '（已关闭）' : ''}`);
-    tip.classList.add('on');
-    const w = tip.offsetWidth; const h = tip.offsetHeight;
+    tip.replaceChildren(b, ` · ${text}${disabled.has(m.dataset.m!) ? "（已关闭）" : ""}`);
+    tip.classList.add("on");
+    const w = tip.offsetWidth;
+    const h = tip.offsetHeight;
     const side = m.dataset.side as Side;
-    let left: number; let top: number;
-    if (side === 'l') { left = a.right - sr.left + 12; top = a.top - sr.top + (a.height - h) / 2; }
-    else if (side === 'r') { left = a.left - sr.left - w - 12; top = a.top - sr.top + (a.height - h) / 2; }
-    else if (side === 't') { left = a.left - sr.left + (a.width - w) / 2; top = a.bottom - sr.top + 10; }
-    else { left = a.left - sr.left + (a.width - w) / 2; top = a.top - sr.top - h - 10; }
+    let left: number;
+    let top: number;
+    if (side === "l") {
+      left = a.right - sr.left + 12;
+      top = a.top - sr.top + (a.height - h) / 2;
+    } else if (side === "r") {
+      left = a.left - sr.left - w - 12;
+      top = a.top - sr.top + (a.height - h) / 2;
+    } else if (side === "t") {
+      left = a.left - sr.left + (a.width - w) / 2;
+      top = a.bottom - sr.top + 10;
+    } else {
+      left = a.left - sr.left + (a.width - w) / 2;
+      top = a.top - sr.top - h - 10;
+    }
     tip.style.left = `${clamp(left, 8, sr.width - w - 8)}px`;
     tip.style.top = `${clamp(top, 8, sr.height - h - 8)}px`;
   };
-  const hideTip = () => tip.classList.remove('on');
+  const hideTip = () => tip.classList.remove("on");
 
   for (const m of mods) {
-    m.addEventListener('click', () => {
+    m.addEventListener("click", () => {
       const name = m.dataset.m!;
       const off = !disabled.has(name);
-      if (off) { disabled.add(name); delete m.dataset.st; }
-      else { disabled.delete(name); if (used.has(name)) m.dataset.st = 'done'; }
-      m.classList.toggle('off', off);
-      m.setAttribute('aria-pressed', String(!off));
+      if (off) {
+        disabled.add(name);
+        delete m.dataset.st;
+      } else {
+        disabled.delete(name);
+        if (used.has(name)) m.dataset.st = "done";
+      }
+      m.classList.toggle("off", off);
+      m.setAttribute("aria-pressed", String(!off));
       sync();
-      if (tip.classList.contains('on')) showTip(m);
+      if (tip.classList.contains("on")) showTip(m);
       onToggle?.(name, off, used.has(name));
     });
-    m.addEventListener('mouseenter', () => showTip(m));
-    m.addEventListener('mouseleave', hideTip);
-    m.addEventListener('focus', () => { if (m.matches(':focus-visible')) showTip(m); });
-    m.addEventListener('blur', hideTip);
+    m.addEventListener("mouseenter", () => showTip(m));
+    m.addEventListener("mouseleave", hideTip);
+    m.addEventListener("focus", () => {
+      if (m.matches(":focus-visible")) showTip(m);
+    });
+    m.addEventListener("blur", hideTip);
   }
   return api;
 }
@@ -171,8 +218,13 @@ export function createPluginStage(
 export function createClock() {
   let timers: number[] = [];
   return {
-    at(ms: number, fn: () => void) { timers.push(window.setTimeout(fn, ms)); },
-    stop() { timers.forEach(clearTimeout); timers = []; },
+    at(ms: number, fn: () => void) {
+      timers.push(window.setTimeout(fn, ms));
+    },
+    stop() {
+      timers.forEach(clearTimeout);
+      timers = [];
+    },
   };
 }
 
@@ -182,53 +234,65 @@ export function playWhenVisible(root: HTMLElement, start: () => void, stop: () =
   let running = false;
   const update = () => {
     const should = visible && !document.hidden;
-    if (should && !running) { running = true; start(); }
-    else if (!should && running) { running = false; stop(); }
+    if (should && !running) {
+      running = true;
+      start();
+    } else if (!should && running) {
+      running = false;
+      stop();
+    }
   };
-  new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; update(); }, { threshold: 0.25 }).observe(root);
-  document.addEventListener('visibilitychange', update);
+  new IntersectionObserver(
+    ([entry]) => {
+      visible = entry.isIntersecting;
+      update();
+    },
+    { threshold: 0.25 },
+  ).observe(root);
+  document.addEventListener("visibilitychange", update);
 }
 
 // 首屏任务：窗口按桌面端真实界面重画，用到的插件各自对应窗口里一处看得见的变化。
 // 关掉插件会按新配置重跑（Browser Use 这个任务用不到，开关不重跑）。
-type Category = 'sys' | 'tools' | 'rules' | 'skills' | 'sum' | 'conv';
-const CATEGORIES: Category[] = ['sys', 'tools', 'rules', 'skills', 'sum', 'conv'];
+type Category = "sys" | "tools" | "rules" | "skills" | "sum" | "conv";
+const CATEGORIES: Category[] = ["sys", "tools", "rules", "skills", "sum", "conv"];
 const LIMIT = 200;
 const fmt = (k: number) => `${Math.round(k * 10) / 10}K`;
-const icon = (d: string, size = 12) => `<svg class="i chev" viewBox="0 0 24 24" style="width:${size}px;height:${size}px"><path d="${d}"/></svg>`;
-const CHEV = icon('m9 18 6-6-6-6');
+const icon = (d: string, size = 12) =>
+  `<svg class="i chev" viewBox="0 0 24 24" style="width:${size}px;height:${size}px"><path d="${d}"/></svg>`;
+const CHEV = icon("m9 18 6-6-6-6");
 // 上一轮对话：让窗口一开场就像用了一阵子的会话，而不是空白起步。
 const PREVIOUS = `<div class="prev"><div class="bubble">先把路由守卫修好，未登录跳回 /login。</div></div>
-  <div class="prev worked">Worked for 34s ${icon('m9 18 6-6-6-6', 13)}</div>
+  <div class="prev worked">Worked for 34s ${icon("m9 18 6-6-6-6", 13)}</div>
   <div class="prev say">已修复。<code>requireAuth</code> 现在在 beforeEach 里读 session，未登录统一 redirect 到 /login 并带回 <code>?next=</code>。</div>
   <div class="prev card chg"><div class="h"><span class="fi"><b>&lt;/&gt;</b></span><div>已编辑 1 个文件<small><u>+12</u> <s>-4</s></small></div></div>
     <div class="f"><span>src/router/guard.ts</span><span><u>+12</u> <s>-4</s></span></div></div>
-  <div class="prev usage">${icon('M8 4h10a2 2 0 0 1 2 2v10M4 8h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z', 13)}
-    <b>${icon('M3 5c0-1.7 4-3 9-3s9 1.3 9 3-4 3-9 3-9-1.3-9-3M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3', 13)}用量 9.8K tok</b><span>09:38</span></div>
+  <div class="prev usage">${icon("M8 4h10a2 2 0 0 1 2 2v10M4 8h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z", 13)}
+    <b>${icon("M3 5c0-1.7 4-3 9-3s9 1.3 9 3-4 3-9 3-9-1.3-9-3M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3", 13)}用量 9.8K tok</b><span>09:38</span></div>
   <div class="gap"></div>`;
 
 export function initializeHeroStage() {
-  const root = document.querySelector<HTMLElement>('[data-hero-stage]');
+  const root = document.querySelector<HTMLElement>("[data-hero-stage]");
   if (!root) return;
-  const app = root.querySelector<HTMLElement>('[data-hero-window]')!;
+  const app = root.querySelector<HTMLElement>("[data-hero-window]")!;
   const h = <T extends Element = HTMLElement>(name: string) => app.querySelector<T>(`[data-h="${name}"]`)!;
-  const feed = h('feed');
-  const scroll = h('scroll');
-  const panel = h('panel');
-  const panelBtn = h('panel-btn');
-  const evs = h('evs');
-  const send = h('send');
-  const ph = h('ph');
-  const ring = h('ring');
-  const ringArc = h<SVGCircleElement>('ring-arc');
-  const segments = new Map(CATEGORIES.map((c) => [c, h('bar').querySelector<HTMLElement>(`[data-c="${c}"]`)]));
+  const feed = h("feed");
+  const scroll = h("scroll");
+  const panel = h("panel");
+  const panelBtn = h("panel-btn");
+  const evs = h("evs");
+  const send = h("send");
+  const ph = h("ph");
+  const ring = h("ring");
+  const ringArc = h<SVGCircleElement>("ring-arc");
+  const segments = new Map(CATEGORIES.map((c) => [c, h("bar").querySelector<HTMLElement>(`[data-c="${c}"]`)]));
   const legend = new Map(CATEGORIES.map((c) => [c, app.querySelector<HTMLElement>(`[data-l="${c}"]`)]));
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const clock = createClock();
   let playing = false;
   let rerun = 0;
-  const stage = createPluginStage(root, app, root.querySelector('[data-hero-count]'), (name) => {
-    if (name === 'browser') return;
+  const stage = createPluginStage(root, app, root.querySelector("[data-hero-count]"), (name) => {
+    if (name === "browser") return;
     clock.stop();
     clearTimeout(rerun);
     if (playing || reduced) rerun = window.setTimeout(run, 450);
@@ -242,62 +306,68 @@ export function initializeHeroStage() {
   const total = () => CATEGORIES.reduce((sum, c) => sum + ctx[c], 0);
   const renderContext = () => {
     const pct = Math.round((total() / LIMIT) * 100);
-    h('tok').textContent = `≈${fmt(total())}`;
-    h('pct').textContent = `${pct}%`;
-    h('ring-txt').textContent = `${pct}%`;
+    h("tok").textContent = `≈${fmt(total())}`;
+    h("pct").textContent = `${pct}%`;
+    h("ring-txt").textContent = `${pct}%`;
     for (const c of CATEGORIES) {
       segments.get(c)!.style.width = `${(ctx[c] / LIMIT) * 100}%`;
       legend.get(c)!.textContent = fmt(ctx[c]);
     }
     ringArc.style.strokeDashoffset = String(37.7 * (1 - Math.min(1, total() / LIMIT)));
-    ring.classList.toggle('hot', pct >= 85);
+    ring.classList.toggle("hot", pct >= 85);
   };
-  const event = (name: string, value: string, note: string, tone: Category | 'warn', highlight = false) => {
-    if (!on('panel')) return;
+  const event = (name: string, value: string, note: string, tone: Category | "warn", highlight = false) => {
+    if (!on("panel")) return;
     events += 1;
-    const el = document.createElement('div');
-    el.className = highlight ? 'ev hl' : 'ev';
+    const el = document.createElement("div");
+    el.className = highlight ? "ev hl" : "ev";
     el.dataset.c = tone;
     el.innerHTML = `<b>${name}</b><span>${value}</span><small>${note}</small>`;
     evs.prepend(el);
     while (evs.children.length > 6) evs.lastElementChild!.remove();
-    h('ev-count').textContent = `${events} 条`;
+    h("ev-count").textContent = `${events} 条`;
   };
 
   // 对话：过程行先写进 flow（收尾时塌缩成 Worked），其余直接进 feed。
   let flow: HTMLElement | null = null;
-  const follow = () => requestAnimationFrame(() => scroll.scrollTo({ top: scroll.scrollHeight, behavior: reduced ? 'auto' : 'smooth' }));
-  const put = (html: string, cls = '') => {
-    const tpl = document.createElement('template');
+  const follow = () =>
+    requestAnimationFrame(() => scroll.scrollTo({ top: scroll.scrollHeight, behavior: reduced ? "auto" : "smooth" }));
+  const put = (html: string, cls = "") => {
+    const tpl = document.createElement("template");
     tpl.innerHTML = html.trim();
     const el = tpl.content.firstElementChild as HTMLElement;
-    if (cls) el.classList.add(...cls.split(' '));
-    el.classList.add('in');
+    if (cls) el.classList.add(...cls.split(" "));
+    el.classList.add("in");
     (flow ?? feed).append(el);
     follow();
     return el;
   };
-  const putOutside = (html: string) => { const inner = flow; flow = null; put(html); flow = inner; };
-  const row = (verb: string, path: string, extra = '', cls = 'run') =>
+  const putOutside = (html: string) => {
+    const inner = flow;
+    flow = null;
+    put(html);
+    flow = inner;
+  };
+  const row = (verb: string, path: string, extra = "", cls = "run") =>
     put(`<div class="row"><span class="v">${verb}</span><span class="p">${path}</span>${extra}${CHEV}</div>`, cls);
-  const done = (el?: HTMLElement) => el?.classList.remove('run');
+  const done = (el?: HTMLElement) => el?.classList.remove("run");
 
   // 压缩开着：越过阈值立刻压；关着：最多涨到 97%，不会超出上限。
   const compress = () => {
     compressed = true;
     const before = total();
-    stage.light(['comp']);
+    stage.light(["comp"]);
     ctx.sum = 11.6;
     ctx.conv = 32.4;
     renderContext();
     putOutside(`<div class="cmp"><span>上下文已压缩 · <b>${fmt(before)} → ${fmt(total())}</b></span></div>`);
-    event('自动压缩', `${fmt(before)} → ${fmt(total())}`, '目标、决策和没做完的事写进摘要', 'sum', true);
+    event("自动压缩", `${fmt(before)} → ${fmt(total())}`, "目标、决策和没做完的事写进摘要", "sum", true);
   };
   const add = (c: Category, k: number) => {
     ctx[c] += k;
-    if (!on('comp')) ctx.conv -= Math.max(0, total() - 194);
+    if (!on("comp")) ctx.conv -= Math.max(0, total() - 194);
     renderContext();
-    if (on('comp') && !compressed && total() >= 160) compress();
+    if (on("comp") && !compressed && total() >= 160) compress();
   };
 
   const reset = () => {
@@ -308,48 +378,63 @@ export function initializeHeroStage() {
     renderContext();
     events = 0;
     evs.replaceChildren();
-    h('ev-count').textContent = '0 条';
+    h("ev-count").textContent = "0 条";
     flow = null;
     feed.innerHTML = PREVIOUS;
     scroll.scrollTop = scroll.scrollHeight;
-    panel.classList.remove('open');
-    panelBtn.classList.remove('on');
-    send.classList.remove('stop', 'ready', 'press');
-    ph.classList.remove('typing');
-    h('review-stat').innerHTML = '';
-    h('sum').hidden = true;
-    const sesTime = h('ses-time'); sesTime.textContent = '刚刚'; sesTime.classList.remove('pending');
-    ph.textContent = '继续追问…';
-    h('perm').textContent = on('approve') ? '自动' : '完全权限';
-    h('ses-spin').hidden = false;
-    h('ses-time').hidden = true;
+    panel.classList.remove("open");
+    panelBtn.classList.remove("on");
+    send.classList.remove("stop", "ready", "press");
+    ph.classList.remove("typing");
+    h("review-stat").innerHTML = "";
+    h("sum").hidden = true;
+    const sesTime = h("ses-time");
+    sesTime.textContent = "刚刚";
+    sesTime.classList.remove("pending");
+    ph.textContent = "继续追问…";
+    h("perm").textContent = on("approve") ? "自动" : "完全权限";
+    h("ses-spin").hidden = false;
+    h("ses-time").hidden = true;
   };
 
   function run() {
     reset();
     let t = reduced ? 0 : 500;
-    const step = (gap: number, fn: () => void) => { clock.at(t, fn); t += reduced ? 0 : gap; };
+    const step = (gap: number, fn: () => void) => {
+      clock.at(t, fn);
+      t += reduced ? 0 : gap;
+    };
     let r: HTMLElement | undefined;
     let started = 0;
 
     // 先把这句话打进输入框，再发送——不是凭空蹦出一个气泡。
-    const ask = '把登录页的表单校验补完，跑一下测试。';
+    const ask = "把登录页的表单校验补完，跑一下测试。";
     if (!reduced) {
       const typeAt = t;
-      clock.at(typeAt, () => { ph.classList.add('typing'); ph.textContent = ''; });
+      clock.at(typeAt, () => {
+        ph.classList.add("typing");
+        ph.textContent = "";
+      });
       for (let i = 1; i <= ask.length; i += 1) {
-        clock.at(typeAt + i * 55, () => { ph.textContent = ask.slice(0, i); if (i === 3) send.classList.add('ready'); });
+        clock.at(typeAt + i * 55, () => {
+          ph.textContent = ask.slice(0, i);
+          if (i === 3) send.classList.add("ready");
+        });
       }
       t += ask.length * 55 + 350;
-      step(180, () => send.classList.add('press'));
+      step(180, () => send.classList.add("press"));
     }
     step(900, () => {
-      ph.classList.remove('typing');
-      send.classList.remove('ready', 'press');
+      ph.classList.remove("typing");
+      send.classList.remove("ready", "press");
       put(`<div class="bubble">${ask}</div>`);
-      send.classList.add('stop');
-      ph.textContent = '继续追问，运行中发送会进入队列…';
-      if (on('panel')) { panel.classList.add('open'); panelBtn.classList.add('on'); stage.light(['panel']); }
+      send.classList.add("stop");
+      ph.textContent = "继续追问，运行中发送会进入队列…";
+      if (on("panel")) {
+        panel.classList.add("open");
+        panelBtn.classList.add("on");
+        stage.light(["panel"]);
+      }
     });
     step(700, () => {
       flow = put('<div class="collapse"><div class="feed flow"></div></div>').firstElementChild as HTMLElement;
@@ -357,92 +442,157 @@ export function initializeHeroStage() {
     });
 
     // 读取 + 渐进披露
-    if (on('read')) {
-      if (on('prog')) {
-        step(1100, () => { r = row('Read', 'src/pages/Login.tsx'); stage.light(['read', 'prog']); add('conv', 2.1); event('渐进披露', '+2.1K', '只载入 Login.tsx', 'conv'); });
+    if (on("read")) {
+      if (on("prog")) {
+        step(1100, () => {
+          r = row("Read", "src/pages/Login.tsx");
+          stage.light(["read", "prog"]);
+          add("conv", 2.1);
+          event("渐进披露", "+2.1K", "只载入 Login.tsx", "conv");
+        });
       } else {
-        step(1100, () => { r = row('Read', 'src/ · 38 个文件', ' <span class="tag">一次性载入</span>'); stage.light(['read']); add('conv', 31); event('一次性载入', '+31K', '渐进披露已关闭，整个 src 都进了上下文', 'warn', true); });
+        step(1100, () => {
+          r = row("Read", "src/ · 38 个文件", ' <span class="tag">一次性载入</span>');
+          stage.light(["read"]);
+          add("conv", 31);
+          event("一次性载入", "+31K", "渐进披露已关闭，整个 src 都进了上下文", "warn", true);
+        });
       }
       step(0, () => done(r));
     }
     // Skills
-    if (on('skills')) {
-      step(1100, () => { r = row('Loaded Skill', '表单校验约定'); stage.light(['skills']); add('skills', 1.8); event('Skill 注入', '+1.8K', '表单校验约定：错误文案、zod 写法', 'skills'); });
+    if (on("skills")) {
+      step(1100, () => {
+        r = row("Loaded Skill", "表单校验约定");
+        stage.light(["skills"]);
+        add("skills", 1.8);
+        event("Skill 注入", "+1.8K", "表单校验约定：错误文案、zod 写法", "skills");
+      });
       step(0, () => done(r));
     }
     // 子 Agent：检索过程留在子 Agent，关掉后检索结果都进主会话
-    if (on('sub')) {
+    if (on("sub")) {
       let card: HTMLElement;
       step(1700, () => {
-        card = put(`<div class="card agent"><span class="av"></span><span class="nm">查找可复用的校验函数</span><span class="st"><i>Agent</i><em class="dot"></em>运行中</span></div>`);
-        stage.light(['sub']);
+        card = put(
+          `<div class="card agent"><span class="av"></span><span class="nm">查找可复用的校验函数</span><span class="st"><i>Agent</i><em class="dot"></em>运行中</span></div>`,
+        );
+        stage.light(["sub"]);
       });
       step(900, () => {
-        card.querySelector('.st')!.innerHTML = `<i>Agent</i>${icon('m5 12 5 5L20 7', 12)}已完成`;
-        add('conv', 0.9);
-        event('子 Agent 摘要', '+0.9K', '检索过程留在子 Agent，主会话只收结论', 'conv');
+        card.querySelector(".st")!.innerHTML = `<i>Agent</i>${icon("m5 12 5 5L20 7", 12)}已完成`;
+        add("conv", 0.9);
+        event("子 Agent 摘要", "+0.9K", "检索过程留在子 Agent，主会话只收结论", "conv");
       });
     } else {
-      step(800, () => { r = row('Searched files', 'src/lib · 14 个结果'); add('conv', 6.4); });
-      step(800, () => { done(r); r = row('Read', 'src/lib/schema.ts'); add('conv', 9.2); });
-      step(800, () => { done(r); r = row('Read', 'src/lib/rules.ts'); add('conv', 8.1); event('检索结果', '+23.7K', '子 Agent 已关闭，检索内容都留在主会话', 'warn', true); });
+      step(800, () => {
+        r = row("Searched files", "src/lib · 14 个结果");
+        add("conv", 6.4);
+      });
+      step(800, () => {
+        done(r);
+        r = row("Read", "src/lib/schema.ts");
+        add("conv", 9.2);
+      });
+      step(800, () => {
+        done(r);
+        r = row("Read", "src/lib/rules.ts");
+        add("conv", 8.1);
+        event("检索结果", "+23.7K", "子 Agent 已关闭，检索内容都留在主会话", "warn", true);
+      });
       step(0, () => done(r));
     }
     // 编辑
-    if (on('edit')) {
-      step(1000, () => { r = row('Edit', 'src/lib/validate.ts', ' <u>+24</u> <s>-3</s>'); stage.light(['edit']); add('conv', 3.6); });
-      step(900, () => { done(r); r = row('Edit', 'src/pages/Login.tsx', ' <u>+7</u>'); add('conv', 1.8); });
+    if (on("edit")) {
+      step(1000, () => {
+        r = row("Edit", "src/lib/validate.ts", " <u>+24</u> <s>-3</s>");
+        stage.light(["edit"]);
+        add("conv", 3.6);
+      });
+      step(900, () => {
+        done(r);
+        r = row("Edit", "src/pages/Login.tsx", " <u>+7</u>");
+        add("conv", 1.8);
+      });
       step(0, () => done(r));
     }
     // 终端 + 审批：没改文件时测试照旧失败
-    const testOk = on('edit');
+    const testOk = on("edit");
     const runTest = () => {
       const lines = testOk
-        ? ['<span class="c">$ pnpm test</span>', '<span class="g">✓</span> validate.test.ts (11)', '<span class="g">✓</span> Login.test.tsx (7)', '<span class="g">Tests 18 passed</span> · 2.4s']
-        : ['<span class="c">$ pnpm test</span>', '<span class="r">✕</span> validate.test.ts (3 failed)', '<span class="g">✓</span> Login.test.tsx (7)', '<span class="r">Tests 3 failed</span> · 2.1s'];
+        ? [
+            '<span class="c">$ pnpm test</span>',
+            '<span class="g">✓</span> validate.test.ts (11)',
+            '<span class="g">✓</span> Login.test.tsx (7)',
+            '<span class="g">Tests 18 passed</span> · 2.4s',
+          ]
+        : [
+            '<span class="c">$ pnpm test</span>',
+            '<span class="r">✕</span> validate.test.ts (3 failed)',
+            '<span class="g">✓</span> Login.test.tsx (7)',
+            '<span class="r">Tests 3 failed</span> · 2.1s',
+          ];
       const out = put(`<div><div class="row run"><span class="v">Ran</span><span class="p">pnpm test</span>${CHEV}</div>
-        <div class="out">${lines.map((line) => `<div>${line}</div>`).join('')}</div></div>`);
-      stage.light(['term']);
-      out.querySelectorAll('.out div').forEach((line, i) => { clock.at(reduced ? 0 : 250 + i * 320, () => { line.classList.add('on'); follow(); }); });
+        <div class="out">${lines.map((line) => `<div>${line}</div>`).join("")}</div></div>`);
+      stage.light(["term"]);
+      out.querySelectorAll(".out div").forEach((line, i) => {
+        clock.at(reduced ? 0 : 250 + i * 320, () => {
+          line.classList.add("on");
+          follow();
+        });
+      });
       clock.at(reduced ? 0 : 1700, () => {
-        out.querySelector('.row')!.classList.remove('run');
-        add('conv', 2.3);
-        event('命令输出', '+2.3K', 'pnpm test · 只留摘要行', 'conv');
+        out.querySelector(".row")!.classList.remove("run");
+        add("conv", 2.3);
+        event("命令输出", "+2.3K", "pnpm test · 只留摘要行", "conv");
       });
     };
-    if (on('term')) {
-      if (on('approve')) {
+    if (on("term")) {
+      if (on("approve")) {
         let card: HTMLElement;
         step(1500, () => {
-          card = put(`<div class="card appr"><div class="hd">${icon('M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 8 2-2-2-2m4 6h4', 14)}运行项目测试 pnpm</div>
+          card =
+            put(`<div class="card appr"><div class="hd">${icon("M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 8 2-2-2-2m4 6h4", 14)}运行项目测试 pnpm</div>
             <div class="cmd"><i>$</i> <em>pnpm</em> test</div>
-            <div class="ft">${icon('M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1zM4 4l16 16', 13)}<span></span><b>拒绝</b><b class="al">本会话允许 <code>pnpm</code></b><b class="go">运行</b></div></div>`);
-          stage.light(['approve']);
-          h('ses-spin').hidden = true;
-          const pending = h('ses-time'); pending.hidden = false; pending.textContent = '待审批'; pending.classList.add('pending');
+            <div class="ft">${icon("M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1zM4 4l16 16", 13)}<span></span><b>拒绝</b><b class="al">本会话允许 <code>pnpm</code></b><b class="go">运行</b></div></div>`);
+          stage.light(["approve"]);
+          h("ses-spin").hidden = true;
+          const pending = h("ses-time");
+          pending.hidden = false;
+          pending.textContent = "待审批";
+          pending.classList.add("pending");
         });
-        step(400, () => card.querySelector('.go')!.classList.add('press'));
+        step(400, () => card.querySelector(".go")!.classList.add("press"));
         step(2300, () => {
-          card.remove(); runTest();
-          h('ses-spin').hidden = false;
-          const pending = h('ses-time'); pending.hidden = true; pending.textContent = '刚刚'; pending.classList.remove('pending');
+          card.remove();
+          runTest();
+          h("ses-spin").hidden = false;
+          const pending = h("ses-time");
+          pending.hidden = true;
+          pending.textContent = "刚刚";
+          pending.classList.remove("pending");
         });
       } else {
         step(2300, runTest);
       }
     } else {
-      step(900, () => row('终端已关闭', '没有运行测试', '', 'mute'));
+      step(900, () => row("终端已关闭", "没有运行测试", "", "mute"));
     }
     // 压缩：任务里没越过阈值时，在收尾前补上一次
     step(900, () => {
-      if (on('comp')) {
-        if (!compressed) { ctx.conv += Math.max(0, 161 - total()); compress(); }
+      if (on("comp")) {
+        if (!compressed) {
+          ctx.conv += Math.max(0, 161 - total());
+          compress();
+        }
         return;
       }
       ctx.conv += Math.max(0, 182 - total());
       renderContext();
-      putOutside(`<div class="cmp warn"><span>上下文已用 ${Math.round((total() / LIMIT) * 100)}% · 压缩已关闭</span></div>`);
-      event('接近上限', fmt(total()), '压缩已关闭，再聊几轮就会超出上限', 'warn', true);
+      putOutside(
+        `<div class="cmp warn"><span>上下文已用 ${Math.round((total() / LIMIT) * 100)}% · 压缩已关闭</span></div>`,
+      );
+      event("接近上限", fmt(total()), "压缩已关闭，再聊几轮就会超出上限", "warn", true);
     });
     // 收尾：过程塌缩成 Worked，交付卡片出现
     step(1300, () => {
@@ -450,39 +600,56 @@ export function initializeHeroStage() {
       const box = flow!.parentElement!;
       const secs = Math.max(12, Math.round((performance.now() - started) / 1000) * 2);
       box.style.height = `${box.scrollHeight}px`;
-      requestAnimationFrame(() => { box.style.height = '0px'; box.style.opacity = '0'; });
+      requestAnimationFrame(() => {
+        box.style.height = "0px";
+        box.style.opacity = "0";
+      });
       flow = null;
-      feed.insertBefore(put(`<div class="worked">Worked for ${secs}s ${icon('m9 18 6-6-6-6', 13)}</div>`), box);
+      feed.insertBefore(put(`<div class="worked">Worked for ${secs}s ${icon("m9 18 6-6-6-6", 13)}</div>`), box);
     });
     step(700, () => {
-      const parts = [on('edit') ? '邮箱和密码校验补完了' : '「编辑」已关闭，我只给出了修改建议，没有改文件'];
-      if (on('term')) parts.push(testOk ? '18 个测试全部通过' : '现有代码还有 3 个测试失败');
-      put(`<div class="say">${parts.join('，')}。</div>`);
-      if (on('edit')) {
+      const parts = [on("edit") ? "邮箱和密码校验补完了" : "「编辑」已关闭，我只给出了修改建议，没有改文件"];
+      if (on("term")) parts.push(testOk ? "18 个测试全部通过" : "现有代码还有 3 个测试失败");
+      put(`<div class="say">${parts.join("，")}。</div>`);
+      if (on("edit")) {
         put(`<div class="card chg"><div class="h"><span class="fi"><b>&lt;/&gt;</b></span><div>已编辑 2 个文件<small><u>+31</u> <s>-3</s></small></div></div>
           <div class="f"><span>src/lib/validate.ts</span><span><u>+24</u> <s>-3</s></span></div>
           <div class="f"><span>src/pages/Login.tsx</span><span><u>+7</u> <s>-0</s></span></div></div>`);
       }
-      put(`<div class="usage">${icon('M8 4h10a2 2 0 0 1 2 2v10M4 8h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z', 13)}
-        <b>${icon('M3 5c0-1.7 4-3 9-3s9 1.3 9 3-4 3-9 3-9-1.3-9-3M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3', 13)}用量 ${on('sub') ? '18.4K' : '41.2K'} tok</b><span>09:41</span></div>`);
-      send.classList.remove('stop');
-      ph.textContent = '继续追问…';
-      h('ses-spin').hidden = true;
-      h('ses-time').hidden = false;
-      if (on('edit')) h('review-stat').innerHTML = '<u>+31</u> <s>-3</s>';
-      h('sum-tok').textContent = on('sub') ? '28.2K' : '51.0K';
-      h('sum').hidden = false;
+      put(`<div class="usage">${icon("M8 4h10a2 2 0 0 1 2 2v10M4 8h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z", 13)}
+        <b>${icon("M3 5c0-1.7 4-3 9-3s9 1.3 9 3-4 3-9 3-9-1.3-9-3M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3", 13)}用量 ${on("sub") ? "18.4K" : "41.2K"} tok</b><span>09:41</span></div>`);
+      send.classList.remove("stop");
+      ph.textContent = "继续追问…";
+      h("ses-spin").hidden = true;
+      h("ses-time").hidden = false;
+      if (on("edit")) h("review-stat").innerHTML = "<u>+31</u> <s>-3</s>";
+      h("sum-tok").textContent = on("sub") ? "28.2K" : "51.0K";
+      h("sum").hidden = false;
     });
     step(2400, () => stage.settle());
     if (!reduced) clock.at(t + 4200, run);
   }
 
   const redraw = () => stage.draw();
-  addEventListener('resize', redraw);
+  addEventListener("resize", redraw);
   document.fonts?.ready.then(redraw);
   redraw();
   reset();
   // 减少动态效果：一次排完，停在最后一帧。
-  if (reduced) { run(); return; }
-  playWhenVisible(root, () => { playing = true; run(); }, () => { playing = false; clearTimeout(rerun); reset(); });
+  if (reduced) {
+    run();
+    return;
+  }
+  playWhenVisible(
+    root,
+    () => {
+      playing = true;
+      run();
+    },
+    () => {
+      playing = false;
+      clearTimeout(rerun);
+      reset();
+    },
+  );
 }

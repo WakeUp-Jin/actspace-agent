@@ -43,12 +43,19 @@ describe("response annotation text model", () => {
     expect(model.text.slice(offsets!.start, offsets!.end)).toBe("体部分 中间 斜体 和 链接");
 
     const draft = createAnnotationDraft(model, offsets!.start, offsets!.end, "v2-3");
-    expect(draft).toMatchObject({ assistantMessageId: "v2-3", selectedText: "体部分 中间 斜体 和 链接", prefixContext: "前文 粗", suffixContext: "文字 结尾" });
+    expect(draft).toMatchObject({
+      assistantMessageId: "v2-3",
+      selectedText: "体部分 中间 斜体 和 链接",
+      prefixContext: "前文 粗",
+      suffixContext: "文字 结尾",
+    });
     expect(draft.annotationId).toMatch(/^ann_/);
   });
 
   it("collects paragraphs, list items, quotes and table cells with one newline between blocks", () => {
-    const root = renderReply(["段一", "", "段二", "", "- 项一", "- 项二", "", "> 引用", "", "| A | B |", "|---|---|", "| 1 | 2 |"].join("\n"));
+    const root = renderReply(
+      ["段一", "", "段二", "", "- 项一", "- 项二", "", "> 引用", "", "| A | B |", "|---|---|", "| 1 | 2 |"].join("\n"),
+    );
     const model = collectAnnotatableText(root);
     expect(model.text).toBe("段一\n段二\n项一\n项二\n引用\nA\nB\n1\n2");
 
@@ -93,11 +100,23 @@ describe("response annotation text model", () => {
     const draft = createAnnotationDraft(model, start, start + 4, "v2-1");
 
     expect(resolveAnnotation(model, draft)).toEqual({ status: "resolved", start, end: start + 4 });
-    expect(resolveAnnotation(model, { ...draft, startOffset: 0, endOffset: 4 })).toEqual({ status: "resolved", start, end: start + 4 });
+    expect(resolveAnnotation(model, { ...draft, startOffset: 0, endOffset: 4 })).toEqual({
+      status: "resolved",
+      start,
+      end: start + 4,
+    });
     expect(resolveAnnotation(model, { ...draft, selectedText: "不存在的原文" })).toEqual({ status: "unresolved" });
 
     const repeated = collectAnnotatableText(renderReply("重复。重复。"));
-    expect(resolveAnnotation(repeated, { selectedText: "重复", startOffset: 20, endOffset: 22, prefixContext: "", suffixContext: "。" })).toEqual({ status: "unresolved" });
+    expect(
+      resolveAnnotation(repeated, {
+        selectedText: "重复",
+        startOffset: 20,
+        endOffset: 22,
+        prefixContext: "",
+        suffixContext: "。",
+      }),
+    ).toEqual({ status: "unresolved" });
   });
 
   // 聊天区 Markdown 改造（规范 §11、T26）：新增元素不能改变可批注的可见文本。
@@ -116,7 +135,11 @@ describe("response annotation text model", () => {
   });
 
   it("collects text of whitelisted raw HTML (details, kbd) like any other element", async () => {
-    const view = render(<MarkdownProse content={"按 <kbd>Esc</kbd> 退出\n\n<details>\n<summary>更多</summary>\n\n隐藏的细节\n\n</details>"} />);
+    const view = render(
+      <MarkdownProse
+        content={"按 <kbd>Esc</kbd> 退出\n\n<details>\n<summary>更多</summary>\n\n隐藏的细节\n\n</details>"}
+      />,
+    );
     const root = view.container.querySelector<HTMLElement>(".markdown-prose")!;
     await waitFor(() => expect(root.querySelector("details")).not.toBeNull());
     const model = collectAnnotatableText(root);
@@ -135,7 +158,12 @@ describe("response annotation text model", () => {
   });
 
   it("keeps the visible text of path chips unchanged and still maps selections across them", () => {
-    const root = render(<MarkdownProse content={"改了 `src/app.ts:12` 这个文件，再看 [入口](src/main.ts) 就行"} onOpenWorkspaceFile={() => {}} />).container.querySelector<HTMLElement>(".markdown-prose")!;
+    const root = render(
+      <MarkdownProse
+        content={"改了 `src/app.ts:12` 这个文件，再看 [入口](src/main.ts) 就行"}
+        onOpenWorkspaceFile={() => {}}
+      />,
+    ).container.querySelector<HTMLElement>(".markdown-prose")!;
     expect(root.querySelector("code.md-path")).not.toBeNull();
     const model = collectAnnotatableText(root);
     expect(model.text).toBe("改了 src/app.ts:12 这个文件，再看 入口 就行");
@@ -156,7 +184,11 @@ describe("response annotation text model", () => {
   it("is unaffected by the streaming tail fade spans and caret", () => {
     const content = "流式中的这一句话很长很长，需要被拆成好几层渐显，还有一个光标";
     const plain = collectAnnotatableText(renderReply(content)).text;
-    const view = render(<ReplyStreamingContext.Provider value={true}><MarkdownProse content={content} /></ReplyStreamingContext.Provider>);
+    const view = render(
+      <ReplyStreamingContext.Provider value={true}>
+        <MarkdownProse content={content} />
+      </ReplyStreamingContext.Provider>,
+    );
     const root = view.container.querySelector<HTMLElement>(".markdown-prose")!;
     expect(root.querySelector(".md-tail")).not.toBeNull();
     expect(root.querySelector(".md-caret")).not.toBeNull();

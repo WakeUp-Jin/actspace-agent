@@ -2,7 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { AssistantText } from "../blocks/AssistantText";
 
 it("renders http links in a new tab and strips javascript: hrefs", () => {
-  render(<AssistantText content={"[ok](https://example.com) [bad](javascript:alert(1)) [mail](mailto:a@b.c) [rel](/x)"} />);
+  render(
+    <AssistantText content={"[ok](https://example.com) [bad](javascript:alert(1)) [mail](mailto:a@b.c) [rel](/x)"} />,
+  );
   const ok = screen.getByText("ok");
   expect(ok).toHaveAttribute("href", "https://example.com");
   expect(ok).toHaveAttribute("target", "_blank");

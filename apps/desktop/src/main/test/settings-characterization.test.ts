@@ -10,7 +10,13 @@ import { chmod, copyFile, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ProviderSettingsError, SettingsRevisionConflictError, SettingsService, type SecretCrypto, type SettingsServiceOptions } from "../settings-service";
+import {
+  ProviderSettingsError,
+  SettingsRevisionConflictError,
+  SettingsService,
+  type SecretCrypto,
+  type SettingsServiceOptions,
+} from "../settings-service";
 
 const FIXTURES = join(__dirname, "fixtures", "settings");
 const UPDATE_GOLDEN = process.env.UPDATE_SETTINGS_GOLDEN === "1";
@@ -105,7 +111,11 @@ async function readTree(root: string): Promise<Record<string, unknown>> {
 }
 
 function normalized(value: unknown, root: string): unknown {
-  return JSON.parse(JSON.stringify(value ?? null).split(root).join("<root>"));
+  return JSON.parse(
+    JSON.stringify(value ?? null)
+      .split(root)
+      .join("<root>"),
+  );
 }
 
 /** 和默认 writeJsonAtomic 写出同样的字节；可以让第 N 次调用在写入前或写入后抛错，也可以让第 N 次调用等一个 gate。 */
@@ -119,7 +129,10 @@ function recordingWriter() {
     await gates.get(call);
     if (failures.get(call) === "before") throw new Error(`injected failure before write #${call}`);
     await mkdir(dirname(filePath), { recursive: true });
-    await writeFile(filePath, JSON.stringify(value, null, 2) + "\n", { encoding: "utf8", ...(options?.mode !== undefined && { mode: options.mode }) });
+    await writeFile(filePath, JSON.stringify(value, null, 2) + "\n", {
+      encoding: "utf8",
+      ...(options?.mode !== undefined && { mode: options.mode }),
+    });
     if (options?.mode !== undefined) await chmod(filePath, options.mode);
     if (failures.get(call) === "after") throw new Error(`injected failure after write #${call}`);
   };
@@ -138,12 +151,16 @@ function recordingWriter() {
     },
     gateOn(call: number): () => void {
       let release!: () => void;
-      gates.set(call, new Promise<void>((resolve) => { release = resolve; }));
+      gates.set(
+        call,
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+      );
       return release;
     },
   };
 }
-
 
 describe("settings load snapshots (v1–v4)", () => {
   it("treats a missing simplifyThinking as on and keeps an explicit off", async () => {
@@ -152,7 +169,11 @@ describe("settings load snapshots (v1–v4)", () => {
     await service.load();
     expect(service.getV4().settings.general.simplifyThinking).toBe(true);
 
-    await service.updateNamespaceV4({ namespace: "general", expectedRevision: service.getV4().revision, patch: { simplifyThinking: false } });
+    await service.updateNamespaceV4({
+      namespace: "general",
+      expectedRevision: service.getV4().revision,
+      patch: { simplifyThinking: false },
+    });
     const reloaded = new SettingsService({ dataRoot: root, crypto: fixtureCrypto });
     await reloaded.load();
     expect(reloaded.getV4().settings.general.simplifyThinking).toBe(false);
@@ -169,12 +190,15 @@ describe("settings load snapshots (v1–v4)", () => {
     // revision 是整份 v4 的哈希，含临时目录下的绝对 systemPromptPath，每次运行都不同，所以不进快照。
     expect(v4.revision).toMatch(/^[0-9a-f]{64}$/);
     await expectGolden(`load-${version}`, {
-      views: normalized({
-        get: service.get(),
-        v4: { ...v4, revision: "<revision>" },
-        lastLoadError: service.getLastLoadError() ?? null,
-        credentialStorage: service.getCredentialStorageView(),
-      }, root),
+      views: normalized(
+        {
+          get: service.get(),
+          v4: { ...v4, revision: "<revision>" },
+          lastLoadError: service.getLastLoadError() ?? null,
+          credentialStorage: service.getCredentialStorageView(),
+        },
+        root,
+      ),
       files: await readTree(root),
     });
     expect(reloadEnv).toHaveBeenCalledTimes(1);
@@ -241,8 +265,12 @@ describe("settings load snapshots (v1–v4)", () => {
 
     // 现有行为：toSettingsV4 只在 v4 的 taskDefaults.temperature 为空时才用 agent.temperature。
     // v4 样本里是 1.2，所以 update 改到 0.1 后内存是 0.1、文件仍是 1.2，重新 load 回到 1.2。
-    await expect(service.update({ agent: { temperature: 0.1 } })).resolves.toMatchObject({ agent: { temperature: 0.1 } });
-    await expect(service.updateV2({ agent: { maxTokens: 999 } })).resolves.toMatchObject({ agent: { temperature: 0.1, maxTokens: 999 } });
+    await expect(service.update({ agent: { temperature: 0.1 } })).resolves.toMatchObject({
+      agent: { temperature: 0.1 },
+    });
+    await expect(service.updateV2({ agent: { maxTokens: 999 } })).resolves.toMatchObject({
+      agent: { temperature: 0.1, maxTokens: 999 },
+    });
     const written = JSON.parse(await readFile(join(root, "settings.json"), "utf8"));
     expect(written.general.taskDefaults).toMatchObject({ temperature: 1.2, maxOutputTokens: 2048 });
     expect(process.env.LLM_TEMPERATURE).toBe("0.1");
@@ -281,7 +309,15 @@ describe("legacy v1 secrets", () => {
 
   it.each([
     ["crypto is unavailable", { ...fixtureCrypto, isAvailable: async () => false }],
-    ["decryption throws", { ...fixtureCrypto, decrypt: async () => { throw new Error("keychain locked"); } }],
+    [
+      "decryption throws",
+      {
+        ...fixtureCrypto,
+        decrypt: async () => {
+          throw new Error("keychain locked");
+        },
+      },
+    ],
     ["decryption returns an empty string", { ...fixtureCrypto, decrypt: async () => "" }],
   ])("keeps the legacy file untouched and blocks credential edits when %s", async (_label, crypto: SecretCrypto) => {
     const root = await makeRoot({ "secrets.json": "secrets-v1-legacy.json" });
@@ -315,13 +351,28 @@ const ROLLBACK_CASES: RollbackCase[] = [
   {
     name: "updateProviderConnection",
     seed: (service) => service.updateProviderConnection({ provider: "deepseek", apiKey: "old-deepseek-key" }),
-    run: (service) => service.updateProviderConnection({ provider: "deepseek", apiKey: "new-deepseek-key", baseUrl: "https://gateway.example/v1" }),
+    run: (service) =>
+      service.updateProviderConnection({
+        provider: "deepseek",
+        apiKey: "new-deepseek-key",
+        baseUrl: "https://gateway.example/v1",
+      }),
     message: "供应商设置写入失败。",
   },
   {
     name: "updateImageGeneration",
-    seed: (service) => service.updateImageGeneration({ apiKey: "old-image-key", baseUrl: "https://images.example/v1", model: "old-model" }),
-    run: (service) => service.updateImageGeneration({ apiKey: "new-image-key", baseUrl: "https://images.example/v2", model: "new-model" }),
+    seed: (service) =>
+      service.updateImageGeneration({
+        apiKey: "old-image-key",
+        baseUrl: "https://images.example/v1",
+        model: "old-model",
+      }),
+    run: (service) =>
+      service.updateImageGeneration({
+        apiKey: "new-image-key",
+        baseUrl: "https://images.example/v2",
+        model: "new-model",
+      }),
     message: "图片生成配置写入失败。",
   },
 ];
@@ -380,15 +431,21 @@ describe("rollback when settings.json fails after secrets.json was written", () 
     writer.reset();
     writer.failOn(2, "after");
 
-    await expect(service.updateProviderConnection({ provider: "kimi", apiKey: "kimi-extra-key" })).rejects.toMatchObject({ code: "write_failed" });
+    await expect(
+      service.updateProviderConnection({ provider: "kimi", apiKey: "kimi-extra-key" }),
+    ).rejects.toMatchObject({ code: "write_failed" });
     const after = await readTree(root);
     // 现有行为：原来没有 secrets.json，恢复后多出一份空的；settings.json 按内存重新序列化。
     // 样本是四层模型之前的 v4，加载时已经迁移重写过一次，相对 systemPromptPath 在 before 里就成了绝对路径。
     expect(after["secrets.json"]).toEqual({ version: 2, providerCredentials: {} });
     expect(after["secrets.json mode"]).toBe("600");
     expect(after["settings.json"]).toEqual(normalized(service.getV4().settings, root));
-    expect((before["settings.json"] as { general: { agentInstructions: unknown } }).general.agentInstructions).toEqual({ systemPromptPath: "<root>/prompts/v4-agent.md" });
-    expect((after["settings.json"] as { general: { agentInstructions: unknown } }).general.agentInstructions).toEqual({ systemPromptPath: "<root>/prompts/v4-agent.md" });
+    expect((before["settings.json"] as { general: { agentInstructions: unknown } }).general.agentInstructions).toEqual({
+      systemPromptPath: "<root>/prompts/v4-agent.md",
+    });
+    expect((after["settings.json"] as { general: { agentInstructions: unknown } }).general.agentInstructions).toEqual({
+      systemPromptPath: "<root>/prompts/v4-agent.md",
+    });
   });
 
   it("stops restoring secrets.json when restoring settings.json also fails (best effort)", async () => {
@@ -432,7 +489,10 @@ describe("mutation queue", () => {
     const [firstResult, secondResult] = await Promise.all([first, second]);
     expect(firstResult.skills.disabled).toEqual(["first"]);
     expect(secondResult.skills.disabled).toEqual(["second"]);
-    expect(writer.calls.map((call) => (call.value as { skills: { disabled: string[] } }).skills.disabled)).toEqual([["first"], ["second"]]);
+    expect(writer.calls.map((call) => (call.value as { skills: { disabled: string[] } }).skills.disabled)).toEqual([
+      ["first"],
+      ["second"],
+    ]);
     expect(service.get().skills.disabled).toEqual(["second"]);
   });
 
@@ -463,24 +523,24 @@ describe("mutation queue", () => {
     release();
     await Promise.all(pending);
 
-    expect(writer.files()).toEqual([
-      "secrets.json", "settings.json",
-      "secrets.json",
-      "settings.json",
-    ]);
+    expect(writer.files()).toEqual(["secrets.json", "settings.json", "secrets.json", "settings.json"]);
   });
 });
 
 describe("applyToEnv", () => {
   it("writes the target env keys on load and removes the LLM keys", async () => {
     const root = await makeRoot({ "settings.json": "v4.json" });
-    await writeFile(join(root, "secrets.json"), JSON.stringify({
-      version: 2,
-      providerCredentials: {},
-      deepseek: "stored-deepseek-key",
-      zhipu: "stored-zhipu-key",
-      tavily: "stored-tavily-key",
-    }), "utf8");
+    await writeFile(
+      join(root, "secrets.json"),
+      JSON.stringify({
+        version: 2,
+        providerCredentials: {},
+        deepseek: "stored-deepseek-key",
+        zhipu: "stored-zhipu-key",
+        tavily: "stored-tavily-key",
+      }),
+      "utf8",
+    );
     process.env.DEEPSEEK_API_KEY = "stale-deepseek";
     process.env.KIMI_API_KEY = "stale-kimi";
     process.env.EXA_API_KEY = "stale-exa";
@@ -519,10 +579,21 @@ describe("applyToEnv", () => {
       ["update", () => service.update({ skills: { disabled: ["a"] } })],
       ["updateV2", () => service.updateV2({ agent: { temperature: null, maxTokens: null } })],
       ["updateQuickOpenShortcut", () => service.updateQuickOpenShortcut({ enabled: false })],
-      ["updateNamespaceV4", () => service.updateNamespaceV4({ namespace: "skills", expectedRevision: service.getV4().revision, patch: { disabled: ["c"] } })],
+      [
+        "updateNamespaceV4",
+        () =>
+          service.updateNamespaceV4({
+            namespace: "skills",
+            expectedRevision: service.getV4().revision,
+            patch: { disabled: ["c"] },
+          }),
+      ],
       ["updateModelStorage", () => service.updateModelStorage({ installedModels: { "kimi:kimi-k2.6": null } })],
       ["updateProviderConnection", () => service.updateProviderConnection({ provider: "kimi", apiKey: "kimi-key" })],
-      ["updateImageGeneration", () => service.updateImageGeneration({ apiKey: "image-key", baseUrl: "https://images.example/v5", model: "m5" })],
+      [
+        "updateImageGeneration",
+        () => service.updateImageGeneration({ apiKey: "image-key", baseUrl: "https://images.example/v5", model: "m5" }),
+      ],
       ["setProviderKey(image-generation)", () => service.setProviderKey("image-generation", "image-key-2")],
       ["clearProviderKey(image-generation)", () => service.clearProviderKey("image-generation")],
       ["setProviderKey(tavily)", () => service.setProviderKey("tavily", "tavily-key")],
@@ -538,7 +609,11 @@ describe("applyToEnv", () => {
       const before = reloadEnv.mock.calls.length;
       await step();
       deltas.push([name, reloadEnv.mock.calls.length - before]);
-      env[name] = { TAVILY_API_KEY: process.env.TAVILY_API_KEY, LLM_TEMPERATURE: process.env.LLM_TEMPERATURE, IMAGE_GENERATION_MODEL: process.env.IMAGE_GENERATION_MODEL };
+      env[name] = {
+        TAVILY_API_KEY: process.env.TAVILY_API_KEY,
+        LLM_TEMPERATURE: process.env.LLM_TEMPERATURE,
+        IMAGE_GENERATION_MODEL: process.env.IMAGE_GENERATION_MODEL,
+      };
     }
 
     expect(deltas).toEqual([
@@ -559,7 +634,11 @@ describe("applyToEnv", () => {
       ["setProviderKey(speech-minimax)", 0],
       ["writeAgentSystemPrompt", 0],
     ]);
-    expect(env["setProviderKey(tavily)"]).toEqual({ TAVILY_API_KEY: undefined, LLM_TEMPERATURE: "1.2", IMAGE_GENERATION_MODEL: "m5" });
+    expect(env["setProviderKey(tavily)"]).toEqual({
+      TAVILY_API_KEY: undefined,
+      LLM_TEMPERATURE: "1.2",
+      IMAGE_GENERATION_MODEL: "m5",
+    });
     expect(env["clearProviderKey(tavily)"]?.TAVILY_API_KEY).toBeUndefined();
     expect(env.load?.LLM_TEMPERATURE).toBe("1.2");
     // 现有行为：updateV2 把 temperature 清成 null，env 随之删掉；但下一次 updateNamespaceV4 从 v4 文件里的
@@ -581,10 +660,21 @@ describe("v4 change notifications", () => {
       ["load", () => service.load()],
       ["update", () => service.update({ skills: { disabled: ["a"] } })],
       ["updateQuickOpenShortcut", () => service.updateQuickOpenShortcut({ enabled: false })],
-      ["updateNamespaceV4", () => service.updateNamespaceV4({ namespace: "skills", expectedRevision: service.getV4().revision, patch: { disabled: ["c"] } })],
+      [
+        "updateNamespaceV4",
+        () =>
+          service.updateNamespaceV4({
+            namespace: "skills",
+            expectedRevision: service.getV4().revision,
+            patch: { disabled: ["c"] },
+          }),
+      ],
       ["updateModelStorage", () => service.updateModelStorage({ installedModels: { "kimi:kimi-k2.6": null } })],
       ["updateProviderConnection", () => service.updateProviderConnection({ provider: "kimi", apiKey: "kimi-key" })],
-      ["updateImageGeneration", () => service.updateImageGeneration({ apiKey: "image-key", baseUrl: "https://images.example/v5", model: "m5" })],
+      [
+        "updateImageGeneration",
+        () => service.updateImageGeneration({ apiKey: "image-key", baseUrl: "https://images.example/v5", model: "m5" }),
+      ],
       ["setProviderKey(tavily)", () => service.setProviderKey("tavily", "tavily-key")],
       ["setProviderKey(speech-minimax)", () => service.setProviderKey("speech-minimax", "speech-key")],
       ["writeAgentSystemPrompt", () => service.writeAgentSystemPrompt("Custom prompt")],
@@ -612,13 +702,21 @@ describe("v4 change notifications", () => {
     });
     const unsubscribeLater = service.subscribeV4Changes(later);
 
-    const snapshot = await service.updateNamespaceV4({ namespace: "skills", expectedRevision: service.getV4().revision, patch: { disabled: ["x"] } });
+    const snapshot = await service.updateNamespaceV4({
+      namespace: "skills",
+      expectedRevision: service.getV4().revision,
+      patch: { disabled: ["x"] },
+    });
     expect(snapshot.settings.skills.disabled).toEqual(["x"]);
     expect(later).toHaveBeenCalledTimes(1);
 
     unsubscribeThrowing();
     unsubscribeLater();
-    await service.updateNamespaceV4({ namespace: "skills", expectedRevision: service.getV4().revision, patch: { disabled: ["y"] } });
+    await service.updateNamespaceV4({
+      namespace: "skills",
+      expectedRevision: service.getV4().revision,
+      patch: { disabled: ["y"] },
+    });
     expect(later).toHaveBeenCalledTimes(1);
   });
 });
@@ -647,7 +745,10 @@ describe("agent system prompt file", () => {
     await service.load();
 
     expect(await readFile(join(root, "prompts", "v4-agent.md"), "utf8")).toBe("existing prompt");
-    expect(await service.readAgentSystemPrompt()).toEqual({ path: join(root, "prompts", "v4-agent.md"), content: "existing prompt" });
+    expect(await service.readAgentSystemPrompt()).toEqual({
+      path: join(root, "prompts", "v4-agent.md"),
+      content: "existing prompt",
+    });
   });
 
   it("recreates the default prompt when the file is missing at read time", async () => {
@@ -695,8 +796,13 @@ describe("v4 namespace updates", () => {
     const fileBefore = await readFile(join(root, "settings.json"), "utf8");
     writer.failOn(1, "before");
 
-    await expect(service.updateNamespaceV4({ namespace: "skills", expectedRevision: before.revision, patch: { disabled: ["lost"] } }))
-      .rejects.toThrow("injected failure before write #1");
+    await expect(
+      service.updateNamespaceV4({
+        namespace: "skills",
+        expectedRevision: before.revision,
+        patch: { disabled: ["lost"] },
+      }),
+    ).rejects.toThrow("injected failure before write #1");
     expect(service.getV4()).toEqual(before);
     expect(await readFile(join(root, "settings.json"), "utf8")).toBe(fileBefore);
   });
@@ -706,11 +812,18 @@ describe("v4 namespace updates", () => {
     const before = service.getV4();
     writer.failOn(1, "after");
 
-    await expect(service.updateNamespaceV4({ namespace: "skills", expectedRevision: before.revision, patch: { disabled: ["landed"] } }))
-      .rejects.toThrow("injected failure after write #1");
+    await expect(
+      service.updateNamespaceV4({
+        namespace: "skills",
+        expectedRevision: before.revision,
+        patch: { disabled: ["landed"] },
+      }),
+    ).rejects.toThrow("injected failure after write #1");
     // 现有行为：只回滚内存，不恢复文件（v4 namespace 路径没有 restoreFilesBestEffort）。
     expect(service.getV4()).toEqual(before);
-    const onDisk = JSON.parse(await readFile(join(root, "settings.json"), "utf8")) as { skills: { disabled: string[] } };
+    const onDisk = JSON.parse(await readFile(join(root, "settings.json"), "utf8")) as {
+      skills: { disabled: string[] };
+    };
     expect(onDisk.skills.disabled).toEqual(["landed"]);
     expect(writer.files()).toEqual(["settings.json"]);
   });
@@ -721,7 +834,11 @@ describe("v4 namespace updates", () => {
     const revision = service.getV4().revision;
 
     const first = service.update({ skills: { disabled: ["first"] } });
-    const second = service.updateNamespaceV4({ namespace: "skills", expectedRevision: revision, patch: { disabled: ["second"] } });
+    const second = service.updateNamespaceV4({
+      namespace: "skills",
+      expectedRevision: revision,
+      patch: { disabled: ["second"] },
+    });
     await vi.waitFor(() => expect(writer.calls).toHaveLength(1));
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(writer.calls).toHaveLength(1);

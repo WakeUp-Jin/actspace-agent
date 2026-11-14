@@ -1,8 +1,4 @@
-import type {
-  QuickOpenShortcutSettings,
-  SessionListItem,
-  WorkspaceEntry,
-} from "@actspace/shared";
+import type { QuickOpenShortcutSettings, SessionListItem, WorkspaceEntry } from "@actspace/shared";
 
 export type QuickOpenResolution =
   | { kind: "session"; sessionId: string }
@@ -13,14 +9,11 @@ function normalizeRoot(root: string | undefined): string {
   return root?.replace(/\/+$/, "") ?? "";
 }
 
-export function orderQuickOpenProjects(
-  workspaces: WorkspaceEntry[],
-  sessions: SessionListItem[],
-): WorkspaceEntry[] {
+export function orderQuickOpenProjects(workspaces: WorkspaceEntry[], sessions: SessionListItem[]): WorkspaceEntry[] {
   const latestByWorkspace = new Map<string, string>();
   for (const session of sessions) {
-    const workspace = workspaces.find((item) =>
-      item.id === session.workspaceId || normalizeRoot(item.path) === normalizeRoot(session.workspaceRoot),
+    const workspace = workspaces.find(
+      (item) => item.id === session.workspaceId || normalizeRoot(item.path) === normalizeRoot(session.workspaceRoot),
     );
     if (!workspace) continue;
     const current = latestByWorkspace.get(workspace.id) ?? "";

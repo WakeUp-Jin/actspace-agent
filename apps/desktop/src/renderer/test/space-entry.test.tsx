@@ -8,7 +8,13 @@ import { spaceDemoStore } from "../components/space/model/space-demo-store";
 type WorkbenchProps = Parameters<typeof TestWorkbenchLayout>[0];
 
 const sessions: WorkbenchProps["sessions"] = [
-  { id: "session-a", title: "普通会话 A", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" },
+  {
+    id: "session-a",
+    title: "普通会话 A",
+    updatedAt: new Date().toISOString(),
+    agentRunCount: 0,
+    workspaceRoot: "/tmp/workspace",
+  },
 ];
 
 function renderWorkbench() {
@@ -109,6 +115,8 @@ describe("Space 演示入口（T4）", () => {
     await user.click(within(dialog).getByRole("button", { name: /^创建/ }));
 
     expect(await screen.findByRole("main", { name: "Space（开发中演示）" })).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "Space" })).getByRole("button", { name: /发布清单/ })).toHaveAttribute("aria-current", "page");
+    expect(
+      within(screen.getByRole("region", { name: "Space" })).getByRole("button", { name: /发布清单/ }),
+    ).toHaveAttribute("aria-current", "page");
   });
 });

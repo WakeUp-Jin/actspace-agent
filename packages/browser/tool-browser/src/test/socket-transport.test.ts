@@ -6,8 +6,15 @@ import { SocketBrowserBridgeTransport } from "../node-capability.js";
 
 describe("Browser socket lifetime", () => {
   const cleanups: Array<() => Promise<void>> = [];
-  afterEach(async () => { await Promise.all(cleanups.splice(0).map((cleanup) => cleanup())); });
-  async function fixture(onRequest: (request: { id: string; method: string; params: Record<string, unknown> }, reply: (body?: unknown, protocol?: string) => void) => void) {
+  afterEach(async () => {
+    await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()));
+  });
+  async function fixture(
+    onRequest: (
+      request: { id: string; method: string; params: Record<string, unknown> },
+      reply: (body?: unknown, protocol?: string) => void,
+    ) => void,
+  ) {
     const root = await mkdtemp("/tmp/browser-wire-");
     const socketPath = join(root, "bridge.sock");
     const clients = new Set<Socket>();
@@ -23,7 +30,8 @@ describe("Browser socket lifetime", () => {
           buffer = buffer.subarray(4 + size);
           onRequest(request, (result = {}, protocol = "0.2.0") => {
             const body = Buffer.from(JSON.stringify({ id: request.id, ok: true, protocolVersion: protocol, result }));
-            const header = Buffer.alloc(4); header.writeUInt32LE(body.length);
+            const header = Buffer.alloc(4);
+            header.writeUInt32LE(body.length);
             client.write(Buffer.concat([header, body]));
           });
         }
@@ -41,13 +49,23 @@ describe("Browser socket lifetime", () => {
   it("starts one Session before parallel requests and sends cancellation for the original request ID", async () => {
     const requests: Array<{ id: string; method: string; params: Record<string, unknown> }> = [];
     let dispatched!: () => void;
-    const commandSeen = new Promise<void>((resolve) => { dispatched = resolve; });
+    const commandSeen = new Promise<void>((resolve) => {
+      dispatched = resolve;
+    });
     let cancelled!: () => void;
-    const cancelSeen = new Promise<void>((resolve) => { cancelled = resolve; });
+    const cancelSeen = new Promise<void>((resolve) => {
+      cancelled = resolve;
+    });
     const transport = await fixture((request, reply) => {
       requests.push(request);
-      if (request.method.endsWith("session.start")) { setTimeout(() => reply(), 20); return; }
-      if (request.method.endsWith("command.execute")) { dispatched(); return; }
+      if (request.method.endsWith("session.start")) {
+        setTimeout(() => reply(), 20);
+        return;
+      }
+      if (request.method.endsWith("command.execute")) {
+        dispatched();
+        return;
+      }
       if (request.method.endsWith("command.cancel")) cancelled();
       reply();
     });
@@ -60,14 +78,19 @@ describe("Browser socket lifetime", () => {
     controller.abort();
     await rejection;
     await cancelSeen;
-    expect(requests.find((request) => request.method.endsWith("command.cancel"))?.params.id).toBe(requests.find((request) => request.method.endsWith("command.execute"))?.id);
+    expect(requests.find((request) => request.method.endsWith("command.cancel"))?.params.id).toBe(
+      requests.find((request) => request.method.endsWith("command.execute"))?.id,
+    );
     await transport.dispose();
     await expect(transport.request("agent_browser_bridge.command.list", {})).rejects.toThrow("disposed");
   });
 
   it("rejects incompatible startup responses without sending the requested action", async () => {
     const methods: string[] = [];
-    const transport = await fixture((request, reply) => { methods.push(request.method); reply({}, "0.1.0"); });
+    const transport = await fixture((request, reply) => {
+      methods.push(request.method);
+      reply({}, "0.1.0");
+    });
     await expect(transport.request("agent_browser_bridge.command.execute", {})).rejects.toThrow("incompatible");
     expect(methods).toEqual(["agent_browser_bridge.session.start"]);
     await transport.dispose();
@@ -75,7 +98,10 @@ describe("Browser socket lifetime", () => {
 
   it("cannot finish startup or dispatch after disposal while connecting", async () => {
     const methods: string[] = [];
-    const transport = await fixture((request, reply) => { methods.push(request.method); reply(); });
+    const transport = await fixture((request, reply) => {
+      methods.push(request.method);
+      reply();
+    });
     const pending = transport.request("agent_browser_bridge.command.execute", {});
     const rejection = expect(pending).rejects.toThrow(/closed|disposed/);
     await transport.dispose();

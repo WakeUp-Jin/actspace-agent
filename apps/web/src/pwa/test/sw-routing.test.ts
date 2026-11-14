@@ -1,7 +1,8 @@
 import { routeRequest } from "../sw-routing";
 
 const origin = "https://a.test";
-const route = (path: string, mode: RequestMode = "no-cors", method = "GET", base = origin) => routeRequest(new URL(path, base), mode, method, origin);
+const route = (path: string, mode: RequestMode = "no-cors", method = "GET", base = origin) =>
+  routeRequest(new URL(path, base), mode, method, origin);
 
 describe("routeRequest", () => {
   it("bypasses /rpc, cross-origin and non-GET", () => {

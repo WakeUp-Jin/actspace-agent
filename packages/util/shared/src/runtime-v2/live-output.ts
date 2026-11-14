@@ -9,15 +9,31 @@
  */
 export type LiveOutputKind = "assistant-delta" | "reasoning-delta";
 /** `requestId`：产生这段输出的模型请求（轨迹按它把正文放进占位行）；旧版远程 Host 不带。 */
-export type LiveOutputPiece = { readonly kind: LiveOutputKind; readonly messageId: string; readonly requestId?: string; readonly text: string; readonly revision: number };
-export type LiveOutputSegment = { readonly kind: "text" | "thinking"; readonly messageId: string; readonly requestId?: string; readonly text: string };
+export type LiveOutputPiece = {
+  readonly kind: LiveOutputKind;
+  readonly messageId: string;
+  readonly requestId?: string;
+  readonly text: string;
+  readonly revision: number;
+};
+export type LiveOutputSegment = {
+  readonly kind: "text" | "thinking";
+  readonly messageId: string;
+  readonly requestId?: string;
+  readonly text: string;
+};
 export type LiveOutputBaseline = {
   /** 底稿所属运行；没有未定稿输出时为 null，revision 仍然有效（用于截断之前的帧）。 */
   readonly runId: string | null;
   readonly revision: number;
   readonly segments: readonly LiveOutputSegment[];
 };
-export type LiveOutputPage = { readonly runId: string; readonly revision: number; readonly next: number; readonly chunks: readonly LiveOutputPiece[] };
+export type LiveOutputPage = {
+  readonly runId: string;
+  readonly revision: number;
+  readonly next: number;
+  readonly chunks: readonly LiveOutputPiece[];
+};
 
 /** 单段上限：远程分页时一段不会超过帧大小，超长的单个增量拆成多段，每段一个 revision。 */
 const PIECE_CHARS = 8192;
@@ -27,18 +43,30 @@ export class LiveOutputBuffer {
   #revision = 0;
   readonly #sessions = new Map<string, { runId: string; pieces: LiveOutputPiece[] }>();
 
-  get revision(): number { return this.#revision; }
+  get revision(): number {
+    return this.#revision;
+  }
 
   /** 收下一个实时事件。是正文或思考增量时返回它的 revision，其余事件返回 null。 */
   accept(event: unknown): number | null {
     if (!isRecord(event) || typeof event.sessionId !== "string" || typeof event.agentRunId !== "string") return null;
     if (event.kind !== "assistant-delta" && event.kind !== "reasoning-delta") return null;
-    if (typeof event.message !== "string" || typeof event.messageId !== "string" || event.message.length === 0) return null;
+    if (typeof event.message !== "string" || typeof event.messageId !== "string" || event.message.length === 0)
+      return null;
     let state = this.#sessions.get(event.sessionId);
-    if (!state || state.runId !== event.agentRunId) { state = { runId: event.agentRunId, pieces: [] }; this.#sessions.set(event.sessionId, state); }
+    if (!state || state.runId !== event.agentRunId) {
+      state = { runId: event.agentRunId, pieces: [] };
+      this.#sessions.set(event.sessionId, state);
+    }
     const request = typeof event.requestId === "string" ? { requestId: event.requestId } : {};
     for (let offset = 0; offset < event.message.length; offset += PIECE_CHARS) {
-      state.pieces.push({ kind: event.kind, messageId: event.messageId, ...request, text: event.message.slice(offset, offset + PIECE_CHARS), revision: ++this.#revision });
+      state.pieces.push({
+        kind: event.kind,
+        messageId: event.messageId,
+        ...request,
+        text: event.message.slice(offset, offset + PIECE_CHARS),
+        revision: ++this.#revision,
+      });
     }
     return this.#revision;
   }
@@ -77,13 +105,21 @@ export class LiveOutputBuffer {
   }
 }
 
-export function mergePieces(pieces: readonly Pick<LiveOutputPiece, "kind" | "messageId" | "requestId" | "text">[]): LiveOutputSegment[] {
+export function mergePieces(
+  pieces: readonly Pick<LiveOutputPiece, "kind" | "messageId" | "requestId" | "text">[],
+): LiveOutputSegment[] {
   const segments: { kind: "text" | "thinking"; messageId: string; requestId?: string; text: string }[] = [];
   for (const piece of pieces) {
     const kind = piece.kind === "reasoning-delta" ? "thinking" : "text";
     const last = segments.at(-1);
     if (last && last.kind === kind && last.messageId === piece.messageId) last.text += piece.text;
-    else segments.push({ kind, messageId: piece.messageId, ...(piece.requestId === undefined ? {} : { requestId: piece.requestId }), text: piece.text });
+    else
+      segments.push({
+        kind,
+        messageId: piece.messageId,
+        ...(piece.requestId === undefined ? {} : { requestId: piece.requestId }),
+        text: piece.text,
+      });
   }
   return segments;
 }

@@ -7,7 +7,13 @@ const source = { ownerPluginId: "@actspace/core" } as const;
 function eventJournal(): SessionEventEnvelopeV1[] {
   const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-08-30T00:00:00.000Z" });
   journal.append({ type: "turn/start", eventVersion: 1, source, data: { turnId: "turn-1" }, surface: null });
-  journal.append({ type: "user/message", eventVersion: 1, source, data: { messageId: "user-1", content: "hello" }, surface: { kind: "append" } });
+  journal.append({
+    type: "user/message",
+    eventVersion: 1,
+    source,
+    data: { messageId: "user-1", content: "hello" },
+    surface: { kind: "append" },
+  });
   journal.append({ type: "turn/end", eventVersion: 1, source, data: { turnId: "turn-1" }, surface: null });
   return [...journal.events];
 }
@@ -17,8 +23,16 @@ describe("SessionProjectionRegistry", () => {
     let views = 0;
     const make = () => {
       const registry = new SessionProjectionRegistry();
-      registry.register({ key: "count", stateVersion: 1, init: () => 0,
-        apply: state => state + 1, view: state => { views++; return state; } });
+      registry.register({
+        key: "count",
+        stateVersion: 1,
+        init: () => 0,
+        apply: (state) => state + 1,
+        view: (state) => {
+          views++;
+          return state;
+        },
+      });
       return registry;
     };
     const sequential = make();
@@ -29,7 +43,9 @@ describe("SessionProjectionRegistry", () => {
     const before = views;
     batch.replayTail("s", events.slice(1));
     expect(views).toBe(before);
-    events.slice(1).forEach(event => { sequential.apply("s", event); });
+    events.slice(1).forEach((event) => {
+      sequential.apply("s", event);
+    });
     expect(batch.checkpoint("s")).toEqual(sequential.checkpoint("s"));
     expect(batch.snapshot("s")).toEqual(sequential.snapshot("s"));
     const checkpoint = batch.checkpoint("s");
@@ -40,34 +56,66 @@ describe("SessionProjectionRegistry", () => {
   it("keeps incomplete transactions pending across a checkpoint and commits their tail together", () => {
     const make = () => {
       const registry = new SessionProjectionRegistry();
-      registry.register({ key: "types", stateVersion: 1, init: () => [] as string[], apply: (state, event) => [...state, event.type], view: state => state });
+      registry.register({
+        key: "types",
+        stateVersion: 1,
+        init: () => [] as string[],
+        apply: (state, event) => [...state, event.type],
+        view: (state) => state,
+      });
       return registry;
     };
     const base = eventJournal()[0];
-    const events = ["compaction/start", "compaction/summary", "compaction/end"].map((type, seq) => ({ ...base, type, seq, data: { compactionId: "c" } }));
+    const events = ["compaction/start", "compaction/summary", "compaction/end"].map((type, seq) => ({
+      ...base,
+      type,
+      seq,
+      data: { compactionId: "c" },
+    }));
     const sequential = make();
-    events.slice(0, 2).forEach(event => { sequential.apply("s", event); });
-    const batch = make(); batch.restore("s", sequential.checkpoint("s"));
+    events.slice(0, 2).forEach((event) => {
+      sequential.apply("s", event);
+    });
+    const batch = make();
+    batch.restore("s", sequential.checkpoint("s"));
     expect(batch.snapshot("s").values.types).toEqual([]);
     batch.replayTail("s", events.slice(2));
     sequential.apply("s", events[2]);
     expect(batch.checkpoint("s")).toEqual(sequential.checkpoint("s"));
-    expect(batch.snapshot("s").values.types).toEqual(events.map(event => event.type));
+    expect(batch.snapshot("s").values.types).toEqual(events.map((event) => event.type));
   });
 
   it("checkpoints internal state and rejects asynchronous views", () => {
     const registry = new SessionProjectionRegistry();
-    registry.register({ key: "count", stateVersion: 1, init: () => ({ count: 0, secretState: 4 }), apply: state => ({ ...state, count: state.count + 1 }), view: state => state.count });
+    registry.register({
+      key: "count",
+      stateVersion: 1,
+      init: () => ({ count: 0, secretState: 4 }),
+      apply: (state) => ({ ...state, count: state.count + 1 }),
+      view: (state) => state.count,
+    });
     registry.sync("s", eventJournal());
     const checkpoint = registry.checkpoint("s");
     (checkpoint.rows.count.state as { count: number }).count = 99;
     expect(registry.snapshot("s").values.count).toBe(3);
     const restored = new SessionProjectionRegistry();
-    restored.register({ key: "count", stateVersion: 1, init: () => ({ count: 0, secretState: 4 }), apply: state => state, view: state => state.count });
+    restored.register({
+      key: "count",
+      stateVersion: 1,
+      init: () => ({ count: 0, secretState: 4 }),
+      apply: (state) => state,
+      view: (state) => state.count,
+    });
     restored.restore("s", registry.checkpoint("s"));
     expect(restored.snapshot("s")).toEqual(registry.snapshot("s"));
     const invalid = new SessionProjectionRegistry();
-    invalid.register({ key: "bad", stateVersion: 1, init: () => 0, apply: state => state, view: (() => Promise.resolve(1)) as never });
+    invalid.register({
+      key: "bad",
+      stateVersion: 1,
+      init: () => 0,
+      apply: (state) => state,
+      view: (() => Promise.resolve(1)) as never,
+    });
     expect(() => invalid.snapshot("s")).toThrow("plain JSON");
   });
 
@@ -77,7 +125,7 @@ describe("SessionProjectionRegistry", () => {
       key: "count",
       stateVersion: 1,
       init: () => 0,
-      apply: (state, event) => event.type === "user/message" ? state + 1 : state,
+      apply: (state, event) => (event.type === "user/message" ? state + 1 : state),
       view: (state) => state,
     });
     const changes: unknown[] = [];
@@ -86,7 +134,11 @@ describe("SessionProjectionRegistry", () => {
     registry.sync("session-1", [events[0]]);
     expect(registry.apply("session-1", events[1])).not.toBeNull();
     expect(registry.apply("session-1", events[2])).toBeNull();
-    expect(registry.snapshot("session-1")).toMatchObject({ sessionId: "session-1", throughJournalSeq: 2, values: { count: 1 } });
+    expect(registry.snapshot("session-1")).toMatchObject({
+      sessionId: "session-1",
+      throughJournalSeq: 2,
+      values: { count: 1 },
+    });
     expect(changes).toHaveLength(1);
   });
 
@@ -98,7 +150,7 @@ describe("SessionProjectionRegistry", () => {
       key: "messages",
       stateVersion: 1,
       init: () => [] as string[],
-      apply: (state, event) => event.type === "user/message" ? [...state, "user-1"] : state,
+      apply: (state, event) => (event.type === "user/message" ? [...state, "user-1"] : state),
       view: (state) => state,
     });
     expect(registry.snapshot("session-1").values.messages).toEqual(["user-1"]);
@@ -107,7 +159,16 @@ describe("SessionProjectionRegistry", () => {
 
   it("rejects mutating reducers without advancing or contaminating committed state", () => {
     const registry = new SessionProjectionRegistry();
-    registry.register({ key: "count", stateVersion: 1, init: () => ({ count: 0 }), apply: state => { state.count++; throw new Error("broken reducer"); }, view: state => state });
+    registry.register({
+      key: "count",
+      stateVersion: 1,
+      init: () => ({ count: 0 }),
+      apply: (state) => {
+        state.count++;
+        throw new Error("broken reducer");
+      },
+      view: (state) => state,
+    });
     registry.ensureSession("s");
     expect(() => registry.apply("s", eventJournal()[0])).toThrow();
     expect(registry.snapshot("s")).toMatchObject({ throughJournalSeq: -1, values: { count: { count: 0 } } });
@@ -115,8 +176,22 @@ describe("SessionProjectionRegistry", () => {
 
   it("fails duplicate keys and event gaps without mutating the cell", () => {
     const registry = new SessionProjectionRegistry();
-    registry.register({ key: "count", stateVersion: 1, init: () => 0, apply: (state) => state + 1, view: (state) => state });
-    expect(() => registry.register({ key: "count", stateVersion: 1, init: () => 0, apply: (state) => state, view: (state) => state })).toThrow("Duplicate projection key");
+    registry.register({
+      key: "count",
+      stateVersion: 1,
+      init: () => 0,
+      apply: (state) => state + 1,
+      view: (state) => state,
+    });
+    expect(() =>
+      registry.register({
+        key: "count",
+        stateVersion: 1,
+        init: () => 0,
+        apply: (state) => state,
+        view: (state) => state,
+      }),
+    ).toThrow("Duplicate projection key");
     const events = eventJournal();
     registry.sync("session-1", [events[0]]);
     expect(registry.apply("session-1", events[0])).toBeNull();
@@ -127,7 +202,13 @@ describe("SessionProjectionRegistry", () => {
 
 it("sealed runtime cells retain no replay bodies and require resync for evicted duplicate proofs", () => {
   const registry = new SessionProjectionRegistry();
-  registry.register({ key: "count", stateVersion: 1, init: () => 0, apply: state => state + 1, view: state => state });
+  registry.register({
+    key: "count",
+    stateVersion: 1,
+    init: () => 0,
+    apply: (state) => state + 1,
+    view: (state) => state,
+  });
   registry.seal();
   const base = eventJournal()[0];
   for (let seq = 0; seq < 1000; seq++) registry.apply("s", { ...base, seq });
@@ -136,5 +217,7 @@ it("sealed runtime cells retain no replay bodies and require resync for evicted 
   expect(registry.apply("s", { ...base, seq: 999 })).toBeNull();
   expect(() => registry.apply("s", { ...base, seq: 999, time: "different" })).toThrow("resync");
   expect(() => registry.apply("s", base)).toThrow("resync");
-  expect(() => registry.register({ key: "late", stateVersion: 1, init: () => 0, apply: state => state, view: state => state })).toThrow("sealing");
+  expect(() =>
+    registry.register({ key: "late", stateVersion: 1, init: () => 0, apply: (state) => state, view: (state) => state }),
+  ).toThrow("sealing");
 });

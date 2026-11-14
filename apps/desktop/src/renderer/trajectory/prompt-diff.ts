@@ -11,10 +11,15 @@ function lineOps(before: readonly string[], after: readonly string[]): Op[] {
   let head = 0;
   while (head < before.length && head < after.length && before[head] === after[head]) head += 1;
   let tail = 0;
-  while (tail < before.length - head && tail < after.length - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail += 1;
+  while (
+    tail < before.length - head &&
+    tail < after.length - head &&
+    before[before.length - 1 - tail] === after[after.length - 1 - tail]
+  )
+    tail += 1;
   const a = before.slice(head, before.length - tail);
   const b = after.slice(head, after.length - tail);
-  const ops: Op[] = before.slice(0, head).map(text => ({ sign: " ", text }));
+  const ops: Op[] = before.slice(0, head).map((text) => ({ sign: " ", text }));
   if ((a.length + 1) * (b.length + 1) > MAX_LCS_CELLS) {
     ops.push(...a.map((text): Op => ({ sign: "-", text })), ...b.map((text): Op => ({ sign: "+", text })));
   } else {
@@ -22,15 +27,26 @@ function lineOps(before: readonly string[], after: readonly string[]): Op[] {
     const table = new Uint32Array((a.length + 1) * width);
     for (let i = a.length - 1; i >= 0; i -= 1) {
       for (let j = b.length - 1; j >= 0; j -= 1) {
-        table[i * width + j] = a[i] === b[j] ? table[(i + 1) * width + j + 1] + 1 : Math.max(table[(i + 1) * width + j], table[i * width + j + 1]);
+        table[i * width + j] =
+          a[i] === b[j]
+            ? table[(i + 1) * width + j + 1] + 1
+            : Math.max(table[(i + 1) * width + j], table[i * width + j + 1]);
       }
     }
     let i = 0;
     let j = 0;
     while (i < a.length && j < b.length) {
-      if (a[i] === b[j]) { ops.push({ sign: " ", text: a[i] }); i += 1; j += 1; }
-      else if (table[(i + 1) * width + j] >= table[i * width + j + 1]) { ops.push({ sign: "-", text: a[i] }); i += 1; }
-      else { ops.push({ sign: "+", text: b[j] }); j += 1; }
+      if (a[i] === b[j]) {
+        ops.push({ sign: " ", text: a[i] });
+        i += 1;
+        j += 1;
+      } else if (table[(i + 1) * width + j] >= table[i * width + j + 1]) {
+        ops.push({ sign: "-", text: a[i] });
+        i += 1;
+      } else {
+        ops.push({ sign: "+", text: b[j] });
+        j += 1;
+      }
     }
     for (; i < a.length; i += 1) ops.push({ sign: "-", text: a[i] });
     for (; j < b.length; j += 1) ops.push({ sign: "+", text: b[j] });
@@ -64,14 +80,16 @@ export function promptDiffLines(before: string, after: string): readonly PromptD
     const from = Math.max(0, first - CONTEXT);
     const to = Math.min(ops.length - 1, last + CONTEXT);
     const slice = ops.slice(from, to + 1);
-    const oldLines = slice.filter(op => op.sign !== "+").length;
-    const newLines = slice.filter(op => op.sign !== "-").length;
+    const oldLines = slice.filter((op) => op.sign !== "+").length;
+    const newLines = slice.filter((op) => op.sign !== "-").length;
     const oldStart = oldLines === 0 ? oldAt[from] - 1 : oldAt[from];
     const newStart = newLines === 0 ? newAt[from] - 1 : newAt[from];
-    const lines = slice.map((op): PromptDiffLine => ({
-      kind: op.sign === "+" ? "added" : op.sign === "-" ? "removed" : "context",
-      text: `${op.sign}${op.text}`,
-    }));
+    const lines = slice.map(
+      (op): PromptDiffLine => ({
+        kind: op.sign === "+" ? "added" : op.sign === "-" ? "removed" : "context",
+        text: `${op.sign}${op.text}`,
+      }),
+    );
     return [
       ...(hunk === 0 ? [] : [{ kind: "meta", text: "" } as const]),
       { kind: "meta", text: `@@ -${oldStart},${oldLines} +${newStart},${newLines} @@` } as const,

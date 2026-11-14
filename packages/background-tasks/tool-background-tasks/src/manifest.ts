@@ -4,7 +4,13 @@ export const BACKGROUND_TASK_TOOLS_PLUGIN_ID = "actspace.background-tasks" as co
 export const BACKGROUND_TASK_TOOL_NAMES = Object.freeze(["task_list", "task_output", "task_stop"] as const);
 
 export const manifest = defineBuiltinPluginManifest({
-  display: { title: "后台任务", description: "查看和停止后台运行的命令与子智能体", scope: "session", defaultEnabled: true, canDisable: false },
+  display: {
+    title: "后台任务",
+    description: "查看和停止后台运行的命令与子智能体",
+    scope: "session",
+    defaultEnabled: true,
+    canDisable: false,
+  },
   pluginId: BACKGROUND_TASK_TOOLS_PLUGIN_ID,
   version: "0.1.0",
   name: "ActSpace Background Task Tools",
@@ -12,5 +18,10 @@ export const manifest = defineBuiltinPluginManifest({
   host: { required: [], optional: [] },
   frontend: null,
   injects: ["tools.runtime", "actspace.host.background-tasks"],
-  contributions: { services: ["tools.background-tasks"], tools: [...BACKGROUND_TASK_TOOL_NAMES], prompts: [], events: [] },
+  contributions: {
+    services: ["tools.background-tasks"],
+    tools: [...BACKGROUND_TASK_TOOL_NAMES],
+    prompts: [],
+    events: [],
+  },
 });

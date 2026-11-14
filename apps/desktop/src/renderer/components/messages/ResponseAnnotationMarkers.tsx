@@ -63,7 +63,11 @@ export function ResponseAnnotationMarkers({
       for (const [index, current] of placed.entries()) {
         const previous = placed[index - 1];
         // 两段原文在同一行附近结束：向右错开，不叠在一起。
-        if (previous && Math.abs(current.top - previous.top) < MARK_SIZE_PX && current.left - previous.left < MARK_MIN_SPACING_PX) {
+        if (
+          previous &&
+          Math.abs(current.top - previous.top) < MARK_SIZE_PX &&
+          current.left - previous.left < MARK_MIN_SPACING_PX
+        ) {
           current.top = previous.top;
           current.left = previous.left + MARK_MIN_SPACING_PX;
         }

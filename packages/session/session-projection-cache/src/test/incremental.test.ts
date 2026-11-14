@@ -6,52 +6,165 @@ import { SessionProjectionCache } from "../index.js";
 
 const codecs = createCoreCodecRegistry();
 const MB = 1024 * 1024;
-const header = (sessionId: string) => createSessionHeader({ sessionId, createdAt: "2026-11-04T00:00:00Z", lineage: null, createdWith: { profileId: "p", runtimeContractVersion: "1", manifestDigest: "x", plugins: [], codecSetDigest: codecs.digest } });
-const event = (seq: number, type: string, data: Record<string, unknown> | null = null): SessionEventEnvelopeV1 => ({ recordKind: "event", seq, type, eventVersion: 1, criticality: "required", time: "2026-11-04T00:00:00Z", source: { ownerPluginId: "t" }, data, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } } as unknown as SessionEventEnvelopeV1);
+const header = (sessionId: string) =>
+  createSessionHeader({
+    sessionId,
+    createdAt: "2026-11-04T00:00:00Z",
+    lineage: null,
+    createdWith: {
+      profileId: "p",
+      runtimeContractVersion: "1",
+      manifestDigest: "x",
+      plugins: [],
+      codecSetDigest: codecs.digest,
+    },
+  });
+const event = (seq: number, type: string, data: Record<string, unknown> | null = null): SessionEventEnvelopeV1 =>
+  ({
+    recordKind: "event",
+    seq,
+    type,
+    eventVersion: 1,
+    criticality: "required",
+    time: "2026-11-04T00:00:00Z",
+    source: { ownerPluginId: "t" },
+    data,
+    surface: null,
+    provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
+  }) as unknown as SessionEventEnvelopeV1;
 
 /** A backend whose refresh() classifies against what it currently holds; counts what the cache asks of it. */
 class FakeStorage implements SessionStorage {
   readonly identity = Symbol("fake");
-  readonly sessions = new Map<string, { events: SessionEventEnvelopeV1[]; revision: number; bytes: number; integrity: "complete" | "repair-required"; validatedDigest: string | undefined }>();
-  inspects = 0; refreshes = 0; failRefresh = false;
-  put(id: string, events: SessionEventEnvelopeV1[], bytes = 100) { this.sessions.set(id, { events, revision: (this.sessions.get(id)?.revision ?? -1) + 1, bytes, integrity: "complete", validatedDigest: codecs.digest }); }
-  append(id: string, ...events: SessionEventEnvelopeV1[]) { const s = this.sessions.get(id)!; s.events = [...s.events, ...events]; s.revision++; s.bytes += 100 * events.length; }
+  readonly sessions = new Map<
+    string,
+    {
+      events: SessionEventEnvelopeV1[];
+      revision: number;
+      bytes: number;
+      integrity: "complete" | "repair-required";
+      validatedDigest: string | undefined;
+    }
+  >();
+  inspects = 0;
+  refreshes = 0;
+  failRefresh = false;
+  put(id: string, events: SessionEventEnvelopeV1[], bytes = 100) {
+    this.sessions.set(id, {
+      events,
+      revision: (this.sessions.get(id)?.revision ?? -1) + 1,
+      bytes,
+      integrity: "complete",
+      validatedDigest: codecs.digest,
+    });
+  }
+  append(id: string, ...events: SessionEventEnvelopeV1[]) {
+    const s = this.sessions.get(id)!;
+    s.events = [...s.events, ...events];
+    s.revision++;
+    s.bytes += 100 * events.length;
+  }
   #snapshot(id: string): SessionStorageSnapshot {
     const s = this.sessions.get(id)!;
-    return Object.freeze({ header: header(id), events: Object.freeze([...s.events]), revision: String(s.revision), integrity: s.integrity, ...(s.integrity === "complete" ? {} : { problem: "torn" }), bytes: s.bytes, ...(s.validatedDigest ? { validated: { codecDigest: s.validatedDigest, accessState: "read-write" as const, result: { accessState: "read-write" as const, diagnostics: [], relations: { openTurnId: null, openStepId: null, openRequestIds: [], openToolCallIds: [], pendingInboxMessageIds: [], committedRepairIds: [] } } } } : {}) });
+    return Object.freeze({
+      header: header(id),
+      events: Object.freeze([...s.events]),
+      revision: String(s.revision),
+      integrity: s.integrity,
+      ...(s.integrity === "complete" ? {} : { problem: "torn" }),
+      bytes: s.bytes,
+      ...(s.validatedDigest
+        ? {
+            validated: {
+              codecDigest: s.validatedDigest,
+              accessState: "read-write" as const,
+              result: {
+                accessState: "read-write" as const,
+                diagnostics: [],
+                relations: {
+                  openTurnId: null,
+                  openStepId: null,
+                  openRequestIds: [],
+                  openToolCallIds: [],
+                  pendingInboxMessageIds: [],
+                  committedRepairIds: [],
+                },
+              },
+            },
+          }
+        : {}),
+    });
   }
-  async inspect(id: string) { this.inspects++; return this.#snapshot(id); }
+  async inspect(id: string) {
+    this.inspects++;
+    return this.#snapshot(id);
+  }
   async refresh(id: string, base: SessionStorageSnapshot): Promise<SessionStorageRefresh> {
     this.refreshes++;
     if (this.failRefresh) throw new Error("backend unavailable");
     const s = this.sessions.get(id)!;
-    if (String(s.revision) === base.revision && s.integrity === "complete") return { kind: "unchanged", snapshot: base };
+    if (String(s.revision) === base.revision && s.integrity === "complete")
+      return { kind: "unchanged", snapshot: base };
     const snapshot = this.#snapshot(id);
     const prefix = base.events.length <= snapshot.events.length && base.events.every((e, i) => e === s.events[i]);
-    return prefix && s.integrity === "complete" ? { kind: "appended", snapshot, fromEvent: base.events.length } : { kind: "replaced", snapshot };
+    return prefix && s.integrity === "complete"
+      ? { kind: "appended", snapshot, fromEvent: base.events.length }
+      : { kind: "replaced", snapshot };
   }
-  async listSessionIds() { return [...this.sessions.keys()]; }
-  create(): never { throw new Error("unused"); }
-  open(): never { throw new Error("unused"); }
-  discard(): never { throw new Error("unused"); }
+  async listSessionIds() {
+    return [...this.sessions.keys()];
+  }
+  create(): never {
+    throw new Error("unused");
+  }
+  open(): never {
+    throw new Error("unused");
+  }
+  discard(): never {
+    throw new Error("unused");
+  }
   async close() {}
 }
 
 function setup(options: { reducerVersion?: () => number } = {}) {
   const storage = new FakeStorage();
   let applies = 0;
-  const cache = new SessionProjectionCache({ storage, codecs, createRegistry: () => {
-    const registry = new SessionProjectionRegistry();
-    registry.register({ key: "count", stateVersion: options.reducerVersion?.() ?? 1, init: () => 0, apply: state => { applies++; return state + 1; }, view: state => state });
-    return registry;
-  } });
+  const cache = new SessionProjectionCache({
+    storage,
+    codecs,
+    createRegistry: () => {
+      const registry = new SessionProjectionRegistry();
+      registry.register({
+        key: "count",
+        stateVersion: options.reducerVersion?.() ?? 1,
+        init: () => 0,
+        apply: (state) => {
+          applies++;
+          return state + 1;
+        },
+        view: (state) => state,
+      });
+      return registry;
+    },
+  });
   return { storage, cache, applies: () => applies };
 }
-const title = (seq: number) => ({ ...event(seq, "session/title-set", { title: `t${seq}` }), source: { ownerPluginId: "@actspace/core" } }) as SessionEventEnvelopeV1;
-const turn = (from: number) => [event(from, "turn/start", { callId: "a" }), event(from + 1, "request/header", { callId: "b" }), event(from + 2, "turn/end"), event(from + 3, "llm/auxiliary-start"), event(from + 4, "x/y", { callId: "a" })];
+const title = (seq: number) =>
+  ({
+    ...event(seq, "session/title-set", { title: `t${seq}` }),
+    source: { ownerPluginId: "@actspace/core" },
+  }) as SessionEventEnvelopeV1;
+const turn = (from: number) => [
+  event(from, "turn/start", { callId: "a" }),
+  event(from + 1, "request/header", { callId: "b" }),
+  event(from + 2, "turn/end"),
+  event(from + 3, "llm/auxiliary-start"),
+  event(from + 4, "x/y", { callId: "a" }),
+];
 /** What an index/checkpoint should be: the answer of a cache that never saw the session before. */
 async function cold(storage: FakeStorage, id: string) {
-  const fresh = setup(); fresh.storage.sessions = storage.sessions;
+  const fresh = setup();
+  fresh.storage.sessions = storage.sessions;
   return fresh.cache.read(id);
 }
 
@@ -114,9 +227,11 @@ it("a torn tail reported by refresh rejects like a fresh read and leaves no stal
   const { storage, cache } = setup();
   storage.put("s", turn(0));
   await cache.read("s");
-  storage.sessions.get("s")!.integrity = "repair-required"; storage.sessions.get("s")!.revision++;
+  storage.sessions.get("s")!.integrity = "repair-required";
+  storage.sessions.get("s")!.revision++;
   await expect(cache.read("s")).rejects.toThrow("torn");
-  storage.sessions.get("s")!.integrity = "complete"; storage.sessions.get("s")!.revision++;
+  storage.sessions.get("s")!.integrity = "complete";
+  storage.sessions.get("s")!.revision++;
   expect((await cache.read("s")).events).toHaveLength(5);
 });
 
@@ -186,7 +301,9 @@ it("large Sessions are cacheable: size does not decide whether a read is retaine
 it("keeps the 3 most recently used Sessions and evicts the oldest", async () => {
   const { storage, cache } = setup();
   for (const id of ["a", "b", "c", "d"]) storage.put(id, turn(0));
-  const a = await cache.read("a"); const b = await cache.read("b"); const c = await cache.read("c");
+  const a = await cache.read("a");
+  const b = await cache.read("b");
+  const c = await cache.read("c");
   expect(await cache.read("a")).toBe(a); // touch: b is now least recently used
   await cache.read("d");
   expect(await cache.read("a")).toBe(a);

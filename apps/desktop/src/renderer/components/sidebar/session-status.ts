@@ -13,7 +13,8 @@ export const SESSION_STATUS_META: Record<SessionUiStatusKind, SessionStatusMeta>
     label: "运行中",
     detail: "Agent 正在执行当前轮次。",
     // 运行中是转圈的细环。
-    dotClass: "size-2.5 rounded-full border-[1.5px] border-operational border-t-transparent animate-spin motion-reduce:animate-none",
+    dotClass:
+      "size-2.5 rounded-full border-[1.5px] border-operational border-t-transparent animate-spin motion-reduce:animate-none",
     rowClass: "is-busy",
   },
   waiting_approval: {
@@ -47,7 +48,9 @@ export function sessionStatusOf(
 ): SessionUiStatusKind {
   const status = sessionStatuses?.[sessionId] ?? (busySessionIds?.has(sessionId) ? "running" : "idle");
   // 用 hasOwnProperty 而不是 in：`"toString" in SESSION_STATUS_META` 也为真。
-  return typeof status === "string" && Object.prototype.hasOwnProperty.call(SESSION_STATUS_META, status) ? status as SessionUiStatusKind : "idle";
+  return typeof status === "string" && Object.prototype.hasOwnProperty.call(SESSION_STATUS_META, status)
+    ? (status as SessionUiStatusKind)
+    : "idle";
 }
 
 /** 需要用户看一眼的会话：待审批、失败、跑完未读。按时间分组时收进最上面的「需要处理」。 */

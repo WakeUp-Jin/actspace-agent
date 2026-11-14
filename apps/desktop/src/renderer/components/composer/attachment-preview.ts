@@ -8,7 +8,10 @@ export function revokeAttachmentPreview(attachment: ComposerAttachment): void {
 }
 
 /** 释放 `attachments` 中、`kept` 里没有用到的预览。 */
-export function revokeAttachmentPreviews(attachments: readonly ComposerAttachment[] | undefined, kept: readonly ComposerAttachment[] = []): void {
+export function revokeAttachmentPreviews(
+  attachments: readonly ComposerAttachment[] | undefined,
+  kept: readonly ComposerAttachment[] = [],
+): void {
   if (!attachments?.length) return;
   const keptUrls = new Set(kept.map((attachment) => attachment.previewUrl).filter(Boolean));
   for (const attachment of attachments) {

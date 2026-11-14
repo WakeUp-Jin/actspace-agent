@@ -20,23 +20,32 @@ export function sideChatBoundarySeq(lineage: RuntimeJsonValue | null | undefined
 export function hideInheritedMessages(messages: readonly MessageBlock[], boundarySeq: number | null): MessageBlock[] {
   if (boundarySeq === null) return [...messages];
   const inheritedRuns = new Set<string>();
-  for (const block of messages) if (block.sourceSeq !== undefined && block.sourceSeq <= boundarySeq && block.runId) inheritedRuns.add(block.runId);
-  return messages.filter((block) => block.sourceSeq !== undefined
-    ? block.sourceSeq > boundarySeq
-    : !(block.runId && inheritedRuns.has(block.runId)));
+  for (const block of messages)
+    if (block.sourceSeq !== undefined && block.sourceSeq <= boundarySeq && block.runId) inheritedRuns.add(block.runId);
+  return messages.filter((block) =>
+    block.sourceSeq !== undefined ? block.sourceSeq > boundarySeq : !(block.runId && inheritedRuns.has(block.runId)),
+  );
 }
 
 /**
  * 从侧边对话自己的事件窗口数出继承了几轮：窗口之前的轮数加上窗口里分叉点之前开始的轮。
  * 窗口已经不含分叉点（侧边对话自己聊了很久）时数不出来，返回 null。
  */
-export function countInheritedTurns(window: RuntimeEventWindow | null | undefined, boundarySeq: number | null): number | null {
+export function countInheritedTurns(
+  window: RuntimeEventWindow | null | undefined,
+  boundarySeq: number | null,
+): number | null {
   if (!window || boundarySeq === null || window.fromSeq > boundarySeq + 1) return null;
-  return window.turnOffset + window.events.filter((event) => event.type === "turn/start" && event.seq <= boundarySeq).length;
+  return (
+    window.turnOffset + window.events.filter((event) => event.type === "turn/start" && event.seq <= boundarySeq).length
+  );
 }
 
 /** 消息流开头的分隔线文案。 */
-export function sideChatDividerText(inheritedTurnCount: number | null | undefined, runningTurnExcluded = false): string {
+export function sideChatDividerText(
+  inheritedTurnCount: number | null | undefined,
+  runningTurnExcluded = false,
+): string {
   if (inheritedTurnCount == null) return "继承主会话的上下文";
   return `继承主会话 ${inheritedTurnCount} 轮${runningTurnExcluded ? `，不含进行中的第 ${inheritedTurnCount + 1} 轮` : ""}`;
 }

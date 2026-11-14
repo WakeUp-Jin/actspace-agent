@@ -4,7 +4,9 @@ import { useSyncExternalStore } from "react";
 export const WIDE_QUERY = "(min-width: 1024px)";
 
 function media(): MediaQueryList | null {
-  return typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia(WIDE_QUERY) : null;
+  return typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia(WIDE_QUERY)
+    : null;
 }
 
 function subscribe(listener: () => void): () => void {
@@ -14,5 +16,9 @@ function subscribe(listener: () => void): () => void {
 }
 
 export function useWide(): boolean {
-  return useSyncExternalStore(subscribe, () => media()?.matches ?? false, () => false);
+  return useSyncExternalStore(
+    subscribe,
+    () => media()?.matches ?? false,
+    () => false,
+  );
 }

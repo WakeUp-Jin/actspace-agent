@@ -1,4 +1,9 @@
-import { CLAUDE_CODE_PERMISSION_MODE_VALUES, CODEX_APPROVAL_POLICY_VALUES, CODEX_SANDBOX_VALUES, type SettingsV4Tools } from "@actspace/shared";
+import {
+  CLAUDE_CODE_PERMISSION_MODE_VALUES,
+  CODEX_APPROVAL_POLICY_VALUES,
+  CODEX_SANDBOX_VALUES,
+  type SettingsV4Tools,
+} from "@actspace/shared";
 
 /** 插件设置项：哪些插件有设置、每项的取值与文案。取值与后端插件包导出的常量一致，由 main 里的测试比对。 */
 export type PluginSettingField = {
@@ -13,7 +18,8 @@ export type PluginSettingField = {
 
 export type PluginSettingsSpec = { note: string; fields: readonly PluginSettingField[] };
 
-const labelled = (values: readonly string[], labels: Readonly<Record<string, string>>) => values.map((value) => ({ value, label: `${value} · ${labels[value]}` }));
+const labelled = (values: readonly string[], labels: Readonly<Record<string, string>>) =>
+  values.map((value) => ({ value, label: `${value} · ${labels[value]}` }));
 
 export const PLUGIN_SETTINGS: Readonly<Record<string, PluginSettingsSpec>> = {
   "subagent-codex": {
@@ -23,15 +29,27 @@ export const PLUGIN_SETTINGS: Readonly<Record<string, PluginSettingsSpec>> = {
         key: "approvalPolicy",
         title: "审批策略",
         description: "Codex 执行命令前是否要审批；子智能体在后台运行，没人点审批，默认从不审批。",
-        options: labelled(CODEX_APPROVAL_POLICY_VALUES, { untrusted: "不在信任名单的命令要审批", "on-request": "Codex 认为需要时审批", never: "从不审批" }),
-        patch: (value) => ({ externalSubagents: { codex: { approvalPolicy: value as (typeof CODEX_APPROVAL_POLICY_VALUES)[number] } } }),
+        options: labelled(CODEX_APPROVAL_POLICY_VALUES, {
+          untrusted: "不在信任名单的命令要审批",
+          "on-request": "Codex 认为需要时审批",
+          never: "从不审批",
+        }),
+        patch: (value) => ({
+          externalSubagents: { codex: { approvalPolicy: value as (typeof CODEX_APPROVAL_POLICY_VALUES)[number] } },
+        }),
       },
       {
         key: "sandbox",
         title: "沙箱",
         description: "Codex 自己的沙箱范围。",
-        options: labelled(CODEX_SANDBOX_VALUES, { "read-only": "只读", "workspace-write": "可写工作区", "danger-full-access": "不限制" }),
-        patch: (value) => ({ externalSubagents: { codex: { sandbox: value as (typeof CODEX_SANDBOX_VALUES)[number] } } }),
+        options: labelled(CODEX_SANDBOX_VALUES, {
+          "read-only": "只读",
+          "workspace-write": "可写工作区",
+          "danger-full-access": "不限制",
+        }),
+        patch: (value) => ({
+          externalSubagents: { codex: { sandbox: value as (typeof CODEX_SANDBOX_VALUES)[number] } },
+        }),
       },
     ],
   },
@@ -50,7 +68,11 @@ export const PLUGIN_SETTINGS: Readonly<Record<string, PluginSettingsSpec>> = {
           plan: "只做计划",
           bypassPermissions: "跳过全部权限检查",
         }),
-        patch: (value) => ({ externalSubagents: { claudeCode: { permissionMode: value as (typeof CLAUDE_CODE_PERMISSION_MODE_VALUES)[number] } } }),
+        patch: (value) => ({
+          externalSubagents: {
+            claudeCode: { permissionMode: value as (typeof CLAUDE_CODE_PERMISSION_MODE_VALUES)[number] },
+          },
+        }),
       },
     ],
   },

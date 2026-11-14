@@ -21,7 +21,12 @@ export type BackgroundTaskTerminal = {
 };
 
 /** What a background Bash command is, for the 「后台任务」 panel. `outputPath` is its log under the Session directory. */
-export type BackgroundBashDetails = { readonly command: string; readonly cwd: string; readonly sandboxed: boolean; readonly outputPath?: string };
+export type BackgroundBashDetails = {
+  readonly command: string;
+  readonly cwd: string;
+  readonly sandboxed: boolean;
+  readonly outputPath?: string;
+};
 
 /** A background subagent: its transcript and its kind label (`general`, `explore`, `fork`, `codex`, `claude-code`). */
 export type BackgroundAgentDetails = { readonly transcriptPath: string; readonly label: string };
@@ -30,7 +35,13 @@ export type BackgroundAgentDetails = { readonly transcriptPath: string; readonly
  * Non-blocking snapshot shown by `task_output`. Bash also reports the log size and the byte offset to pass as
  * `since` next time; `pruned` means the log was deleted by the per-Session cap and `text` is empty.
  */
-export type BackgroundTaskOutput = { readonly text: string; readonly outputPath?: string; readonly logSize?: number; readonly nextOffset?: number; readonly pruned?: boolean };
+export type BackgroundTaskOutput = {
+  readonly text: string;
+  readonly outputPath?: string;
+  readonly logSize?: number;
+  readonly nextOffset?: number;
+  readonly pruned?: boolean;
+};
 
 /** `since`: Bash log byte offset to read from; without it a source returns its tail. */
 export type BackgroundTaskOutputOptions = { readonly since?: number };
@@ -71,12 +82,28 @@ export type BackgroundTaskRecord = {
 export type BackgroundTaskErrorCode = "TASK_NOT_FOUND" | "TASK_ID_CONFLICT";
 
 export class BackgroundTaskError extends Error {
-  constructor(readonly code: BackgroundTaskErrorCode, message: string) { super(message); this.name = "BackgroundTaskError"; }
+  constructor(
+    readonly code: BackgroundTaskErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "BackgroundTaskError";
+  }
 }
 
 /** Harness artifacts inline their own copy of this package, so a Host error is recognised by shape, never by `instanceof`. */
-export function isBackgroundTaskError(error: unknown): error is { readonly name: "BackgroundTaskError"; readonly code: BackgroundTaskErrorCode; readonly message: string } {
+export function isBackgroundTaskError(
+  error: unknown,
+): error is { readonly name: "BackgroundTaskError"; readonly code: BackgroundTaskErrorCode; readonly message: string } {
   if (typeof error !== "object" || error === null) return false;
-  const { name, code, message } = error as { readonly name?: unknown; readonly code?: unknown; readonly message?: unknown };
-  return name === "BackgroundTaskError" && (code === "TASK_NOT_FOUND" || code === "TASK_ID_CONFLICT") && typeof message === "string";
+  const { name, code, message } = error as {
+    readonly name?: unknown;
+    readonly code?: unknown;
+    readonly message?: unknown;
+  };
+  return (
+    name === "BackgroundTaskError" &&
+    (code === "TASK_NOT_FOUND" || code === "TASK_ID_CONFLICT") &&
+    typeof message === "string"
+  );
 }

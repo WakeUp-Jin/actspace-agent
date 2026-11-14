@@ -9,10 +9,18 @@ const VARIANTS: Record<ButtonVariant, string> = {
   danger: "bg-danger text-on-danger-solid hover:bg-danger-hover",
 };
 
-export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { readonly variant?: ButtonVariant; readonly busy?: boolean; readonly icon?: ReactNode; readonly block?: boolean };
+export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  readonly variant?: ButtonVariant;
+  readonly busy?: boolean;
+  readonly icon?: ReactNode;
+  readonly block?: boolean;
+};
 
 /** 最小高度 44px（触控规范）。busy 时显示转圈并禁用。 */
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ variant = "secondary", busy = false, icon, block = false, className, children, disabled, type = "button", ...rest }, ref) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = "secondary", busy = false, icon, block = false, className, children, disabled, type = "button", ...rest },
+  ref,
+) {
   return (
     <button
       ref={ref}

@@ -22,7 +22,11 @@ export function renderTex(tex: string, display: boolean, engine: Katex): string 
   if (rendered.has(key)) return rendered.get(key) ?? null;
   let html: string | null;
   try {
-    html = engine.renderToString(tex, { ...KATEX_OPTIONS, displayMode: display, errorColor: "var(--act-color-danger)" });
+    html = engine.renderToString(tex, {
+      ...KATEX_OPTIONS,
+      displayMode: display,
+      errorColor: "var(--act-color-danger)",
+    });
   } catch {
     html = null;
   }

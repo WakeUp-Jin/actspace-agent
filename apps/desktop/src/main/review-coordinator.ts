@@ -33,25 +33,35 @@ export type ResolvedReviewWorkspace = {
   workspaceRoot: string;
 };
 
-export type ReviewWorkspaceResolver = (input: ReviewWorkspaceInput) => Promise<
-  | { ok: true; workspace: ResolvedReviewWorkspace }
-  | { ok: false; message: string }
->;
+export type ReviewWorkspaceResolver = (
+  input: ReviewWorkspaceInput,
+) => Promise<{ ok: true; workspace: ResolvedReviewWorkspace } | { ok: false; message: string }>;
 
 export interface ReviewQueryProvider {
-  getSnapshot(input: ResolvedReviewWorkspace & { selection: ReviewSelection; generation: number; options: ReviewDiffQueryOptions; signal: AbortSignal }): Promise<ReviewSnapshot>;
-  getFileDiffs(input: ResolvedReviewWorkspace & {
-    snapshot: ReviewSnapshot;
-    requests: ReviewDiffRequest[];
-    generation: number;
-    signal: AbortSignal;
-  }): Promise<ReviewGetFileDiffsResult>;
-  getFileContents(input: ResolvedReviewWorkspace & {
-    snapshot: ReviewSnapshot;
-    fileIds: string[];
-    generation: number;
-    signal: AbortSignal;
-  }): Promise<ReviewGetFileContentsResult>;
+  getSnapshot(
+    input: ResolvedReviewWorkspace & {
+      selection: ReviewSelection;
+      generation: number;
+      options: ReviewDiffQueryOptions;
+      signal: AbortSignal;
+    },
+  ): Promise<ReviewSnapshot>;
+  getFileDiffs(
+    input: ResolvedReviewWorkspace & {
+      snapshot: ReviewSnapshot;
+      requests: ReviewDiffRequest[];
+      generation: number;
+      signal: AbortSignal;
+    },
+  ): Promise<ReviewGetFileDiffsResult>;
+  getFileContents(
+    input: ResolvedReviewWorkspace & {
+      snapshot: ReviewSnapshot;
+      fileIds: string[];
+      generation: number;
+      signal: AbortSignal;
+    },
+  ): Promise<ReviewGetFileContentsResult>;
   invalidateWorkspace?(workspaceId: string): void;
   dispose?(): void;
 }
@@ -84,7 +94,13 @@ export class ReviewCoordinator {
     const key = `${state.generation}:${reviewSelectionKey(input.selection)}:${options.ignoreWhitespaceChanges ? "ignore-space" : "show-space"}`;
     let pending = state.snapshots.get(key);
     if (!pending) {
-      pending = this.loadSnapshot(resolved.workspace, input.selection, options, state.generation, state.abortController.signal);
+      pending = this.loadSnapshot(
+        resolved.workspace,
+        input.selection,
+        options,
+        state.generation,
+        state.abortController.signal,
+      );
       state.snapshots.set(key, pending);
     }
     try {
@@ -132,7 +148,9 @@ export class ReviewCoordinator {
     }
     if (requests.length === 0) return { ok: true, outcomes: [] };
 
-    const missing = requests.filter((request) => !state.fileDiffs.has(diffCacheKey(snapshot.id, state.generation, request)));
+    const missing = requests.filter(
+      (request) => !state.fileDiffs.has(diffCacheKey(snapshot.id, state.generation, request)),
+    );
     if (missing.length > 0) {
       const batch = this.options.queryProvider.getFileDiffs({
         ...resolved.workspace,
@@ -144,20 +162,32 @@ export class ReviewCoordinator {
       for (const request of missing) {
         const key = diffCacheKey(snapshot.id, state.generation, request);
         const pending = batch.then((result): ReviewFileDiffOutcome => {
-          if (result.ok === false) return { fileId: request.fileId, status: "failed", code: result.code, message: result.message };
-          return result.outcomes.find((outcome) => outcome.fileId === request.fileId)
-            ?? { fileId: request.fileId, status: "failed", code: "file_not_found", message: "Review provider omitted the requested file." };
+          if (result.ok === false)
+            return { fileId: request.fileId, status: "failed", code: result.code, message: result.message };
+          return (
+            result.outcomes.find((outcome) => outcome.fileId === request.fileId) ?? {
+              fileId: request.fileId,
+              status: "failed",
+              code: "file_not_found",
+              message: "Review provider omitted the requested file.",
+            }
+          );
         });
         state.fileDiffs.set(key, pending);
-        void pending.then((outcome) => {
-          if (outcome.status === "failed" && state.fileDiffs.get(key) === pending) state.fileDiffs.delete(key);
-        }, () => {
-          if (state.fileDiffs.get(key) === pending) state.fileDiffs.delete(key);
-        });
+        void pending.then(
+          (outcome) => {
+            if (outcome.status === "failed" && state.fileDiffs.get(key) === pending) state.fileDiffs.delete(key);
+          },
+          () => {
+            if (state.fileDiffs.get(key) === pending) state.fileDiffs.delete(key);
+          },
+        );
       }
     }
 
-    const outcomes = await Promise.all(requests.map((request) => state.fileDiffs.get(diffCacheKey(snapshot.id, state.generation, request))!));
+    const outcomes = await Promise.all(
+      requests.map((request) => state.fileDiffs.get(diffCacheKey(snapshot.id, state.generation, request))!),
+    );
     return { ok: true, outcomes };
   }
 
@@ -177,7 +207,9 @@ export class ReviewCoordinator {
     }
     if (fileIds.length === 0) return { ok: true, outcomes: [] };
 
-    const missing = fileIds.filter((fileId) => !state.fileContents.has(contentCacheKey(snapshot.id, state.generation, fileId)));
+    const missing = fileIds.filter(
+      (fileId) => !state.fileContents.has(contentCacheKey(snapshot.id, state.generation, fileId)),
+    );
     if (missing.length > 0) {
       const batch = this.options.queryProvider.getFileContents({
         ...resolved.workspace,
@@ -190,18 +222,29 @@ export class ReviewCoordinator {
         const key = contentCacheKey(snapshot.id, state.generation, fileId);
         const pending = batch.then((result): ReviewFileContentsOutcome => {
           if (result.ok === false) return { fileId, status: "failed", code: result.code, message: result.message };
-          return result.outcomes.find((outcome) => outcome.fileId === fileId)
-            ?? { fileId, status: "failed", code: "file_not_found", message: "Review provider omitted the requested file content." };
+          return (
+            result.outcomes.find((outcome) => outcome.fileId === fileId) ?? {
+              fileId,
+              status: "failed",
+              code: "file_not_found",
+              message: "Review provider omitted the requested file content.",
+            }
+          );
         });
         state.fileContents.set(key, pending);
-        void pending.then((outcome) => {
-          if (outcome.status === "failed" && state.fileContents.get(key) === pending) state.fileContents.delete(key);
-        }, () => {
-          if (state.fileContents.get(key) === pending) state.fileContents.delete(key);
-        });
+        void pending.then(
+          (outcome) => {
+            if (outcome.status === "failed" && state.fileContents.get(key) === pending) state.fileContents.delete(key);
+          },
+          () => {
+            if (state.fileContents.get(key) === pending) state.fileContents.delete(key);
+          },
+        );
       }
     }
-    const outcomes = await Promise.all(fileIds.map((fileId) => state.fileContents.get(contentCacheKey(snapshot.id, state.generation, fileId))!));
+    const outcomes = await Promise.all(
+      fileIds.map((fileId) => state.fileContents.get(contentCacheKey(snapshot.id, state.generation, fileId))!),
+    );
     return { ok: true, outcomes };
   }
 
@@ -226,7 +269,13 @@ export class ReviewCoordinator {
     generation: number,
     signal: AbortSignal,
   ): Promise<ReviewSnapshot> {
-    const provided = await this.options.queryProvider.getSnapshot({ ...workspace, selection, options, generation, signal });
+    const provided = await this.options.queryProvider.getSnapshot({
+      ...workspace,
+      selection,
+      options,
+      generation,
+      signal,
+    });
     const snapshot: ReviewSnapshot = {
       ...provided,
       generation,
@@ -241,7 +290,14 @@ export class ReviewCoordinator {
   private stateFor(workspaceId: string): WorkspaceReviewState {
     let state = this.states.get(workspaceId);
     if (!state) {
-      state = { generation: 1, snapshots: new Map(), snapshotsById: new Map(), fileDiffs: new Map(), fileContents: new Map(), abortController: new AbortController() };
+      state = {
+        generation: 1,
+        snapshots: new Map(),
+        snapshotsById: new Map(),
+        fileDiffs: new Map(),
+        fileContents: new Map(),
+        abortController: new AbortController(),
+      };
       this.states.set(workspaceId, state);
     }
     return state;

@@ -221,7 +221,11 @@ function ChromeTitle({
   };
 
   if (!canShowPreview || !currentSession) {
-    return <h1 className="chrome-title" title={title}>{title}</h1>;
+    return (
+      <h1 className="chrome-title" title={title}>
+        {title}
+      </h1>
+    );
   }
 
   return (
@@ -238,12 +242,7 @@ function ChromeTitle({
         className={CHROME_TITLE_HOVER_CONTENT_CLASS}
         onPointerDown={(event) => event.preventDefault()}
       >
-        <SessionHoverPreviewCard
-          session={currentSession}
-          title={title}
-          preview={preview}
-          loading={loading}
-        />
+        <SessionHoverPreviewCard session={currentSession} title={title} preview={preview} loading={loading} />
       </TooltipContent>
     </Tooltip>
   );

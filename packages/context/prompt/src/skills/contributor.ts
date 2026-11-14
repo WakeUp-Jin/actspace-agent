@@ -18,7 +18,11 @@ export function createSkillCatalogContributor(catalog: SkillCatalog, scopeId: st
   });
 }
 
-export function createSelectedSkillContributor(catalog: SkillCatalog, scopeId: string, selectedIds?: readonly string[]): PromptContributor {
+export function createSelectedSkillContributor(
+  catalog: SkillCatalog,
+  scopeId: string,
+  selectedIds?: readonly string[],
+): PromptContributor {
   return Object.freeze({
     id: "core/selected-skills",
     ownerPluginId: "@actspace/core",
@@ -33,7 +37,12 @@ export function createSelectedSkillContributor(catalog: SkillCatalog, scopeId: s
         const skill = catalog.get(id);
         if (skill === undefined) throw new Error(`Selected Skill is unavailable: ${id}.`);
         const content = await readFile(skill.path, "utf8");
-        sections.push({ id: skill.id, source: skill.source, digest: skill.contentDigest, content: content.slice(0, 64 * 1024) });
+        sections.push({
+          id: skill.id,
+          source: skill.source,
+          digest: skill.contentDigest,
+          content: content.slice(0, 64 * 1024),
+        });
       }
       return { value: sections };
     },

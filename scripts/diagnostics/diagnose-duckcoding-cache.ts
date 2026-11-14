@@ -545,9 +545,7 @@ function printResults(results: ProbeResult[]): void {
 
   console.log("\nRaw usage fields (safe to share; API key and request body are omitted):");
   for (const result of results) {
-    console.log(
-      `${result.scenarioId}#${result.repeat}: ${JSON.stringify(result.usage.raw ?? null)}`,
-    );
+    console.log(`${result.scenarioId}#${result.repeat}: ${JSON.stringify(result.usage.raw ?? null)}`);
   }
 }
 
@@ -562,9 +560,7 @@ function warmedCacheHit(results: ProbeResult[], scenarioId: string): boolean {
 }
 
 function hasCacheWrites(results: ProbeResult[], scenarioId: string): boolean {
-  return successfulResults(results, scenarioId).some(
-    (result) => (result.usage.cacheWriteTokens ?? 0) > 0,
-  );
+  return successfulResults(results, scenarioId).some((result) => (result.usage.cacheWriteTokens ?? 0) > 0);
 }
 
 function hasAnyCacheFields(results: ProbeResult[]): boolean {
@@ -587,19 +583,29 @@ function classify(results: ProbeResult[], scenarios: Scenario[]): string[] {
   const wwwHit = warmedCacheHit(results, "chat-key-www");
 
   if (selected.has("chat-auto-api") && selected.has("chat-key-api") && !baselineHit && keyedHit) {
-    findings.push("Stable prompt_cache_key changes the result: the current runtime likely needs a session-stable cache key.");
+    findings.push(
+      "Stable prompt_cache_key changes the result: the current runtime likely needs a session-stable cache key.",
+    );
   }
   if (selected.has("chat-key-api") && selected.has("chat-key-tools-api") && keyedHit && !toolsHit) {
-    findings.push("The no-tools request caches but the tools request does not: compare tool definitions and prefix stability.");
+    findings.push(
+      "The no-tools request caches but the tools request does not: compare tool definitions and prefix stability.",
+    );
   }
   if (selected.has("chat-key-tools-api") && selected.has("chat-explicit-api") && !toolsHit && explicitHit) {
-    findings.push("Explicit cache options/breakpoint change the result: DuckCoding may require explicit cache placement for this route.");
+    findings.push(
+      "Explicit cache options/breakpoint change the result: DuckCoding may require explicit cache placement for this route.",
+    );
   }
   if (selected.has("chat-key-tools-api") && selected.has("responses-key-api") && !toolsHit && responsesHit) {
-    findings.push("Responses API caches while Chat Completions with tools does not: protocol/wire_api is the leading difference.");
+    findings.push(
+      "Responses API caches while Chat Completions with tools does not: protocol/wire_api is the leading difference.",
+    );
   }
   if (selected.has("chat-key-tools-api") && selected.has("chat-key-www") && toolsHit && !wwwHit) {
-    findings.push("The API host caches while the WWW host does not: hostname or gateway-node routing is the leading difference.");
+    findings.push(
+      "The API host caches while the WWW host does not: hostname or gateway-node routing is the leading difference.",
+    );
   }
   if (!results.some((result) => (result.usage.cachedTokens ?? 0) > 0)) {
     const wroteCache = scenarios.some((scenario) => hasCacheWrites(results, scenario.id));
@@ -610,17 +616,21 @@ function classify(results: ProbeResult[], scenarios: Scenario[]): string[] {
     );
   }
   if (!hasAnyCacheFields(results)) {
-    findings.push("The gateway returned no recognizable cache usage fields; compare request IDs and token counts with the DuckCoding dashboard.");
+    findings.push(
+      "The gateway returned no recognizable cache usage fields; compare request IDs and token counts with the DuckCoding dashboard.",
+    );
   }
 
-  const failedScenarios = scenarios.filter(
-    (scenario) => successfulResults(results, scenario.id).length === 0,
-  );
+  const failedScenarios = scenarios.filter((scenario) => successfulResults(results, scenario.id).length === 0);
   if (failedScenarios.length > 0) {
-    findings.push(`No successful response for: ${failedScenarios.map((scenario) => scenario.id).join(", ")}. HTTP errors are still useful protocol evidence.`);
+    findings.push(
+      `No successful response for: ${failedScenarios.map((scenario) => scenario.id).join(", ")}. HTTP errors are still useful protocol evidence.`,
+    );
   }
   if (findings.length === 0) {
-    findings.push("Multiple scenarios cache successfully. Compare warmed cached-token ratios to identify the smallest reliable request contract.");
+    findings.push(
+      "Multiple scenarios cache successfully. Compare warmed cached-token ratios to identify the smallest reliable request contract.",
+    );
   }
   return findings;
 }
@@ -647,7 +657,9 @@ async function main(): Promise<void> {
     else {
       console.log(`Dry run: ${summary.plannedRequests} paid requests would be made.`);
       console.log(`Model: ${options.model}`);
-      console.log(`Synthetic prompt: ${prompt.length.toLocaleString("en-US")} chars, ~${Math.ceil(prompt.length / 4).toLocaleString("en-US")} tokens, hash ${hashText(prompt)}`);
+      console.log(
+        `Synthetic prompt: ${prompt.length.toLocaleString("en-US")} chars, ~${Math.ceil(prompt.length / 4).toLocaleString("en-US")} tokens, hash ${hashText(prompt)}`,
+      );
       printScenarioList(scenarios);
     }
     return;
@@ -707,7 +719,9 @@ async function main(): Promise<void> {
     console.log("\nResults");
     printResults(results);
     console.log("\nInterpretation");
-    findings.forEach((finding) => { console.log(`- ${finding}`); });
+    findings.forEach((finding) => {
+      console.log(`- ${finding}`);
+    });
   }
 
   if (!results.some((result) => result.ok)) process.exitCode = 2;

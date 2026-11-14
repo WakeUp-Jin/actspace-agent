@@ -33,10 +33,9 @@ export function defaultProviderSettings(): ProviderConnectionSettings {
 }
 
 export function defaultInstalledModels(): Partial<Record<ModelKey, InstalledModelSettings>> {
-  return Object.fromEntries(BUILTIN_MODEL_LIST.map((definition) => [
-    definition.key,
-    { enabled: true, addedAt: BUILTIN_MODEL_ADDED_AT },
-  ])) as Partial<Record<ModelKey, InstalledModelSettings>>;
+  return Object.fromEntries(
+    BUILTIN_MODEL_LIST.map((definition) => [definition.key, { enabled: true, addedAt: BUILTIN_MODEL_ADDED_AT }]),
+  ) as Partial<Record<ModelKey, InstalledModelSettings>>;
 }
 
 /** 四层模型迁移版本，见 model-layers-migration.ts。新装直接是最新版本。 */
@@ -48,7 +47,10 @@ export function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV3 {
     IMAGE_GENERATION_MODEL: process.env.IMAGE_GENERATION_MODEL,
     LLM_TEMPERATURE: Number(process.env.LLM_TEMPERATURE ?? LLM_TEMPERATURE_DEFAULT),
     LLM_MAX_TOKENS: Number(process.env.LLM_MAX_TOKENS ?? LLM_MAX_TOKENS_DEFAULT),
-    ACTSPACE_DISABLED_TOOLS: (process.env.ACTSPACE_DISABLED_TOOLS ?? "").split(",").map((value) => value.trim()).filter(Boolean),
+    ACTSPACE_DISABLED_TOOLS: (process.env.ACTSPACE_DISABLED_TOOLS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
     ACTSPACE_BASH_ALWAYS_ASK: process.env.ACTSPACE_BASH_ALWAYS_ASK === "1",
   };
   const imageGeneration = safeImageGenerationDefaults(
@@ -57,11 +59,20 @@ export function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV3 {
   );
   return {
     version: 3,
-    providers: Object.fromEntries(PROVIDER_IDS.map((id) => [id, defaultProviderSettings()])) as PersistedSettingsV3["providers"],
+    providers: Object.fromEntries(
+      PROVIDER_IDS.map((id) => [id, defaultProviderSettings()]),
+    ) as PersistedSettingsV3["providers"],
     installedModels: defaultInstalledModels(),
     customModels: {},
     modelOverrides: {},
-    taskModels: { defaultChatModel: null, utilityModel: null, autoReviewModel: null, subagentDefaultModel: null, visionModel: null, thinking: { utility: "off", autoReview: "off" } },
+    taskModels: {
+      defaultChatModel: null,
+      utilityModel: null,
+      autoReviewModel: null,
+      subagentDefaultModel: null,
+      visionModel: null,
+      thinking: { utility: "off", autoReview: "off" },
+    },
     imageGeneration,
     agent: {
       systemPromptPath: defaultSystemPromptPath(dataRoot),
@@ -88,7 +99,14 @@ export function defaultSettingsV4Metadata(): SettingsV4Metadata {
       connections: {},
       definitions: {},
       installed: {},
-      taskBindings: { defaultChat: null, utility: null, autoReview: null, subagentDefaultModel: null, vision: null, thinking: { utility: "off", autoReview: "off" } },
+      taskBindings: {
+        defaultChat: null,
+        utility: null,
+        autoReview: null,
+        subagentDefaultModel: null,
+        vision: null,
+        thinking: { utility: "off", autoReview: "off" },
+      },
       layersVersion: MODEL_LAYERS_VERSION,
     },
     general: {

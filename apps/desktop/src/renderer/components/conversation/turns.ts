@@ -46,7 +46,7 @@ export function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTu
       currentTurn = {
         id: message.renderKey ?? message.id,
         user: message,
-        messages: []
+        messages: [],
       };
       turns.push(currentTurn);
       continue;
@@ -86,7 +86,7 @@ export function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTu
       currentTurn = {
         id: `turn-${message.renderKey ?? message.id}`,
         user: null,
-        messages: []
+        messages: [],
       };
       turns.push(currentTurn);
     }
@@ -143,9 +143,15 @@ export function isSubagentMessageNotice(message: MessageBlock): message is Backg
  * 一轮结束后，来信卡片不收进「Worked for」：从过程里拿出来，排在过程组后、最终回复前
  * （front-子Agent与后台任务规范 §2.1）。运行中保持原位。
  */
-export function liftSubagentMessages(processItems: MessageBlock[], running: boolean): { process: MessageBlock[]; letters: MessageBlock[] } {
+export function liftSubagentMessages(
+  processItems: MessageBlock[],
+  running: boolean,
+): { process: MessageBlock[]; letters: MessageBlock[] } {
   if (running || !processItems.some(isSubagentMessageNotice)) return { process: processItems, letters: [] };
-  return { process: processItems.filter((message) => !isSubagentMessageNotice(message)), letters: processItems.filter(isSubagentMessageNotice) };
+  return {
+    process: processItems.filter((message) => !isSubagentMessageNotice(message)),
+    letters: processItems.filter(isSubagentMessageNotice),
+  };
 }
 
 function normalizeTurnPreviewText(content: string): string {
@@ -159,8 +165,8 @@ export function createTurnNavigationItems(
   const userTurns = turns.filter((turn): turn is ConversationTurn & { user: UserMessageBlock } => Boolean(turn.user));
 
   return userTurns.map((turn, index) => {
-    const finalReply = splitTurnMessages(turn.messages).finalReply
-      .filter((message): message is AssistantMessageBlock => message.kind === "assistant")
+    const finalReply = splitTurnMessages(turn.messages)
+      .finalReply.filter((message): message is AssistantMessageBlock => message.kind === "assistant")
       .map((message) => message.content)
       .join("\n\n");
 

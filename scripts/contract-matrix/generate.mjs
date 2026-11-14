@@ -81,7 +81,8 @@ async function readRelative(relativePath) {
 }
 
 async function assertRelativePath(relativePath) {
-  if (!relativePath || relativePath.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(relativePath)) throw new Error(`Absolute source path is forbidden: ${relativePath}`);
+  if (!relativePath || relativePath.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(relativePath))
+    throw new Error(`Absolute source path is forbidden: ${relativePath}`);
   try {
     await access(resolve(repoRoot, relativePath));
   } catch {
@@ -117,19 +118,33 @@ export function interventionContractPaths(ids, declarations) {
   const paths = new Map();
   for (const id of ids) {
     const contract = declarations.find((item) => item.eventType === id);
-    if (contract === undefined) throw new Error(`Intervention ${id} has no @mode contract in the domain event declarations.`);
-    if (contract.mode !== LOOP_META[id]?.mode) throw new Error(`Intervention ${id} is declared as ${contract.mode} in ${contract.path}, but the matrix metadata says ${LOOP_META[id]?.mode}.`);
+    if (contract === undefined)
+      throw new Error(`Intervention ${id} has no @mode contract in the domain event declarations.`);
+    if (contract.mode !== LOOP_META[id]?.mode)
+      throw new Error(
+        `Intervention ${id} is declared as ${contract.mode} in ${contract.path}, but the matrix metadata says ${LOOP_META[id]?.mode}.`,
+      );
     paths.set(id, contract.path);
   }
   return paths;
 }
 
 function stableSort(rows) {
-  return [...rows].sort((left, right) => `${left.kind}\u0000${left.id}`.localeCompare(`${right.kind}\u0000${right.id}`));
+  return [...rows].sort((left, right) =>
+    `${left.kind}\u0000${left.id}`.localeCompare(`${right.kind}\u0000${right.id}`),
+  );
 }
 
 function row(kind, id, owner, status, sourceRefs, extra = {}) {
-  return Object.freeze({ kind, id, owner, status, sourceRefs: Object.freeze([...sourceRefs]), tests: Object.freeze([...(TEST_BY_KIND[kind] ?? [])]), ...extra });
+  return Object.freeze({
+    kind,
+    id,
+    owner,
+    status,
+    sourceRefs: Object.freeze([...sourceRefs]),
+    tests: Object.freeze([...(TEST_BY_KIND[kind] ?? [])]),
+    ...extra,
+  });
 }
 
 async function parseEvents() {
@@ -140,27 +155,132 @@ async function parseEvents() {
   const interventions = extractUnion(eventSource, "AgentLoopIntervention");
   const notifications = extractUnion(eventSource, "AgentNotification");
   if (core.length !== 14) throw new Error(`Expected 14 Session core events, found ${core.length}.`);
-  for (const [ids, metadata] of [[interventions, LOOP_META], [notifications, NOTIFICATION_META]]) {
-    if (ids.slice().sort().join() !== Object.keys(metadata).sort().join()) throw new Error("Event declarations and matrix metadata differ.");
+  for (const [ids, metadata] of [
+    [interventions, LOOP_META],
+    [notifications, NOTIFICATION_META],
+  ]) {
+    if (ids.slice().sort().join() !== Object.keys(metadata).sort().join())
+      throw new Error("Event declarations and matrix metadata differ.");
   }
 
   const rows = [];
-  for (const id of core) rows.push(row("event", `session:${id}`, "@actspace/session-journal", "active", [sourceRef(EVENT_SOURCES.sessionCore.path, EVENT_SOURCES.sessionCore.symbol)], { plane: "session", category: "core", eventType: id, scope: "session", surface: SESSION_SURFACES[id] ?? "internal", codecStatus: "present", producerStatus: READ_ONLY_CORE_EVENTS.has(id) ? "none" : "present", required: true }));
+  for (const id of core)
+    rows.push(
+      row(
+        "event",
+        `session:${id}`,
+        "@actspace/session-journal",
+        "active",
+        [sourceRef(EVENT_SOURCES.sessionCore.path, EVENT_SOURCES.sessionCore.symbol)],
+        {
+          plane: "session",
+          category: "core",
+          eventType: id,
+          scope: "session",
+          surface: SESSION_SURFACES[id] ?? "internal",
+          codecStatus: "present",
+          producerStatus: READ_ONLY_CORE_EVENTS.has(id) ? "none" : "present",
+          required: true,
+        },
+      ),
+    );
   for (const id of extensions) {
     const future = id === "goal/change" || id === "schedule/change";
     const auxiliary = id === "llm/auxiliary-start" || id === "llm/auxiliary-end";
-    rows.push(row("event", `session:${id}`, "@actspace/session-journal", future ? "unimplemented" : "active", [sourceRef(EVENT_SOURCES.sessionExtensions.path, EVENT_SOURCES.sessionExtensions.symbol)], { plane: "session", category: "extension", eventType: id, scope: "session", surface: "internal", codecStatus: "present", producerStatus: future ? "not-implemented" : auxiliary ? "present" : "none", required: true, ...(auxiliary ? { tests: ["session-journal/auxiliary-request-contract", "runtime/auxiliary-request-recorder", "image-inspection/auxiliary-request-lifecycle"] } : {}) }));
+    rows.push(
+      row(
+        "event",
+        `session:${id}`,
+        "@actspace/session-journal",
+        future ? "unimplemented" : "active",
+        [sourceRef(EVENT_SOURCES.sessionExtensions.path, EVENT_SOURCES.sessionExtensions.symbol)],
+        {
+          plane: "session",
+          category: "extension",
+          eventType: id,
+          scope: "session",
+          surface: "internal",
+          codecStatus: "present",
+          producerStatus: future ? "not-implemented" : auxiliary ? "present" : "none",
+          required: true,
+          ...(auxiliary
+            ? {
+                tests: [
+                  "session-journal/auxiliary-request-contract",
+                  "runtime/auxiliary-request-recorder",
+                  "image-inspection/auxiliary-request-lifecycle",
+                ],
+              }
+            : {}),
+        },
+      ),
+    );
   }
   const domainDeclarations = [];
   for (const path of DOMAIN_EVENT_PATHS) {
-    for (const match of (await readRelative(path)).matchAll(/\/\*\*\s*@mode\s+(emit|waterfall|parallel|serial|bail)\s*\*\/\s*"([^"]+)"/g)) domainDeclarations.push({ path, mode: match[1], eventType: match[2] });
+    for (const match of (await readRelative(path)).matchAll(
+      /\/\*\*\s*@mode\s+(emit|waterfall|parallel|serial|bail)\s*\*\/\s*"([^"]+)"/g,
+    ))
+      domainDeclarations.push({ path, mode: match[1], eventType: match[2] });
   }
   const contractPaths = interventionContractPaths(interventions, domainDeclarations);
-  for (const id of interventions) rows.push(row("event", `intervention:${id}`, "@actspace/cordis-adapter", "active", [sourceRef(EVENT_SOURCES.loopInterventions.path, EVENT_SOURCES.loopInterventions.symbol), contractPaths.get(id)], { plane: "intervention", category: "agent-loop", eventType: id, scope: LOOP_META[id]?.scope ?? "agent", mode: LOOP_META[id]?.mode ?? "waterfall", containment: LOOP_META[id]?.containment ?? "defined", codecStatus: "n/a", producerStatus: "present", required: true }));
-  for (const id of notifications) rows.push(row("event", `notification:${id}`, "@actspace/cordis-adapter", "active", [sourceRef(EVENT_SOURCES.notifications.path, EVENT_SOURCES.notifications.symbol)], { plane: "notification", category: "notification", eventType: id, scope: NOTIFICATION_META[id]?.scope ?? "runtime", containment: NOTIFICATION_META[id]?.containment ?? "observer-isolated", mode: "emit", codecStatus: "n/a", producerStatus: "present", required: true }));
+  for (const id of interventions)
+    rows.push(
+      row(
+        "event",
+        `intervention:${id}`,
+        "@actspace/cordis-adapter",
+        "active",
+        [
+          sourceRef(EVENT_SOURCES.loopInterventions.path, EVENT_SOURCES.loopInterventions.symbol),
+          contractPaths.get(id),
+        ],
+        {
+          plane: "intervention",
+          category: "agent-loop",
+          eventType: id,
+          scope: LOOP_META[id]?.scope ?? "agent",
+          mode: LOOP_META[id]?.mode ?? "waterfall",
+          containment: LOOP_META[id]?.containment ?? "defined",
+          codecStatus: "n/a",
+          producerStatus: "present",
+          required: true,
+        },
+      ),
+    );
+  for (const id of notifications)
+    rows.push(
+      row(
+        "event",
+        `notification:${id}`,
+        "@actspace/cordis-adapter",
+        "active",
+        [sourceRef(EVENT_SOURCES.notifications.path, EVENT_SOURCES.notifications.symbol)],
+        {
+          plane: "notification",
+          category: "notification",
+          eventType: id,
+          scope: NOTIFICATION_META[id]?.scope ?? "runtime",
+          containment: NOTIFICATION_META[id]?.containment ?? "observer-isolated",
+          mode: "emit",
+          codecStatus: "n/a",
+          producerStatus: "present",
+          required: true,
+        },
+      ),
+    );
   for (const { path, mode, eventType } of domainDeclarations) {
-    if (rows.some(item => item.eventType === eventType)) continue;
-    rows.push(row("event", `domain:${eventType}`, path.split("/").slice(0, 2).join("/"), "declared", [path], { plane: "domain", category: "domain", eventType, mode, producerStatus: "not-inferred", codecStatus: "n/a" }));
+    if (rows.some((item) => item.eventType === eventType)) continue;
+    rows.push(
+      row("event", `domain:${eventType}`, path.split("/").slice(0, 2).join("/"), "declared", [path], {
+        plane: "domain",
+        category: "domain",
+        eventType,
+        mode,
+        producerStatus: "not-inferred",
+        codecStatus: "n/a",
+      }),
+    );
   }
   return stableSort(rows);
 }
@@ -181,7 +301,9 @@ function parseManifestSource(path, source) {
   const call = callMatch[1];
   const pluginId = parseField(call, "pluginId")?.replace(/\s+/gu, "") ?? "";
   const pluginConstant = pluginId.match(/([A-Z0-9_]+)$/u)?.[1];
-  const resolvedPluginId = pluginId.startsWith("\"") ? pluginId.slice(1, -1) : parseConstantString(source, pluginConstant) ?? pluginId;
+  const resolvedPluginId = pluginId.startsWith('"')
+    ? pluginId.slice(1, -1)
+    : (parseConstantString(source, pluginConstant) ?? pluginId);
   const version = parseField(call, "version")?.replace(/^"|"$/gu, "") ?? "";
   const name = parseField(call, "name")?.replace(/^"|"$/gu, "") ?? "";
   const entryMatch = call.match(/entry\s*:\s*\{([\s\S]*?)\}/u);
@@ -201,7 +323,24 @@ function parseManifestSource(path, source) {
   const events = resolveArrayField(source, contributions, "events");
   const injects = parseArrayField(call, "injects");
   if (!resolvedPluginId || !entryId || !name) throw new Error(`Incomplete manifest ${path}.`);
-  return Object.freeze({ path, pluginId: resolvedPluginId, version, name, entryId, behavior, codec: codec || null, requiredCapabilities, optionalCapabilities, services, tools, prompts, events, injects, required: parseField(entry, "required") !== "false", enabled: parseField(entry, "enabled") !== "false" });
+  return Object.freeze({
+    path,
+    pluginId: resolvedPluginId,
+    version,
+    name,
+    entryId,
+    behavior,
+    codec: codec || null,
+    requiredCapabilities,
+    optionalCapabilities,
+    services,
+    tools,
+    prompts,
+    events,
+    injects,
+    required: parseField(entry, "required") !== "false",
+    enabled: parseField(entry, "enabled") !== "false",
+  });
 }
 
 function parseConstantString(source, name) {
@@ -211,7 +350,15 @@ function parseConstantString(source, name) {
 
 function resolveArrayField(source, fragment, field) {
   const array = fragment.match(new RegExp(`${field}\\s*:\\s*\\[([^\\]]*)\\]`, "u"));
-  if (array) return quotedStrings(array[1]).concat(array[1].split(",").map(token => token.trim()).filter(token => /^[A-Z0-9_]+$/.test(token)).map(token => parseConstantString(source, token)).filter(Boolean));
+  if (array)
+    return quotedStrings(array[1]).concat(
+      array[1]
+        .split(",")
+        .map((token) => token.trim())
+        .filter((token) => /^[A-Z0-9_]+$/.test(token))
+        .map((token) => parseConstantString(source, token))
+        .filter(Boolean),
+    );
   const direct = fragment.match(new RegExp(`${field}\\s*:\\s*([^,]+)`, "u"))?.[1]?.trim();
   if (!direct) return [];
   if (direct.startsWith("[")) return quotedStrings(direct);
@@ -221,7 +368,9 @@ function resolveArrayField(source, fragment, field) {
   }
   const constant = direct.match(/([A-Z0-9_]+)\.([a-zA-Z0-9_]+)/u);
   if (constant) {
-    const match = source.match(new RegExp(`${constant[1]}[\\s\\S]*?${constant[2]}\\s*:\\s*Object\\.freeze\\(\\[([^\\]]*)\\]`, "u"));
+    const match = source.match(
+      new RegExp(`${constant[1]}[\\s\\S]*?${constant[2]}\\s*:\\s*Object\\.freeze\\(\\[([^\\]]*)\\]`, "u"),
+    );
     if (match) return quotedStrings(match[1]);
   }
   return [];
@@ -239,21 +388,54 @@ async function parseManifests() {
     if (entryIds.has(manifest.entryId)) throw new Error(`Duplicate Entry id ${manifest.entryId}.`);
     entryIds.add(manifest.entryId);
     const provided = new Set(manifest.services);
-    if (provided.size !== manifest.services.length) throw new Error(`Manifest ${manifest.pluginId} repeats a provided service.`);
-    rows.push(row("plugin", manifest.pluginId, manifest.pluginId, manifest.enabled ? (manifest.required ? "active" : "optional") : "degraded", [sourceRef(manifest.path, "manifest")], { version: manifest.version, name: manifest.name, entryId: manifest.entryId, behavior: manifest.behavior, codec: manifest.codec, required: manifest.required, enabled: manifest.enabled, provides: [...manifest.services].sort(), injects: [...manifest.injects].sort(), tools: [...manifest.tools].sort(), prompts: [...manifest.prompts].sort(), events: [...manifest.events].sort(), requiredCapabilities: [...manifest.requiredCapabilities].sort(), optionalCapabilities: [...manifest.optionalCapabilities].sort() }));
+    if (provided.size !== manifest.services.length)
+      throw new Error(`Manifest ${manifest.pluginId} repeats a provided service.`);
+    rows.push(
+      row(
+        "plugin",
+        manifest.pluginId,
+        manifest.pluginId,
+        manifest.enabled ? (manifest.required ? "active" : "optional") : "degraded",
+        [sourceRef(manifest.path, "manifest")],
+        {
+          version: manifest.version,
+          name: manifest.name,
+          entryId: manifest.entryId,
+          behavior: manifest.behavior,
+          codec: manifest.codec,
+          required: manifest.required,
+          enabled: manifest.enabled,
+          provides: [...manifest.services].sort(),
+          injects: [...manifest.injects].sort(),
+          tools: [...manifest.tools].sort(),
+          prompts: [...manifest.prompts].sort(),
+          events: [...manifest.events].sort(),
+          requiredCapabilities: [...manifest.requiredCapabilities].sort(),
+          optionalCapabilities: [...manifest.optionalCapabilities].sort(),
+        },
+      ),
+    );
   }
   return { manifests, rows: stableSort(rows) };
 }
 
 async function parseServices() {
   const source = await readRelative(SERVICE_SOURCE.path);
-  const idsObject = source.match(/ACTSPACE_SERVICE_IDS[\s\S]*?= Object\.freeze\(\{([\s\S]*?)\}\s*as const\)/u)?.[1] ?? "";
-  const ids = new Map([...idsObject.matchAll(/([a-zA-Z0-9_]+)\s*:\s*serviceId\("([^"]+)"\)/gu)].map((match) => [match[1], match[2]]));
-  const definitionsObject = source.match(/ACTSPACE_SERVICE_DEFINITIONS[\s\S]*?= Object\.freeze\(\{([\s\S]*?)\}\);/u)?.[1] ?? "";
-  const roles = [...source.matchAll(/serviceRole\("([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*\[([^\]]*)\]\)/gu)].map((match) => ({ key: match[1], providerOwner: match[2], providerId: match[3], consumers: quotedStrings(match[4]) }));
+  const idsObject =
+    source.match(/ACTSPACE_SERVICE_IDS[\s\S]*?= Object\.freeze\(\{([\s\S]*?)\}\s*as const\)/u)?.[1] ?? "";
+  const ids = new Map(
+    [...idsObject.matchAll(/([a-zA-Z0-9_]+)\s*:\s*serviceId\("([^"]+)"\)/gu)].map((match) => [match[1], match[2]]),
+  );
+  const definitionsObject =
+    source.match(/ACTSPACE_SERVICE_DEFINITIONS[\s\S]*?= Object\.freeze\(\{([\s\S]*?)\}\);/u)?.[1] ?? "";
+  const roles = [...source.matchAll(/serviceRole\("([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*\[([^\]]*)\]\)/gu)].map(
+    (match) => ({ key: match[1], providerOwner: match[2], providerId: match[3], consumers: quotedStrings(match[4]) }),
+  );
   const rows = [];
   for (const role of roles) {
-    const definitionMatch = definitionsObject.match(new RegExp(`${role.key}:\\s*defineServiceDefinition\\(\\{([\\s\\S]*?)\\}\\)`, "u"));
+    const definitionMatch = definitionsObject.match(
+      new RegExp(`${role.key}:\\s*defineServiceDefinition\\(\\{([\\s\\S]*?)\\}\\)`, "u"),
+    );
     if (!definitionMatch) throw new Error(`Missing Service Definition ${role.key}.`);
     const definition = definitionMatch[1];
     const idKey = definition.match(/id:\s*ACTSPACE_SERVICE_IDS\.([a-zA-Z0-9_]+)/u)?.[1];
@@ -264,7 +446,26 @@ async function parseServices() {
     const description = definition.match(/description:\s*"([^"]+)"/u)?.[1] ?? "";
     const publicSurface = quotedStrings(definition.match(/publicSurface:\s*\[([^\]]*)\]/u)?.[1] ?? "");
     if (!id || !owner || !description) throw new Error(`Incomplete Service Definition ${role.key}.`);
-    rows.push(row("service", id, owner, required ? "active" : "optional", [sourceRef(SERVICE_SOURCE.path, `${SERVICE_SOURCE.definitionsSymbol}.${role.key}`)], { abiVersion: 1, scope, required, description, providerId: role.providerId, providerOwner: role.providerOwner, consumerIds: [...role.consumers].sort(), publicSurface, configSchema: { type: "object" } }));
+    rows.push(
+      row(
+        "service",
+        id,
+        owner,
+        required ? "active" : "optional",
+        [sourceRef(SERVICE_SOURCE.path, `${SERVICE_SOURCE.definitionsSymbol}.${role.key}`)],
+        {
+          abiVersion: 1,
+          scope,
+          required,
+          description,
+          providerId: role.providerId,
+          providerOwner: role.providerOwner,
+          consumerIds: [...role.consumers].sort(),
+          publicSurface,
+          configSchema: { type: "object" },
+        },
+      ),
+    );
   }
   return stableSort(rows);
 }
@@ -272,10 +473,33 @@ async function parseServices() {
 async function parseCapabilities(manifests) {
   const owners = new Map();
   for (const manifest of manifests) {
-    for (const capability of manifest.requiredCapabilities) owners.set(capability, { requiredBy: new Set([...(owners.get(capability)?.requiredBy ?? []), manifest.pluginId]), optionalBy: owners.get(capability)?.optionalBy ?? new Set() });
-    for (const capability of manifest.optionalCapabilities) owners.set(capability, { requiredBy: owners.get(capability)?.requiredBy ?? new Set(), optionalBy: new Set([...(owners.get(capability)?.optionalBy ?? []), manifest.pluginId]) });
+    for (const capability of manifest.requiredCapabilities)
+      owners.set(capability, {
+        requiredBy: new Set([...(owners.get(capability)?.requiredBy ?? []), manifest.pluginId]),
+        optionalBy: owners.get(capability)?.optionalBy ?? new Set(),
+      });
+    for (const capability of manifest.optionalCapabilities)
+      owners.set(capability, {
+        requiredBy: owners.get(capability)?.requiredBy ?? new Set(),
+        optionalBy: new Set([...(owners.get(capability)?.optionalBy ?? []), manifest.pluginId]),
+      });
   }
-  return stableSort([...owners].map(([id, value]) => row("capability", id, "@actspace/cordis-adapter", value.requiredBy.size > 0 ? "active" : "optional", [sourceRef("packages/composition/cordis-adapter/src/manifest.ts", "PluginHostRequirement")], { requiredBy: [...value.requiredBy].sort(), optionalBy: [...value.optionalBy].sort(), required: value.requiredBy.size > 0 })));
+  return stableSort(
+    [...owners].map(([id, value]) =>
+      row(
+        "capability",
+        id,
+        "@actspace/cordis-adapter",
+        value.requiredBy.size > 0 ? "active" : "optional",
+        [sourceRef("packages/composition/cordis-adapter/src/manifest.ts", "PluginHostRequirement")],
+        {
+          requiredBy: [...value.requiredBy].sort(),
+          optionalBy: [...value.optionalBy].sort(),
+          required: value.requiredBy.size > 0,
+        },
+      ),
+    ),
+  );
 }
 
 async function parsePackages() {
@@ -283,39 +507,101 @@ async function parsePackages() {
   for (const path of PACKAGE_PATHS) {
     const packageJson = JSON.parse(await readRelative(path));
     const id = packageJson.name ?? path.replace(/\/package\.json$/u, "");
-    const exports = packageJson.exports && typeof packageJson.exports === "object" ? Object.keys(packageJson.exports).sort() : [];
+    const exports =
+      packageJson.exports && typeof packageJson.exports === "object" ? Object.keys(packageJson.exports).sort() : [];
     if (!packageJson.private && !exports.includes(".")) throw new Error(`Package ${id} is missing public exports.`);
-    rows.push(row("package", id, id, "active", [sourceRef(path, "package.json")], { path, exports, dependencies: Object.keys({ ...(packageJson.dependencies ?? {}), ...(packageJson.optionalDependencies ?? {}), ...(packageJson.peerDependencies ?? {}) }).sort(), packageRole: path.startsWith("apps/") ? "host" : "domain" }));
+    rows.push(
+      row("package", id, id, "active", [sourceRef(path, "package.json")], {
+        path,
+        exports,
+        dependencies: Object.keys({
+          ...(packageJson.dependencies ?? {}),
+          ...(packageJson.optionalDependencies ?? {}),
+          ...(packageJson.peerDependencies ?? {}),
+        }).sort(),
+        packageRole: path.startsWith("apps/") ? "host" : "domain",
+      }),
+    );
   }
   return stableSort(rows);
 }
 
 async function parseComposition() {
   const bundleRows = [];
-  for (const path of ["packages/core/runtime/src/profiles/base.bundle.ts", "packages/core/runtime/src/profiles/kernel.bundle.ts"]) {
+  for (const path of [
+    "packages/core/runtime/src/profiles/base.bundle.ts",
+    "packages/core/runtime/src/profiles/kernel.bundle.ts",
+  ]) {
     const source = await readRelative(path);
-    const match = source.match(/export const ([A-Z_]+) = Object\.freeze\(\{\s*id:\s*"([^"]+)",\s*version:\s*"([^"]+)",\s*entries:\s*Object\.freeze\(\[([^\]]*)\]\)/u);
+    const match = source.match(
+      /export const ([A-Z_]+) = Object\.freeze\(\{\s*id:\s*"([^"]+)",\s*version:\s*"([^"]+)",\s*entries:\s*Object\.freeze\(\[([^\]]*)\]\)/u,
+    );
     if (!match) throw new Error(`Could not parse bundle ${path}.`);
-    bundleRows.push({ id: match[2], version: match[3], entries: quotedStrings(match[4]), sourceRefs: [sourceRef(path, match[1])] });
+    bundleRows.push({
+      id: match[2],
+      version: match[3],
+      entries: quotedStrings(match[4]),
+      sourceRefs: [sourceRef(path, match[1])],
+    });
   }
   const desktopBundleSource = await readRelative("packages/host/desktop-app/src/bundle.ts");
   const desktopBundle = desktopBundleSource.match(/id:\s*"([^"]+)"[\s\S]*?version:\s*manifest\.version/u);
-  if (desktopBundle) bundleRows.push({ id: desktopBundle[1], version: "0.1.0", entries: ["desktop.app"], sourceRefs: [sourceRef("packages/host/desktop-app/src/bundle.ts", "DESKTOP_APP_BUNDLE")] });
-  bundleRows.push({ id: "actspace.headless", version: "0.1.0", entries: ["headless.runner"], sourceRefs: [sourceRef("packages/host/headless/src/manifest.ts", "manifest")] });
+  if (desktopBundle)
+    bundleRows.push({
+      id: desktopBundle[1],
+      version: "0.1.0",
+      entries: ["desktop.app"],
+      sourceRefs: [sourceRef("packages/host/desktop-app/src/bundle.ts", "DESKTOP_APP_BUNDLE")],
+    });
+  bundleRows.push({
+    id: "actspace.headless",
+    version: "0.1.0",
+    entries: ["headless.runner"],
+    sourceRefs: [sourceRef("packages/host/headless/src/manifest.ts", "manifest")],
+  });
   const profileSource = await readRelative("packages/core/runtime/src/profiles/composition.ts");
   const profiles = [
-    { id: "actspace.headless", runtimeContract: "actspace.runtime.v2", orderedBundleIds: ["actspace.kernel", "actspace.base", "actspace.headless"] },
-    { id: "actspace.desktop", runtimeContract: "actspace.runtime.v2", orderedBundleIds: ["actspace.kernel", "actspace.base", "actspace.desktop-app"] },
-  ].map((profile) => ({ ...profile, sourceRefs: [sourceRef("packages/core/runtime/src/profiles/composition.ts", "profileDefinitions")] }));
-  if (!profileSource.includes("RUNTIME_PROFILE_IDS.headless") || !profileSource.includes("RUNTIME_PROFILE_IDS.desktop")) throw new Error("Could not parse runtime Profile declarations.");
-  return Object.freeze({ profiles, bundles: bundleRows.sort((a, b) => a.id.localeCompare(b.id)), patches: { supportedKinds: ["insert", "replace-config", "disable", "remove"], sourceRefs: [sourceRef("packages/composition/bundle/src/index.ts", "PatchOperation"), sourceRef("packages/composition/composition/src/compose.ts", "composeRuntime")] } });
+    {
+      id: "actspace.headless",
+      runtimeContract: "actspace.runtime.v2",
+      orderedBundleIds: ["actspace.kernel", "actspace.base", "actspace.headless"],
+    },
+    {
+      id: "actspace.desktop",
+      runtimeContract: "actspace.runtime.v2",
+      orderedBundleIds: ["actspace.kernel", "actspace.base", "actspace.desktop-app"],
+    },
+  ].map((profile) => ({
+    ...profile,
+    sourceRefs: [sourceRef("packages/core/runtime/src/profiles/composition.ts", "profileDefinitions")],
+  }));
+  if (!profileSource.includes("RUNTIME_PROFILE_IDS.headless") || !profileSource.includes("RUNTIME_PROFILE_IDS.desktop"))
+    throw new Error("Could not parse runtime Profile declarations.");
+  return Object.freeze({
+    profiles,
+    bundles: bundleRows.sort((a, b) => a.id.localeCompare(b.id)),
+    patches: {
+      supportedKinds: ["insert", "replace-config", "disable", "remove"],
+      sourceRefs: [
+        sourceRef("packages/composition/bundle/src/index.ts", "PatchOperation"),
+        sourceRef("packages/composition/composition/src/compose.ts", "composeRuntime"),
+      ],
+    },
+  });
 }
 
 async function parseVerification() {
   const rows = [];
   for (const entry of VERIFICATION_SOURCES) {
-    const status = await access(resolve(repoRoot, entry.path)).then(() => "active").catch(() => "missing");
-    rows.push(row("verification", entry.id, "@actspace/verification", status, [sourceRef(entry.path, entry.kind)], { evidenceKind: entry.kind, required: true }));
+    const status = await access(resolve(repoRoot, entry.path))
+      .then(() => "active")
+      .catch(() => "missing");
+    rows.push(
+      row("verification", entry.id, "@actspace/verification", status, [sourceRef(entry.path, entry.kind)], {
+        evidenceKind: entry.kind,
+        required: true,
+      }),
+    );
   }
   return stableSort(rows);
 }
@@ -326,30 +612,83 @@ export function validateRows(matrix) {
     const rows = matrix[kind];
     const seen = new Set();
     for (const item of rows) {
-      if (seen.has(item.id)) diagnostics.push({ severity: "error", code: "DUPLICATE_ID", message: `${kind} duplicates ${item.id}` });
+      if (seen.has(item.id))
+        diagnostics.push({ severity: "error", code: "DUPLICATE_ID", message: `${kind} duplicates ${item.id}` });
       seen.add(item.id);
-      if (!item.owner || item.sourceRefs.length === 0) diagnostics.push({ severity: "error", code: "INCOMPLETE_ROW", message: `${kind}:${item.id} must have owner and sourceRefs` });
-      if (item.sourceRefs.some((ref) => ref.startsWith("/") || ref.includes("\\"))) diagnostics.push({ severity: "error", code: "ABSOLUTE_SOURCE_REF", message: `${kind}:${item.id} has an unsafe sourceRef` });
+      if (!item.owner || item.sourceRefs.length === 0)
+        diagnostics.push({
+          severity: "error",
+          code: "INCOMPLETE_ROW",
+          message: `${kind}:${item.id} must have owner and sourceRefs`,
+        });
+      if (item.sourceRefs.some((ref) => ref.startsWith("/") || ref.includes("\\")))
+        diagnostics.push({
+          severity: "error",
+          code: "ABSOLUTE_SOURCE_REF",
+          message: `${kind}:${item.id} has an unsafe sourceRef`,
+        });
       for (const ref of item.sourceRefs) {
         const path = ref.split("#")[0];
-        if (path.split("/").includes("..") || !existsSync(resolve(repoRoot, path))) diagnostics.push({ severity: "error", code: "INVALID_SOURCE_REF", message: `${kind}:${item.id} references missing or unsafe ${path}` });
+        if (path.split("/").includes("..") || !existsSync(resolve(repoRoot, path)))
+          diagnostics.push({
+            severity: "error",
+            code: "INVALID_SOURCE_REF",
+            message: `${kind}:${item.id} references missing or unsafe ${path}`,
+          });
       }
     }
   }
-  if (!/^[a-f0-9]{64}$/.test(matrix.sourceDigest)) diagnostics.push({ severity: "error", code: "INVALID_DIGEST", message: "sourceDigest must be SHA-256" });
+  if (!/^[a-f0-9]{64}$/.test(matrix.sourceDigest))
+    diagnostics.push({ severity: "error", code: "INVALID_DIGEST", message: "sourceDigest must be SHA-256" });
   const requiredServices = new Set(matrix.services.filter((item) => item.required).map((item) => item.id));
-  for (const service of matrix.services) if (!service.providerId) diagnostics.push({ severity: "error", code: "MISSING_PROVIDER", message: `Service ${service.id} has no Provider.` });
+  for (const service of matrix.services)
+    if (!service.providerId)
+      diagnostics.push({
+        severity: "error",
+        code: "MISSING_PROVIDER",
+        message: `Service ${service.id} has no Provider.`,
+      });
   const core = matrix.events.filter((item) => item.category === "core");
   const interventions = matrix.events.filter((item) => item.category === "agent-loop");
   const notifications = matrix.events.filter((item) => item.category === "notification");
-  if (core.length !== 14 || interventions.map(item => item.eventType).sort().join() !== Object.keys(LOOP_META).sort().join() || notifications.map(item => item.eventType).sort().join() !== Object.keys(NOTIFICATION_META).sort().join()) diagnostics.push({ severity: "error", code: "EVENT_COUNT_DRIFT", message: "Event surfaces differ from declared metadata." });
-  for (const item of matrix.events.filter((event) => event.category === "notification")) if (item.mode === "waterfall") diagnostics.push({ severity: "error", code: "NOTIFICATION_VETO", message: `${item.eventType} cannot be a waterfall/veto event.` });
-  if (requiredServices.size === 0) diagnostics.push({ severity: "warning", code: "NO_REQUIRED_SERVICES", message: "No required Service Definitions were found." });
+  if (
+    core.length !== 14 ||
+    interventions
+      .map((item) => item.eventType)
+      .sort()
+      .join() !== Object.keys(LOOP_META).sort().join() ||
+    notifications
+      .map((item) => item.eventType)
+      .sort()
+      .join() !== Object.keys(NOTIFICATION_META).sort().join()
+  )
+    diagnostics.push({
+      severity: "error",
+      code: "EVENT_COUNT_DRIFT",
+      message: "Event surfaces differ from declared metadata.",
+    });
+  for (const item of matrix.events.filter((event) => event.category === "notification"))
+    if (item.mode === "waterfall")
+      diagnostics.push({
+        severity: "error",
+        code: "NOTIFICATION_VETO",
+        message: `${item.eventType} cannot be a waterfall/veto event.`,
+      });
+  if (requiredServices.size === 0)
+    diagnostics.push({
+      severity: "warning",
+      code: "NO_REQUIRED_SERVICES",
+      message: "No required Service Definitions were found.",
+    });
   return diagnostics;
 }
 
 function canonical(value) {
-  return JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
+  return JSON.stringify(value, (_, item) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+      : item,
+  );
 }
 
 export function renderMarkdown(matrix) {
@@ -367,16 +706,93 @@ export function renderMarkdown(matrix) {
     `- Packages: ${matrix.packages.length}`,
     "",
   ];
-  renderSection(lines, "Services", matrix.services, ["id", "owner", "status", "scope", "providerId", "consumerIds", "sourceRefs", "tests"]);
-  renderSection(lines, "Events", matrix.events, ["eventType", "category", "plane", "status", "scope", "mode", "codecStatus", "producerStatus", "containment", "owner", "sourceRefs", "tests"]);
-  renderSection(lines, "Session boundaries", matrix.sessions, ["id", "owner", "status", "scope", "sourceRefs", "tests"]);
-  renderSection(lines, "Host capabilities", matrix.capabilities, ["id", "status", "required", "requiredBy", "optionalBy", "owner", "sourceRefs", "tests"]);
-  renderSection(lines, "Plugins", matrix.plugins, ["id", "name", "version", "entryId", "status", "required", "provides", "injects", "requiredCapabilities", "sourceRefs", "tests"]);
-  renderSection(lines, "Packages", matrix.packages, ["id", "packageRole", "status", "exports", "dependencies", "sourceRefs", "tests"]);
-  lines.push("## Composition declarations", "", "| Profile | Bundles | Patch kinds | Source refs |", "| --- | --- | --- | --- |", `| ${matrix.composition.profiles.map((item) => item.id).join(", ")} | ${matrix.composition.bundles.map((item) => `${item.id}@${item.version}`).join(", ")} | ${matrix.composition.patches.supportedKinds.join(", ")} | ${[...matrix.composition.profiles.flatMap((item) => item.sourceRefs), ...matrix.composition.bundles.flatMap((item) => item.sourceRefs), ...matrix.composition.patches.sourceRefs].join("; ")} |`, "");
-  renderSection(lines, "Verification evidence", matrix.verification, ["id", "status", "evidenceKind", "owner", "sourceRefs", "tests"]);
+  renderSection(lines, "Services", matrix.services, [
+    "id",
+    "owner",
+    "status",
+    "scope",
+    "providerId",
+    "consumerIds",
+    "sourceRefs",
+    "tests",
+  ]);
+  renderSection(lines, "Events", matrix.events, [
+    "eventType",
+    "category",
+    "plane",
+    "status",
+    "scope",
+    "mode",
+    "codecStatus",
+    "producerStatus",
+    "containment",
+    "owner",
+    "sourceRefs",
+    "tests",
+  ]);
+  renderSection(lines, "Session boundaries", matrix.sessions, [
+    "id",
+    "owner",
+    "status",
+    "scope",
+    "sourceRefs",
+    "tests",
+  ]);
+  renderSection(lines, "Host capabilities", matrix.capabilities, [
+    "id",
+    "status",
+    "required",
+    "requiredBy",
+    "optionalBy",
+    "owner",
+    "sourceRefs",
+    "tests",
+  ]);
+  renderSection(lines, "Plugins", matrix.plugins, [
+    "id",
+    "name",
+    "version",
+    "entryId",
+    "status",
+    "required",
+    "provides",
+    "injects",
+    "requiredCapabilities",
+    "sourceRefs",
+    "tests",
+  ]);
+  renderSection(lines, "Packages", matrix.packages, [
+    "id",
+    "packageRole",
+    "status",
+    "exports",
+    "dependencies",
+    "sourceRefs",
+    "tests",
+  ]);
+  lines.push(
+    "## Composition declarations",
+    "",
+    "| Profile | Bundles | Patch kinds | Source refs |",
+    "| --- | --- | --- | --- |",
+    `| ${matrix.composition.profiles.map((item) => item.id).join(", ")} | ${matrix.composition.bundles.map((item) => `${item.id}@${item.version}`).join(", ")} | ${matrix.composition.patches.supportedKinds.join(", ")} | ${[...matrix.composition.profiles.flatMap((item) => item.sourceRefs), ...matrix.composition.bundles.flatMap((item) => item.sourceRefs), ...matrix.composition.patches.sourceRefs].join("; ")} |`,
+    "",
+  );
+  renderSection(lines, "Verification evidence", matrix.verification, [
+    "id",
+    "status",
+    "evidenceKind",
+    "owner",
+    "sourceRefs",
+    "tests",
+  ]);
   lines.push("## Diagnostics", "");
-  lines.push(...(matrix.diagnostics.length === 0 ? ["- none"] : matrix.diagnostics.map((item) => `- **${item.severity}** \`${item.code}\`: ${item.message}`)), "");
+  lines.push(
+    ...(matrix.diagnostics.length === 0
+      ? ["- none"]
+      : matrix.diagnostics.map((item) => `- **${item.severity}** \`${item.code}\`: ${item.message}`)),
+    "",
+  );
   return `${lines.join("\n")}\n`;
 }
 
@@ -394,7 +810,15 @@ function formatCell(value) {
 }
 
 async function collectSourceSnapshot() {
-  const paths = [...Object.values(EVENT_SOURCES).map((item) => item.path), SERVICE_SOURCE.path, ...DOMAIN_EVENT_PATHS, ...MANIFEST_PATHS, ...COMPOSITION_SOURCES, ...PACKAGE_PATHS, ...VERIFICATION_SOURCES.map((item) => item.path)];
+  const paths = [
+    ...Object.values(EVENT_SOURCES).map((item) => item.path),
+    SERVICE_SOURCE.path,
+    ...DOMAIN_EVENT_PATHS,
+    ...MANIFEST_PATHS,
+    ...COMPOSITION_SOURCES,
+    ...PACKAGE_PATHS,
+    ...VERIFICATION_SOURCES.map((item) => item.path),
+  ];
   const unique = [...new Set(paths)].sort();
   const snapshot = [];
   for (const path of unique) {
@@ -409,26 +833,95 @@ export async function buildMatrix() {
   const sourceSnapshot = await collectSourceSnapshot();
   const events = await parseEvents();
   const { manifests, rows: plugins } = await parseManifests();
-  const services = [...await parseServices()];
-  for (const manifest of manifests) for (const id of manifest.services) {
-    if (!services.some(item => item.id === id)) services.push(row("service", id, manifest.pluginId, "declared", [manifest.path], { providerId: manifest.entryId, required: manifest.required, consumerIds: manifests.filter(item => item.injects.includes(id)).map(item => item.entryId).sort() }));
-  }
+  const services = [...(await parseServices())];
+  for (const manifest of manifests)
+    for (const id of manifest.services) {
+      if (!services.some((item) => item.id === id))
+        services.push(
+          row("service", id, manifest.pluginId, "declared", [manifest.path], {
+            providerId: manifest.entryId,
+            required: manifest.required,
+            consumerIds: manifests
+              .filter((item) => item.injects.includes(id))
+              .map((item) => item.entryId)
+              .sort(),
+          }),
+        );
+    }
   services.sort((a, b) => a.id.localeCompare(b.id));
   const capabilities = await parseCapabilities(manifests);
   const packages = await parsePackages();
   const composition = await parseComposition();
   const verification = await parseVerification();
   const sessions = [
-    row("session", "session.journal", "@actspace/session-journal", "active", ["packages/session/session-journal/src/index.ts#SessionJournal"], { scope: "session", required: true, responsibility: "codec registry, envelope validation, replay" }),
-    row("session", "session.storage", "@actspace/session-storage", "active", ["packages/session/session-storage/src/index.ts#SessionStorage", "packages/session/session-persistence-jsonl/src/storage.ts#JsonlSessionStorage"], { scope: "root", required: true, responsibility: "Backend-neutral inspect/list/create/open/flush ownership" }),
-    row("session", "session.store", "@actspace/session-persistence", "active", ["packages/session/session-persistence/src/session-store.ts#SessionStore"], { scope: "session", required: true, responsibility: "Session admission, recovery, fork and durability lifecycle" }),
-    row("session", "session.projection", "@actspace/session-projection", "optional", ["packages/session/session-projection/src/index.ts#SessionProjectionRegistry"], { scope: "session", required: false, responsibility: "read-only projection" }),
+    row(
+      "session",
+      "session.journal",
+      "@actspace/session-journal",
+      "active",
+      ["packages/session/session-journal/src/index.ts#SessionJournal"],
+      { scope: "session", required: true, responsibility: "codec registry, envelope validation, replay" },
+    ),
+    row(
+      "session",
+      "session.storage",
+      "@actspace/session-storage",
+      "active",
+      [
+        "packages/session/session-storage/src/index.ts#SessionStorage",
+        "packages/session/session-persistence-jsonl/src/storage.ts#JsonlSessionStorage",
+      ],
+      { scope: "root", required: true, responsibility: "Backend-neutral inspect/list/create/open/flush ownership" },
+    ),
+    row(
+      "session",
+      "session.store",
+      "@actspace/session-persistence",
+      "active",
+      ["packages/session/session-persistence/src/session-store.ts#SessionStore"],
+      {
+        scope: "session",
+        required: true,
+        responsibility: "Session admission, recovery, fork and durability lifecycle",
+      },
+    ),
+    row(
+      "session",
+      "session.projection",
+      "@actspace/session-projection",
+      "optional",
+      ["packages/session/session-projection/src/index.ts#SessionProjectionRegistry"],
+      { scope: "session", required: false, responsibility: "read-only projection" },
+    ),
   ];
-  const matrixWithoutDigest = { schemaVersion: 1, generatorVersion: GENERATOR_VERSION, sourceRefs: Object.freeze({ events: EVENT_SOURCES, domainEvents: DOMAIN_EVENT_PATHS, services: SERVICE_SOURCE, manifests: MANIFEST_PATHS, composition: COMPOSITION_SOURCES, packages: PACKAGE_PATHS, verification: VERIFICATION_SOURCES }), services, events, sessions, capabilities, plugins, packages, composition, verification };
+  const matrixWithoutDigest = {
+    schemaVersion: 1,
+    generatorVersion: GENERATOR_VERSION,
+    sourceRefs: Object.freeze({
+      events: EVENT_SOURCES,
+      domainEvents: DOMAIN_EVENT_PATHS,
+      services: SERVICE_SOURCE,
+      manifests: MANIFEST_PATHS,
+      composition: COMPOSITION_SOURCES,
+      packages: PACKAGE_PATHS,
+      verification: VERIFICATION_SOURCES,
+    }),
+    services,
+    events,
+    sessions,
+    capabilities,
+    plugins,
+    packages,
+    composition,
+    verification,
+  };
   const sourceDigest = createHash("sha256").update(canonical(sourceSnapshot)).digest("hex");
   const matrix = { ...matrixWithoutDigest, sourceDigest, diagnostics: [] };
   matrix.diagnostics = validateRows(matrix);
-  if (matrix.diagnostics.some((item) => item.severity === "error")) throw new Error(`Contract matrix validation failed:\n${matrix.diagnostics.map((item) => `${item.severity}: ${item.code}: ${item.message}`).join("\n")}`);
+  if (matrix.diagnostics.some((item) => item.severity === "error"))
+    throw new Error(
+      `Contract matrix validation failed:\n${matrix.diagnostics.map((item) => `${item.severity}: ${item.code}: ${item.message}`).join("\n")}`,
+    );
   return Object.freeze({ ...matrix, diagnostics: Object.freeze(matrix.diagnostics) });
 }
 
@@ -441,7 +934,12 @@ export async function generate({ check = false } = {}) {
   const json = renderJson(matrix);
   const markdown = renderMarkdown(matrix);
   // JSON is a disposable local artifact; only Markdown is versioned and checked.
-  const outputs = check ? [[markdownOutput, markdown]] : [[jsonOutput, json], [markdownOutput, markdown]];
+  const outputs = check
+    ? [[markdownOutput, markdown]]
+    : [
+        [jsonOutput, json],
+        [markdownOutput, markdown],
+      ];
   const failures = [];
   for (const [relativePath, content] of outputs) {
     const absolutePath = resolve(repoRoot, relativePath);
@@ -462,7 +960,9 @@ if (isMain) {
   const check = process.argv.includes("--check");
   try {
     const result = await generate({ check });
-    process.stdout.write(`contract matrix ${check ? "check" : "generated"}: ${result.outputs.join(", ")} (digest ${result.matrix.sourceDigest})\n`);
+    process.stdout.write(
+      `contract matrix ${check ? "check" : "generated"}: ${result.outputs.join(", ")} (digest ${result.matrix.sourceDigest})\n`,
+    );
   } catch (error) {
     process.stderr.write(`contract matrix failed: ${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;

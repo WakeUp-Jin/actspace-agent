@@ -3,7 +3,15 @@ import { useEffect, useState } from "react";
 import { workspacesApi } from "../../api/workspaces";
 import { canChooseApplication, useFileApplications } from "../turn-tail/useFileApplications";
 import { Button } from "../ui/Button";
-import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/Dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/Dialog";
 import { ApplicationLabel } from "./ApplicationLabel";
 
 export type OpenFileFallbackTarget = { workspaceRoot: string; relativePath: string };
@@ -23,7 +31,9 @@ function useVsCodeMissing(): boolean {
         if (!cancelled) setMissing(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
   return missing;
 }
@@ -46,7 +56,10 @@ export function OpenFileFallbackDialog({ target, onClose }: { target: OpenFileFa
     setError(null);
     try {
       const result = await workspacesApi.openFile({ workspaceRoot, relativePath, ...input });
-      if (result.ok) { onClose(); return; }
+      if (result.ok) {
+        onClose();
+        return;
+      }
     } catch {
       // 落到下面的统一提示。
     }
@@ -55,13 +68,22 @@ export function OpenFileFallbackDialog({ target, onClose }: { target: OpenFileFa
   }
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent size="sm" withDescription>
         <div className="flex flex-col gap-3 p-5">
           <DialogHeader>
             <div className="min-w-0">
-              <DialogTitle className="break-words text-act-md font-semibold text-text-main">没有可以打开「{name}」的应用</DialogTitle>
-              <DialogDescription className="mt-1 text-act-sm text-text-muted">系统里没有为这类文件设置默认应用。</DialogDescription>
+              <DialogTitle className="break-words text-act-md font-semibold text-text-main">
+                没有可以打开「{name}」的应用
+              </DialogTitle>
+              <DialogDescription className="mt-1 text-act-sm text-text-muted">
+                系统里没有为这类文件设置默认应用。
+              </DialogDescription>
             </div>
           </DialogHeader>
           <DialogBody className="flex flex-col gap-3">
@@ -70,26 +92,47 @@ export function OpenFileFallbackDialog({ target, onClose }: { target: OpenFileFa
                 <h3 className="m-0 px-2 text-act-xs font-medium text-text-faint">选择应用打开</h3>
                 <div className="flex max-h-48 flex-col overflow-y-auto">
                   {apps.applications.map((app) => (
-                    <Button key={app.id} variant="ghost" size="md" className="w-full justify-start" disabled={pending} onClick={() => void run({ action: "open", applicationId: app.id })}>
+                    <Button
+                      key={app.id}
+                      variant="ghost"
+                      size="md"
+                      className="w-full justify-start"
+                      disabled={pending}
+                      onClick={() => void run({ action: "open", applicationId: app.id })}
+                    >
                       <ApplicationLabel app={app} />
                     </Button>
                   ))}
                 </div>
               </section>
             ) : null}
-            {error ? <p role="alert" className="m-0 px-2 text-act-xs text-danger">{error}</p> : null}
+            {error ? (
+              <p role="alert" className="m-0 px-2 text-act-xs text-danger">
+                {error}
+              </p>
+            ) : null}
             {vscodeMissing ? (
               <p className="m-0 px-2 text-act-xs text-text-faint">
-                推荐安装 <a className="text-text-muted underline hover:text-text-main" href={VSCODE_URL} target="_blank" rel="noreferrer noopener">VS Code</a> 打开代码文件
+                推荐安装{" "}
+                <a
+                  className="text-text-muted underline hover:text-text-main"
+                  href={VSCODE_URL}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  VS Code
+                </a>{" "}
+                打开代码文件
               </p>
             ) : null}
           </DialogBody>
           <DialogFooter className="items-center justify-between">
             <Button variant="secondary" size="md" disabled={pending} onClick={() => void run({ action: "reveal" })}>
-              <FolderOpen size={14} aria-hidden="true" />
-              在 Finder 中显示
+              <FolderOpen size={14} aria-hidden="true" />在 Finder 中显示
             </Button>
-            <Button variant="ghost" size="md" onClick={onClose}>取消</Button>
+            <Button variant="ghost" size="md" onClick={onClose}>
+              取消
+            </Button>
           </DialogFooter>
         </div>
       </DialogContent>

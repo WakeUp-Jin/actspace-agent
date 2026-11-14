@@ -11,4 +11,13 @@ export type LlmUsage = {
   readonly source: "provider-reported" | "estimated" | "unknown";
 };
 
-export const EMPTY_LLM_USAGE: LlmUsage = Object.freeze({ inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, cost: null, costCurrency: null, source: "unknown" });
+export const EMPTY_LLM_USAGE: LlmUsage = Object.freeze({
+  inputTokens: null,
+  outputTokens: null,
+  cacheReadTokens: null,
+  cacheWriteTokens: null,
+  reasoningTokens: null,
+  cost: null,
+  costCurrency: null,
+  source: "unknown",
+});

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type CSSProperties,
+  type DragEvent,
+} from "react";
 import { BookOpen, FileText, X } from "lucide-react";
 import type { ComposerAttachment } from "@actspace/shared";
 import { dialogsApi } from "../../api/dialogs";
@@ -14,10 +22,8 @@ const FILE_ATTACHMENT_CLASS =
 const FILE_ATTACHMENT_NAME_CLASS = "truncate";
 const ATTACHMENT_REMOVE_BASE_CLASS =
   "attachment-remove grid place-items-center rounded-lg opacity-0 pointer-events-none transition-[background,color,opacity] duration-(--motion-base) ease-in-out";
-const IMAGE_ATTACHMENT_REMOVE_CLASS =
-  `${ATTACHMENT_REMOVE_BASE_CLASS} image-attachment-remove absolute right-[-4px] top-[-4px] h-[18px] w-[18px] rounded-full bg-text-main text-surface shadow-[0_3px_8px_rgba(20,21,18,0.2)] group-hover/image-attachment:pointer-events-auto group-hover/image-attachment:opacity-100 group-focus-within/image-attachment:pointer-events-auto group-focus-within/image-attachment:opacity-100 hover:opacity-80`;
-const FILE_ATTACHMENT_REMOVE_CLASS =
-  `${ATTACHMENT_REMOVE_BASE_CLASS} file-attachment-remove h-[22px] w-[22px] text-text-faint group-hover/file-attachment:pointer-events-auto group-hover/file-attachment:opacity-100 group-focus-within/file-attachment:pointer-events-auto group-focus-within/file-attachment:opacity-100 hover:bg-hover-overlay hover:text-text-main`;
+const IMAGE_ATTACHMENT_REMOVE_CLASS = `${ATTACHMENT_REMOVE_BASE_CLASS} image-attachment-remove absolute right-[-4px] top-[-4px] h-[18px] w-[18px] rounded-full bg-text-main text-surface shadow-[0_3px_8px_rgba(20,21,18,0.2)] group-hover/image-attachment:pointer-events-auto group-hover/image-attachment:opacity-100 group-focus-within/image-attachment:pointer-events-auto group-focus-within/image-attachment:opacity-100 hover:opacity-80`;
+const FILE_ATTACHMENT_REMOVE_CLASS = `${ATTACHMENT_REMOVE_BASE_CLASS} file-attachment-remove h-[22px] w-[22px] text-text-faint group-hover/file-attachment:pointer-events-auto group-hover/file-attachment:opacity-100 group-focus-within/file-attachment:pointer-events-auto group-focus-within/file-attachment:opacity-100 hover:bg-hover-overlay hover:text-text-main`;
 const SKILL_PILL_CLASS =
   "group/skill-pill inline-flex h-9 max-w-[240px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-act-sm leading-5 font-medium text-text-main shadow-act-thumb";
 
@@ -27,7 +33,12 @@ function createAttachmentId(): string {
 
 function basenameOf(path: string): string {
   const normalized = path.replace(/[\\/]+$/, "");
-  return normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized;
+  return (
+    normalized
+      .split(/[\\/]+/)
+      .filter(Boolean)
+      .pop() ?? normalized
+  );
 }
 
 function inferAttachmentKind(file: File, path?: string): ComposerAttachment["kind"] {
@@ -45,9 +56,12 @@ function attachmentFromDroppedFile(file: File): ComposerAttachment {
     name: path ? basenameOf(path) : file.name,
     path,
     mimeType: file.type || undefined,
-    previewUrl: kind === "image"
-      ? (typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : undefined)
-      : undefined,
+    previewUrl:
+      kind === "image"
+        ? typeof URL.createObjectURL === "function"
+          ? URL.createObjectURL(file)
+          : undefined
+        : undefined,
   };
 }
 
@@ -96,18 +110,31 @@ export type ComposerAttachmentsOptions = {
  * 选图、选文件、粘贴图片、拖放文件都走这里，失败写进 `error`。
  */
 export function useComposerAttachments({
-  draftKey, readAttachmentDraft, writeAttachmentDraft, isChatForm, isRemoteTarget, inputLocked, onBeforePick, onRemoved, initial,
+  draftKey,
+  readAttachmentDraft,
+  writeAttachmentDraft,
+  isChatForm,
+  isRemoteTarget,
+  inputLocked,
+  onBeforePick,
+  onRemoved,
+  initial,
 }: ComposerAttachmentsOptions) {
-  const [attachments, setAttachmentState] = useState<ComposerAttachment[]>(() => draftKey && readAttachmentDraft ? readAttachmentDraft(draftKey) : [...(initial ?? [])]);
+  const [attachments, setAttachmentState] = useState<ComposerAttachment[]>(() =>
+    draftKey && readAttachmentDraft ? readAttachmentDraft(draftKey) : [...(initial ?? [])],
+  );
   const attachmentsRef = useRef(attachments);
   // 附件改动同时写回当前 draftKey 的草稿（16 T14）。ref 同步更新，连续两次改动不会基于旧值。
-  const setAttachments = useCallback((update: ComposerAttachment[] | ((current: ComposerAttachment[]) => ComposerAttachment[])) => {
-    const next = typeof update === "function" ? update(attachmentsRef.current) : update;
-    if (next === attachmentsRef.current) return;
-    attachmentsRef.current = next;
-    setAttachmentState(next);
-    if (draftKey) writeAttachmentDraft?.(draftKey, next);
-  }, [draftKey, writeAttachmentDraft]);
+  const setAttachments = useCallback(
+    (update: ComposerAttachment[] | ((current: ComposerAttachment[]) => ComposerAttachment[])) => {
+      const next = typeof update === "function" ? update(attachmentsRef.current) : update;
+      if (next === attachmentsRef.current) return;
+      attachmentsRef.current = next;
+      setAttachmentState(next);
+      if (draftKey) writeAttachmentDraft?.(draftKey, next);
+    },
+    [draftKey, writeAttachmentDraft],
+  );
   const persistsAttachmentsRef = useRef(false);
   persistsAttachmentsRef.current = Boolean(draftKey && writeAttachmentDraft);
   const [error, setError] = useState<string | null>(null);
@@ -124,18 +151,19 @@ export function useComposerAttachments({
   }, [draftKey, readAttachmentDraft]);
 
   // 卸载时：附件存在草稿里的（切到设置页等）保留，等发送、移除或会话 evict 时再释放；只存在组件里的才在这里释放。
-  useEffect(() => () => {
-    if (!persistsAttachmentsRef.current) attachmentsRef.current.forEach(revokeAttachmentPreview);
-  }, []);
+  useEffect(
+    () => () => {
+      if (!persistsAttachmentsRef.current) attachmentsRef.current.forEach(revokeAttachmentPreview);
+    },
+    [],
+  );
 
   function append(nextAttachments: ComposerAttachment[]) {
     if (nextAttachments.length === 0) return;
     setAttachments((current) => {
       const next = dedupeAttachments([...current, ...nextAttachments]);
       const retainedIds = new Set(next.map((attachment) => attachment.id));
-      nextAttachments
-        .filter((attachment) => !retainedIds.has(attachment.id))
-        .forEach(revokeAttachmentPreview);
+      nextAttachments.filter((attachment) => !retainedIds.has(attachment.id)).forEach(revokeAttachmentPreview);
       return next;
     });
     setError(null);
@@ -184,18 +212,20 @@ export function useComposerAttachments({
     if (imageFiles.length === 0) return;
 
     event.preventDefault();
-    const results = await Promise.all(imageFiles.map(async (file) => {
-      try {
-        return await dialogsApi.importComposerImage({
-          name: file.name || "pasted-image.png",
-          mimeType: file.type || undefined,
-          bytes: new Uint8Array(await file.arrayBuffer()),
-        });
-      } catch {
-        return { ok: false as const, error: { code: "write_failed" as const, message: "图片粘贴失败。" } };
-      }
-    }));
-    const imported = results.flatMap((result) => result.ok ? [result.attachment] : []);
+    const results = await Promise.all(
+      imageFiles.map(async (file) => {
+        try {
+          return await dialogsApi.importComposerImage({
+            name: file.name || "pasted-image.png",
+            mimeType: file.type || undefined,
+            bytes: new Uint8Array(await file.arrayBuffer()),
+          });
+        } catch {
+          return { ok: false as const, error: { code: "write_failed" as const, message: "图片粘贴失败。" } };
+        }
+      }),
+    );
+    const imported = results.flatMap((result) => (result.ok ? [result.attachment] : []));
     if (imported.length > 0) append(imported);
     let failureMessage: string | undefined;
     for (const result of results) {
@@ -267,7 +297,14 @@ export type ComposerAttachmentsProps = {
 };
 
 /** 输入框里的附件条：图片缩略图、文件卡片和已选的 Skill。 */
-export function ComposerAttachments({ attachments, selectedSkills, issueAttachmentId, onPreview, onRemove, onRemoveSkill }: ComposerAttachmentsProps) {
+export function ComposerAttachments({
+  attachments,
+  selectedSkills,
+  issueAttachmentId,
+  onPreview,
+  onRemove,
+  onRemoveSkill,
+}: ComposerAttachmentsProps) {
   return (
     <div className={COMPOSER_ATTACHMENTS_CLASS} aria-label="已附加的文件">
       {attachments.map((attachment) => {
@@ -311,7 +348,12 @@ export function ComposerAttachments({ attachments, selectedSkills, issueAttachme
         }
 
         return (
-          <div className={FILE_ATTACHMENT_CLASS} aria-label={`已附加的文件 ${attachment.name}`} aria-describedby={issueAttachmentId === attachment.id ? "composer-send-error" : undefined} key={attachment.id}>
+          <div
+            className={FILE_ATTACHMENT_CLASS}
+            aria-label={`已附加的文件 ${attachment.name}`}
+            aria-describedby={issueAttachmentId === attachment.id ? "composer-send-error" : undefined}
+            key={attachment.id}
+          >
             <FileText size={17} aria-hidden="true" />
             <span className={FILE_ATTACHMENT_NAME_CLASS}>{attachment.name}</span>
             <Tooltip>

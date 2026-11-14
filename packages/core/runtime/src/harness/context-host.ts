@@ -7,10 +7,18 @@ import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
 import type { RuntimeSessionController } from "../session/session-controller.js";
 
 /** File discovery only; reading these references still uses ordinary tool permissions. */
-export function createContextHost(getSessions: () => RuntimeSessionController | undefined, tools: Omit<ToolPreparedEnvironment, "journal">): DisclosureHost {
+export function createContextHost(
+  getSessions: () => RuntimeSessionController | undefined,
+  tools: Omit<ToolPreparedEnvironment, "journal">,
+): DisclosureHost {
   const file = async (path: string): Promise<string | undefined> => {
-    try { const canonical = await realpath(path); return (await stat(canonical)).isFile() ? canonical : undefined; }
-    catch (error) { if (["ENOENT", "ENOTDIR", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? "")) return; throw error; }
+    try {
+      const canonical = await realpath(path);
+      return (await stat(canonical)).isFile() ? canonical : undefined;
+    } catch (error) {
+      if (["ENOENT", "ENOTDIR", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? "")) return;
+      throw error;
+    }
   };
   return {
     normalizeFile: async (sessionId, path) => {
@@ -20,13 +28,23 @@ export function createContextHost(getSessions: () => RuntimeSessionController | 
       const root = resolveSessionWorkspaceRoot(session.header, session.journal, tools.workspaceRoot);
       return root ? file(resolve(root, path)) : undefined;
     },
-    historyPath: async sessionId => {
+    historyPath: async (sessionId) => {
       const sessions = getSessions();
       if (!sessions || sessions.isEphemeral(sessionId)) return;
       const path = sessions.store.storage.journalPath?.(sessionId);
       return path ? file(path) : undefined;
     },
-    createIndex: (sessionId, content) => tools.createArtifact({ bytes: Buffer.from(content, "utf8"), mediaType: "text/plain", owner: { sessionId, callId: `context-index:${randomUUID()}`, pluginId: "actspace.context", name: "context-index" } }),
+    createIndex: (sessionId, content) =>
+      tools.createArtifact({
+        bytes: Buffer.from(content, "utf8"),
+        mediaType: "text/plain",
+        owner: {
+          sessionId,
+          callId: `context-index:${randomUUID()}`,
+          pluginId: "actspace.context",
+          name: "context-index",
+        },
+      }),
     resolveArtifact: async (sessionId, artifactId) => {
       if (!tools.resolveArtifact) throw new Error("Context artifact resolution is unavailable.");
       return tools.resolveArtifact(sessionId, artifactId);

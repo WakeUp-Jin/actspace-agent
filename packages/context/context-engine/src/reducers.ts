@@ -11,7 +11,10 @@ export type ContextReducer = {
   readonly owner: string;
   readonly fields: readonly ContextField[];
   readonly criticality: "required" | "optional";
-  readonly reduce: (input: { readonly context: Context; readonly event: SessionEventEnvelopeV1 }) => ContextReducerUpdate | undefined | Promise<ContextReducerUpdate | undefined>;
+  readonly reduce: (input: {
+    readonly context: Context;
+    readonly event: SessionEventEnvelopeV1;
+  }) => ContextReducerUpdate | undefined | Promise<ContextReducerUpdate | undefined>;
 };
 
 /** Ordered module reducers. Each reducer can replace only the slices it owns. */
@@ -19,14 +22,21 @@ export class ContextReducerRegistry {
   readonly #reducers = new Map<string, ContextReducer>();
 
   register(reducer: ContextReducer): () => void {
-    if (!reducer.id || !reducer.owner || reducer.fields.length === 0) throw new Error("Context reducer requires an id, owner and fields.");
+    if (!reducer.id || !reducer.owner || reducer.fields.length === 0)
+      throw new Error("Context reducer requires an id, owner and fields.");
     if (this.#reducers.has(reducer.id)) throw new Error(`Context reducer ${reducer.id} is already registered.`);
     this.#reducers.set(reducer.id, Object.freeze({ ...reducer, fields: Object.freeze([...reducer.fields]) }));
-    return () => { this.#reducers.delete(reducer.id); };
+    return () => {
+      this.#reducers.delete(reducer.id);
+    };
   }
 
-  list(): readonly ContextReducer[] { return Object.freeze([...this.#reducers.values()]); }
-  owners(): ReadonlySet<string> { return new Set([...this.#reducers.values()].map(reducer => reducer.owner)); }
+  list(): readonly ContextReducer[] {
+    return Object.freeze([...this.#reducers.values()]);
+  }
+  owners(): ReadonlySet<string> {
+    return new Set([...this.#reducers.values()].map((reducer) => reducer.owner));
+  }
 
   /** Reuse reducer-owned slices while the engine refreshes source-owned slices. */
   restore(previous: Context, current: Context): Context {
@@ -61,7 +71,9 @@ export class ContextReducerRegistry {
       } catch (error) {
         if (reducer.criticality === "required") {
           const message = error instanceof Error ? `: ${error.message}` : "";
-          throw new Error(`Required Context reducer ${reducer.id} failed at Journal seq ${event.seq}${message}.`, { cause: error });
+          throw new Error(`Required Context reducer ${reducer.id} failed at Journal seq ${event.seq}${message}.`, {
+            cause: error,
+          });
         }
       }
     }
@@ -71,6 +83,8 @@ export class ContextReducerRegistry {
 
 function validateUpdate(reducer: ContextReducer, update: ContextReducerUpdate): void {
   const fields = new Set(reducer.fields);
-  for (const field of Object.keys(update.content ?? {})) if (!fields.has(field as ContextField)) throw new Error(`Context reducer ${reducer.id} does not own ${field}.`);
-  if (update.status !== undefined && !fields.has("status")) throw new Error(`Context reducer ${reducer.id} does not own status.`);
+  for (const field of Object.keys(update.content ?? {}))
+    if (!fields.has(field as ContextField)) throw new Error(`Context reducer ${reducer.id} does not own ${field}.`);
+  if (update.status !== undefined && !fields.has("status"))
+    throw new Error(`Context reducer ${reducer.id} does not own status.`);
 }

@@ -9,14 +9,20 @@ import { isTrustedSurfaceView, surfaceViewVersion } from "../index.js";
 
 const source = { ownerPluginId: "@actspace/core" } as const;
 
-function candidate(type: string, data: RuntimeJsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
+function candidate(
+  type: string,
+  data: RuntimeJsonValue,
+  extra: Partial<SessionEventCandidateV1> = {},
+): SessionEventCandidateV1 {
   return { type, eventVersion: 1, source, data, surface: null, ...extra };
 }
 
 function journalWithTwoMessages(): SessionJournal {
   const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-11-07T12:00:00.000Z" });
   journal.append(candidate("user/message", { messageId: "user-1", content: "one" }, { surface: { kind: "append" } }));
-  journal.append(candidate("assistant/message", { messageId: "assistant-1", content: "two" }, { surface: { kind: "append" } }));
+  journal.append(
+    candidate("assistant/message", { messageId: "assistant-1", content: "two" }, { surface: { kind: "append" } }),
+  );
   return journal;
 }
 
@@ -43,7 +49,9 @@ describe("trusted Surface view", () => {
     const beforeVersion = surfaceViewVersion(before);
     expect(beforeVersion).toBe("0:2:1");
 
-    journal.append(candidate("user/message", { messageId: "user-2", content: "three" }, { surface: { kind: "append" } }));
+    journal.append(
+      candidate("user/message", { messageId: "user-2", content: "three" }, { surface: { kind: "append" } }),
+    );
     const appended = journal.surface;
     expect(appended).not.toBe(before);
     expect(surfaceViewVersion(appended)).toBe("0:3:2");
@@ -59,10 +67,22 @@ describe("trusted Surface view", () => {
 
     journal.append(candidate("compaction/start", { compactionId: "compact-1", start: 0, end: 2 }));
     journal.append(candidate("compaction/summary", { compactionId: "compact-1", summaryDigest: "digest" }));
-    journal.append(candidate("surface/replaced", { compactionId: "compact-1", sourceEventSeqs: [0, 1], replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test", node: { kind: "user", messageId: "summary-1", content: "summary" } }, {
-      provenance: { sourceEventSeqs: [0, 1], contributorIds: ["compactor"], runtimeSelectionSeq: null },
-      surface: { kind: "replace", start: 0, end: 2, sourceEventSeqs: [0, 1] },
-    }));
+    journal.append(
+      candidate(
+        "surface/replaced",
+        {
+          compactionId: "compact-1",
+          sourceEventSeqs: [0, 1],
+          replacedTokens: { conversation: 0, summarizedConversation: 0 },
+          estimatorVersion: "test",
+          node: { kind: "user", messageId: "summary-1", content: "summary" },
+        },
+        {
+          provenance: { sourceEventSeqs: [0, 1], contributorIds: ["compactor"], runtimeSelectionSeq: null },
+          surface: { kind: "replace", start: 0, end: 2, sourceEventSeqs: [0, 1] },
+        },
+      ),
+    );
     // 压缩是一个事务，到 compaction/end 才生效。
     expect(journal.surface).toBe(many);
     journal.append(candidate("compaction/end", { compactionId: "compact-1", summaryDigest: "digest" }));
@@ -74,7 +94,7 @@ describe("trusted Surface view", () => {
     expect(Object.isFrozen(replaced.entries[0].node)).toBe(true);
     // 替换条目记下所属压缩 id，追加条目没有；每次请求列压缩摘要时直接读条目，不回头读 surface/replaced 事件。
     expect(replaced.entries[0]).toMatchObject({ compactionId: "compact-1", node: { messageId: "summary-1" } });
-    expect(replaced.entries.slice(1).every(entry => entry.compactionId === undefined)).toBe(true);
+    expect(replaced.entries.slice(1).every((entry) => entry.compactionId === undefined)).toBe(true);
   });
 
   it("does not trust views of Surfaces rebuilt from caller input", () => {
@@ -84,7 +104,7 @@ describe("trusted Surface view", () => {
     const cloned = SessionSurface.fromView(journal.surface).clone().view;
     for (const view of [fromEvents, fromView, cloned]) {
       expect(isTrustedSurfaceView(view)).toBe(false);
-      expect(view.entries.map(entry => entry.node)).toEqual(journal.surface.entries.map(entry => entry.node));
+      expect(view.entries.map((entry) => entry.node)).toEqual(journal.surface.entries.map((entry) => entry.node));
     }
     // 自己的视图同样按状态复用。
     const surface = SessionSurface.fromView(journal.surface);

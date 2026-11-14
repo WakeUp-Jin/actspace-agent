@@ -33,7 +33,9 @@ function createChunk<T>(load: () => Promise<T>) {
     get: () => module,
     subscribe(listener: () => void) {
       listeners.add(listener);
-      return () => { listeners.delete(listener); };
+      return () => {
+        listeners.delete(listener);
+      };
     },
     ensure() {
       if (started) return;
@@ -41,9 +43,13 @@ function createChunk<T>(load: () => Promise<T>) {
       load().then(
         (loaded) => {
           module = loaded;
-          listeners.forEach((listener) => { listener(); });
+          listeners.forEach((listener) => {
+            listener();
+          });
         },
-        (error: unknown) => { console.warn("Markdown 插件加载失败，按原文显示", error); },
+        (error: unknown) => {
+          console.warn("Markdown 插件加载失败，按原文显示", error);
+        },
       );
     },
     /** 只给测试：回到未加载状态。 */

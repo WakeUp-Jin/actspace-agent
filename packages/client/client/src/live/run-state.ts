@@ -21,7 +21,14 @@ export type ToolEntry = {
 export type StreamingSegment =
   /** `llmCallId` / `messageId`：产生这段输出的模型请求与消息（轨迹流式层按请求取正文）；旧帧可能没有。 */
   /** `startedAtMs` / `lastDeltaAtMs`：这段思考收到第一个字和最后一个字的本机时间，只给「简化思考过程」算用时；不写入会话。 */
-  | { type: "thinking"; text: string; llmCallId?: string; messageId?: string; startedAtMs?: number; lastDeltaAtMs?: number }
+  | {
+      type: "thinking";
+      text: string;
+      llmCallId?: string;
+      messageId?: string;
+      startedAtMs?: number;
+      lastDeltaAtMs?: number;
+    }
   | { type: "text"; text: string; llmCallId?: string; messageId?: string }
   | { type: "tool"; toolCallId: string }
   | { type: "compaction"; agentRunId: string }

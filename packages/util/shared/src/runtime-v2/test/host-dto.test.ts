@@ -43,12 +43,11 @@ describe("runtime-v2 Host DTO boundaries", () => {
     const current = ["filesystem.read", "network", "approval"] as const;
 
     expect(narrowRuntimeCapabilityCeiling(current, current)).toEqual(current);
-    expect(
-      narrowRuntimeCapabilityCeiling(current, ["filesystem.read", "approval"]),
-    ).toEqual(["filesystem.read", "approval"]);
-    expect(() =>
-      narrowRuntimeCapabilityCeiling(current, ["filesystem.write"]),
-    ).toThrow("cannot add filesystem.write");
+    expect(narrowRuntimeCapabilityCeiling(current, ["filesystem.read", "approval"])).toEqual([
+      "filesystem.read",
+      "approval",
+    ]);
+    expect(() => narrowRuntimeCapabilityCeiling(current, ["filesystem.write"])).toThrow("cannot add filesystem.write");
   });
 
   it("keeps diagnostic details scalar and serializable", () => {

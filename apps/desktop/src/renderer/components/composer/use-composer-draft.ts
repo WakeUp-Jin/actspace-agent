@@ -18,8 +18,17 @@ export type ComposerDraftOptions = {
  * 09 T30：输入框文字草稿。按 draftKey 读写（16 T14），换会话换入新会话的草稿；
  * 发送失败的恢复和「聚焦输入框」请求也在这里。
  */
-export function useComposerDraft({ draftKey, readDraft, writeDraft, draftRestore, focusRequestId, inputRef, onSwitched, onRestored }: ComposerDraftOptions) {
-  const [message, setMessage] = useState(() => draftKey && readDraft ? readDraft(draftKey) : "");
+export function useComposerDraft({
+  draftKey,
+  readDraft,
+  writeDraft,
+  draftRestore,
+  focusRequestId,
+  inputRef,
+  onSwitched,
+  onRestored,
+}: ComposerDraftOptions) {
+  const [message, setMessage] = useState(() => (draftKey && readDraft ? readDraft(draftKey) : ""));
   // 两个回调是事件而不是依赖：只在换会话 / 恢复草稿时调用最新的那一份，调用方每次渲染换函数也不触发 effect。
   const callbacksRef = useRef({ onSwitched, onRestored });
   callbacksRef.current = { onSwitched, onRestored };

@@ -23,22 +23,42 @@ import { projectionFixture } from "./projection-fixture";
 let projection: SessionProjectionContextValue | null = null;
 
 vi.mock("../session", async (importOriginal) => ({
-  ...await importOriginal<typeof import("../session")>(),
+  ...(await importOriginal<typeof import("../session")>()),
   // 胶囊只订阅 cell 派生出的模型：这里直接用夹具里的 cell 跑 selector。
-  useProjectionSelect: (selector: (cell: unknown, overlay: unknown) => unknown) => selector(projection?.cell ?? null, null),
+  useProjectionSelect: (selector: (cell: unknown, overlay: unknown) => unknown) =>
+    selector(projection?.cell ?? null, null),
 }));
 
-const NO_STATS: ComposerSessionStats = { turns: 0, steps: 0, llmMs: 0, toolMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 };
+const NO_STATS: ComposerSessionStats = {
+  turns: 0,
+  steps: 0,
+  llmMs: 0,
+  toolMs: 0,
+  ttftMs: 0,
+  ttftSteps: 0,
+  decodeMs: 0,
+  decodeTokens: 0,
+};
 
 function usage(overrides: Partial<RuntimeUsageSummary>): RuntimeUsageSummary {
-  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null, ...overrides };
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    totalTokens: 0,
+    costUsd: null,
+    ...overrides,
+  };
 }
 
 function setProjection(snapshot: Partial<RuntimeSessionSnapshot>) {
   const fixture = projectionFixture("s");
   projection = {
     sessionId: "s",
-    cell: { snapshot: { ...fixture.snapshot, ...snapshot }, window: fixture.window } as unknown as NonNullable<SessionProjectionContextValue["cell"]>,
+    cell: { snapshot: { ...fixture.snapshot, ...snapshot }, window: fixture.window } as unknown as NonNullable<
+      SessionProjectionContextValue["cell"]
+    >,
     overlay: null,
     store: {} as SessionProjectionContextValue["store"],
     bridge: null,
@@ -72,7 +92,10 @@ describe("sessionStats", () => {
   it("reads model timing from the host activity projection", () => {
     const fixture = projectionFixture();
     const timing = { llmMs: 10_000, ttftMs: 3_000, ttftSteps: 1, decodeMs: 5_000, decodeTokens: 100 };
-    const stats = sessionStats({ ...fixture.snapshot, activity: { ...fixture.snapshot.activity, turnCount: 1, stepCount: 2, timing } });
+    const stats = sessionStats({
+      ...fixture.snapshot,
+      activity: { ...fixture.snapshot.activity, turnCount: 1, stepCount: 2, timing },
+    });
     expect(stats).toEqual({ ...NO_STATS, turns: 1, steps: 2, ...timing });
   });
 
@@ -81,7 +104,11 @@ describe("sessionStats", () => {
     const stats = sessionStats({
       ...fixture.snapshot,
       activity: { ...fixture.snapshot.activity, turnCount: 2, stepCount: 5 },
-      tools: [{ durationMs: 1_500 }, { durationMs: null }, { durationMs: 500 }] as unknown as RuntimeSessionSnapshot["tools"],
+      tools: [
+        { durationMs: 1_500 },
+        { durationMs: null },
+        { durationMs: 500 },
+      ] as unknown as RuntimeSessionSnapshot["tools"],
     });
     expect(stats).toEqual({ ...NO_STATS, turns: 2, steps: 5, toolMs: 2_000 });
   });
@@ -94,12 +121,25 @@ describe("pill models", () => {
   });
 
   it("lists only the timed rows in the activity dialog", () => {
-    const model = activityPillModel({ ...NO_STATS, turns: 2, steps: 3, llmMs: 12_340, decodeMs: 4_000, decodeTokens: 170 });
+    const model = activityPillModel({
+      ...NO_STATS,
+      turns: 2,
+      steps: 3,
+      llmMs: 12_340,
+      decodeMs: 4_000,
+      decodeTokens: 170,
+    });
     expect(model).toEqual({
       kind: "dialog",
       label: ["2 轮 3 步", "43 tok/s"],
       ariaLabel: "2 轮 3 步 · 43 tok/s",
-      dialog: { title: "会话统计", rows: [["模型用时", "12.3秒"], ["输出速度（TPS）", "43 tok/s"]] },
+      dialog: {
+        title: "会话统计",
+        rows: [
+          ["模型用时", "12.3秒"],
+          ["输出速度（TPS）", "43 tok/s"],
+        ],
+      },
     });
   });
 
@@ -113,7 +153,12 @@ describe("pill models", () => {
       dialog: {
         title: "会话累计消耗",
         titleValue: "12,240 tok",
-        rows: [["缓存命中", "80%"], ["未缓存输入", "1,967 tok"], ["缓存读取", "8,033 tok"], ["输出", "2,240 tok"]],
+        rows: [
+          ["缓存命中", "80%"],
+          ["未缓存输入", "1,967 tok"],
+          ["缓存读取", "8,033 tok"],
+          ["输出", "2,240 tok"],
+        ],
       },
     });
     const withWrite = usagePillModel(usage({ inputTokens: 10, cacheWriteTokens: 4, outputTokens: 1 }));

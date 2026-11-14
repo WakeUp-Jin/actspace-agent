@@ -1,6 +1,6 @@
 // 真实界面功能块的聚焦：先看全貌，再依次把截图放大到每个要点对应的区域。
 // 悬停或键盘进入某个要点就停在那里，离开后接着轮播；点按（触屏）切换固定。
-import { createClock, playWhenVisible } from './home-stage';
+import { createClock, playWhenVisible } from "./home-stage";
 
 type Rect = [number, number, number, number];
 
@@ -9,17 +9,17 @@ const OVERVIEW = 1600;
 const MAX_ZOOM = 1.7;
 
 export function initializeFocusStages() {
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  for (const root of document.querySelectorAll<HTMLElement>('[data-focus-stage]')) {
-    const section = root.closest('section')!;
-    const view = root.querySelector<HTMLElement>('[data-focus-view]')!;
-    const canvas = root.querySelector<HTMLElement>('[data-focus-canvas]')!;
-    const img = canvas.querySelector('img')!;
-    const ring = root.querySelector<HTMLElement>('[data-focus-ring]')!;
-    const label = root.querySelector<HTMLElement>('[data-focus-label]')!;
-    const rects = JSON.parse(root.dataset.points ?? '[]') as Rect[];
-    const buttons = [...section.querySelectorAll<HTMLButtonElement>('[data-focus-point]')];
-    const titles = buttons.map((button, index) => `0${index + 1} ${button.querySelector('b')?.textContent ?? ''}`);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  for (const root of document.querySelectorAll<HTMLElement>("[data-focus-stage]")) {
+    const section = root.closest("section")!;
+    const view = root.querySelector<HTMLElement>("[data-focus-view]")!;
+    const canvas = root.querySelector<HTMLElement>("[data-focus-canvas]")!;
+    const img = canvas.querySelector("img")!;
+    const ring = root.querySelector<HTMLElement>("[data-focus-ring]")!;
+    const label = root.querySelector<HTMLElement>("[data-focus-label]")!;
+    const rects = JSON.parse(root.dataset.points ?? "[]") as Rect[];
+    const buttons = [...section.querySelectorAll<HTMLButtonElement>("[data-focus-point]")];
+    const titles = buttons.map((button, index) => `0${index + 1} ${button.querySelector("b")?.textContent ?? ""}`);
     const clock = createClock();
     let active = -1;
     let pinned = -1;
@@ -55,20 +55,20 @@ export function initializeFocusStages() {
         ring.style.height = `${rh * 100}%`;
         label.textContent = titles[index];
         // 区域贴着窗口顶部时，标签放到框里面。
-        ring.classList.toggle('label-in', y + ry * ih * scale < 30);
+        ring.classList.toggle("label-in", y + ry * ih * scale < 30);
       }
       canvas.style.transform = `translate(${x}px, ${y}px) scale(${scale / MAX_ZOOM})`;
-      canvas.style.setProperty('--zoom', String(scale / MAX_ZOOM));
-      ring.classList.toggle('on', index >= 0);
+      canvas.style.setProperty("--zoom", String(scale / MAX_ZOOM));
+      ring.classList.toggle("on", index >= 0);
     };
 
     const show = (index: number) => {
       active = index;
       buttons.forEach((button, i) => {
-        button.classList.toggle('on', i === index);
-        button.setAttribute('aria-pressed', String(i === pinned));
+        button.classList.toggle("on", i === index);
+        button.setAttribute("aria-pressed", String(i === pinned));
       });
-      section.classList.toggle('focus-auto', playing && pinned < 0 && hovered < 0 && index >= 0);
+      section.classList.toggle("focus-auto", playing && pinned < 0 && hovered < 0 && index >= 0);
       layout(index);
     };
 
@@ -93,21 +93,50 @@ export function initializeFocusStages() {
     };
 
     buttons.forEach((button, index) => {
-      button.addEventListener('mouseenter', () => { hovered = index; hold(); });
-      button.addEventListener('mouseleave', () => { hovered = -1; hold(); });
-      button.addEventListener('focus', () => { if (button.matches(':focus-visible')) { hovered = index; hold(); } });
-      button.addEventListener('blur', () => { if (hovered === index) { hovered = -1; hold(); } });
-      button.addEventListener('click', () => { pinned = pinned === index ? -1 : index; hold(); });
+      button.addEventListener("mouseenter", () => {
+        hovered = index;
+        hold();
+      });
+      button.addEventListener("mouseleave", () => {
+        hovered = -1;
+        hold();
+      });
+      button.addEventListener("focus", () => {
+        if (button.matches(":focus-visible")) {
+          hovered = index;
+          hold();
+        }
+      });
+      button.addEventListener("blur", () => {
+        if (hovered === index) {
+          hovered = -1;
+          hold();
+        }
+      });
+      button.addEventListener("click", () => {
+        pinned = pinned === index ? -1 : index;
+        hold();
+      });
     });
 
     new ResizeObserver(() => layout(active)).observe(view);
     new ResizeObserver(() => layout(active)).observe(img);
     show(-1);
-    if (reduced) { root.classList.add('still'); continue; }
-    playWhenVisible(root, () => { playing = true; clock.at(OVERVIEW, () => cycle(0)); }, () => {
-      playing = false;
-      clock.stop();
-      if (pinned < 0 && hovered < 0) show(-1);
-    });
+    if (reduced) {
+      root.classList.add("still");
+      continue;
+    }
+    playWhenVisible(
+      root,
+      () => {
+        playing = true;
+        clock.at(OVERVIEW, () => cycle(0));
+      },
+      () => {
+        playing = false;
+        clock.stop();
+        if (pinned < 0 && hovered < 0) show(-1);
+      },
+    );
   }
 }

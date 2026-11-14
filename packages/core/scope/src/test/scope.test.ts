@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { AgentScope, bindScopeParent, carrierKeyOf, scopeActiveOf, scopeChainOf, scopeContext, scopeParentOf, scopeTarget } from "../scope.js";
+import {
+  AgentScope,
+  bindScopeParent,
+  carrierKeyOf,
+  scopeActiveOf,
+  scopeChainOf,
+  scopeContext,
+  scopeParentOf,
+  scopeTarget,
+} from "../scope.js";
 import { CordisContextClass } from "@actspace/cordis-adapter";
 import { ScopedRegistry } from "../layered-registry.js";
 
@@ -9,7 +18,9 @@ describe("AgentScope", () => {
     const child = root.child("explore", "child");
     let disposed = 0;
     root.contributors.register({ id: "plugin/context", owner: "plugin", value: "root" });
-    child.contributors.register({ id: "plugin/context", owner: "plugin", value: "child" }, () => { disposed += 1; });
+    child.contributors.register({ id: "plugin/context", owner: "plugin", value: "child" }, () => {
+      disposed += 1;
+    });
     child.contributors.register({ id: "plugin/extra", owner: "plugin", value: "extra" });
     expect(child.contributors.get("plugin/context")?.value).toBe("child");
     expect(child.contributors.entries().map((entry) => entry.id)).toEqual(["plugin/context", "plugin/extra"]);
@@ -117,7 +128,9 @@ describe("AgentScope", () => {
   it("closes a scope carrier before asynchronous disposal completes", async () => {
     const scope = new AgentScope("root", undefined, "root");
     let release!: () => void;
-    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     scope.disposer.add(async () => pending);
     const disposal = scope.dispose();
     expect(scopeActiveOf(scope.scopeKey)).toBe(false);
@@ -157,7 +170,9 @@ describe("AgentScope", () => {
   it("cancels an explicit registration disposer when the registration is removed", async () => {
     const scope = new AgentScope("root", undefined, "root");
     let disposed = 0;
-    const remove = scope.contributors.register({ id: "owned", owner: "plugin", value: true }, () => { disposed += 1; });
+    const remove = scope.contributors.register({ id: "owned", owner: "plugin", value: true }, () => {
+      disposed += 1;
+    });
     remove();
     await scope.dispose();
     expect(disposed).toBe(0);
@@ -169,7 +184,9 @@ describe("AgentScope", () => {
     const scope = new AgentScope("root");
     const seen: string[] = [];
     const scoped = scopeContext(root.context, scope.scopeKey, scope.disposer);
-    scoped.on?.("agent/status", () => { seen.push("scoped"); });
+    scoped.on?.("agent/status", () => {
+      seen.push("scoped");
+    });
     await root.context.emit?.("agent/status", { status: "before" });
     expect(seen).toEqual(["scoped"]);
     await scope.dispose();

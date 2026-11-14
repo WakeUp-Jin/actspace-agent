@@ -1,12 +1,20 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { createMockSession } from "../mock/mock-db";
-import { SessionProjectionProvider, SessionProjectionScope, useOptionalSessionProjection } from "../session/SessionProjectionContext";
+import {
+  SessionProjectionProvider,
+  SessionProjectionScope,
+  useOptionalSessionProjection,
+} from "../session/SessionProjectionContext";
 import { setupBridge } from "./helpers/bridge";
 
 function Probe({ label }: { label: string }) {
   const projection = useOptionalSessionProjection();
-  return <p data-testid={label}>{`${projection?.sessionId ?? "none"}|${projection?.cell?.snapshot?.metadata.title ?? ""}|${projection?.store.selectedSessionId ?? ""}`}</p>;
+  return (
+    <p
+      data-testid={label}
+    >{`${projection?.sessionId ?? "none"}|${projection?.cell?.snapshot?.metadata.title ?? ""}|${projection?.store.selectedSessionId ?? ""}`}</p>
+  );
 }
 
 it("gives a side chat scope its own session without changing the selected one", async () => {

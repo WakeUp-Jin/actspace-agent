@@ -29,8 +29,12 @@ export class SessionPersistenceCoordinator {
     });
   }
 
-  get durableSeq(): number { return this.#durableSeq; }
-  get blocked(): boolean { return !this.#writes.canAccept; }
+  get durableSeq(): number {
+    return this.#durableSeq;
+  }
+  get blocked(): boolean {
+    return !this.#writes.canAccept;
+  }
 
   accept(event: SessionEventEnvelopeV1): void | Promise<void> {
     if (this.#closed) throw new Error("Session persistence coordinator is closed.");
@@ -48,16 +52,29 @@ export class SessionPersistenceCoordinator {
     if (this.#closed) throw new Error("Session persistence coordinator is closed.");
     await this.#writes.flush();
     await this.driver.assertOwned();
-    if (this.#durableSeq < throughSeq) throw new Error(`Session durability barrier stopped at seq ${this.#durableSeq}; expected ${throughSeq}.`);
+    if (this.#durableSeq < throughSeq)
+      throw new Error(`Session durability barrier stopped at seq ${this.#durableSeq}; expected ${throughSeq}.`);
   }
 
   async close(throughSeq: number): Promise<void> {
     if (this.#closed) return;
     let failure: unknown;
-    try { await this.flush(throughSeq); } catch (error) { failure = error; }
+    try {
+      await this.flush(throughSeq);
+    } catch (error) {
+      failure = error;
+    }
     this.#closed = true;
-    try { await this.#writes.close(); } catch (error) { failure ??= error; }
-    try { await this.driver.close(); } catch (error) { failure ??= error; }
+    try {
+      await this.#writes.close();
+    } catch (error) {
+      failure ??= error;
+    }
+    try {
+      await this.driver.close();
+    } catch (error) {
+      failure ??= error;
+    }
     if (failure !== undefined) throw failure;
   }
 }

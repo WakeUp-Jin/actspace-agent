@@ -35,7 +35,12 @@ export function createServiceLifecycleFixtures(): ServiceLifecycleFixtures {
     constructor(ctx: CordisServiceContext, config: Config = {}) {
       super(ctx, SERVICE_FIXTURE_IDS.probe);
       events.push(`probe:active:${config.enabled === false ? "disabled" : "enabled"}`);
-      ctx.effect(() => () => { events.push("probe:disposed"); }, "fixture.probe");
+      ctx.effect(
+        () => () => {
+          events.push("probe:disposed");
+        },
+        "fixture.probe",
+      );
     }
   }
 

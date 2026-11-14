@@ -1,8 +1,20 @@
 import type { RuntimeJsonValue } from "./host-dto";
 import type { ApprovalDecision, ApprovalRequest, PermissionMode, SessionGrant } from "./permission";
 import type { RuntimeAgentMode } from "./runtime";
-import type { SessionEventCandidateV1, SessionEventProvenanceV1, SessionSurfaceNodeV1, SessionSurfaceOperationV1 } from "./session-events";
-import type { InboxSourceId, SubagentActivationStatus, SubagentActivationTrigger, SubagentDelivery, SubagentKind, SubagentPreset } from "./subagents";
+import type {
+  SessionEventCandidateV1,
+  SessionEventProvenanceV1,
+  SessionSurfaceNodeV1,
+  SessionSurfaceOperationV1,
+} from "./session-events";
+import type {
+  InboxSourceId,
+  SubagentActivationStatus,
+  SubagentActivationTrigger,
+  SubagentDelivery,
+  SubagentKind,
+  SubagentPreset,
+} from "./subagents";
 
 /**
  * `@actspace/core` 名下的 Session 事件在写入时的形状：事件名 → `data`。
@@ -15,29 +27,99 @@ import type { InboxSourceId, SubagentActivationStatus, SubagentActivationTrigger
  * 写成 `RuntimeJsonValue`。
  */
 export type CoreEventDataMap = {
-  "turn/start": { readonly turnId: string; readonly agentRunId: string; readonly mode: RuntimeAgentMode; readonly modeRevision: number };
+  "turn/start": {
+    readonly turnId: string;
+    readonly agentRunId: string;
+    readonly mode: RuntimeAgentMode;
+    readonly modeRevision: number;
+  };
   /** `forked`：fork 出的子会话把继承来的那个回合收尾；`interrupted`：恢复时补上的结束。 */
-  "turn/end": { readonly turnId: string; readonly reason: "completed" | "step-limit" | "aborted" | "failed" | "interrupted" | "forked"; readonly failure?: RuntimeJsonValue; readonly repairId?: string };
-  "step/start": { readonly turnId: string; readonly stepId: string; readonly agentRunId: string; readonly stepIndex: number; readonly metadata?: RuntimeJsonValue };
-  "step/end": { readonly turnId: string; readonly stepId: string; readonly reason: "completed" | "tool-use" | "aborted" | "failed" | "interrupted"; readonly usage?: RuntimeJsonValue; readonly repairId?: string };
+  "turn/end": {
+    readonly turnId: string;
+    readonly reason: "completed" | "step-limit" | "aborted" | "failed" | "interrupted" | "forked";
+    readonly failure?: RuntimeJsonValue;
+    readonly repairId?: string;
+  };
+  "step/start": {
+    readonly turnId: string;
+    readonly stepId: string;
+    readonly agentRunId: string;
+    readonly stepIndex: number;
+    readonly metadata?: RuntimeJsonValue;
+  };
+  "step/end": {
+    readonly turnId: string;
+    readonly stepId: string;
+    readonly reason: "completed" | "tool-use" | "aborted" | "failed" | "interrupted";
+    readonly usage?: RuntimeJsonValue;
+    readonly repairId?: string;
+  };
   /** 任务队列领取任务时写的那一条不带 `turnId`：它写在回合开始之前。 */
-  "user/message": { readonly messageId: string; readonly agentRunId: string; readonly turnId?: string; readonly content: RuntimeJsonValue };
+  "user/message": {
+    readonly messageId: string;
+    readonly agentRunId: string;
+    readonly turnId?: string;
+    readonly content: RuntimeJsonValue;
+  };
   "assistant/message":
-    | (CoreRequestIds & { readonly messageId: string; readonly content: RuntimeJsonValue; readonly finishReason: string; readonly usage: RuntimeJsonValue; readonly firstTokenAt?: string })
+    | (CoreRequestIds & {
+        readonly messageId: string;
+        readonly content: RuntimeJsonValue;
+        readonly finishReason: string;
+        readonly usage: RuntimeJsonValue;
+        readonly firstTokenAt?: string;
+      })
     /** 恢复时给没有结果的请求补的结束。 */
-    | { readonly requestId: string; readonly messageId: string; readonly content: ""; readonly finishReason: "aborted"; readonly recovery: "outcome-unknown"; readonly repairId: string };
-  "llm/retry": { readonly requestId: string; readonly retryId: string; readonly attempt: number; readonly nextAttempt: number; readonly delayMs: number; readonly failure: RuntimeJsonValue; readonly usage: RuntimeJsonValue };
+    | {
+        readonly requestId: string;
+        readonly messageId: string;
+        readonly content: "";
+        readonly finishReason: "aborted";
+        readonly recovery: "outcome-unknown";
+        readonly repairId: string;
+      };
+  "llm/retry": {
+    readonly requestId: string;
+    readonly retryId: string;
+    readonly attempt: number;
+    readonly nextAttempt: number;
+    readonly delayMs: number;
+    readonly failure: RuntimeJsonValue;
+    readonly usage: RuntimeJsonValue;
+  };
   "llm/retry-started": { readonly requestId: string; readonly retryId: string; readonly attempt: number };
   "llm/auxiliary-start": CoreAuxiliaryRequestData;
-  "llm/auxiliary-end": CoreAuxiliaryRequestData & { readonly finishedAt: string; readonly status: "completed" | "failed" | "aborted"; readonly usage: RuntimeJsonValue };
+  "llm/auxiliary-end": CoreAuxiliaryRequestData & {
+    readonly finishedAt: string;
+    readonly status: "completed" | "failed" | "aborted";
+    readonly usage: RuntimeJsonValue;
+  };
 
-  "request/header": CoreRequestIds & { readonly routeId: string; readonly model: string; readonly contextWindow: number | null; readonly attempt: number; readonly agentMode: RuntimeAgentMode; readonly agentModeRevision: number };
-  "request/system-prompt": CoreRequestIds & { readonly digest: string; readonly sections: readonly RuntimeJsonValue[]; readonly modelFacts: readonly RuntimeJsonValue[]; readonly contributorProvenance: readonly RuntimeJsonValue[] };
+  "request/header": CoreRequestIds & {
+    readonly routeId: string;
+    readonly model: string;
+    readonly contextWindow: number | null;
+    readonly attempt: number;
+    readonly agentMode: RuntimeAgentMode;
+    readonly agentModeRevision: number;
+  };
+  "request/system-prompt": CoreRequestIds & {
+    readonly digest: string;
+    readonly sections: readonly RuntimeJsonValue[];
+    readonly modelFacts: readonly RuntimeJsonValue[];
+    readonly contributorProvenance: readonly RuntimeJsonValue[];
+  };
   "request/tools": CoreRequestIds & { readonly digest: string; readonly tools: readonly RuntimeJsonValue[] };
   /** 恢复时给只写了 header 的请求补的那一条只有 id，没有快照。 */
   "request/context": CoreRequestIds & ({ readonly snapshot: RuntimeJsonValue } | { readonly repairId: string });
 
-  "tool/call": CoreRequestIds & { readonly agentRunId: string; readonly callId: string; readonly pluginId: string; readonly name: string; readonly args: RuntimeJsonValue };
+  "tool/call": CoreRequestIds & {
+    readonly agentRunId: string;
+    readonly callId: string;
+    readonly pluginId: string;
+    readonly name: string;
+    readonly args: RuntimeJsonValue;
+  };
   "tool/result": {
     readonly approvalMode?: "auto" | "manual" | "session";
     readonly approvalReason?: string;
@@ -52,41 +134,151 @@ export type CoreEventDataMap = {
     readonly failure: RuntimeJsonValue;
     readonly renderer: RuntimeJsonValue;
   };
-  "tool/recovery-outcome": { readonly callId: string; readonly repairId: string; readonly outcome: "not-started" | "outcome-unknown"; readonly retryAllowed: boolean; readonly content: string };
-  "tool-workflow/run-start": { readonly callId: string; readonly pluginId: string; readonly name: string; readonly registrationId: string; readonly definitionVersion: number; readonly definitionDigest: string };
+  "tool/recovery-outcome": {
+    readonly callId: string;
+    readonly repairId: string;
+    readonly outcome: "not-started" | "outcome-unknown";
+    readonly retryAllowed: boolean;
+    readonly content: string;
+  };
+  "tool-workflow/run-start": {
+    readonly callId: string;
+    readonly pluginId: string;
+    readonly name: string;
+    readonly registrationId: string;
+    readonly definitionVersion: number;
+    readonly definitionDigest: string;
+  };
 
   "permission/asked": ApprovalRequest;
   /** 审批中途权限模式变了，拒绝会多带一个 `reason`。 */
-  "permission/decided": ApprovalDecision | (Extract<ApprovalDecision, { readonly kind: "deny" }> & { readonly reason: string });
+  "permission/decided":
+    | ApprovalDecision
+    | (Extract<ApprovalDecision, { readonly kind: "deny" }> & { readonly reason: string });
   "permission/scope-denied": { readonly callId: string; readonly code: string; readonly reason: string };
   "permission/grant-added": SessionGrant;
-  "permission/grant-used": { readonly schemaVersion: 1; readonly grantId: string; readonly sessionId: string; readonly agentId: string; readonly callId: string; readonly pluginId: string; readonly toolName: string; readonly commandDigest: string; readonly usedAt: string };
-  "permission/grant-revoked": { readonly schemaVersion: 1; readonly grantId: string; readonly sessionId: string; readonly agentId: string; readonly revokedAt: string; readonly reason: "workspace-changed" | "permission-mode-downgrade" | "user-revoked" };
+  "permission/grant-used": {
+    readonly schemaVersion: 1;
+    readonly grantId: string;
+    readonly sessionId: string;
+    readonly agentId: string;
+    readonly callId: string;
+    readonly pluginId: string;
+    readonly toolName: string;
+    readonly commandDigest: string;
+    readonly usedAt: string;
+  };
+  "permission/grant-revoked": {
+    readonly schemaVersion: 1;
+    readonly grantId: string;
+    readonly sessionId: string;
+    readonly agentId: string;
+    readonly revokedAt: string;
+    readonly reason: "workspace-changed" | "permission-mode-downgrade" | "user-revoked";
+  };
   "permission/mode-set": { readonly mode: PermissionMode; readonly changedAt: string; readonly source: string };
 
-  "agent/mode-set": { readonly mode: RuntimeAgentMode; readonly revision: number; readonly changedAt: string; readonly source: string };
+  "agent/mode-set": {
+    readonly mode: RuntimeAgentMode;
+    readonly revision: number;
+    readonly changedAt: string;
+    readonly source: string;
+  };
   "agent/inbox/spliced":
-    | { readonly operation: "enqueue"; readonly messageId: string; readonly target: CoreInboxTarget; readonly content: RuntimeJsonValue; readonly source: InboxSourceId; readonly senderId?: string; readonly notice?: CoreInboxNotice }
+    | {
+        readonly operation: "enqueue";
+        readonly messageId: string;
+        readonly target: CoreInboxTarget;
+        readonly content: RuntimeJsonValue;
+        readonly source: InboxSourceId;
+        readonly senderId?: string;
+        readonly notice?: CoreInboxNotice;
+      }
     /** 领取时把内容再带一遍：只加载后半段日志也能推出模型看到的节点。 */
-    | { readonly operation: "claim"; readonly messageId: string; readonly target: CoreInboxTarget; readonly content: RuntimeJsonValue; readonly source?: InboxSourceId; readonly senderId?: string; readonly notice?: CoreInboxNotice; readonly opensTurn?: true }
-    | { readonly operation: "discard"; readonly messageId: string; readonly target: CoreInboxTarget; readonly reason: string };
+    | {
+        readonly operation: "claim";
+        readonly messageId: string;
+        readonly target: CoreInboxTarget;
+        readonly content: RuntimeJsonValue;
+        readonly source?: InboxSourceId;
+        readonly senderId?: string;
+        readonly notice?: CoreInboxNotice;
+        readonly opensTurn?: true;
+      }
+    | {
+        readonly operation: "discard";
+        readonly messageId: string;
+        readonly target: CoreInboxTarget;
+        readonly reason: string;
+      };
 
   "session/title-set": { readonly title: string | null };
   "session/pinned-set": { readonly pinned: boolean };
   "session/archived-set": { readonly archived: boolean };
   "session/workspace-set": { readonly workspaceRoot: string };
-  "session/rewound": { readonly cutSeq: number; readonly droppedThroughSeq: number; readonly runId: string; readonly archive: string; readonly rewoundAt: string };
+  "session/rewound": {
+    readonly cutSeq: number;
+    readonly droppedThroughSeq: number;
+    readonly runId: string;
+    readonly archive: string;
+    readonly rewoundAt: string;
+  };
   "session/end-seed": { readonly sessionId: string; readonly lastSeq: number };
 
   "background/task":
-    | { readonly op: "start"; readonly taskId: string; readonly kind: "bash" | "agent"; readonly callId: string; readonly description: string; readonly startedAt: string; readonly transcriptPath?: string }
-    | { readonly op: "settle"; readonly taskId: string; readonly status: "completed" | "failed" | "stopped" | "lost"; readonly exitCode?: number | null; readonly endedAt: string; readonly delivery: "notified" | "stopped" | "lost" }
+    | {
+        readonly op: "start";
+        readonly taskId: string;
+        readonly kind: "bash" | "agent";
+        readonly callId: string;
+        readonly description: string;
+        readonly startedAt: string;
+        readonly transcriptPath?: string;
+      }
+    | {
+        readonly op: "settle";
+        readonly taskId: string;
+        readonly status: "completed" | "failed" | "stopped" | "lost";
+        readonly exitCode?: number | null;
+        readonly endedAt: string;
+        readonly delivery: "notified" | "stopped" | "lost";
+      }
     | { readonly op: "prune"; readonly taskId: string; readonly prunedAt: string; readonly reason: "session-cap" };
   /** `preset` 只有 `local` 有，`inheritedThroughSeq` 只有 `fork` 有。 */
-  "subagent/spawned": { readonly agentId: string; readonly callId: string; readonly kind: SubagentKind; readonly preset?: SubagentPreset; readonly description: string; readonly transcriptPath: string; readonly createdAt: string; readonly inheritedThroughSeq?: number; readonly toolNames?: readonly string[] };
+  "subagent/spawned": {
+    readonly agentId: string;
+    readonly callId: string;
+    readonly kind: SubagentKind;
+    readonly preset?: SubagentPreset;
+    readonly description: string;
+    readonly transcriptPath: string;
+    readonly createdAt: string;
+    readonly inheritedThroughSeq?: number;
+    readonly toolNames?: readonly string[];
+  };
   "subagent/activation":
-    | { readonly op: "start"; readonly agentId: string; readonly activationId: string; readonly trigger: SubagentActivationTrigger; readonly callId: string; readonly background: boolean; readonly model?: string; readonly reasoningEffort?: string; readonly startedAt: string }
-    | { readonly op: "settle"; readonly agentId: string; readonly activationId: string; readonly status: SubagentActivationStatus; readonly summary: string; readonly result?: string; readonly resultTruncated?: boolean; readonly delivery: SubagentDelivery; readonly endedAt: string };
+    | {
+        readonly op: "start";
+        readonly agentId: string;
+        readonly activationId: string;
+        readonly trigger: SubagentActivationTrigger;
+        readonly callId: string;
+        readonly background: boolean;
+        readonly model?: string;
+        readonly reasoningEffort?: string;
+        readonly startedAt: string;
+      }
+    | {
+        readonly op: "settle";
+        readonly agentId: string;
+        readonly activationId: string;
+        readonly status: SubagentActivationStatus;
+        readonly summary: string;
+        readonly result?: string;
+        readonly resultTruncated?: boolean;
+        readonly delivery: SubagentDelivery;
+        readonly endedAt: string;
+      };
 
   "recovery/start": { readonly repairId: string; readonly sourceBoundarySeq: number };
   "recovery/committed": { readonly repairId: string; readonly sourceBoundarySeq: number };
@@ -94,8 +286,22 @@ export type CoreEventDataMap = {
   "compaction/start": { readonly compactionId: string; readonly start: number; readonly end: number };
   "compaction/summary": { readonly compactionId: string; readonly summaryDigest: string };
   /** 摘要节点只存在 `data.node`，`surface` 只记被替换的范围。 */
-  "surface/replaced": { readonly compactionId: string; readonly sourceEventSeqs: readonly number[]; readonly replacedTokens: { readonly conversation: number; readonly summarizedConversation: number }; readonly estimatorVersion: string; readonly node: SessionSurfaceNodeV1 };
-  "compaction/end": { readonly compactionId: string; readonly summaryDigest: string; readonly durationMs?: number; readonly trigger?: "manual" | "auto"; readonly beforeTokens?: number; readonly afterTokens?: number; readonly beforeEstimated?: true };
+  "surface/replaced": {
+    readonly compactionId: string;
+    readonly sourceEventSeqs: readonly number[];
+    readonly replacedTokens: { readonly conversation: number; readonly summarizedConversation: number };
+    readonly estimatorVersion: string;
+    readonly node: SessionSurfaceNodeV1;
+  };
+  "compaction/end": {
+    readonly compactionId: string;
+    readonly summaryDigest: string;
+    readonly durationMs?: number;
+    readonly trigger?: "manual" | "auto";
+    readonly beforeTokens?: number;
+    readonly afterTokens?: number;
+    readonly beforeEstimated?: true;
+  };
 };
 
 export type CoreEventType = keyof CoreEventDataMap;
@@ -105,7 +311,12 @@ export type CoreRequestIds = { readonly requestId: string; readonly turnId: stri
 
 export type CoreInboxTarget = "next-step" | "next-turn";
 /** 后台任务通知的展示信息；模型只读 `content`。 */
-export type CoreInboxNotice = { readonly taskId: string; readonly kind: string; readonly title: string; readonly status: string };
+export type CoreInboxNotice = {
+  readonly taskId: string;
+  readonly kind: string;
+  readonly title: string;
+  readonly status: string;
+};
 
 /**
  * 辅助请求（会话标题、压缩、图片识别、自动审批）的身份。会话标题和压缩不属于某一次工具调用，不带那四个 id，
@@ -114,7 +325,14 @@ export type CoreInboxNotice = { readonly taskId: string; readonly kind: string; 
 export type CoreAuxiliaryRequestData = (
   | { readonly sessionId: string; readonly purpose: "session-title" }
   | { readonly sessionId: string; readonly purpose: "compaction"; readonly turnId?: string }
-  | { readonly sessionId: string; readonly purpose: "image-inspection" | "auto-review"; readonly agentRunId: string; readonly turnId: string; readonly stepId: string; readonly callId: string }
+  | {
+      readonly sessionId: string;
+      readonly purpose: "image-inspection" | "auto-review";
+      readonly agentRunId: string;
+      readonly turnId: string;
+      readonly stepId: string;
+      readonly callId: string;
+    }
 ) & {
   /** 同一次逻辑请求的各次尝试共用。 */
   readonly logicalRequestId: string;
@@ -139,7 +357,11 @@ export const CORE_EVENT_OWNER = "@actspace/core";
  * 构造一条 `@actspace/core` 名下的事件，交给 `session.append` / `appendMany`。
  * 别处不要自己拼带这个来源的事件对象，`pnpm check:core-events` 会拦。
  */
-export function coreEvent<T extends CoreEventType>(type: T, data: CoreEventDataMap[T], options: CoreEventOptions = {}): SessionEventCandidateV1 {
+export function coreEvent<T extends CoreEventType>(
+  type: T,
+  data: CoreEventDataMap[T],
+  options: CoreEventOptions = {},
+): SessionEventCandidateV1 {
   return {
     type,
     eventVersion: 1,

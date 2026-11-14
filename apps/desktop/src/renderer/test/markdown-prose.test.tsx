@@ -30,7 +30,9 @@ const FLOW = "flowchart TD\n  A[Start] --> B[Done]";
 describe("MarkdownProse", () => {
   it("follows footnotes and backlinks inside the reply without opening a new page", async () => {
     const onOpenWorkspaceFile = vi.fn();
-    const { container } = render(<MarkdownProse content={"Read[^note].\n\n[^note]: Footnote detail."} onOpenWorkspaceFile={onOpenWorkspaceFile} />);
+    const { container } = render(
+      <MarkdownProse content={"Read[^note].\n\n[^note]: Footnote detail."} onOpenWorkspaceFile={onOpenWorkspaceFile} />,
+    );
     const reference = container.querySelector<HTMLAnchorElement>("[data-footnote-ref]")!;
     const backlink = container.querySelector<HTMLAnchorElement>("[data-footnote-backref]")!;
     const definition = container.querySelector<HTMLElement>(".footnotes li")!;
@@ -49,20 +51,32 @@ describe("MarkdownProse", () => {
 
   it("keeps repeated footnotes local to their reply and stable while its content updates", async () => {
     const content = "Read[^same].\n\n[^same]: Detail.";
-    const { container, rerender } = render(<><MarkdownProse content={content} /><MarkdownProse content={content} /></>);
+    const { container, rerender } = render(
+      <>
+        <MarkdownProse content={content} />
+        <MarkdownProse content={content} />
+      </>,
+    );
     const references = Array.from(container.querySelectorAll<HTMLAnchorElement>("[data-footnote-ref]"));
     const definitions = Array.from(container.querySelectorAll<HTMLElement>(".footnotes li"));
     expect(definitions[0].id).not.toBe(definitions[1].id);
     const labels = Array.from(container.querySelectorAll(".footnotes h2"));
     expect(labels[0].id).not.toBe(labels[1].id);
-    references.forEach((reference, index) => { expect(reference).toHaveAttribute("aria-describedby", labels[index].id); });
+    references.forEach((reference, index) => {
+      expect(reference).toHaveAttribute("aria-describedby", labels[index].id);
+    });
     const firstScroll = vi.spyOn(definitions[0], "scrollIntoView");
     const secondScroll = vi.spyOn(definitions[1], "scrollIntoView");
     await userEvent.click(references[1]);
     expect(secondScroll).toHaveBeenCalledOnce();
     expect(firstScroll).not.toHaveBeenCalled();
     const href = references[1].getAttribute("href");
-    rerender(<><MarkdownProse content={content} /><MarkdownProse content={`${content}\n\nMore streamed text.`} /></>);
+    rerender(
+      <>
+        <MarkdownProse content={content} />
+        <MarkdownProse content={`${content}\n\nMore streamed text.`} />
+      </>,
+    );
     expect(container.querySelectorAll("[data-footnote-ref]")[1]).toHaveAttribute("href", href);
   });
 
@@ -76,7 +90,7 @@ describe("MarkdownProse", () => {
   it("renders fenced code with a language toolbar and copy action", async () => {
     const writeText = vi.fn(async () => undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
-    render(<MarkdownProse content={'```ts\nconst answer = 42;\n```'} />);
+    render(<MarkdownProse content={"```ts\nconst answer = 42;\n```"} />);
 
     expect(screen.getByText("TypeScript")).toBeInTheDocument();
     expect(document.querySelector("code")?.textContent).toContain("const answer = 42;");
@@ -123,7 +137,9 @@ describe("MarkdownProse Mermaid fences", () => {
   it("keeps a closed mermaid fence as a code block until the turn finishes streaming", async () => {
     const closed = `\`\`\`mermaid\n${FLOW}\n\`\`\``;
     const view = (streaming: boolean) => (
-      <ReplyStreamingContext.Provider value={streaming}><MarkdownProse content={closed} /></ReplyStreamingContext.Provider>
+      <ReplyStreamingContext.Provider value={streaming}>
+        <MarkdownProse content={closed} />
+      </ReplyStreamingContext.Provider>
     );
     const { rerender, container } = render(view(true));
     expect(screen.getByRole("button", { name: "复制代码" })).toBeInTheDocument();

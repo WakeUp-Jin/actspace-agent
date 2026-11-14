@@ -7,7 +7,15 @@ const docs = defineCollection({
   schema: z.object({
     title: z.string().min(1),
     description: z.string().min(1),
-    group: z.enum(["getting-started", "workspace-sessions", "models-context", "tools-execution", "workbench", "extensions", "settings-development"]),
+    group: z.enum([
+      "getting-started",
+      "workspace-sessions",
+      "models-context",
+      "tools-execution",
+      "workbench",
+      "extensions",
+      "settings-development",
+    ]),
     order: z.number().int().nonnegative(),
     updatedAt: z.coerce.date(),
     draft: z.boolean().default(false),

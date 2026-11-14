@@ -22,8 +22,8 @@ export function comparePaths(a: ContextPathState, b: ContextPathState): number {
 
 export function capNewPaths(paths: readonly ContextPathState[], newIds: ReadonlySet<string>): readonly string[] {
   return paths
-    .filter(path => path.visibility === "active" || newIds.has(path.id))
+    .filter((path) => path.visibility === "active" || newIds.has(path.id))
     .sort(comparePaths)
     .slice(0, ACTIVE_PATH_LIMIT)
-    .map(path => path.id);
+    .map((path) => path.id);
 }

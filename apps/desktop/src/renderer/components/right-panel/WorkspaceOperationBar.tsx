@@ -29,7 +29,11 @@ function relativePathOf(tab: RightPanelTab | null): string | undefined {
 /** workspace 绝对路径的末段目录名，用作面包屑的根标签。 */
 function workspaceLabelOf(workspaceRoot: string | undefined): string | undefined {
   if (!workspaceRoot) return undefined;
-  return workspaceRoot.replace(/[/\\]+$/, "").split(/[/\\]/).filter(Boolean).at(-1);
+  return workspaceRoot
+    .replace(/[/\\]+$/, "")
+    .split(/[/\\]/)
+    .filter(Boolean)
+    .at(-1);
 }
 
 /**
@@ -54,7 +58,11 @@ export function WorkspaceOperationBar({
 
   const reload = () => {
     if (!path || !activeTab) return;
-    void reloadFile(path, activeTab.kind === "context" ? path : (activeTab as { title: string }).title, meta?.workspaceRoot !== undefined || meta?.hostId ? meta : undefined);
+    void reloadFile(
+      path,
+      activeTab.kind === "context" ? path : (activeTab as { title: string }).title,
+      meta?.workspaceRoot !== undefined || meta?.hostId ? meta : undefined,
+    );
   };
 
   return (

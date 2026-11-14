@@ -21,32 +21,63 @@ vi.mock("../trajectory/layout", async (importOriginal) => {
   return { ...actual, deriveLayout: vi.fn(actual.deriveLayout) };
 });
 
-const spies = () => [vi.mocked(builder.buildTrajectorySnapshot), vi.mocked(layout.deriveLayout), vi.mocked(timeline.deriveTimeline)];
-const calls = () => spies().map(spy => spy.mock.calls.length);
+const spies = () => [
+  vi.mocked(builder.buildTrajectorySnapshot),
+  vi.mocked(layout.deriveLayout),
+  vi.mocked(timeline.deriveTimeline),
+];
+const calls = () => spies().map((spy) => spy.mock.calls.length);
 /** A settled `tool/call` after the streamed chunks; it does not close the reply. */
 function withToolCall(snapshot: RuntimeTrajectorySnapshot): RuntimeTrajectorySnapshot {
   const last = snapshot.nodes.at(-1)!;
   const data = last.data as Record<string, string>;
-  const call = { ...last, key: `${last.sessionId}:${last.eventSeq + 1}`, eventSeq: last.eventSeq + 1, eventType: "tool/call", callId: "streaming-call",
-    data: { turnId: data.turnId, stepId: data.stepId, callId: "streaming-call", name: "bash", arguments: { command: "ls" } } };
-  return { ...snapshot, throughJournalSeq: call.eventSeq, nodes: [...snapshot.nodes, call] as RuntimeTrajectorySnapshot["nodes"] };
+  const call = {
+    ...last,
+    key: `${last.sessionId}:${last.eventSeq + 1}`,
+    eventSeq: last.eventSeq + 1,
+    eventType: "tool/call",
+    callId: "streaming-call",
+    data: {
+      turnId: data.turnId,
+      stepId: data.stepId,
+      callId: "streaming-call",
+      name: "bash",
+      arguments: { command: "ls" },
+    },
+  };
+  return {
+    ...snapshot,
+    throughJournalSeq: call.eventSeq,
+    nodes: [...snapshot.nodes, call] as RuntimeTrajectorySnapshot["nodes"],
+  };
 }
 
 /** The Journal does not change while a reply streams; only the live run's output grows. */
 const settled = streamingFixture(0).snapshot;
-const at = (frame: number, snapshot: RuntimeTrajectorySnapshot = settled) => <TrajectoryView snapshot={snapshot} live={streamingFixture(frame).live} />;
-const runningRow = () => document.querySelector<HTMLTableRowElement>('tr[data-record-id$=":record:assistant:assistant-running"]');
+const at = (frame: number, snapshot: RuntimeTrajectorySnapshot = settled) => (
+  <TrajectoryView snapshot={snapshot} live={streamingFixture(frame).live} />
+);
+const runningRow = () =>
+  document.querySelector<HTMLTableRowElement>('tr[data-record-id$=":record:assistant:assistant-running"]');
 
 describe("trajectory streaming", () => {
-  afterEach(() => { vi.useRealTimers(); });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("grows the streaming assistant row in place without rebuilding the settled layer", () => {
     const view = render(at(0));
-    spies().forEach(spy => { spy.mockClear(); });
+    spies().forEach((spy) => {
+      spy.mockClear();
+    });
     const lengths: number[] = [];
     let row: HTMLTableRowElement | null = null;
     const removed: Node[] = [];
-    const observer = new MutationObserver(records => records.forEach(record => { removed.push(...Array.from(record.removedNodes)); }));
+    const observer = new MutationObserver((records) =>
+      records.forEach((record) => {
+        removed.push(...Array.from(record.removedNodes));
+      }),
+    );
     for (let frame = 1; frame <= 5; frame += 1) {
       view.rerender(at(frame));
       const current = runningRow();
@@ -59,7 +90,7 @@ describe("trajectory streaming", () => {
       lengths.push(current!.querySelector(".tj-content")!.textContent.length);
     }
     observer.disconnect();
-    expect(removed.filter(node => node === row)).toHaveLength(0);
+    expect(removed.filter((node) => node === row)).toHaveLength(0);
     expect(lengths).toEqual([...lengths].sort((a, b) => a - b));
     expect(new Set(lengths).size).toBe(5);
     // Only the frame that names the reply's message rebuilds; later text goes to the streaming layer.
@@ -91,22 +122,30 @@ describe("trajectory streaming", () => {
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "圆点和类型" } });
     expect(runningRow()).toBeNull();
     view.rerender(at(8));
-    act(() => { vi.advanceTimersByTime(SEARCH_INDEX_THROTTLE_MS - 1); });
+    act(() => {
+      vi.advanceTimersByTime(SEARCH_INDEX_THROTTLE_MS - 1);
+    });
     expect(runningRow()).toBeNull();
-    act(() => { vi.advanceTimersByTime(1); });
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
     expect(runningRow()).not.toBeNull();
   });
 
   it("commits projection updates at most once per animation frame", () => {
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
     const immediate = (committed: number | null) => committed === null;
-    const { result, rerender } = renderHook(({ value }) => useFrameCoalesced<number | null>(value, immediate), { initialProps: { value: null as number | null } });
+    const { result, rerender } = renderHook(({ value }) => useFrameCoalesced<number | null>(value, immediate), {
+      initialProps: { value: null as number | null },
+    });
     rerender({ value: 1 });
     expect(result.current).toBe(1);
     rerender({ value: 2 });
     rerender({ value: 3 });
     expect(result.current).toBe(1);
-    act(() => { vi.advanceTimersToNextFrame(); });
+    act(() => {
+      vi.advanceTimersToNextFrame();
+    });
     expect(result.current).toBe(3);
   });
 });

@@ -16,10 +16,12 @@ export type ApprovalChoice = "once" | "session" | "deny";
 const APPROVAL_FRAME_CLASS = "approval message-row w-full max-w-[var(--conversation-block-max-width)]";
 const APPROVAL_TRAY_CLASS = "approval-tray rounded-act-lg bg-surface-subtle";
 const APPROVAL_CARD_CLASS = "approval-card rounded-act-lg border border-line bg-surface shadow-act-xs";
-const APPROVAL_CARD_HEAD_CLASS = "approval-card-head flex min-h-[30px] min-w-0 items-center gap-1.5 px-3 pt-2.5 text-act-md leading-5";
+const APPROVAL_CARD_HEAD_CLASS =
+  "approval-card-head flex min-h-[30px] min-w-0 items-center gap-1.5 px-3 pt-2.5 text-act-md leading-5";
 const APPROVAL_CARD_HEAD_DIVIDED_CLASS = "border-b border-line pb-2";
 const APPROVAL_CARD_FOOTER_CLASS = "approval-card-footer flex min-h-10 flex-wrap items-center gap-1.5 py-2 pr-2 pl-3";
-const APPROVAL_CARD_FOOTER_META_CLASS = "approval-card-meta mr-auto flex min-w-0 items-center gap-1.5 truncate text-act-sm leading-5 text-text-faint";
+const APPROVAL_CARD_FOOTER_META_CLASS =
+  "approval-card-meta mr-auto flex min-w-0 items-center gap-1.5 truncate text-act-sm leading-5 text-text-faint";
 const APPROVAL_NOTE_CLASS = "approval-note px-3 pt-1.5 pb-2 text-act-sm leading-normal text-text-faint";
 const APPROVAL_ICON_CLASS = "grid size-4 flex-none place-items-center text-text-faint";
 const APPROVAL_VERB_CLASS = "flex-none text-text-muted";
@@ -40,7 +42,10 @@ const SILENT_APPROVAL_REASONS = new Set([
 
 /** 把 Runtime 以换行拼接的 reason 文本过滤成需要展示的说明；已知原因和通用确认句都不展示，未知原因原样保留。 */
 export function getApprovalReasonNotes(reason?: string): string[] {
-  return (reason ?? "").split("\n").map((item) => item.trim()).filter((line) => line && !SILENT_APPROVAL_REASONS.has(line));
+  return (reason ?? "")
+    .split("\n")
+    .map((item) => item.trim())
+    .filter((line) => line && !SILENT_APPROVAL_REASONS.has(line));
 }
 
 export function splitApprovalPath(path: string): { dir: string; base: string } {
@@ -84,42 +89,60 @@ export function useApprovalDecision(requestId: string | undefined): ApprovalDeci
   // 15 T11：审批块属于当前会话，远端审批所在的 Host 就是会话的运行目标，不再从 requestId 里拆。
   const { target } = useRunTargetContext();
   const remoteHost = requestId && target.kind === "remote" ? target.hostId : null;
-  const remoteConnected = useHostDirectory((snapshot) => snapshot.hosts.some(host => host.hostId === remoteHost && host.state === "connected"));
+  const remoteConnected = useHostDirectory((snapshot) =>
+    snapshot.hosts.some((host) => host.hostId === remoteHost && host.state === "connected"),
+  );
   const unavailable = Boolean(remoteHost && !remoteConnected);
   const [submitting, setSubmitting] = useState<ApprovalChoice | null>(null);
   const [resolved, setResolved] = useState<ApprovalChoice | null>(null);
   const busy = useRef(false);
   const current = useRef(requestId);
   current.current = requestId;
-  useEffect(() => { busy.current = false; setSubmitting(null); setResolved(null); }, [requestId]);
+  useEffect(() => {
+    busy.current = false;
+    setSubmitting(null);
+    setResolved(null);
+  }, [requestId]);
   const decide = async (choice: ApprovalChoice, suggestionId?: string) => {
     if (!requestId || busy.current || unavailable) return;
     if (choice === "session" && !suggestionId) return;
     busy.current = true;
     setSubmitting(choice);
     const host = remoteHost ? { hostId: remoteHost } : {};
-    const input: RuntimeApprovalDecisionInput = choice === "session" && suggestionId
-      ? { requestId, ...host, decision: "session", suggestionId }
-      : { requestId, ...host, decision: choice === "deny" ? "deny" : "once" };
+    const input: RuntimeApprovalDecisionInput =
+      choice === "session" && suggestionId
+        ? { requestId, ...host, decision: "session", suggestionId }
+        : { requestId, ...host, decision: choice === "deny" ? "deny" : "once" };
     const accepted = await submitApprovalDecision(input);
     if (current.current !== requestId) return;
     if (accepted) setResolved(choice);
-    else { busy.current = false; setSubmitting(null); }
+    else {
+      busy.current = false;
+      setSubmitting(null);
+    }
   };
   return { submitting, resolved, disabled: !requestId || submitting !== null || unavailable, decide };
 }
 
 // pick 必须是模块级常量，否则每次渲染都会重新取。
-function useGrantSuggestion(requestId: string | undefined, pick: (suggestion: GrantSuggestion) => boolean): GrantSuggestion | undefined {
+function useGrantSuggestion(
+  requestId: string | undefined,
+  pick: (suggestion: GrantSuggestion) => boolean,
+): GrantSuggestion | undefined {
   const [result, setResult] = useState<{ requestId: string; suggestion?: GrantSuggestion }>();
   useEffect(() => {
     let active = true;
     if (!requestId) return;
-    void approvalsApi.listPending().then((pending) => {
-      const request = pending.find((item) => item.requestId === requestId);
-      if (active) setResult({ requestId, suggestion: request?.grantSuggestions?.find(pick) });
-    }).catch(() => undefined);
-    return () => { active = false; };
+    void approvalsApi
+      .listPending()
+      .then((pending) => {
+        const request = pending.find((item) => item.requestId === requestId);
+        if (active) setResult({ requestId, suggestion: request?.grantSuggestions?.find(pick) });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [requestId, pick]);
   return result?.requestId === requestId ? result?.suggestion : undefined;
 }
@@ -128,11 +151,22 @@ export function useFileGrantSuggestions(requestId: string | undefined): readonly
   const [result, setResult] = useState<{ requestId: string; suggestions: readonly GrantSuggestion[] }>();
   useEffect(() => {
     let active = true;
-    if (requestId) void approvalsApi.listPending().then(pending => {
-      const suggestions = pending.find(item => item.requestId === requestId)?.grantSuggestions?.filter(item => item.selector.kind === "exact" || item.selector.kind === "subtree") ?? [];
-      if (active) setResult({ requestId, suggestions });
-    }).catch(() => undefined);
-    return () => { active = false; };
+    if (requestId)
+      void approvalsApi
+        .listPending()
+        .then((pending) => {
+          const suggestions =
+            pending
+              .find((item) => item.requestId === requestId)
+              ?.grantSuggestions?.filter(
+                (item) => item.selector.kind === "exact" || item.selector.kind === "subtree",
+              ) ?? [];
+          if (active) setResult({ requestId, suggestions });
+        })
+        .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [requestId]);
   return result !== undefined && result.requestId === requestId ? result.suggestions : [];
 }
@@ -140,9 +174,11 @@ export function useFileGrantSuggestions(requestId: string | undefined): readonly
 /** Backend-owned command prefix; the renderer never derives authorization from command text. */
 export function getCommandPrefixGrant(suggestion: GrantSuggestion): string | null {
   const selector = suggestion.selector;
-  return selector.kind === "command_prefix" && selector.prefix.length > 0
-    && selector.prefix.every(token => typeof token === "string" && token.length > 0)
-    ? selector.prefix.join(" ") : null;
+  return selector.kind === "command_prefix" &&
+    selector.prefix.length > 0 &&
+    selector.prefix.every((token) => typeof token === "string" && token.length > 0)
+    ? selector.prefix.join(" ")
+    : null;
 }
 
 const isCommandPrefixSuggestion = (suggestion: GrantSuggestion) => getCommandPrefixGrant(suggestion) !== null;
@@ -156,7 +192,12 @@ export function ApprovalReason({ reason }: { reason?: string }) {
   const notes = getApprovalReasonNotes(reason);
   if (notes.length === 0) return null;
   return (
-    <span className="grid size-4 flex-none place-items-center text-text-faint" role="img" aria-label="审批原因" title={notes.join("\n")}>
+    <span
+      className="grid size-4 flex-none place-items-center text-text-faint"
+      role="img"
+      aria-label="审批原因"
+      title={notes.join("\n")}
+    >
       <Info size={13} aria-hidden="true" />
     </span>
   );
@@ -176,8 +217,15 @@ export function ApprovalPath({ path }: { path: string }) {
 export function ApprovalPattern({ pattern, scope }: { pattern: string; scope?: string }) {
   return (
     <span className="approval-pattern flex min-w-0 items-center gap-1">
-      <span className="min-w-0 truncate text-text-muted" title={pattern}>{pattern}</span>
-      {scope ? <><span className="flex-none">于</span><ApprovalPath path={scope} /></> : null}
+      <span className="min-w-0 truncate text-text-muted" title={pattern}>
+        {pattern}
+      </span>
+      {scope ? (
+        <>
+          <span className="flex-none">于</span>
+          <ApprovalPath path={scope} />
+        </>
+      ) : null}
     </span>
   );
 }
@@ -200,18 +248,55 @@ export function ApprovalActions({
   sessionDetail?: string;
 }) {
   const [chosen, setChosen] = useState<GrantSuggestion>();
-  const fileGrant = fileSuggestions?.find(item => item.suggestionId === chosen?.suggestionId) ?? fileSuggestions?.find(item => item.selector.kind === "exact");
+  const fileGrant =
+    fileSuggestions?.find((item) => item.suggestionId === chosen?.suggestionId) ??
+    fileSuggestions?.find((item) => item.selector.kind === "exact");
   const selected = fileSuggestions ? fileGrant : suggestion;
-  return <>
-    {fileSuggestions ? <FileGrantScope suggestions={fileSuggestions} selectedId={fileGrant?.suggestionId} disabled={state.disabled} onChoose={setChosen} /> : null}
-    <Button variant="ghost" size="xs" shape="pill" busy={state.submitting === "deny"} disabled={state.disabled} onClick={() => void state.decide("deny")}>拒绝</Button>
-    {selected ? (
-      <Button variant="tonal" size="xs" shape="pill" busy={state.submitting === "session"} disabled={state.disabled} title={fileSuggestions ? grantScopeLabel(selected) : selected.label} onClick={() => void state.decide("session", selected.suggestionId)}>
-        本会话允许{sessionDetail ? <code className="font-mono font-normal">{sessionDetail}</code> : null}
+  return (
+    <>
+      {fileSuggestions ? (
+        <FileGrantScope
+          suggestions={fileSuggestions}
+          selectedId={fileGrant?.suggestionId}
+          disabled={state.disabled}
+          onChoose={setChosen}
+        />
+      ) : null}
+      <Button
+        variant="ghost"
+        size="xs"
+        shape="pill"
+        busy={state.submitting === "deny"}
+        disabled={state.disabled}
+        onClick={() => void state.decide("deny")}
+      >
+        拒绝
       </Button>
-    ) : null}
-    <Button variant={primaryVariant === "danger" ? "danger-solid" : "accent"} size="xs" shape="pill" busy={state.submitting === "once"} disabled={state.disabled} onClick={() => void state.decide("once")}>{primaryLabel}</Button>
-  </>;
+      {selected ? (
+        <Button
+          variant="tonal"
+          size="xs"
+          shape="pill"
+          busy={state.submitting === "session"}
+          disabled={state.disabled}
+          title={fileSuggestions ? grantScopeLabel(selected) : selected.label}
+          onClick={() => void state.decide("session", selected.suggestionId)}
+        >
+          本会话允许{sessionDetail ? <code className="font-mono font-normal">{sessionDetail}</code> : null}
+        </Button>
+      ) : null}
+      <Button
+        variant={primaryVariant === "danger" ? "danger-solid" : "accent"}
+        size="xs"
+        shape="pill"
+        busy={state.submitting === "once"}
+        disabled={state.disabled}
+        onClick={() => void state.decide("once")}
+      >
+        {primaryLabel}
+      </Button>
+    </>
+  );
 }
 
 /**
@@ -244,9 +329,16 @@ export function ApprovalCard({
   const card = (
     <div className={APPROVAL_CARD_CLASS}>
       <header className={`${APPROVAL_CARD_HEAD_CLASS}${divided ? ` ${APPROVAL_CARD_HEAD_DIVIDED_CLASS}` : ""}`}>
-        {icon ? <span className={APPROVAL_ICON_CLASS} aria-hidden="true">{icon}</span> : null}
+        {icon ? (
+          <span className={APPROVAL_ICON_CLASS} aria-hidden="true">
+            {icon}
+          </span>
+        ) : null}
         {verb ? <span className={APPROVAL_VERB_CLASS}>{verb}</span> : null}
-        <span className={APPROVAL_TARGET_CLASS}>{target}{meta}</span>
+        <span className={APPROVAL_TARGET_CLASS}>
+          {target}
+          {meta}
+        </span>
       </header>
       {children}
       <footer className={APPROVAL_CARD_FOOTER_CLASS}>
@@ -257,7 +349,14 @@ export function ApprovalCard({
   );
   return (
     <article aria-label="等待确认" className={`${APPROVAL_FRAME_CLASS}${className ? ` ${className}` : ""}`}>
-      {note ? <div className={APPROVAL_TRAY_CLASS}>{card}<p className={APPROVAL_NOTE_CLASS}>{note}</p></div> : card}
+      {note ? (
+        <div className={APPROVAL_TRAY_CLASS}>
+          {card}
+          <p className={APPROVAL_NOTE_CLASS}>{note}</p>
+        </div>
+      ) : (
+        card
+      )}
     </article>
   );
 }

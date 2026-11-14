@@ -19,7 +19,12 @@ export class ImageWidget extends WidgetType {
   }
 
   eq(other: ImageWidget): boolean {
-    return other.relativePath === this.relativePath && other.alt === this.alt && other.raw === this.raw && other.generation === this.generation;
+    return (
+      other.relativePath === this.relativePath &&
+      other.alt === this.alt &&
+      other.raw === this.raw &&
+      other.generation === this.generation
+    );
   }
 
   toDOM(view: EditorView): HTMLElement {

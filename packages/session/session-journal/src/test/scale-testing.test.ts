@@ -9,8 +9,17 @@ describe("synthetic session for scale tests", () => {
     const events = syntheticSessionEvents(2_000, { compactEvery: 10 });
     expect(events.length).toBeGreaterThanOrEqual(2_000);
     expect(events.length).toBeLessThan(2_020);
-    const types = new Set(events.map(event => event.type));
-    for (const type of ["turn/start", "user/message", "tool/call", "tool/result", "assistant/message", "surface/replaced", "compaction/end"]) expect(types).toContain(type);
+    const types = new Set(events.map((event) => event.type));
+    for (const type of [
+      "turn/start",
+      "user/message",
+      "tool/call",
+      "tool/result",
+      "assistant/message",
+      "surface/replaced",
+      "compaction/end",
+    ])
+      expect(types).toContain(type);
   });
 
   it("keeps only the tail in memory and counts archived reads", () => {
@@ -28,10 +37,13 @@ describe("synthetic session for scale tests", () => {
       return history.eventsRead;
     };
     // 有界：只看最近的事件，读取量和会话长度无关。
-    const tail = (journal: ReturnType<typeof syntheticJournal>["journal"]) => journal.eventsAfter(journal.lastSeq - 100);
+    const tail = (journal: ReturnType<typeof syntheticJournal>["journal"]) =>
+      journal.eventsAfter(journal.lastSeq - 100);
     expect(reads(1_000, tail)).toBe(reads(10_000, tail));
     // 整份读：读取量随会话长度增长，这就是高频路径上要避免的写法。
-    const full = (journal: ReturnType<typeof syntheticJournal>["journal"]) => { for (const _ of journal.iterateEvents()) void _; };
+    const full = (journal: ReturnType<typeof syntheticJournal>["journal"]) => {
+      for (const _ of journal.iterateEvents()) void _;
+    };
     expect(reads(10_000, full)).toBeGreaterThan(reads(1_000, full) * 5);
   }, 30_000);
 });

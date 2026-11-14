@@ -9,18 +9,26 @@ import { NodeArtifactStore } from "../node-ports/artifact-store.js";
 it("snapshots workspace results and rejects cross-session reads and symlink escape", async () => {
   const root = await mkdtemp(join(tmpdir(), "host-artifacts-"));
   try {
-    const workspace = join(root, "workspace"); await mkdir(workspace);
+    const workspace = join(root, "workspace");
+    await mkdir(workspace);
     await writeFile(join(workspace, "result.txt"), "original");
-    const artifacts = new HostArtifacts(new HostUploads(join(root, "uploads")), new NodeArtifactStore(join(root, "data")));
+    const artifacts = new HostArtifacts(
+      new HostUploads(join(root, "uploads")),
+      new NodeArtifactStore(join(root, "data")),
+    );
     const ref = await artifacts.reference("s", workspace, "result.txt");
     await writeFile(join(workspace, "result.txt"), "replaced");
     expect(Buffer.from((await artifacts.read("s", ref.id, 0, 100)).data, "base64").toString()).toBe("original");
     await expect(artifacts.describe("other", ref.id)).rejects.toThrow("Session");
     await expect(artifacts.read("other", ref.id, 0, 100)).rejects.toThrow("Session");
     await rm(join(workspace, "result.txt"));
-    const reopened = new HostArtifacts(new HostUploads(join(root, "uploads")), new NodeArtifactStore(join(root, "data")));
+    const reopened = new HostArtifacts(
+      new HostUploads(join(root, "uploads")),
+      new NodeArtifactStore(join(root, "data")),
+    );
     expect(Buffer.from((await reopened.read("s", ref.id, 0, 100)).data, "base64").toString()).toBe("original");
-    await writeFile(join(root, "secret"), "outside"); await symlink(join(root, "secret"), join(workspace, "escape"));
+    await writeFile(join(root, "secret"), "outside");
+    await symlink(join(root, "secret"), join(workspace, "escape"));
     await expect(artifacts.reference("s", workspace, "escape")).rejects.toMatchObject({ kind: "FORBIDDEN" });
     await expect(artifacts.reference("s", workspace, "../secret")).rejects.toMatchObject({ kind: "FORBIDDEN" });
     await writeFile(join(workspace, "..notes.txt"), "dots");
@@ -28,56 +36,86 @@ it("snapshots workspace results and rejects cross-session reads and symlink esca
     await writeFile(join(workspace, "large.bin"), Buffer.alloc(20 * 1024 * 1024 + 1));
     await expect(artifacts.reference("s", workspace, "large.bin")).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
     await expect(artifacts.reference("s", workspace, ".")).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 it("serves ranges up to one chunk and names a bad range as the caller's mistake", async () => {
   const root = await mkdtemp(join(tmpdir(), "host-artifacts-range-"));
   try {
-    const workspace = join(root, "workspace"); await mkdir(workspace);
+    const workspace = join(root, "workspace");
+    await mkdir(workspace);
     await writeFile(join(workspace, "result.txt"), "0123456789");
-    const artifacts = new HostArtifacts(new HostUploads(join(root, "uploads")), new NodeArtifactStore(join(root, "data")));
+    const artifacts = new HostArtifacts(
+      new HostUploads(join(root, "uploads")),
+      new NodeArtifactStore(join(root, "data")),
+    );
     const ref = await artifacts.reference("s", workspace, "result.txt");
-    const text = async (offset: number, length: number) => { const part = await artifacts.read("s", ref.id, offset, length); expect(part.size).toBe(10); return Buffer.from(part.data, "base64").toString(); };
+    const text = async (offset: number, length: number) => {
+      const part = await artifacts.read("s", ref.id, offset, length);
+      expect(part.size).toBe(10);
+      return Buffer.from(part.data, "base64").toString();
+    };
     expect(await text(0, 4)).toBe("0123");
     expect(await text(8, 262144)).toBe("89");
     expect(await text(10, 1)).toBe("");
-    for (const [offset, length] of [[11, 1], [-1, 1], [0, 0], [0, 262145], [0.5, 1], [0, 1.5]] as const) {
+    for (const [offset, length] of [
+      [11, 1],
+      [-1, 1],
+      [0, 0],
+      [0, 262145],
+      [0.5, 1],
+      [0, 1.5],
+    ] as const) {
       const failure = await artifacts.read("s", ref.id, offset, length).catch((error: unknown) => error);
       expect(failure).toBeInstanceOf(HostRequestError);
       expect(failure).toMatchObject({ message: "Invalid artifact range", code: -32602 });
     }
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 it("explains missing source files and allows retry without invalidating snapshots", async () => {
   const root = await mkdtemp(join(tmpdir(), "host-artifacts-missing-"));
   try {
-    const workspace = join(root, "workspace"); await mkdir(workspace);
-    const path = join(workspace, "result.txt"); await writeFile(path, "original");
-    const artifacts = new HostArtifacts(new HostUploads(join(root, "uploads")), new NodeArtifactStore(join(root, "data")));
+    const workspace = join(root, "workspace");
+    await mkdir(workspace);
+    const path = join(workspace, "result.txt");
+    await writeFile(path, "original");
+    const artifacts = new HostArtifacts(
+      new HostUploads(join(root, "uploads")),
+      new NodeArtifactStore(join(root, "data")),
+    );
     const original = await artifacts.reference("s", workspace, "result.txt");
     await rm(path);
     await expect(artifacts.reference("s", workspace, "result.txt")).rejects.toMatchObject({
-      kind: "NOT_FOUND", message: "Result file does not exist; restore or regenerate it, then retry",
+      kind: "NOT_FOUND",
+      message: "Result file does not exist; restore or regenerate it, then retry",
     });
     expect(Buffer.from((await artifacts.read("s", original.id, 0, 100)).data, "base64").toString()).toBe("original");
     await writeFile(path, "restored");
     await expect(artifacts.reference("s", workspace, "result.txt/child")).rejects.toMatchObject({ kind: "NOT_FOUND" });
     const restored = await artifacts.reference("s", workspace, "result.txt");
     expect(Buffer.from((await artifacts.read("s", restored.id, 0, 100)).data, "base64").toString()).toBe("restored");
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 it("does not misclassify snapshot persistence failures as missing source files", async () => {
   const root = await mkdtemp(join(tmpdir(), "host-artifacts-storage-"));
   try {
-    const workspace = join(root, "workspace"); await mkdir(workspace);
+    const workspace = join(root, "workspace");
+    await mkdir(workspace);
     await writeFile(join(workspace, "result.txt"), "present");
     const store = new NodeArtifactStore(join(root, "data"));
     const failure = Object.assign(new Error("owned snapshot storage unavailable"), { code: "ENOENT" });
     vi.spyOn(store, "create").mockRejectedValueOnce(failure);
     const artifacts = new HostArtifacts(new HostUploads(join(root, "uploads")), store);
     await expect(artifacts.reference("s", workspace, "result.txt")).rejects.toBe(failure);
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

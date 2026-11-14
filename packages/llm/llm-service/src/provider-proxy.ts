@@ -53,9 +53,23 @@ export class ProviderProxyPool {
 
 export function normalizeProviderProxyUrl(rawUrl: string): string {
   let parsed: URL;
-  try { parsed = new URL(rawUrl.trim()); } catch { throw new ProviderProxyError(); }
-  if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.username || parsed.password || !parsed.hostname) throw new ProviderProxyError();
-  parsed.username = ""; parsed.password = ""; parsed.search = ""; parsed.hash = ""; parsed.pathname = "/";
+  try {
+    parsed = new URL(rawUrl.trim());
+  } catch {
+    throw new ProviderProxyError();
+  }
+  if (
+    (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+    parsed.username ||
+    parsed.password ||
+    !parsed.hostname
+  )
+    throw new ProviderProxyError();
+  parsed.username = "";
+  parsed.password = "";
+  parsed.search = "";
+  parsed.hash = "";
+  parsed.pathname = "/";
   return parsed.toString();
 }
 

@@ -3,16 +3,28 @@ import type { PreparedLlmCall } from "./prepared-call.js";
 import { EMPTY_LLM_USAGE } from "./usage.js";
 
 /** Account transport completion before callers parse or apply the returned text. */
-export async function completeAuxiliaryText(prepared: PreparedLlmCall, input: {
-  readonly recorder: AuxiliaryRequestRecorder;
-  readonly owner: AuxiliaryRequestOwner;
-  readonly logicalRequestId?: string;
-  readonly signal?: AbortSignal;
-  readonly maxTextLength?: number;
-}) {
+export async function completeAuxiliaryText(
+  prepared: PreparedLlmCall,
+  input: {
+    readonly recorder: AuxiliaryRequestRecorder;
+    readonly owner: AuxiliaryRequestOwner;
+    readonly logicalRequestId?: string;
+    readonly signal?: AbortSignal;
+    readonly maxTextLength?: number;
+  },
+) {
   try {
-    const attempt = await input.recorder.start({ ...input.owner, logicalRequestId: input.logicalRequestId ?? prepared.request.requestId, attemptId: prepared.request.requestId, attempt: 1, routeId: prepared.request.routeId, model: prepared.request.model });
-    let usage = EMPTY_LLM_USAGE, text = "", stopReason: string | null = null;
+    const attempt = await input.recorder.start({
+      ...input.owner,
+      logicalRequestId: input.logicalRequestId ?? prepared.request.requestId,
+      attemptId: prepared.request.requestId,
+      attempt: 1,
+      routeId: prepared.request.routeId,
+      model: prepared.request.model,
+    });
+    let usage = EMPTY_LLM_USAGE,
+      text = "",
+      stopReason: string | null = null;
     let status: AuxiliaryRequestEnd["status"] = "failed";
     let failure: unknown;
     let failed = false;
@@ -22,7 +34,11 @@ export async function completeAuxiliaryText(prepared: PreparedLlmCall, input: {
         if (event.type === "done") {
           usage = event.usage;
           stopReason = event.stopReason;
-          if (!text) text = event.content.filter(block => block.type === "text").map(block => block.text).join("");
+          if (!text)
+            text = event.content
+              .filter((block) => block.type === "text")
+              .map((block) => block.text)
+              .join("");
           status = "completed";
         }
         if (event.type === "error" || event.type === "aborted") {
@@ -30,7 +46,8 @@ export async function completeAuxiliaryText(prepared: PreparedLlmCall, input: {
           status = event.type === "aborted" ? "aborted" : "failed";
           throw new Error(event.type === "error" ? event.failure.message : event.reason || "LLM request was aborted.");
         }
-        if (input.maxTextLength !== undefined && text.length > input.maxTextLength) throw new Error("Auxiliary response exceeds limit");
+        if (input.maxTextLength !== undefined && text.length > input.maxTextLength)
+          throw new Error("Auxiliary response exceeds limit");
       }
       if (status !== "completed") throw new Error("Incomplete auxiliary response");
     } catch (error) {
@@ -42,5 +59,7 @@ export async function completeAuxiliaryText(prepared: PreparedLlmCall, input: {
     await attempt.finish({ status, usage });
     if (failed) throw failure;
     return { text, usage, stopReason };
-  } finally { prepared.release(); }
+  } finally {
+    prepared.release();
+  }
 }

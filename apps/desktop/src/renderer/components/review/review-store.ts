@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  ReviewFileContents,
-  ReviewFileDiff,
-  ReviewSelection,
-  ReviewSnapshot,
-} from "@actspace/shared";
+import type { ReviewFileContents, ReviewFileDiff, ReviewSelection, ReviewSnapshot } from "@actspace/shared";
 import { eventsApi } from "../../api/events";
 import { reviewApi } from "../../api/review";
 
@@ -63,158 +58,198 @@ export function useReviewWorkspaceStore(input: {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const loadSnapshot = useCallback(async (
-    selection: ReviewSelection,
-    refresh = false,
-    ignoreWhitespaceChanges = stateRef.current.ignoreWhitespaceChanges,
-  ) => {
-    if (!input.workspaceRoot && !input.sessionId) {
-      setState((current) => ({ ...current, selection, loading: false, error: null, snapshot: null, diffs: new Map(), fileRequests: new Map(), fileContents: new Map() }));
-      return;
-    }
-    const api = refresh ? reviewApi.refreshSnapshot : reviewApi.getSnapshot;
-    const currentRequest = ++snapshotRequestId.current;
-    inFlightDiffs.current.clear();
-    inFlightContents.current.clear();
-    setState((current) => ({ ...current, selection, loading: true, error: null, feedback: null }));
-    try {
-      const result = await api({
-        workspaceRoot: input.workspaceRoot,
-        sessionId: input.sessionId ?? undefined,
-        selection,
-        options: { ignoreWhitespaceChanges },
-      });
-      if (snapshotRequestId.current !== currentRequest) return;
-      if (result.ok === false) {
-        setState((current) => ({ ...current, loading: false, error: result.message, snapshot: null, diffs: new Map(), fileRequests: new Map(), fileContents: new Map() }));
+  const loadSnapshot = useCallback(
+    async (
+      selection: ReviewSelection,
+      refresh = false,
+      ignoreWhitespaceChanges = stateRef.current.ignoreWhitespaceChanges,
+    ) => {
+      if (!input.workspaceRoot && !input.sessionId) {
+        setState((current) => ({
+          ...current,
+          selection,
+          loading: false,
+          error: null,
+          snapshot: null,
+          diffs: new Map(),
+          fileRequests: new Map(),
+          fileContents: new Map(),
+        }));
         return;
       }
-      staleRefreshGeneration.current = null;
-      const selectedFileId = result.snapshot.files[0]?.id ?? null;
-      const displayedIds = result.snapshot.loadPolicy.mode === "all-files"
-        ? result.snapshot.files.map((file) => file.id)
-        : selectedFileId ? [selectedFileId] : [];
-      setState((current) => ({
-        ...current,
-        selection: result.snapshot.selection,
-        snapshot: result.snapshot,
-        diffs: new Map(),
-        fileRequests: new Map(),
-        fileContents: new Map(),
-        loading: false,
-        error: null,
-        selectedFileId,
-        expandedFileIds: new Set(displayedIds),
-      }));
-    } catch (error) {
-      if (snapshotRequestId.current !== currentRequest) return;
-      setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "加载变更审查失败。" }));
-    }
-  }, [input.sessionId, input.workspaceRoot]);
+      const api = refresh ? reviewApi.refreshSnapshot : reviewApi.getSnapshot;
+      const currentRequest = ++snapshotRequestId.current;
+      inFlightDiffs.current.clear();
+      inFlightContents.current.clear();
+      setState((current) => ({ ...current, selection, loading: true, error: null, feedback: null }));
+      try {
+        const result = await api({
+          workspaceRoot: input.workspaceRoot,
+          sessionId: input.sessionId ?? undefined,
+          selection,
+          options: { ignoreWhitespaceChanges },
+        });
+        if (snapshotRequestId.current !== currentRequest) return;
+        if (result.ok === false) {
+          setState((current) => ({
+            ...current,
+            loading: false,
+            error: result.message,
+            snapshot: null,
+            diffs: new Map(),
+            fileRequests: new Map(),
+            fileContents: new Map(),
+          }));
+          return;
+        }
+        staleRefreshGeneration.current = null;
+        const selectedFileId = result.snapshot.files[0]?.id ?? null;
+        const displayedIds =
+          result.snapshot.loadPolicy.mode === "all-files"
+            ? result.snapshot.files.map((file) => file.id)
+            : selectedFileId
+              ? [selectedFileId]
+              : [];
+        setState((current) => ({
+          ...current,
+          selection: result.snapshot.selection,
+          snapshot: result.snapshot,
+          diffs: new Map(),
+          fileRequests: new Map(),
+          fileContents: new Map(),
+          loading: false,
+          error: null,
+          selectedFileId,
+          expandedFileIds: new Set(displayedIds),
+        }));
+      } catch (error) {
+        if (snapshotRequestId.current !== currentRequest) return;
+        setState((current) => ({
+          ...current,
+          loading: false,
+          error: error instanceof Error ? error.message : "加载变更审查失败。",
+        }));
+      }
+    },
+    [input.sessionId, input.workspaceRoot],
+  );
 
-  const loadDiffs = useCallback(async (fileIds: string[], contextOverride?: number) => {
-    const snapshot = stateRef.current.snapshot;
-    const api = reviewApi.getFileDiffs;
-    if (!snapshot) return;
-    const requestIds = [...new Set(fileIds)].filter((fileId) => {
-      const file = snapshot.files.find((candidate) => candidate.id === fileId);
-      return file?.renderKind === "text" && !inFlightDiffs.current.has(fileId);
-    });
-    if (requestIds.length === 0) return;
-    for (const fileId of requestIds) inFlightDiffs.current.add(fileId);
-    setState((current) => {
-      if (current.snapshot?.id !== snapshot.id) return current;
-      const fileRequests = new Map(current.fileRequests);
-      for (const fileId of requestIds) fileRequests.set(fileId, { status: "loading" });
-      return { ...current, fileRequests };
-    });
-    try {
-      const result = await api({
-        workspaceRoot: input.workspaceRoot,
-        sessionId: input.sessionId ?? undefined,
-        snapshotId: snapshot.id,
-        expectedGeneration: snapshot.generation,
-        requests: requestIds.map((fileId) => ({
-          fileId,
-          contextLines: contextOverride ?? stateRef.current.contextLinesByFile.get(fileId) ?? 3,
-        })),
+  const loadDiffs = useCallback(
+    async (fileIds: string[], contextOverride?: number) => {
+      const snapshot = stateRef.current.snapshot;
+      const api = reviewApi.getFileDiffs;
+      if (!snapshot) return;
+      const requestIds = [...new Set(fileIds)].filter((fileId) => {
+        const file = snapshot.files.find((candidate) => candidate.id === fileId);
+        return file?.renderKind === "text" && !inFlightDiffs.current.has(fileId);
       });
-      if (result.ok === false) {
-        if (result.code === "stale_generation" && staleRefreshGeneration.current !== snapshot.generation) {
-          staleRefreshGeneration.current = snapshot.generation;
-          void loadSnapshot(stateRef.current.selection, true);
+      if (requestIds.length === 0) return;
+      for (const fileId of requestIds) inFlightDiffs.current.add(fileId);
+      setState((current) => {
+        if (current.snapshot?.id !== snapshot.id) return current;
+        const fileRequests = new Map(current.fileRequests);
+        for (const fileId of requestIds) fileRequests.set(fileId, { status: "loading" });
+        return { ...current, fileRequests };
+      });
+      try {
+        const result = await api({
+          workspaceRoot: input.workspaceRoot,
+          sessionId: input.sessionId ?? undefined,
+          snapshotId: snapshot.id,
+          expectedGeneration: snapshot.generation,
+          requests: requestIds.map((fileId) => ({
+            fileId,
+            contextLines: contextOverride ?? stateRef.current.contextLinesByFile.get(fileId) ?? 3,
+          })),
+        });
+        if (result.ok === false) {
+          if (result.code === "stale_generation" && staleRefreshGeneration.current !== snapshot.generation) {
+            staleRefreshGeneration.current = snapshot.generation;
+            void loadSnapshot(stateRef.current.selection, true);
+            return;
+          }
+          setState((current) => {
+            if (current.snapshot?.id !== snapshot.id) return current;
+            const fileRequests = new Map(current.fileRequests);
+            for (const fileId of requestIds) fileRequests.set(fileId, { status: "failed", error: result.message });
+            return { ...current, fileRequests, feedback: result.message };
+          });
           return;
         }
         setState((current) => {
           if (current.snapshot?.id !== snapshot.id) return current;
+          const diffs = new Map(current.diffs);
           const fileRequests = new Map(current.fileRequests);
-          for (const fileId of requestIds) fileRequests.set(fileId, { status: "failed", error: result.message });
-          return { ...current, fileRequests, feedback: result.message };
-        });
-        return;
-      }
-      setState((current) => {
-        if (current.snapshot?.id !== snapshot.id) return current;
-        const diffs = new Map(current.diffs);
-        const fileRequests = new Map(current.fileRequests);
-        for (const outcome of result.outcomes) {
-          if (outcome.status === "failed") fileRequests.set(outcome.fileId, { status: "failed", error: outcome.message });
-          else {
-            diffs.set(outcome.fileId, outcome.diff);
-            fileRequests.set(outcome.fileId, { status: outcome.status });
+          for (const outcome of result.outcomes) {
+            if (outcome.status === "failed")
+              fileRequests.set(outcome.fileId, { status: "failed", error: outcome.message });
+            else {
+              diffs.set(outcome.fileId, outcome.diff);
+              fileRequests.set(outcome.fileId, { status: outcome.status });
+            }
           }
-        }
-        return { ...current, diffs, fileRequests };
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "加载变更差异失败。";
-      setState((current) => {
-        if (current.snapshot?.id !== snapshot.id) return current;
-        const fileRequests = new Map(current.fileRequests);
-        for (const fileId of requestIds) fileRequests.set(fileId, { status: "failed", error: message });
-        return { ...current, fileRequests, feedback: message };
-      });
-    } finally {
-      for (const fileId of requestIds) inFlightDiffs.current.delete(fileId);
-    }
-  }, [input.sessionId, input.workspaceRoot, loadSnapshot]);
+          return { ...current, diffs, fileRequests };
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "加载变更差异失败。";
+        setState((current) => {
+          if (current.snapshot?.id !== snapshot.id) return current;
+          const fileRequests = new Map(current.fileRequests);
+          for (const fileId of requestIds) fileRequests.set(fileId, { status: "failed", error: message });
+          return { ...current, fileRequests, feedback: message };
+        });
+      } finally {
+        for (const fileId of requestIds) inFlightDiffs.current.delete(fileId);
+      }
+    },
+    [input.sessionId, input.workspaceRoot, loadSnapshot],
+  );
 
-  const loadFileContents = useCallback(async (fileIds: string[]) => {
-    const snapshot = stateRef.current.snapshot;
-    const api = reviewApi.getFileContents;
-    if (!snapshot || !stateRef.current.loadFullFiles) return;
-    const requested = [...new Set(fileIds)].filter((fileId) => {
-      const file = snapshot.files.find((candidate) => candidate.id === fileId);
-      return file?.renderKind === "text" && !stateRef.current.fileContents.has(fileId) && !inFlightContents.current.has(fileId);
-    }).slice(0, 4);
-    if (requested.length === 0) return;
-    for (const fileId of requested) inFlightContents.current.add(fileId);
-    try {
-      const result = await api({
-        workspaceRoot: input.workspaceRoot,
-        sessionId: input.sessionId ?? undefined,
-        snapshotId: snapshot.id,
-        expectedGeneration: snapshot.generation,
-        fileIds: requested,
-      });
-      if (!result.ok) return;
-      setState((current) => {
-        if (current.snapshot?.id !== snapshot.id) return current;
-        const fileContents = new Map(current.fileContents);
-        for (const outcome of result.outcomes) {
-          if (outcome.status !== "failed") fileContents.set(outcome.fileId, outcome.contents);
-        }
-        return { ...current, fileContents };
-      });
-    } catch (error) {
-      setState((current) => ({
-        ...current,
-        feedback: error instanceof Error ? error.message : "加载完整文件内容失败。",
-      }));
-    } finally {
-      for (const fileId of requested) inFlightContents.current.delete(fileId);
-    }
-  }, [input.sessionId, input.workspaceRoot]);
+  const loadFileContents = useCallback(
+    async (fileIds: string[]) => {
+      const snapshot = stateRef.current.snapshot;
+      const api = reviewApi.getFileContents;
+      if (!snapshot || !stateRef.current.loadFullFiles) return;
+      const requested = [...new Set(fileIds)]
+        .filter((fileId) => {
+          const file = snapshot.files.find((candidate) => candidate.id === fileId);
+          return (
+            file?.renderKind === "text" &&
+            !stateRef.current.fileContents.has(fileId) &&
+            !inFlightContents.current.has(fileId)
+          );
+        })
+        .slice(0, 4);
+      if (requested.length === 0) return;
+      for (const fileId of requested) inFlightContents.current.add(fileId);
+      try {
+        const result = await api({
+          workspaceRoot: input.workspaceRoot,
+          sessionId: input.sessionId ?? undefined,
+          snapshotId: snapshot.id,
+          expectedGeneration: snapshot.generation,
+          fileIds: requested,
+        });
+        if (!result.ok) return;
+        setState((current) => {
+          if (current.snapshot?.id !== snapshot.id) return current;
+          const fileContents = new Map(current.fileContents);
+          for (const outcome of result.outcomes) {
+            if (outcome.status !== "failed") fileContents.set(outcome.fileId, outcome.contents);
+          }
+          return { ...current, fileContents };
+        });
+      } catch (error) {
+        setState((current) => ({
+          ...current,
+          feedback: error instanceof Error ? error.message : "加载完整文件内容失败。",
+        }));
+      } finally {
+        for (const fileId of requested) inFlightContents.current.delete(fileId);
+      }
+    },
+    [input.sessionId, input.workspaceRoot],
+  );
 
   useEffect(() => {
     // 没有实时监听：每次挂载都强制刷新，避免读到旧缓存。
@@ -226,7 +261,13 @@ export function useReviewWorkspaceStore(input: {
       const snapshot = stateRef.current.snapshot;
       if (notification.workspaceId !== snapshot?.workspaceId) return;
       if (notification.generation === snapshot.generation) return;
-      setState((current) => ({ ...current, feedback: "变更已更新，正在刷新审查视图…", diffs: new Map(), fileRequests: new Map(), fileContents: new Map() }));
+      setState((current) => ({
+        ...current,
+        feedback: "变更已更新，正在刷新审查视图…",
+        diffs: new Map(),
+        fileRequests: new Map(),
+        fileContents: new Map(),
+      }));
       void loadSnapshot(stateRef.current.selection);
     });
   }, [loadSnapshot]);
@@ -236,9 +277,12 @@ export function useReviewWorkspaceStore(input: {
   useEffect(() => {
     const snapshot = stateRef.current.snapshot;
     if (!snapshot) return;
-    const requestIds = snapshot.loadPolicy.mode === "single-file"
-      ? state.selectedFileId ? [state.selectedFileId] : []
-      : snapshot.files.map((file) => file.id);
+    const requestIds =
+      snapshot.loadPolicy.mode === "single-file"
+        ? state.selectedFileId
+          ? [state.selectedFileId]
+          : []
+        : snapshot.files.map((file) => file.id);
     void loadDiffs(requestIds);
   }, [loadDiffs, state.selectedFileId, snapshotId]);
 
@@ -264,33 +308,42 @@ export function useReviewWorkspaceStore(input: {
 
   const setAllExpanded = useCallback((expanded: boolean) => {
     setState((current) => {
-      const ids = current.snapshot?.loadPolicy.mode === "single-file"
-        ? current.selectedFileId ? [current.selectedFileId] : []
-        : current.snapshot?.files.map((file) => file.id) ?? [];
+      const ids =
+        current.snapshot?.loadPolicy.mode === "single-file"
+          ? current.selectedFileId
+            ? [current.selectedFileId]
+            : []
+          : (current.snapshot?.files.map((file) => file.id) ?? []);
       return { ...current, expandedFileIds: expanded ? new Set(ids) : new Set() };
     });
   }, []);
 
-  const retryDiff = useCallback((fileId: string) => {
-    setState((current) => {
-      const fileRequests = new Map(current.fileRequests);
-      fileRequests.set(fileId, { status: "idle" });
-      return { ...current, fileRequests };
-    });
-    void loadDiffs([fileId]);
-  }, [loadDiffs]);
+  const retryDiff = useCallback(
+    (fileId: string) => {
+      setState((current) => {
+        const fileRequests = new Map(current.fileRequests);
+        fileRequests.set(fileId, { status: "idle" });
+        return { ...current, fileRequests };
+      });
+      void loadDiffs([fileId]);
+    },
+    [loadDiffs],
+  );
 
-  const expandContext = useCallback((fileId: string) => {
-    const next = Math.min(200, (stateRef.current.contextLinesByFile.get(fileId) ?? 3) + 20);
-    setState((current) => {
-      const contextLinesByFile = new Map(current.contextLinesByFile);
-      contextLinesByFile.set(fileId, next);
-      const diffs = new Map(current.diffs);
-      diffs.delete(fileId);
-      return { ...current, contextLinesByFile, diffs };
-    });
-    void loadDiffs([fileId], next);
-  }, [loadDiffs]);
+  const expandContext = useCallback(
+    (fileId: string) => {
+      const next = Math.min(200, (stateRef.current.contextLinesByFile.get(fileId) ?? 3) + 20);
+      setState((current) => {
+        const contextLinesByFile = new Map(current.contextLinesByFile);
+        contextLinesByFile.set(fileId, next);
+        const diffs = new Map(current.diffs);
+        diffs.delete(fileId);
+        return { ...current, contextLinesByFile, diffs };
+      });
+      void loadDiffs([fileId], next);
+    },
+    [loadDiffs],
+  );
 
   const toggleWhitespace = useCallback(() => {
     const next = !stateRef.current.ignoreWhitespaceChanges;
@@ -305,13 +358,40 @@ export function useReviewWorkspaceStore(input: {
     if (Object.keys(preferencePatch).length > 0) saveDisplayPreference(preferencePatch);
   }, []);
 
-  return { state, setSelection, refresh, selectFile, toggleFile, setAllExpanded, retryDiff, expandContext, loadFileContents, toggleWhitespace, patchState };
+  return {
+    state,
+    setSelection,
+    refresh,
+    selectFile,
+    toggleFile,
+    setAllExpanded,
+    retryDiff,
+    expandContext,
+    loadFileContents,
+    toggleWhitespace,
+    patchState,
+  };
 }
 
-function loadDisplayPreferences(): Pick<ReviewWorkspaceState, "diffMode" | "wrap" | "ignoreWhitespaceChanges" | "wordDiff" | "loadFullFiles" | "richPreview"> {
-  const defaults = { diffMode: "unified" as const, wrap: false, ignoreWhitespaceChanges: false, wordDiff: false, loadFullFiles: true, richPreview: false };
+function loadDisplayPreferences(): Pick<
+  ReviewWorkspaceState,
+  "diffMode" | "wrap" | "ignoreWhitespaceChanges" | "wordDiff" | "loadFullFiles" | "richPreview"
+> {
+  const defaults = {
+    diffMode: "unified" as const,
+    wrap: false,
+    ignoreWhitespaceChanges: false,
+    wordDiff: false,
+    loadFullFiles: true,
+    richPreview: false,
+  };
   try {
-    const stored = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") as Partial<Pick<ReviewWorkspaceState, "diffMode" | "wrap" | "ignoreWhitespaceChanges" | "wordDiff" | "loadFullFiles" | "richPreview">>;
+    const stored = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") as Partial<
+      Pick<
+        ReviewWorkspaceState,
+        "diffMode" | "wrap" | "ignoreWhitespaceChanges" | "wordDiff" | "loadFullFiles" | "richPreview"
+      >
+    >;
     return { ...defaults, ...stored, diffMode: stored.diffMode === "split" ? "split" : "unified" };
   } catch {
     return defaults;
@@ -329,7 +409,14 @@ function saveDisplayPreference(patch: Record<string, unknown>): void {
 
 function displayPreferencePatch(patch: Partial<ReviewWorkspaceState>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-  for (const key of ["diffMode", "wrap", "ignoreWhitespaceChanges", "wordDiff", "loadFullFiles", "richPreview"] as const) {
+  for (const key of [
+    "diffMode",
+    "wrap",
+    "ignoreWhitespaceChanges",
+    "wordDiff",
+    "loadFullFiles",
+    "richPreview",
+  ] as const) {
     if (key in patch) result[key] = patch[key];
   }
   return result;

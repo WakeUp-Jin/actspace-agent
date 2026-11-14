@@ -11,7 +11,10 @@ export const PlainButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HT
     <button
       ref={ref}
       type={type}
-      className={cn("text-left focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring", className)}
+      className={cn(
+        "text-left focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring",
+        className,
+      )}
       {...rest}
     />
   );

@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatAttachmentIssue, ComposerAttachment, ComposerMode, ModelSelectionId, ResponseAnnotationReference } from "@actspace/shared";
+import type {
+  ChatAttachmentIssue,
+  ComposerAttachment,
+  ComposerMode,
+  ModelSelectionId,
+  ResponseAnnotationReference,
+} from "@actspace/shared";
 import type { HostUploadProgress } from "@actspace/shared/host-protocol";
 import { eventsApi } from "../../api/events";
 import { revokeAttachmentPreview } from "./attachment-preview";
@@ -21,9 +27,11 @@ export function composerSendOptions(input: {
     selectedSkills: input.selectedSkills,
     thinkingEnabled: input.runtimeOptions.thinkingEnabled,
   };
-  if (input.runtimeOptions.thinkingEnabled && input.runtimeOptions.reasoningEffort) options.reasoningEffort = input.runtimeOptions.reasoningEffort;
+  if (input.runtimeOptions.thinkingEnabled && input.runtimeOptions.reasoningEffort)
+    options.reasoningEffort = input.runtimeOptions.reasoningEffort;
   if (input.attachments && input.attachments.length > 0) options.attachments = input.attachments;
-  if (input.responseAnnotations && input.responseAnnotations.length > 0) options.responseAnnotations = [...input.responseAnnotations];
+  if (input.responseAnnotations && input.responseAnnotations.length > 0)
+    options.responseAnnotations = [...input.responseAnnotations];
   return options;
 }
 
@@ -50,11 +58,28 @@ export type ComposerSendInput = {
  * 09 T30：发送。发出去就清空草稿；失败时草稿写回原会话，还在这个会话时放回输入框并显示错误。
  * 远端发送在 Host 确认前显示「正在确认提交…」或上传进度。
  */
-export function useComposerSend({ sessionId, draftKey, writeDraft, onSend, remote, ready, text, attachments, clearDraft, restoreDraft }: ComposerSendInput) {
+export function useComposerSend({
+  sessionId,
+  draftKey,
+  writeDraft,
+  onSend,
+  remote,
+  ready,
+  text,
+  attachments,
+  clearDraft,
+  restoreDraft,
+}: ComposerSendInput) {
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(false);
   const [uploadProgress, setUploadProgress] = useState<HostUploadProgress | null>(null);
-  useEffect(() => eventsApi.hostUploadProgress(value => { if (value.sessionId === sessionId) setUploadProgress(value.state === "finished" ? null : value); }), [sessionId]);
+  useEffect(
+    () =>
+      eventsApi.hostUploadProgress((value) => {
+        if (value.sessionId === sessionId) setUploadProgress(value.state === "finished" ? null : value);
+      }),
+    [sessionId],
+  );
   const [error, setError] = useState<ComposerSendError | null>(null);
   const activeDraftKeyRef = useRef(draftKey);
   activeDraftKeyRef.current = draftKey;
@@ -64,18 +89,34 @@ export function useComposerSend({ sessionId, draftKey, writeDraft, onSend, remot
     if (!canSend || !onSend || sendingRef.current) return;
     const message = text;
     const sentAttachments = [...attachments];
-    if (remote) { sendingRef.current = true; setSending(true); }
+    if (remote) {
+      sendingRef.current = true;
+      setSending(true);
+    }
     let sendResult: void | Promise<void>;
-    try { sendResult = onSend(message.trim(), options); } catch (sendError) { sendResult = Promise.reject(sendError); }
-    void Promise.resolve(sendResult).then(() => { sentAttachments.forEach(revokeAttachmentPreview); }).catch((sendError: unknown) => {
-      if (draftKey) writeDraft?.(draftKey, message);
-      if (activeDraftKeyRef.current !== draftKey) return;
-      // 兜底：App 已经恢复过草稿（带格式化的错误和附件问题）时，不覆盖它。
-      restoreDraft(message, sentAttachments);
-      setError(current => current ?? { message: sendError instanceof Error ? sendError.message : "发送失败，草稿已保留" });
-    }).finally(() => {
-      sendingRef.current = false; setSending(false); setUploadProgress(null);
-    });
+    try {
+      sendResult = onSend(message.trim(), options);
+    } catch (sendError) {
+      sendResult = Promise.reject(sendError);
+    }
+    void Promise.resolve(sendResult)
+      .then(() => {
+        sentAttachments.forEach(revokeAttachmentPreview);
+      })
+      .catch((sendError: unknown) => {
+        if (draftKey) writeDraft?.(draftKey, message);
+        if (activeDraftKeyRef.current !== draftKey) return;
+        // 兜底：App 已经恢复过草稿（带格式化的错误和附件问题）时，不覆盖它。
+        restoreDraft(message, sentAttachments);
+        setError(
+          (current) => current ?? { message: sendError instanceof Error ? sendError.message : "发送失败，草稿已保留" },
+        );
+      })
+      .finally(() => {
+        sendingRef.current = false;
+        setSending(false);
+        setUploadProgress(null);
+      });
     clearDraft();
     setError(null);
   }
@@ -89,7 +130,8 @@ export function useComposerSend({ sessionId, draftKey, writeDraft, onSend, remot
       const counts = { ...current.issue.textCharacterCounts };
       delete counts[attachmentId];
       return Object.values(counts).reduce((sum, count) => sum + count, 0) > (current.issue.limit ?? 256_000)
-        ? { ...current, issue: { ...current.issue, textCharacterCounts: counts } } : null;
+        ? { ...current, issue: { ...current.issue, textCharacterCounts: counts } }
+        : null;
     });
   }
 

@@ -36,7 +36,10 @@ export interface DesktopRuntimeModelPort {
   resolveUtilityTaskModel?(requestedMain?: string | null): DesktopRuntimeModelResolution;
   /** 用途表里的思考档位；null = 模型默认。 */
   purposeThinking?(purpose: "utility" | "autoReview" | "vision"): import("@actspace/shared").ThinkingLevel | null;
-  resolvePricing?(model: DesktopRuntimeResolvedModel, apiModel: string): import("@actspace/shared").ModelPricingSnapshot | null;
+  resolvePricing?(
+    model: DesktopRuntimeResolvedModel,
+    apiModel: string,
+  ): import("@actspace/shared").ModelPricingSnapshot | null;
   resolveMainModel(requested?: string | null): DesktopRuntimeModelResolution;
   /** 设置 › 模型 里能用的模型（`ModelStoreService.listUsableModels`）。 */
   listUsableModels?(purpose: "chat"): readonly import("@actspace/shared").UsableModelView[];
@@ -51,7 +54,10 @@ export interface DesktopRuntimeModelPort {
 }
 
 /** 运行时和 legacy 兜底共用的计价参数。definition.pricing 是快照里算好的最终价（参考价已乘倍率）。 */
-export function customConnectionPricingInput(model: DesktopRuntimeResolvedModel, apiModel: string): Parameters<typeof resolveModelPricing>[1] {
+export function customConnectionPricingInput(
+  model: DesktopRuntimeResolvedModel,
+  apiModel: string,
+): Parameters<typeof resolveModelPricing>[1] {
   return {
     providerId: model.definition.provider,
     apiModel,
@@ -69,10 +75,11 @@ export function customConnectionPricingInput(model: DesktopRuntimeResolvedModel,
  * `actspace.host.models` for Desktop: the models usable for chat right now.
  * `subagentDefaultModel` reads the 子智能体默认模型 setting on every call (null = follow the parent session).
  */
-export function createDesktopModelsHostPort(models: Pick<DesktopRuntimeModelPort, "listUsableModels" | "subagentDefaultModel">): ModelsHostPort {
+export function createDesktopModelsHostPort(
+  models: Pick<DesktopRuntimeModelPort, "listUsableModels" | "subagentDefaultModel">,
+): ModelsHostPort {
   return Object.freeze({
     listUsableModels: () => Object.freeze((models.listUsableModels?.("chat") ?? []).map(usableModelSummary)),
     subagentDefaultModel: () => models.subagentDefaultModel?.() ?? null,
   });
 }
-

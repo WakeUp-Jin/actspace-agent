@@ -31,7 +31,9 @@ export function useTabOverflow(activeId: string, signature: string) {
       fadeLeft: over && el.scrollLeft > 1,
       fadeRight: over && el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
     };
-    setOverflow((prev) => (prev.over === next.over && prev.fadeLeft === next.fadeLeft && prev.fadeRight === next.fadeRight ? prev : next));
+    setOverflow((prev) =>
+      prev.over === next.over && prev.fadeLeft === next.fadeLeft && prev.fadeRight === next.fadeRight ? prev : next,
+    );
   }, []);
 
   useLayoutEffect(() => {

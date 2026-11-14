@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { Play, Square } from "lucide-react";
-import { DEFAULT_SPEECH_SETTINGS, SPEECH_MODELS, isSpeechModel, type SpeechModel, type EnglishLearningState, type SettingsV4Snapshot } from "@actspace/shared";
+import {
+  DEFAULT_SPEECH_SETTINGS,
+  SPEECH_MODELS,
+  isSpeechModel,
+  type SpeechModel,
+  type EnglishLearningState,
+  type SettingsV4Snapshot,
+} from "@actspace/shared";
 import {
   SettingEditor,
   SettingGroup,
@@ -36,52 +43,82 @@ export function SpeechSettingsSection() {
   const [reload, setReload] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    const accept = (next: EnglishLearningState) => { if (!cancelled) setState((previous) => !previous || next.revision >= previous.revision ? next : previous); };
+    const accept = (next: EnglishLearningState) => {
+      if (!cancelled) setState((previous) => (!previous || next.revision >= previous.revision ? next : previous));
+    };
     const remove = eventsApi.englishLearningStateChanged(accept);
-    void Promise.all([settingsApi.getV4(), englishLearningApi.getState()]).then(([next, learning]) => {
-      if (cancelled) return;
-      setSnapshot(next); accept(learning);
-      setVoice(next.settings.media.speech?.voiceId ?? DEFAULT_SPEECH_SETTINGS.voiceId);
-      setModel(next.settings.media.speech?.model ?? DEFAULT_SPEECH_SETTINGS.model);
-      setSpeed(next.settings.media.speech?.speed ?? 1);
-      setError(null);
-    }).catch(() => { if (!cancelled) setError("语音配置读取失败，请重试。"); });
-    return () => { cancelled = true; remove(); };
+    void Promise.all([settingsApi.getV4(), englishLearningApi.getState()])
+      .then(([next, learning]) => {
+        if (cancelled) return;
+        setSnapshot(next);
+        accept(learning);
+        setVoice(next.settings.media.speech?.voiceId ?? DEFAULT_SPEECH_SETTINGS.voiceId);
+        setModel(next.settings.media.speech?.model ?? DEFAULT_SPEECH_SETTINGS.model);
+        setSpeed(next.settings.media.speech?.speed ?? 1);
+        setError(null);
+      })
+      .catch(() => {
+        if (!cancelled) setError("语音配置读取失败，请重试。");
+      });
+    return () => {
+      cancelled = true;
+      remove();
+    };
   }, [reload]);
 
   const action = async (run: () => Promise<void>) => {
-    setBusy(true); setError(null);
-    try { await run(); } catch { setError("操作失败，输入已保留，请重试。"); }
-    finally { setBusy(false); }
+    setBusy(true);
+    setError(null);
+    try {
+      await run();
+    } catch {
+      setError("操作失败，输入已保留，请重试。");
+    } finally {
+      setBusy(false);
+    }
   };
   /** 模型、音色、语速改动即保存；以当前输入为准，传入的字段覆盖尚未提交的状态。 */
-  const saveSpeech = (next: { model?: SpeechModel; voiceId?: string; speed?: number }) => action(async () => {
-    if (!snapshot) return;
-    const speech = { ...DEFAULT_SPEECH_SETTINGS, model, voiceId: voice.trim(), speed, ...next };
-    if (!speech.voiceId || !Number.isFinite(speech.speed) || speech.speed < 0.5 || speech.speed > 2) return;
-    const result = await settingsApi.updateV4({ expectedRevision: snapshot.revision, namespace: "media", patch: { speech } });
-    if (result.ok === false) { setSnapshot(result.latest); setError("设置已在其他位置更新，请再改一次。"); return; }
-    setSnapshot(result.snapshot);
-    notifySaved();
-  });
-  const saveKey = () => action(async () => {
-    const result = await providersApi.setKey({ provider: "speech-minimax", apiKey: key });
-    if (!result.ok) throw new Error();
-    setKey("");
-    setKeyEditorOpen(false);
-    setState(await englishLearningApi.getState());
-    notifySaved();
-  });
-  const clearKey = () => action(async () => {
-    const result = await providersApi.clearKey({ provider: "speech-minimax" });
-    if (!result.ok) throw new Error();
-    setState(await englishLearningApi.getState());
-    notifySaved("已清除");
-  });
+  const saveSpeech = (next: { model?: SpeechModel; voiceId?: string; speed?: number }) =>
+    action(async () => {
+      if (!snapshot) return;
+      const speech = { ...DEFAULT_SPEECH_SETTINGS, model, voiceId: voice.trim(), speed, ...next };
+      if (!speech.voiceId || !Number.isFinite(speech.speed) || speech.speed < 0.5 || speech.speed > 2) return;
+      const result = await settingsApi.updateV4({
+        expectedRevision: snapshot.revision,
+        namespace: "media",
+        patch: { speech },
+      });
+      if (result.ok === false) {
+        setSnapshot(result.latest);
+        setError("设置已在其他位置更新，请再改一次。");
+        return;
+      }
+      setSnapshot(result.snapshot);
+      notifySaved();
+    });
+  const saveKey = () =>
+    action(async () => {
+      const result = await providersApi.setKey({ provider: "speech-minimax", apiKey: key });
+      if (!result.ok) throw new Error();
+      setKey("");
+      setKeyEditorOpen(false);
+      setState(await englishLearningApi.getState());
+      notifySaved();
+    });
+  const clearKey = () =>
+    action(async () => {
+      const result = await providersApi.clearKey({ provider: "speech-minimax" });
+      if (!result.ok) throw new Error();
+      setState(await englishLearningApi.getState());
+      notifySaved("已清除");
+    });
 
   const savedVoice = snapshot?.settings.media.speech?.voiceId ?? DEFAULT_SPEECH_SETTINGS.voiceId;
   const playing = Boolean(state && ["playing", "synthesizing"].includes(state.speechStatus));
-  const canPreview = !busy && Boolean(state?.hasApiKey) && !["unsupported", "playing", "synthesizing"].includes(state?.speechStatus ?? "unsupported");
+  const canPreview =
+    !busy &&
+    Boolean(state?.hasApiKey) &&
+    !["unsupported", "playing", "synthesizing"].includes(state?.speechStatus ?? "unsupported");
   const statusText = state && state.speechStatus !== "idle" ? SPEECH_STATUS_LABELS[state.speechStatus] : undefined;
   const problem = error ?? state?.error?.message ?? null;
   const disabled = busy || !snapshot;
@@ -91,26 +128,37 @@ export function SpeechSettingsSection() {
       <>
         <SettingRow
           title="MiniMax API Key"
-          control={state?.hasApiKey ? (
-            <>
-              <StatusDot tone="ok">已配置</StatusDot>
-              <SettingsMenuButton
-                id="speech-key-trigger"
-                label="管理"
-                ariaLabel="管理 MiniMax Key"
-                disabled={busy}
-                items={[
-                  { label: "更换 Key", onSelect: () => setKeyEditorOpen(true) },
-                  { label: "清除 Key", danger: true, onSelect: () => void clearKey() },
-                ]}
-              />
-            </>
-          ) : (
-            <>
-              <StatusDot tone="off">未配置</StatusDot>
-              <Button id="speech-key-trigger" aria-label="设置 MiniMax Key" aria-expanded={keyEditorOpen} aria-controls="speech-key-editor" disabled={busy} onClick={() => setKeyEditorOpen((open) => !open)}>设置 Key</Button>
-            </>
-          )}
+          control={
+            state?.hasApiKey ? (
+              <>
+                <StatusDot tone="ok">已配置</StatusDot>
+                <SettingsMenuButton
+                  id="speech-key-trigger"
+                  label="管理"
+                  ariaLabel="管理 MiniMax Key"
+                  disabled={busy}
+                  items={[
+                    { label: "更换 Key", onSelect: () => setKeyEditorOpen(true) },
+                    { label: "清除 Key", danger: true, onSelect: () => void clearKey() },
+                  ]}
+                />
+              </>
+            ) : (
+              <>
+                <StatusDot tone="off">未配置</StatusDot>
+                <Button
+                  id="speech-key-trigger"
+                  aria-label="设置 MiniMax Key"
+                  aria-expanded={keyEditorOpen}
+                  aria-controls="speech-key-editor"
+                  disabled={busy}
+                  onClick={() => setKeyEditorOpen((open) => !open)}
+                >
+                  设置 Key
+                </Button>
+              </>
+            )
+          }
         />
         {keyEditorOpen ? (
           <SettingEditor
@@ -120,7 +168,10 @@ export function SpeechSettingsSection() {
             saving={busy}
             saveDisabled={!key.trim()}
             saveAriaLabel="保存 Key"
-            onCancel={() => { setKey(""); setKeyEditorOpen(false); }}
+            onCancel={() => {
+              setKey("");
+              setKeyEditorOpen(false);
+            }}
             onSave={() => void saveKey()}
           >
             <SettingsInput
@@ -164,15 +215,38 @@ export function SpeechSettingsSection() {
                 disabled={disabled}
                 invalid={!voice.trim()}
                 onChange={(event) => setVoice(event.target.value)}
-                onBlur={() => { if (voice.trim() && voice.trim() !== savedVoice) void saveSpeech({ voiceId: voice.trim() }); }}
-                onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+                onBlur={() => {
+                  if (voice.trim() && voice.trim() !== savedVoice) void saveSpeech({ voiceId: voice.trim() });
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
               />
               {playing ? (
-                <IconButton variant="secondary" label="停止播放" disabled={busy} onClick={() => void action(async () => { setState(await englishLearningApi.stopSpeech()); })}>
+                <IconButton
+                  variant="secondary"
+                  label="停止播放"
+                  disabled={busy}
+                  onClick={() =>
+                    void action(async () => {
+                      setState(await englishLearningApi.stopSpeech());
+                    })
+                  }
+                >
                   <Square size={11} aria-hidden="true" />
                 </IconButton>
               ) : (
-                <IconButton variant="secondary" label="试听已保存配置" tooltip={state?.hasApiKey ? "试听已保存配置" : "需要先配置 Key"} disabled={!canPreview} onClick={() => void action(async () => { setState(await englishLearningApi.previewSpeech()); })}>
+                <IconButton
+                  variant="secondary"
+                  label="试听已保存配置"
+                  tooltip={state?.hasApiKey ? "试听已保存配置" : "需要先配置 Key"}
+                  disabled={!canPreview}
+                  onClick={() =>
+                    void action(async () => {
+                      setState(await englishLearningApi.previewSpeech());
+                    })
+                  }
+                >
                   <Play size={11} aria-hidden="true" />
                 </IconButton>
               )}
@@ -201,7 +275,11 @@ export function SpeechSettingsSection() {
         {problem ? (
           <div role="alert" className="flex items-center justify-between gap-3 px-4 py-2.5 text-act-xs text-on-danger">
             <span>{problem}</span>
-            {!snapshot ? <Button variant="ghost" onClick={() => setReload((value) => value + 1)}>重试</Button> : null}
+            {!snapshot ? (
+              <Button variant="ghost" onClick={() => setReload((value) => value + 1)}>
+                重试
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </>

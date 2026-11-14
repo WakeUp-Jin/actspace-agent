@@ -11,7 +11,6 @@ import { SectionShell, SettingGroup, Toggle } from "../settings/SettingsPrimitiv
 import { Button } from "../ui/Button";
 import { skillsApi } from "../../api/skills";
 
-
 const SOURCE_LABELS: Record<string, string> = {
   actspace: ".actspace",
   "actspace-userData": "用户目录",
@@ -109,7 +108,16 @@ export function SkillsSection({
           {items.length > discovered.length ? `（另有 ${items.length - discovered.length} 个同名被遮蔽）` : ""}
         </span>
         <div className="flex gap-2">
-          <Button variant="secondary" disabled={loading} onClick={() => { setMessage(null); void refresh(); }}>刷新</Button>
+          <Button
+            variant="secondary"
+            disabled={loading}
+            onClick={() => {
+              setMessage(null);
+              void refresh();
+            }}
+          >
+            刷新
+          </Button>
           <Button variant="secondary" onClick={() => void install()}>
             <FolderDown size={14} className="mr-1.5" />
             安装 Skill
@@ -121,10 +129,7 @@ export function SkillsSection({
         <p className={`text-act-xs ${message.includes("失败") ? "text-on-danger" : "text-on-success"}`}>{message}</p>
       ) : null}
 
-      <SettingGroup
-        title="可用 Skills"
-        description="启用后，主 Agent 可在后续对话中使用。"
-      >
+      <SettingGroup title="可用 Skills" description="启用后，主 Agent 可在后续对话中使用。">
         {loading ? (
           <div className="px-4 py-6 text-center text-act-sm text-text-faint">加载 Skill 列表中…</div>
         ) : visible.length === 0 ? (
@@ -139,7 +144,8 @@ export function SkillsSection({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-act-sm font-medium text-text-main">{item.name}</span>
                     <span className="inline-flex items-center rounded-full bg-surface-subtle px-2 py-0.5 text-act-xxs font-medium text-text-faint">
-                      {item.scope === "project" ? "项目" : item.scope === "official" ? "官方" : "用户"} · {SOURCE_LABELS[item.source] ?? item.source}
+                      {item.scope === "project" ? "项目" : item.scope === "official" ? "官方" : "用户"} ·{" "}
+                      {SOURCE_LABELS[item.source] ?? item.source}
                     </span>
                     {item.status === "warning" ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-act-xxs font-medium text-on-danger">
@@ -151,7 +157,10 @@ export function SkillsSection({
                     {item.description || "（无描述）"}
                   </p>
                   {item.warning ? <p className="mt-1 text-act-xs text-on-danger">{item.warning}</p> : null}
-                  <details className="mt-1 text-act-xxs text-text-subtle"><summary className="w-fit cursor-pointer hover:text-text-main">来源路径</summary><p className="mt-1 break-all">{item.directory}</p></details>
+                  <details className="mt-1 text-act-xxs text-text-subtle">
+                    <summary className="w-fit cursor-pointer hover:text-text-main">来源路径</summary>
+                    <p className="mt-1 break-all">{item.directory}</p>
+                  </details>
                 </div>
                 {item.removable ? (
                   <button
@@ -167,7 +176,10 @@ export function SkillsSection({
               <div className="flex items-center gap-6">
                 <label className="flex items-center gap-2 text-act-xs text-text-muted">
                   <Toggle
-                    checked={!settings.skills.disabled.includes(item.id ?? item.name) && !settings.skills.disabled.includes(item.name)}
+                    checked={
+                      !settings.skills.disabled.includes(item.id ?? item.name) &&
+                      !settings.skills.disabled.includes(item.name)
+                    }
                     disabled={saving}
                     onChange={(next) => void toggleAgent(item.id ?? item.name, next, item.name)}
                     ariaLabel={`主 Agent 使用 ${item.name}`}

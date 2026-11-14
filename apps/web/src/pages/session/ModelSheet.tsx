@@ -22,27 +22,62 @@ const SEARCH_MIN = 7;
 export function ModelSheet({ open, onOpenChange, models, model, effort = null, effortOptions = [], onPick }: Props) {
   const [query, setQuery] = useState("");
   const needle = query.trim().toLowerCase();
-  const shown = needle ? models.filter(item => `${item.name} ${item.id}`.toLowerCase().includes(needle)) : models;
+  const shown = needle ? models.filter((item) => `${item.name} ${item.id}`.toLowerCase().includes(needle)) : models;
   return (
-    <Sheet open={open} onOpenChange={next => { if (!next) setQuery(""); onOpenChange(next); }} title="模型">
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setQuery("");
+        onOpenChange(next);
+      }}
+      title="模型"
+    >
       {effortOptions.length ? (
         <div className="pb-1 pt-1">
-          <Segmented label="推理强度" className="w-full" value={effort ?? ""} options={effortOptions.map(value => ({ value, label: effortLabel(value) }))} onChange={value => onPick({ model, effort: value })} />
+          <Segmented
+            label="推理强度"
+            className="w-full"
+            value={effort ?? ""}
+            options={effortOptions.map((value) => ({ value, label: effortLabel(value) }))}
+            onChange={(value) => onPick({ model, effort: value })}
+          />
         </div>
       ) : null}
       {models.length >= SEARCH_MIN ? (
         <label className="mb-1.5 mt-1 flex h-[38px] items-center gap-2 rounded-act-md bg-surface-subtle px-3 text-text-subtle">
           <Search size={16} aria-hidden />
-          <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索模型" aria-label="搜索模型" className="min-w-0 flex-1 border-0 bg-transparent text-act-base text-text-main outline-none placeholder:text-text-subtle" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索模型"
+            aria-label="搜索模型"
+            className="min-w-0 flex-1 border-0 bg-transparent text-act-base text-text-main outline-none placeholder:text-text-subtle"
+          />
         </label>
       ) : null}
-      {groupModels(shown).map(group => (
+      {groupModels(shown).map((group) => (
         <div key={group.provider} role="radiogroup" aria-label={group.provider}>
           <SheetGroupLabel>{group.provider}</SheetGroupLabel>
-          {group.models.map(item => <SheetOption key={item.id} selected={item.id === model} title={item.name} onSelect={() => { onPick({ model: item.id, effort }); onOpenChange(false); setQuery(""); }} />)}
+          {group.models.map((item) => (
+            <SheetOption
+              key={item.id}
+              selected={item.id === model}
+              title={item.name}
+              onSelect={() => {
+                onPick({ model: item.id, effort });
+                onOpenChange(false);
+                setQuery("");
+              }}
+            />
+          ))}
         </div>
       ))}
-      {models.length === 0 ? <p className="m-0 py-6 text-act-md text-text-faint">服务器没有提供可选模型</p> : shown.length === 0 ? <p className="m-0 py-6 text-act-md text-text-faint">没有匹配的模型</p> : null}
+      {models.length === 0 ? (
+        <p className="m-0 py-6 text-act-md text-text-faint">服务器没有提供可选模型</p>
+      ) : shown.length === 0 ? (
+        <p className="m-0 py-6 text-act-md text-text-faint">没有匹配的模型</p>
+      ) : null}
     </Sheet>
   );
 }

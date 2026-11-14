@@ -28,9 +28,10 @@ export function typeFixture(fixturePath: string) {
     };
     const host = ts.createCompilerHost(options);
     const getSourceFile = host.getSourceFile.bind(host);
-    host.getSourceFile = (fileName, languageVersionOrOptions, ...rest) => resolve(fileName) === fixturePath
-      ? ts.createSourceFile(fileName, source, languageVersionOrOptions, true)
-      : getSourceFile(fileName, languageVersionOrOptions, ...rest);
+    host.getSourceFile = (fileName, languageVersionOrOptions, ...rest) =>
+      resolve(fileName) === fixturePath
+        ? ts.createSourceFile(fileName, source, languageVersionOrOptions, true)
+        : getSourceFile(fileName, languageVersionOrOptions, ...rest);
     const program = ts.createProgram([fixturePath], options, host);
     const file = program.getSourceFile(fixturePath);
     if (file === undefined) throw new Error("fixture was not loaded");
@@ -38,7 +39,10 @@ export function typeFixture(fixturePath: string) {
     return [...program.getSyntacticDiagnostics(file), ...program.getSemanticDiagnostics(file)].map((diagnostic) => {
       const line = file.getLineAndCharacterOfPosition(diagnostic.start ?? 0).line;
       const label = /\[([a-z-]+)\]/u.exec(lines[line - 1] ?? "")?.[1];
-      return { label: label ?? `line ${line + 1}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")}`, code: diagnostic.code };
+      return {
+        label: label ?? `line ${line + 1}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")}`,
+        code: diagnostic.code,
+      };
     });
   }
 

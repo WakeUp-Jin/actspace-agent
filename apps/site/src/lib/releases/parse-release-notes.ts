@@ -52,9 +52,7 @@ function isRealDate(value: string): boolean {
 function parseListItem(item: ListItem, sourcePath: string, month: string, releaseLine: number | undefined): string {
   const line = lineOf(item) ?? releaseLine;
   if (item.children.length !== 1 || item.children[0]?.type !== "paragraph") {
-    throw new ReleaseParseError(
-      `${location(sourcePath, month, line)}：更新条目必须是单段、无嵌套的 Markdown 列表项。`,
-    );
+    throw new ReleaseParseError(`${location(sourcePath, month, line)}：更新条目必须是单段、无嵌套的 Markdown 列表项。`);
   }
 
   const paragraph = item.children[0] as Paragraph;
@@ -121,10 +119,14 @@ export function parseReleaseNotes(markdown: string, sourcePath = releaseSourceLa
 
         const [, date, title] = match;
         if (!isRealDate(date)) {
-          throw new ReleaseParseError(`${location(sourcePath, currentMonth, line)}：日期“${date}”不是合法的 YYYY-MM-DD。`);
+          throw new ReleaseParseError(
+            `${location(sourcePath, currentMonth, line)}：日期“${date}”不是合法的 YYYY-MM-DD。`,
+          );
         }
         if (!date.startsWith(`${currentMonth}-`)) {
-          throw new ReleaseParseError(`${location(sourcePath, currentMonth, line)}：日期 ${date} 不属于标题月份 ${currentMonth}。`);
+          throw new ReleaseParseError(
+            `${location(sourcePath, currentMonth, line)}：日期 ${date} 不属于标题月份 ${currentMonth}。`,
+          );
         }
         if (!title.trim()) {
           throw new ReleaseParseError(`${location(sourcePath, currentMonth, line)}：发布标题不能为空。`);

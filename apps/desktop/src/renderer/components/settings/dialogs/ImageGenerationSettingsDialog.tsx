@@ -73,13 +73,21 @@ export function ImageGenerationSettingsDialog({
 
   return (
     // 保存或断开进行中不能关闭；点遮罩不关闭，免得丢掉刚输入的 Key。
-    <Dialog open onOpenChange={(open) => { if (!open && !busy) onClose(); }}>
-      <DialogContent size="lg" closeOnOutsideClick={false} returnFocus={returnFocus} className="max-h-[86vh] overflow-y-auto p-5">
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) onClose();
+      }}
+    >
+      <DialogContent
+        size="lg"
+        closeOnOutsideClick={false}
+        returnFocus={returnFocus}
+        className="max-h-[86vh] overflow-y-auto p-5"
+      >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <DialogTitle className="text-act-lg font-semibold text-text-main">
-              配置图片生成服务
-            </DialogTitle>
+            <DialogTitle className="text-act-lg font-semibold text-text-main">配置图片生成服务</DialogTitle>
           </div>
           <button
             type="button"
@@ -101,7 +109,7 @@ export function ImageGenerationSettingsDialog({
               <div className="min-w-0 flex-1">
                 <div className="text-act-sm font-semibold text-text-main">API Key 已安全保存</div>
               </div>
-              <Button variant="secondary" autoFocus  onClick={() => setReplaceKey(true)}>
+              <Button variant="secondary" autoFocus onClick={() => setReplaceKey(true)}>
                 更换 Key
               </Button>
             </div>
@@ -109,7 +117,11 @@ export function ImageGenerationSettingsDialog({
             <label className="flex flex-col gap-1.5 text-act-xs font-semibold text-text-muted">
               API Key
               <div className="relative">
-                <KeyRound size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" aria-hidden="true" />
+                <KeyRound
+                  size={15}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-faint"
+                  aria-hidden="true"
+                />
                 <input
                   autoFocus
                   type="password"
@@ -132,14 +144,23 @@ export function ImageGenerationSettingsDialog({
               className="flex w-full items-center gap-2 px-3.5 py-3 text-left transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring/20"
               onClick={() => setAdvancedOpen((open) => !open)}
             >
-              <ChevronRight size={16} className={`shrink-0 text-text-faint transition-transform ${advancedOpen ? "rotate-90" : ""}`} aria-hidden="true" />
+              <ChevronRight
+                size={16}
+                className={`shrink-0 text-text-faint transition-transform ${advancedOpen ? "rotate-90" : ""}`}
+                aria-hidden="true"
+              />
               <span className="min-w-0 flex-1">
                 <span className="block text-act-sm font-semibold text-text-main">高级设置</span>
-                <span className="mt-0.5 block truncate text-act-xxs text-text-faint">{model || "未填写模型"} · {endpointLabel}</span>
+                <span className="mt-0.5 block truncate text-act-xxs text-text-faint">
+                  {model || "未填写模型"} · {endpointLabel}
+                </span>
               </span>
             </button>
             {advancedOpen ? (
-              <div id="image-generation-advanced-settings" className="grid gap-4 border-t border-line bg-surface-subtle px-3.5 py-3.5">
+              <div
+                id="image-generation-advanced-settings"
+                className="grid gap-4 border-t border-line bg-surface-subtle px-3.5 py-3.5"
+              >
                 <label className="flex flex-col gap-1.5 text-act-xs font-semibold text-text-muted">
                   Base URL
                   <input
@@ -166,7 +187,11 @@ export function ImageGenerationSettingsDialog({
             ) : null}
           </div>
 
-          {error ? <p role="alert" className="text-act-xs text-on-danger">{error}</p> : null}
+          {error ? (
+            <p role="alert" className="text-act-xs text-on-danger">
+              {error}
+            </p>
+          ) : null}
         </div>
 
         <div className="mt-6 flex items-center justify-between gap-3">
@@ -178,7 +203,9 @@ export function ImageGenerationSettingsDialog({
             ) : null}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={onClose} disabled={Boolean(busy)}>取消</Button>
+            <Button variant="secondary" onClick={onClose} disabled={Boolean(busy)}>
+              取消
+            </Button>
             <Button variant="primary" onClick={() => void save()} disabled={Boolean(busy)}>
               {busy === "save" ? "保存中…" : "保存配置"}
             </Button>

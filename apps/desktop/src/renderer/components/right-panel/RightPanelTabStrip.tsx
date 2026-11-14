@@ -35,8 +35,7 @@ const RIGHT_TABS_CLASS =
 // 横向滚动条隐藏（scrollbar-none 见 electron.css）；溢出靠下拉而非可见滚动条。
 const RIGHT_TAB_SCROLL_CLASS =
   "scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [pointer-events:auto]";
-const RIGHT_PANEL_EMPTY_TITLE_CLASS =
-  "px-2 text-act-sm font-medium leading-none text-text-muted";
+const RIGHT_PANEL_EMPTY_TITLE_CLASS = "px-2 text-act-sm font-medium leading-none text-text-muted";
 const RIGHT_TAB_GROUP_BASE =
   "group inline-flex h-[30px] shrink-0 items-center gap-2.5 rounded-act-md pl-2.5 pr-1.5 text-act-sm leading-none transition-colors duration-(--motion-fast) ease-in-out [pointer-events:auto] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_INACTIVE_CLASS = "bg-transparent text-text-muted hover:bg-hover-overlay hover:text-text-main";
@@ -124,9 +123,7 @@ export function RightPanelTabStrip({
   return (
     <div className={RIGHT_TABS_CLASS} role="tablist" aria-label={label}>
       <div ref={scrollRef} className={RIGHT_TAB_SCROLL_CLASS}>
-        {items.length === 0 ? (
-          <span className={RIGHT_PANEL_EMPTY_TITLE_CLASS}>{emptyTitle}</span>
-        ) : null}
+        {items.length === 0 ? <span className={RIGHT_PANEL_EMPTY_TITLE_CLASS}>{emptyTitle}</span> : null}
         {items.map((tab) => {
           const isActive = tab.id === activeId;
           const isClosing = tab.closing === true;
@@ -137,7 +134,9 @@ export function RightPanelTabStrip({
               data-tab-id={tab.id}
               className={`${RIGHT_TAB_GROUP_BASE} ${isActive ? RIGHT_TAB_ACTIVE_CLASS : RIGHT_TAB_INACTIVE_CLASS}`}
             >
-              {tab.icon ? <span className="-mr-1 inline-flex shrink-0 items-center text-text-faint">{tab.icon}</span> : null}
+              {tab.icon ? (
+                <span className="-mr-1 inline-flex shrink-0 items-center text-text-faint">{tab.icon}</span>
+              ) : null}
               <button
                 className={RIGHT_TAB_LABEL_CLASS}
                 type="button"
@@ -157,10 +156,16 @@ export function RightPanelTabStrip({
                     disabled={isClosing}
                     onClick={() => onClose(tab.id)}
                   >
-                    {isClosing ? <LoaderCircle size={12} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <X size={12} aria-hidden="true" />}
+                    {isClosing ? (
+                      <LoaderCircle size={12} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                    ) : (
+                      <X size={12} aria-hidden="true" />
+                    )}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>{tab.closeHint ?? (isClosing ? "正在关闭…" : `${tab.closeVerb ?? "关闭"} ${tab.title}`)}</TooltipContent>
+                <TooltipContent>
+                  {tab.closeHint ?? (isClosing ? "正在关闭…" : `${tab.closeVerb ?? "关闭"} ${tab.title}`)}
+                </TooltipContent>
               </Tooltip>
             </span>
           );
@@ -217,7 +222,11 @@ export function RightPanelTabStrip({
                         onClose(tab.id);
                       }}
                     >
-                      {isClosing ? <LoaderCircle size={12} className="animate-spin motion-reduce:animate-none" /> : <X size={12} />}
+                      {isClosing ? (
+                        <LoaderCircle size={12} className="animate-spin motion-reduce:animate-none" />
+                      ) : (
+                        <X size={12} />
+                      )}
                     </button>
                   </div>
                 );

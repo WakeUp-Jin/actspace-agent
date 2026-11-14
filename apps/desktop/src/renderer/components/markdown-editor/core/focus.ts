@@ -29,14 +29,18 @@ export function isEditorFocused(state: EditorState): boolean {
 
 /** 选区碰到 [from, to]：光标含两端，非空选区按重叠算。 */
 export function selectionTouches(state: EditorState, from: number, to: number): boolean {
-  return state.selection.ranges.some((range) => (range.empty ? range.from >= from && range.from <= to : range.from < to && range.to > from));
+  return state.selection.ranges.some((range) =>
+    range.empty ? range.from >= from && range.from <= to : range.from < to && range.to > from,
+  );
 }
 
 /** 选区是否落在 [from, to] 所在的任意一行里（引用 `>`、分隔线按行露出）。 */
 export function selectionTouchesLines(state: EditorState, from: number, to: number): boolean {
   const first = state.doc.lineAt(from).number;
   const last = state.doc.lineAt(to).number;
-  return state.selection.ranges.some((range) => state.doc.lineAt(range.from).number <= last && state.doc.lineAt(range.to).number >= first);
+  return state.selection.ranges.some(
+    (range) => state.doc.lineAt(range.from).number <= last && state.doc.lineAt(range.to).number >= first,
+  );
 }
 
 /** 标记是否露出：有焦点，并且选区碰到这个节点。 */

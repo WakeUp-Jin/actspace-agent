@@ -60,7 +60,11 @@ describe("workspace open service", () => {
     const roots = await makeRoots();
     const runner = vi.fn(async () => ({ ok: true }));
 
-    const result = await openWorkspaceInTool({ workspaceRoot: join(roots.workspaceRoot, "missing"), toolId: "finder" }, roots, runner);
+    const result = await openWorkspaceInTool(
+      { workspaceRoot: join(roots.workspaceRoot, "missing"), toolId: "finder" },
+      roots,
+      runner,
+    );
 
     expect(result).toMatchObject({ ok: false, error: "invalid_workspace" });
     expect(runner).not.toHaveBeenCalled();
@@ -74,11 +78,7 @@ describe("workspace open service", () => {
       await writeFile(join(roots.workspaceRoot, "src", "main.ts"), "export const x = 1;\n");
       const runner = vi.fn(async () => ({ ok: true }));
 
-      const result = await openWorkspaceInTool(
-        { toolId: "cursor", relativePath: "src/main.ts" },
-        roots,
-        runner,
-      );
+      const result = await openWorkspaceInTool({ toolId: "cursor", relativePath: "src/main.ts" }, roots, runner);
 
       expect(result).toMatchObject({ ok: true, relativePath: "src/main.ts" });
       expect(runner).toHaveBeenLastCalledWith(["-a", "Cursor", join(roots.workspaceRoot, "src", "main.ts")]);
@@ -110,11 +110,7 @@ describe("workspace open service", () => {
       const roots = await makeRoots();
       const runner = vi.fn(async () => ({ ok: true }));
 
-      const result = await openWorkspaceInTool(
-        { toolId: "cursor", relativePath: "../../etc/hosts" },
-        roots,
-        runner,
-      );
+      const result = await openWorkspaceInTool({ toolId: "cursor", relativePath: "../../etc/hosts" }, roots, runner);
 
       expect(result).toMatchObject({ ok: false, error: "escapes_root" });
       expect(runner).not.toHaveBeenCalled();

@@ -3,7 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { DiffCard } from "../blocks/DiffCard";
 
 const lines = (count: number) => Array.from({ length: count }, (_, index) => `+line ${index + 1}`).join("\n");
-const card = (count: number) => <DiffCard kind="edit_diff" filePath="/w/a.ts" additions={count} deletions={0} diff={lines(count)} />;
+const card = (count: number) => (
+  <DiffCard kind="edit_diff" filePath="/w/a.ts" additions={count} deletions={0} diff={lines(count)} />
+);
 const expand = () => userEvent.click(screen.getByRole("button", { expanded: false }));
 
 it("shows a collapsed change row with counts", () => {
@@ -31,7 +33,9 @@ it("folds at 13 lines and expands on tap", async () => {
 });
 
 it("marks additions and deletions", async () => {
-  const { container } = render(<DiffCard kind="edit_diff" filePath="a" additions={1} deletions={1} diff={"-old\n+new"} />);
+  const { container } = render(
+    <DiffCard kind="edit_diff" filePath="a" additions={1} deletions={1} diff={"-old\n+new"} />,
+  );
   await expand();
   expect(container.querySelector('[data-kind="del"]')?.textContent).toContain("old");
   expect(container.querySelector('[data-kind="add"]')?.textContent).toContain("new");

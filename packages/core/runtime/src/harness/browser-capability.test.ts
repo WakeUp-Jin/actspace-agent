@@ -10,34 +10,97 @@ import { runtimeCordisConfigPath } from "../config-path.js";
 import { bootProfileRuntime } from "../startup/boot.js";
 import { createRuntimeHostServices } from "../startup/host-services.js";
 
-const BASE_CAPABILITIES = ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const;
+const BASE_CAPABILITIES = [
+  "filesystem.read",
+  "filesystem.write",
+  "network",
+  "approval",
+  "credential",
+  "process",
+] as const;
 
 /**
  * Boot the checked-in tree and report the Harness's tool names. `browser-tools` needs the Host capability and an
  * enabled switch; a Host that passes no switches keeps every default-off plugin off.
  */
-async function bootToolNames(capabilities: readonly string[], disabledPlugins?: readonly string[]): Promise<readonly string[]> {
+async function bootToolNames(
+  capabilities: readonly string[],
+  disabledPlugins?: readonly string[],
+): Promise<readonly string[]> {
   const root = await mkdtemp(join(tmpdir(), "browser-capability-"));
-  const host = { hostKind: "cli-run" as const, capabilityCeiling: capabilities as typeof BASE_CAPABILITIES, runtimeContract: "actspace.runtime.v2" as const, invocationId: "test" };
+  const host = {
+    hostKind: "cli-run" as const,
+    capabilityCeiling: capabilities as typeof BASE_CAPABILITIES,
+    runtimeContract: "actspace.runtime.v2" as const,
+    invocationId: "test",
+  };
   const composition = createProfileComposition(RUNTIME_PROFILE_IDS.headless, host);
-  const env = { workspaceRoot: root, hostCapabilities: new Set<string>(capabilities), capabilitySet: { ids: capabilities, has: () => true, get: <T>() => ({}) as T }, createArtifact: async () => { throw new Error("unused"); } };
-  const ports = Object.fromEntries(PLUGIN_CATALOG.filter(item => item.manifest.behaviors[0].injects?.some(id => String(id) === `actspace.host.tools.${item.id}`)).map(item => [`actspace.host.tools.${item.id}`, { createPorts: () => ({}) }]));
+  const env = {
+    workspaceRoot: root,
+    hostCapabilities: new Set<string>(capabilities),
+    capabilitySet: { ids: capabilities, has: () => true, get: <T>() => ({}) as T },
+    createArtifact: async () => {
+      throw new Error("unused");
+    },
+  };
+  const ports = Object.fromEntries(
+    PLUGIN_CATALOG.filter((item) =>
+      item.manifest.behaviors[0].injects?.some((id) => String(id) === `actspace.host.tools.${item.id}`),
+    ).map((item) => [`actspace.host.tools.${item.id}`, { createPorts: () => ({}) }]),
+  );
   let profile: Awaited<ReturnType<typeof bootProfileRuntime>> | undefined;
   try {
     profile = await bootProfileRuntime({
-      host, dataRoot: root, toolEnvironment: env, composition, ...(disabledPlugins ? { disabledPlugins } : {}),
-      hostServices: createRuntimeHostServices({ descriptor: host, dataRoot: root, workspaceRoot: root, toolEnvironment: env, services: {
-        ...ports,
-        "actspace.host.tools.browser": { ready: true, command: async () => { throw new Error("unused"); } },
-        "actspace.host.llm": { credentials: { resolve: async () => ({}) }, routes: [{ routeId: "test", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async () => { throw new Error("No model calls in this test."); } } }] },
-      } }),
+      host,
+      dataRoot: root,
+      toolEnvironment: env,
+      composition,
+      ...(disabledPlugins ? { disabledPlugins } : {}),
+      hostServices: createRuntimeHostServices({
+        descriptor: host,
+        dataRoot: root,
+        workspaceRoot: root,
+        toolEnvironment: env,
+        services: {
+          ...ports,
+          "actspace.host.tools.browser": {
+            ready: true,
+            command: async () => {
+              throw new Error("unused");
+            },
+          },
+          "actspace.host.llm": {
+            credentials: { resolve: async () => ({}) },
+            routes: [
+              {
+                routeId: "test",
+                providerId: "test",
+                modelPattern: "*",
+                credentialRef: "test",
+                defaults: {},
+                adapter: {
+                  adapterVersion: "test",
+                  dispatch: async () => {
+                    throw new Error("No model calls in this test.");
+                  },
+                },
+              },
+            ],
+          },
+        },
+      }),
       cordis: { configPath: runtimeCordisConfigPath(), admission: await inspectCordisAdmission() },
     });
     const runtime = profile.context.get!("agent.runtime") as import("./agent-runtime-plugin.js").AgentRuntimeService;
     const lease = await runtime.harnesses.acquire("main");
     try {
-      return lease.getService<ToolRuntime>("tools.runtime")!.registry.listDefinitions().map(item => item.name);
-    } finally { await lease.release(); }
+      return lease
+        .getService<ToolRuntime>("tools.runtime")!
+        .registry.listDefinitions()
+        .map((item) => item.name);
+    } finally {
+      await lease.release();
+    }
   } finally {
     await profile?.shutdown();
     await rm(root, { recursive: true, force: true });
@@ -47,7 +110,11 @@ async function bootToolNames(capabilities: readonly string[], disabledPlugins?: 
 describe("Host capability rule for optional Harness entries", () => {
   it("lists only optional entries whose manifest requires a missing capability", () => {
     // The external subagents need `process`.
-    expect(harnessEntriesMissingHostCapabilities(["filesystem.read"])).toEqual(["browser-tools", "subagent-codex", "subagent-claude-code"]);
+    expect(harnessEntriesMissingHostCapabilities(["filesystem.read"])).toEqual([
+      "browser-tools",
+      "subagent-codex",
+      "subagent-claude-code",
+    ]);
     expect(harnessEntriesMissingHostCapabilities([...BASE_CAPABILITIES, "browser"])).toEqual([]);
   });
 

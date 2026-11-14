@@ -8,7 +8,9 @@ import type { JsonlQueryReader } from "./query-reader.js";
 // The provider Worker is a built artifact, tested independently of Vitest transforms.
 
 const cleanup: (() => Promise<void>)[] = [];
-afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
+afterEach(async () => {
+  for (const close of cleanup.splice(0).reverse()) await close();
+});
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "jsonl-query-test-"));
   cleanup.push(() => rm(root, { recursive: true, force: true }));
@@ -16,28 +18,52 @@ async function fixture() {
   const reader: JsonlQueryReader = new BuiltReader();
   cleanup.push(() => reader.close());
   const path = join(root, "journal.jsonl");
-  const header = createSessionHeader({ sessionId: "test", createdAt: new Date().toISOString(), lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "v2", manifestDigest: "test", plugins: [], codecSetDigest: "test" } });
+  const header = createSessionHeader({
+    sessionId: "test",
+    createdAt: new Date().toISOString(),
+    lineage: null,
+    createdWith: {
+      profileId: "test",
+      runtimeContractVersion: "v2",
+      manifestDigest: "test",
+      plugins: [],
+      codecSetDigest: "test",
+    },
+  });
   await writeFile(path, JSON.stringify(header) + "\n");
   return { reader, path };
 }
 function event(seq: number, text = "test") {
-  return { recordKind: "event", seq, type: "test/value", eventVersion: 1, criticality: "ignorable", time: new Date().toISOString(), source: { ownerPluginId: "test" }, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null }, data: { text }, surface: null };
+  return {
+    recordKind: "event",
+    seq,
+    type: "test/value",
+    eventVersion: 1,
+    criticality: "ignorable",
+    time: new Date().toISOString(),
+    source: { ownerPluginId: "test" },
+    provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
+    data: { text },
+    surface: null,
+  };
 }
 
 test("bounded batches resume exactly at the durable prefix and continue after append", async () => {
   const { reader, path } = await fixture();
   await appendFile(path, Array.from({ length: 600 }, (_, i) => JSON.stringify(event(i))).join("\n") + "\n");
-  let cursor: string | undefined; const seqs: number[] = [];
+  let cursor: string | undefined;
+  const seqs: number[] = [];
   for (;;) {
     const batch = await reader.read(path, "test", { throughSeq: 599, cursor });
     expect(batch.events.length).toBeLessThanOrEqual(256);
-    seqs.push(...batch.events.map(item => item.seq)); cursor = batch.cursor;
+    seqs.push(...batch.events.map((item) => item.seq));
+    cursor = batch.cursor;
     if (batch.done) break;
   }
   expect(seqs).toEqual(Array.from({ length: 600 }, (_, i) => i));
   await appendFile(path, JSON.stringify(event(600)) + "\n" + '{"partial":');
   const appended = await reader.read(path, "test", { throughSeq: 600, cursor });
-  expect(appended.events.map(item => item.seq)).toEqual([600]);
+  expect(appended.events.map((item) => item.seq)).toEqual([600]);
   expect(appended.done).toBe(true);
 });
 
@@ -67,13 +93,15 @@ test("query descriptor uses the complete prefix, detects appends and never reads
   const { reader, path } = await fixture();
   const empty = await reader.source(path, "test");
   expect(empty.throughSeq).toBe(-1);
-  await appendFile(path, Array.from({ length: 1000 }, (_, i) => JSON.stringify(event(i))).join("\n") + "\n" + '{"partial":');
+  await appendFile(
+    path,
+    Array.from({ length: 1000 }, (_, i) => JSON.stringify(event(i))).join("\n") + "\n" + '{"partial":',
+  );
   const next = await reader.source(path, "test");
   expect(next.throughSeq).toBe(999);
   expect(next.stamp).not.toBe(empty.stamp);
   expect(await reader.source(path, "test")).toEqual(next);
 });
-
 
 test("event type filtering advances the physical cursor with bounded empty batches", async () => {
   const { reader, path } = await fixture();
@@ -85,7 +113,6 @@ test("event type filtering advances the physical cursor with bounded empty batch
   const next = await reader.read(path, "test", { throughSeq: 1999, cursor: first.cursor });
   expect(next.events[0]?.seq).toBe(unfiltered.events.at(-1)!.seq + 1);
 });
-
 
 test("cached descriptors detect same-length file replacement and do not hide deletion", async () => {
   const { reader, path } = await fixture();

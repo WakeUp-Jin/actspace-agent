@@ -11,16 +11,30 @@ describe("the turn's abort signal", () => {
     let requests = 0;
     const listeners: number[] = [];
     await runToolStreamFixture({
-      stream: () => (async function* (): AsyncGenerator<LlmStreamEvent> {
-        requests += 1;
-        yield requests < steps
-          ? { type: "done", stopReason: "tool-use", usage: EMPTY_LLM_USAGE, content: [{ type: "tool-call", callId: `read-${requests}`, name: "read_file", arguments: '{"path":"fixture.txt"}' }] }
-          : { type: "done", stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text: "Done" }] };
-      })(),
+      stream: () =>
+        (async function* (): AsyncGenerator<LlmStreamEvent> {
+          requests += 1;
+          yield requests < steps
+            ? {
+                type: "done",
+                stopReason: "tool-use",
+                usage: EMPTY_LLM_USAGE,
+                content: [
+                  {
+                    type: "tool-call",
+                    callId: `read-${requests}`,
+                    name: "read_file",
+                    arguments: '{"path":"fixture.txt"}',
+                  },
+                ],
+              }
+            : { type: "done", stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text: "Done" }] };
+        })(),
       context: {
         get: () => ({ flush: async () => {} }),
         waterfall: async (type, payload, next) => {
-          if (type === "llm/stream") listeners.push(getEventListeners((payload as { signal: AbortSignal }).signal, "abort").length);
+          if (type === "llm/stream")
+            listeners.push(getEventListeners((payload as { signal: AbortSignal }).signal, "abort").length);
           return (next as () => Promise<object>)();
         },
       },

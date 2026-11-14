@@ -3,7 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 // FRONTEND_CHECK_REPO_ROOT 只给测试用，指向带 fixture 的临时仓库根。
-const repoRoot = process.env.FRONTEND_CHECK_REPO_ROOT ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot =
+  process.env.FRONTEND_CHECK_REPO_ROOT ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // 扫描根列表；根目录不存在时静默跳过（web 在脚手架阶段可能还没有）。
 // web 与 desktop 共用同一套颜色规则；差异：web 无强调色调色板（不检查 accents），暗色块可以是 data-theme="dark" 或 prefers-color-scheme 媒体查询，
 // 且不要求 chart / scrollbar / annotation 这几类桌面专用 token。
@@ -123,7 +124,10 @@ for (const target of TARGETS) {
   currentTarget = target.name;
   if (!fs.existsSync(path.join(repoRoot, target.root))) continue;
   const rendererRoot = path.join(repoRoot, target.root);
-  if (!fs.existsSync(path.join(rendererRoot, "styles/tokens.css")) || !fs.existsSync(path.join(rendererRoot, "styles/tailwind.css"))) {
+  if (
+    !fs.existsSync(path.join(rendererRoot, "styles/tokens.css")) ||
+    !fs.existsSync(path.join(rendererRoot, "styles/tailwind.css"))
+  ) {
     fail(`${target.root}/styles/{tokens,tailwind}.css not found`);
     continue;
   }
@@ -135,10 +139,19 @@ for (const target of TARGETS) {
   const mediaStart = tokensSource.indexOf("@media (prefers-color-scheme: dark)");
   const systemDarkBlock = findBlock(tokensSource, ':root[data-theme="system"]', mediaStart);
   const mediaDarkBlock = target.accents ? null : findBlock(tokensSource, "@media (prefers-color-scheme: dark)");
-  const requiredTokens = target.optionalTokens ? REQUIRED_THEME_TOKENS.filter((token) => !WEB_OPTIONAL_TOKEN.test(token)) : REQUIRED_THEME_TOKENS;
+  const requiredTokens = target.optionalTokens
+    ? REQUIRED_THEME_TOKENS.filter((token) => !WEB_OPTIONAL_TOKEN.test(token))
+    : REQUIRED_THEME_TOKENS;
   const blocksToCheck = target.accents
-    ? [["light", lightBlock], ["dark", darkBlock], ["system-dark", systemDarkBlock]]
-    : [["light", lightBlock], ["dark", darkBlock ?? mediaDarkBlock]];
+    ? [
+        ["light", lightBlock],
+        ["dark", darkBlock],
+        ["system-dark", systemDarkBlock],
+      ]
+    : [
+        ["light", lightBlock],
+        ["dark", darkBlock ?? mediaDarkBlock],
+      ];
 
   for (const [label, block] of blocksToCheck) {
     if (!block) {
@@ -190,8 +203,10 @@ for (const target of TARGETS) {
       },
     };
 
-    if (!accentIds.includes(DEFAULT_ACCENT_PALETTE)) fail(`appearance/accents.ts is missing default palette ${DEFAULT_ACCENT_PALETTE}`);
-    if (lightBlock && /--act-palette-[a-z-]+\s*:/.test(lightBlock)) fail("light block must not define --act-palette-* source values (default palette falls back)");
+    if (!accentIds.includes(DEFAULT_ACCENT_PALETTE))
+      fail(`appearance/accents.ts is missing default palette ${DEFAULT_ACCENT_PALETTE}`);
+    if (lightBlock && /--act-palette-[a-z-]+\s*:/.test(lightBlock))
+      fail("light block must not define --act-palette-* source values (default palette falls back)");
     for (const id of accentIds) {
       const swatch = id === DEFAULT_ACCENT_PALETTE ? `--act-preview-accent-${id}-ink` : `--act-preview-accent-${id}`;
       if (lightBlock && !lightBlock.includes(`${swatch}:`)) fail(`light is missing accent swatch ${swatch}`);
@@ -216,7 +231,10 @@ for (const target of TARGETS) {
             continue;
           }
           const ratio = contrast(accent, backdrop);
-          if (ratio < ACCENT_MIN_CONTRAST) fail(`accent palette ${id} ${tone} ${accent} vs ${label} ${backdrop} is ${ratio.toFixed(2)}:1 (< ${ACCENT_MIN_CONTRAST})`);
+          if (ratio < ACCENT_MIN_CONTRAST)
+            fail(
+              `accent palette ${id} ${tone} ${accent} vs ${label} ${backdrop} is ${ratio.toFixed(2)}:1 (< ${ACCENT_MIN_CONTRAST})`,
+            );
         }
       }
     }
@@ -255,7 +273,8 @@ for (const target of TARGETS) {
   for (const [relative, patterns] of target.accents ? REQUIRED_LITERAL_EXCEPTIONS : []) {
     const source = read(path.join(rendererRoot, relative));
     for (const pattern of patterns) {
-      if (!pattern.test(source)) fail(`${relative} literal exception drifted; update its documented srcDoc palette intentionally`);
+      if (!pattern.test(source))
+        fail(`${relative} literal exception drifted; update its documented srcDoc palette intentionally`);
     }
   }
   ran.push(target.name);

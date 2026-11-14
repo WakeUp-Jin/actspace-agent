@@ -29,9 +29,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const result = await runCommand(parsed.options, {
       stdinIsTTY: process.stdin.isTTY === true,
       readStdin: readProcessStdin,
-      onLiveEvent: parsed.options.outputFormat === "jsonl"
-        ? (event) => writeJsonLine({ type: "runtime_event", event })
-        : undefined,
+      onLiveEvent:
+        parsed.options.outputFormat === "jsonl"
+          ? (event) => writeJsonLine({ type: "runtime_event", event })
+          : undefined,
       onControl: (nextControl) => {
         termination.setAbort(nextControl.abort);
       },

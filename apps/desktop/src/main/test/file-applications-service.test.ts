@@ -6,13 +6,20 @@ import type { AppDataRoots } from "../app-paths";
 
 vi.mock("electron", () => ({
   clipboard: { write: vi.fn(async () => undefined), writeText: vi.fn(async () => undefined) },
-  ClipboardItem: class { constructor(public readonly items: Record<string, unknown>) {} },
+  ClipboardItem: class {
+    constructor(public readonly items: Record<string, unknown>) {}
+  },
   Menu: { buildFromTemplate: vi.fn() },
   nativeImage: { createFromDataURL: vi.fn() },
   shell: { openPath: vi.fn(), showItemInFolder: vi.fn() },
 }));
 
-import { dedupeMacApplications, listWorkspaceFileApplications, openWorkspaceFile, parseMacApplications } from "../file-applications-service";
+import {
+  dedupeMacApplications,
+  listWorkspaceFileApplications,
+  openWorkspaceFile,
+  parseMacApplications,
+} from "../file-applications-service";
 
 const created: string[] = [];
 
@@ -26,14 +33,49 @@ async function makeRoots(): Promise<AppDataRoots> {
   const workspaceRoot = join(dataRoot, "workspace");
   await mkdir(join(workspaceRoot, "out"), { recursive: true });
   await writeFile(join(workspaceRoot, "out", "report.docx"), "doc");
-  return { dataRoot, sessionRoot: join(dataRoot, "sessions"), logRoot: join(dataRoot, "logs"), tmpRoot: join(dataRoot, "tmp"), defaultWorkspaceRoot: workspaceRoot, workspaceRoot };
+  return {
+    dataRoot,
+    sessionRoot: join(dataRoot, "sessions"),
+    logRoot: join(dataRoot, "logs"),
+    tmpRoot: join(dataRoot, "tmp"),
+    defaultWorkspaceRoot: workspaceRoot,
+    workspaceRoot,
+  };
 }
 
 const handlers = [
-  { id: "/Applications/Word.app", name: "Microsoft Word", default: false, icon: "data:image/png;base64,AAA", bundle: "com.microsoft.Word", version: "16.1" },
-  { id: "/Users/me/Library/Word.app", name: "Microsoft Word", default: false, icon: null, bundle: "com.microsoft.Word", version: "16.9" },
-  { id: "/System/Applications/Pages.app", name: "Pages", default: true, icon: null, bundle: "com.apple.Pages", version: "14.0" },
-  { id: "/Applications/Pages.app", name: "Pages", default: false, icon: null, bundle: "com.apple.Pages", version: "15.0" },
+  {
+    id: "/Applications/Word.app",
+    name: "Microsoft Word",
+    default: false,
+    icon: "data:image/png;base64,AAA",
+    bundle: "com.microsoft.Word",
+    version: "16.1",
+  },
+  {
+    id: "/Users/me/Library/Word.app",
+    name: "Microsoft Word",
+    default: false,
+    icon: null,
+    bundle: "com.microsoft.Word",
+    version: "16.9",
+  },
+  {
+    id: "/System/Applications/Pages.app",
+    name: "Pages",
+    default: true,
+    icon: null,
+    bundle: "com.apple.Pages",
+    version: "14.0",
+  },
+  {
+    id: "/Applications/Pages.app",
+    name: "Pages",
+    default: false,
+    icon: null,
+    bundle: "com.apple.Pages",
+    version: "15.0",
+  },
   { id: "/Applications/Tool.app", name: "Tool", default: false, icon: null, bundle: null, version: null },
 ];
 
@@ -50,35 +92,68 @@ describe("file applications service", () => {
   it("lists applications for workspace files and rejects paths outside the workspace", async () => {
     const roots = await makeRoots();
     const run = vi.fn(async () => JSON.stringify(handlers.slice(0, 1)));
-    const result = await listWorkspaceFileApplications({ workspaceRoot: roots.workspaceRoot, relativePath: "out/report.docx" }, roots, { platform: "darwin", run });
-    expect(result).toEqual({ applications: [{ id: "/Applications/Word.app", name: "Microsoft Word", default: false, iconDataUrl: "data:image/png;base64,AAA" }] });
+    const result = await listWorkspaceFileApplications(
+      { workspaceRoot: roots.workspaceRoot, relativePath: "out/report.docx" },
+      roots,
+      { platform: "darwin", run },
+    );
+    expect(result).toEqual({
+      applications: [
+        {
+          id: "/Applications/Word.app",
+          name: "Microsoft Word",
+          default: false,
+          iconDataUrl: "data:image/png;base64,AAA",
+        },
+      ],
+    });
     const [, args] = run.mock.calls[0] as unknown as [string, string[]];
     expect(args.slice(-2)).toEqual([await realpath(join(roots.workspaceRoot, "out", "report.docx")), "icons"]);
 
-    expect(await listWorkspaceFileApplications({ workspaceRoot: roots.workspaceRoot, relativePath: "../outside.docx" }, roots, { platform: "darwin", run })).toEqual({ applications: [], error: "invalid_target" });
-    expect(await listWorkspaceFileApplications({ workspaceRoot: roots.workspaceRoot, relativePath: "out/report.docx" }, roots, { platform: "linux", run })).toEqual({ applications: [] });
+    expect(
+      await listWorkspaceFileApplications(
+        { workspaceRoot: roots.workspaceRoot, relativePath: "../outside.docx" },
+        roots,
+        { platform: "darwin", run },
+      ),
+    ).toEqual({ applications: [], error: "invalid_target" });
+    expect(
+      await listWorkspaceFileApplications(
+        { workspaceRoot: roots.workspaceRoot, relativePath: "out/report.docx" },
+        roots,
+        { platform: "linux", run },
+      ),
+    ).toEqual({ applications: [] });
   });
 
   it("opens with a registered application, the default app, or reveals the file", async () => {
     const roots = await makeRoots();
     const file = await realpath(join(roots.workspaceRoot, "out", "report.docx"));
-    const run = vi.fn(async (command: string) => command.endsWith("osascript") ? JSON.stringify(handlers) : "");
+    const run = vi.fn(async (command: string) => (command.endsWith("osascript") ? JSON.stringify(handlers) : ""));
     const openPath = vi.fn(async () => "");
     const showItemInFolder = vi.fn();
     const deps = { platform: "darwin" as const, run, openPath, showItemInFolder };
     const input = { workspaceRoot: roots.workspaceRoot, relativePath: "out/report.docx" };
 
     // 去重时被合并掉的副本仍然可以打开。
-    expect(await openWorkspaceFile({ ...input, action: "open", applicationId: "/Applications/Word.app" }, roots, deps)).toEqual({ ok: true });
+    expect(
+      await openWorkspaceFile({ ...input, action: "open", applicationId: "/Applications/Word.app" }, roots, deps),
+    ).toEqual({ ok: true });
     expect(run).toHaveBeenLastCalledWith("/usr/bin/open", ["-a", "/Applications/Word.app", file]);
-    expect(await openWorkspaceFile({ ...input, action: "open", applicationId: "/Applications/Evil.app" }, roots, deps)).toMatchObject({ ok: false, error: "not_registered" });
+    expect(
+      await openWorkspaceFile({ ...input, action: "open", applicationId: "/Applications/Evil.app" }, roots, deps),
+    ).toMatchObject({ ok: false, error: "not_registered" });
     expect(await openWorkspaceFile({ ...input, action: "open" }, roots, deps)).toEqual({ ok: true });
     expect(openPath).toHaveBeenCalledWith(file);
     // 实测：没有关联应用时 shell.openPath 返回错误串，映射为 no_application 供 renderer 弹兜底对话框。
     const noAppOpenPath = vi.fn(async () => "Failed to open path");
-    expect(await openWorkspaceFile({ ...input, action: "open" }, roots, { ...deps, openPath: noAppOpenPath })).toMatchObject({ ok: false, error: "no_application", message: "Failed to open path" });
+    expect(
+      await openWorkspaceFile({ ...input, action: "open" }, roots, { ...deps, openPath: noAppOpenPath }),
+    ).toMatchObject({ ok: false, error: "no_application", message: "Failed to open path" });
     expect(await openWorkspaceFile({ ...input, action: "reveal" }, roots, deps)).toEqual({ ok: true });
     expect(showItemInFolder).toHaveBeenCalledWith(file);
-    expect(await openWorkspaceFile({ ...input, relativePath: "missing.docx", action: "reveal" }, roots, deps)).toMatchObject({ ok: false, error: "invalid_target" });
+    expect(
+      await openWorkspaceFile({ ...input, relativePath: "missing.docx", action: "reveal" }, roots, deps),
+    ).toMatchObject({ ok: false, error: "invalid_target" });
   });
 });

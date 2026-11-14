@@ -9,7 +9,8 @@ import { PanelEmpty } from "./PanelEmpty";
 
 const ROW_CLASS =
   "grid w-full grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-act-sm border-0 bg-transparent px-2 py-[7px] text-left transition-colors duration-(--motion-fast) hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
-const FOLDER_CLASS = "flex items-center gap-[7px] px-2 pb-1 pt-3 text-act-xxs font-semibold tracking-[0.03em] text-text-faint";
+const FOLDER_CLASS =
+  "flex items-center gap-[7px] px-2 pb-1 pt-3 text-act-xxs font-semibold tracking-[0.03em] text-text-faint";
 
 // 保留原生 <button>：三列网格的文件行，ui/Button 套不上。
 function FileRow({ file, onOpen }: { file: LibraryFile; onOpen: () => void }) {
@@ -43,20 +44,29 @@ export function LibraryList() {
       </div>
       {artifacts.length ? (
         <>
-          <div className={FOLDER_CLASS}><FileText size={12} aria-hidden="true" /> Actor 产出</div>
-          {artifacts.map((f) => <FileRow key={f.id} file={f} onOpen={preview} />)}
+          <div className={FOLDER_CLASS}>
+            <FileText size={12} aria-hidden="true" /> Actor 产出
+          </div>
+          {artifacts.map((f) => (
+            <FileRow key={f.id} file={f} onOpen={preview} />
+          ))}
         </>
       ) : null}
       {added.length ? (
         <>
-          <div className={FOLDER_CLASS}><BookOpen size={12} aria-hidden="true" /> 你放进去的</div>
-          {added.map((f) => <FileRow key={f.id} file={f} onOpen={preview} />)}
+          <div className={FOLDER_CLASS}>
+            <BookOpen size={12} aria-hidden="true" /> 你放进去的
+          </div>
+          {added.map((f) => (
+            <FileRow key={f.id} file={f} onOpen={preview} />
+          ))}
         </>
       ) : null}
       {library.length ? null : <PanelEmpty icon={<Library size={22} />}>库还是空的。</PanelEmpty>}
       <div className="mx-1 mt-3.5 rounded-act-md border border-dashed border-line px-3 py-2.5 text-act-xs leading-relaxed text-text-faint">
-        库就是 <code className="font-mono text-text-muted [overflow-wrap:anywhere]">spaces/&lt;id&gt;/library/</code> 这个真实目录。Actor 的产出写进{" "}
-        <code className="font-mono text-text-muted">artifacts/</code>，代码本身不会复制进来。
+        库就是 <code className="font-mono text-text-muted [overflow-wrap:anywhere]">spaces/&lt;id&gt;/library/</code>{" "}
+        这个真实目录。Actor 的产出写进 <code className="font-mono text-text-muted">artifacts/</code>
+        ，代码本身不会复制进来。
       </div>
     </div>
   );

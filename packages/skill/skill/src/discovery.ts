@@ -15,10 +15,16 @@ export type SkillDiscoveryOptions = {
   readonly disabled?: readonly string[];
 };
 
-export async function discoverSkills(input: string | SkillDiscoveryOptions, roots: readonly string[] = DEFAULT_SKILL_ROOTS): Promise<SkillCatalog> {
+export async function discoverSkills(
+  input: string | SkillDiscoveryOptions,
+  roots: readonly string[] = DEFAULT_SKILL_ROOTS,
+): Promise<SkillCatalog> {
   const catalog = new SkillCatalog();
   const options = typeof input === "string" ? { workspaceRoot: input, roots } : input;
-  const scanRoots = (options.roots ?? DEFAULT_SKILL_ROOTS).map((source) => ({ root: resolve(options.workspaceRoot, source), source }));
+  const scanRoots = (options.roots ?? DEFAULT_SKILL_ROOTS).map((source) => ({
+    root: resolve(options.workspaceRoot, source),
+    source,
+  }));
   if (options.dataRoot !== undefined) {
     scanRoots.push({ root: resolve(options.dataRoot, "skills"), source: "actspace-userData" });
     scanRoots.push({ root: resolve(options.dataRoot, ".actspace/skills"), source: "actspace-userData-legacy" });
@@ -27,18 +33,37 @@ export async function discoverSkills(input: string | SkillDiscoveryOptions, root
     scanRoots.push({ root: resolve(options.homeDir, ".agents/skills"), source: "agents-user" });
     scanRoots.push({ root: resolve(options.homeDir, ".claude/skills"), source: "claude-user" });
   }
-  if (options.officialRoot !== false) scanRoots.push({ root: options.officialRoot ?? officialSkillsRoot, source: `actspace-official@${OFFICIAL_SKILLS_VERSION}` });
+  if (options.officialRoot !== false)
+    scanRoots.push({
+      root: options.officialRoot ?? officialSkillsRoot,
+      source: `actspace-official@${OFFICIAL_SKILLS_VERSION}`,
+    });
   for (const { root, source } of scanRoots) await scanRoot(root, source, catalog, 0, { files: 0 });
-  return new SkillCatalog(catalog.list().filter(skill => !options.disabled?.includes(skill.id) && !options.disabled?.includes(skill.name)));
+  return new SkillCatalog(
+    catalog.list().filter((skill) => !options.disabled?.includes(skill.id) && !options.disabled?.includes(skill.name)),
+  );
 }
 
-async function scanRoot(root: string, source: string, catalog: SkillCatalog, depth: number, state: { files: number }): Promise<void> {
+async function scanRoot(
+  root: string,
+  source: string,
+  catalog: SkillCatalog,
+  depth: number,
+  state: { files: number },
+): Promise<void> {
   if (depth > 6 || state.files >= 512) return;
   let entries;
-  try { entries = await readdir(root, { withFileTypes: true }); } catch { return; }
+  try {
+    entries = await readdir(root, { withFileTypes: true });
+  } catch {
+    return;
+  }
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
     const fullPath = join(root, entry.name);
-    if (entry.isDirectory()) { await scanRoot(fullPath, source, catalog, depth + 1, state); continue; }
+    if (entry.isDirectory()) {
+      await scanRoot(fullPath, source, catalog, depth + 1, state);
+      continue;
+    }
     if (!entry.isFile() || entry.name !== "SKILL.md") continue;
     state.files += 1;
     const skill = await parseSkill(fullPath, source);
@@ -54,14 +79,27 @@ async function parseSkill(path: string, source: string): Promise<SkillRecord | n
   for (const line of match[1].split(/\r?\n/)) {
     const separator = line.indexOf(":");
     if (separator < 1) continue;
-    fields.set(line.slice(0, separator).trim(), line.slice(separator + 1).trim().replace(/^['"]|['"]$/g, ""));
+    fields.set(
+      line.slice(0, separator).trim(),
+      line
+        .slice(separator + 1)
+        .trim()
+        .replace(/^['"]|['"]$/g, ""),
+    );
   }
   const id = fields.get("id") ?? fields.get("name") ?? basenameSkill(path);
   const name = fields.get("name") ?? id;
   const description = fields.get("description") ?? "";
   if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(id) || description.length === 0 || description.length > 1024) return null;
   await stat(path);
-  return Object.freeze({ id, name, description, path, source, contentDigest: createHash("sha256").update(match[2]).digest("hex") });
+  return Object.freeze({
+    id,
+    name,
+    description,
+    path,
+    source,
+    contentDigest: createHash("sha256").update(match[2]).digest("hex"),
+  });
 }
 
 function basenameSkill(path: string): string {

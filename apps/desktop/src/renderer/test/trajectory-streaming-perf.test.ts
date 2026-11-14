@@ -10,10 +10,19 @@ const RUNS = 30;
 const WARMUP = 3;
 const ms = (value: { p50: number; p95: number }) => `p50 ${value.p50.toFixed(3)}ms / p95 ${value.p95.toFixed(3)}ms`;
 
-const toEvent = (node: RuntimeTrajectoryNode) => ({
-  recordKind: "event", seq: node.eventSeq, type: node.eventType, eventVersion: 1, criticality: "required",
-  time: node.time, source: node.source ?? { ownerPluginId: "fixture" }, data: node.data, surface: node.surface ?? null, provenance: {},
-}) as unknown as SessionEventEnvelopeV1;
+const toEvent = (node: RuntimeTrajectoryNode) =>
+  ({
+    recordKind: "event",
+    seq: node.eventSeq,
+    type: node.eventType,
+    eventVersion: 1,
+    criticality: "required",
+    time: node.time,
+    source: node.source ?? { ownerPluginId: "fixture" },
+    data: node.data,
+    surface: node.surface ?? null,
+    provenance: {},
+  }) as unknown as SessionEventEnvelopeV1;
 
 function percentile(samples: readonly number[], p: number): number {
   const sorted = [...samples].sort((a, b) => a - b);
@@ -31,7 +40,12 @@ function measure(run: () => void): { p50: number; p95: number } {
 }
 
 const windowOf = (nodes: readonly RuntimeTrajectoryNode[]): RuntimeEventWindow => ({
-  events: nodes.map(toEvent), fromSeq: 0, throughJournalSeq: nodes.at(-1)!.eventSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0,
+  events: nodes.map(toEvent),
+  fromSeq: 0,
+  throughJournalSeq: nodes.at(-1)!.eventSeq,
+  beforeSeq: null,
+  turnOffset: 0,
+  requestOffset: 0,
 });
 
 describe.runIf(process.env.TRAJECTORY_PERF === "1")("trajectory streaming frame cost", () => {
@@ -42,7 +56,9 @@ describe.runIf(process.env.TRAJECTORY_PERF === "1")("trajectory streaming frame 
       const { snapshot, live } = streamingLongFixture(chunks);
       const projected = projectTrajectoryWindow("mock-long-session", windowOf(snapshot.nodes));
       const layout = deriveLayout(buildTrajectorySnapshot(projected, { liveMessageIds: liveMessageIds(live) }));
-      const frame = measure(() => { expect(streamingCells(layout.cells, live).size).toBe(1); });
+      const frame = measure(() => {
+        expect(streamingCells(layout.cells, live).size).toBe(1);
+      });
       console.log(`[trajectory-perf] streaming frame nodes=${snapshot.nodes.length} chunks=${chunks}`, ms(frame));
       expect(frame.p95).toBeLessThan(2);
     });
@@ -51,9 +67,16 @@ describe.runIf(process.env.TRAJECTORY_PERF === "1")("trajectory streaming frame 
   it("measures the settled rebuild a Journal event triggers", () => {
     const { snapshot, live } = streamingLongFixture(2000);
     const stages = {
-      project: measure(() => { projectTrajectoryWindow("mock-long-session", windowOf(snapshot.nodes)); }),
-      rebuild: measure(() => { flattenLayout(deriveLayout(buildTrajectorySnapshot(snapshot, { liveMessageIds: liveMessageIds(live) })).turns); }),
+      project: measure(() => {
+        projectTrajectoryWindow("mock-long-session", windowOf(snapshot.nodes));
+      }),
+      rebuild: measure(() => {
+        flattenLayout(deriveLayout(buildTrajectorySnapshot(snapshot, { liveMessageIds: liveMessageIds(live) })).turns);
+      }),
     };
-    console.log("[trajectory-perf] settled rebuild", JSON.stringify(Object.fromEntries(Object.entries(stages).map(([key, value]) => [key, ms(value)]))));
+    console.log(
+      "[trajectory-perf] settled rebuild",
+      JSON.stringify(Object.fromEntries(Object.entries(stages).map(([key, value]) => [key, ms(value)]))),
+    );
   });
 });

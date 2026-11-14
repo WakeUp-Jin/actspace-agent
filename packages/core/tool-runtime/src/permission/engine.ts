@@ -1,6 +1,12 @@
 import type { PermissionMode } from "@actspace/shared/runtime-v2";
 import { classifyFileResource, isPathWithin } from "./file-resource.js";
-import type { GlobalBoundaryDecision, PermissionDecision, PermissionReason, ToolPermissionDecision, ToolResource } from "./types.js";
+import type {
+  GlobalBoundaryDecision,
+  PermissionDecision,
+  PermissionReason,
+  ToolPermissionDecision,
+  ToolResource,
+} from "./types.js";
 
 export function evaluateGlobalBoundary(
   mode: PermissionMode,
@@ -21,18 +27,37 @@ export function evaluateGlobalBoundary(
     }
     const hostReadable = resource.access === "read" && isHostReadable?.(resource.canonicalPath) === true;
     const hostWritable = resource.access !== "delete" && isHostWritable?.(resource.canonicalPath) === true;
-    if (mode !== "full-access" && !hostReadable && !hostWritable && !isPathWithin(workspaceRoot, resource.canonicalPath)) {
-      reasons.push({ code: "WORKSPACE_SCOPE_APPROVAL_REQUIRED", message: "The requested file is outside the workspace.", risk: resource.access === "read" ? "medium" : "high", reusable: resource.access !== "delete" });
+    if (
+      mode !== "full-access" &&
+      !hostReadable &&
+      !hostWritable &&
+      !isPathWithin(workspaceRoot, resource.canonicalPath)
+    ) {
+      reasons.push({
+        code: "WORKSPACE_SCOPE_APPROVAL_REQUIRED",
+        message: "The requested file is outside the workspace.",
+        risk: resource.access === "read" ? "medium" : "high",
+        reusable: resource.access !== "delete",
+      });
     }
   }
   return reasons.length === 0 ? { kind: "pass" } : { kind: "ask", reasons: Object.freeze(reasons) };
 }
 
-export function combinePermissionDecisions(global: GlobalBoundaryDecision, tool: ToolPermissionDecision): PermissionDecision {
+export function combinePermissionDecisions(
+  global: GlobalBoundaryDecision,
+  tool: ToolPermissionDecision,
+): PermissionDecision {
   if (global.kind === "deny") return global;
   if (tool.kind === "deny") return tool;
   const reasons: PermissionReason[] = global.kind === "ask" ? [...global.reasons] : [];
-  if (tool.kind === "ask") reasons.push({ code: "TOOL_APPROVAL_REQUIRED", message: tool.reason, risk: tool.risk, reusable: tool.reusable === true });
+  if (tool.kind === "ask")
+    reasons.push({
+      code: "TOOL_APPROVAL_REQUIRED",
+      message: tool.reason,
+      risk: tool.risk,
+      reusable: tool.reusable === true,
+    });
   if (reasons.length === 0) return { kind: "allow" };
   return { kind: "ask", reasons: Object.freeze(reasons) };
 }

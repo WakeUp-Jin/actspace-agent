@@ -24,39 +24,71 @@ export class ContextInstanceRegistry {
   readonly #queues = new Map<string, Promise<void>>();
 
   /** Serialize commits for one logical Context while allowing other keys to proceed. */
-  async commit(context: Context, logicalAgentScopeId = context.request.logicalAgentScopeId ?? DEFAULT_LOGICAL_SCOPE): Promise<Context> {
+  async commit(
+    context: Context,
+    logicalAgentScopeId = context.request.logicalAgentScopeId ?? DEFAULT_LOGICAL_SCOPE,
+  ): Promise<Context> {
     const key = identityKey(contextIdentity(context.request.sessionId, logicalAgentScopeId));
     const prior = this.#queues.get(key) ?? Promise.resolve();
     let release!: () => void;
-    const turn = new Promise<void>(resolve => { release = resolve; });
+    const turn = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const chain = prior.then(() => turn);
     this.#queues.set(key, chain);
     await prior;
-    try { return this.acquire(context, logicalAgentScopeId); }
-    finally {
+    try {
+      return this.acquire(context, logicalAgentScopeId);
+    } finally {
       release();
       if (this.#queues.get(key) === chain) this.#queues.delete(key);
     }
   }
 
-  acquire(context: Context, logicalAgentScopeId = context.request.logicalAgentScopeId ?? DEFAULT_LOGICAL_SCOPE): Context {
+  acquire(
+    context: Context,
+    logicalAgentScopeId = context.request.logicalAgentScopeId ?? DEFAULT_LOGICAL_SCOPE,
+  ): Context {
     const identity = contextIdentity(context.request.sessionId, logicalAgentScopeId);
     const key = identityKey(identity);
     const previous = this.#entries.get(key);
     // A late async source may finish with an older Journal watermark. Keep the
     // newest committed state while still binding the caller's request metadata.
-    const assembled = previous !== undefined && context.status.throughJournalSeq < previous.view.status.throughJournalSeq
-      ? { ...previous.view, request: context.request }
-      : context;
-    const inheritedModel = previous?.view.request.model === assembled.request.model && previous?.view.request.routeId === assembled.request.routeId ? previous?.view.status.requestModel : undefined;
-    const candidate = { ...assembled, status: { ...assembled.status, ...(assembled.status.requestModel || !inheritedModel ? {} : { requestModel: inheritedModel }) } };
+    const assembled =
+      previous !== undefined && context.status.throughJournalSeq < previous.view.status.throughJournalSeq
+        ? { ...previous.view, request: context.request }
+        : context;
+    const inheritedModel =
+      previous?.view.request.model === assembled.request.model &&
+      previous?.view.request.routeId === assembled.request.routeId
+        ? previous?.view.status.requestModel
+        : undefined;
+    const candidate = {
+      ...assembled,
+      status: {
+        ...assembled.status,
+        ...(assembled.status.requestModel || !inheritedModel ? {} : { requestModel: inheritedModel }),
+      },
+    };
     const digest = stateDigest(candidate);
-    const revision = previous === undefined ? 1 : previous.digest === digest ? previous.revision : previous.revision + 1;
+    const revision =
+      previous === undefined ? 1 : previous.digest === digest ? previous.revision : previous.revision + 1;
     const view = freezeContextView({
       ...candidate,
       request: { ...candidate.request, logicalAgentScopeId: identity.logicalAgentScopeId },
-      status: { ...candidate.status, instanceGeneration: previous?.view.status.instanceGeneration ?? randomUUID(),
-        ...(candidate.status.requestModel ? {} : previous?.view.request.model === candidate.request.model && previous?.view.request.routeId === candidate.request.routeId && previous?.view.status.requestModel ? { requestModel: previous.view.status.requestModel } : {}), contextRevision: revision, logicalAgentScopeId: identity.logicalAgentScopeId },
+      status: {
+        ...candidate.status,
+        instanceGeneration: previous?.view.status.instanceGeneration ?? randomUUID(),
+        ...(candidate.status.requestModel
+          ? {}
+          : previous?.view.request.model === candidate.request.model &&
+              previous?.view.request.routeId === candidate.request.routeId &&
+              previous?.view.status.requestModel
+            ? { requestModel: previous.view.status.requestModel }
+            : {}),
+        contextRevision: revision,
+        logicalAgentScopeId: identity.logicalAgentScopeId,
+      },
     });
     const entry: Entry = previous ?? { identity, revision, digest, activeBindings: 0, view };
     entry.revision = revision;
@@ -94,11 +126,14 @@ export class ContextInstanceRegistry {
   }
 
   clear(): void {
-    for (const entry of this.#entries.values()) if (entry.activeBindings > 0) throw new Error("Cannot clear Context instances with active bindings.");
+    for (const entry of this.#entries.values())
+      if (entry.activeBindings > 0) throw new Error("Cannot clear Context instances with active bindings.");
     this.#entries.clear();
   }
 
-  get size(): number { return this.#entries.size; }
+  get size(): number {
+    return this.#entries.size;
+  }
 }
 
 export function contextIdentity(sessionId: string, logicalAgentScopeId = DEFAULT_LOGICAL_SCOPE): ContextIdentity {
@@ -107,11 +142,18 @@ export function contextIdentity(sessionId: string, logicalAgentScopeId = DEFAULT
   return Object.freeze({ sessionId, logicalAgentScopeId });
 }
 
-function identityKey(identity: ContextIdentity): string { return `${identity.sessionId}\u0000${identity.logicalAgentScopeId}`; }
+function identityKey(identity: ContextIdentity): string {
+  return `${identity.sessionId}\u0000${identity.logicalAgentScopeId}`;
+}
 
 function stateDigest(context: Context): string {
   const { request: _request, status, content } = context;
-  const { contextRevision: _revision, instanceGeneration: _generation, logicalAgentScopeId: _scope, ...stableStatus } = status;
+  const {
+    contextRevision: _revision,
+    instanceGeneration: _generation,
+    logicalAgentScopeId: _scope,
+    ...stableStatus
+  } = status;
   // 对话用版本号代替整段转字符串（agent-spec-context-trusted-surface.md §3.3）：已信任视图版本号相同即内容相同；
   // 普通对象的版本号就是它的 JSON，判断结果和改前一致。
   const { conversation, ...rest } = content;
@@ -119,5 +161,10 @@ function stateDigest(context: Context): string {
 }
 
 function snapshot(entry: Entry): ContextInstanceSnapshot {
-  return Object.freeze({ identity: entry.identity, revision: entry.revision, activeBindings: entry.activeBindings, view: entry.view });
+  return Object.freeze({
+    identity: entry.identity,
+    revision: entry.revision,
+    activeBindings: entry.activeBindings,
+    view: entry.view,
+  });
 }

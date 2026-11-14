@@ -49,11 +49,8 @@ export async function waitForStrict(
     if (!options.actionable && !options.editable) return strict.element;
     strict.element.scrollIntoView({ block: "center", inline: "nearest" });
     const state = await actionability(strict.element);
-    const acceptable = state.visible
-      && state.enabled
-      && state.stable
-      && state.receivesEvents
-      && (!options.editable || state.editable);
+    const acceptable =
+      state.visible && state.enabled && state.stable && state.receivesEvents && (!options.editable || state.editable);
     if (acceptable) return strict.element;
     lastReason = state.reason ?? "element_not_actionable";
     await delay(50);
@@ -82,7 +79,11 @@ export async function waitForState(
   throw new Error(`locator_timeout: ${describeTarget(target)} did not become ${state}; matches=${lastCount}`);
 }
 
-export async function actionPoint(target: LocatorTarget, timeoutMs?: number, localCoordinates = false): Promise<ActionPoint> {
+export async function actionPoint(
+  target: LocatorTarget,
+  timeoutMs?: number,
+  localCoordinates = false,
+): Promise<ActionPoint> {
   const element = await waitForStrict(target, { timeoutMs, actionable: true });
   element.scrollIntoView({ block: "center", inline: "nearest" });
   const state = await actionability(element);
@@ -96,11 +97,28 @@ export async function actionPoint(target: LocatorTarget, timeoutMs?: number, loc
 
 export async function actionability(element: Element): Promise<ActionabilityState> {
   const visible = isVisible(element);
-  if (!visible) return { visible, enabled: isEnabled(element), editable: isEditable(element), stable: false, receivesEvents: false, reason: "element_not_visible" };
+  if (!visible)
+    return {
+      visible,
+      enabled: isEnabled(element),
+      editable: isEditable(element),
+      stable: false,
+      receivesEvents: false,
+      reason: "element_not_visible",
+    };
   const enabled = isEnabled(element);
-  if (!enabled) return { visible, enabled, editable: false, stable: false, receivesEvents: false, reason: "element_disabled" };
+  if (!enabled)
+    return { visible, enabled, editable: false, stable: false, receivesEvents: false, reason: "element_disabled" };
   const stable = await isStable(element);
-  if (!stable) return { visible, enabled, editable: isEditable(element), stable, receivesEvents: false, reason: "element_not_stable" };
+  if (!stable)
+    return {
+      visible,
+      enabled,
+      editable: isEditable(element),
+      stable,
+      receivesEvents: false,
+      reason: "element_not_stable",
+    };
   const canReceiveEvents = receivesEvents(element);
   return {
     visible,
@@ -115,12 +133,18 @@ export async function actionability(element: Element): Promise<ActionabilityStat
 export function describeTarget(target: LocatorTarget): string {
   const framePrefix = target.framePath?.length ? `frames=${target.framePath.length} ` : "";
   switch (target.kind) {
-    case "role": return `${framePrefix}role=${target.role ?? target.value ?? ""} name=${target.name ?? ""}`.trim();
-    case "text": return `${framePrefix}text=${target.value ?? target.name ?? ""}`;
-    case "label": return `${framePrefix}label=${target.value ?? target.name ?? ""}`;
-    case "placeholder": return `${framePrefix}placeholder=${target.value ?? target.name ?? ""}`;
-    case "test_id": return `${framePrefix}test_id=${target.value ?? ""}`;
-    case "css": return `${framePrefix}css=${target.value ?? ""}`;
+    case "role":
+      return `${framePrefix}role=${target.role ?? target.value ?? ""} name=${target.name ?? ""}`.trim();
+    case "text":
+      return `${framePrefix}text=${target.value ?? target.name ?? ""}`;
+    case "label":
+      return `${framePrefix}label=${target.value ?? target.name ?? ""}`;
+    case "placeholder":
+      return `${framePrefix}placeholder=${target.value ?? target.name ?? ""}`;
+    case "test_id":
+      return `${framePrefix}test_id=${target.value ?? ""}`;
+    case "css":
+      return `${framePrefix}css=${target.value ?? ""}`;
   }
 }
 
@@ -163,18 +187,24 @@ function resolveWithin(root: Document | ShadowRoot | Element, target: LocatorTar
     case "text": {
       const expected = target.value ?? target.name;
       if (!expected) throw new Error("invalid_locator_target: text target requires value");
-      const matches = allComposedElements(root).filter((element) => textMatches(composedText(element), expected, target.exact));
+      const matches = allComposedElements(root).filter((element) =>
+        textMatches(composedText(element), expected, target.exact),
+      );
       return matches.filter((element) => !Array.from(element.children).some((child) => matches.includes(child)));
     }
     case "label": {
       const expected = target.value ?? target.name;
       if (!expected) throw new Error("invalid_locator_target: label target requires value");
-      return allComposedElements(root).filter((element) => labelsFor(element).some((label) => textMatches(labelText(label, element), expected, target.exact)));
+      return allComposedElements(root).filter((element) =>
+        labelsFor(element).some((label) => textMatches(labelText(label, element), expected, target.exact)),
+      );
     }
     case "placeholder": {
       const expected = target.value ?? target.name;
       if (!expected) throw new Error("invalid_locator_target: placeholder target requires value");
-      return allComposedElements(root).filter((element) => textMatches(element.getAttribute("placeholder") ?? "", expected, target.exact));
+      return allComposedElements(root).filter((element) =>
+        textMatches(element.getAttribute("placeholder") ?? "", expected, target.exact),
+      );
     }
     case "test_id": {
       const expected = requiredValue(target, "test_id");

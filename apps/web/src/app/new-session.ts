@@ -12,8 +12,14 @@ export const openNewSession = () => set(true);
 export const closeNewSession = () => set(false);
 function subscribe(listener: () => void) {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => {
+    listeners.delete(listener);
+  };
 }
 export function useNewSessionOpen(): boolean {
-  return useSyncExternalStore(subscribe, () => open, () => false);
+  return useSyncExternalStore(
+    subscribe,
+    () => open,
+    () => false,
+  );
 }

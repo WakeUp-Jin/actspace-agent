@@ -43,7 +43,9 @@ export const icons = {
   check: stroke('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
   arrowUp: stroke('<path d="M12 19V5M6 11l6-6 6 6"/>'),
   plus: stroke('<path d="M12 5v14M5 12h14"/>'),
-  shield: stroke('<path d="M12 3l7 3v5.5c0 4.3-2.9 7.8-7 9.5-4.1-1.7-7-5.2-7-9.5V6z"/><path d="M9 12l2.2 2.2L15 10.5"/>'),
+  shield: stroke(
+    '<path d="M12 3l7 3v5.5c0 4.3-2.9 7.8-7 9.5-4.1-1.7-7-5.2-7-9.5V6z"/><path d="M9 12l2.2 2.2L15 10.5"/>',
+  ),
   key: stroke('<circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2.5 2.5"/>'),
   gauge: stroke('<path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-6"/>'),
 };

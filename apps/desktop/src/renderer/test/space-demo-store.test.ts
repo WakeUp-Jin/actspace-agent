@@ -24,7 +24,10 @@ const lastCoord = () => {
   const m = sp().msgs.at(-1);
   return m?.k === "coord" ? m : undefined;
 };
-const replyDone = () => { const m = lastCoord(); return !!m && !m.typing && m.shown == null; };
+const replyDone = () => {
+  const m = lastCoord();
+  return !!m && !m.typing && m.shown == null;
+};
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -55,7 +58,9 @@ describe("状态不可变", () => {
     const after = st();
     expect(after.spaces[0]).not.toBe(before.spaces[0]);
     expect(after.spaces[1]).toBe(before.spaces[1]);
-    expect(after.spaces[0].members.find((m) => m.id === "be")).toBe(before.spaces[0].members.find((m) => m.id === "be"));
+    expect(after.spaces[0].members.find((m) => m.id === "be")).toBe(
+      before.spaces[0].members.find((m) => m.id === "be"),
+    );
     expect(before.spaces[0].openTabs).toEqual([]);
   });
 });
@@ -108,7 +113,13 @@ describe("发送、流式、审批", () => {
 
   it("拒绝进入空闲并写「命令被拒绝，等你给方向」", () => {
     store.actions.deny("be");
-    expect(mem("be")).toMatchObject({ status: "idle", note: "命令被拒绝，等你给方向", last: "quote N+1 修复", denied: true, ask: null });
+    expect(mem("be")).toMatchObject({
+      status: "idle",
+      note: "命令被拒绝，等你给方向",
+      last: "quote N+1 修复",
+      denied: true,
+      ask: null,
+    });
     expect(st().notice?.text).toBe("已拒绝，后端 等你给别的方向");
   });
 
@@ -262,7 +273,11 @@ describe("右栏", () => {
     store.actions.openFile("payments-api/load/quote.js");
     expect(st().ftSelected).toBe("payments-api/load/quote.js");
     expect(panelFor(st())?.active).toBe("file:payments-api/load/quote.js");
-    expect(panelFor(st())?.tabs.at(-1)).toMatchObject({ kind: "file", path: "payments-api/load/quote.js", label: "quote.js" });
+    expect(panelFor(st())?.tabs.at(-1)).toMatchObject({
+      kind: "file",
+      path: "payments-api/load/quote.js",
+      label: "quote.js",
+    });
   });
 
   it("togglePanel 和 panelOpen；名册页没有右栏", () => {
@@ -291,7 +306,14 @@ describe("留下 Actor、记忆", () => {
     tick(TIMING.grow - 1);
     expect(st().actors.env.nascent).toBe(true);
     tick(1);
-    expect(st().actors.env).toMatchObject({ nascent: false, img: 9, abilities: ["环境检查", "健康探测"], memN: 1, last: "刚刚长成", spaces: 1 });
+    expect(st().actors.env).toMatchObject({
+      nascent: false,
+      img: 9,
+      abilities: ["环境检查", "健康探测"],
+      memN: 1,
+      last: "刚刚长成",
+      spaces: 1,
+    });
     expect(sp().msgs.at(-1)).toMatchObject({ state: "kept" });
     expect(st().freshCard).toBe("env");
     expect(st().justGrown).toEqual({ id: "env", revision: 1 });
@@ -376,7 +398,10 @@ describe("一对一、名册、新建 Space", () => {
     const id = store.actions.createSpace({ name: "  ", goal: "目标", dirs: ["a"], crew: ["be", "fe"] });
     expect(st().spaceId).toBe(id);
     expect(sp()).toMatchObject({ name: "未命名 Space", img: "cream", goal: "目标", msgs: [], activeTab: "coord" });
-    expect(sp().members.map((m) => [m.id, m.status, m.dir])).toEqual([["be", "idle", "a"], ["fe", "idle", "a"]]);
+    expect(sp().members.map((m) => [m.id, m.status, m.dir])).toEqual([
+      ["be", "idle", "a"],
+      ["fe", "idle", "a"],
+    ]);
     expect(st().notice?.text).toBe("创建了「未命名 Space」");
     expect(kinds(`${id}:coord`)).toEqual(["actors", "library", "memory"]);
   });

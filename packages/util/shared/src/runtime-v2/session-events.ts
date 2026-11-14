@@ -91,7 +91,10 @@ export function surfaceNode(event: SurfaceNodeSource): SessionSurfaceNodeV1 | nu
 }
 
 function deriveSurfaceNode(event: SurfaceNodeSource): SessionSurfaceNodeV1 | null {
-  const data = event.data !== null && typeof event.data === "object" && !Array.isArray(event.data) ? event.data as Readonly<Record<string, RuntimeJsonValue>> : null;
+  const data =
+    event.data !== null && typeof event.data === "object" && !Array.isArray(event.data)
+      ? (event.data as Readonly<Record<string, RuntimeJsonValue>>)
+      : null;
   if (data === null) return null;
   const messageId = nonEmpty(data.messageId);
   switch (event.type) {
@@ -100,14 +103,33 @@ function deriveSurfaceNode(event: SurfaceNodeSource): SessionSurfaceNodeV1 | nul
     case "assistant/message":
       return messageId && data.content !== undefined ? { kind: "assistant", messageId, content: data.content } : null;
     case "agent/inbox/spliced":
-      return data.operation === "claim" && messageId && data.content !== undefined ? { kind: "user", messageId, content: data.content } : null;
+      return data.operation === "claim" && messageId && data.content !== undefined
+        ? { kind: "user", messageId, content: data.content }
+        : null;
     case "tool/result": {
       const callId = nonEmpty(data.callId);
-      return callId && data.modelOutput !== undefined ? { kind: "tool-result", messageId: `tool-${callId}`, callId, content: data.modelOutput, isError: data.status !== "completed" } : null;
+      return callId && data.modelOutput !== undefined
+        ? {
+            kind: "tool-result",
+            messageId: `tool-${callId}`,
+            callId,
+            content: data.modelOutput,
+            isError: data.status !== "completed",
+          }
+        : null;
     }
     case "tool/recovery-outcome": {
-      const callId = nonEmpty(data.callId), repairId = nonEmpty(data.repairId);
-      return callId && repairId && data.content !== undefined ? { kind: "tool-result", messageId: `recovery-${repairId}-${callId}`, callId, content: data.content, isError: true } : null;
+      const callId = nonEmpty(data.callId),
+        repairId = nonEmpty(data.repairId);
+      return callId && repairId && data.content !== undefined
+        ? {
+            kind: "tool-result",
+            messageId: `recovery-${repairId}-${callId}`,
+            callId,
+            content: data.content,
+            isError: true,
+          }
+        : null;
     }
     case "surface/replaced":
       return isSurfaceNode(data.node) ? data.node : null;
@@ -125,4 +147,6 @@ export function isSurfaceNode(value: RuntimeJsonValue | undefined): value is Ses
   return node.kind === "tool-result" && nonEmpty(node.callId) !== null && typeof node.isError === "boolean";
 }
 
-function nonEmpty(value: RuntimeJsonValue | undefined): string | null { return typeof value === "string" && value.length > 0 ? value : null; }
+function nonEmpty(value: RuntimeJsonValue | undefined): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}

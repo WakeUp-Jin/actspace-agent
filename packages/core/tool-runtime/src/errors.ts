@@ -26,7 +26,10 @@ export type ToolFailure = {
 };
 
 export class ToolRuntimeError extends Error {
-  constructor(readonly failure: ToolFailure, readonly cause?: unknown) {
+  constructor(
+    readonly failure: ToolFailure,
+    readonly cause?: unknown,
+  ) {
     super(failure.message, { cause });
     this.name = "ToolRuntimeError";
   }

@@ -28,10 +28,16 @@ export type BlockInfo =
 export function collectBlocks(state: EditorState): BlockInfo[] {
   const blocks: BlockInfo[] = [];
   const front = frontmatterRange(state);
-  if (front) blocks.push({ kind: "frontmatter", from: front.from, to: front.to, source: state.sliceDoc(front.from, front.to) });
+  if (front)
+    blocks.push({ kind: "frontmatter", from: front.from, to: front.to, source: state.sliceDoc(front.from, front.to) });
   for (let node = syntaxTree(state).topNode.firstChild; node; node = node.nextSibling) {
     // 每次改文档都要整篇扫一遍：先看语言再看是否闭合，大部分代码块不是 Mermaid，省掉取子节点和定位行
-    if (node.name === "FencedCode" && fenceLanguage(state, node) === "mermaid" && isTopLevel(node) && isFenceClosed(state, node)) {
+    if (
+      node.name === "FencedCode" &&
+      fenceLanguage(state, node) === "mermaid" &&
+      isTopLevel(node) &&
+      isFenceClosed(state, node)
+    ) {
       const { from, to } = lineExtent(state, node);
       blocks.push({ kind: "mermaid", from, to, code: fenceCode(state, node) });
     } else if (node.name === "MathBlock") {
@@ -51,21 +57,33 @@ function revealKey(state: EditorState, blocks: readonly BlockInfo[]): string {
   return blocks.map((block) => (isRevealedBlock(state, block) ? "1" : "0")).join("");
 }
 
-function decorate(state: EditorState, blocks: readonly BlockInfo[]): { decorations: DecorationSet; atomic: DecorationSet } {
+function decorate(
+  state: EditorState,
+  blocks: readonly BlockInfo[],
+): { decorations: DecorationSet; atomic: DecorationSet } {
   const out: Range<Decoration>[] = [];
   const atomic: Range<Decoration>[] = [];
   for (const block of blocks) {
     const open = isRevealedBlock(state, block);
     if (block.kind === "mermaid") {
       // 露出时源码由行装饰显示，图放在源码下方；平时整块替换成图
-      if (open) out.push(Decoration.widget({ block: true, side: 1, widget: new MermaidWidget(block.code, "below") }).range(block.to));
+      if (open)
+        out.push(
+          Decoration.widget({ block: true, side: 1, widget: new MermaidWidget(block.code, "below") }).range(block.to),
+        );
       else {
-        const range = Decoration.replace({ block: true, widget: new MermaidWidget(block.code, "replace") }).range(block.from, block.to);
+        const range = Decoration.replace({ block: true, widget: new MermaidWidget(block.code, "replace") }).range(
+          block.from,
+          block.to,
+        );
         out.push(range);
         atomic.push(range);
       }
     } else if (!open) {
-      const widget = block.kind === "frontmatter" ? new FrontmatterWidget(parseFrontmatter(block.source)) : new MathWidget(block.tex, true);
+      const widget =
+        block.kind === "frontmatter"
+          ? new FrontmatterWidget(parseFrontmatter(block.source))
+          : new MathWidget(block.tex, true);
       const range = Decoration.replace({ block: true, widget }).range(block.from, block.to);
       out.push(range);
       atomic.push(range);
@@ -99,7 +117,12 @@ export const blockField = StateField.define<BlockFieldValue>({
     const structureChanged = tr.docChanged || syntaxTree(tr.startState) !== syntaxTree(state);
     if (structureChanged) {
       if (tr.docChanged && isComposing(tr)) {
-        return { ...value, decorations: value.decorations.map(tr.changes), atomic: value.atomic.map(tr.changes), stale: true };
+        return {
+          ...value,
+          decorations: value.decorations.map(tr.changes),
+          atomic: value.atomic.map(tr.changes),
+          stale: true,
+        };
       }
       return build(state);
     }

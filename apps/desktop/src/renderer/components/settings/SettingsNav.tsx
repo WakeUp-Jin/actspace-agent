@@ -1,5 +1,19 @@
 import type { ComponentType } from "react";
-import { Server, Activity, Archive, ArrowLeft, ChartColumn, Cpu, Gauge, RefreshCw, Search, SlidersHorizontal, Sun, Users, Wrench } from "lucide-react";
+import {
+  Server,
+  Activity,
+  Archive,
+  ArrowLeft,
+  ChartColumn,
+  Cpu,
+  Gauge,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Sun,
+  Users,
+  Wrench,
+} from "lucide-react";
 
 export type SettingsSectionId =
   | "hosts"
@@ -17,7 +31,10 @@ export type SettingsSectionId =
 
 type IconComponent = ComponentType<{ size?: number | string; className?: string }>;
 
-export const SETTINGS_GROUPS: { label: string; sections: { id: SettingsSectionId; label: string; icon: IconComponent }[] }[] = [
+export const SETTINGS_GROUPS: {
+  label: string;
+  sections: { id: SettingsSectionId; label: string; icon: IconComponent }[];
+}[] = [
   {
     label: "偏好",
     sections: [
@@ -52,7 +69,8 @@ export const SETTINGS_GROUPS: { label: string; sections: { id: SettingsSectionId
   },
 ];
 
-const NAV_GROUP_LABEL_CLASS = "px-2.5 pb-1 pt-3.5 text-act-xxs font-medium text-text-faint first:pt-1 max-[820px]:hidden";
+const NAV_GROUP_LABEL_CLASS =
+  "px-2.5 pb-1 pt-3.5 text-act-xxs font-medium text-text-faint first:pt-1 max-[820px]:hidden";
 
 const NAV_ITEM_CLASS =
   "flex h-[30px] shrink-0 items-center gap-2.5 rounded-act-sm px-2.5 text-left text-act-sm transition-colors duration-(--motion-fast) ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30";

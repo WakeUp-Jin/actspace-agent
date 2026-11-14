@@ -13,7 +13,7 @@ export function DetailHeader({ sessionId, title }: { readonly sessionId: string;
   const wide = useWide();
   const { sessions } = useSessionList();
   const workspaces = useHostDescription()?.workspaces ?? [];
-  const item = sessions?.find(session => session.sessionId === sessionId);
+  const item = sessions?.find((session) => session.sessionId === sessionId);
   const workspace = workspaceOf(item?.workspaceRoot ?? null, workspaces);
   // 打开着的会话随更新一直记为已读
   const itemSessionId = item?.sessionId;
@@ -26,7 +26,13 @@ export function DetailHeader({ sessionId, title }: { readonly sessionId: string;
     <PageHeader
       title={shown}
       sub={<span className="truncate">{workspace.name}</span>}
-      left={wide ? undefined : <HeaderButton label="返回" onClick={() => navigate({ name: "home" })}><ChevronLeft size={22} aria-hidden /></HeaderButton>}
+      left={
+        wide ? undefined : (
+          <HeaderButton label="返回" onClick={() => navigate({ name: "home" })}>
+            <ChevronLeft size={22} aria-hidden />
+          </HeaderButton>
+        )
+      }
     />
   );
 }

@@ -63,24 +63,62 @@ function getComposerPanelClass(surface: ComposerSurface, layout: ComposerLayout,
     surface === "initial" ? "composer-panel-initial" : "",
     COMPOSER_PANEL_SHAPE_CLASS[layout],
     dragActive ? COMPOSER_PANEL_DROP_ACTIVE_CLASS : COMPOSER_PANEL_IDLE_CLASS,
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export const Composer = memo(function Composer({
-  surface = "followup", sessionId, contextSnapshot, contextState, statusNotice = null, permissionControl, placeholder, statusRow,
-  isStreaming = false, isAborting = false, isCompacting = false, messageQueue, onSend, onAbort, onOpenSideChat,
-  models, defaultModelId, selectedModelId: controlledSelectedModelId, onSelectedModelChange,
-  mode = "agent", onModeChange, selectedSkills = [], onSelectedSkillsChange,
-  workspaceOptions = [], selectedWorkspaceRoot, onSelectWorkspace, executionContext, onConnectHost,
-  draftKey, readDraft, writeDraft, readAttachmentDraft, writeAttachmentDraft, draftRestore, inputHistory = [], focusRequestId = 0,
-  onOpenAttachmentPreview, onExpandContext, reviewSummary, onOpenReview,
-  responseAnnotations = EMPTY_RESPONSE_ANNOTATIONS, onResponseAnnotationsChange, responseAnnotationNotice,
+  surface = "followup",
+  sessionId,
+  contextSnapshot,
+  contextState,
+  statusNotice = null,
+  permissionControl,
+  placeholder,
+  statusRow,
+  isStreaming = false,
+  isAborting = false,
+  isCompacting = false,
+  messageQueue,
+  onSend,
+  onAbort,
+  onOpenSideChat,
+  models,
+  defaultModelId,
+  selectedModelId: controlledSelectedModelId,
+  onSelectedModelChange,
+  mode = "agent",
+  onModeChange,
+  selectedSkills = [],
+  onSelectedSkillsChange,
+  workspaceOptions = [],
+  selectedWorkspaceRoot,
+  onSelectWorkspace,
+  executionContext,
+  onConnectHost,
+  draftKey,
+  readDraft,
+  writeDraft,
+  readAttachmentDraft,
+  writeAttachmentDraft,
+  draftRestore,
+  inputHistory = [],
+  focusRequestId = 0,
+  onOpenAttachmentPreview,
+  onExpandContext,
+  reviewSummary,
+  onOpenReview,
+  responseAnnotations = EMPTY_RESPONSE_ANNOTATIONS,
+  onResponseAnnotationsChange,
+  responseAnnotationNotice,
 }: ComposerProps) {
   const isChatForm = mode === "chat";
   const openSideChat = isChatForm ? undefined : onOpenSideChat;
   const { target, capabilities, readiness, choices } = useRunTargetContext();
   const isRemoteTarget = target.kind === "remote";
-  const remoteHost = target.kind === "remote" ? choices?.hosts.find((host) => host.hostId === target.hostId) : undefined;
+  const remoteHost =
+    target.kind === "remote" ? choices?.hosts.find((host) => host.hostId === target.hostId) : undefined;
   const effectiveContextSnapshot = useComposerContextSnapshot(sessionId, contextState, contextSnapshot);
   const overlays = useComposerOverlay();
   // 有队列时运行中也能输入；没有队列的调用方保持运行中锁定输入框。
@@ -127,7 +165,8 @@ export const Composer = memo(function Composer({
   const hasAttachments = attachments.length > 0 || (!isChatForm && selectedSkills.length > 0);
   // 能否发送看 readiness（15 T7）：远端看 Host，本机看有没有工作区。不能时的原因进发送按钮 tooltip 和状态行。
   const remoteReady = readiness.state === "ready";
-  const targetNotReady = readiness.state !== "ready" ? describeReadiness(readiness, isRemoteTarget ? target.hostName : "") : null;
+  const targetNotReady =
+    readiness.state !== "ready" ? describeReadiness(readiness, isRemoteTarget ? target.hostName : "") : null;
   const model = useComposerModel({
     target,
     sessionId: sessionId ?? null,
@@ -143,12 +182,17 @@ export const Composer = memo(function Composer({
     draftKey,
     writeDraft,
     // `/side 问题` 不发到当前会话：开一个侧边对话，问题发到那边。失败时和普通发送一样放回草稿。
-    onSend: onSend && ((text, options) => {
-      const question = openSideChat ? parseSideChatCommand(text) : null;
-      return question === null ? onSend(text, options) : openSideChat!(question, options);
-    }),
+    onSend:
+      onSend &&
+      ((text, options) => {
+        const question = openSideChat ? parseSideChatCommand(text) : null;
+        return question === null ? onSend(text, options) : openSideChat!(question, options);
+      }),
     remote: isRemoteTarget,
-    ready: Boolean(message.trim() || attachments.length > 0 || responseAnnotations.length > 0) && model.available && readiness.state === "ready",
+    ready:
+      Boolean(message.trim() || attachments.length > 0 || responseAnnotations.length > 0) &&
+      model.available &&
+      readiness.state === "ready",
     text: message,
     attachments,
     clearDraft: () => {
@@ -160,11 +204,15 @@ export const Composer = memo(function Composer({
       closeFloatingPanels();
     },
     restoreDraft: (text, sentAttachments) => {
-      setMessage(current => current || text);
-      setAttachments(current => current.length ? current : sentAttachments);
+      setMessage((current) => current || text);
+      setAttachments((current) => (current.length ? current : sentAttachments));
     },
   });
-  const skills = useComposerSkills({ workspaceRoot: selectedWorkspaceRoot, selected: selectedSkills, onSelectedChange: onSelectedSkillsChange });
+  const skills = useComposerSkills({
+    workspaceRoot: selectedWorkspaceRoot,
+    selected: selectedSkills,
+    onSelectedChange: onSelectedSkillsChange,
+  });
   const slash = useSlashMenu({
     message,
     inputLocked,
@@ -260,12 +308,16 @@ export const Composer = memo(function Composer({
     }
     if (result.kind === "skill") skills.toggle(result.item.id ?? result.item.name);
     // /compact 在运行中锁定输入或模型不可用时不执行，菜单保持打开。
-    else if (!runSlashFunction(result.item.id, {
-      selectMode,
-      compact: onSend && !inputLocked && model.available ? () => onSend("/compact", createSendOptions(false)) : undefined,
-      openContext: onExpandContext,
-      openReview: onOpenReview,
-    })) return;
+    else if (
+      !runSlashFunction(result.item.id, {
+        selectMode,
+        compact:
+          onSend && !inputLocked && model.available ? () => onSend("/compact", createSendOptions(false)) : undefined,
+        openContext: onExpandContext,
+        openReview: onOpenReview,
+      })
+    )
+      return;
     slash.finish();
   }
 
@@ -372,14 +424,18 @@ export const Composer = memo(function Composer({
           icon: acceptsFiles ? "files" : "images",
           onSelect: () => void (acceptsFiles ? attachmentState.selectFiles() : attachmentState.selectImages()),
         }}
-        skills={isChatForm ? null : {
-          items: skills.items,
-          loading: skills.loading,
-          error: skills.error,
-          selected: selectedSkills,
-          onToggle: skills.toggle,
-          onRetry: () => void skills.load(true),
-        }}
+        skills={
+          isChatForm
+            ? null
+            : {
+                items: skills.items,
+                loading: skills.loading,
+                error: skills.error,
+                selected: selectedSkills,
+                onToggle: skills.toggle,
+                onRetry: () => void skills.load(true),
+              }
+        }
       >
         <div
           className={getComposerPanelClass(surface, layout.layout, attachmentState.dragActive)}
@@ -387,7 +443,15 @@ export const Composer = memo(function Composer({
           {...attachmentState.dropTarget}
         >
           <ComposerNotices
-            annotations={onResponseAnnotationsChange ? { items: responseAnnotations, notice: responseAnnotationNotice, onClear: () => onResponseAnnotationsChange([]) } : undefined}
+            annotations={
+              onResponseAnnotationsChange
+                ? {
+                    items: responseAnnotations,
+                    notice: responseAnnotationNotice,
+                    onClear: () => onResponseAnnotationsChange([]),
+                  }
+                : undefined
+            }
             statusNotice={statusNotice}
             sending={sender.sending}
             uploadProgress={sender.uploadProgress}
@@ -395,11 +459,7 @@ export const Composer = memo(function Composer({
           >
             {renderAttachmentStrip()}
           </ComposerNotices>
-          <div
-            ref={layout.bodyRef}
-            className={layout.bodyClass}
-            data-layout={layout.layout}
-          >
+          <div ref={layout.bodyRef} className={layout.bodyClass} data-layout={layout.layout}>
             {renderComposerInput()}
             {renderToolbar()}
           </div>
@@ -467,7 +527,13 @@ export const Composer = memo(function Composer({
         onSelectHost={(hostId) => choices?.selectHost(hostId)}
         onSelectRemoteWorkspace={(workspaceId) => choices?.selectWorkspace(workspaceId)}
         onConnectHost={() => onConnectHost?.()}
-        local={composerLocalRunTarget({ workspaceOptions, selectedWorkspaceRoot, onSelectWorkspace, executionContext, newWorktree: capabilities.newWorktree })}
+        local={composerLocalRunTarget({
+          workspaceOptions,
+          selectedWorkspaceRoot,
+          onSelectWorkspace,
+          executionContext,
+          newWorktree: capabilities.newWorktree,
+        })}
       />
     );
   }

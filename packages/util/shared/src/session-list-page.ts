@@ -1,10 +1,15 @@
-import type { SessionListItem, SessionListPage, SessionListPageInput } from './ipc';
-import type { RuntimeBrowseList } from './runtime-v2';
+import type { SessionListItem, SessionListPage, SessionListPageInput } from "./ipc";
+import type { RuntimeBrowseList } from "./runtime-v2";
 
 /** Only explicit delegation creates a child session. Forks and legacy origins stay accessible. */
 export function isDelegatedSession(lineage: unknown): boolean {
-  return typeof lineage === 'object' && lineage !== null && !Array.isArray(lineage) &&
-    'origin' in lineage && lineage.origin === 'delegation';
+  return (
+    typeof lineage === "object" &&
+    lineage !== null &&
+    !Array.isArray(lineage) &&
+    "origin" in lineage &&
+    lineage.origin === "delegation"
+  );
 }
 
 /** Parent of a side chat, read from Session lineage; undefined for every other Session. */
@@ -16,16 +21,21 @@ export function isDelegatedSession(lineage: unknown): boolean {
  * after. Other delegated children copy nothing. Returns -1 when nothing was inherited.
  */
 export function inheritedThroughSeq(lineage: unknown): number {
-  if (!lineage || typeof lineage !== 'object' || Array.isArray(lineage)) return -1;
+  if (!lineage || typeof lineage !== "object" || Array.isArray(lineage)) return -1;
   const value = lineage as { origin?: unknown; parentBoundarySeq?: unknown; inheritedThroughSeq?: unknown };
-  const seq = value.origin === 'fork' || value.origin === 'side-chat' ? value.parentBoundarySeq : value.origin === 'delegation' ? value.inheritedThroughSeq : undefined;
-  return typeof seq === 'number' && Number.isSafeInteger(seq) ? seq : -1;
+  const seq =
+    value.origin === "fork" || value.origin === "side-chat"
+      ? value.parentBoundarySeq
+      : value.origin === "delegation"
+        ? value.inheritedThroughSeq
+        : undefined;
+  return typeof seq === "number" && Number.isSafeInteger(seq) ? seq : -1;
 }
 
 export function sideChatParentId(lineage: unknown): string | undefined {
-  if (!lineage || typeof lineage !== 'object' || Array.isArray(lineage)) return undefined;
+  if (!lineage || typeof lineage !== "object" || Array.isArray(lineage)) return undefined;
   const value = lineage as { origin?: unknown; parentSessionId?: unknown };
-  return value.origin === 'side-chat' && typeof value.parentSessionId === 'string' ? value.parentSessionId : undefined;
+  return value.origin === "side-chat" && typeof value.parentSessionId === "string" ? value.parentSessionId : undefined;
 }
 
 /** Side chats stay out of the page and only show up as their parent's count. */
@@ -34,25 +44,45 @@ export function paginateSessionSummaries(result: RuntimeBrowseList, input: Sessi
   const sideChatCounts = new Map<string, number>();
   for (const item of result.items) {
     const parent = sideChatParentId(item.lineage);
-    if (parent !== undefined && !item.metadata.archived) sideChatCounts.set(parent, (sideChatCounts.get(parent) ?? 0) + 1);
+    if (parent !== undefined && !item.metadata.archived)
+      sideChatCounts.set(parent, (sideChatCounts.get(parent) ?? 0) + 1);
   }
-  const sorted = [...result.items].filter(s => !s.metadata.archived && !isDelegatedSession(s.lineage) && sideChatParentId(s.lineage) === undefined).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
+  const sorted = [...result.items]
+    .filter((s) => !s.metadata.archived && !isDelegatedSession(s.lineage) && sideChatParentId(s.lineage) === undefined)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
   for (const item of sorted) {
-    const key = JSON.stringify([item.worktree?.sourceWorkspaceRoot ?? item.workspaceRoot ?? '', item.metadata.pinned]);
+    const key = JSON.stringify([item.worktree?.sourceWorkspaceRoot ?? item.workspaceRoot ?? "", item.metadata.pinned]);
     const group = grouped.get(key) ?? [];
-    group.push({ id: item.sessionId, title: item.metadata.title ?? 'New chat', updatedAt: item.updatedAt, workspaceRoot: item.workspaceRoot ?? undefined, ...(item.worktree ? { worktree: item.worktree } : {}), pinned: item.metadata.pinned, archived: false, accessState: item.accessState, isChildSession: false, agentRunCount: item.completedTurnCount ?? 0, ...(sideChatCounts.get(item.sessionId) ? { sideChatCount: sideChatCounts.get(item.sessionId) } : {}) });
+    group.push({
+      id: item.sessionId,
+      title: item.metadata.title ?? "New chat",
+      updatedAt: item.updatedAt,
+      workspaceRoot: item.workspaceRoot ?? undefined,
+      ...(item.worktree ? { worktree: item.worktree } : {}),
+      pinned: item.metadata.pinned,
+      archived: false,
+      accessState: item.accessState,
+      isChildSession: false,
+      agentRunCount: item.completedTurnCount ?? 0,
+      ...(sideChatCounts.get(item.sessionId) ? { sideChatCount: sideChatCounts.get(item.sessionId) } : {}),
+    });
     grouped.set(key, group);
   }
-  const groups: SessionListPage['groups'] = [];
+  const groups: SessionListPage["groups"] = [];
   const items: SessionListItem[] = [];
   for (const group of grouped.values()) {
-    const workspaceRoot = group[0].worktree?.sourceWorkspaceRoot ?? group[0].workspaceRoot ?? '';
+    const workspaceRoot = group[0].worktree?.sourceWorkspaceRoot ?? group[0].workspaceRoot ?? "";
     const pinned = group[0].pinned === true;
     if (input.workspaceRoot !== undefined && workspaceRoot !== input.workspaceRoot) continue;
     if (input.pinned !== undefined && pinned !== input.pinned) continue;
-    const start = input.after ? Math.max(0, group.findIndex(s => s.id === input.after) + 1) : 0;
+    const start = input.after ? Math.max(0, group.findIndex((s) => s.id === input.after) + 1) : 0;
     items.push(...group.slice(start, start + 10));
     groups.push({ workspaceRoot, pinned, hasMore: group.length > start + 10 });
   }
-  return { items: items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)), groups, indexing: result.indexing, failed: result.failed };
+  return {
+    items: items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)),
+    groups,
+    indexing: result.indexing,
+    failed: result.failed,
+  };
 }

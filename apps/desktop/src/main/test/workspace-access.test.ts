@@ -3,7 +3,12 @@ import { mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import type { WorkspaceRegistry } from "@actspace/shared";
-import { isPathInside, resolveWorkspaceAccess, WorkspaceAccessError, type WorkspaceAccessDeps } from "../workspace-access";
+import {
+  isPathInside,
+  resolveWorkspaceAccess,
+  WorkspaceAccessError,
+  type WorkspaceAccessDeps,
+} from "../workspace-access";
 
 const created: string[] = [];
 
@@ -40,7 +45,10 @@ function deps(registry: WorkspaceRegistry, sessionRoots: (string | null)[] = [])
 }
 
 async function rejection(promise: Promise<unknown>): Promise<unknown> {
-  return promise.then(() => undefined, (error: unknown) => error);
+  return promise.then(
+    () => undefined,
+    (error: unknown) => error,
+  );
 }
 
 describe("resolveWorkspaceAccess", () => {
@@ -50,7 +58,9 @@ describe("resolveWorkspaceAccess", () => {
     const access = deps(registryOf(root));
 
     expect(await resolveWorkspaceAccess({ workspaceRoot: root }, access)).toBe(await realpath(root));
-    expect(await rejection(resolveWorkspaceAccess({ workspaceRoot: join(root, "src") }, access))).toBeInstanceOf(WorkspaceAccessError);
+    expect(await rejection(resolveWorkspaceAccess({ workspaceRoot: join(root, "src") }, access))).toBeInstanceOf(
+      WorkspaceAccessError,
+    );
   });
 
   it("rejects a missing root instead of falling back to a workspace", async () => {
@@ -75,7 +85,9 @@ describe("resolveWorkspaceAccess", () => {
     const outside = await tempDir("actspace-access-outside-");
     await symlink(outside, join(root, "escape"));
 
-    const error = await rejection(resolveWorkspaceAccess({ workspaceRoot: join(root, "escape") }, deps(registryOf(root))));
+    const error = await rejection(
+      resolveWorkspaceAccess({ workspaceRoot: join(root, "escape") }, deps(registryOf(root))),
+    );
 
     expect(error).toBeInstanceOf(WorkspaceAccessError);
   });
@@ -93,7 +105,10 @@ describe("resolveWorkspaceAccess", () => {
     const root = await tempDir("actspace-access-root-");
     const worktree = await tempDir("actspace-access-worktree-");
 
-    const resolved = await resolveWorkspaceAccess({ workspaceRoot: worktree }, deps(registryOf(root), [null, worktree]));
+    const resolved = await resolveWorkspaceAccess(
+      { workspaceRoot: worktree },
+      deps(registryOf(root), [null, worktree]),
+    );
 
     expect(resolved).toBe(await realpath(worktree));
   });
@@ -117,7 +132,9 @@ describe("resolveWorkspaceAccess", () => {
 
   it("rejects paths that do not exist", async () => {
     const root = await tempDir("actspace-access-root-");
-    const error = await rejection(resolveWorkspaceAccess({ workspaceRoot: join(root, "missing") }, deps(registryOf(root))));
+    const error = await rejection(
+      resolveWorkspaceAccess({ workspaceRoot: join(root, "missing") }, deps(registryOf(root))),
+    );
     expect(error).toBeInstanceOf(WorkspaceAccessError);
   });
 });

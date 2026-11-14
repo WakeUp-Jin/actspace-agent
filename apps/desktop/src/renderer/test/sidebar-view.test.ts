@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { SessionListItem } from "@actspace/shared";
 import {
-  bucketByTime, formatRelativeTimeZh, isDefaultViewOptions, isManualOrder, limitGroupSessions, moveInOrder, nextRevealCount,
-  orderGroups, orderSessions, parseSidebarViewState, passesArchivedFilter, sortByRecency, timeBucketOf,
+  bucketByTime,
+  formatRelativeTimeZh,
+  isDefaultViewOptions,
+  isManualOrder,
+  limitGroupSessions,
+  moveInOrder,
+  nextRevealCount,
+  orderGroups,
+  orderSessions,
+  parseSidebarViewState,
+  passesArchivedFilter,
+  sortByRecency,
+  timeBucketOf,
 } from "../components/sidebar/sidebar-view";
 import { createSidebarViewStore, SIDEBAR_VIEW_STORAGE_KEY } from "../components/sidebar/sidebar-view-store";
 
@@ -135,14 +146,22 @@ describe("formatRelativeTimeZh", () => {
 describe("sidebar view store", () => {
   function memoryStorage() {
     const data = new Map<string, string>();
-    return { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); }, data };
+    return {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        data.set(key, value);
+      },
+      data,
+    };
   }
 
   it("persists options and snapshots order when switching to manual", () => {
     const storage = memoryStorage();
     const store = createSidebarViewStore(() => storage);
     let notified = 0;
-    store.subscribe(() => { notified++; });
+    store.subscribe(() => {
+      notified++;
+    });
     store.setGroupBy("flat");
     store.setSort("manual", { flat: ["b", "a"] });
     expect(store.get().orders).toEqual({ flat: ["b", "a"] });
@@ -177,7 +196,12 @@ describe("sidebar view store", () => {
   });
 
   it("survives broken storage", () => {
-    const store = createSidebarViewStore(() => ({ getItem: () => "{not json", setItem: () => { throw new Error("quota"); } }));
+    const store = createSidebarViewStore(() => ({
+      getItem: () => "{not json",
+      setItem: () => {
+        throw new Error("quota");
+      },
+    }));
     expect(store.get().options.groupBy).toBe("workspace");
     store.setGroupBy("time");
     expect(store.get().options.groupBy).toBe("time");

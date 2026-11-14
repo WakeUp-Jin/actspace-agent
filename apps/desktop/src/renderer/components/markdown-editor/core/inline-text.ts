@@ -1,7 +1,17 @@
 /** 行内装饰：标题、强调、行内代码与路径、链接、图片、公式、原始 HTML（规范 §5）。 */
 import { Decoration } from "@codemirror/view";
 import type { SyntaxNodeRef } from "./lezer-types";
-import { forEachLine, hide, isRevealed, lineClass, mark, replaceWith, trailingBlank, type InlineCtx, type InlineHandler } from "./inline-context";
+import {
+  forEachLine,
+  hide,
+  isRevealed,
+  lineClass,
+  mark,
+  replaceWith,
+  trailingBlank,
+  type InlineCtx,
+  type InlineHandler,
+} from "./inline-context";
 import { isRemoteImage, resolveCodePath, resolveImagePath, routeHref } from "./paths";
 import { FileIconWidget } from "./widgets/file-icon";
 import { ImageWidget } from "./widgets/image";
@@ -94,7 +104,12 @@ export const link: InlineHandler = (ctx, n) => {
     } else {
       if (route.kind === "path") {
         // inclusiveStart：起点处的文件图标落在链接里，和第一个字符同在一个不换行的 .md-path-lead 里
-        ctx.out.push(Decoration.mark({ class: "md-link md-link-file", attributes: { title: href }, inclusiveStart: true }).range(textFrom, textTo));
+        ctx.out.push(
+          Decoration.mark({ class: "md-link md-link-file", attributes: { title: href }, inclusiveStart: true }).range(
+            textFrom,
+            textTo,
+          ),
+        );
         addFileIcon(ctx, textFrom);
       } else {
         mark(ctx, textFrom, textTo, "md-link", { title: href });
@@ -153,7 +168,12 @@ export const image: InlineHandler = (ctx, n) => {
 /** 行内公式 `$…$`：平时 KaTeX 行内显示，光标进入时露出源码。 */
 export const mathInline: InlineHandler = (ctx, n) => {
   if (n.to - n.from > 2 && !isRevealed(ctx, n.from, n.to)) {
-    replaceWith(ctx, n.from, n.to, Decoration.replace({ widget: new MathWidget(ctx.state.sliceDoc(n.from + 1, n.to - 1), false) }));
+    replaceWith(
+      ctx,
+      n.from,
+      n.to,
+      Decoration.replace({ widget: new MathWidget(ctx.state.sliceDoc(n.from + 1, n.to - 1), false) }),
+    );
   }
   return false;
 };

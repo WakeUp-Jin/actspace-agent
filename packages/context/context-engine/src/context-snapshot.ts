@@ -27,9 +27,15 @@ export function contextValue<T>(value: T): T {
  * 其余子项照旧检查、复制、冻结；键名（含密钥字段检查）和键顺序与整份 freezeRequest 相同。
  */
 function withTrustedChildren(value: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-  const probe = Object.fromEntries(Object.entries(value).map(([key, child]) => [key, isTrustedSurfaceView(child) ? null : child]));
+  const probe = Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [key, isTrustedSurfaceView(child) ? null : child]),
+  );
   const checked = freezeRequest(probe as RuntimeJsonValue) as Readonly<Record<string, RuntimeJsonValue>>;
-  const result = Object.freeze(Object.fromEntries(Object.keys(checked).map(key => [key, isTrustedSurfaceView(value[key]) ? value[key] : checked[key]])));
+  const result = Object.freeze(
+    Object.fromEntries(
+      Object.keys(checked).map((key) => [key, isTrustedSurfaceView(value[key]) ? value[key] : checked[key]]),
+    ),
+  );
   remember(result);
   return result;
 }
@@ -48,15 +54,21 @@ export function isCheckedContextValue(value: unknown): boolean {
 /** Detach new slices once; preserve validated immutable module output. */
 export function freezeContextView(context: Context): Context {
   const system = Object.freeze({
-    sections: Object.freeze(context.content.system.sections.map(section => contextValue(section))),
-    modelFacts: Object.freeze(context.content.system.modelFacts.map(fact => contextValue(fact))),
-    ...(context.content.system.modelFactSources ? { modelFactSources: contextValue(context.content.system.modelFactSources) } : {}),
+    sections: Object.freeze(context.content.system.sections.map((section) => contextValue(section))),
+    modelFacts: Object.freeze(context.content.system.modelFacts.map((fact) => contextValue(fact))),
+    ...(context.content.system.modelFactSources
+      ? { modelFactSources: contextValue(context.content.system.modelFactSources) }
+      : {}),
   });
   remember(system);
   const view = Object.freeze({
     request: contextValue(context.request),
-    content: Object.freeze({ system, conversation: contextValue(context.content.conversation),
-      supplements: Object.freeze(context.content.supplements.map(value => contextValue(value))), tools: contextValue(context.content.tools) }),
+    content: Object.freeze({
+      system,
+      conversation: contextValue(context.content.conversation),
+      supplements: Object.freeze(context.content.supplements.map((value) => contextValue(value))),
+      tools: contextValue(context.content.tools),
+    }),
     status: contextValue(context.status),
   });
   remember(view);

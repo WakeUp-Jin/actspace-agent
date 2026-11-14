@@ -5,13 +5,26 @@ import type { SessionWorktreeContext, WorkspaceGitContext } from "@actspace/shar
  * `invalid` 是损坏的会话 key（见 `locateSession`）：既不是本机，也连不到任何 Host。
  */
 export type RunTarget =
-  | { readonly kind: "local"; readonly workspaceRoot?: string; readonly branch?: string; readonly worktree?: SessionWorktreeContext }
-  | { readonly kind: "remote"; readonly hostId: string; readonly hostName: string; readonly workspaceId?: string; readonly workspaceName?: string }
+  | {
+      readonly kind: "local";
+      readonly workspaceRoot?: string;
+      readonly branch?: string;
+      readonly worktree?: SessionWorktreeContext;
+    }
+  | {
+      readonly kind: "remote";
+      readonly hostId: string;
+      readonly hostName: string;
+      readonly workspaceId?: string;
+      readonly workspaceName?: string;
+    }
   | { readonly kind: "invalid"; readonly key: string };
 
 /** Source workspace groups do not identify a worktree execution directory. */
 export function localExecutionRoot(target: RunTarget, fallback?: string | null): string | undefined {
-  return target.kind === "local" ? target.worktree?.workspaceRoot ?? target.workspaceRoot ?? fallback ?? undefined : undefined;
+  return target.kind === "local"
+    ? (target.worktree?.workspaceRoot ?? target.workspaceRoot ?? fallback ?? undefined)
+    : undefined;
 }
 
 export type Capability = { readonly enabled: boolean; readonly reason?: string };
@@ -38,12 +51,17 @@ const INVALID = "会话标识损坏";
 const enabled: Capability = { enabled: true };
 const off = (reason: string): Capability => ({ enabled: false, reason });
 
-export function capabilitiesOf(target: RunTarget, env: { readonly gitStatus?: WorkspaceGitContext["status"] } = {}): RunTargetCapabilities {
+export function capabilitiesOf(
+  target: RunTarget,
+  env: { readonly gitStatus?: WorkspaceGitContext["status"] } = {},
+): RunTargetCapabilities {
   if (target.kind === "local") {
     const gitReady = env.gitStatus === "ready";
     const gitHasBranch = gitReady || env.gitStatus === "no_head";
     return {
-      newWorktree: gitReady ? enabled : off(env.gitStatus === "no_head" ? "需要先创建提交" : "当前工作区不是可用的 Git 仓库"),
+      newWorktree: gitReady
+        ? enabled
+        : off(env.gitStatus === "no_head" ? "需要先创建提交" : "当前工作区不是可用的 Git 仓库"),
       branchSwitch: gitHasBranch ? enabled : off("当前工作区不是 Git 仓库"),
       localFileOpen: enabled,
       workspacePanels: enabled,

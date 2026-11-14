@@ -4,7 +4,12 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { extensionLayerDigest, installExtensionLayer, installedExtensionSitePackages, EXTENSION_LAYER_LOCAL_WHEELS } from "../extension.js";
+import {
+  extensionLayerDigest,
+  installExtensionLayer,
+  installedExtensionSitePackages,
+  EXTENSION_LAYER_LOCAL_WHEELS,
+} from "../extension.js";
 import { findBundledPythonRuntime, loadPythonRuntime, repoPythonRuntimePath } from "../locate.js";
 import { parsePythonRuntimeManifest, pythonRuntimeTarget, type PythonRuntimeManifest } from "../runtime-manifest.js";
 import { installPath, installWheel } from "../wheel.js";
@@ -17,15 +22,30 @@ async function scratch(): Promise<string> {
   roots.push(root);
   return root;
 }
-afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
 
 const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
 
-function manifestFor(wheels: readonly { file: string; bytes: Buffer }[], target = pythonRuntimeTarget() ?? "linux-x64"): PythonRuntimeManifest {
-  const pinned = wheels.map((wheel, index) => ({ name: `pkg${index}`, version: "1.0", file: wheel.file, url: `https://files.example/${wheel.file}`, sha256: sha256(wheel.bytes) }));
+function manifestFor(
+  wheels: readonly { file: string; bytes: Buffer }[],
+  target = pythonRuntimeTarget() ?? "linux-x64",
+): PythonRuntimeManifest {
+  const pinned = wheels.map((wheel, index) => ({
+    name: `pkg${index}`,
+    version: "1.0",
+    file: wheel.file,
+    url: `https://files.example/${wheel.file}`,
+    sha256: sha256(wheel.bytes),
+  }));
   return parsePythonRuntimeManifest({
-    schemaVersion: 1, target, python: { version: "3.12.16", release: "20261026" },
-    executable: target === "win-x64" ? "python.exe" : "bin/python3.12", sitePackages: "lib/python3.12/site-packages", shimDirectory: "shim",
+    schemaVersion: 1,
+    target,
+    python: { version: "3.12.16", release: "20261026" },
+    executable: target === "win-x64" ? "python.exe" : "bin/python3.12",
+    sitePackages: "lib/python3.12/site-packages",
+    shimDirectory: "shim",
     core: [{ name: "openpyxl", version: "3.1.5" }],
     extension: { digest: extensionLayerDigest(pinned), packages: ["numpy"], wheels: pinned },
   });
@@ -36,8 +56,24 @@ describe("manifest", () => {
     const manifest = manifestFor([]);
     expect(manifest.core).toEqual([{ name: "openpyxl", version: "3.1.5" }]);
     expect(() => parsePythonRuntimeManifest({ ...manifest, executable: "../bin/python" })).toThrow(/relative path/);
-    expect(() => parsePythonRuntimeManifest({ ...manifest, extension: { ...manifest.extension, wheels: [{ name: "x", version: "1", file: "x.whl", url: "http://insecure/x.whl", sha256: "a".repeat(64) }] } })).toThrow(/https/);
-    expect(() => parsePythonRuntimeManifest({ ...manifest, extension: { ...manifest.extension, wheels: [{ name: "x", version: "1", file: "x.whl", url: "https://ok/x.whl", sha256: "zz" }] } })).toThrow(/sha256/);
+    expect(() =>
+      parsePythonRuntimeManifest({
+        ...manifest,
+        extension: {
+          ...manifest.extension,
+          wheels: [{ name: "x", version: "1", file: "x.whl", url: "http://insecure/x.whl", sha256: "a".repeat(64) }],
+        },
+      }),
+    ).toThrow(/https/);
+    expect(() =>
+      parsePythonRuntimeManifest({
+        ...manifest,
+        extension: {
+          ...manifest.extension,
+          wheels: [{ name: "x", version: "1", file: "x.whl", url: "https://ok/x.whl", sha256: "zz" }],
+        },
+      }),
+    ).toThrow(/sha256/);
     expect(() => parsePythonRuntimeManifest({ ...manifest, target: "freebsd" })).toThrow(/unknown target/);
   });
 
@@ -72,7 +108,11 @@ describe("locate", () => {
 
 describe("zip and wheel", () => {
   it("reads stored and deflated entries with their modes", () => {
-    const archive = buildZip([{ name: "a.txt", data: "hello" }, { name: "b/c.py", data: "print(1)\n".repeat(50), deflate: true, mode: 0o755 }, { name: "d/" }]);
+    const archive = buildZip([
+      { name: "a.txt", data: "hello" },
+      { name: "b/c.py", data: "print(1)\n".repeat(50), deflate: true, mode: 0o755 },
+      { name: "d/" },
+    ]);
     const entries = readZipEntries(archive);
     expect(entries.map((entry) => entry.name)).toEqual(["a.txt", "b/c.py", "d/"]);
     expect(entries[0]!.read().toString()).toBe("hello");
@@ -118,8 +158,16 @@ describe("extension layer", () => {
     expect(installedExtensionSitePackages(dataRoot, manifest)).toBeUndefined();
     const progress: number[] = [];
     const fetched: string[] = [];
-    const fetchStub = (async (url: string | URL | Request) => { fetched.push(String(url)); return new Response(good); }) as typeof fetch;
-    const sitePackages = await installExtensionLayer({ manifest, dataRoot, fetch: fetchStub, onProgress: (item) => progress.push(item.completed) });
+    const fetchStub = (async (url: string | URL | Request) => {
+      fetched.push(String(url));
+      return new Response(good);
+    }) as typeof fetch;
+    const sitePackages = await installExtensionLayer({
+      manifest,
+      dataRoot,
+      fetch: fetchStub,
+      onProgress: (item) => progress.push(item.completed),
+    });
     expect(fetched).toEqual(["https://files.example/numpy-2.0-py3-none-any.whl"]);
     expect(progress).toEqual([0, 1]);
     expect(sitePackages).toBe(join(dataRoot, "runtime", "python-ext", manifest.extension.digest, "site-packages"));
@@ -132,8 +180,11 @@ describe("extension layer", () => {
     const dataRoot = await scratch();
     const good = buildZip([{ name: "numpy/__init__.py", data: "ok" }]);
     const manifest = manifestFor([{ file: "numpy-2.0-py3-none-any.whl", bytes: good }]);
-    const fetchStub = (async () => new Response(buildZip([{ name: "numpy/__init__.py", data: "tampered" }]))) as typeof fetch;
-    await expect(installExtensionLayer({ manifest, dataRoot, fetch: fetchStub })).rejects.toThrow(/does not match its pinned sha256/);
+    const fetchStub = (async () =>
+      new Response(buildZip([{ name: "numpy/__init__.py", data: "tampered" }]))) as typeof fetch;
+    await expect(installExtensionLayer({ manifest, dataRoot, fetch: fetchStub })).rejects.toThrow(
+      /does not match its pinned sha256/,
+    );
     expect(await readdir(join(dataRoot, "runtime", "python-ext"))).toEqual([]);
     expect(installedExtensionSitePackages(dataRoot, manifest)).toBeUndefined();
   });
@@ -146,7 +197,9 @@ describe("extension layer", () => {
     await mkdir(join(extRoot, EXTENSION_LAYER_LOCAL_WHEELS), { recursive: true });
     await writeFile(join(extRoot, EXTENSION_LAYER_LOCAL_WHEELS, "numpy-2.0-py3-none-any.whl"), good);
     await mkdir(join(extRoot, "0123456789abcdef", "site-packages"), { recursive: true });
-    const fetchStub = (async () => { throw new Error("offline"); }) as typeof fetch;
+    const fetchStub = (async () => {
+      throw new Error("offline");
+    }) as typeof fetch;
     const sitePackages = await installExtensionLayer({ manifest, dataRoot, fetch: fetchStub });
     expect(readFileSync(join(sitePackages, "numpy", "__init__.py"), "utf8")).toBe("offline");
     expect((await readdir(extRoot)).sort()).toEqual([manifest.extension.digest, EXTENSION_LAYER_LOCAL_WHEELS].sort());

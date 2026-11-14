@@ -13,10 +13,26 @@ it("uses current image configuration for each call, including removal and reconf
     getToolEnvironment: () => ({ searchCredentials: {}, imageGeneration: generation }),
     resolveImageInspectionModel: () => ({ ok: false, message: "not configured" }),
   } as DesktopRuntimeModelPort;
-  const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ data: [{ b64_json: Buffer.from([137,80,78,71,13,10,26,10,0]).toString("base64") }] }), { headers: { "content-type": "application/json" } }));
+  const fetchImpl = vi.fn(
+    async () =>
+      new Response(
+        JSON.stringify({ data: [{ b64_json: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]).toString("base64") }] }),
+        { headers: { "content-type": "application/json" } },
+      ),
+  );
   vi.stubGlobal("fetch", fetchImpl);
-  const ports = await createDesktopToolHostServices({ workspaceRoot: "/workspace", tmpRoot: "/tmp", modelRuntime, readArtifact: async () => { throw new Error("unused"); } })[IMAGE_GENERATION_HOST_PORT_ID].createPorts();
-  const ctx = { signal: new AbortController().signal, createArtifact: async () => ({ artifactId: "image", mediaType: "image/png", size: 9, sha256: "sha" }) } as unknown as ToolExecutionContext;
+  const ports = await createDesktopToolHostServices({
+    workspaceRoot: "/workspace",
+    tmpRoot: "/tmp",
+    modelRuntime,
+    readArtifact: async () => {
+      throw new Error("unused");
+    },
+  })[IMAGE_GENERATION_HOST_PORT_ID].createPorts();
+  const ctx = {
+    signal: new AbortController().signal,
+    createArtifact: async () => ({ artifactId: "image", mediaType: "image/png", size: 9, sha256: "sha" }),
+  } as unknown as ToolExecutionContext;
   const run = () => ports.generate_image({ prompt: "circle" }, ctx);
   try {
     expect(await run()).toMatchObject({ failure: { code: "IMAGE_GENERATION_NOT_CONFIGURED" } });
@@ -26,11 +42,19 @@ it("uses current image configuration for each call, including removal and reconf
     expect(await run()).toMatchObject({ status: "completed" });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     const calls = fetchImpl.mock.calls as unknown as [URL, RequestInit][];
-    expect(calls.map(([url]) => String(url))).toEqual(["https://one.example/v1/images/generations", "https://two.example/v1/images/generations"]);
-    expect(calls.map(([, init]) => new Headers(init.headers).get("Authorization"))).toEqual(["Bearer key-one", "Bearer key-two"]);
+    expect(calls.map(([url]) => String(url))).toEqual([
+      "https://one.example/v1/images/generations",
+      "https://two.example/v1/images/generations",
+    ]);
+    expect(calls.map(([, init]) => new Headers(init.headers).get("Authorization"))).toEqual([
+      "Bearer key-one",
+      "Bearer key-two",
+    ]);
     expect(calls.map(([, init]) => JSON.parse(init.body as string).model)).toEqual(["image-one", "image-two"]);
     generation = undefined;
     expect(await run()).toMatchObject({ failure: { code: "IMAGE_GENERATION_NOT_CONFIGURED" } });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-  } finally { await ports.dispose?.(); }
+  } finally {
+    await ports.dispose?.();
+  }
 });

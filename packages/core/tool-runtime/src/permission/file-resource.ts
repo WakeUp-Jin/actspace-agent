@@ -21,7 +21,8 @@ export async function canonicalizeFileResource(
       const canonicalPath = await realpath(candidate);
       const info = await lstat(canonicalPath);
       const targetKind = info.isFile() ? "file" : info.isDirectory() ? "directory" : undefined;
-      if (targetKind === undefined) throw denied("NON_REGULAR_RESOURCE_DENIED", "Non-regular filesystem resources are not supported.");
+      if (targetKind === undefined)
+        throw denied("NON_REGULAR_RESOURCE_DENIED", "Non-regular filesystem resources are not supported.");
       return Object.freeze({ kind: "file", access, canonicalPath, targetKind });
     }
     if (access !== "write") throw denied("RESOURCE_NOT_FOUND", "The requested filesystem resource does not exist.");
@@ -29,12 +30,14 @@ export async function canonicalizeFileResource(
     const suffix: string[] = [basename(candidate)];
     while (!existsSync(ancestor)) {
       const parent = dirname(ancestor);
-      if (parent === ancestor) throw denied("RESOURCE_CANONICALIZATION_FAILED", "No existing parent could be verified for the write target.");
+      if (parent === ancestor)
+        throw denied("RESOURCE_CANONICALIZATION_FAILED", "No existing parent could be verified for the write target.");
       suffix.unshift(basename(ancestor));
       ancestor = parent;
     }
     const ancestorInfo = await lstat(ancestor);
-    if (ancestorInfo.isSymbolicLink()) throw denied("SYMLINK_TARGET_DENIED", "A write target parent cannot be a symbolic link.");
+    if (ancestorInfo.isSymbolicLink())
+      throw denied("SYMLINK_TARGET_DENIED", "A write target parent cannot be a symbolic link.");
     const canonicalAncestor = await realpath(ancestor);
     const canonicalPath = resolve(canonicalAncestor, ...suffix);
     return Object.freeze({ kind: "file", access, canonicalPath, targetKind: "missing" });
@@ -66,16 +69,25 @@ export function classifyFileResource(resource: Extract<ToolResource, { kind: "fi
     return { kind: "protected", code: "CREDENTIAL_STORE_DENIED", reason: "System credential stores are Host-only." };
   }
   if (/\/(cookies|login data|web data)$/i.test(normalized) || /\/\.ssh\/(id_[^/]+|.*\.pem)$/i.test(normalized)) {
-    return { kind: "protected", code: "CREDENTIAL_FILE_DENIED", reason: "Credential files cannot be accessed by file tools." };
+    return {
+      kind: "protected",
+      code: "CREDENTIAL_FILE_DENIED",
+      reason: "Credential files cannot be accessed by file tools.",
+    };
   }
-  const onceOnly = (name.startsWith(".env") && name !== ".env.example")
-    || [".npmrc", ".pypirc", ".netrc"].includes(name)
-    || lower.endsWith("/.aws/credentials")
-    || lower.endsWith("/.kube/config")
-    || lower.endsWith("/.docker/config.json")
-    || lower.endsWith("/.git/config");
+  const onceOnly =
+    (name.startsWith(".env") && name !== ".env.example") ||
+    [".npmrc", ".pypirc", ".netrc"].includes(name) ||
+    lower.endsWith("/.aws/credentials") ||
+    lower.endsWith("/.kube/config") ||
+    lower.endsWith("/.docker/config.json") ||
+    lower.endsWith("/.git/config");
   return onceOnly
-    ? { kind: "once-only", code: "SENSITIVE_FILE_APPROVAL_REQUIRED", reason: "This file may contain credentials and requires one-time approval." }
+    ? {
+        kind: "once-only",
+        code: "SENSITIVE_FILE_APPROVAL_REQUIRED",
+        reason: "This file may contain credentials and requires one-time approval.",
+      }
     : { kind: "normal" };
 }
 

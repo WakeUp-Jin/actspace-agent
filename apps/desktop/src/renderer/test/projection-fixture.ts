@@ -1,29 +1,132 @@
 import { initialContextEstimate, viewContextEstimate, type SessionEvent, type SessionRecord } from "@actspace/shared";
-import { surfaceNode, type RuntimeDesktopSessionProjection, type RuntimeJsonValue, type RuntimeSessionSnapshot, type SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import {
+  surfaceNode,
+  type RuntimeDesktopSessionProjection,
+  type RuntimeJsonValue,
+  type RuntimeSessionSnapshot,
+  type SessionEventEnvelopeV1,
+} from "@actspace/shared/runtime-v2";
 
-export function projectionFixture(sessionId = "s", throughJournalSeq = -1, events: readonly SessionEventEnvelopeV1[] = []): RuntimeDesktopSessionProjection {
-  const snapshot: RuntimeSessionSnapshot = { kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-09-21T00:00:00Z", updatedAt: "2026-09-21T00:00:00Z", throughJournalSeq, workspaceRoot: "/tmp/workspace", agentForm: "agent", permissionMode: "default", sessionGrants: [], accessState: "read-write", metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], lineage: null,
+export function projectionFixture(
+  sessionId = "s",
+  throughJournalSeq = -1,
+  events: readonly SessionEventEnvelopeV1[] = [],
+): RuntimeDesktopSessionProjection {
+  const snapshot: RuntimeSessionSnapshot = {
+    kind: "session-snapshot",
+    schemaVersion: 1,
+    sessionId,
+    createdAt: "2026-09-21T00:00:00Z",
+    updatedAt: "2026-09-21T00:00:00Z",
+    throughJournalSeq,
+    workspaceRoot: "/tmp/workspace",
+    agentForm: "agent",
+    permissionMode: "default",
+    sessionGrants: [],
+    accessState: "read-write",
+    metadata: { title: null, pinned: false, archived: false },
+    messages: [],
+    tools: [],
+    pendingInbox: [],
+    todos: [],
+    delegations: [],
+    lineage: null,
     usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
-    activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } } };
-  return { kind: "session-projection", schemaVersion: 1, sessionId, throughJournalSeq, snapshot, activeMessageIds: [], deferredToolCalls: [],
-    values: { metadata: snapshot.metadata, providerUsage: snapshot.usage, sessionStats: snapshot.activity, contextEstimate: viewContextEstimate(initialContextEstimate()) as unknown as RuntimeJsonValue },
-    window: { events, fromSeq: events[0]?.seq ?? 0, throughJournalSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0 } };
+    activity: {
+      turnCount: 0,
+      completedTurnCount: 0,
+      stepCount: 0,
+      activeTurnId: null,
+      activeStepId: null,
+      compactionCount: 0,
+      activeCompactionId: null,
+      lastCompactionSummary: null,
+      timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 },
+    },
+  };
+  return {
+    kind: "session-projection",
+    schemaVersion: 1,
+    sessionId,
+    throughJournalSeq,
+    snapshot,
+    activeMessageIds: [],
+    deferredToolCalls: [],
+    values: {
+      metadata: snapshot.metadata,
+      providerUsage: snapshot.usage,
+      sessionStats: snapshot.activity,
+      contextEstimate: viewContextEstimate(initialContextEstimate()) as unknown as RuntimeJsonValue,
+    },
+    window: {
+      events,
+      fromSeq: events[0]?.seq ?? 0,
+      throughJournalSeq,
+      beforeSeq: null,
+      turnOffset: 0,
+      requestOffset: 0,
+    },
+  };
 }
 
 /** Converts older UI test scenarios to Journal fixtures, never used in production. */
 export function recordProjectionFixture(record: SessionRecord): RuntimeDesktopSessionProjection {
-  const sourceEvents = record.events.length > 0 ? record.events : (record.messageBlocks ?? []).flatMap((block) => {
-    if (block.kind !== "user" && block.kind !== "assistant") return [];
-    return [{ id: block.id, sessionId: record.meta.id, agentRunId: "fixture-run", schemaVersion: 2 as const, timestamp: block.createdAt, type: block.kind === "user" ? "user_message" as const : "assistant_message" as const, payload: { content: block.content } }];
-  });
+  const sourceEvents =
+    record.events.length > 0
+      ? record.events
+      : (record.messageBlocks ?? []).flatMap((block) => {
+          if (block.kind !== "user" && block.kind !== "assistant") return [];
+          return [
+            {
+              id: block.id,
+              sessionId: record.meta.id,
+              agentRunId: "fixture-run",
+              schemaVersion: 2 as const,
+              timestamp: block.createdAt,
+              type: block.kind === "user" ? ("user_message" as const) : ("assistant_message" as const),
+              payload: { content: block.content },
+            },
+          ];
+        });
   const events: SessionEventEnvelopeV1[] = sourceEvents.map((event, seq) => legacyEventToJournal(event, seq));
   const value = projectionFixture(record.meta.id, events.length - 1, events);
-  return { ...value, activeMessageIds: events.flatMap(event => { const node = surfaceNode(event); return node ? [node.messageId] : []; }), snapshot: { ...value.snapshot, metadata: { title: record.meta.title, pinned: record.meta.pinned ?? false, archived: record.meta.archived ?? false }, workspaceRoot: record.meta.workspaceRoot ?? null, agentForm: record.meta.agentForm ?? "agent", agentMode: record.meta.agentMode ?? (record.meta.agentForm === "chat" ? "chat" : "agent"), agentModeRevision: record.meta.agentModeRevision ?? 0, messages: events.flatMap(event => { const node = surfaceNode(event); return node ? [node] : []; }), activity: { ...value.snapshot.activity, turnCount: record.meta.agentRunCount, completedTurnCount: record.meta.agentRunCount } } };
+  return {
+    ...value,
+    activeMessageIds: events.flatMap((event) => {
+      const node = surfaceNode(event);
+      return node ? [node.messageId] : [];
+    }),
+    snapshot: {
+      ...value.snapshot,
+      metadata: {
+        title: record.meta.title,
+        pinned: record.meta.pinned ?? false,
+        archived: record.meta.archived ?? false,
+      },
+      workspaceRoot: record.meta.workspaceRoot ?? null,
+      agentForm: record.meta.agentForm ?? "agent",
+      agentMode: record.meta.agentMode ?? (record.meta.agentForm === "chat" ? "chat" : "agent"),
+      agentModeRevision: record.meta.agentModeRevision ?? 0,
+      messages: events.flatMap((event) => {
+        const node = surfaceNode(event);
+        return node ? [node] : [];
+      }),
+      activity: {
+        ...value.snapshot.activity,
+        turnCount: record.meta.agentRunCount,
+        completedTurnCount: record.meta.agentRunCount,
+      },
+    },
+  };
 }
 
 function legacyEventToJournal(event: SessionEvent, seq: number): SessionEventEnvelopeV1 {
   const payload = record(event.payload);
-  const identity = { agentRunId: event.agentRunId, ...(event.turnId ? { turnId: event.turnId } : {}), ...(event.llmCallId ? { requestId: event.llmCallId } : {}) };
+  const identity = {
+    agentRunId: event.agentRunId,
+    ...(event.turnId ? { turnId: event.turnId } : {}),
+    ...(event.llmCallId ? { requestId: event.llmCallId } : {}),
+  };
   let type: string = "turn/end";
   let data: Record<string, RuntimeJsonValue> = { ...identity, reason: "completed" };
   let surface: SessionEventEnvelopeV1["surface"] = null;
@@ -33,15 +136,36 @@ function legacyEventToJournal(event: SessionEvent, seq: number): SessionEventEnv
     surface = { kind: "append" };
   } else if (event.type === "assistant_message" || event.type === "assistant_reply") {
     type = "assistant/message";
-    data = { ...identity, messageId: event.id, content: payload.content ?? "", ...(payload.usage === undefined ? {} : { usage: payload.usage }), ...(payload.stopReason === undefined ? {} : { finishReason: payload.stopReason }) };
+    data = {
+      ...identity,
+      messageId: event.id,
+      content: payload.content ?? "",
+      ...(payload.usage === undefined ? {} : { usage: payload.usage }),
+      ...(payload.stopReason === undefined ? {} : { finishReason: payload.stopReason }),
+    };
     surface = { kind: "append" };
   } else if (event.type === "tool_call") {
     type = "tool/call";
-    data = { ...identity, callId: payload.id ?? payload.toolCallId ?? event.id, name: payload.name ?? payload.toolName ?? "tool", args: payload.arguments ?? payload.args ?? {} , pluginId: "fixture" };
+    data = {
+      ...identity,
+      callId: payload.id ?? payload.toolCallId ?? event.id,
+      name: payload.name ?? payload.toolName ?? "tool",
+      args: payload.arguments ?? payload.args ?? {},
+      pluginId: "fixture",
+    };
   } else if (event.type === "tool_result") {
     type = "tool/result";
     surface = { kind: "append" };
-    data = { ...identity, callId: payload.toolCallId ?? payload.callId ?? event.id, name: payload.toolName ?? "tool", status: payload.status ?? (payload.ok === false ? "failed" : "completed"), summary: payload.summary ?? "Tool completed", ...(payload.detail === undefined ? {} : { detail: payload.detail }), modelOutput: payload.modelOutput ?? "", ...(payload.uiPreview === undefined ? {} : { renderer: payload.uiPreview }) };
+    data = {
+      ...identity,
+      callId: payload.toolCallId ?? payload.callId ?? event.id,
+      name: payload.toolName ?? "tool",
+      status: payload.status ?? (payload.ok === false ? "failed" : "completed"),
+      summary: payload.summary ?? "Tool completed",
+      ...(payload.detail === undefined ? {} : { detail: payload.detail }),
+      modelOutput: payload.modelOutput ?? "",
+      ...(payload.uiPreview === undefined ? {} : { renderer: payload.uiPreview }),
+    };
   } else if (event.type === "thinking") {
     type = "assistant/chunk";
     data = { ...identity, messageId: event.id, chunkIndex: 0, kind: "reasoning", content: payload.content ?? "" };
@@ -55,9 +179,22 @@ function legacyEventToJournal(event: SessionEvent, seq: number): SessionEventEnv
     type = "turn/end";
     data = { ...identity, reason: "aborted" };
   }
-  return { recordKind: "event", seq, type, eventVersion: 1, criticality: "ignorable", time: event.timestamp, source: { ownerPluginId: "@actspace/core" }, data, surface, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
+  return {
+    recordKind: "event",
+    seq,
+    type,
+    eventVersion: 1,
+    criticality: "ignorable",
+    time: event.timestamp,
+    source: { ownerPluginId: "@actspace/core" },
+    data,
+    surface,
+    provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
+  };
 }
 
 function record(value: unknown): Record<string, RuntimeJsonValue> {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, RuntimeJsonValue> : {};
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, RuntimeJsonValue>)
+    : {};
 }

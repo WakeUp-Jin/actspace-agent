@@ -12,14 +12,22 @@ export function unavailableSecrets(code: CredentialStorageIssueCode, message: st
   return { secrets: emptySecrets(), source: "unavailable", issue: { code, message } };
 }
 
-export function parseSecretsV1(value: Record<string, unknown>): { secrets: PersistedSecretsV1; legacyProviderRemoved: boolean } | undefined {
+export function parseSecretsV1(
+  value: Record<string, unknown>,
+): { secrets: PersistedSecretsV1; legacyProviderRemoved: boolean } | undefined {
   const parsed = parseSecretFields(value, true);
-  return parsed ? { secrets: { version: 1, ...parsed.secrets }, legacyProviderRemoved: parsed.legacyProviderRemoved } : undefined;
+  return parsed
+    ? { secrets: { version: 1, ...parsed.secrets }, legacyProviderRemoved: parsed.legacyProviderRemoved }
+    : undefined;
 }
 
-export function parseSecretsV2(value: Record<string, unknown>): { secrets: PersistedSecrets; legacyProviderRemoved: boolean } | undefined {
+export function parseSecretsV2(
+  value: Record<string, unknown>,
+): { secrets: PersistedSecrets; legacyProviderRemoved: boolean } | undefined {
   const parsed = parseSecretFields(value, false);
-  return parsed ? { secrets: { version: 2, ...parsed.secrets }, legacyProviderRemoved: parsed.legacyProviderRemoved } : undefined;
+  return parsed
+    ? { secrets: { version: 2, ...parsed.secrets }, legacyProviderRemoved: parsed.legacyProviderRemoved }
+    : undefined;
 }
 
 export type ParsedSecretFields = {
@@ -33,7 +41,10 @@ export function parseSecretFields(
 ): ParsedSecretFields | undefined {
   const allowedTopLevel = new Set<string>(["version", "providerCredentials", "duckcoding", ...ALL_SECRET_PROVIDER_IDS]);
   if (Object.keys(value).some((key) => !allowedTopLevel.has(key))) return undefined;
-  if (!isRecord(value.providerCredentials) && !(allowMissingProviderCredentials && value.providerCredentials === undefined)) {
+  if (
+    !isRecord(value.providerCredentials) &&
+    !(allowMissingProviderCredentials && value.providerCredentials === undefined)
+  ) {
     return undefined;
   }
 
@@ -51,7 +62,8 @@ export function parseSecretFields(
   }
   for (const [id, secret] of Object.entries(isRecord(value.providerCredentials) ? value.providerCredentials : {})) {
     if (id.startsWith("duckcoding:")) {
-      if (!isValidCredentialId(id.slice("duckcoding:".length)) || typeof secret !== "string" || secret.length === 0) return undefined;
+      if (!isValidCredentialId(id.slice("duckcoding:".length)) || typeof secret !== "string" || secret.length === 0)
+        return undefined;
       legacyProviderRemoved = true;
       continue;
     }
@@ -86,5 +98,8 @@ export function isProviderCredentialSecretId(value: string): boolean {
 function isRemovedExtraKeyId(value: string): boolean {
   const separator = value.indexOf(":");
   if (separator <= 0 || value.indexOf(":", separator + 1) !== -1) return false;
-  return (PROVIDER_IDS as readonly string[]).includes(value.slice(0, separator)) && isValidCredentialId(value.slice(separator + 1));
+  return (
+    (PROVIDER_IDS as readonly string[]).includes(value.slice(0, separator)) &&
+    isValidCredentialId(value.slice(separator + 1))
+  );
 }

@@ -1,6 +1,11 @@
 import type { ServiceOf } from "@actspace/cordis-adapter";
 import type { LOOP_CHECKPOINT_VIEW } from "@actspace/agent-loop";
-import type { APPLICATION_AGENT_RUNTIME_VIEW, APPLICATION_BROWSER_TOOLS_VIEW, APPLICATION_CONTEXT_ENGINE_VIEW, APPLICATION_SESSIONS_VIEW } from "@actspace/agent-service";
+import type {
+  APPLICATION_AGENT_RUNTIME_VIEW,
+  APPLICATION_BROWSER_TOOLS_VIEW,
+  APPLICATION_CONTEXT_ENGINE_VIEW,
+  APPLICATION_SESSIONS_VIEW,
+} from "@actspace/agent-service";
 import type { DISCLOSURE_HOST_VIEW } from "@actspace/context-disclosure";
 import type { CONTEXT_ENGINE_SERVICE } from "@actspace/context-engine";
 import type { TITLE_SESSIONS_VIEW } from "@actspace/desktop-app";
@@ -10,12 +15,22 @@ import type { PLUGIN_MANAGER_HOST_VIEW } from "@actspace/plugin-manager";
 import type { CHECKPOINT_SESSIONS_VIEW, SESSION_CHECKPOINT_SERVICE } from "@actspace/session-checkpoint-policy";
 import type { JSONL_STORAGE_HOST_VIEW } from "@actspace/session-persistence-jsonl";
 import type { SESSION_STORAGE_SERVICE } from "@actspace/session-storage";
-import type { TRANSCRIPT_HOST_VIEW, TRANSCRIPT_SESSIONS_VIEW, TRANSCRIPT_STORAGE_VIEW } from "@actspace/session-transcript";
+import type {
+  TRANSCRIPT_HOST_VIEW,
+  TRANSCRIPT_SESSIONS_VIEW,
+  TRANSCRIPT_STORAGE_VIEW,
+} from "@actspace/session-transcript";
 import type { SIDE_CHAT_SESSIONS_VIEW } from "@actspace/side-chat";
 import type { BROWSER_TOOLS_SERVICE } from "@actspace/tool-browser";
 import type { SHELL_SESSION_HOST_VIEW, SHELL_TOOLS_SERVICE } from "@actspace/tool-shell";
 import type { TODO_SESSIONS_VIEW } from "@actspace/tool-todo";
-import type { AGENT_RUNTIME_HOST_PORT, AGENT_RUNTIME_SERVICE, FACTORY_SHELL_TOOLS_VIEW, SESSION_RUNTIME_HOST_PORT, SESSION_RUNTIME_SERVICE } from "../service-keys.js";
+import type {
+  AGENT_RUNTIME_HOST_PORT,
+  AGENT_RUNTIME_SERVICE,
+  FACTORY_SHELL_TOOLS_VIEW,
+  SESSION_RUNTIME_HOST_PORT,
+  SESSION_RUNTIME_SERVICE,
+} from "../service-keys.js";
 
 /**
  * 视图和真实服务的对照表，只做类型检查，运行时没有内容。
@@ -54,9 +69,18 @@ export type ServiceViewConformance = {
   readonly disclosureHost: Covers<AgentHost, ServiceOf<typeof DISCLOSURE_HOST_VIEW>>;
   readonly pluginManagerHost: Covers<AgentHost, ServiceOf<typeof PLUGIN_MANAGER_HOST_VIEW>>;
   // 其它包拥有的服务
-  readonly transcriptStorage: Covers<ServiceOf<typeof SESSION_STORAGE_SERVICE>, ServiceOf<typeof TRANSCRIPT_STORAGE_VIEW>>;
+  readonly transcriptStorage: Covers<
+    ServiceOf<typeof SESSION_STORAGE_SERVICE>,
+    ServiceOf<typeof TRANSCRIPT_STORAGE_VIEW>
+  >;
   readonly loopCheckpoint: Covers<ServiceOf<typeof SESSION_CHECKPOINT_SERVICE>, ServiceOf<typeof LOOP_CHECKPOINT_VIEW>>;
-  readonly applicationBrowserTools: Covers<ServiceOf<typeof BROWSER_TOOLS_SERVICE>, ServiceOf<typeof APPLICATION_BROWSER_TOOLS_VIEW>>;
-  readonly applicationContextEngine: Covers<ServiceOf<typeof CONTEXT_ENGINE_SERVICE>, ServiceOf<typeof APPLICATION_CONTEXT_ENGINE_VIEW>>;
+  readonly applicationBrowserTools: Covers<
+    ServiceOf<typeof BROWSER_TOOLS_SERVICE>,
+    ServiceOf<typeof APPLICATION_BROWSER_TOOLS_VIEW>
+  >;
+  readonly applicationContextEngine: Covers<
+    ServiceOf<typeof CONTEXT_ENGINE_SERVICE>,
+    ServiceOf<typeof APPLICATION_CONTEXT_ENGINE_VIEW>
+  >;
   readonly factoryShellTools: Covers<ServiceOf<typeof SHELL_TOOLS_SERVICE>, ServiceOf<typeof FACTORY_SHELL_TOOLS_VIEW>>;
 };

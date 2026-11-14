@@ -5,13 +5,24 @@ import { flushSync } from "react-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../components/ui/ContextMenu";
 import {
-  Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger, MenuTrigger,
+  Menu,
+  MenuCheckboxItem,
+  MenuContent,
+  MenuItem,
+  MenuSeparator,
+  MenuSub,
+  MenuSubContent,
+  MenuSubTrigger,
+  MenuTrigger,
 } from "../components/ui/Menu";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "../components/ui/Popover";
 import { Select } from "../components/ui/Select";
 
 // Radix 在 setTimeout(0) 里把焦点还给触发器。
-const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+const settle = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 
 function ActionMenu({ onSelect }: { onSelect: (label: string) => void }) {
   return (
@@ -20,7 +31,9 @@ function ActionMenu({ onSelect }: { onSelect: (label: string) => void }) {
       <MenuContent>
         <MenuItem onSelect={() => onSelect("复制")}>复制</MenuItem>
         <MenuItem onSelect={() => onSelect("重命名")}>重命名</MenuItem>
-        <MenuItem disabled onSelect={() => onSelect("归档")}>归档</MenuItem>
+        <MenuItem disabled onSelect={() => onSelect("归档")}>
+          归档
+        </MenuItem>
         <MenuSeparator />
         <MenuSub>
           <MenuSubTrigger>移动到</MenuSubTrigger>
@@ -29,7 +42,9 @@ function ActionMenu({ onSelect }: { onSelect: (label: string) => void }) {
             <MenuItem onSelect={() => onSelect("web")}>web</MenuItem>
           </MenuSubContent>
         </MenuSub>
-        <MenuItem danger onSelect={() => onSelect("删除")}>删除</MenuItem>
+        <MenuItem danger onSelect={() => onSelect("删除")}>
+          删除
+        </MenuItem>
       </MenuContent>
     </Menu>
   );
@@ -96,7 +111,11 @@ describe("Menu", () => {
   it("closes on Escape, returns focus to the trigger and keeps Escape away from outer handlers", async () => {
     const user = userEvent.setup();
     const outerKeyDown = vi.fn();
-    render(<div onKeyDown={outerKeyDown}><ActionMenu onSelect={() => {}} /></div>);
+    render(
+      <div onKeyDown={outerKeyDown}>
+        <ActionMenu onSelect={() => {}} />
+      </div>,
+    );
     await user.click(screen.getByRole("button", { name: "操作" }));
     expect(screen.getByRole("menu")).toBeInTheDocument();
     outerKeyDown.mockClear();
@@ -115,7 +134,13 @@ describe("Menu", () => {
         <Menu>
           <MenuTrigger>筛选</MenuTrigger>
           <MenuContent>
-            <MenuCheckboxItem checked={checked} onCheckedChange={setChecked} onSelect={(event) => event.preventDefault()}>只看未读</MenuCheckboxItem>
+            <MenuCheckboxItem
+              checked={checked}
+              onCheckedChange={setChecked}
+              onSelect={(event) => event.preventDefault()}
+            >
+              只看未读
+            </MenuCheckboxItem>
           </MenuContent>
         </Menu>
       );
@@ -129,7 +154,14 @@ describe("Menu", () => {
   it("lets a click outside fall through to the element underneath", async () => {
     const user = userEvent.setup();
     const outside = vi.fn();
-    render(<><button type="button" onClick={outside}>外面</button><ActionMenu onSelect={() => {}} /></>);
+    render(
+      <>
+        <button type="button" onClick={outside}>
+          外面
+        </button>
+        <ActionMenu onSelect={() => {}} />
+      </>,
+    );
     await user.click(screen.getByRole("button", { name: "操作" }));
     expect(screen.getByRole("menu")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "外面" }));
@@ -144,7 +176,9 @@ describe("ContextMenu", () => {
     const onSelect = vi.fn();
     render(
       <ContextMenu>
-        <ContextMenuTrigger asChild><div>会话 A</div></ContextMenuTrigger>
+        <ContextMenuTrigger asChild>
+          <div>会话 A</div>
+        </ContextMenuTrigger>
         <ContextMenuContent>
           <ContextMenuItem onSelect={() => onSelect("重命名")}>重命名</ContextMenuItem>
           <ContextMenuItem onSelect={() => onSelect("删除")}>删除</ContextMenuItem>
@@ -164,10 +198,16 @@ describe("ContextMenu", () => {
     const outside = vi.fn();
     render(
       <>
-        <button type="button" onClick={outside}>外面</button>
+        <button type="button" onClick={outside}>
+          外面
+        </button>
         <ContextMenu>
-          <ContextMenuTrigger asChild><div>会话 A</div></ContextMenuTrigger>
-          <ContextMenuContent><ContextMenuItem>重命名</ContextMenuItem></ContextMenuContent>
+          <ContextMenuTrigger asChild>
+            <div>会话 A</div>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem>重命名</ContextMenuItem>
+          </ContextMenuContent>
         </ContextMenu>
       </>,
     );
@@ -181,7 +221,17 @@ describe("ContextMenu", () => {
 
 describe("Popover", () => {
   it("positions against a virtual anchor", async () => {
-    const rect = { x: 120, y: 80, top: 80, left: 120, right: 220, bottom: 96, width: 100, height: 16, toJSON: () => ({}) };
+    const rect = {
+      x: 120,
+      y: 80,
+      top: 80,
+      left: 120,
+      right: 220,
+      bottom: 96,
+      width: 100,
+      height: 16,
+      toJSON: () => ({}),
+    };
     const getBoundingClientRect = vi.fn(() => rect as DOMRect);
     render(
       <Popover open>
@@ -200,7 +250,9 @@ describe("Popover", () => {
       <div onKeyDown={outerKeyDown}>
         <Popover>
           <PopoverTrigger>详情</PopoverTrigger>
-          <PopoverContent aria-label="详情浮层"><button type="button">里面</button></PopoverContent>
+          <PopoverContent aria-label="详情浮层">
+            <button type="button">里面</button>
+          </PopoverContent>
         </Popover>
       </div>,
     );
@@ -305,7 +357,9 @@ describe("Select", () => {
   it("supports an empty-string option and shows the placeholder for unknown values", async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
-    const { rerender } = render(<Select ariaLabel="模型" value="zzz" placeholder="未选择" options={options} onValueChange={onValueChange} />);
+    const { rerender } = render(
+      <Select ariaLabel="模型" value="zzz" placeholder="未选择" options={options} onValueChange={onValueChange} />,
+    );
     expect(screen.getByRole("combobox", { name: "模型" })).toHaveTextContent("未选择");
     await user.click(screen.getByRole("combobox", { name: "模型" }));
     await user.click(screen.getByRole("option", { name: "跟随默认" }));
@@ -318,7 +372,11 @@ describe("Select", () => {
     // 设置表单外层用 onKeyDown 监听 Esc 返回上一步；在下拉里按 Esc 只该收起下拉。
     const user = userEvent.setup();
     const outerKeyDown = vi.fn();
-    render(<div onKeyDown={outerKeyDown}><Select ariaLabel="模型" value="a" options={options} onValueChange={() => {}} /></div>);
+    render(
+      <div onKeyDown={outerKeyDown}>
+        <Select ariaLabel="模型" value="a" options={options} onValueChange={() => {}} />
+      </div>,
+    );
     const trigger = screen.getByRole("combobox", { name: "模型" });
     await user.click(trigger);
     expect(screen.getByRole("listbox")).toBeInTheDocument();

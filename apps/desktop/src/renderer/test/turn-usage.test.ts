@@ -3,7 +3,19 @@ import type { TurnUsageSummary } from "@actspace/shared";
 import { turnUsageModel } from "../components/conversation/turn-usage";
 
 function usage(overrides: Partial<TurnUsageSummary> = {}): TurnUsageSummary {
-  return { totalTokens: 88_035, inputTokens: 20_462, cacheReadTokens: 64_512, cacheWriteTokens: 0, outputTokens: 3_061, reasoningTokens: 0, routes: ["deepseek/deepseek-flash"], costUsd: 0.0123, unpricedRequestCount: 0, costEstimated: false, ...overrides };
+  return {
+    totalTokens: 88_035,
+    inputTokens: 20_462,
+    cacheReadTokens: 64_512,
+    cacheWriteTokens: 0,
+    outputTokens: 3_061,
+    reasoningTokens: 0,
+    routes: ["deepseek/deepseek-flash"],
+    costUsd: 0.0123,
+    unpricedRequestCount: 0,
+    costEstimated: false,
+    ...overrides,
+  };
 }
 
 describe("turnUsageModel", () => {
@@ -34,6 +46,9 @@ describe("turnUsageModel", () => {
 
   it("never shows an undercounted cost when some requests have no price", () => {
     expect(turnUsageModel(usage({ unpricedRequestCount: 1 }))?.cost).toEqual({ kind: "unknown", text: "部分未知" });
-    expect(turnUsageModel(usage({ unpricedRequestCount: 2, costUsd: 0 }))?.cost).toEqual({ kind: "unknown", text: "未知" });
+    expect(turnUsageModel(usage({ unpricedRequestCount: 2, costUsd: 0 }))?.cost).toEqual({
+      kind: "unknown",
+      text: "未知",
+    });
   });
 });

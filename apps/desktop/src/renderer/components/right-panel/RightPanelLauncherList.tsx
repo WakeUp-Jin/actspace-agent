@@ -50,13 +50,19 @@ export function RightPanelLauncherList({
   return (
     <nav className={LAUNCHER_CLASS} aria-label={label}>
       {caption ? <p className={LAUNCHER_CAPTION_CLASS}>{caption}</p> : null}
-      {items.map((item) => <LauncherItem key={item.id} item={item} />)}
-      {groups.filter((group) => group.items.length > 0).map((group) => (
-        <section key={group.id} className="mt-3 flex flex-col gap-px" aria-label={group.caption}>
-          <p className={LAUNCHER_CAPTION_CLASS}>{group.caption}</p>
-          {group.items.map((item) => <LauncherItem key={item.id} item={item} />)}
-        </section>
+      {items.map((item) => (
+        <LauncherItem key={item.id} item={item} />
       ))}
+      {groups
+        .filter((group) => group.items.length > 0)
+        .map((group) => (
+          <section key={group.id} className="mt-3 flex flex-col gap-px" aria-label={group.caption}>
+            <p className={LAUNCHER_CAPTION_CLASS}>{group.caption}</p>
+            {group.items.map((item) => (
+              <LauncherItem key={item.id} item={item} />
+            ))}
+          </section>
+        ))}
     </nav>
   );
 }
@@ -79,7 +85,9 @@ function LauncherItem({ item }: { item: RightPanelLauncherItem }) {
         {item.icon}
       </span>
       <span>{item.label}</span>
-      <span id={descriptionId} className={LAUNCHER_DESCRIPTION_CLASS}>{item.description}</span>
+      <span id={descriptionId} className={LAUNCHER_DESCRIPTION_CLASS}>
+        {item.description}
+      </span>
     </button>
   );
 }

@@ -1,21 +1,51 @@
 import { mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { createNodeSandboxHostPort, createSandboxService, resolvePolicy, sandboxTemplate, type SandboxRequest } from "@actspace/sandbox";
+import {
+  createNodeSandboxHostPort,
+  createSandboxService,
+  resolvePolicy,
+  sandboxTemplate,
+  type SandboxRequest,
+} from "@actspace/sandbox";
 import { buildSeatbeltProfile, createSeatbeltBackend, sbplString } from "../backend.js";
 
 const template = sandboxTemplate("tool", { homeDir: "/Users/agent", platform: "darwin" });
-const base = (overrides: Partial<SandboxRequest> = {}): SandboxRequest => ({ purpose: "tool", isolation: "sandboxed", argv: ["/bin/zsh", "-lc", "true"], cwd: "/work", env: {}, scratchDir: "/scratch", filesystem: { readWrite: ["/work", "/scratch"] }, ...overrides });
+const base = (overrides: Partial<SandboxRequest> = {}): SandboxRequest => ({
+  purpose: "tool",
+  isolation: "sandboxed",
+  argv: ["/bin/zsh", "-lc", "true"],
+  cwd: "/work",
+  env: {},
+  scratchDir: "/scratch",
+  filesystem: { readWrite: ["/work", "/scratch"] },
+  ...overrides,
+});
 
 describe("seatbelt profile", () => {
   it("keeps the existing rule shape and derives paths from the policy", async () => {
     const resolved = await resolvePolicy(base(), template);
     if (!resolved.ok) throw new Error(resolved.reasons.join());
     const lines = buildSeatbeltProfile(resolved.policy).split("\n");
-    expect(lines.slice(0, 10)).toEqual(["(version 1)", "(deny default)", "(allow process*)", "(allow signal)", "(allow network*)", "(allow sysctl-read)", "(allow mach-lookup)", "(allow ipc-posix*)", "(allow file-ioctl)", "(allow file-read*)"]);
+    expect(lines.slice(0, 10)).toEqual([
+      "(version 1)",
+      "(deny default)",
+      "(allow process*)",
+      "(allow signal)",
+      "(allow network*)",
+      "(allow sysctl-read)",
+      "(allow mach-lookup)",
+      "(allow ipc-posix*)",
+      "(allow file-ioctl)",
+      "(allow file-read*)",
+    ]);
     expect(lines[10]).toMatch(/^\(deny file-read\* .*\(subpath "\/Users\/agent\/\.ssh"\)/);
-    expect(lines[11]).toBe('(allow file-write* (subpath "/scratch") (subpath "/work") (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr"))');
-    expect(lines[12]).toBe('(deny file-write* (subpath "/scratch/.git/config") (subpath "/scratch/.git/hooks") (subpath "/work/.git/config") (subpath "/work/.git/hooks"))');
+    expect(lines[11]).toBe(
+      '(allow file-write* (subpath "/scratch") (subpath "/work") (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr"))',
+    );
+    expect(lines[12]).toBe(
+      '(deny file-write* (subpath "/scratch/.git/config") (subpath "/scratch/.git/hooks") (subpath "/work/.git/config") (subpath "/work/.git/hooks"))',
+    );
   });
 
   it("drops the network allowance when blocked and escapes strings", async () => {
@@ -27,7 +57,10 @@ describe("seatbelt profile", () => {
 
   it("is unavailable off macOS", async () => {
     const host = { ...createNodeSandboxHostPort(), platform: "linux" as const };
-    expect(await createSeatbeltBackend(host).probe()).toEqual({ available: false, reason: "sandbox-exec is macOS only." });
+    expect(await createSeatbeltBackend(host).probe()).toEqual({
+      available: false,
+      reason: "sandbox-exec is macOS only.",
+    });
   });
 });
 
@@ -38,9 +71,20 @@ describe.skipIf(process.platform !== "darwin")("seatbelt enforcement", () => {
     await mkdir(join(workspace, ".git", "hooks"), { recursive: true });
     const service = createSandboxService({ host: createNodeSandboxHostPort() });
     service.register(createSeatbeltBackend(createNodeSandboxHostPort()));
-    const execution = service.run({ purpose: "tool", isolation: "sandboxed", argv: ["/bin/sh", "-c", command], cwd: workspace, env: { ...process.env, TMPDIR: scratch }, scratchDir: scratch, filesystem: { readWrite: [workspace, scratch] }, ...(network ? { network } : {}) });
+    const execution = service.run({
+      purpose: "tool",
+      isolation: "sandboxed",
+      argv: ["/bin/sh", "-c", command],
+      cwd: workspace,
+      env: { ...process.env, TMPDIR: scratch },
+      scratchDir: scratch,
+      filesystem: { readWrite: [workspace, scratch] },
+      ...(network ? { network } : {}),
+    });
     let output = "";
-    execution.onOutput(chunk => { output += chunk.text; });
+    execution.onOutput((chunk) => {
+      output += chunk.text;
+    });
     return { result: await execution.result, output, workspace };
   }
 
@@ -66,7 +110,10 @@ describe.skipIf(process.platform !== "darwin")("seatbelt enforcement", () => {
   });
 
   it("blocks the network when requested", async () => {
-    const blocked = await run("/usr/bin/curl -sS -m 5 -o /dev/null https://example.com && echo online || echo offline", { mode: "blocked" });
+    const blocked = await run(
+      "/usr/bin/curl -sS -m 5 -o /dev/null https://example.com && echo online || echo offline",
+      { mode: "blocked" },
+    );
     expect(blocked.output.trim().split("\n").at(-1)).toBe("offline");
   });
 });

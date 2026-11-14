@@ -71,7 +71,13 @@ export function AgentInstructionsSection({ settings }: SectionProps) {
     <SettingGroup title="Agent 指令" headingLevel={3}>
       <SettingLinkRow
         title="系统提示词"
-        description={promptError && !editorOpen ? <span className="font-sans text-act-xs text-on-danger">{promptError}</span> : path}
+        description={
+          promptError && !editorOpen ? (
+            <span className="font-sans text-act-xs text-on-danger">{promptError}</span>
+          ) : (
+            path
+          )
+        }
         monoDescription
         value={promptFile ? `${promptFile.content.length.toLocaleString("zh-CN")} 字` : undefined}
         ariaLabel={editorOpen ? "收起 Agent 指令" : "编辑 Agent 指令"}

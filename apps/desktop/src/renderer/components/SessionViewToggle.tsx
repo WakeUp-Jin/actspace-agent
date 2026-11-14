@@ -3,13 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 export type SessionMainView = "chat" | "trajectory";
 
-export function SessionViewToggle({
-  view,
-  onToggle,
-}: {
-  view: SessionMainView;
-  onToggle: () => void;
-}) {
+export function SessionViewToggle({ view, onToggle }: { view: SessionMainView; onToggle: () => void }) {
   const showingTrajectory = view === "trajectory";
   const label = showingTrajectory ? "返回对话" : "查看执行轨迹";
 
@@ -31,7 +25,9 @@ export function SessionViewToggle({
           )}
         </button>
       </TooltipTrigger>
-      <TooltipContent side="bottom" sideOffset={6}>{label}</TooltipContent>
+      <TooltipContent side="bottom" sideOffset={6}>
+        {label}
+      </TooltipContent>
     </Tooltip>
   );
 }

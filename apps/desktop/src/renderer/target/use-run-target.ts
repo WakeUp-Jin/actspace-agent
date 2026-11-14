@@ -16,7 +16,12 @@ export type RunTargetInput = {
   readonly sessionWorkspacePath?: string | null;
   /** 已有会话时运行目标不可再改。 */
   readonly locked: boolean;
-  readonly local: { readonly workspaceRoot?: string; readonly branch?: string; readonly worktree?: SessionWorktreeContext; readonly gitStatus?: WorkspaceGitContext["status"] };
+  readonly local: {
+    readonly workspaceRoot?: string;
+    readonly branch?: string;
+    readonly worktree?: SessionWorktreeContext;
+    readonly gitStatus?: WorkspaceGitContext["status"];
+  };
 };
 
 export type RunTargetState = {
@@ -57,17 +62,19 @@ const noPrefs = () => () => {};
 export function useRunTarget({ sessionId, sessionWorkspacePath, locked, local }: RunTargetInput): RunTargetState {
   const location = locateSession(sessionId);
   const sessionHostId = location.kind === "remote" ? location.hostId : null;
-  const prefs = useSyncExternalStore(
-    sessionHostId ? remoteSessionPrefs.subscribe : noPrefs,
-    () => sessionId && sessionHostId ? remoteSessionPrefs.get(sessionId) : undefined,
+  const prefs = useSyncExternalStore(sessionHostId ? remoteSessionPrefs.subscribe : noPrefs, () =>
+    sessionId && sessionHostId ? remoteSessionPrefs.get(sessionId) : undefined,
   );
   const descriptions = useHostDirectory(selectDescriptions);
-  const resolved = sessionHostId ? resolveRemoteWorkspaceId(prefs, sessionWorkspacePath, descriptions[sessionHostId]) : null;
+  const resolved = sessionHostId
+    ? resolveRemoteWorkspaceId(prefs, sessionWorkspacePath, descriptions[sessionHostId])
+    : null;
   useEffect(() => {
     if (sessionId && resolved?.fromPath) remoteSessionPrefs.set(sessionId, { workspaceId: resolved.workspaceId });
   }, [sessionId, resolved?.fromPath, resolved?.workspaceId]);
   // 没有记录也没有路径时用下面的本地选择（与原来一致）。
-  const sessionWorkspaceId = resolved && (prefs?.workspaceId || sessionWorkspacePath) ? resolved.workspaceId : undefined;
+  const sessionWorkspaceId =
+    resolved && (prefs?.workspaceId || sessionWorkspacePath) ? resolved.workspaceId : undefined;
 
   const hosts = useHostDirectory(selectHosts);
   const [selectedHostId, selectHost] = useState<string | null>(null);
@@ -75,15 +82,21 @@ export function useRunTarget({ sessionId, sessionWorkspacePath, locked, local }:
   const description = hostId ? descriptions[hostId] : undefined;
   const [selectedWorkspaceId, selectWorkspace] = useState("");
   const firstWorkspaceId = description?.workspaces[0]?.id ?? "";
-  useEffect(() => { selectWorkspace(firstWorkspaceId); }, [hostId, firstWorkspaceId]);
+  useEffect(() => {
+    selectWorkspace(firstWorkspaceId);
+  }, [hostId, firstWorkspaceId]);
   // 让 main 把当前会话所在的 Host 设为活动连接；Host 列表变化（如重连）后再报一次。
-  useEffect(() => { void hostsApi.activate(sessionId).catch(() => undefined); }, [sessionId, hosts]);
+  useEffect(() => {
+    void hostsApi.activate(sessionId).catch(() => undefined);
+  }, [sessionId, hosts]);
   const { modelId: remoteModelId, selectModel } = useRemoteModel(sessionId, hostId);
 
   const hostName = hosts.find((host) => host.hostId === hostId)?.name ?? hostId ?? "";
   // sessionWorkspaceId 只在远端会话上有值；新建页和没有记录的旧会话用本地选择。
   const workspaceId = (sessionWorkspaceId ?? selectedWorkspaceId) || undefined;
-  const workspaceName = workspaceId ? description?.workspaces.find((workspace) => workspace.id === workspaceId)?.name : undefined;
+  const workspaceName = workspaceId
+    ? description?.workspaces.find((workspace) => workspace.id === workspaceId)?.name
+    : undefined;
   const invalidKey = location.kind === "invalid" ? location.key : null;
   const target = useMemo<RunTarget>(() => {
     if (invalidKey !== null) return { kind: "invalid", key: invalidKey };
@@ -92,7 +105,16 @@ export function useRunTarget({ sessionId, sessionWorkspacePath, locked, local }:
   }, [invalidKey, hostId, hostName, workspaceId, workspaceName, local.workspaceRoot, local.branch, local.worktree]);
   const capabilities = useMemo(() => capabilitiesOf(target, { gitStatus: local.gitStatus }), [target, local.gitStatus]);
   const directory = useHostDirectory(selectSnapshot);
-  const readiness = useShallowStable(resolveReadiness({ target, directory, workspaceId, modelId: remoteModelId || undefined }));
-  const choices = useShallowStable<RunTargetChoices>({ hosts, description, modelId: remoteModelId, selectHost, selectWorkspace, selectModel });
+  const readiness = useShallowStable(
+    resolveReadiness({ target, directory, workspaceId, modelId: remoteModelId || undefined }),
+  );
+  const choices = useShallowStable<RunTargetChoices>({
+    hosts,
+    description,
+    modelId: remoteModelId,
+    selectHost,
+    selectWorkspace,
+    selectModel,
+  });
   return useShallowStable<RunTargetState>({ target, capabilities, locked, readiness, choices });
 }

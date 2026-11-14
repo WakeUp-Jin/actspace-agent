@@ -7,7 +7,8 @@ import { spawnSync } from "node:child_process";
 
 test("cutover ignores generated Astro caches but rejects retired production imports", async () => {
   const root = await mkdtemp(join(tmpdir(), "actspace-cutover-"));
-  const check = () => spawnSync(process.execPath, [join(root, "scripts/check-package-cutover.mjs"), "--strict"], { encoding: "utf8" });
+  const check = () =>
+    spawnSync(process.execPath, [join(root, "scripts/check-package-cutover.mjs"), "--strict"], { encoding: "utf8" });
   try {
     await mkdir(join(root, "scripts"));
     await copyFile("scripts/check-package-cutover.mjs", join(root, "scripts/check-package-cutover.mjs"));
@@ -25,8 +26,10 @@ test("cutover ignores generated Astro caches but rejects retired production impo
       await writeFile(path, source);
       const result = check();
       assert.equal(result.status, 1, result.stdout + result.stderr);
-      assert.match(result.stdout, new RegExp(name.replace('.', '\\.')));
+      assert.match(result.stdout, new RegExp(name.replace(".", "\\.")));
       await rm(path);
     }
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

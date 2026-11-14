@@ -6,7 +6,17 @@ import { PluginsSection } from "../components/extensions/PluginsSection";
 import { extensionBrowserStatus, extensionPlugins } from "./fixtures/extensionsFixture";
 import { setupBridge } from "./helpers/bridge";
 
-const learningState = { enabled: false, targetSessionId: null, revision: 0, promptStatus: "off", speechStatus: "idle", queuedSegments: 0, hasApiKey: false, notice: null, error: null };
+const learningState = {
+  enabled: false,
+  targetSessionId: null,
+  revision: 0,
+  promptStatus: "off",
+  speechStatus: "idle",
+  queuedSegments: 0,
+  hasApiKey: false,
+  notice: null,
+  error: null,
+};
 
 function setup(plugins = extensionPlugins()) {
   const list = vi.fn(async () => plugins);
@@ -31,12 +41,19 @@ function setup(plugins = extensionPlugins()) {
 function pythonStatus(extension: Partial<PythonRuntimeStatus["extension"]> = {}): PythonRuntimeStatus {
   return {
     runtime: { version: "3.12.16", root: "/app/runtime/python", corePackages: ["openpyxl", "pypdf"] },
-    extension: { packages: ["numpy", "pandas", "markitdown"], state: "missing", localWheelsDirectory: "/data/runtime/python-ext/wheels", ...extension },
+    extension: {
+      packages: ["numpy", "pandas", "markitdown"],
+      state: "missing",
+      localWheelsDirectory: "/data/runtime/python-ext/wheels",
+      ...extension,
+    },
   };
 }
 
 describe("PluginsSection", () => {
-  beforeEach(() => { vi.restoreAllMocks(); });
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it("groups plugins into global and session, with the switchable ones on top and built-ins folded", async () => {
     setup();
@@ -65,7 +82,13 @@ describe("PluginsSection", () => {
     const toggle = await screen.findByRole("switch", { name: "操控浏览器" });
     list.mockResolvedValue(extensionPlugins({ "browser-tools": { enabled: true } }));
     await userEvent.click(toggle);
-    await waitFor(() => expect(updateV4).toHaveBeenCalledWith({ expectedRevision: "r1", namespace: "tools", patch: { plugins: { "browser-tools": true } } }));
+    await waitFor(() =>
+      expect(updateV4).toHaveBeenCalledWith({
+        expectedRevision: "r1",
+        namespace: "tools",
+        patch: { plugins: { "browser-tools": true } },
+      }),
+    );
     expect(await screen.findByText("重启后开启")).toBeVisible();
     expect(screen.getByRole("switch", { name: "操控浏览器" })).toHaveAttribute("aria-checked", "true");
 
@@ -94,7 +117,12 @@ describe("PluginsSection", () => {
   });
 
   it("does not mount details when enabled but not loaded yet (restart pending)", async () => {
-    const { getStatus, getLearning } = setup(extensionPlugins({ "browser-tools": { enabled: true, loaded: false }, "english-learning": { enabled: true, loaded: false } }));
+    const { getStatus, getLearning } = setup(
+      extensionPlugins({
+        "browser-tools": { enabled: true, loaded: false },
+        "english-learning": { enabled: true, loaded: false },
+      }),
+    );
     render(<PluginsSection />);
     expect(await screen.findAllByText("重启后开启")).toHaveLength(2);
     expect(getStatus).not.toHaveBeenCalled();
@@ -102,7 +130,12 @@ describe("PluginsSection", () => {
   });
 
   it("expands the connection panel and learning settings when loaded and enabled", async () => {
-    const { getStatus, getLearning } = setup(extensionPlugins({ "browser-tools": { enabled: true, loaded: true }, "english-learning": { enabled: true, loaded: true } }));
+    const { getStatus, getLearning } = setup(
+      extensionPlugins({
+        "browser-tools": { enabled: true, loaded: true },
+        "english-learning": { enabled: true, loaded: true },
+      }),
+    );
     render(<PluginsSection />);
     expect(await screen.findByText("已连接，可以在对话中使用 Chrome")).toBeVisible();
     expect(await screen.findByRole("region", { name: "英语辅助学习" })).toBeVisible();
@@ -123,15 +156,39 @@ describe("PluginsSection", () => {
     rerender(<PluginsSection query="context" />);
     expect(within(await screen.findByRole("region", { name: "会话插件" })).getByText("规则")).toBeVisible();
     rerender(<PluginsSection query="Chrome 扩展" />);
-    expect(within(await screen.findByRole("region", { name: "会话插件" })).getByRole("switch", { name: "操控浏览器" })).toBeVisible();
+    expect(
+      within(await screen.findByRole("region", { name: "会话插件" })).getByRole("switch", { name: "操控浏览器" }),
+    ).toBeVisible();
     rerender(<PluginsSection query="不存在" />);
     expect(await screen.findByText("没有找到匹配的插件。")).toBeVisible();
   });
   it("subagent plugins show why they are unavailable and write their settings", async () => {
     const plugins = [
       ...extensionPlugins(),
-      { id: "subagent-codex", title: "Codex 子智能体", description: "用本机 Codex 跑子任务", scope: "session" as const, directory: "subagent", canDisable: true, loaded: true, enabled: true, settings: { approvalPolicy: "never", sandbox: "workspace-write" }, settingsPendingRestart: false },
-      { id: "subagent-claude-code", title: "Claude Code", description: "用本机 Claude Code 跑子任务", scope: "session" as const, directory: "subagent", canDisable: true, loaded: false, enabled: false, unavailableReason: "本机没有找到 claude 命令", settings: { permissionMode: "dontAsk" } },
+      {
+        id: "subagent-codex",
+        title: "Codex 子智能体",
+        description: "用本机 Codex 跑子任务",
+        scope: "session" as const,
+        directory: "subagent",
+        canDisable: true,
+        loaded: true,
+        enabled: true,
+        settings: { approvalPolicy: "never", sandbox: "workspace-write" },
+        settingsPendingRestart: false,
+      },
+      {
+        id: "subagent-claude-code",
+        title: "Claude Code",
+        description: "用本机 Claude Code 跑子任务",
+        scope: "session" as const,
+        directory: "subagent",
+        canDisable: true,
+        loaded: false,
+        enabled: false,
+        unavailableReason: "本机没有找到 claude 命令",
+        settings: { permissionMode: "dontAsk" },
+      },
     ];
     const { updateV4 } = setup(plugins);
     render(<PluginsSection />);
@@ -142,7 +199,13 @@ describe("PluginsSection", () => {
     expect(within(panel).getByText(/不经过 ActSpace 的审批与沙箱/)).toBeVisible();
     await userEvent.click(within(panel).getByRole("combobox", { name: "Codex 子智能体沙箱" }));
     await userEvent.click(await screen.findByRole("option", { name: /^read-only/ }));
-    await waitFor(() => expect(updateV4).toHaveBeenCalledWith({ expectedRevision: "r1", namespace: "tools", patch: { externalSubagents: { codex: { sandbox: "read-only" } } } }));
+    await waitFor(() =>
+      expect(updateV4).toHaveBeenCalledWith({
+        expectedRevision: "r1",
+        namespace: "tools",
+        patch: { externalSubagents: { codex: { sandbox: "read-only" } } },
+      }),
+    );
   });
   it("mounts the script runtime panel under the 命令行 row only when the fold is open, and starts the extension download", async () => {
     const { getPython, installPython } = setup();

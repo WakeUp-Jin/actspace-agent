@@ -22,14 +22,18 @@ export type ClickTarget = Exclude<LinkRoute, { kind: "none" }>;
 export const DRAG_THRESHOLD = 4;
 
 /** 语法树里 `pos` 处的链接原文：行内代码的文字，或链接 / 自动链接 / 裸 URL 的地址；图片不算。 */
-function sourceAt(state: EditorState, pos: number): { kind: "code"; text: string } | { kind: "href"; href: string } | null {
+function sourceAt(
+  state: EditorState,
+  pos: number,
+): { kind: "code"; text: string } | { kind: "href"; href: string } | null {
   for (const node of ancestorsAt(state, pos)) {
     switch (node.name) {
       case "Image":
         return null;
       case "InlineCode": {
         const marks = node.getChildren("CodeMark");
-        if (marks.length >= 2) return { kind: "code", text: state.sliceDoc(marks[0].to, marks[marks.length - 1].from).trim() };
+        if (marks.length >= 2)
+          return { kind: "code", text: state.sliceDoc(marks[0].to, marks[marks.length - 1].from).trim() };
         break;
       }
       case "URL":
@@ -57,7 +61,8 @@ export function clickTargetAt(state: EditorState, pos: number): ClickTarget | nu
       const marks = node.getChildren("CodeMark");
       if (marks.length >= 2) {
         const resolved = resolveCodePath(state.sliceDoc(marks[0].to, marks[marks.length - 1].from).trim(), ctx);
-        if (resolved) return resolved.line ? { kind: "path", ...resolved } : { kind: "path", relativePath: resolved.relativePath };
+        if (resolved)
+          return resolved.line ? { kind: "path", ...resolved } : { kind: "path", relativePath: resolved.relativePath };
       }
       continue;
     }
@@ -98,7 +103,9 @@ export function openClickTarget(view: EditorView, target: ClickTarget): boolean 
 const CLICKABLE = ".md-path, .md-link";
 
 function isPlainClick(event: MouseEvent): boolean {
-  return event.button === 0 && event.detail <= 1 && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey;
+  return (
+    event.button === 0 && event.detail <= 1 && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
+  );
 }
 
 /**

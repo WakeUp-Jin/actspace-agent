@@ -3,8 +3,15 @@ import type { LlmMessage } from "@actspace/llm-service";
 import { runToolStreamFixture } from "../testing.js";
 
 const excerpt = {
-  type: "response-excerpt", annotationId: "ann_1", assistantMessageId: "v2-5",
-  selectedText: "先读配置，再启动服务。", startOffset: 0, endOffset: 11, prefixContext: "", suffixContext: "", comment: "顺序能反过来吗？",
+  type: "response-excerpt",
+  annotationId: "ann_1",
+  assistantMessageId: "v2-5",
+  selectedText: "先读配置，再启动服务。",
+  startOffset: 0,
+  endOffset: 11,
+  prefixContext: "",
+  suffixContext: "",
+  comment: "顺序能反过来吗？",
 };
 
 it("renders file references once and excerpts as readable text, and records them once in the user message", async () => {
@@ -20,7 +27,9 @@ it("renders file references once and excerpts as readable text, and records them
     onMessages: (messages) => requests.push(messages),
   });
   const user = requests[0].find((message) => message.role === "user")!;
-  const texts = (user.content as readonly { type: string; text?: string }[]).filter((block) => block.type === "text").map((block) => block.text);
+  const texts = (user.content as readonly { type: string; text?: string }[])
+    .filter((block) => block.type === "text")
+    .map((block) => block.text);
   expect(texts.slice(0, 3)).toEqual([
     "看一下",
     [
@@ -33,11 +42,13 @@ it("renders file references once and excerpts as readable text, and records them
   const serialized = JSON.stringify(user.content);
   expect(serialized).not.toContain("v2-5");
   expect(serialized).not.toContain("ann_1");
-  expect(serialized).not.toContain("\"file-reference\"");
+  expect(serialized).not.toContain('"file-reference"');
 
   // 对话只在对话事件里记一次，请求快照不再复制（agent-spec-request-record.md §5）。
   const contextEvent = run.journal.find((event) => event.type === "request/context");
   expect(JSON.stringify(contextEvent)).not.toContain("先读配置，再启动服务。");
-  expect(JSON.stringify(run.journal.find((event) => event.type === "user/message"))).toContain("先读配置，再启动服务。");
+  expect(JSON.stringify(run.journal.find((event) => event.type === "user/message"))).toContain(
+    "先读配置，再启动服务。",
+  );
   expect(run.result.reason).toBe("completed");
 });

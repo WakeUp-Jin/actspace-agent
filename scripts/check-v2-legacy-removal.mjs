@@ -42,20 +42,30 @@ async function scan(path) {
   if (path.endsWith(".ts") || path.endsWith(".tsx")) {
     const text = await readFile(path, "utf8");
     for (const token of forbidden) {
-      if (text.includes(token) && !allowedCurrentReferences.get(relativePath)?.has(token)) hits.push(`${relativePath}: ${token}`);
+      if (text.includes(token) && !allowedCurrentReferences.get(relativePath)?.has(token))
+        hits.push(`${relativePath}: ${token}`);
     }
     return;
   }
   let entries;
-  try { entries = await readdir(path, { withFileTypes: true }); } catch { return; }
+  try {
+    entries = await readdir(path, { withFileTypes: true });
+  } catch {
+    return;
+  }
   for (const entry of entries) {
     const target = join(path, entry.name);
     if (entry.isDirectory()) await scan(target);
-    else if (/\.(?:ts|tsx|js|mjs|cjs)$/.test(entry.name) && !entry.name.endsWith(".test.ts") && !entry.name.endsWith(".test.tsx")) {
+    else if (
+      /\.(?:ts|tsx|js|mjs|cjs)$/.test(entry.name) &&
+      !entry.name.endsWith(".test.ts") &&
+      !entry.name.endsWith(".test.tsx")
+    ) {
       const text = await readFile(target, "utf8");
       const relativeTarget = relative(root, target);
       for (const token of forbidden) {
-        if (text.includes(token) && !allowedCurrentReferences.get(relativeTarget)?.has(token)) hits.push(`${relativeTarget}: ${token}`);
+        if (text.includes(token) && !allowedCurrentReferences.get(relativeTarget)?.has(token))
+          hits.push(`${relativeTarget}: ${token}`);
       }
     }
   }

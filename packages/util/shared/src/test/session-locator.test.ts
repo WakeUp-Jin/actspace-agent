@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { decodeSessionLocator, encodeSessionLocator, InvalidSessionLocatorError } from "../session-locator";
 
 declare const Buffer: { from(value: string, encoding?: string): { toString(encoding: string): string } };
-const nodeKey = (hostId: string, sessionId: string) => `host:${Buffer.from(JSON.stringify([hostId, sessionId])).toString("base64url")}`;
+const nodeKey = (hostId: string, sessionId: string) =>
+  `host:${Buffer.from(JSON.stringify([hostId, sessionId])).toString("base64url")}`;
 const rawKey = (payload: string) => `host:${Buffer.from(payload).toString("base64url")}`;
 
 describe("session locator", () => {
@@ -37,8 +38,29 @@ describe("session locator", () => {
   it("matches Buffer base64url byte for byte on random input", () => {
     let seed = 20261006;
     const next = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
-    const pool = ["a", "Z", "0", "-", "_", ":", "/", "\"", "\\", " ", "é", "中", "文", "😀", "𝒳", "\u0000", "\n", " ", "\ud800"];
-    const randomString = () => Array.from({ length: 1 + Math.floor(next() * 40) }, () => pool[Math.floor(next() * pool.length)]).join("");
+    const pool = [
+      "a",
+      "Z",
+      "0",
+      "-",
+      "_",
+      ":",
+      "/",
+      '"',
+      "\\",
+      " ",
+      "é",
+      "中",
+      "文",
+      "😀",
+      "𝒳",
+      "\u0000",
+      "\n",
+      " ",
+      "\ud800",
+    ];
+    const randomString = () =>
+      Array.from({ length: 1 + Math.floor(next() * 40) }, () => pool[Math.floor(next() * pool.length)]).join("");
     for (let index = 0; index < 200; index++) {
       const ref = { hostId: randomString(), sessionId: randomString() };
       const key = encodeSessionLocator(ref);

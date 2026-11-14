@@ -12,7 +12,6 @@ const usableModels: UsableModelView[] = [
     thinkingDefault: false,
     capabilities: { input: ["text"], toolUse: "verified", reasoning: false, thinkingToggle: false },
   },
-
 ];
 
 function settings(overrides: Partial<AppSettings> = {}): Pick<AppSettings, "taskModels" | "defaultModelId"> {
@@ -30,8 +29,11 @@ describe("resolvePreferredChatModel", () => {
   });
 
   it("uses the current DeepSeek Flash default when v2 has no explicit default", () => {
-    expect(resolvePreferredChatModel(settings({ taskModels: { defaultChatModel: null, utilityModel: null, subagentDefaultModel: null } }), usableModels)).toBe(
-      "deepseek:deepseek-flash",
-    );
+    expect(
+      resolvePreferredChatModel(
+        settings({ taskModels: { defaultChatModel: null, utilityModel: null, subagentDefaultModel: null } }),
+        usableModels,
+      ),
+    ).toBe("deepseek:deepseek-flash");
   });
 });

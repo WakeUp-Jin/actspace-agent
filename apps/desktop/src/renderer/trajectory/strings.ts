@@ -124,7 +124,11 @@ export const KIND_LABEL: Record<TrajectoryCellKind, string> = {
   subtool: "子工具",
 };
 
-export const STATUS_LABEL: Record<TrajectoryStatus, string> = { completed: "已完成", running: "等待中", failed: "失败" };
+export const STATUS_LABEL: Record<TrajectoryStatus, string> = {
+  completed: "已完成",
+  running: "等待中",
+  failed: "失败",
+};
 export const APPROVAL_LABEL = { pending: "等待批准", allowed: "已允许", denied: "已拒绝" } as const;
 
 export const TAB_LABEL = {
@@ -154,7 +158,8 @@ export const blockLabel = (index: number, type: string) => `块 #${index} ${type
 export const openBlockSummary = (index: number) => `打开第 ${index} 个块的工具调用概述`;
 export const timelineTotal = (duration: string) => `总计 ${duration}`;
 export const timelineTtftDecoding = (ttft: string, decoding: string) => `首 token ${ttft} · 解码 ${decoding}`;
-export const collapsedRowAria = (kind: "turn" | "assistant", summary: string) => `已收起的${kind === "turn" ? "轮次" : "助手"}概述，${summary}`;
+export const collapsedRowAria = (kind: "turn" | "assistant", summary: string) =>
+  `已收起的${kind === "turn" ? "轮次" : "助手"}概述，${summary}`;
 export const rowAria = (request: number | null, kind: string, content: string) =>
   `${request === null ? "" : `请求 ${request}，`}${kind}，${content || "无内容"}`;
 export const namedParametersJson = (name: string) => `${name} 参数 JSON`;

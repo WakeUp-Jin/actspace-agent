@@ -9,14 +9,24 @@ export type NonoGrants = { readonly read: ReadCover; readonly readWrite: ReadCov
  * Login shells read these before the command runs; nono's built-in shell-config protection would otherwise deny them
  * and `zsh -lc` would lose the user's PATH. Interactive files (`.zshrc`, `.bashrc`) stay protected.
  */
-export const LOGIN_SHELL_FILES = Object.freeze([".zshenv", ".zprofile", ".zlogin", ".bash_profile", ".bash_login", ".profile"]);
+export const LOGIN_SHELL_FILES = Object.freeze([
+  ".zshenv",
+  ".zprofile",
+  ".zlogin",
+  ".bash_profile",
+  ".bash_login",
+  ".profile",
+]);
 
 /**
  * Profiles include nono's system write groups by default: all of /tmp on both platforms, and all of /private/var/folders
  * (every app's $TMPDIR) on macOS. An evaluation may write only its own temp root, so they are excluded there. The tool
  * sandbox keeps them as in the first phase.
  */
-function systemWrite(policy: SandboxPolicy, group: "system_write_macos" | "system_write_linux"): Record<string, unknown> {
+function systemWrite(
+  policy: SandboxPolicy,
+  group: "system_write_macos" | "system_write_linux",
+): Record<string, unknown> {
   return policy.purpose === "evaluation" ? { groups: { exclude: [group] } } : {};
 }
 
@@ -37,11 +47,11 @@ export function buildMacosProfile(policy: SandboxPolicy, grants: NonoGrants, hom
       read_file: grants.read.files,
       allow: grants.readWrite.directories,
       allow_file: [...grants.readWrite.files, "/dev/null"],
-      bypass_protection: LOGIN_SHELL_FILES.map(file => join(homeDir, file)),
+      bypass_protection: LOGIN_SHELL_FILES.map((file) => join(homeDir, file)),
     },
     unsafe_macos_seatbelt_rules: [
-      ...denyRead.length ? [`(deny file-read* ${subpaths(denyRead)})`] : [],
-      ...denyWrite.length ? [`(deny file-write* ${subpaths(denyWrite)})`] : [],
+      ...(denyRead.length ? [`(deny file-read* ${subpaths(denyRead)})`] : []),
+      ...(denyWrite.length ? [`(deny file-write* ${subpaths(denyWrite)})`] : []),
     ],
     network: profileNetwork(policy.network),
   };
@@ -52,11 +62,17 @@ export function buildMacosProfile(policy: SandboxPolicy, grants: NonoGrants, hom
  * drops it, and `-c` refuses every other flag). Grants are the same split cover as the manifest.
  */
 export function buildLinuxProfile(policy: SandboxPolicy, grants: NonoGrants): Record<string, unknown> {
-  if (policy.filesystem.denyWrite.length) throw new Error("nono on Linux cannot deny writes inside a writable directory.");
+  if (policy.filesystem.denyWrite.length)
+    throw new Error("nono on Linux cannot deny writes inside a writable directory.");
   return {
     meta: { name: "actspace-sandbox", description: `ActSpace ${policy.purpose} sandbox ${policy.fingerprint}` },
     ...systemWrite(policy, "system_write_linux"),
-    filesystem: { read: grants.read.directories, read_file: grants.read.files, allow: grants.readWrite.directories, allow_file: [...grants.readWrite.files, "/dev/null"] },
+    filesystem: {
+      read: grants.read.directories,
+      read_file: grants.read.files,
+      allow: grants.readWrite.directories,
+      allow_file: [...grants.readWrite.files, "/dev/null"],
+    },
     network: profileNetwork(policy.network),
   };
 }
@@ -73,8 +89,8 @@ function profileNetwork(network: SandboxNetwork): Record<string, unknown> {
   if (!network.domains.length) return { block: true, open_port: network.localPorts ?? [] };
   return {
     allow_domain: network.domains,
-    ...network.localPorts?.length ? { open_port: network.localPorts } : {},
-    ...network.upstreamProxy ? { upstream_proxy: network.upstreamProxy } : {},
+    ...(network.localPorts?.length ? { open_port: network.localPorts } : {}),
+    ...(network.upstreamProxy ? { upstream_proxy: network.upstreamProxy } : {}),
   };
 }
 
@@ -83,15 +99,16 @@ function profileNetwork(network: SandboxNetwork): Record<string, unknown> {
  * leave out denyRead, and policies that need write denies are refused.
  */
 export function buildLinuxManifest(policy: SandboxPolicy, grants: NonoGrants): Record<string, unknown> {
-  if (policy.filesystem.denyWrite.length) throw new Error("nono on Linux cannot deny writes inside a writable directory.");
+  if (policy.filesystem.denyWrite.length)
+    throw new Error("nono on Linux cannot deny writes inside a writable directory.");
   return {
     version: "0.1.0",
     filesystem: {
       grants: [
-        ...grants.read.directories.map(path => ({ path, access: "read" })),
-        ...grants.read.files.map(path => ({ path, access: "read", type: "file" })),
-        ...grants.readWrite.directories.map(path => ({ path, access: "readwrite" })),
-        ...grants.readWrite.files.map(path => ({ path, access: "readwrite", type: "file" })),
+        ...grants.read.directories.map((path) => ({ path, access: "read" })),
+        ...grants.read.files.map((path) => ({ path, access: "read", type: "file" })),
+        ...grants.readWrite.directories.map((path) => ({ path, access: "readwrite" })),
+        ...grants.readWrite.files.map((path) => ({ path, access: "readwrite", type: "file" })),
         { path: "/dev/null", access: "readwrite", type: "file" },
       ],
     },
@@ -100,5 +117,9 @@ export function buildLinuxManifest(policy: SandboxPolicy, grants: NonoGrants): R
   };
 }
 
-function subpaths(paths: readonly string[]): string { return paths.map(path => `(subpath ${sbplString(path)})`).join(" "); }
-export function sbplString(value: string): string { return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`; }
+function subpaths(paths: readonly string[]): string {
+  return paths.map((path) => `(subpath ${sbplString(path)})`).join(" ");
+}
+export function sbplString(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}

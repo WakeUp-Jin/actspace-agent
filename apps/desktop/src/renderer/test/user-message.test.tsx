@@ -49,11 +49,15 @@ describe("UserMessage", () => {
         <UserMessage message={{ ...makeUserBlock("纯文本发送"), attachments }} sessionId="session-1" />
       </Profiler>,
     );
-    await act(async () => { await Promise.resolve(); });
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(readSessionArtifact).not.toHaveBeenCalled();
     expect(commits).toBeLessThanOrEqual(2);
     const settledCommits = commits;
-    await act(async () => { await Promise.resolve(); });
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(commits).toBe(settledCommits);
   });
 
@@ -175,7 +179,9 @@ describe("UserMessage", () => {
     expect(previewButton).not.toBeDisabled();
 
     await userEvent.click(previewButton);
-    expect(onOpenAttachmentPreview).toHaveBeenCalledWith(expect.objectContaining({ previewUrl: "data:image/png;base64,persisted" }));
+    expect(onOpenAttachmentPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ previewUrl: "data:image/png;base64,persisted" }),
+    );
   });
 });
 
@@ -209,7 +215,9 @@ describe("UserMessage sent response annotations", () => {
 
   it("locates an available annotation and marks unavailable ones", async () => {
     const locateAnnotation = vi.fn();
-    const resolveRange = vi.fn((annotation: ResponseAnnotationReference) => (annotation.annotationId === "a" ? document.createRange() : null));
+    const resolveRange = vi.fn((annotation: ResponseAnnotationReference) =>
+      annotation.annotationId === "a" ? document.createRange() : null,
+    );
     render(
       <ResponseAnnotationContext.Provider value={createAnnotationContextValue({ locateAnnotation, resolveRange })}>
         <UserMessage message={annotated} sessionId="session-1" />

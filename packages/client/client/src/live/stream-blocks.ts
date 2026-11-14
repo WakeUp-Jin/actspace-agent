@@ -3,11 +3,15 @@ import { hasVisibleText, trimTrailing } from "@actspace/shared";
 import type { BashStatus, MessageBlock, ToolUiPreview } from "@actspace/shared";
 import type { StreamingState, ToolEntry } from "./run-state.js";
 
-export function getStreamingBashStatus(tool: {
-  isError?: boolean;
-  finished?: boolean;
-  approvalPending?: boolean;
-}, previewStatus?: BashStatus, background?: boolean): BashStatus {
+export function getStreamingBashStatus(
+  tool: {
+    isError?: boolean;
+    finished?: boolean;
+    approvalPending?: boolean;
+  },
+  previewStatus?: BashStatus,
+  background?: boolean,
+): BashStatus {
   if (tool.approvalPending) {
     return "pending";
   }
@@ -64,7 +68,14 @@ export function getStreamingDirectoryText(
 
 export function displayFileName(path: string): string {
   const normalized = trimTrailing(path, "\\/");
-  return normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized ?? path;
+  return (
+    normalized
+      .split(/[\\/]+/)
+      .filter(Boolean)
+      .pop() ??
+    normalized ??
+    path
+  );
 }
 
 export function getStreamingDeleteText(
@@ -83,13 +94,21 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
   const blockId = agentRunId ? `turn:${agentRunId}:tool:${toolCallId}` : `streaming-tool-${toolCallId}`;
 
   // Previews without a dedicated approval component must retain an actionable fallback.
-  if (tool.approvalPending && !["bash", "read", "grep", "glob", "delete", "write", "edit_diff"].includes(tool.preview?.kind ?? "")) {
+  if (
+    tool.approvalPending &&
+    !["bash", "read", "grep", "glob", "delete", "write", "edit_diff"].includes(tool.preview?.kind ?? "")
+  ) {
     return {
-      kind: "tool", id: blockId, toolName: tool.toolName,
+      kind: "tool",
+      id: blockId,
+      toolName: tool.toolName,
       title: tool.approvalSummary ?? tool.toolName,
-      content: tool.preview?.kind === "directory_list" ? tool.preview.path : tool.approvalReason ?? "等待审批",
-      createdAt: now, status: "pending", approvalRequestId: tool.approvalRequestId,
-      approvalReason: tool.approvalReason, approvalScope: tool.approvalScope,
+      content: tool.preview?.kind === "directory_list" ? tool.preview.path : (tool.approvalReason ?? "等待审批"),
+      createdAt: now,
+      status: "pending",
+      approvalRequestId: tool.approvalRequestId,
+      approvalReason: tool.approvalReason,
+      approvalScope: tool.approvalScope,
     };
   }
 
@@ -98,9 +117,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       kind: "bash",
       id: blockId,
       status: getStreamingBashStatus(tool, tool.preview.status, tool.preview.background),
-      title: tool.approvalPending
-        ? (tool.approvalSummary ?? "Bash command needs approval")
-        : tool.preview.title,
+      title: tool.approvalPending ? (tool.approvalSummary ?? "Bash command needs approval") : tool.preview.title,
       command: tool.preview.command || "Waiting for Bash result...",
       commandPreview: tool.preview.commandPreview || "bash",
       cwd: tool.preview.cwd,
@@ -128,7 +145,11 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       displayText: tool.finished ? tool.preview.displayText : getStreamingReadText(tool.preview),
       resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
       createdAt: now,
-      status: tool.approvalPending ? "pending" : tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      status: tool.approvalPending
+        ? "pending"
+        : tool.finished
+          ? (tool.terminalStatus ?? (tool.isError ? "failed" : "completed"))
+          : "running",
       approvalRequestId: tool.approvalRequestId,
       reason: tool.approvalReason,
     };
@@ -144,7 +165,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       displayText: tool.finished ? tool.preview.displayText : getStreamingSearchText(tool.preview),
       resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
       createdAt: now,
-      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      status: tool.finished ? (tool.terminalStatus ?? (tool.isError ? "failed" : "completed")) : "running",
     };
   }
 
@@ -158,7 +179,11 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       displayText: tool.finished ? tool.preview.displayText : getStreamingGrepText(tool.preview),
       resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
       createdAt: now,
-      status: tool.approvalPending ? "pending" : tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      status: tool.approvalPending
+        ? "pending"
+        : tool.finished
+          ? (tool.terminalStatus ?? (tool.isError ? "failed" : "completed"))
+          : "running",
       approvalRequestId: tool.approvalRequestId,
       reason: tool.approvalReason,
     };
@@ -174,7 +199,11 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       displayText: tool.finished ? tool.preview.displayText : getStreamingGlobText(tool.preview),
       resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
       createdAt: now,
-      status: tool.approvalPending ? "pending" : tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      status: tool.approvalPending
+        ? "pending"
+        : tool.finished
+          ? (tool.terminalStatus ?? (tool.isError ? "failed" : "completed"))
+          : "running",
       approvalRequestId: tool.approvalRequestId,
       reason: tool.approvalReason,
     };
@@ -189,7 +218,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       url: tool.preview.url,
       displayText: getStreamingWebSearchText(tool.preview),
       createdAt: now,
-      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      status: tool.finished ? (tool.terminalStatus ?? (tool.isError ? "failed" : "completed")) : "running",
       resultUrls: tool.finished ? tool.preview.resultUrls : undefined,
       contentPreview: tool.finished ? tool.preview.contentPreview : undefined,
     };
@@ -203,7 +232,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       mediaKind: tool.preview.mediaKind,
       displayText: getStreamingMediaAnalysisText(tool.preview),
       createdAt: now,
-      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      status: tool.finished ? (tool.terminalStatus ?? (tool.isError ? "failed" : "completed")) : "running",
       isError: tool.isError,
     };
   }
@@ -212,9 +241,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
     return {
       kind: "image_generation",
       id: blockId,
-      status: tool.finished
-        ? tool.isError ? "failed" : tool.preview.status
-        : "running",
+      status: tool.finished ? (tool.isError ? "failed" : tool.preview.status) : "running",
       promptPreview: tool.preview.promptPreview,
       requestedCount: tool.preview.requestedCount,
       generatedCount: tool.finished ? tool.preview.generatedCount : undefined,
@@ -236,13 +263,27 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       entryCount: tool.finished ? tool.preview.entryCount : undefined,
       displayText: tool.finished ? tool.preview.displayText : getStreamingDirectoryText(tool.preview, tool.finished),
       createdAt: now,
-      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
+      status: tool.finished ? (tool.terminalStatus ?? (tool.isError ? "failed" : "completed")) : "running",
     };
   }
 
   if (tool.preview?.kind === "present") {
-    const status = tool.finished ? tool.terminalStatus === "denied" ? "denied" : tool.isError ? "failed" : "completed" : "running";
-    return { kind: "present", id: blockId, files: tool.preview.files, displayText: tool.preview.displayText, createdAt: now, status, isError: status === "failed" || status === "denied" };
+    const status = tool.finished
+      ? tool.terminalStatus === "denied"
+        ? "denied"
+        : tool.isError
+          ? "failed"
+          : "completed"
+      : "running";
+    return {
+      kind: "present",
+      id: blockId,
+      files: tool.preview.files,
+      displayText: tool.preview.displayText,
+      createdAt: now,
+      status,
+      isError: status === "failed" || status === "denied",
+    };
   }
 
   if (tool.preview?.kind === "delete") {
@@ -250,7 +291,9 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       ? "pending"
       : tool.finished
         ? tool.isError
-          ? tool.preview.status === "denied" ? "denied" : "failed"
+          ? tool.preview.status === "denied"
+            ? "denied"
+            : "failed"
           : "completed"
         : "running";
     return {
@@ -272,7 +315,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
     const status = tool.approvalPending
       ? "pending"
       : tool.finished
-        ? tool.preview.status ?? (tool.isError ? "failed" : "completed")
+        ? (tool.preview.status ?? (tool.isError ? "failed" : "completed"))
         : "running";
     return {
       kind: "edit_diff",
@@ -297,7 +340,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
     const status = tool.approvalPending
       ? "pending"
       : tool.finished
-        ? tool.preview.status ?? (tool.isError ? "failed" : "completed")
+        ? (tool.preview.status ?? (tool.isError ? "failed" : "completed"))
         : "running";
     return {
       kind: "write_diff",
@@ -355,7 +398,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       completedCount: tool.preview.completedCount,
       revision: tool.preview.revision,
       displayText: tool.preview.displayText,
-      status: tool.finished ? tool.isError ? "failed" : "completed" : "running",
+      status: tool.finished ? (tool.isError ? "failed" : "completed") : "running",
       isError: tool.isError,
       createdAt: now,
     };
@@ -366,23 +409,25 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
     id: blockId,
     toolName: tool.toolName,
     artifacts: tool.preview?.kind === "generic" ? tool.preview.artifacts : undefined,
-    title: tool.preview?.kind === "generic"
-      ? tool.preview.title
-      : tool.finished ? `${tool.toolName}` : `Running ${tool.toolName}...`,
-    content: tool.approvalPending && tool.toolName.startsWith("browser_")
-      ? "等待确认浏览器操作"
-      : tool.preview?.kind === "generic"
-        ? tool.preview.content
-      : tool.finished
-        ? tool.isError ? "Tool execution failed" : "Completed"
-        : "Executing...",
+    title:
+      tool.preview?.kind === "generic"
+        ? tool.preview.title
+        : tool.finished
+          ? `${tool.toolName}`
+          : `Running ${tool.toolName}...`,
+    content:
+      tool.approvalPending && tool.toolName.startsWith("browser_")
+        ? "等待确认浏览器操作"
+        : tool.preview?.kind === "generic"
+          ? tool.preview.content
+          : tool.finished
+            ? tool.isError
+              ? "Tool execution failed"
+              : "Completed"
+            : "Executing...",
     createdAt: now,
     isError: tool.isError,
-    status: tool.approvalPending
-      ? "pending"
-      : tool.finished
-        ? tool.isError ? "failed" : "completed"
-        : "running",
+    status: tool.approvalPending ? "pending" : tool.finished ? (tool.isError ? "failed" : "completed") : "running",
     approvalRequestId: tool.approvalRequestId,
     approvalReason: tool.approvalReason,
     approvalScope: tool.approvalScope,
@@ -394,7 +439,8 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
  * 这样的调用不是在运行，不投影成「Running」行，等审批结束或它真正开始后再出现。
  */
 function isQueuedBehindApproval(state: StreamingState, tool: ToolEntry): boolean {
-  if (tool.started || tool.finished || tool.terminalStatus || tool.approvalPending || tool.transcriptEvents) return false;
+  if (tool.started || tool.finished || tool.terminalStatus || tool.approvalPending || tool.transcriptEvents)
+    return false;
   for (const other of state.activeTools.values()) {
     if (other.approvalPending && !other.terminalStatus) return true;
   }
@@ -474,7 +520,7 @@ export function streamingStateToBlocks(state: StreamingState, agentRunId?: strin
   }
 
   // 每个 live 块都带所属 run 的 runId（14 T13），合并 durable 与 live 时按它判断归属；已有 runId 的（压缩块）保持不变。
-  return agentRunId ? blocks.map((block) => block.runId ? block : { ...block, runId: agentRunId }) : blocks;
+  return agentRunId ? blocks.map((block) => (block.runId ? block : { ...block, runId: agentRunId })) : blocks;
 }
 
 export type CompactionBlock = Extract<MessageBlock, { kind: "context_compaction" }>;

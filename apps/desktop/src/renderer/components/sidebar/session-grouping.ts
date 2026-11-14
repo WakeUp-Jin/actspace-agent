@@ -24,17 +24,21 @@ export type WorkspaceGroup = {
 
 export function sessionWorkspaceRoot(session: SessionListItem, workspaces: WorkspaceEntry[]): string | undefined {
   if (session.hostId) return session.workspaceRoot;
-  return workspaces.find((workspace) => workspace.id === session.workspaceId)?.path ??
+  return (
+    workspaces.find((workspace) => workspace.id === session.workspaceId)?.path ??
     workspaces.find((workspace) => session.workspaceRoot && workspace.path === session.workspaceRoot)?.path ??
-    (session.workspaceRoot || undefined);
+    (session.workspaceRoot || undefined)
+  );
 }
 
 /** 本机会话归属的已登记工作区：先按 id，再按路径。远端会话不归本机工作区。 */
 function matchSessionWorkspace(session: SessionListItem, workspaces: WorkspaceEntry[]): WorkspaceEntry | undefined {
   if (session.hostId) return undefined;
   const root = sessionRoot(session);
-  return workspaces.find((workspace) => workspace.id === session.workspaceId) ??
-    (root ? workspaces.find((workspace) => workspace.path === root) : undefined);
+  return (
+    workspaces.find((workspace) => workspace.id === session.workspaceId) ??
+    (root ? workspaces.find((workspace) => workspace.path === root) : undefined)
+  );
 }
 
 /** 旧版本留下的本机会话：既没有登记的工作区，也没有路径。侧栏不显示。 */
@@ -48,7 +52,11 @@ export function isInRegisteredWorkspace(session: SessionListItem, workspaces: Wo
 }
 
 /** 单列表、按时间和搜索结果里行尾的工作区名：远端是「Host · 目录名」，本机是登记的名称，其次目录名。 */
-export function sessionWorkspaceLabel(session: SessionListItem, workspaces: WorkspaceEntry[], hostNameOf?: HostNameLookup): string {
+export function sessionWorkspaceLabel(
+  session: SessionListItem,
+  workspaces: WorkspaceEntry[],
+  hostNameOf?: HostNameLookup,
+): string {
   if (session.hostId) return remoteGroupLabel(session.hostId, session, hostNameOf);
   return matchSessionWorkspace(session, workspaces)?.label ?? workspaceLabelFromRoot(sessionRoot(session));
 }
@@ -64,7 +72,7 @@ export type HostNameLookup = (hostId: string) => string | undefined;
 
 function remoteGroupLabel(hostId: string, session: SessionListItem, hostNameOf?: HostNameLookup): string {
   const hostName = hostNameOf?.(hostId) ?? session.hostName ?? hostId;
-  return `${hostName} · ${workspaceLabelFromRoot((session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot))}`;
+  return `${hostName} · ${workspaceLabelFromRoot(session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot)}`;
 }
 
 export function groupSessionsByWorkspace(
@@ -91,9 +99,12 @@ export function groupSessionsByWorkspace(
       groups.set(key, {
         key,
         hostId: session.hostId,
-        label: session.hostId ? remoteGroupLabel(session.hostId, session, hostNameOf) : matchedWorkspace?.label ?? workspaceLabelFromRoot((session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot)),
+        label: session.hostId
+          ? remoteGroupLabel(session.hostId, session, hostNameOf)
+          : (matchedWorkspace?.label ??
+            workspaceLabelFromRoot(session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot)),
         workspaceId: matchedWorkspace?.id ?? session.workspaceId,
-        workspaceRoot: matchedWorkspace?.path ?? (session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot),
+        workspaceRoot: matchedWorkspace?.path ?? session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot,
         sessions: [],
       });
     }
@@ -116,7 +127,10 @@ export function groupSessionsByWorkspace(
 }
 
 /** 按分组 key 收集会话，不排序。侧栏用它判断工作区「归档全部」是否可用，传入的是全部会话（含置顶）。 */
-export function sessionsByGroupKey(sessions: SessionListItem[], workspaces: WorkspaceEntry[]): Map<string, SessionListItem[]> {
+export function sessionsByGroupKey(
+  sessions: SessionListItem[],
+  workspaces: WorkspaceEntry[],
+): Map<string, SessionListItem[]> {
   const groups = new Map<string, SessionListItem[]>();
   for (const session of sessions) {
     if (isOrphanSession(session, workspaces)) continue;

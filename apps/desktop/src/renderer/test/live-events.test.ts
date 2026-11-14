@@ -5,7 +5,15 @@ import { createLiveEventHub } from "../api/live-events";
 // 14 T17：sessionLive 全局只订阅一次，按 message 分发。
 function envelope(message: string | null, sessionId = "s1"): RuntimeDesktopLiveEnvelope {
   return {
-    event: { kind: "runtime-live", schemaVersion: 1, runtimeInstanceId: "rt", liveSeq: 1, throughJournalSeq: 0, sessionId, message },
+    event: {
+      kind: "runtime-live",
+      schemaVersion: 1,
+      runtimeInstanceId: "rt",
+      liveSeq: 1,
+      throughJournalSeq: 0,
+      sessionId,
+      message,
+    },
     emittedAt: "2026-10-06T00:00:00.000Z",
   };
 }
@@ -15,9 +23,14 @@ function fakeSource() {
   const release = vi.fn();
   const source = vi.fn((listener: (envelope: RuntimeDesktopLiveEnvelope) => void) => {
     listeners.add(listener);
-    return () => { listeners.delete(listener); release(); };
+    return () => {
+      listeners.delete(listener);
+      release();
+    };
   });
-  const emit = (value: RuntimeDesktopLiveEnvelope) => { for (const listener of [...listeners]) listener(value); };
+  const emit = (value: RuntimeDesktopLiveEnvelope) => {
+    for (const listener of [...listeners]) listener(value);
+  };
   return { source, release, emit, size: () => listeners.size };
 }
 
@@ -67,7 +80,9 @@ describe("live event hub", () => {
     const hub = createLiveEventHub(source);
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const after = vi.fn();
-    hub.subscribe(() => { throw new Error("boom"); });
+    hub.subscribe(() => {
+      throw new Error("boom");
+    });
     const offFirst = hub.subscribe(after);
     hub.subscribe(after);
     emit(envelope("task-queue-updated"));

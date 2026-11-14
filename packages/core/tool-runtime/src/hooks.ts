@@ -13,7 +13,10 @@ export type ToolPreExecutePayload = {
 export type ToolArgumentsPatch = { readonly args?: Readonly<Record<string, RuntimeJsonValue>> };
 
 /** `tools/execute` 的 payload：`execute` 是工具体的执行入口，监听器可以包住它。 */
-export type ToolExecutePayload = { readonly context: ToolExecutionContext; readonly execute: () => Promise<ToolBodyResult> };
+export type ToolExecutePayload = {
+  readonly context: ToolExecutionContext;
+  readonly execute: () => Promise<ToolBodyResult>;
+};
 /** `tools/execute` 的结果。给了 `execute` 就调用它，否则调用原来的入口。 */
 export type ToolExecutePatch = { readonly execute?: () => Promise<ToolBodyResult> };
 
@@ -31,4 +34,6 @@ export interface ToolHooks {
   "tools/post-execute": WaterfallHook<ToolBodyResult, ToolBodyResult>;
 }
 
-declare module "@actspace/cordis-adapter" { interface DomainEvents extends ToolHooks {} }
+declare module "@actspace/cordis-adapter" {
+  interface DomainEvents extends ToolHooks {}
+}

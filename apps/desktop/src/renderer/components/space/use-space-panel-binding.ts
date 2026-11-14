@@ -21,7 +21,13 @@ function useLiveSpacePanelBinding(): SpacePanelBinding {
 }
 
 const noop = () => {};
-const DISABLED_BINDING: SpacePanelBinding = { available: false, isOpen: false, setOpen: noop, openPanel: noop, closePanel: noop };
+const DISABLED_BINDING: SpacePanelBinding = {
+  available: false,
+  isOpen: false,
+  setOpen: noop,
+  openPanel: noop,
+  closePanel: noop,
+};
 
 function useDisabledSpacePanelBinding(): SpacePanelBinding {
   return DISABLED_BINDING;

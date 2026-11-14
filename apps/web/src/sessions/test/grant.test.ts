@@ -1,10 +1,22 @@
 import type { GrantSuggestion } from "@actspace/shared/runtime-v2";
 import { commandPrefixGrant, getCommandPrefixGrant } from "../grant";
 
-const suggestion = (selector: unknown, id = "g1"): GrantSuggestion => ({ suggestionId: id, lifetime: "session", action: "process.execute", access: "execute", selector, audience: { pluginId: "p", permissionDomain: "d", policyVersion: 1 }, label: "x" } as GrantSuggestion);
+const suggestion = (selector: unknown, id = "g1"): GrantSuggestion =>
+  ({
+    suggestionId: id,
+    lifetime: "session",
+    action: "process.execute",
+    access: "execute",
+    selector,
+    audience: { pluginId: "p", permissionDomain: "d", policyVersion: 1 },
+    label: "x",
+  }) as GrantSuggestion;
 
 it("builds the prefix from a command_prefix suggestion", () => {
-  const found = commandPrefixGrant([suggestion({ kind: "exact", canonicalPath: "/a" }, "f"), suggestion({ kind: "command_prefix", prefix: ["git", "status"], cwdRoot: "/w" }, "c")]);
+  const found = commandPrefixGrant([
+    suggestion({ kind: "exact", canonicalPath: "/a" }, "f"),
+    suggestion({ kind: "command_prefix", prefix: ["git", "status"], cwdRoot: "/w" }, "c"),
+  ]);
   expect(found).toMatchObject({ prefix: "git status", suggestion: { suggestionId: "c" } });
 });
 

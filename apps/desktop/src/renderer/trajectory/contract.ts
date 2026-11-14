@@ -2,8 +2,19 @@ import type { RuntimeJsonValue, RuntimeTrajectoryNode } from "@actspace/shared/r
 
 export type TrajectoryTimelineMode = "sequence" | "duration" | "time" | "actual";
 export type TrajectoryRecordKind =
-  | "turn" | "step" | "system" | "user" | "request" | "context" | "assistant"
-  | "tool" | "approval" | "retry" | "compaction" | "error" | "raw";
+  | "turn"
+  | "step"
+  | "system"
+  | "user"
+  | "request"
+  | "context"
+  | "assistant"
+  | "tool"
+  | "approval"
+  | "retry"
+  | "compaction"
+  | "error"
+  | "raw";
 export type TrajectoryRecordState = "started" | "running" | "updated" | "completed" | "failed" | "aborted" | "observed";
 
 /** A prompt/tool snapshot used by an explicit SYSTEM prompt boundary. */
@@ -126,7 +137,13 @@ export type TrajectoryRecord = {
   readonly messageSource?: RuntimeJsonValue | null;
   /** Parent call identity for nested tool dispatch records. */
   readonly parentCallId?: string | null;
-  readonly contextPresentation?: { readonly category: string; readonly title: string; readonly action: string; readonly placement: string; readonly previousText?: string };
+  readonly contextPresentation?: {
+    readonly category: string;
+    readonly title: string;
+    readonly action: string;
+    readonly placement: string;
+    readonly previousText?: string;
+  };
   /** Resolved owner from explicit message/call identity, never row proximity. */
   readonly assistantRecordId?: string | null;
   /** Compaction facts merged from `compaction/start` and `compaction/end`; fields are null in journals that predate them. */
@@ -193,8 +210,16 @@ export type TrajectoryCell = {
   readonly approval: TrajectoryApproval | null;
 };
 
-export type TrajectoryGroup = { readonly key: string; readonly title: string; readonly cells: readonly TrajectoryCell[] };
-export type TrajectoryLayoutTurn = { readonly section: number; readonly turn: number | null; readonly groups: readonly TrajectoryGroup[] };
+export type TrajectoryGroup = {
+  readonly key: string;
+  readonly title: string;
+  readonly cells: readonly TrajectoryCell[];
+};
+export type TrajectoryLayoutTurn = {
+  readonly section: number;
+  readonly turn: number | null;
+  readonly groups: readonly TrajectoryGroup[];
+};
 
 /** One model request, numbered in session order. Retries of the same step fold into it. */
 export type TrajectoryRequestView = {

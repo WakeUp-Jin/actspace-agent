@@ -44,22 +44,28 @@ describe("App session copy and fork actions", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "复制 ID" }));
     expect(writeText).toHaveBeenLastCalledWith(sourceSessionId);
     // 等上一个菜单在 setTimeout(0) 里处理完关闭后的焦点，否则会把刚打开的菜单当成焦点移出而关掉。
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     fireEvent.contextMenu(sourceRow as HTMLElement, { clientX: 120, clientY: 80 });
     screen.getByRole("menuitem", { name: "复制" }).focus();
     await user.keyboard("{ArrowRight}");
     fireEvent.click(await screen.findByRole("menuitem", { name: "复制会话记录" }));
     await waitFor(() => expect(writeText).toHaveBeenLastCalledWith("# New chat\n"));
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     fireEvent.contextMenu(sourceRow as HTMLElement, { clientX: 120, clientY: 80 });
     await user.click(screen.getByRole("menuitem", { name: "分叉" }));
 
     let forkRow = null as HTMLElement | null;
     await waitFor(() => {
-      forkRow = Array.from(document.querySelectorAll<HTMLElement>(".session-row"))
-        .find((row) => row.textContent?.includes("New chat (fork)")) ?? null;
+      forkRow =
+        Array.from(document.querySelectorAll<HTMLElement>(".session-row")).find((row) =>
+          row.textContent?.includes("New chat (fork)"),
+        ) ?? null;
       expect(forkRow).not.toBeNull();
     });
     expect(forkRow).not.toBeNull();

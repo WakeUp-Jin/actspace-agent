@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { caretInCode, createCodeSource, moveCodeCaret, selectedCode, sourceOffsetAt } from "../components/right-panel/code-source-selection";
+import {
+  caretInCode,
+  createCodeSource,
+  moveCodeCaret,
+  selectedCode,
+  sourceOffsetAt,
+} from "../components/right-panel/code-source-selection";
 
 describe("virtual code source selection", () => {
   it("maps UTF-16 offsets through empty lines, CRLF and the last line", () => {
@@ -28,7 +34,8 @@ describe("virtual code source selection", () => {
   it("maps highlighted token spans without copying line numbers or empty-line placeholders", () => {
     const source = createCodeSource(["const 中文 = '😀';", "", "end"]);
     const row = document.createElement("div");
-    row.innerHTML = '<span data-line-number="1">1</span><code data-line-index="0"><span>const</span> 中文 = <span>\'😀\'</span>;</code><code data-line-index="1">\u200b</code>';
+    row.innerHTML =
+      '<span data-line-number="1">1</span><code data-line-index="0"><span>const</span> 中文 = <span>\'😀\'</span>;</code><code data-line-index="1">\u200b</code>';
     const code = row.querySelector("code")!;
     const emoji = code.querySelectorAll("span")[1].firstChild!;
     const offset = sourceOffsetAt(source, emoji, 3)!;

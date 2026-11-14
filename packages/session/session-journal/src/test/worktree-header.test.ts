@@ -5,29 +5,94 @@ import { createSessionForkSeed } from "../fork.js";
 
 describe("optional durable worktree binding", () => {
   const registry = createCoreCodecRegistry();
-  const base = { sessionId: "source", createdAt: "2026-10-07T00:00:00Z", cwd: "/worktree", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "2", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } };
-  const worktree = { kind: "worktree" as const, sourceWorkspaceRoot: "/repo", workspaceRoot: "/worktree", baseBranch: "main", branch: "codex/test", baseCommit: "abc", createdAt: base.createdAt };
+  const base = {
+    sessionId: "source",
+    createdAt: "2026-10-07T00:00:00Z",
+    cwd: "/worktree",
+    lineage: null,
+    createdWith: {
+      profileId: "test",
+      runtimeContractVersion: "2",
+      manifestDigest: "test",
+      plugins: [],
+      codecSetDigest: registry.digest,
+    },
+  };
+  const worktree = {
+    kind: "worktree" as const,
+    sourceWorkspaceRoot: "/repo",
+    workspaceRoot: "/worktree",
+    baseBranch: "main",
+    branch: "codex/test",
+    baseCommit: "abc",
+    createdAt: base.createdAt,
+  };
   it("reads old headers, validates the bound cwd, and carries the binding into forks", () => {
     expect(() => validateSessionHeader(createSessionHeader(base))).not.toThrow();
     const header = createSessionHeader({ ...base, worktree });
     expect(() => createSessionHeader({ ...base, cwd: "/different", worktree })).toThrow("Worktree must match");
     expect(() => createSessionHeader({ ...base, worktree: { ...worktree, createdAt: "bad" } })).toThrow("timestamp");
-    const fork = createSessionForkSeed({ parentHeader: header, parentEvents: [], boundarySeq: -1, newSessionId: "fork", createdAt: base.createdAt, createdWith: base.createdWith, registry });
+    const fork = createSessionForkSeed({
+      parentHeader: header,
+      parentEvents: [],
+      boundarySeq: -1,
+      newSessionId: "fork",
+      createdAt: base.createdAt,
+      createdWith: base.createdWith,
+      registry,
+    });
     expect(fork.header.worktree).toEqual(worktree);
     expect(fork.header.cwd).toBe(worktree.workspaceRoot);
   });
   it("accepts side-chat lineage and keeps the parent's delegation depth", () => {
     const parent = createSessionHeader(base);
-    const seed = createSessionForkSeed({ parentHeader: parent, parentEvents: [], boundarySeq: -1, newSessionId: "side", createdAt: base.createdAt, createdWith: base.createdWith, registry, origin: "side-chat" });
+    const seed = createSessionForkSeed({
+      parentHeader: parent,
+      parentEvents: [],
+      boundarySeq: -1,
+      newSessionId: "side",
+      createdAt: base.createdAt,
+      createdWith: base.createdWith,
+      registry,
+      origin: "side-chat",
+    });
     expect(seed.header.lineage).toMatchObject({ parentSessionId: "source", origin: "side-chat", delegationDepth: 0 });
     expect(() => validateSessionHeader(seed.header)).not.toThrow();
-    expect(() => createSessionHeader({ ...base, lineage: { parentSessionId: "source", parentBoundarySeq: -1, origin: "branch" as never, delegationDepth: 0 } })).toThrow("side-chat");
+    expect(() =>
+      createSessionHeader({
+        ...base,
+        lineage: { parentSessionId: "source", parentBoundarySeq: -1, origin: "branch" as never, delegationDepth: 0 },
+      }),
+    ).toThrow("side-chat");
   });
   it("accepts inheritedThroughSeq only on delegation lineage", () => {
-    const lineage = { parentSessionId: "source", parentBoundarySeq: 9, origin: "delegation" as const, delegationDepth: 1, parentCallId: "call-1", inheritedThroughSeq: 9 };
+    const lineage = {
+      parentSessionId: "source",
+      parentBoundarySeq: 9,
+      origin: "delegation" as const,
+      delegationDepth: 1,
+      parentCallId: "call-1",
+      inheritedThroughSeq: 9,
+    };
     expect(() => validateSessionHeader(createSessionHeader({ ...base, lineage }))).not.toThrow();
-    expect(() => createSessionHeader({ ...base, lineage: { ...lineage, origin: "side-chat" } })).toThrow("only allowed for delegation");
-    expect(() => createSessionHeader({ ...base, lineage: { ...lineage, inheritedThroughSeq: -1 } })).toThrow("non-negative");
-    expect(() => validateSessionHeader(createSessionHeader({ ...base, lineage: { parentSessionId: "source", parentBoundarySeq: -1, origin: "delegation" as const, delegationDepth: 1 } }))).not.toThrow();
+    expect(() => createSessionHeader({ ...base, lineage: { ...lineage, origin: "side-chat" } })).toThrow(
+      "only allowed for delegation",
+    );
+    expect(() => createSessionHeader({ ...base, lineage: { ...lineage, inheritedThroughSeq: -1 } })).toThrow(
+      "non-negative",
+    );
+    expect(() =>
+      validateSessionHeader(
+        createSessionHeader({
+          ...base,
+          lineage: {
+            parentSessionId: "source",
+            parentBoundarySeq: -1,
+            origin: "delegation" as const,
+            delegationDepth: 1,
+          },
+        }),
+      ),
+    ).not.toThrow();
   });
 });

@@ -7,9 +7,7 @@ import { defineConfig } from "astro/config";
 
 const site = process.env.SITE_URL ?? "https://wakeup-jin.github.io";
 const configuredBase = process.env.SITE_BASE ?? "/actspace-agent";
-const base = configuredBase === "/"
-  ? "/"
-  : `/${configuredBase.replace(/^\/+|\/+$/g, "")}`;
+const base = configuredBase === "/" ? "/" : `/${configuredBase.replace(/^\/+|\/+$/g, "")}`;
 
 export default defineConfig({
   site,

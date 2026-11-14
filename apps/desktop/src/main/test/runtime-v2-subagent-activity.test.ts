@@ -9,21 +9,75 @@ describe("subagent activity in the parent stream", () => {
     const adapter = new FixedRendererStreamAdapter();
     const events: RuntimeStreamEvent[] = [];
     adapter.subscribe((event) => events.push(event));
-    const parent = { sessionId: "parent", agentRunId: "parent-run", turnId: "turn", requestId: "request", callId: "delegate", name: "agent" };
+    const parent = {
+      sessionId: "parent",
+      agentRunId: "parent-run",
+      turnId: "turn",
+      requestId: "request",
+      callId: "delegate",
+      name: "agent",
+    };
     adapter.accept({ ...parent, kind: "tool-prepared", arguments: { task: "Inspect tests" } });
     adapter.accept({ ...parent, kind: "tool-started" });
-    const child = { sessionId: "child", parentSessionId: "parent", parentCallId: "delegate", agentRunId: "child-run", turnId: "child-turn", requestId: "child-request", messageId: "message" };
-    const labels = () => events.flatMap((event) => event.sessionId === "parent" && event.type === "tool_call_streaming" && event.preview?.kind === "agent" ? [event.preview.displayText] : []);
+    const child = {
+      sessionId: "child",
+      parentSessionId: "parent",
+      parentCallId: "delegate",
+      agentRunId: "child-run",
+      turnId: "child-turn",
+      requestId: "child-request",
+      messageId: "message",
+    };
+    const labels = () =>
+      events.flatMap((event) =>
+        event.sessionId === "parent" && event.type === "tool_call_streaming" && event.preview?.kind === "agent"
+          ? [event.preview.displayText]
+          : [],
+      );
     adapter.accept({ ...child, kind: "run-state", message: "request-started", model: "deepseek-flash" });
-    const models = events.flatMap((event) => event.sessionId === "parent" && event.type === "tool_call_streaming" && event.preview?.kind === "agent" ? [event.preview.model] : []);
+    const models = events.flatMap((event) =>
+      event.sessionId === "parent" && event.type === "tool_call_streaming" && event.preview?.kind === "agent"
+        ? [event.preview.model]
+        : [],
+    );
     expect(models.at(-1)).toBe("deepseek-flash");
     adapter.accept({ ...child, kind: "reasoning-delta", message: "hidden reasoning" });
-    adapter.accept({ ...child, kind: "tool-prepared", callId: "read", name: "read_file", arguments: { path: "/private/workspace/test.ts" } });
-    adapter.accept({ ...child, kind: "tool-prepared", callId: "grep", name: "grep", arguments: { pattern: "secret=do-not-show" } });
+    adapter.accept({
+      ...child,
+      kind: "tool-prepared",
+      callId: "read",
+      name: "read_file",
+      arguments: { path: "/private/workspace/test.ts" },
+    });
+    adapter.accept({
+      ...child,
+      kind: "tool-prepared",
+      callId: "grep",
+      name: "grep",
+      arguments: { pattern: "secret=do-not-show" },
+    });
     expect(labels()).toContain("正在读取 · test.ts");
     expect(labels().at(-1)).toBe("正在执行 2 项工具调用 · 正在搜索");
-    const result = { status: "completed" as const, summary: "ok", modelOutput: [], artifacts: [], detail: [], failure: null };
-    for (const [callId, name] of [["read", "read_file"], ["grep", "grep"]]) adapter.accept({ ...child, kind: "tool-finished", callId: callId, name: name, result: result as never, resultEventId: callId });
+    const result = {
+      status: "completed" as const,
+      summary: "ok",
+      modelOutput: [],
+      artifacts: [],
+      detail: [],
+      failure: null,
+    };
+    for (const [callId, name] of [
+      ["read", "read_file"],
+      ["grep", "grep"],
+    ])
+      adapter.accept({
+        ...child,
+        kind: "tool-finished",
+        callId: callId,
+        name: name,
+        result: result as never,
+        resultEventId: callId,
+      });
     for (let i = 0; i < 30; i++) adapter.accept({ ...child, kind: "assistant-delta", message: "hidden reply" });
     expect(labels().filter((label) => label === "正在整理回复")).toHaveLength(1);
     expect(labels().join()).not.toMatch(/hidden|do-not-show|private/);
@@ -36,16 +90,46 @@ describe("subagent activity in the parent stream", () => {
 });
 
 const child = { sessionId: "child", agentRunId: "run", turnId: "turn", requestId: "request" };
-const result = { status: "completed" as const, summary: "ok", modelOutput: [], artifacts: [], detail: [], failure: null };
+const result = {
+  status: "completed" as const,
+  summary: "ok",
+  modelOutput: [],
+  artifacts: [],
+  detail: [],
+  failure: null,
+};
 
 describe("subagent operation context", () => {
   it("retains a fast file operation through subsequent model phases, without claiming it is running", () => {
     const activity = new SubagentActivity();
-    expect(activity.accept({ ...child, kind: "tool-prepared", callId: "read", name: "read_file", arguments: { path: "/workspace/ConversationView.tsx" } })).toBe("正在读取 · ConversationView.tsx");
-    expect(activity.accept({ ...child, kind: "tool-finished", callId: "read", name: "read_file", result: result as never, resultEventId: "done" })).toBe("正在分析 · 刚读取 ConversationView.tsx");
-    expect(activity.accept({ ...child, kind: "run-state", message: "request-started" })).toBe("正在思考 · 刚读取 ConversationView.tsx");
-    expect(activity.accept({ ...child, kind: "reasoning-delta", messageId: "m", message: "private" })).toBe("正在分析 · 刚读取 ConversationView.tsx");
-    expect(activity.accept({ ...child, kind: "assistant-delta", messageId: "m", message: "private" })).toBe("正在整理回复");
+    expect(
+      activity.accept({
+        ...child,
+        kind: "tool-prepared",
+        callId: "read",
+        name: "read_file",
+        arguments: { path: "/workspace/ConversationView.tsx" },
+      }),
+    ).toBe("正在读取 · ConversationView.tsx");
+    expect(
+      activity.accept({
+        ...child,
+        kind: "tool-finished",
+        callId: "read",
+        name: "read_file",
+        result: result as never,
+        resultEventId: "done",
+      }),
+    ).toBe("正在分析 · 刚读取 ConversationView.tsx");
+    expect(activity.accept({ ...child, kind: "run-state", message: "request-started" })).toBe(
+      "正在思考 · 刚读取 ConversationView.tsx",
+    );
+    expect(activity.accept({ ...child, kind: "reasoning-delta", messageId: "m", message: "private" })).toBe(
+      "正在分析 · 刚读取 ConversationView.tsx",
+    );
+    expect(activity.accept({ ...child, kind: "assistant-delta", messageId: "m", message: "private" })).toBe(
+      "正在整理回复",
+    );
     expect(activity.accept({ ...child, kind: "run-state", message: "completed" })).toBe("正在交回结果");
   });
 
@@ -57,15 +141,49 @@ describe("subagent operation context", () => {
     ["grep", { pattern: "Bearer do-not-show" }, "正在搜索"],
     ["grep", { pattern: "sk-test-12345678901234567890" }, "正在搜索"],
   ])("preserves useful %s targets and hides credential values", (name, args, expected) => {
-    expect(new SubagentActivity().accept({ ...child, kind: "tool-prepared", callId: "tool", name, arguments: args })).toBe(expected);
+    expect(
+      new SubagentActivity().accept({ ...child, kind: "tool-prepared", callId: "tool", name, arguments: args }),
+    ).toBe(expected);
   });
 
   it("keeps parallel targets visible and does not report a failed read as successful", () => {
     const activity = new SubagentActivity();
-    activity.accept({ ...child, kind: "tool-prepared", callId: "read", name: "read_file", arguments: { path: "a.ts" } });
-    expect(activity.accept({ ...child, kind: "tool-prepared", callId: "grep", name: "grep", arguments: { pattern: "AgentRunBlock" } })).toBe("正在执行 2 项工具调用 · 正在搜索 · AgentRunBlock");
-    expect(activity.accept({ ...child, kind: "tool-finished", callId: "grep", name: "grep", result: result as never, resultEventId: "g" })).toBe("正在读取 · a.ts");
-    expect(activity.accept({ ...child, kind: "tool-finished", callId: "read", name: "read_file", result: { ...result, status: "failed" } as never, resultEventId: "r" })).toBe("正在分析 · 刚尝试读取 a.ts");
+    activity.accept({
+      ...child,
+      kind: "tool-prepared",
+      callId: "read",
+      name: "read_file",
+      arguments: { path: "a.ts" },
+    });
+    expect(
+      activity.accept({
+        ...child,
+        kind: "tool-prepared",
+        callId: "grep",
+        name: "grep",
+        arguments: { pattern: "AgentRunBlock" },
+      }),
+    ).toBe("正在执行 2 项工具调用 · 正在搜索 · AgentRunBlock");
+    expect(
+      activity.accept({
+        ...child,
+        kind: "tool-finished",
+        callId: "grep",
+        name: "grep",
+        result: result as never,
+        resultEventId: "g",
+      }),
+    ).toBe("正在读取 · a.ts");
+    expect(
+      activity.accept({
+        ...child,
+        kind: "tool-finished",
+        callId: "read",
+        name: "read_file",
+        result: { ...result, status: "failed" } as never,
+        resultEventId: "r",
+      }),
+    ).toBe("正在分析 · 刚尝试读取 a.ts");
   });
 });
 
@@ -74,13 +192,27 @@ describe("subagent activity board (panel second line)", () => {
     const board = new SubagentActivityBoard();
     const a = { ...child, sessionId: "child-a", parentSessionId: "parent" };
     const b = { ...child, sessionId: "child-b", parentSessionId: "parent" };
-    board.accept({ ...child, sessionId: "parent", kind: "tool-prepared", callId: "x", name: "read_file", arguments: { path: "parent.ts" } });
+    board.accept({
+      ...child,
+      sessionId: "parent",
+      kind: "tool-prepared",
+      callId: "x",
+      name: "read_file",
+      arguments: { path: "parent.ts" },
+    });
     expect(board.label("parent")).toBeUndefined();
     board.accept({ ...a, kind: "tool-prepared", callId: "read", name: "read_file", arguments: { path: "/w/a.ts" } });
     board.accept({ ...b, kind: "run-state", message: "request-started" });
     expect(board.label("child-a")).toBe("正在读取 · a.ts");
     expect(board.label("child-b")).toBe("正在思考");
-    board.accept({ ...a, kind: "tool-finished", callId: "read", name: "read_file", result: result as never, resultEventId: "r" });
+    board.accept({
+      ...a,
+      kind: "tool-finished",
+      callId: "read",
+      name: "read_file",
+      result: result as never,
+      resultEventId: "r",
+    });
     board.accept({ ...a, kind: "assistant-delta", messageId: "m", message: "private reply" });
     expect(board.label("child-a")).toBe("正在整理回复");
     board.accept({ ...a, kind: "run-state", message: "completed" });
@@ -90,7 +222,14 @@ describe("subagent activity board (panel second line)", () => {
 
   it("keeps at most 200 children, dropping the oldest", () => {
     const board = new SubagentActivityBoard();
-    for (let i = 0; i <= 200; i++) board.accept({ ...child, sessionId: `c${i}`, parentSessionId: "parent", kind: "run-state", message: "request-started" });
+    for (let i = 0; i <= 200; i++)
+      board.accept({
+        ...child,
+        sessionId: `c${i}`,
+        parentSessionId: "parent",
+        kind: "run-state",
+        message: "request-started",
+      });
     expect(board.label("c0")).toBeUndefined();
     expect(board.label("c1")).toBe("正在思考");
     expect(board.label("c200")).toBe("正在思考");

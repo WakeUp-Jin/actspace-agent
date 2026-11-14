@@ -12,10 +12,13 @@ export const FILE_APPLICATIONS_CACHE_MAX_ENTRIES = 200;
 const cache = new LruCache<Promise<WorkspaceFileApplicationsResult>>(FILE_APPLICATIONS_CACHE_MAX_ENTRIES);
 
 function query(key: string, workspaceRoot: string, relativePath: string): Promise<WorkspaceFileApplicationsResult> {
-  const pending = workspacesApi.listFileApplications({ workspaceRoot, relativePath })
+  const pending = workspacesApi
+    .listFileApplications({ workspaceRoot, relativePath })
     .catch((): WorkspaceFileApplicationsResult => ({ applications: [], error: "query_failed" }));
   cache.set(key, pending);
-  void pending.then((result) => { if (result.error && cache.peek(key) === pending) cache.delete(key); });
+  void pending.then((result) => {
+    if (result.error && cache.peek(key) === pending) cache.delete(key);
+  });
   return pending;
 }
 
@@ -31,17 +34,28 @@ export type FileApplicationsState = {
   refresh: () => void;
 };
 
-export function useFileApplications(workspaceRoot: string | null | undefined, relativePath: string, enabled: boolean): FileApplicationsState {
+export function useFileApplications(
+  workspaceRoot: string | null | undefined,
+  relativePath: string,
+  enabled: boolean,
+): FileApplicationsState {
   const key = `${workspaceRoot ?? ""}\u0000${relativePath}`;
   const [loaded, setLoaded] = useState<{ key: string; result: WorkspaceFileApplicationsResult } | null>(null);
 
-  const load = useCallback((force: boolean) => {
-    if (!enabled || !workspaceRoot) return () => {};
-    let cancelled = false;
-    const pending = (!force && cache.get(key)) || query(key, workspaceRoot, relativePath);
-    void pending.then((result) => { if (!cancelled) setLoaded({ key, result }); });
-    return () => { cancelled = true; };
-  }, [enabled, key, workspaceRoot, relativePath]);
+  const load = useCallback(
+    (force: boolean) => {
+      if (!enabled || !workspaceRoot) return () => {};
+      let cancelled = false;
+      const pending = (!force && cache.get(key)) || query(key, workspaceRoot, relativePath);
+      void pending.then((result) => {
+        if (!cancelled) setLoaded({ key, result });
+      });
+      return () => {
+        cancelled = true;
+      };
+    },
+    [enabled, key, workspaceRoot, relativePath],
+  );
 
   useEffect(() => load(false), [load]);
 
@@ -50,7 +64,9 @@ export function useFileApplications(workspaceRoot: string | null | undefined, re
     applications: current?.applications ?? [],
     failed: current?.error === "query_failed",
     loading: enabled && Boolean(workspaceRoot) && current === null,
-    refresh: useCallback(() => { load(true); }, [load]),
+    refresh: useCallback(() => {
+      load(true);
+    }, [load]),
   };
 }
 

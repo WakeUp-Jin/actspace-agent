@@ -13,11 +13,17 @@ import { useWorkspaceFileLinks } from "./use-workspace-file-links";
 export function ChatMarkdownHostProvider({ children }: { children: ReactNode }) {
   const { openWorkspaceFile, workspaceRoot } = useWorkspaceFileLinks();
   // loadImage 只依赖工作区根：openWorkspaceFile 随右栏状态变化时 host 会换，loader 引用必须不变，图片缓存才会命中。
-  const loadImage = useMemo(() => workspaceRoot ? (path: string) => readWorkspaceImage(workspaceRoot, path) : undefined, [workspaceRoot]);
-  const host = useMemo<MarkdownHost>(() => ({
-    openPath: openWorkspaceFile,
-    workspaceRoot,
-    ...(loadImage ? { loadImage } : {}),
-  }), [openWorkspaceFile, workspaceRoot, loadImage]);
+  const loadImage = useMemo(
+    () => (workspaceRoot ? (path: string) => readWorkspaceImage(workspaceRoot, path) : undefined),
+    [workspaceRoot],
+  );
+  const host = useMemo<MarkdownHost>(
+    () => ({
+      openPath: openWorkspaceFile,
+      workspaceRoot,
+      ...(loadImage ? { loadImage } : {}),
+    }),
+    [openWorkspaceFile, workspaceRoot, loadImage],
+  );
   return <MarkdownHostContext.Provider value={host}>{children}</MarkdownHostContext.Provider>;
 }

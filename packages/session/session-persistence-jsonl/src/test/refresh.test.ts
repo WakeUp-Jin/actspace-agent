@@ -4,7 +4,12 @@ import { appendFile, mkdtemp, readFile, rename, rm, stat, truncate, writeFile } 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { createCoreCodecRegistry, createSessionHeader, SessionJournal, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import {
+  createCoreCodecRegistry,
+  createSessionHeader,
+  SessionJournal,
+  type SessionEventEnvelopeV1,
+} from "@actspace/session-journal";
 import type { SessionStorageSnapshot } from "@actspace/session-storage";
 import { JsonlSessionStorage } from "../storage.js";
 
@@ -13,19 +18,33 @@ const reads = vi.hoisted(() => ({ calls: 0, bytes: 0 }));
 // When set, every stat of an opened Journal answers this instead: what the reader sees when a write
 // lands in the same timestamp tick as the previous read (size and timestamps do not move).
 const heldStat = vi.hoisted(() => ({ value: null as Stats | null }));
-vi.mock("node:fs/promises", async importOriginal => {
+vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   return {
     ...actual,
     open: async (...args: Parameters<typeof actual.open>) => {
       const handle = await actual.open(...args);
-      return new Proxy(handle, { get(target, key) {
-        const value = Reflect.get(target, key) as unknown;
-        if (key === "readFile") return async (...a: unknown[]) => { const buffer = await (value as Function).apply(target, a) as Buffer; reads.calls++; reads.bytes += buffer.length; return buffer; };
-        if (key === "read") return async (...a: unknown[]) => { const result = await (value as Function).apply(target, a) as { bytesRead: number }; reads.calls++; reads.bytes += result.bytesRead; return result; };
-        if (key === "stat") return async () => heldStat.value ?? await target.stat();
-        return typeof value === "function" ? value.bind(target) : value;
-      } });
+      return new Proxy(handle, {
+        get(target, key) {
+          const value = Reflect.get(target, key) as unknown;
+          if (key === "readFile")
+            return async (...a: unknown[]) => {
+              const buffer = (await (value as Function).apply(target, a)) as Buffer;
+              reads.calls++;
+              reads.bytes += buffer.length;
+              return buffer;
+            };
+          if (key === "read")
+            return async (...a: unknown[]) => {
+              const result = (await (value as Function).apply(target, a)) as { bytesRead: number };
+              reads.calls++;
+              reads.bytes += result.bytesRead;
+              return result;
+            };
+          if (key === "stat") return async () => heldStat.value ?? (await target.stat());
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
     },
   };
 });
@@ -38,13 +57,28 @@ beforeEach(async () => {
   dataRoot = await mkdtemp(join(tmpdir(), "jsonl-refresh-"));
   storage = new JsonlSessionStorage({ dataRoot, runtimeId: "test", registry });
   journal = new SessionJournal({ registry });
-  reads.calls = 0; reads.bytes = 0;
+  reads.calls = 0;
+  reads.bytes = 0;
   heldStat.value = null;
 });
-afterEach(async () => { await storage.close(); await rm(dataRoot, { recursive: true, force: true }); });
+afterEach(async () => {
+  await storage.close();
+  await rm(dataRoot, { recursive: true, force: true });
+});
 
 async function createSession(id: string, titles: readonly string[] = []): Promise<string> {
-  const header = createSessionHeader({ sessionId: id, createdAt: "2026-11-04T00:00:00.000Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } });
+  const header = createSessionHeader({
+    sessionId: id,
+    createdAt: "2026-11-04T00:00:00.000Z",
+    lineage: null,
+    createdWith: {
+      profileId: "test",
+      runtimeContractVersion: "1",
+      manifestDigest: "test",
+      plugins: [],
+      codecSetDigest: registry.digest,
+    },
+  });
   const handle = await storage.create(header);
   await handle.close();
   const path = storage.journalPath(id);
@@ -52,12 +86,21 @@ async function createSession(id: string, titles: readonly string[] = []): Promis
   return path;
 }
 function titleEvent(title: string): SessionEventEnvelopeV1 {
-  return journal.append({ type: "session/title-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { title }, surface: null });
+  return journal.append({
+    type: "session/title-set",
+    eventVersion: 1,
+    source: { ownerPluginId: "@actspace/core" },
+    data: { title },
+    surface: null,
+  });
 }
 async function appendEvents(path: string, titles: readonly string[]): Promise<void> {
-  await appendFile(path, titles.map(title => JSON.stringify(titleEvent(title)) + "\n").join(""));
+  await appendFile(path, titles.map((title) => JSON.stringify(titleEvent(title)) + "\n").join(""));
 }
-const sha = async (path: string) => createHash("sha256").update(await readFile(path)).digest("hex");
+const sha = async (path: string) =>
+  createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex");
 const bigTitle = (n: number) => "x".repeat(n);
 
 /** What callers may observe must equal a from-scratch read. */
@@ -73,10 +116,14 @@ async function expectSameAsFresh(id: string, snapshot: SessionStorageSnapshot): 
 }
 
 it("unchanged Journal: refresh returns the same snapshot and re-reads only the 4 KiB tail, however large the file is", async () => {
-  const path = await createSession("same", Array.from({ length: 200 }, (_, i) => `${i}${bigTitle(500)}`));
+  const path = await createSession(
+    "same",
+    Array.from({ length: 200 }, (_, i) => `${i}${bigTitle(500)}`),
+  );
   const base = await storage.inspect("same");
   expect(reads.bytes).toBeGreaterThan(100_000); // control: the spy sees a full read
-  reads.calls = 0; reads.bytes = 0;
+  reads.calls = 0;
+  reads.bytes = 0;
   const result = await storage.refresh("same", base);
   expect(result).toEqual({ kind: "unchanged", snapshot: base });
   expect(result.snapshot).toBe(base);
@@ -89,18 +136,23 @@ it("unchanged Journal: refresh returns the same snapshot and re-reads only the 4
 it("unchanged Journal smaller than the tail window: the comparison covers the whole file", async () => {
   const path = await createSession("small", ["a", "b"]);
   const base = await storage.inspect("small");
-  reads.calls = 0; reads.bytes = 0;
+  reads.calls = 0;
+  reads.bytes = 0;
   expect((await storage.refresh("small", base)).kind).toBe("unchanged");
   expect(reads.bytes).toBe((await stat(path)).size);
 });
 
 it("append: reads only the new bytes, parses only new events, and matches a full read exactly (revision is still the file sha256)", async () => {
-  const path = await createSession("grow", Array.from({ length: 200 }, (_, i) => `${i}${bigTitle(500)}`));
+  const path = await createSession(
+    "grow",
+    Array.from({ length: 200 }, (_, i) => `${i}${bigTitle(500)}`),
+  );
   const base = await storage.inspect("grow");
   expect(base.revision).toBe(await sha(path));
   const added = ["new-1", "new-2", "new-3"];
   await appendEvents(path, added);
-  reads.calls = 0; reads.bytes = 0;
+  reads.calls = 0;
+  reads.bytes = 0;
   const result = await storage.refresh("grow", base);
   expect(result.kind).toBe("appended");
   if (result.kind !== "appended") return;
@@ -177,7 +229,8 @@ it("growth combined with an in-place edit of already-consumed bytes falls back t
 it("a different file at the same path (rename-over, as repair does) falls back to a full read", async () => {
   const path = await createSession("replaced-file", ["a"]);
   const base = await storage.inspect("replaced-file");
-  const longer = (await readFile(path, "utf8")) + JSON.stringify(titleEvent("b")) + "\n" + JSON.stringify(titleEvent("c")) + "\n";
+  const longer =
+    (await readFile(path, "utf8")) + JSON.stringify(titleEvent("b")) + "\n" + JSON.stringify(titleEvent("c")) + "\n";
   await writeFile(`${path}.next`, longer);
   await rename(`${path}.next`, path);
   const result = await storage.refresh("replaced-file", base);
@@ -239,5 +292,9 @@ it("snapshots expose bytes and the codec digest validation ran under", async () 
   const path = await createSession("meta", ["a"]);
   const snapshot = await storage.inspect("meta");
   expect(snapshot.bytes).toBe((await readFile(path)).length);
-  expect(snapshot.validated).toMatchObject({ codecDigest: registry.digest, accessState: "read-write", result: { accessState: "read-write", diagnostics: [] } });
+  expect(snapshot.validated).toMatchObject({
+    codecDigest: registry.digest,
+    accessState: "read-write",
+    result: { accessState: "read-write", diagnostics: [] },
+  });
 });

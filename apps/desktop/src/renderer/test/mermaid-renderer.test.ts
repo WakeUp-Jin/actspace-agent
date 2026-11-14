@@ -65,10 +65,10 @@ describe("prepareMermaidSource", () => {
       "  securityLevel: loose",
       "  theme: dark",
       "---",
-      "%%{init: {\"securityLevel\": \"loose\", \"theme\": \"forest\"}}%%",
+      '%%{init: {"securityLevel": "loose", "theme": "forest"}}%%',
       "flowchart TD",
       "  A[Start] --> B{Ok?}",
-      "  click A \"https://example.com\" _blank",
+      '  click A "https://example.com" _blank',
       "  CLICK B callback",
       "  B --> C",
     ].join("\n");
@@ -115,8 +115,16 @@ describe("renderMermaid", () => {
 
     expect(mermaid.initialize).toHaveBeenCalledTimes(1);
     const config = mermaid.initialize.mock.calls[0][0];
-    expect(config).toMatchObject({ startOnLoad: false, securityLevel: "strict", htmlLabels: false, theme: "base", suppressErrorRendering: true });
-    expect(config.secure).toEqual(expect.arrayContaining(["securityLevel", "theme", "themeVariables", "themeCSS", "htmlLabels"]));
+    expect(config).toMatchObject({
+      startOnLoad: false,
+      securityLevel: "strict",
+      htmlLabels: false,
+      theme: "base",
+      suppressErrorRendering: true,
+    });
+    expect(config.secure).toEqual(
+      expect.arrayContaining(["securityLevel", "theme", "themeVariables", "themeCSS", "htmlLabels"]),
+    );
     expect(config.themeVariables.primaryColor).toBe("#ffe7d9");
   });
 
@@ -147,16 +155,24 @@ describe("renderMermaid", () => {
   it("maps failures to controlled error kinds", async () => {
     const mermaid = await mermaidMock();
     mermaid.render.mockRejectedValueOnce(new Error("Parse error on line 2: secret-source"));
-    await expect(renderMermaid("graph TD\nA-->", "codex")).rejects.toMatchObject({ kind: "syntax", message: "图表语法有误" });
+    await expect(renderMermaid("graph TD\nA-->", "codex")).rejects.toMatchObject({
+      kind: "syntax",
+      message: "图表语法有误",
+    });
 
-    await expect(renderMermaid("x".repeat(MERMAID_MAX_SOURCE_CHARS + 1), "codex")).rejects.toMatchObject({ kind: "too-large" });
+    await expect(renderMermaid("x".repeat(MERMAID_MAX_SOURCE_CHARS + 1), "codex")).rejects.toMatchObject({
+      kind: "too-large",
+    });
     await expect(renderMermaid("%%{init: {}}%%\n", "codex")).rejects.toMatchObject({ kind: "empty" });
     expect(mermaid.render).toHaveBeenCalledTimes(1);
   });
 
   it("rejects oversized SVG output", async () => {
     const mermaid = await mermaidMock();
-    mermaid.render.mockResolvedValueOnce({ svg: `<svg viewBox="0 0 1 1">${"<g></g>".repeat(400_000)}</svg>`, diagramType: "flowchart" });
+    mermaid.render.mockResolvedValueOnce({
+      svg: `<svg viewBox="0 0 1 1">${"<g></g>".repeat(400_000)}</svg>`,
+      diagramType: "flowchart",
+    });
     await expect(renderMermaid("graph TD\nA-->B", "codex")).rejects.toMatchObject({ kind: "too-large" });
   });
 });

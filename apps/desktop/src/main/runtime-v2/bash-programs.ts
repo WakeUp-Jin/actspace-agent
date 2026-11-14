@@ -11,7 +11,16 @@ export type BashProgramOccurrence = {
   subcommand: string;
 };
 
-export const BASH_SUBCOMMAND_PROGRAMS: ReadonlySet<string> = new Set(["git", "pnpm", "npm", "yarn", "cargo", "go", "gh", "docker"]);
+export const BASH_SUBCOMMAND_PROGRAMS: ReadonlySet<string> = new Set([
+  "git",
+  "pnpm",
+  "npm",
+  "yarn",
+  "cargo",
+  "go",
+  "gh",
+  "docker",
+]);
 
 export const BASH_COMMAND_PARSE_LIMIT = 16_000;
 
@@ -23,14 +32,54 @@ const LEADING_KEYWORDS = new Set(["!", "if", "then", "else", "elif", "do", "whil
 
 /** 段首是这些词时整段不计。 */
 const NOT_PROGRAMS = new Set([
-  "cd", "pushd", "popd",
-  "export", "local", "declare", "readonly", "typeset",
-  "for", "case", "select", "function", "coproc", "done", "fi", "esac", "in", "[", "[[", "]]",
+  "cd",
+  "pushd",
+  "popd",
+  "export",
+  "local",
+  "declare",
+  "readonly",
+  "typeset",
+  "for",
+  "case",
+  "select",
+  "function",
+  "coproc",
+  "done",
+  "fi",
+  "esac",
+  "in",
+  "[",
+  "[[",
+  "]]",
 ]);
 
 /** 包装命令及其会带值的选项。 */
 const WRAPPERS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ["sudo", new Set(["-u", "-g", "-p", "-C", "-D", "-r", "-t", "-U", "-T", "--user", "--group", "--host", "--prompt", "--chdir", "--role", "--type", "--other-user", "--close-from", "--command-timeout"])],
+  [
+    "sudo",
+    new Set([
+      "-u",
+      "-g",
+      "-p",
+      "-C",
+      "-D",
+      "-r",
+      "-t",
+      "-U",
+      "-T",
+      "--user",
+      "--group",
+      "--host",
+      "--prompt",
+      "--chdir",
+      "--role",
+      "--type",
+      "--other-user",
+      "--close-from",
+      "--command-timeout",
+    ]),
+  ],
   ["doas", new Set(["-u", "-C"])],
   ["env", new Set(["-u", "-C", "-S", "--unset", "--chdir", "--split-string"])],
   ["command", new Set<string>()],
@@ -125,7 +174,7 @@ function splitSegments(text: string): Token[][] {
       i = stop + 1;
       continue;
     }
-    if (c === "\"") {
+    if (c === '"') {
       const { value, end } = readDoubleQuoted(text, i + 1);
       append(value, true);
       i = end;
@@ -247,7 +296,7 @@ function splitSegments(text: string): Token[][] {
 function readDoubleQuoted(text: string, start: number): { value: string; end: number } {
   let value = "";
   let i = start;
-  while (i < text.length && text[i] !== "\"") {
+  while (i < text.length && text[i] !== '"') {
     const c = text[i];
     if (c === "\\" && i + 1 < text.length) {
       value += text[i + 1] === "\n" ? "" : text[i + 1];
@@ -283,7 +332,7 @@ function scanBalanced(text: string, open: number, left: string, right: string): 
       i = end < 0 ? text.length : end + 1;
       continue;
     }
-    if (c === "\"") {
+    if (c === '"') {
       i = readDoubleQuoted(text, i + 1).end;
       continue;
     }
@@ -359,7 +408,12 @@ function segmentProgram(tokens: readonly Token[]): BashProgramOccurrence | null 
 }
 
 /** 返回包装命令之后第一个词的位置；`command -v` 这类只查找不执行的返回 null。 */
-function skipWrapperOptions(name: string, valueOptions: ReadonlySet<string>, words: readonly Word[], start: number): number | null {
+function skipWrapperOptions(
+  name: string,
+  valueOptions: ReadonlySet<string>,
+  words: readonly Word[],
+  start: number,
+): number | null {
   let k = start;
   while (k < words.length) {
     const value = words[k].value;

@@ -8,28 +8,46 @@ import { runToolStreamFixture } from "../testing.js";
 function modeProbe() {
   const seen: { stepId: string | undefined; mode: unknown }[] = [];
   const sources = new ContextSourceRegistry();
-  sources.register({ id: "probe", owner: "probe", order: 0, criticality: "required", fields: [],
-    get: (context) => { seen.push({ stepId: context.request.stepId, mode: (context.status.plugins["actspace.loop"] as { mode?: unknown } | undefined)?.mode }); } });
+  sources.register({
+    id: "probe",
+    owner: "probe",
+    order: 0,
+    criticality: "required",
+    fields: [],
+    get: (context) => {
+      seen.push({
+        stepId: context.request.stepId,
+        mode: (context.status.plugins["actspace.loop"] as { mode?: unknown } | undefined)?.mode,
+      });
+    },
+  });
   return { seen, sources };
 }
 
 describe("AgentLoop tool live events", () => {
-  it.each(["chat", "plan", "agent"] as const)("stores the user message as given and hands %s mode to context sources", async (mode) => {
-    const probe = modeProbe();
-    const { journal } = await runToolStreamFixture({ mode, terminalOnly: true, contextSources: probe.sources });
-    expect(journal.find((event) => event.type === "request/context")?.data).toMatchObject({
-      snapshot: { prepared: { defaults: { cacheRetention: mode === "chat" ? "long" : "short" } } },
-    });
-    const userEvent = journal.find((event) => event.type === "user/message");
-    expect(userEvent ? surfaceNode(userEvent).content : null).toBe("Read fixture");
-    expect(probe.seen.length).toBeGreaterThan(0);
-    expect(probe.seen.every((entry) => entry.mode === mode)).toBe(true);
-  });
+  it.each(["chat", "plan", "agent"] as const)(
+    "stores the user message as given and hands %s mode to context sources",
+    async (mode) => {
+      const probe = modeProbe();
+      const { journal } = await runToolStreamFixture({ mode, terminalOnly: true, contextSources: probe.sources });
+      expect(journal.find((event) => event.type === "request/context")?.data).toMatchObject({
+        snapshot: { prepared: { defaults: { cacheRetention: mode === "chat" ? "long" : "short" } } },
+      });
+      const userEvent = journal.find((event) => event.type === "user/message");
+      expect(userEvent ? surfaceNode(userEvent).content : null).toBe("Read fixture");
+      expect(probe.seen.length).toBeGreaterThan(0);
+      expect(probe.seen.every((entry) => entry.mode === mode)).toBe(true);
+    },
+  );
 
   it("hands the same mode to context sources again on the next tool step", async () => {
     const probe = modeProbe();
     const requests: (readonly import("@actspace/llm-service").LlmMessage[])[] = [];
-    await runToolStreamFixture({ mode: "agent", contextSources: probe.sources, onMessages: (messages) => requests.push(messages) });
+    await runToolStreamFixture({
+      mode: "agent",
+      contextSources: probe.sources,
+      onMessages: (messages) => requests.push(messages),
+    });
     expect(requests).toHaveLength(2);
     expect(new Set(probe.seen.map((entry) => entry.stepId)).size).toBe(2);
     expect(probe.seen.every((entry) => entry.mode === "agent")).toBe(true);
@@ -38,7 +56,8 @@ describe("AgentLoop tool live events", () => {
   it("reserves the last subagent step for a tool-free summary and preserves lineage", async () => {
     const tools: string[][] = [];
     const messages: string[] = [];
-    const { events, result, journal } = await runToolStreamFixture({ subagent: true,
+    const { events, result, journal } = await runToolStreamFixture({
+      subagent: true,
       onTools: (definitions) => tools.push(definitions.map((tool) => tool.name)),
       onMessages: (values) => messages.push(JSON.stringify(values)),
     });
@@ -51,7 +70,8 @@ describe("AgentLoop tool live events", () => {
   it("reserves the last main step for a tool-free summary addressed to the user", async () => {
     const tools: string[][] = [];
     const messages: string[] = [];
-    const { result, journal } = await runToolStreamFixture({ maxSteps: 2,
+    const { result, journal } = await runToolStreamFixture({
+      maxSteps: 2,
       onTools: (definitions) => tools.push(definitions.map((tool) => tool.name)),
       onMessages: (values) => messages.push(JSON.stringify(values)),
     });
@@ -63,12 +83,21 @@ describe("AgentLoop tool live events", () => {
   });
   it.each([true, false])("separates arguments and emits each tool lifecycle (deltas=%s)", async (deltas) => {
     const { events, journal } = await runToolStreamFixture({ deltas });
-    expect(events.filter((e) => e.kind === "assistant-delta").map((e) => e.message).join("")).toBe('Read now. Done. {"valid":"body JSON"}');
-    expect(events.filter((e) => ["tool-prepared", "tool-started", "tool-finished"].includes(e.kind)).map((e) => e.kind)).toEqual(["tool-prepared", "tool-started", "tool-finished"]);
+    expect(
+      events
+        .filter((e) => e.kind === "assistant-delta")
+        .map((e) => e.message)
+        .join(""),
+    ).toBe('Read now. Done. {"valid":"body JSON"}');
+    expect(
+      events.filter((e) => ["tool-prepared", "tool-started", "tool-finished"].includes(e.kind)).map((e) => e.kind),
+    ).toEqual(["tool-prepared", "tool-started", "tool-finished"]);
     const finished = events.find((e) => e.kind === "tool-finished")!;
     expect(finished).toMatchObject({ callId: "read-1", result: { status: "completed" } });
     expect(journal.find((e) => e.type === "request/header")?.data).toMatchObject({ requestId: finished.requestId });
-    expect(events.findIndex((e) => e.kind === "tool-finished")).toBeLessThan(events.findIndex((e) => e.kind === "assistant-delta" && e.message.startsWith("Done.")));
+    expect(events.findIndex((e) => e.kind === "tool-finished")).toBeLessThan(
+      events.findIndex((e) => e.kind === "assistant-delta" && e.message.startsWith("Done.")),
+    );
   });
 
   it("finishes invalid arguments without claiming execution started", async () => {
@@ -78,13 +107,25 @@ describe("AgentLoop tool live events", () => {
   });
 
   it("finishes denied calls without executing them", async () => {
-    const { events } = await runToolStreamFixture({ permission: { extractResources: () => [], evaluate: () => ({ kind: "deny", reason: "Fixture policy denied", code: "POLICY_DENIED" }) }, execute: async () => { throw new Error("must not execute"); } });
+    const { events } = await runToolStreamFixture({
+      permission: {
+        extractResources: () => [],
+        evaluate: () => ({ kind: "deny", reason: "Fixture policy denied", code: "POLICY_DENIED" }),
+      },
+      execute: async () => {
+        throw new Error("must not execute");
+      },
+    });
     expect(events.some((e) => e.kind === "tool-started")).toBe(false);
     expect(events.find((e) => e.kind === "tool-finished")).toMatchObject({ result: { status: "denied" } });
   });
 
   it("isolates failing live observers from tool execution", async () => {
-    const { events, result } = await runToolStreamFixture({ onLiveEvent: () => { throw new Error("observer failure"); } });
+    const { events, result } = await runToolStreamFixture({
+      onLiveEvent: () => {
+        throw new Error("observer failure");
+      },
+    });
     expect(result.reason).toBe("completed");
     expect(events.filter((e) => e.kind === "tool-finished")).toHaveLength(1);
   });
@@ -92,7 +133,14 @@ describe("AgentLoop tool live events", () => {
   it("awaits durability checkpoint services at each real side-effect boundary", async () => {
     const reasons: string[] = [];
     const context = {
-      get: (name: string) => name === "session.checkpoint" ? { flush: async (payload: { reason: string }) => { reasons.push(payload.reason); } } : undefined,
+      get: (name: string) =>
+        name === "session.checkpoint"
+          ? {
+              flush: async (payload: { reason: string }) => {
+                reasons.push(payload.reason);
+              },
+            }
+          : undefined,
     };
     await runToolStreamFixture({ context });
     expect(reasons).toEqual([
@@ -107,14 +155,32 @@ describe("AgentLoop tool live events", () => {
 
   it("does not cross the model boundary before a pending checkpoint settles", async () => {
     let enter!: () => void, release!: () => void;
-    const entered = new Promise<void>(resolve => { enter = resolve; });
-    const gate = new Promise<void>(resolve => { release = resolve; });
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     let requests = 0;
-    const running = runToolStreamFixture({ context: { get: () => ({ flush: async () => { enter(); await gate; } }) }, onRequest: () => { requests++; } });
+    const running = runToolStreamFixture({
+      context: {
+        get: () => ({
+          flush: async () => {
+            enter();
+            await gate;
+          },
+        }),
+      },
+      onRequest: () => {
+        requests++;
+      },
+    });
     try {
       await entered;
       expect(requests).toBe(0);
-    } finally { release(); }
+    } finally {
+      release();
+    }
     await running;
     expect(requests).toBeGreaterThan(0);
   });
@@ -123,70 +189,123 @@ describe("AgentLoop tool live events", () => {
     const root = await createCordisRoot();
     let requests = 0;
     try {
-      await expect(runToolStreamFixture({ context: root.context, onRequest: () => { requests += 1; } })).rejects.toThrow();
+      await expect(
+        runToolStreamFixture({
+          context: root.context,
+          onRequest: () => {
+            requests += 1;
+          },
+        }),
+      ).rejects.toThrow();
       expect(requests).toBe(0);
-    } finally { await root.dispose(); }
+    } finally {
+      await root.dispose();
+    }
   });
 });
 
 it("passes reasoning settings to every request in a tool turn", async () => {
   const observed: unknown[] = [];
-  await runToolStreamFixture({ thinkingEnabled: true, reasoningEffort: "max", onRequest: (options) => observed.push(options) });
+  await runToolStreamFixture({
+    thinkingEnabled: true,
+    reasoningEffort: "max",
+    onRequest: (options) => observed.push(options),
+  });
   expect(observed).toHaveLength(2);
-  expect(observed).toEqual([expect.objectContaining({ reasoning: true, reasoningEffort: "max" }), expect.objectContaining({ reasoning: true, reasoningEffort: "max" })]);
+  expect(observed).toEqual([
+    expect.objectContaining({ reasoning: true, reasoningEffort: "max" }),
+    expect.objectContaining({ reasoning: true, reasoningEffort: "max" }),
+  ]);
 });
 
- it("settles hidden tool calls without execution and allows a following Chat turn", async () => {
-    let executed = 0;
-    const requests: (readonly import("@actspace/llm-service").LlmMessage[])[] = [];
-    const { journal, result } = await runToolStreamFixture({ mode: "chat", followup: true,
-      execute: async () => { executed++; throw new Error("must not execute"); },
-      onMessages: messages => requests.push(messages),
-    });
-    expect(executed).toBe(0);
-    expect(result.reason).toBe("completed");
-    expect(journal.filter(event => event.type === "tool/result")).toHaveLength(1);
-    expect(journal.find(event => event.type === "tool/result")?.data).toMatchObject({ status: "denied" });
-    expect(requests).toHaveLength(3);
-    expect(requests[2]?.filter(message => message.role === "tool" && message.callId === "read-1")).toHaveLength(1);
+it("settles hidden tool calls without execution and allows a following Chat turn", async () => {
+  let executed = 0;
+  const requests: (readonly import("@actspace/llm-service").LlmMessage[])[] = [];
+  const { journal, result } = await runToolStreamFixture({
+    mode: "chat",
+    followup: true,
+    execute: async () => {
+      executed++;
+      throw new Error("must not execute");
+    },
+    onMessages: (messages) => requests.push(messages),
   });
+  expect(executed).toBe(0);
+  expect(result.reason).toBe("completed");
+  expect(journal.filter((event) => event.type === "tool/result")).toHaveLength(1);
+  expect(journal.find((event) => event.type === "tool/result")?.data).toMatchObject({ status: "denied" });
+  expect(requests).toHaveLength(3);
+  expect(requests[2]?.filter((message) => message.role === "tool" && message.callId === "read-1")).toHaveLength(1);
+});
 
-  it("recovers an orphaned historical call without rewriting the Journal", async () => {
-    let request: readonly import("@actspace/llm-service").LlmMessage[] = [];
-    const { journal } = await runToolStreamFixture({ mode: "chat", terminalOnly: true,
-      seedSession: async session => {
-        await session.append({ type: "assistant/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" },
-          data: { messageId: "old", content: [{ type: "tool-call", callId: "orphan", name: "read_file", arguments: "{}" }] },
-          surface: { kind: "append" } });
-      }, onMessages: messages => { request = messages; },
-    });
-    const feedback = request.findIndex(message => message.role === "tool" && message.callId === "orphan");
-    expect(feedback).toBeGreaterThan(0);
-    expect(request[feedback - 1]?.role).toBe("assistant");
-    expect(JSON.stringify(request[feedback])).toContain("No result was recorded");
-    expect(journal.some(event => event.type === "tool/result")).toBe(false);
+it("recovers an orphaned historical call without rewriting the Journal", async () => {
+  let request: readonly import("@actspace/llm-service").LlmMessage[] = [];
+  const { journal } = await runToolStreamFixture({
+    mode: "chat",
+    terminalOnly: true,
+    seedSession: async (session) => {
+      await session.append({
+        type: "assistant/message",
+        eventVersion: 1,
+        source: { ownerPluginId: "@actspace/core" },
+        data: {
+          messageId: "old",
+          content: [{ type: "tool-call", callId: "orphan", name: "read_file", arguments: "{}" }],
+        },
+        surface: { kind: "append" },
+      });
+    },
+    onMessages: (messages) => {
+      request = messages;
+    },
   });
+  const feedback = request.findIndex((message) => message.role === "tool" && message.callId === "orphan");
+  expect(feedback).toBeGreaterThan(0);
+  expect(request[feedback - 1]?.role).toBe("assistant");
+  expect(JSON.stringify(request[feedback])).toContain("No result was recorded");
+  expect(journal.some((event) => event.type === "tool/result")).toBe(false);
+});
 
-  it("rejects every call in a mixed batch when one tool is unknown", async () => {
-    let executions = 0;
-    const { journal } = await runToolStreamFixture({ extraToolCall: true, execute: async () => {
-      executions++; return { status: "completed", summary: "unexpected", modelOutput: [] };
-    } });
-    expect(executions).toBe(0);
-    expect(journal.filter(event => event.type === "tool/result").map(event => event.data)).toEqual([
-      expect.objectContaining({ callId: "read-1", status: "denied" }),
-      expect.objectContaining({ callId: "unknown-2", status: "denied" }),
-    ]);
+it("rejects every call in a mixed batch when one tool is unknown", async () => {
+  let executions = 0;
+  const { journal } = await runToolStreamFixture({
+    extraToolCall: true,
+    execute: async () => {
+      executions++;
+      return { status: "completed", summary: "unexpected", modelOutput: [] };
+    },
   });
+  expect(executions).toBe(0);
+  expect(journal.filter((event) => event.type === "tool/result").map((event) => event.data)).toEqual([
+    expect.objectContaining({ callId: "read-1", status: "denied" }),
+    expect.objectContaining({ callId: "unknown-2", status: "denied" }),
+  ]);
+});
 
-it.each([false, true])("persists automatic approval fields on tool/result (body fails=%s)", async fails => {
+it.each([false, true])("persists automatic approval fields on tool/result (body fails=%s)", async (fails) => {
   const { journal, events } = await runToolStreamFixture({
-    toolEnvironment: { permissionMode: "auto-review", autoReview: async input => { expect(input.action).toMatchObject({ name: "read_file", args: { path: "fixture.txt" } }); return { approved: true, reason: "Inspection requested" }; } },
+    toolEnvironment: {
+      permissionMode: "auto-review",
+      autoReview: async (input) => {
+        expect(input.action).toMatchObject({ name: "read_file", args: { path: "fixture.txt" } });
+        return { approved: true, reason: "Inspection requested" };
+      },
+    },
     permission: { extractResources: () => [], evaluate: () => ({ kind: "ask", reason: "inspect", risk: "low" }) },
-    ...(fails ? { execute: async () => { throw Error("body failed"); } } : {}),
+    ...(fails
+      ? {
+          execute: async () => {
+            throw Error("body failed");
+          },
+        }
+      : {}),
   });
-  const expected = { status: fails ? "failed" : "completed", approvalMode: "auto", approvalReason: "Inspection requested" };
-  expect(journal.find(e => e.type === "tool/result")?.data).toMatchObject(expected);
-  expect(events.find(e => e.kind === "tool-finished")).toMatchObject({ result: expected });
-  expect(journal.some(e => e.type.startsWith("permission/"))).toBe(false);
+  const expected = {
+    status: fails ? "failed" : "completed",
+    approvalMode: "auto",
+    approvalReason: "Inspection requested",
+  };
+  expect(journal.find((e) => e.type === "tool/result")?.data).toMatchObject(expected);
+  expect(events.find((e) => e.kind === "tool-finished")).toMatchObject({ result: expected });
+  expect(journal.some((e) => e.type.startsWith("permission/"))).toBe(false);
 });

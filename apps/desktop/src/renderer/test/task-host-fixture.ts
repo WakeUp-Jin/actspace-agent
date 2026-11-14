@@ -33,7 +33,6 @@ export type FixtureCompactionResult = {
   };
 };
 
-
 /** 用例只需提供 fixture 读到的字段；contextSnapshot / contextState 允许写 null。 */
 export type FixtureRunResult = Omit<AgentRunResult, "contextSnapshot" | "contextState"> & {
   contextSnapshot: AgentRunResult["contextSnapshot"] | null;
@@ -42,11 +41,16 @@ export type FixtureRunResult = Omit<AgentRunResult, "contextSnapshot" | "context
 
 type FixtureOptions = {
   execute?: (input: FixtureRunInput) => Promise<FixtureRunResult>;
-  executeCompaction?: (input: { sessionId: string; agentRunId: string }) => Promise<FixtureCompactionResult | undefined> | FixtureCompactionResult | undefined;
+  executeCompaction?: (input: {
+    sessionId: string;
+    agentRunId: string;
+  }) => Promise<FixtureCompactionResult | undefined> | FixtureCompactionResult | undefined;
   // 用例常把同一个回调既当 execute 又当 prepare，入参保持宽松。
   prepare?: (input: any) => unknown;
   /** 用例里的会话以 SessionRecord 描述：fixture 据此提供 `sessions.get` / `sessions.getPage`，运行结束后把事件写回 record。 */
-  getRecord?: (input: { sessionId: string }) => SessionRecord | null | undefined | Promise<SessionRecord | null | undefined>;
+  getRecord?: (input: {
+    sessionId: string;
+  }) => SessionRecord | null | undefined | Promise<SessionRecord | null | undefined>;
 };
 
 /**
@@ -60,14 +64,34 @@ export function taskHostFixture(bridge: FixtureOptions & BridgeOverrides): Bridg
   const streams = new Set<(event: RuntimeStreamEvent) => void>();
   const live = new Set<(event: any) => void>();
   const pendingOperations = new Map<string, () => void>();
-  const state = (id: string): TaskSnapshot => states.get(id) ?? { sessionId: id, revision: 0, paused: false, tasks: [], queue: [], runs: [] };
-  const emit = (event: RuntimeStreamEvent) => { for (const fn of streams) fn(event); };
-  const publish = (value: TaskSnapshot) => { states.set(value.sessionId, { ...value, revision: state(value.sessionId).revision + 1 }); for (const fn of live) fn({ event: { sessionId: value.sessionId, message: "task-queue-updated" } }); };
+  const state = (id: string): TaskSnapshot =>
+    states.get(id) ?? { sessionId: id, revision: 0, paused: false, tasks: [], queue: [], runs: [] };
+  const emit = (event: RuntimeStreamEvent) => {
+    for (const fn of streams) fn(event);
+  };
+  const publish = (value: TaskSnapshot) => {
+    states.set(value.sessionId, { ...value, revision: state(value.sessionId).revision + 1 });
+    for (const fn of live) fn({ event: { sessionId: value.sessionId, message: "task-queue-updated" } });
+  };
   return {
     ...(getRecord ? { "sessions.get": projectRecord(getRecord), "sessions.getPage": projectRecord(getRecord) } : {}),
     ...api,
-    "events.agentStream": (fn: (event: RuntimeStreamEvent) => void) => { streams.add(fn); const unsub = api["events.agentStream"]?.(fn) as (() => void) | undefined; return () => { streams.delete(fn); unsub?.(); }; },
-    "events.sessionLive": (fn: (event: any) => void) => { live.add(fn); const unsub = api["events.sessionLive"]?.(fn) as (() => void) | undefined; return () => { live.delete(fn); unsub?.(); }; },
+    "events.agentStream": (fn: (event: RuntimeStreamEvent) => void) => {
+      streams.add(fn);
+      const unsub = api["events.agentStream"]?.(fn) as (() => void) | undefined;
+      return () => {
+        streams.delete(fn);
+        unsub?.();
+      };
+    },
+    "events.sessionLive": (fn: (event: any) => void) => {
+      live.add(fn);
+      const unsub = api["events.sessionLive"]?.(fn) as (() => void) | undefined;
+      return () => {
+        live.delete(fn);
+        unsub?.();
+      };
+    },
     "tasks.command": async (input: TaskCommand) => {
       if (input.op === "resume") {
         publish({ ...state(input.sessionId), paused: false });
@@ -76,45 +100,148 @@ export function taskHostFixture(bridge: FixtureOptions & BridgeOverrides): Bridg
         resume?.();
       }
       if (input.op === "configure") configs.set(input.sessionId, input.configuration);
-      if (input.op === "stop") { publish({ ...state(input.sessionId), paused: true }); await api["tasks.abort"]?.({ sessionId: input.sessionId, agentRunId: input.runId }); }
+      if (input.op === "stop") {
+        publish({ ...state(input.sessionId), paused: true });
+        await api["tasks.abort"]?.({ sessionId: input.sessionId, agentRunId: input.runId });
+      }
       return { snapshot: state(input.sessionId) };
     },
     "tasks.submit": async (input: SubmitTaskInput) => {
       const rejection = await prepare?.(input);
       if (rejection) return rejection;
       const current = state(input.sessionId);
-      const existing = current.tasks.find(task => task.submissionId === input.submissionId);
+      const existing = current.tasks.find((task) => task.submissionId === input.submissionId);
       if (existing) return { task: existing, revision: current.revision, durableSeq: current.revision };
       const runId = `host-${input.submissionId}`;
-      const task = { taskId: input.submissionId, submissionId: input.submissionId, acceptedSeq: current.revision + 1, state: "claimed" as const, targetRunId: null, runId, continuationOf: null, content: { kind: "composer-task", original: input, prepared: input.userInput } };
+      const task = {
+        taskId: input.submissionId,
+        submissionId: input.submissionId,
+        acceptedSeq: current.revision + 1,
+        state: "claimed" as const,
+        targetRunId: null,
+        runId,
+        continuationOf: null,
+        content: { kind: "composer-task", original: input, prepared: input.userInput },
+      };
       if (input.userInput.trim() === "/compact") {
-        const operationTask = { ...task, runId: null, state: current.paused ? "pending" as const : "claimed" as const };
-        publish({ ...current, tasks: [...current.tasks, operationTask], queue: current.paused ? [...current.queue, task.taskId] : current.queue });
+        const operationTask = {
+          ...task,
+          runId: null,
+          state: current.paused ? ("pending" as const) : ("claimed" as const),
+        };
+        publish({
+          ...current,
+          tasks: [...current.tasks, operationTask],
+          queue: current.paused ? [...current.queue, task.taskId] : current.queue,
+        });
         const executeOperation = () => {
-          publish({ ...state(input.sessionId), queue: state(input.sessionId).queue.filter(id => id !== task.taskId), tasks: state(input.sessionId).tasks.map(item => item.taskId === task.taskId ? { ...item, state: "claimed" } : item) });
-          void Promise.resolve().then(() => executeCompaction?.({ sessionId: input.sessionId, agentRunId: task.taskId })).then(result => {
-            publish({ ...state(input.sessionId), tasks: state(input.sessionId).tasks.map(item => item.taskId === task.taskId ? { ...item, state: "completed", result: { compacted: result?.status !== "skipped" } } : item) });
-          }, error => {
-            publish({ ...state(input.sessionId), paused: true, tasks: state(input.sessionId).tasks.map(item => item.taskId === task.taskId ? { ...item, state: "failed", result: { error: error.message } } : item) });
+          publish({
+            ...state(input.sessionId),
+            queue: state(input.sessionId).queue.filter((id) => id !== task.taskId),
+            tasks: state(input.sessionId).tasks.map((item) =>
+              item.taskId === task.taskId ? { ...item, state: "claimed" } : item,
+            ),
           });
+          void Promise.resolve()
+            .then(() => executeCompaction?.({ sessionId: input.sessionId, agentRunId: task.taskId }))
+            .then(
+              (result) => {
+                publish({
+                  ...state(input.sessionId),
+                  tasks: state(input.sessionId).tasks.map((item) =>
+                    item.taskId === task.taskId
+                      ? { ...item, state: "completed", result: { compacted: result?.status !== "skipped" } }
+                      : item,
+                  ),
+                });
+              },
+              (error) => {
+                publish({
+                  ...state(input.sessionId),
+                  paused: true,
+                  tasks: state(input.sessionId).tasks.map((item) =>
+                    item.taskId === task.taskId ? { ...item, state: "failed", result: { error: error.message } } : item,
+                  ),
+                });
+              },
+            );
         };
         if (current.paused) pendingOperations.set(input.sessionId, executeOperation);
         else executeOperation();
-        return { task: operationTask, revision: state(input.sessionId).revision, durableSeq: state(input.sessionId).revision };
+        return {
+          task: operationTask,
+          revision: state(input.sessionId).revision,
+          durableSeq: state(input.sessionId).revision,
+        };
       }
-      publish({ ...current, tasks: [...current.tasks, task], runs: [...current.runs, { runId, taskId: task.taskId, state: "running", result: null, configuration: {}, harness: { harnessId: "main", generationId: "fixture", revision: 1 } }] });
+      publish({
+        ...current,
+        tasks: [...current.tasks, task],
+        runs: [
+          ...current.runs,
+          {
+            runId,
+            taskId: task.taskId,
+            state: "running",
+            result: null,
+            configuration: {},
+            harness: { harnessId: "main", generationId: "fixture", revision: 1 },
+          },
+        ],
+      });
       emit({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: runId });
       const configuration = configs.get(input.sessionId) ?? {};
-      void execute?.({ ...input, mode: "agent", ...configuration, selectedSkills: [...configuration.selectedSkillIds ?? []], agentRunId: runId } as FixtureRunInput).then(async result => {
-        const record = await getRecord?.({ sessionId: input.sessionId });
-        if (record && result.events?.length) Object.assign(record, { events: result.events, messageBlocks: undefined, contextSnapshot: result.contextSnapshot });
-        const outcome = result.status === "aborted" ? "cancelled" : result.status;
-        publish({ ...state(input.sessionId), runs: state(input.sessionId).runs.map(run => run.runId === runId ? { ...run, state: outcome } : run), tasks: state(input.sessionId).tasks.map(item => item.taskId === task.taskId ? { ...item, state: outcome } : item) });
-        emit({ type: result.status === "completed" ? "agent_run_finished" : result.status === "aborted" ? "agent_run_aborted" : "agent_run_failed", sessionId: input.sessionId, agentRunId: runId } as RuntimeStreamEvent);
-      }, error => {
-        publish({ ...state(input.sessionId), paused: true, runs: state(input.sessionId).runs.map(run => run.runId === runId ? { ...run, state: "failed" } : run), tasks: state(input.sessionId).tasks.map(item => item.taskId === task.taskId ? { ...item, state: "failed" } : item) });
-        emit({ type: "agent_run_failed", sessionId: input.sessionId, agentRunId: runId, error: { code: "RUNTIME_ERROR", message: error.message, recoverable: false } });
-      });
+      void execute?.({
+        ...input,
+        mode: "agent",
+        ...configuration,
+        selectedSkills: [...(configuration.selectedSkillIds ?? [])],
+        agentRunId: runId,
+      } as FixtureRunInput).then(
+        async (result) => {
+          const record = await getRecord?.({ sessionId: input.sessionId });
+          if (record && result.events?.length)
+            Object.assign(record, {
+              events: result.events,
+              messageBlocks: undefined,
+              contextSnapshot: result.contextSnapshot,
+            });
+          const outcome = result.status === "aborted" ? "cancelled" : result.status;
+          publish({
+            ...state(input.sessionId),
+            runs: state(input.sessionId).runs.map((run) => (run.runId === runId ? { ...run, state: outcome } : run)),
+            tasks: state(input.sessionId).tasks.map((item) =>
+              item.taskId === task.taskId ? { ...item, state: outcome } : item,
+            ),
+          });
+          emit({
+            type:
+              result.status === "completed"
+                ? "agent_run_finished"
+                : result.status === "aborted"
+                  ? "agent_run_aborted"
+                  : "agent_run_failed",
+            sessionId: input.sessionId,
+            agentRunId: runId,
+          } as RuntimeStreamEvent);
+        },
+        (error) => {
+          publish({
+            ...state(input.sessionId),
+            paused: true,
+            runs: state(input.sessionId).runs.map((run) => (run.runId === runId ? { ...run, state: "failed" } : run)),
+            tasks: state(input.sessionId).tasks.map((item) =>
+              item.taskId === task.taskId ? { ...item, state: "failed" } : item,
+            ),
+          });
+          emit({
+            type: "agent_run_failed",
+            sessionId: input.sessionId,
+            agentRunId: runId,
+            error: { code: "RUNTIME_ERROR", message: error.message, recoverable: false },
+          });
+        },
+      );
       return { task, revision: state(input.sessionId).revision, durableSeq: state(input.sessionId).revision };
     },
   };

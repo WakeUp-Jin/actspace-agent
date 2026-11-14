@@ -52,14 +52,17 @@ describe("splitMarkdownBlocks", () => {
   it("slices blocks verbatim so they always join back into the content", () => {
     for (const split of stream(DOC)) {
       expect(split.blocks.map((block) => block.source).join("")).toBe(split.content);
-      for (const block of split.blocks) expect(split.content.slice(block.start, block.start + block.source.length)).toBe(block.source);
+      for (const block of split.blocks)
+        expect(split.content.slice(block.start, block.start + block.source.length)).toBe(block.source);
     }
   });
 
   it("streams to the same blocks as a from-scratch split, for every prefix", () => {
     for (const split of stream(DOC)) {
       const fresh = splitMarkdownBlocks(split.content);
-      expect(split.blocks.map((block) => [block.start, block.source])).toEqual(fresh.blocks.map((block) => [block.start, block.source]));
+      expect(split.blocks.map((block) => [block.start, block.source])).toEqual(
+        fresh.blocks.map((block) => [block.start, block.source]),
+      );
     }
   });
 
@@ -97,9 +100,18 @@ describe("MarkdownProse block rendering", () => {
   const normalize = (html: string) => html.replace(/>\s+</g, "><").trim();
 
   it("renders the same structure as parsing the whole message at once", () => {
-    const blocked = render(<MarkdownProse content={DOC} onOpenWorkspaceFile={() => {}} />).container.querySelector(".markdown-prose")!;
-    const whole = render(<div><Markdown remarkPlugins={[remarkGfm]}>{DOC}</Markdown></div>).container.firstElementChild!;
-    const tags = (root: Element) => Array.from(root.querySelectorAll("h1, h2, p, ul, li, table, td, blockquote, a")).map((node) => `${node.tagName}:${node.textContent}`);
+    const blocked = render(<MarkdownProse content={DOC} onOpenWorkspaceFile={() => {}} />).container.querySelector(
+      ".markdown-prose",
+    )!;
+    const whole = render(
+      <div>
+        <Markdown remarkPlugins={[remarkGfm]}>{DOC}</Markdown>
+      </div>,
+    ).container.firstElementChild!;
+    const tags = (root: Element) =>
+      Array.from(root.querySelectorAll("h1, h2, p, ul, li, table, td, blockquote, a")).map(
+        (node) => `${node.tagName}:${node.textContent}`,
+      );
     expect(tags(blocked)).toEqual(tags(whole));
     expect(normalize(blocked.innerHTML)).toContain("markdown-code-shell");
   });
@@ -109,6 +121,11 @@ describe("MarkdownProse block rendering", () => {
     const firstParagraph = container.querySelector("p");
     rerender(<MarkdownProse content={"第一段\n\n第二段\n\n第三段继续\n\n第四段"} />);
     expect(container.querySelector("p")).toBe(firstParagraph);
-    expect(Array.from(container.querySelectorAll("p")).map((node) => node.textContent)).toEqual(["第一段", "第二段", "第三段继续", "第四段"]);
+    expect(Array.from(container.querySelectorAll("p")).map((node) => node.textContent)).toEqual([
+      "第一段",
+      "第二段",
+      "第三段继续",
+      "第四段",
+    ]);
   });
 });

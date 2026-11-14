@@ -52,8 +52,14 @@ export function selectSessionView(cell: ClientSessionCell | null): SessionProjec
 export function sameSessionView(left: SessionProjectionView | null, right: SessionProjectionView | null): boolean {
   if (left === right) return true;
   if (!left || !right) return false;
-  return left.surfaceMessageCount === right.surfaceMessageCount && left.composerPhase === right.composerPhase
-    && left.contextState === right.contextState && left.status === right.status && left.error === right.error
-    && left.permissionMode === right.permissionMode && left.contextRevision === right.contextRevision
-    && jsonEqual(left.contextSnapshot, right.contextSnapshot);
+  return (
+    left.surfaceMessageCount === right.surfaceMessageCount &&
+    left.composerPhase === right.composerPhase &&
+    left.contextState === right.contextState &&
+    left.status === right.status &&
+    left.error === right.error &&
+    left.permissionMode === right.permissionMode &&
+    left.contextRevision === right.contextRevision &&
+    jsonEqual(left.contextSnapshot, right.contextSnapshot)
+  );
 }

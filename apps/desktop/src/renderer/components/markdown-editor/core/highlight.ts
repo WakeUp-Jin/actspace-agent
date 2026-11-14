@@ -21,12 +21,18 @@ export const markdownHighlightStyle = HighlightStyle.define([
   { tag: [t.angleBracket, t.documentMeta], class: "tok-html" },
   { tag: mathTag, class: "tok-math" },
   // 代码块里的语言
-  { tag: [t.keyword, t.controlKeyword, t.definitionKeyword, t.moduleKeyword, t.operatorKeyword, t.modifier], class: "tok-kw" },
+  {
+    tag: [t.keyword, t.controlKeyword, t.definitionKeyword, t.moduleKeyword, t.operatorKeyword, t.modifier],
+    class: "tok-kw",
+  },
   { tag: [t.string, t.special(t.string), t.regexp, t.escape], class: "tok-str" },
   { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], class: "tok-cmt" },
   { tag: [t.number, t.integer, t.float], class: "tok-num" },
   { tag: [t.bool, t.null, t.atom, t.self], class: "tok-lit" },
-  { tag: [t.function(t.variableName), t.function(t.propertyName), t.function(t.definition(t.variableName))], class: "tok-fn" },
+  {
+    tag: [t.function(t.variableName), t.function(t.propertyName), t.function(t.definition(t.variableName))],
+    class: "tok-fn",
+  },
   { tag: [t.typeName, t.className, t.namespace, t.tagName], class: "tok-type" },
   { tag: [t.propertyName, t.attributeName, t.definition(t.propertyName)], class: "tok-var" },
   { tag: [t.operator, t.punctuation, t.bracket], class: "tok-op" },

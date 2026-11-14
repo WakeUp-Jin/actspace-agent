@@ -34,20 +34,26 @@ export function apply(ctx: CordisContext): void {
   if (sessionStore === undefined) throw new Error("Session Runtime plugin requires session.store.");
   if (projection === undefined) throw new Error("Session Runtime plugin requires session.projection.");
 
-  const service = new RuntimeSessionController({
-    ...host,
-    registry: journal.registry,
-    projectionService: projection,
-    onEvent: (sessionId, event) => emitNotification(ctx, "session/event", event, { sessionId }),
-    onFlush: (sessionId, throughSeq) => emitNotification(ctx, "session/flush", { sessionId, throughSeq }),
-    onCreated: (sessionId) => emitNotification(ctx, "session/created", { sessionId }),
-    onDisposed: (sessionId, outcome) => emitNotification(ctx, "session/disposed", { sessionId, outcome }),
-  }, sessionStore.store);
+  const service = new RuntimeSessionController(
+    {
+      ...host,
+      registry: journal.registry,
+      projectionService: projection,
+      onEvent: (sessionId, event) => emitNotification(ctx, "session/event", event, { sessionId }),
+      onFlush: (sessionId, throughSeq) => emitNotification(ctx, "session/flush", { sessionId, throughSeq }),
+      onCreated: (sessionId) => emitNotification(ctx, "session/created", { sessionId }),
+      onDisposed: (sessionId, outcome) => emitNotification(ctx, "session/disposed", { sessionId, outcome }),
+    },
+    sessionStore.store,
+  );
   provideService(ctx, SESSION_RUNTIME_SERVICE, service);
   provideService(ctx, LLM_AUXILIARY_REQUESTS_SERVICE, createAuxiliaryRequestRecorder(service));
-  ctx.effect?.(() => async () => {
-    await service.closeAll();
-  }, "session-runtime");
+  ctx.effect?.(
+    () => async () => {
+      await service.closeAll();
+    },
+    "session-runtime",
+  );
 }
 
 /** Session lifecycle facts are observational; persistence uses explicit awaited ports. */
@@ -57,4 +63,6 @@ interface SessionLifecycleEvents {
   /** @mode emit */
   "session/disposed": (payload: { sessionId: string; outcome: unknown }) => void;
 }
-declare module "@actspace/cordis-adapter" { interface DomainEvents extends SessionLifecycleEvents {} }
+declare module "@actspace/cordis-adapter" {
+  interface DomainEvents extends SessionLifecycleEvents {}
+}

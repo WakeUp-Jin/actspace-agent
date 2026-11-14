@@ -5,15 +5,30 @@ import type { SandboxRequest } from "../types.js";
 import { FULL, fakeBackend, fakeHost, tick } from "./fakes.js";
 
 const timing = { killGraceMs: 20, residualWaitMs: 20 };
-const request = (overrides: Partial<SandboxRequest> = {}): SandboxRequest => ({ purpose: "tool", isolation: "sandboxed", argv: ["/bin/zsh", "-lc", "echo hi"], cwd: "/work", env: {}, scratchDir: "/scratch", filesystem: { readWrite: ["/work", "/scratch"] }, ...overrides });
+const request = (overrides: Partial<SandboxRequest> = {}): SandboxRequest => ({
+  purpose: "tool",
+  isolation: "sandboxed",
+  argv: ["/bin/zsh", "-lc", "echo hi"],
+  cwd: "/work",
+  env: {},
+  scratchDir: "/scratch",
+  filesystem: { readWrite: ["/work", "/scratch"] },
+  ...overrides,
+});
 
 describe("backend selection", () => {
   it("prefers higher priority, falls through unavailable or partial backends, and explains failures", async () => {
     const registry = new BackendRegistry();
     const nono = fakeBackend("nono", 100, { available: false, reason: "not bundled" });
-    const partial = fakeBackend("partial", 80, { available: true, version: "2", capabilities: { ...FULL, "filesystem.write-deny": "partial" } });
+    const partial = fakeBackend("partial", 80, {
+      available: true,
+      version: "2",
+      capabilities: { ...FULL, "filesystem.write-deny": "partial" },
+    });
     const seatbelt = fakeBackend("seatbelt", 50);
-    registry.register(seatbelt); registry.register(nono); registry.register(partial);
+    registry.register(seatbelt);
+    registry.register(nono);
+    registry.register(partial);
     const selection = await registry.select(["filesystem.write", "filesystem.write-deny"]);
     expect(selection.ok && selection.backend.id).toBe("seatbelt");
     const none = await new BackendRegistry().select([]);
@@ -21,15 +36,20 @@ describe("backend selection", () => {
     const unregisterSeatbelt = registry.register(fakeBackend("other", 10, { available: false, reason: "x" }));
     unregisterSeatbelt();
     const failing = new BackendRegistry();
-    failing.register(nono); failing.register(partial);
-    expect(await failing.select(["filesystem.write-deny"])).toEqual({ ok: false, reasons: ["nono: not bundled", "partial 2: filesystem.write-deny=partial"] });
+    failing.register(nono);
+    failing.register(partial);
+    expect(await failing.select(["filesystem.write-deny"])).toEqual({
+      ok: false,
+      reasons: ["nono: not bundled", "partial 2: filesystem.write-deny=partial"],
+    });
   });
 
   it("caches probes until the backend is unregistered, and rejects duplicate ids", async () => {
     const registry = new BackendRegistry();
     const backend = fakeBackend("nono", 100);
     const unregister = registry.register(backend);
-    await registry.select([]); await registry.select([]);
+    await registry.select([]);
+    await registry.select([]);
     expect(backend.probes).toBe(1);
     expect(() => registry.register(fakeBackend("nono", 1))).toThrow(/already registered/);
     unregister();
@@ -40,7 +60,11 @@ describe("backend selection", () => {
 
   it("turns a throwing probe into an unavailable reason", async () => {
     const registry = new BackendRegistry();
-    registry.register(fakeBackend("broken", 1, async () => { throw new Error("boom"); }));
+    registry.register(
+      fakeBackend("broken", 1, async () => {
+        throw new Error("boom");
+      }),
+    );
     expect(await registry.select([])).toEqual({ ok: false, reasons: ["broken: probe failed: boom"] });
   });
 });
@@ -53,14 +77,19 @@ describe("sandbox execution", () => {
     service.register(backend);
     const execution = service.run(request());
     const chunks: string[] = [];
-    execution.onOutput(chunk => chunks.push(chunk.text));
+    execution.onOutput((chunk) => chunks.push(chunk.text));
     while (!host.processes[0]) await tick();
     expect(host.processes[0].spec).toMatchObject({ command: "/bin/nono", args: ["--", "/bin/zsh", "-lc", "echo hi"] });
     host.processes[0].emit({ stream: "stdout", text: "hi\n" });
     host.processes[0].exit({ exitCode: 3 });
     const result = await execution.result;
     expect(result.outcome).toEqual({ status: "exited", exitCode: 3, signal: null });
-    expect(result.facts).toMatchObject({ isolation: "sandboxed", backend: { id: "nono", version: "1.0.0" }, capabilities: FULL, cleanup: "ok" });
+    expect(result.facts).toMatchObject({
+      isolation: "sandboxed",
+      backend: { id: "nono", version: "1.0.0" },
+      capabilities: FULL,
+      cleanup: "ok",
+    });
     expect(result.facts.policyFingerprint).toMatch(/^[0-9a-f]{64}$/);
     expect(chunks).toEqual(["hi\n"]);
     expect(backend.disposed).toBe(1);
@@ -69,8 +98,22 @@ describe("sandbox execution", () => {
   it("never spawns when preparation fails", async () => {
     for (const [setup, reason] of [
       [() => undefined, "No sandbox backend is registered."],
-      [(service: ReturnType<typeof createSandboxService>) => service.register(fakeBackend("nono", 100, undefined, { prepareError: "manifest" })), "nono: manifest"],
-      [(service: ReturnType<typeof createSandboxService>) => service.register(fakeBackend("nono", 100, { available: true, version: "1", capabilities: { ...FULL, "filesystem.write-deny": "unsupported" } })), "nono 1: filesystem.write-deny=unsupported"],
+      [
+        (service: ReturnType<typeof createSandboxService>) =>
+          service.register(fakeBackend("nono", 100, undefined, { prepareError: "manifest" })),
+        "nono: manifest",
+      ],
+      [
+        (service: ReturnType<typeof createSandboxService>) =>
+          service.register(
+            fakeBackend("nono", 100, {
+              available: true,
+              version: "1",
+              capabilities: { ...FULL, "filesystem.write-deny": "unsupported" },
+            }),
+          ),
+        "nono 1: filesystem.write-deny=unsupported",
+      ],
     ] as const) {
       const host = fakeHost();
       const service = createSandboxService({ host, timing });
@@ -88,7 +131,10 @@ describe("sandbox execution", () => {
   it("reports a spawn error as prepare_failed", async () => {
     const service = createSandboxService({ host: fakeHost({ startError: "ENOENT" }), timing });
     service.register(fakeBackend("nono", 100));
-    expect((await service.run(request()).result).outcome).toEqual({ status: "prepare_failed", reasons: ["spawn failed: ENOENT"] });
+    expect((await service.run(request()).result).outcome).toEqual({
+      status: "prepare_failed",
+      reasons: ["spawn failed: ENOENT"],
+    });
   });
 
   it("terminates with SIGTERM, escalates to SIGKILL after the grace period, then reports residue", async () => {
@@ -98,7 +144,9 @@ describe("sandbox execution", () => {
     const execution = service.run(request());
     while (!graceful.processes[0]) await tick();
     execution.terminate();
-    expect(await execution.result).toMatchObject({ outcome: { status: "cancelled", signal: "SIGTERM", residual: false } });
+    expect(await execution.result).toMatchObject({
+      outcome: { status: "cancelled", signal: "SIGTERM", residual: false },
+    });
     expect(graceful.processes[0].signals).toEqual(["SIGTERM"]);
 
     const stubborn = fakeHost({ ignore: ["SIGTERM"] });
@@ -142,12 +190,26 @@ describe("sandbox execution", () => {
     const host = fakeHost();
     const service = createSandboxService({ host, timing });
     let release!: () => void;
-    service.register(fakeBackend("nono", 100, () => new Promise(resolve => { release = () => resolve({ available: true, version: "1", capabilities: FULL }); })));
+    service.register(
+      fakeBackend(
+        "nono",
+        100,
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve({ available: true, version: "1", capabilities: FULL });
+          }),
+      ),
+    );
     const execution = service.run(request());
     while (!release) await tick();
     execution.terminate();
     release();
-    expect((await execution.result).outcome).toEqual({ status: "cancelled", exitCode: null, signal: null, residual: false });
+    expect((await execution.result).outcome).toEqual({
+      status: "cancelled",
+      exitCode: null,
+      signal: null,
+      residual: false,
+    });
     expect(host.processes).toHaveLength(0);
   });
 
@@ -168,7 +230,10 @@ describe("sandbox execution", () => {
     const execution = service.run(request());
     while (!host.processes[0]) await tick();
     host.processes[0].exit({ exitCode: 0 });
-    expect(await execution.result).toMatchObject({ outcome: { status: "exited", exitCode: 0 }, facts: { cleanup: { failed: "rm failed" } } });
+    expect(await execution.result).toMatchObject({
+      outcome: { status: "exited", exitCode: 0 },
+      facts: { cleanup: { failed: "rm failed" } },
+    });
   });
 
   it("runs approved unsandboxed requests directly without consulting backends", async () => {
@@ -188,10 +253,22 @@ describe("sandbox execution", () => {
 describe("sandbox service status", () => {
   it("reports the selected backend or the reasons nothing qualifies", async () => {
     const service = createSandboxService({ host: fakeHost(), timing });
-    expect(await service.status()).toEqual({ available: false, isolation: "sandboxed", reasons: ["No sandbox backend is registered."] });
+    expect(await service.status()).toEqual({
+      available: false,
+      isolation: "sandboxed",
+      reasons: ["No sandbox backend is registered."],
+    });
     const unregister = service.register(fakeBackend("seatbelt", 50));
-    expect(await service.status()).toEqual({ available: true, isolation: "sandboxed", backend: { id: "seatbelt", version: "1.0.0" }, reasons: [] });
-    expect(await service.status("evaluation")).toMatchObject({ available: false, reasons: ["seatbelt 1.0.0: network.allowlist=unsupported"] });
+    expect(await service.status()).toEqual({
+      available: true,
+      isolation: "sandboxed",
+      backend: { id: "seatbelt", version: "1.0.0" },
+      reasons: [],
+    });
+    expect(await service.status("evaluation")).toMatchObject({
+      available: false,
+      reasons: ["seatbelt 1.0.0: network.allowlist=unsupported"],
+    });
     unregister();
     expect((await service.status()).available).toBe(false);
   });
@@ -211,19 +288,46 @@ describe("sandbox service status", () => {
     host.processes[1].exit({ exitCode: 0 });
     expect((await unsandboxed.result).facts.isolation).toBe("inherited");
     // A candidate never starts a nested evaluation.
-    expect(await service.status("evaluation")).toEqual({ available: false, isolation: "inherited", reasons: [INHERITED_EVALUATION] });
-    const nested = await service.run(request({ purpose: "evaluation", network: { mode: "allowlist", domains: ["api.example.com"] } })).result;
+    expect(await service.status("evaluation")).toEqual({
+      available: false,
+      isolation: "inherited",
+      reasons: [INHERITED_EVALUATION],
+    });
+    const nested = await service.run(
+      request({ purpose: "evaluation", network: { mode: "allowlist", domains: ["api.example.com"] } }),
+    ).result;
     expect(nested.outcome).toEqual({ status: "prepare_failed", reasons: [INHERITED_EVALUATION] });
     expect(host.processes).toHaveLength(2);
   });
 
   it("refuses evaluation when the backend lacks a reserved capability", async () => {
     const service = createSandboxService({ host: fakeHost(), timing });
-    service.register(fakeBackend("nono", 100, { available: true, version: "1", capabilities: { ...FULL, "network.allowlist": "full" } }));
+    service.register(
+      fakeBackend("nono", 100, {
+        available: true,
+        version: "1",
+        capabilities: { ...FULL, "network.allowlist": "full" },
+      }),
+    );
     expect(await service.status("evaluation")).toMatchObject({ available: true, backend: { id: "nono" } });
-    const evaluation = (overrides: Partial<SandboxRequest>) => service.run(request({ purpose: "evaluation", network: { mode: "allowlist", domains: ["api.example.com"] }, ...overrides })).result;
-    expect((await evaluation({ limits: { memoryBytes: 1 << 30 } })).outcome).toEqual({ status: "prepare_failed", reasons: ["nono 1: process.resource-limits=unsupported"] });
-    expect((await evaluation({ network: { mode: "allowlist", domains: ["api.example.com"], credentials: [{ domain: "api.example.com", header: "Authorization", source: { env: "KEY" } }] } })).outcome)
-      .toEqual({ status: "prepare_failed", reasons: ["nono 1: network.credential-injection=unsupported"] });
+    const evaluation = (overrides: Partial<SandboxRequest>) =>
+      service.run(
+        request({ purpose: "evaluation", network: { mode: "allowlist", domains: ["api.example.com"] }, ...overrides }),
+      ).result;
+    expect((await evaluation({ limits: { memoryBytes: 1 << 30 } })).outcome).toEqual({
+      status: "prepare_failed",
+      reasons: ["nono 1: process.resource-limits=unsupported"],
+    });
+    expect(
+      (
+        await evaluation({
+          network: {
+            mode: "allowlist",
+            domains: ["api.example.com"],
+            credentials: [{ domain: "api.example.com", header: "Authorization", source: { env: "KEY" } }],
+          },
+        })
+      ).outcome,
+    ).toEqual({ status: "prepare_failed", reasons: ["nono 1: network.credential-injection=unsupported"] });
   });
 });

@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ExtensionsPage } from "../components/extensions/ExtensionsPage";
-import { extensionsSettings, extensionSkills, extensionBrowserStatus, extensionPlugins } from "./fixtures/extensionsFixture";
+import {
+  extensionsSettings,
+  extensionSkills,
+  extensionBrowserStatus,
+  extensionPlugins,
+} from "./fixtures/extensionsFixture";
 import { setupBridge } from "./helpers/bridge";
 
 describe("ExtensionsPage", () => {
@@ -19,8 +24,11 @@ describe("ExtensionsPage", () => {
     installSkill.mockResolvedValue({ ok: true, name: "new-skill" });
     uninstallSkill.mockResolvedValue({ ok: true });
     setupBridge({
-      "settings.get": vi.fn(async () => extensionsSettings()), "settings.update": updateSettings,
-      "skills.list": listSkills, "skills.install": installSkill, "skills.uninstall": uninstallSkill,
+      "settings.get": vi.fn(async () => extensionsSettings()),
+      "settings.update": updateSettings,
+      "skills.list": listSkills,
+      "skills.install": installSkill,
+      "skills.uninstall": uninstallSkill,
       "browserBridge.getStatus": vi.fn(async () => extensionBrowserStatus),
       "plugins.list": vi.fn(async () => extensionPlugins({ "browser-tools": { loaded: true, enabled: true } })),
     });

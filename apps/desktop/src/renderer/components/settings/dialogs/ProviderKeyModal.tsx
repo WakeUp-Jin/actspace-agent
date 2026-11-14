@@ -51,9 +51,16 @@ export function ProviderKeyModal({
   };
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent size="sm" surface="raised" backdrop="overlay" withDescription className="p-5">
-        <DialogTitle asChild><h3 className="text-act-lg font-semibold text-text-main">连接 {label}</h3></DialogTitle>
+        <DialogTitle asChild>
+          <h3 className="text-act-lg font-semibold text-text-main">连接 {label}</h3>
+        </DialogTitle>
         <DialogDescription className="mt-1.5 text-act-xs leading-relaxed text-text-faint">
           Key 只保存在本机
         </DialogDescription>

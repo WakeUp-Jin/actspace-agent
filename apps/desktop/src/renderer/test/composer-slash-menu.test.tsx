@@ -35,11 +35,13 @@ function renderSlash(initial: Partial<SlashMenuOptions> = {}) {
     setDraftText: () => {},
     onDraftReplaced: () => {},
   };
-  return renderHook((props: Partial<SlashMenuOptions>) => useSlashMenu({ ...base, ...props }), { initialProps: initial });
+  return renderHook((props: Partial<SlashMenuOptions>) => useSlashMenu({ ...base, ...props }), {
+    initialProps: initial,
+  });
 }
 
 function functionIds(results: ReturnType<typeof useSlashMenu>["results"]) {
-  return results.map((result) => result.kind === "function" ? result.item.id : `skill:${result.item.name}`);
+  return results.map((result) => (result.kind === "function" ? result.item.id : `skill:${result.item.name}`));
 }
 
 describe("useSlashMenu", () => {
@@ -61,7 +63,9 @@ describe("useSlashMenu", () => {
   it("lists /side only where a side chat can be opened", () => {
     expect(functionIds(renderSlash().result.current.results)).not.toContain("side");
     expect(functionIds(renderSlash({ allowSideChat: true }).result.current.results)).toContain("side");
-    expect(functionIds(renderSlash({ allowSideChat: true, isStreaming: true }).result.current.results)).toContain("side");
+    expect(functionIds(renderSlash({ allowSideChat: true, isStreaming: true }).result.current.results)).toContain(
+      "side",
+    );
   });
 
   it("gives each menu instance its own id", () => {
@@ -128,9 +132,12 @@ describe("useComposerSkills", () => {
   it("loads once per workspace and reloads when the workspace changes", async () => {
     const list = vi.fn(async () => ({ items: [skill("alpha")], warnings: [] }));
     setupBridge({ "skills.list": list });
-    const { result, rerender } = renderHook((props: { workspaceRoot: string }) => useComposerSkills({ workspaceRoot: props.workspaceRoot, selected: [] }), {
-      initialProps: { workspaceRoot: "/repo-a" },
-    });
+    const { result, rerender } = renderHook(
+      (props: { workspaceRoot: string }) => useComposerSkills({ workspaceRoot: props.workspaceRoot, selected: [] }),
+      {
+        initialProps: { workspaceRoot: "/repo-a" },
+      },
+    );
 
     await act(() => result.current.load());
     await act(() => result.current.load());
@@ -142,7 +149,8 @@ describe("useComposerSkills", () => {
   });
 
   it("lets a failed load be retried without forcing", async () => {
-    const list = vi.fn()
+    const list = vi
+      .fn()
       .mockRejectedValueOnce(new Error("boom"))
       .mockResolvedValue({ items: [skill("alpha")], warnings: [] });
     setupBridge({ "skills.list": list });

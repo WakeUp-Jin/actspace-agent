@@ -7,7 +7,10 @@ export type FixtureRequestPlan = { readonly model?: string; readonly trace?: rea
 declare module "../../src/event-contract.js" {
   interface DomainEvents {
     "agent/request": WaterfallHook<{ readonly model: string }, FixtureRequestPlan>;
-    "tools/pre-execute": WaterfallHook<{ readonly name: string; readonly args: Readonly<Record<string, unknown>> }, { readonly args?: Readonly<Record<string, unknown>> }>;
+    "tools/pre-execute": WaterfallHook<
+      { readonly name: string; readonly args: Readonly<Record<string, unknown>> },
+      { readonly args?: Readonly<Record<string, unknown>> }
+    >;
     "agent/turn-stopping": SerialHook<{ readonly reason: "completed" | "step-limit" }>;
   }
 }

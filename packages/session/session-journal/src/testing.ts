@@ -28,11 +28,19 @@ const TIME = "2026-11-07T00:00:00.000Z";
  * 生成至少 `count` 条事件的合成会话（按整轮生成，最后一轮可能多出几条）。
  * 每轮：turn/start、step/start、user/message、request/header、request/context、若干 tool/call + tool/result、assistant/message、step/end、turn/end。
  */
-export function syntheticSessionEvents(count: number, options: SyntheticSessionOptions = {}): readonly SessionEventEnvelopeV1[] {
+export function syntheticSessionEvents(
+  count: number,
+  options: SyntheticSessionOptions = {},
+): readonly SessionEventEnvelopeV1[] {
   const compactEvery = options.compactEvery ?? 20;
   const toolCalls = options.toolCallsPerTurn ?? 2;
   const text = "x".repeat(options.textLength ?? 200);
-  const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => TIME, retainedEvents: Number.MAX_SAFE_INTEGER, retainedBytes: Number.MAX_SAFE_INTEGER });
+  const journal = new SessionJournal({
+    registry: createCoreCodecRegistry(),
+    now: () => TIME,
+    retainedEvents: Number.MAX_SAFE_INTEGER,
+    retainedBytes: Number.MAX_SAFE_INTEGER,
+  });
   const append = (type: string, data: Record<string, RuntimeJsonValue>, extra: Partial<SessionEventCandidateV1> = {}) =>
     journal.append({ type, eventVersion: 1, source: SOURCE, data, surface: null, ...extra });
   for (let turn = 0; journal.lastSeq + 1 < count; turn += 1) {
@@ -46,9 +54,22 @@ export function syntheticSessionEvents(count: number, options: SyntheticSessionO
     for (let call = 0; call < toolCalls; call += 1) {
       const callId = `call-${turn}-${call}`;
       append("tool/call", { callId, name: "read_file", turnId, stepId, args: { path: `file-${call}.ts` } });
-      append("tool/result", { callId, name: "read_file", status: "completed", modelOutput: [{ type: "text", text }] }, { surface: { kind: "append" } });
+      append(
+        "tool/result",
+        { callId, name: "read_file", status: "completed", modelOutput: [{ type: "text", text }] },
+        { surface: { kind: "append" } },
+      );
     }
-    append("assistant/message", { messageId: `assistant-${turn}`, requestId: `request-${turn}`, content: `${turn} ${text}`, finishReason: "stop" }, { surface: { kind: "append" } });
+    append(
+      "assistant/message",
+      {
+        messageId: `assistant-${turn}`,
+        requestId: `request-${turn}`,
+        content: `${turn} ${text}`,
+        finishReason: "stop",
+      },
+      { surface: { kind: "append" } },
+    );
     append("step/end", { turnId, stepId, status: "completed" });
     append("turn/end", { turnId, status: "completed" });
     if (compactEvery > 0 && (turn + 1) % compactEvery === 0) compact(journal, append, `compact-${turn}`);
@@ -57,17 +78,33 @@ export function syntheticSessionEvents(count: number, options: SyntheticSessionO
 }
 
 /** 把当前对话除最后一条之外全部替换成一条摘要（和真实压缩一样走 compaction/* + surface/replaced）。 */
-function compact(journal: SessionJournal, append: (type: string, data: Record<string, RuntimeJsonValue>, extra?: Partial<SessionEventCandidateV1>) => unknown, compactionId: string) {
+function compact(
+  journal: SessionJournal,
+  append: (type: string, data: Record<string, RuntimeJsonValue>, extra?: Partial<SessionEventCandidateV1>) => unknown,
+  compactionId: string,
+) {
   const entries = journal.surface.entries;
   const end = entries.length - 1;
   if (end < 2) return;
-  const sourceEventSeqs = [...new Set(entries.slice(0, end).flatMap(entry => entry.sourceEventSeqs))].sort((a, b) => a - b);
+  const sourceEventSeqs = [...new Set(entries.slice(0, end).flatMap((entry) => entry.sourceEventSeqs))].sort(
+    (a, b) => a - b,
+  );
   append("compaction/start", { compactionId, start: 0, end });
   append("compaction/summary", { compactionId, summaryDigest: compactionId });
-  append("surface/replaced", { compactionId, sourceEventSeqs, replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "synthetic", node: { kind: "user", messageId: `summary-${compactionId}`, content: `summary ${compactionId}` } }, {
-    provenance: { sourceEventSeqs, contributorIds: ["compactor"], runtimeSelectionSeq: null },
-    surface: { kind: "replace", start: 0, end, sourceEventSeqs },
-  });
+  append(
+    "surface/replaced",
+    {
+      compactionId,
+      sourceEventSeqs,
+      replacedTokens: { conversation: 0, summarizedConversation: 0 },
+      estimatorVersion: "synthetic",
+      node: { kind: "user", messageId: `summary-${compactionId}`, content: `summary ${compactionId}` },
+    },
+    {
+      provenance: { sourceEventSeqs, contributorIds: ["compactor"], runtimeSelectionSeq: null },
+      surface: { kind: "replace", start: 0, end, sourceEventSeqs },
+    },
+  );
   append("compaction/end", { compactionId, summaryDigest: compactionId });
 }
 
@@ -89,9 +126,16 @@ export function countingHistory(events: readonly SessionEventEnvelopeV1[]): Coun
       eventsRead += end - start;
       return events.slice(start, end);
     },
-    get eventsRead() { return eventsRead; },
-    get calls() { return calls; },
-    reset() { eventsRead = 0; calls = 0; },
+    get eventsRead() {
+      return eventsRead;
+    },
+    get calls() {
+      return calls;
+    },
+    reset() {
+      eventsRead = 0;
+      calls = 0;
+    },
   };
 }
 
@@ -99,10 +143,19 @@ export function countingHistory(events: readonly SessionEventEnvelopeV1[]): Coun
  * 一个装着合成会话的 Journal：只有末尾 `retainedEvents` 条（默认 512，和产品默认一致）在内存里，
  * 更早的都要经 `history` 读取，读了多少条看 `history.eventsRead`。
  */
-export function syntheticJournal(count: number, options: SyntheticSessionOptions & { readonly retainedEvents?: number } = {}): { journal: SessionJournal; history: CountingHistory; events: readonly SessionEventEnvelopeV1[] } {
+export function syntheticJournal(
+  count: number,
+  options: SyntheticSessionOptions & { readonly retainedEvents?: number } = {},
+): { journal: SessionJournal; history: CountingHistory; events: readonly SessionEventEnvelopeV1[] } {
   const events = syntheticSessionEvents(count, options);
   const history = countingHistory(events);
-  const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => TIME, seed: events, history, retainedEvents: options.retainedEvents ?? 512 });
+  const journal = new SessionJournal({
+    registry: createCoreCodecRegistry(),
+    now: () => TIME,
+    seed: events,
+    history,
+    retainedEvents: options.retainedEvents ?? 512,
+  });
   journal.releaseDurable(journal.lastSeq);
   history.reset();
   return { journal, history, events };

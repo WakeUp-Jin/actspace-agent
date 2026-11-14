@@ -1,6 +1,12 @@
 import { createContext, useContext } from "react";
 import type { ClientSessionStore } from "@actspace/client/sessions";
-import type { ComposerMode, ModelSelectionId, SessionListItem, SideChatOpenResult, UsableModelView } from "@actspace/shared";
+import type {
+  ComposerMode,
+  ModelSelectionId,
+  SessionListItem,
+  SideChatOpenResult,
+  UsableModelView,
+} from "@actspace/shared";
 import type { LiveRunStore } from "../../../session/live-runs/live-run-store";
 import type { SessionLocalStore } from "../../../session/session-local-store";
 import type { ComposerSendOptions } from "../../Composer";

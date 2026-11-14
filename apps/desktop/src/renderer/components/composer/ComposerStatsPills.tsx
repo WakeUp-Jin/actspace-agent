@@ -23,7 +23,8 @@ import {
  * 落位与面板见 docs/design-docs/frontend/front-聊天输入框规范.md。
  */
 
-const PILL_CLASS = "inline-flex min-h-5 max-w-full items-center gap-1.5 whitespace-nowrap rounded-act-pill px-2 py-px text-left text-act-xs leading-5 text-text-faint tabular-nums";
+const PILL_CLASS =
+  "inline-flex min-h-5 max-w-full items-center gap-1.5 whitespace-nowrap rounded-act-pill px-2 py-px text-left text-act-xs leading-5 text-text-faint tabular-nums";
 const BUTTON_PILL_CLASS = `${PILL_CLASS} cursor-pointer hover:bg-hover-overlay hover:text-text-muted aria-expanded:bg-hover-overlay aria-expanded:text-text-muted`;
 const PILL_ICON_CLASS = "shrink-0";
 const PILL_LABEL_CLASS = "min-w-0 truncate";
@@ -40,7 +41,12 @@ export type ComposerStatsOverlay = {
 
 type PillModel =
   | { readonly kind: "plain"; readonly label: readonly string[] }
-  | { readonly kind: "dialog"; readonly label: readonly string[]; readonly ariaLabel: string; readonly dialog: StatDialog };
+  | {
+      readonly kind: "dialog";
+      readonly label: readonly string[];
+      readonly ariaLabel: string;
+      readonly dialog: StatDialog;
+    };
 
 const tokenCount = (value: string) => `${value} tok`;
 
@@ -52,9 +58,8 @@ const tokenCount = (value: string) => `${value} tok`;
 export function activityPillModel(stats: ComposerSessionStats): PillModel | null {
   if (stats.steps === 0) return null;
   const counts = `${stats.turns} 轮 ${stats.steps} 步`;
-  const speed = stats.decodeMs > 0
-    ? `${formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1_000))} tok/s`
-    : null;
+  const speed =
+    stats.decodeMs > 0 ? `${formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1_000))} tok/s` : null;
   const label = speed === null ? [counts] : [counts, speed];
   if (stats.llmMs <= 0 && stats.toolMs <= 0 && stats.ttftSteps <= 0 && speed === null) {
     return { kind: "plain", label };
@@ -113,15 +118,27 @@ function selectStatsModels(cell: ClientSessionCell | null): StatsModels {
 export function ComposerStatsPills({ overlay }: { overlay?: ComposerStatsOverlay }) {
   const [localOpen, setLocalOpen] = useState<ComposerStat | null>(null);
   const openStat = overlay ? overlay.openStat : localOpen;
-  const onOpenChange = overlay?.onOpenChange
-    ?? ((stat: ComposerStat, open: boolean) => setLocalOpen((current) => (open ? stat : current === stat ? null : current)));
+  const onOpenChange =
+    overlay?.onOpenChange ??
+    ((stat: ComposerStat, open: boolean) =>
+      setLocalOpen((current) => (open ? stat : current === stat ? null : current)));
   // 只订阅两个胶囊的模型：流式时 cell 每帧换一次，模型几乎不变，状态行不随帧重渲染。
   const { activity, usage } = useProjectionSelect<StatsModels>(selectStatsModels, jsonEqual);
   if (activity === null && usage === null) return null;
   return (
     <span className="flex min-w-0 shrink flex-wrap items-center gap-1" data-composer-stats="">
-      {activity ? <StatPill stat="activity" icon={Gauge} model={activity} open={openStat === "activity"} onOpenChange={onOpenChange} /> : null}
-      {usage ? <StatPill stat="usage" icon={Database} model={usage} open={openStat === "usage"} onOpenChange={onOpenChange} /> : null}
+      {activity ? (
+        <StatPill
+          stat="activity"
+          icon={Gauge}
+          model={activity}
+          open={openStat === "activity"}
+          onOpenChange={onOpenChange}
+        />
+      ) : null}
+      {usage ? (
+        <StatPill stat="usage" icon={Database} model={usage} open={openStat === "usage"} onOpenChange={onOpenChange} />
+      ) : null}
     </span>
   );
 }
@@ -133,7 +150,11 @@ function PillContent({ icon: Icon, label }: { icon: LucideIcon; label: readonly 
       <span className={PILL_LABEL_CLASS}>
         {label.map((part, index) => (
           <Fragment key={index}>
-            {index > 0 ? <span className={PILL_SEP_CLASS} aria-hidden="true">·</span> : null}
+            {index > 0 ? (
+              <span className={PILL_SEP_CLASS} aria-hidden="true">
+                ·
+              </span>
+            ) : null}
             {part}
           </Fragment>
         ))}
@@ -162,7 +183,13 @@ function StatPill({ stat, icon, model, open, onOpenChange }: StatPillProps) {
     <Popover open={open} onOpenChange={(next) => onOpenChange(stat, next)}>
       <PopoverTrigger asChild>
         {/* 原生 button：和旁边的 context 圆环一样，状态行里的纯文字入口，不要 Button 的边框和内边距。 */}
-        <button className={BUTTON_PILL_CLASS} type="button" aria-haspopup="dialog" aria-label={model.ariaLabel} data-composer-stat={stat}>
+        <button
+          className={BUTTON_PILL_CLASS}
+          type="button"
+          aria-haspopup="dialog"
+          aria-label={model.ariaLabel}
+          data-composer-stat={stat}
+        >
           <PillContent icon={icon} label={model.label} />
         </button>
       </PopoverTrigger>

@@ -1,100 +1,229 @@
 /** Opt-in real Electron/preload/IPC acceptance; no Provider call or user data writes. */
-import assert from 'node:assert/strict';
-import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, resolve, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createRequire } from 'node:module';
-import { createCoreCodecRegistry } from '@actspace/session-journal';
-import { SessionStore } from '../../../packages/session/session-persistence/dist/index.js';
-import { JsonlSessionStorage } from '../../../packages/session/session-persistence-jsonl/dist/index.js';
+import assert from "node:assert/strict";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, resolve, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
+import { createCoreCodecRegistry } from "@actspace/session-journal";
+import { SessionStore } from "../../../packages/session/session-persistence/dist/index.js";
+import { JsonlSessionStorage } from "../../../packages/session/session-persistence-jsonl/dist/index.js";
 
 const require = createRequire(import.meta.url);
 const playwrightPath = process.env.ACTSPACE_PLAYWRIGHT_MODULE;
-if (!playwrightPath) throw new Error('Set ACTSPACE_PLAYWRIGHT_MODULE to an installed playwright module.');
+if (!playwrightPath) throw new Error("Set ACTSPACE_PLAYWRIGHT_MODULE to an installed playwright module.");
 const { _electron } = await import(pathToFileURL(playwrightPath));
-const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const dataRoot = await mkdtemp(join(tmpdir(), 'actspace-trajectory-phase5-'));
+const desktop = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const dataRoot = await mkdtemp(join(tmpdir(), "actspace-trajectory-phase5-"));
 const registry = createCoreCodecRegistry();
-const storage = new JsonlSessionStorage({ dataRoot, runtimeId: 'trajectory-acceptance', registry });
+const storage = new JsonlSessionStorage({ dataRoot, runtimeId: "trajectory-acceptance", registry });
 const store = new SessionStore({ registry }, storage);
-const sessionId = 'trajectory-phase5-verification';
-const session = await store.create({ sessionId, createdAt: new Date().toISOString(), cwd: desktop, lineage: null, createdWith: { profileId: 'base', runtimeContractVersion: 'actspace.runtime.v2', manifestDigest: 'acceptance', plugins: [{ id: '@actspace/core', version: '2.0.0' }], codecSetDigest: registry.digest } });
-const append = (type, data, surface = null) => session.append({ type, eventVersion: 1, source: { ownerPluginId: '@actspace/core' }, data, surface });
-await append('session/title-set', { title: 'Trajectory Phase 5 verification' });
+const sessionId = "trajectory-phase5-verification";
+const session = await store.create({
+  sessionId,
+  createdAt: new Date().toISOString(),
+  cwd: desktop,
+  lineage: null,
+  createdWith: {
+    profileId: "base",
+    runtimeContractVersion: "actspace.runtime.v2",
+    manifestDigest: "acceptance",
+    plugins: [{ id: "@actspace/core", version: "2.0.0" }],
+    codecSetDigest: registry.digest,
+  },
+});
+const append = (type, data, surface = null) =>
+  session.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface });
+await append("session/title-set", { title: "Trajectory Phase 5 verification" });
 for (let turn = 1; turn <= 25; turn++) {
   const ids = { turnId: `t${turn}`, stepId: `s${turn}`, requestId: `r${turn}` };
-  await append('turn/start', { turnId: ids.turnId });
-  await append('user/message', { turnId: ids.turnId, messageId: `u${turn}` }, { kind: 'append', node: { kind: 'user', messageId: `u${turn}`, content: `Question ${turn}` } });
-  await append('step/start', ids);
-  await append('request/header', { ...ids, model: 'acceptance-model', routeId: 'default' });
+  await append("turn/start", { turnId: ids.turnId });
+  await append(
+    "user/message",
+    { turnId: ids.turnId, messageId: `u${turn}` },
+    { kind: "append", node: { kind: "user", messageId: `u${turn}`, content: `Question ${turn}` } },
+  );
+  await append("step/start", ids);
+  await append("request/header", { ...ids, model: "acceptance-model", routeId: "default" });
   // 提示词、工具只在第 1 轮写（只在变化时写）；翻到最早一页后系统行与 Schema 仍要能显示（agent-spec-request-record.md §7）。
   if (turn === 1) {
-    await append('request/system-prompt', { ...ids, digest: 'verification-prompt', contributorProvenance: [], sections: [{ owner: 'actspace.context-system', id: 'core', order: 0, content: 'You are the verification assistant.' }], modelFacts: [] });
-    await append('request/tools', { ...ids, digest: 'verification-tools', tools: [{ name: 'read_file', description: 'Read a UTF-8 file', inputSchema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } }] });
+    await append("request/system-prompt", {
+      ...ids,
+      digest: "verification-prompt",
+      contributorProvenance: [],
+      sections: [
+        { owner: "actspace.context-system", id: "core", order: 0, content: "You are the verification assistant." },
+      ],
+      modelFacts: [],
+    });
+    await append("request/tools", {
+      ...ids,
+      digest: "verification-tools",
+      tools: [
+        {
+          name: "read_file",
+          description: "Read a UTF-8 file",
+          inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+        },
+      ],
+    });
   }
-  await append('request/context', { ...ids, snapshot: { schemaVersion: 3, requestOptions: {} } });
-  const content = [{ type: 'text', text: `Answer ${turn}` }, { type: 'tool-call', callId: `c${turn}`, name: 'read_file', arguments: '{"path":"example.txt"}' }];
-  await append('assistant/message', { ...ids, messageId: `a${turn}`, content, finishReason: 'tool-calls', firstTokenAt: new Date().toISOString(), usage: { outputTokens: 10 } }, { kind: 'append', node: { kind: 'assistant', messageId: `a${turn}`, content } });
-  await append('tool/call', { turnId: ids.turnId, stepId: ids.stepId, callId: `c${turn}`, name: 'read_file', pluginId: 'core', args: { path: 'example.txt' } });
-  await append('tool/result', { callId: `c${turn}`, name: 'read_file', status: 'completed', summary: '1 line read', modelOutput: [{ type: 'text', text: `File output ${turn}` }], detail: [], artifacts: [] });
-  await append('step/end', { ...ids, reason: 'completed' });
-  await append('turn/end', { turnId: ids.turnId, reason: 'completed' });
+  await append("request/context", { ...ids, snapshot: { schemaVersion: 3, requestOptions: {} } });
+  const content = [
+    { type: "text", text: `Answer ${turn}` },
+    { type: "tool-call", callId: `c${turn}`, name: "read_file", arguments: '{"path":"example.txt"}' },
+  ];
+  await append(
+    "assistant/message",
+    {
+      ...ids,
+      messageId: `a${turn}`,
+      content,
+      finishReason: "tool-calls",
+      firstTokenAt: new Date().toISOString(),
+      usage: { outputTokens: 10 },
+    },
+    { kind: "append", node: { kind: "assistant", messageId: `a${turn}`, content } },
+  );
+  await append("tool/call", {
+    turnId: ids.turnId,
+    stepId: ids.stepId,
+    callId: `c${turn}`,
+    name: "read_file",
+    pluginId: "core",
+    args: { path: "example.txt" },
+  });
+  await append("tool/result", {
+    callId: `c${turn}`,
+    name: "read_file",
+    status: "completed",
+    summary: "1 line read",
+    modelOutput: [{ type: "text", text: `File output ${turn}` }],
+    detail: [],
+    artifacts: [],
+  });
+  await append("step/end", { ...ids, reason: "completed" });
+  await append("turn/end", { turnId: ids.turnId, reason: "completed" });
 }
 await session.close();
 await storage.close();
-const env = { ...process.env, ACTSPACE_DATA_DIR: dataRoot, ACTSPACE_REPO_ROOT: resolve(desktop, '../..'), ACTSPACE_DEV_APP_NAME: 'ActSpace Trajectory Verification' };
-delete env.ELECTRON_RUN_AS_NODE; delete env.VITE_DEV_SERVER_URL;
-const app = await _electron.launch({ executablePath: require('electron'), args: [join(desktop, 'dist-electron/main/index.js')], cwd: desktop, env, timeout: 30000 });
+const env = {
+  ...process.env,
+  ACTSPACE_DATA_DIR: dataRoot,
+  ACTSPACE_REPO_ROOT: resolve(desktop, "../.."),
+  ACTSPACE_DEV_APP_NAME: "ActSpace Trajectory Verification",
+};
+delete env.ELECTRON_RUN_AS_NODE;
+delete env.VITE_DEV_SERVER_URL;
+const app = await _electron.launch({
+  executablePath: require("electron"),
+  args: [join(desktop, "dist-electron/main/index.js")],
+  cwd: desktop,
+  env,
+  timeout: 30000,
+});
 try {
   const page = await app.firstWindow();
-  await page.waitForFunction(() => typeof window.actspace?.sessions?.getProjectionSnapshot === 'function');
-  const result = await page.evaluate(async id => {
+  await page.waitForFunction(() => typeof window.actspace?.sessions?.getProjectionSnapshot === "function");
+  const result = await page.evaluate(async (id) => {
     const first = await window.actspace.sessions.getProjectionSnapshot({ sessionId: id });
-    const earlier = await window.actspace.sessions.getProjectionSnapshot({ sessionId: id, beforeSeq: first.window.beforeSeq });
-    return { revision: first.throughJournalSeq, snapshotRevision: first.snapshot.throughJournalSeq, history: first.window, earlier: earlier.window };
+    const earlier = await window.actspace.sessions.getProjectionSnapshot({
+      sessionId: id,
+      beforeSeq: first.window.beforeSeq,
+    });
+    return {
+      revision: first.throughJournalSeq,
+      snapshotRevision: first.snapshot.throughJournalSeq,
+      history: first.window,
+      earlier: earlier.window,
+    };
   }, sessionId);
   assert.equal(result.revision, result.snapshotRevision);
   // The first page holds the latest 20 complete turns; one earlier page reaches the start.
-  assert.equal(result.history.turnOffset, 5); assert.equal(result.earlier.turnOffset, 0); assert.equal(result.earlier.fromSeq, 0);
-  await page.getByRole('button', { name: /Trajectory Phase 5 verification/ }).first().click();
-  await page.getByRole('button', { name: '查看执行轨迹', exact: true }).click();
-  const ledger = page.getByRole('table');
-  await ledger.getByRole('button', { name: '加载更早的历史', exact: true }).click();
-  await page.getByRole('row', { name: '用户，Question 1', exact: true }).waitFor();
-  await page.getByRole('row', { name: /^请求 \d+，助手，Answer 1$/ }).click();
-  await page.getByRole('tabpanel').getByRole('button', { name: /read_file/ }).click();
-  await page.getByRole('tab', { name: '结果', exact: true }).click();
-  assert.match(await page.getByRole('tabpanel').innerText(), /File output 1/);
-  await page.getByRole('tab', { name: 'Schema', exact: true }).click();
-  assert.match(await page.getByRole('tabpanel').innerText(), /Read a UTF-8 file/);
-  await page.screenshot({ path: join(dataRoot, 'electron-trajectory.png') });
+  assert.equal(result.history.turnOffset, 5);
+  assert.equal(result.earlier.turnOffset, 0);
+  assert.equal(result.earlier.fromSeq, 0);
+  await page
+    .getByRole("button", { name: /Trajectory Phase 5 verification/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "查看执行轨迹", exact: true }).click();
+  const ledger = page.getByRole("table");
+  await ledger.getByRole("button", { name: "加载更早的历史", exact: true }).click();
+  await page.getByRole("row", { name: "用户，Question 1", exact: true }).waitFor();
+  await page.getByRole("row", { name: /^请求 \d+，助手，Answer 1$/ }).click();
+  await page
+    .getByRole("tabpanel")
+    .getByRole("button", { name: /read_file/ })
+    .click();
+  await page.getByRole("tab", { name: "结果", exact: true }).click();
+  assert.match(await page.getByRole("tabpanel").innerText(), /File output 1/);
+  await page.getByRole("tab", { name: "Schema", exact: true }).click();
+  assert.match(await page.getByRole("tabpanel").innerText(), /Read a UTF-8 file/);
+  await page.screenshot({ path: join(dataRoot, "electron-trajectory.png") });
   // Real IPC mutation in the isolated Session exercises the commit observer.
-  const committed = await page.evaluate(async id => {
+  const committed = await page.evaluate(async (id) => {
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => { off(); reject(new Error('No committed Journal notification')); }, 10000);
+      const timeout = setTimeout(() => {
+        off();
+        reject(new Error("No committed Journal notification"));
+      }, 10000);
       const off = window.actspace.events.sessionLive(({ event }) => {
-        if (event.sessionId === id && event.kind === 'journal-update') { clearTimeout(timeout); off(); resolve(event.throughJournalSeq); }
+        if (event.sessionId === id && event.kind === "journal-update") {
+          clearTimeout(timeout);
+          off();
+          resolve(event.throughJournalSeq);
+        }
       });
-      window.actspace.sessions.rename({ sessionId: id, title: 'Trajectory Phase 5 verified' }).catch(error => { clearTimeout(timeout); off(); reject(error); });
+      window.actspace.sessions.rename({ sessionId: id, title: "Trajectory Phase 5 verified" }).catch((error) => {
+        clearTimeout(timeout);
+        off();
+        reject(error);
+      });
     });
   }, sessionId);
   assert.ok(committed > result.revision);
   // The trajectory view hides the Composer without unmounting it, so a draft survives the round trip.
-  const composer = page.getByRole('textbox', { name: '消息输入框', exact: true });
-  await page.getByRole('button', { name: '返回对话', exact: true }).click();
-  await composer.fill('Unsent verification draft');
-  await page.getByRole('button', { name: '查看执行轨迹', exact: true }).click();
+  const composer = page.getByRole("textbox", { name: "消息输入框", exact: true });
+  await page.getByRole("button", { name: "返回对话", exact: true }).click();
+  await composer.fill("Unsent verification draft");
+  await page.getByRole("button", { name: "查看执行轨迹", exact: true }).click();
   assert.equal(await composer.isVisible(), false);
-  await page.getByRole('button', { name: '返回对话', exact: true }).click();
-  assert.equal(await composer.inputValue(), 'Unsent verification draft');
+  await page.getByRole("button", { name: "返回对话", exact: true }).click();
+  assert.equal(await composer.inputValue(), "Unsent verification draft");
   await page.reload();
-  const reloaded = await page.evaluate(id => window.actspace.sessions.getProjectionSnapshot({ sessionId: id }), sessionId);
-  assert.equal(reloaded.snapshot.metadata.title, 'Trajectory Phase 5 verified');
+  const reloaded = await page.evaluate(
+    (id) => window.actspace.sessions.getProjectionSnapshot({ sessionId: id }),
+    sessionId,
+  );
+  assert.equal(reloaded.snapshot.metadata.title, "Trajectory Phase 5 verified");
   assert.equal(reloaded.throughJournalSeq, committed);
-  console.log(JSON.stringify({ passed: true, checks: ['real Journal', 'preload', 'IPC revisions', 'history paging', 'UI history', 'assistant-tool link', 'tool output', 'schema', 'commit notifications', 'Composer draft toggle', 'reload'], evidence: join(dataRoot, 'electron-trajectory.png') }));
+  console.log(
+    JSON.stringify({
+      passed: true,
+      checks: [
+        "real Journal",
+        "preload",
+        "IPC revisions",
+        "history paging",
+        "UI history",
+        "assistant-tool link",
+        "tool output",
+        "schema",
+        "commit notifications",
+        "Composer draft toggle",
+        "reload",
+      ],
+      evidence: join(dataRoot, "electron-trajectory.png"),
+    }),
+  );
 } catch (error) {
   const page = app.windows()[0];
-  if (page) { await page.screenshot({ path: join(dataRoot, 'electron-failure.png') }); console.log((await page.locator('body').innerText()).slice(0,3500)); }
+  if (page) {
+    await page.screenshot({ path: join(dataRoot, "electron-failure.png") });
+    console.log((await page.locator("body").innerText()).slice(0, 3500));
+  }
   throw error;
-} finally { await app.close(); }
+} finally {
+  await app.close();
+}

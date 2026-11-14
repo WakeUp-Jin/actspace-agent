@@ -1,5 +1,11 @@
 import { HostClient, type HostSocket } from "@actspace/client/host";
-import { HostError, isRecord, type HostErrorKind, type HostHello, type HostObserveSnapshot } from "@actspace/shared/host-protocol";
+import {
+  HostError,
+  isRecord,
+  type HostErrorKind,
+  type HostHello,
+  type HostObserveSnapshot,
+} from "@actspace/shared/host-protocol";
 import { HostEventRouter } from "./host-events";
 import { activeSavedHost, clearHostToken, removeHost, saveHost, type SavedHost } from "./saved-hosts";
 
@@ -26,7 +32,12 @@ export type HostConnection = {
 };
 
 export type ConnectionStatus = "idle" | "connecting" | "ready" | "reconnecting" | "revoked" | "failed";
-export type ConnectionError = { readonly kind?: HostErrorKind; readonly closeCode?: number; readonly message: string; readonly url?: string };
+export type ConnectionError = {
+  readonly kind?: HostErrorKind;
+  readonly closeCode?: number;
+  readonly message: string;
+  readonly url?: string;
+};
 export type ConnectionState = {
   readonly status: ConnectionStatus;
   readonly host: SavedHost | null;
@@ -53,7 +64,9 @@ export type ConnectionStoreOptions = {
 export const RECONNECT_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000] as const;
 const PROBE_TIMEOUT_MS = 4_000;
 
-type Mode = { readonly kind: "pair"; readonly url: string; readonly code: string; readonly name: string } | { readonly kind: "resume" };
+type Mode =
+  | { readonly kind: "pair"; readonly url: string; readonly code: string; readonly name: string }
+  | { readonly kind: "resume" };
 
 /** 用户输入的地址统一成 origin；没写协议时按 https。 */
 export function normalizeHostUrl(input: string): string {
@@ -75,14 +88,22 @@ function waitOpen(socket: HostSocket, timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const done = (error?: Error) => {
       clearTimeout(timer);
-      socket.removeEventListener("open", onOpen); socket.removeEventListener("error", onError); socket.removeEventListener("close", onClose);
-      if (error) reject(error); else resolve();
+      socket.removeEventListener("open", onOpen);
+      socket.removeEventListener("error", onError);
+      socket.removeEventListener("close", onClose);
+      if (error) reject(error);
+      else resolve();
     };
     const onOpen = () => done();
     const onError = () => done(new Error("WebSocket error"));
     const onClose = () => done(new Error("WebSocket closed"));
-    const timer = setTimeout(() => { done(new Error("WebSocket open timed out")); socket.close(); }, timeoutMs);
-    socket.addEventListener("open", onOpen); socket.addEventListener("error", onError); socket.addEventListener("close", onClose);
+    const timer = setTimeout(() => {
+      done(new Error("WebSocket open timed out"));
+      socket.close();
+    }, timeoutMs);
+    socket.addEventListener("open", onOpen);
+    socket.addEventListener("error", onError);
+    socket.addEventListener("close", onClose);
   });
 }
 
@@ -112,13 +133,22 @@ export class ConnectionStore {
 
   constructor(options: ConnectionStoreOptions = {}) {
     this.#options = {
-      createSocket: options.createSocket ?? (url => new WebSocket(url) as unknown as HostSocket),
+      createSocket: options.createSocket ?? ((url) => new WebSocket(url) as unknown as HostSocket),
       storage: options.storage ?? localStorage,
       isVisible: options.isVisible ?? (() => typeof document === "undefined" || document.visibilityState === "visible"),
       openTimeoutMs: options.openTimeoutMs ?? 10_000,
       target: options.target ?? (typeof window === "undefined" ? undefined : window),
     };
-    this.#state = { status: "idle", host: activeSavedHost(this.#options.storage), connection: null, description: null, maintenance: false, error: null, revokedReason: null, retryAt: null };
+    this.#state = {
+      status: "idle",
+      host: activeSavedHost(this.#options.storage),
+      connection: null,
+      description: null,
+      maintenance: false,
+      error: null,
+      revokedReason: null,
+      retryAt: null,
+    };
     this.#options.target?.addEventListener("online", this.#wake);
     this.#options.target?.addEventListener("visibilitychange", this.#wake);
   }
@@ -126,7 +156,9 @@ export class ConnectionStore {
   getState = (): ConnectionState => this.#state;
   subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(listener);
-    return () => { this.#listeners.delete(listener); };
+    return () => {
+      this.#listeners.delete(listener);
+    };
   };
 
   /** 启动时调用：有保存的 token 就恢复连接。 */
@@ -163,7 +195,8 @@ export class ConnectionStore {
   reportError(error: unknown): void {
     if (!(error instanceof HostError)) return;
     if (error.kind === "MAINTENANCE" || error.kind === "RECOVERY_BLOCKED") this.#set({ maintenance: true });
-    if (error.kind === "REVOKED" || error.kind === "UNAUTHENTICATED") this.#revoke(error.kind === "REVOKED" ? "revoked" : "unauthenticated");
+    if (error.kind === "REVOKED" || error.kind === "UNAUTHENTICATED")
+      this.#revoke(error.kind === "REVOKED" ? "revoked" : "unauthenticated");
   }
 
   dispose(): void {
@@ -202,37 +235,81 @@ export class ConnectionStore {
       return;
     }
     const url = mode.kind === "pair" ? mode.url : saved!.url;
-    this.#set({ status: wasConnected && mode.kind === "resume" ? "reconnecting" : "connecting", connection: null, error: null, retryAt: null, ...(mode.kind === "pair" ? { revokedReason: null } : {}) });
+    this.#set({
+      status: wasConnected && mode.kind === "resume" ? "reconnecting" : "connecting",
+      connection: null,
+      error: null,
+      retryAt: null,
+      ...(mode.kind === "pair" ? { revokedReason: null } : {}),
+    });
     let closeCode: number | undefined;
     let socket: HostSocket | undefined;
     try {
       socket = this.#options.createSocket(rpcUrl(url));
       this.#socket = socket;
-      socket.addEventListener("close", event => {
+      socket.addEventListener("close", (event) => {
         closeCode = event.code;
         if (!stale() && this.#state.status === "ready") this.#dropped(generation, event.code);
       });
       await waitOpen(socket, this.#options.openTimeoutMs);
       if (stale()) return;
       const client = new HostClient(socket);
-      const auth = await client.authenticate(mode.kind === "pair" ? { code: mode.code, name: mode.name } : { token: saved!.token, expectedHostId: saved!.hostId });
-      if (stale()) { client.close(); return; }
-      const host: SavedHost = mode.kind === "pair"
-        ? { hostId: auth.hostId, deviceId: auth.deviceId, url, token: auth.token ?? "", name: mode.name, pairedAt: new Date().toISOString() }
-        : saved!;
+      const auth = await client.authenticate(
+        mode.kind === "pair"
+          ? { code: mode.code, name: mode.name }
+          : { token: saved!.token, expectedHostId: saved!.hostId },
+      );
+      if (stale()) {
+        client.close();
+        return;
+      }
+      const host: SavedHost =
+        mode.kind === "pair"
+          ? {
+              hostId: auth.hostId,
+              deviceId: auth.deviceId,
+              url,
+              token: auth.token ?? "",
+              name: mode.name,
+              pairedAt: new Date().toISOString(),
+            }
+          : saved!;
       if (mode.kind === "pair") saveHost(host, this.#options.storage);
       const events = new HostEventRouter();
       client.subscribe(events.accept);
-      const description = await client.call("host.describe") as HostDescription;
-      const observed = await client.call("host.observe") as { subscriptionId: string; snapshot: HostObserveSnapshot };
-      if (stale()) { client.close(); return; }
-      if (!isRecord(observed) || typeof observed.subscriptionId !== "string") throw new Error("Invalid host.observe response");
-      const connection: HostConnection = { id: generation, client, events, hostId: host.hostId, epoch: client.hello!.epoch, description, hostSubscriptionId: observed.subscriptionId, hostSnapshot: observed.snapshot };
-      this.#hostListener = events.on(observed.subscriptionId, value => {
-        if (isRecord(value) && value.kind === "state" && typeof value.state === "string") this.#set({ maintenance: value.state !== "ready" });
+      const description = (await client.call("host.describe")) as HostDescription;
+      const observed = (await client.call("host.observe")) as { subscriptionId: string; snapshot: HostObserveSnapshot };
+      if (stale()) {
+        client.close();
+        return;
+      }
+      if (!isRecord(observed) || typeof observed.subscriptionId !== "string")
+        throw new Error("Invalid host.observe response");
+      const connection: HostConnection = {
+        id: generation,
+        client,
+        events,
+        hostId: host.hostId,
+        epoch: client.hello!.epoch,
+        description,
+        hostSubscriptionId: observed.subscriptionId,
+        hostSnapshot: observed.snapshot,
+      };
+      this.#hostListener = events.on(observed.subscriptionId, (value) => {
+        if (isRecord(value) && value.kind === "state" && typeof value.state === "string")
+          this.#set({ maintenance: value.state !== "ready" });
       });
       this.#attempt = 0;
-      this.#set({ status: "ready", host, connection, description, error: null, revokedReason: null, retryAt: null, maintenance: client.hello!.state !== "ready" || observed.snapshot.state !== "ready" });
+      this.#set({
+        status: "ready",
+        host,
+        connection,
+        description,
+        error: null,
+        revokedReason: null,
+        retryAt: null,
+        maintenance: client.hello!.state !== "ready" || observed.snapshot.state !== "ready",
+      });
     } catch (error) {
       if (stale()) return;
       socket?.close();
@@ -259,7 +336,10 @@ export class ConnectionStore {
     if (code === 4003) return this.#revoke("revoked", { closeCode: code, message: "Device revoked" });
     this.#set({ connection: null });
     // 4008 是 Host 要求重新同步，直接重连。
-    if (code === 4008) { void this.#connect({ kind: "resume" }); return; }
+    if (code === 4008) {
+      void this.#connect({ kind: "resume" });
+      return;
+    }
     this.#schedule({ ...(code === undefined ? {} : { closeCode: code }), message: "Connection closed" });
   }
 
@@ -268,7 +348,9 @@ export class ConnectionStore {
     this.#attempt++;
     clearTimeout(this.#timer);
     const generation = this.#generation;
-    this.#timer = setTimeout(() => { if (generation === this.#generation) void this.#connect({ kind: "resume" }); }, delay);
+    this.#timer = setTimeout(() => {
+      if (generation === this.#generation) void this.#connect({ kind: "resume" });
+    }, delay);
     this.#set({ status: "reconnecting", connection: null, error, retryAt: Date.now() + delay });
   }
 
@@ -277,7 +359,15 @@ export class ConnectionStore {
     this.#generation++;
     this.#teardown();
     if (hostId) clearHostToken(hostId, this.#options.storage);
-    this.#set({ status: "revoked", host: activeSavedHost(this.#options.storage), connection: null, error: error ?? null, revokedReason: reason, retryAt: null, maintenance: false });
+    this.#set({
+      status: "revoked",
+      host: activeSavedHost(this.#options.storage),
+      connection: null,
+      error: error ?? null,
+      revokedReason: reason,
+      retryAt: null,
+      maintenance: false,
+    });
   }
 
   /** 回到前台或网络恢复：重连中就立刻重连；已连接时探一下连接是否还活着（iOS 后台会静默断开）。 */
@@ -292,7 +382,9 @@ export class ConnectionStore {
     if (this.#state.status !== "ready" || !connection) return;
     const generation = this.#generation;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("probe timeout")), PROBE_TIMEOUT_MS); });
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("probe timeout")), PROBE_TIMEOUT_MS);
+    });
     void Promise.race([connection.client.call("host.describe"), timeout])
       .catch(() => {
         if (generation !== this.#generation || this.#state.connection !== connection) return;

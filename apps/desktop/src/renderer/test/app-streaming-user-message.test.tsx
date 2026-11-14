@@ -1,5 +1,10 @@
 import { vi } from "vitest";
-import type { FixtureRunInput, FixtureRunResult, FixtureCompactionInput, FixtureCompactionResult } from "./task-host-fixture";
+import type {
+  FixtureRunInput,
+  FixtureRunResult,
+  FixtureCompactionInput,
+  FixtureCompactionResult,
+} from "./task-host-fixture";
 import { taskHostFixture } from "./task-host-fixture";
 import { FixedRendererStreamAdapter } from "../../main/runtime-v2/fixed-renderer-stream-adapter";
 import { runToolStreamFixture } from "@actspace/agent-loop/testing";
@@ -8,7 +13,16 @@ import { recordProjectionFixture } from "./projection-fixture";
 import { projectChatSession } from "@actspace/client/sessions";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState,  ReviewGetSnapshotResult,  RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import type {
+  AppSettings,
+  BootstrapState,
+  ReviewGetSnapshotResult,
+  RuntimeStreamEvent,
+  SessionEvent,
+  SessionListItem,
+  SessionRecord,
+  WorkspaceListResult,
+} from "@actspace/shared";
 import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
@@ -65,8 +79,19 @@ const settingsApiStub = {
   "providers.clearKey": async () => ({ ok: true }),
   "review.getSnapshot": async () => createReviewChanges(0, 0),
   "review.refreshSnapshot": async () => createReviewChanges(0, 0),
-  "workspaces.listMarkdownFiles": async () => ({ ok: true as const, files: [], truncated: false, source: "walk" as const }),
-  "workspaces.readFile": async () => ({ relativePath: "", renderKind: "text" as const, size: 0, mtimeMs: 0, content: "" }),
+  "workspaces.listMarkdownFiles": async () => ({
+    ok: true as const,
+    files: [],
+    truncated: false,
+    source: "walk" as const,
+  }),
+  "workspaces.readFile": async () => ({
+    relativePath: "",
+    renderKind: "text" as const,
+    size: 0,
+    mtimeMs: 0,
+    content: "",
+  }),
   "sessions.archive": async () => ({ ok: true }),
   "sessions.archiveMany": async (input: { sessionIds: string[] }) => ({
     ok: true,
@@ -145,21 +170,29 @@ function createReviewChanges(additions: number, deletions: number): ReviewGetSna
       baseline: { kind: "git-ref", label: "HEAD" },
       target: { label: "Working tree" },
       status: hasChanges ? "ready" : "empty",
-      files: hasChanges ? [
-        {
-          id: "src/example.ts",
-          path: "src/example.ts",
-          status: "modified",
-          additions,
-          deletions,
-          binary: false,
-          renderKind: "text",
-          source: "workingTree",
-          diffLoadStatus: "idle",
-          fingerprint: "example-fingerprint",
-        },
-      ] : [],
-      totals: { files: hasChanges ? 1 : 0, additions, deletions, changedLines: additions + deletions, estimatedChangedBytes: 0 },
+      files: hasChanges
+        ? [
+            {
+              id: "src/example.ts",
+              path: "src/example.ts",
+              status: "modified",
+              additions,
+              deletions,
+              binary: false,
+              renderKind: "text",
+              source: "workingTree",
+              diffLoadStatus: "idle",
+              fingerprint: "example-fingerprint",
+            },
+          ]
+        : [],
+      totals: {
+        files: hasChanges ? 1 : 0,
+        additions,
+        deletions,
+        changedLines: additions + deletions,
+        estimatedChangedBytes: 0,
+      },
       capabilities: { canLoadFullFile: true },
       loadPolicy: { mode: "all-files" },
       queryOptions: { ignoreWhitespaceChanges: false },
@@ -203,28 +236,46 @@ describe("App streaming user message", () => {
     active.meta.title = "Active session";
     const target = createEmptySessionRecord("archive-target");
     target.meta.title = "Archive target";
-    const records = new Map([[active.meta.id, active], [target.meta.id, target]]);
+    const records = new Map([
+      [active.meta.id, active],
+      [target.meta.id, target],
+    ]);
     const sessions: SessionListItem[] = [active, target].map((record) => ({
-      id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, workspaceRoot: "/tmp/workspace",
+      id: record.meta.id,
+      title: record.meta.title,
+      updatedAt: record.meta.updatedAt,
+      agentRunCount: 0,
+      workspaceRoot: "/tmp/workspace",
     }));
     let resolveArchive!: (result: { ok: boolean; error?: string }) => void;
-    const archiveSession = vi.fn(() => new Promise<{ ok: boolean; error?: string }>((resolve) => { resolveArchive = resolve; }));
+    const archiveSession = vi.fn(
+      () =>
+        new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          resolveArchive = resolve;
+        }),
+    );
     const listSessions = vi.fn(async () => sessions);
-    setupBridge(taskHostFixture({
-      ...settingsApiStub,
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": listSessions,
-      getRecord: async ({ sessionId }: { sessionId: string }) => records.get(sessionId) ?? null,
-      "sessions.create": projectRecord(async () => active),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      "sessions.archive": archiveSession,
-      "events.agentStream": () => () => {},
-      execute: vi.fn(),
-    }));
-    return { archiveSession, listSessions, resolveArchive: (result: { ok: boolean; error?: string }) => resolveArchive(result) };
+    setupBridge(
+      taskHostFixture({
+        ...settingsApiStub,
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": listSessions,
+        getRecord: async ({ sessionId }: { sessionId: string }) => records.get(sessionId) ?? null,
+        "sessions.create": projectRecord(async () => active),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        "sessions.archive": archiveSession,
+        "events.agentStream": () => () => {},
+        execute: vi.fn(),
+      }),
+    );
+    return {
+      archiveSession,
+      listSessions,
+      resolveArchive: (result: { ok: boolean; error?: string }) => resolveArchive(result),
+    };
   }
 
   it("hides a single session before a slow archive IPC finishes", async () => {
@@ -270,32 +321,66 @@ describe("App streaming user message", () => {
     fallback.meta.workspaceId = "ws_alt";
     fallback.meta.workspaceRoot = "/tmp/alt-workspace";
     const sessions: SessionListItem[] = [
-      { id: active.meta.id, title: active.meta.title, updatedAt: now, agentRunCount: 1, workspaceId: "ws_source", workspaceRoot: "/tmp/workspace" },
-      { id: "session-pinned", title: "Pinned workspace session", updatedAt: now, agentRunCount: 1, workspaceId: "ws_source", workspaceRoot: "/tmp/workspace", pinned: true },
-      { id: fallback.meta.id, title: fallback.meta.title, updatedAt: now, agentRunCount: 1, workspaceId: "ws_alt", workspaceRoot: "/tmp/alt-workspace" },
+      {
+        id: active.meta.id,
+        title: active.meta.title,
+        updatedAt: now,
+        agentRunCount: 1,
+        workspaceId: "ws_source",
+        workspaceRoot: "/tmp/workspace",
+      },
+      {
+        id: "session-pinned",
+        title: "Pinned workspace session",
+        updatedAt: now,
+        agentRunCount: 1,
+        workspaceId: "ws_source",
+        workspaceRoot: "/tmp/workspace",
+        pinned: true,
+      },
+      {
+        id: fallback.meta.id,
+        title: fallback.meta.title,
+        updatedAt: now,
+        agentRunCount: 1,
+        workspaceId: "ws_alt",
+        workspaceRoot: "/tmp/alt-workspace",
+      },
     ];
     const archiveSessions = vi.fn(async (input: { sessionIds: string[] }) => ({
       ok: true,
       archivedSessionIds: input.sessionIds,
       failedSessionIds: [],
     }));
-    const records = new Map([[active.meta.id, active], [fallback.meta.id, fallback]]);
+    const records = new Map([
+      [active.meta.id, active],
+      [fallback.meta.id, fallback],
+    ]);
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(now),
-      "sessions.list": async () => sessions,
-      getRecord: async ({ sessionId }) => records.get(sessionId) ?? null,
-      "sessions.create": projectRecord(async () => active),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "sessions.archiveMany": archiveSessions,
-      "events.agentStream": () => () => {},
-      execute: async () => ({ sessionId: active.meta.id, agentRunId: "unused", status: "completed", events: [], contextSnapshot: null, contextState: null }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(now),
+        "sessions.list": async () => sessions,
+        getRecord: async ({ sessionId }) => records.get(sessionId) ?? null,
+        "sessions.create": projectRecord(async () => active),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "sessions.archiveMany": archiveSessions,
+        "events.agentStream": () => () => {},
+        execute: async () => ({
+          sessionId: active.meta.id,
+          agentRunId: "unused",
+          status: "completed",
+          events: [],
+          contextSnapshot: null,
+          contextState: null,
+        }),
+      }),
+    );
 
     renderApp();
     await screen.findByRole("button", { name: "查看会话详情： Active workspace session" });
@@ -319,34 +404,62 @@ describe("App streaming user message", () => {
     fallback.meta.workspaceId = "ws_alt";
     fallback.meta.workspaceRoot = "/tmp/alt-workspace";
     const sessions: SessionListItem[] = [
-      { id: active.meta.id, title: active.meta.title, updatedAt: now, agentRunCount: 1, workspaceId: "ws_source", workspaceRoot: "/tmp/workspace" },
-      { id: fallback.meta.id, title: fallback.meta.title, updatedAt: now, agentRunCount: 1, workspaceId: "ws_alt", workspaceRoot: "/tmp/alt-workspace" },
+      {
+        id: active.meta.id,
+        title: active.meta.title,
+        updatedAt: now,
+        agentRunCount: 1,
+        workspaceId: "ws_source",
+        workspaceRoot: "/tmp/workspace",
+      },
+      {
+        id: fallback.meta.id,
+        title: fallback.meta.title,
+        updatedAt: now,
+        agentRunCount: 1,
+        workspaceId: "ws_alt",
+        workspaceRoot: "/tmp/alt-workspace",
+      },
     ];
     let registry = createWorkspaceRegistryFixture(now);
     const setWorkspaceVisibility = vi.fn(async () => {
       registry = {
         ...registry,
-        items: registry.items.map((workspace) => workspace.id === "ws_source" ? { ...workspace, hidden: true } : workspace),
+        items: registry.items.map((workspace) =>
+          workspace.id === "ws_source" ? { ...workspace, hidden: true } : workspace,
+        ),
       };
       return { ok: true as const };
     });
-    const records = new Map([[active.meta.id, active], [fallback.meta.id, fallback]]);
+    const records = new Map([
+      [active.meta.id, active],
+      [fallback.meta.id, fallback],
+    ]);
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => registry,
-      "sessions.list": async () => sessions,
-      getRecord: async ({ sessionId }) => records.get(sessionId) ?? null,
-      "sessions.create": projectRecord(async () => active),
-      "workspaces.setVisibility": setWorkspaceVisibility,
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": () => () => {},
-      execute: async () => ({ sessionId: active.meta.id, agentRunId: "unused", status: "completed", events: [], contextSnapshot: null, contextState: null }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => registry,
+        "sessions.list": async () => sessions,
+        getRecord: async ({ sessionId }) => records.get(sessionId) ?? null,
+        "sessions.create": projectRecord(async () => active),
+        "workspaces.setVisibility": setWorkspaceVisibility,
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": () => () => {},
+        execute: async () => ({
+          sessionId: active.meta.id,
+          agentRunId: "unused",
+          status: "completed",
+          events: [],
+          contextSnapshot: null,
+          contextState: null,
+        }),
+      }),
+    );
 
     renderApp();
     await screen.findByRole("button", { name: "查看会话详情： Hidden active session" });
@@ -370,30 +483,63 @@ describe("App streaming user message", () => {
     visible.meta.workspaceId = "ws_alt";
     visible.meta.workspaceRoot = "/tmp/alt-workspace";
     const sessions: SessionListItem[] = [
-      { id: visible.meta.id, title: visible.meta.title, updatedAt: now, agentRunCount: 1, workspaceId: "ws_alt", workspaceRoot: "/tmp/alt-workspace" },
-      { id: "session-removed", title: "Removed workspace session", updatedAt: now, agentRunCount: 1, workspaceId: "ws_source", workspaceRoot: "/tmp/workspace" },
+      {
+        id: visible.meta.id,
+        title: visible.meta.title,
+        updatedAt: now,
+        agentRunCount: 1,
+        workspaceId: "ws_alt",
+        workspaceRoot: "/tmp/alt-workspace",
+      },
+      {
+        id: "session-removed",
+        title: "Removed workspace session",
+        updatedAt: now,
+        agentRunCount: 1,
+        workspaceId: "ws_source",
+        workspaceRoot: "/tmp/workspace",
+      },
     ];
     let registry = createWorkspaceRegistryFixture(now);
     const setWorkspaceVisibility = vi.fn(async () => {
-      registry = { ...registry, items: registry.items.map((workspace) => workspace.id === "ws_source" ? { ...workspace, hidden: true } : workspace) };
+      registry = {
+        ...registry,
+        items: registry.items.map((workspace) =>
+          workspace.id === "ws_source" ? { ...workspace, hidden: true } : workspace,
+        ),
+      };
       return { ok: true as const };
     });
     const listSessions = vi.fn(async () => sessions.map((session) => ({ ...session })));
     const listPending = vi.fn(async (_input: { sessionId: string }) => []);
     const hostListeners = new Set<(hosts: unknown[]) => void>();
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => registry,
-      "sessions.list": listSessions,
-      getRecord: async ({ sessionId }) => sessionId === visible.meta.id ? visible : null,
-      "workspaces.setVisibility": setWorkspaceVisibility,
-      "approvals.listPending": listPending,
-      "events.hostsChanged": (callback: (hosts: unknown[]) => void) => { hostListeners.add(callback); return () => { hostListeners.delete(callback); }; },
-      ...settingsApiStub,
-      "events.agentStream": () => () => {},
-      execute: async () => ({ sessionId: visible.meta.id, agentRunId: "unused", status: "completed", events: [], contextSnapshot: null, contextState: null }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => registry,
+        "sessions.list": listSessions,
+        getRecord: async ({ sessionId }) => (sessionId === visible.meta.id ? visible : null),
+        "workspaces.setVisibility": setWorkspaceVisibility,
+        "approvals.listPending": listPending,
+        "events.hostsChanged": (callback: (hosts: unknown[]) => void) => {
+          hostListeners.add(callback);
+          return () => {
+            hostListeners.delete(callback);
+          };
+        },
+        ...settingsApiStub,
+        "events.agentStream": () => () => {},
+        execute: async () => ({
+          sessionId: visible.meta.id,
+          agentRunId: "unused",
+          status: "completed",
+          events: [],
+          contextSnapshot: null,
+          contextState: null,
+        }),
+      }),
+    );
 
     renderApp();
     await screen.findByText("Removed workspace session");
@@ -404,9 +550,13 @@ describe("App streaming user message", () => {
 
     listPending.mockClear();
     const listCalls = listSessions.mock.calls.length;
-    act(() => { for (const listener of hostListeners) listener([]); });
+    act(() => {
+      for (const listener of hostListeners) listener([]);
+    });
     await waitFor(() => expect(listSessions.mock.calls.length).toBeGreaterThan(listCalls));
-    await act(async () => { await Promise.resolve(); });
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(listPending).not.toHaveBeenCalledWith({ sessionId: "session-removed" });
   });
 
@@ -433,8 +583,7 @@ describe("App streaming user message", () => {
     ];
     let reviewAdditions = 7;
     let reviewDeletions = 2;
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
     // 缓存读取故意一直返回旧数字：只有强制刷新（refreshSnapshot）才会读到最新值。
     const getReviewSnapshot = vi.fn(async () => createReviewChanges(7, 2));
     const refreshReviewSnapshot = vi.fn(async () => createReviewChanges(reviewAdditions, reviewDeletions));
@@ -444,25 +593,27 @@ describe("App streaming user message", () => {
       value: vi.fn(),
     });
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "review.getSnapshot": getReviewSnapshot,
-      "review.refreshSnapshot": refreshReviewSnapshot,
-      "events.agentStream": () => () => {},
-      execute: () =>
-        new Promise((resolve) => {
-          resolveExecution = resolve;
-        }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "review.getSnapshot": getReviewSnapshot,
+        "review.refreshSnapshot": refreshReviewSnapshot,
+        "events.agentStream": () => () => {},
+        execute: () =>
+          new Promise((resolve) => {
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -530,28 +681,30 @@ describe("App streaming user message", () => {
       },
     }));
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.getPreview": getSessionPreview,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": () => () => {},
-      execute: async () => ({
-        sessionId,
-        agentRunId: "turn-unused",
-        status: "completed",
-        events: [],
-        contextSnapshot: null,
-        contextState: null,
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.getPreview": getSessionPreview,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": () => () => {},
+        execute: async () => ({
+          sessionId,
+          agentRunId: "turn-unused",
+          status: "completed",
+          events: [],
+          contextSnapshot: null,
+          contextState: null,
+        }),
       }),
-    }));
+    );
 
     renderApp();
 
@@ -571,23 +724,46 @@ describe("App streaming user message", () => {
     type LiveListener = (envelope: { event: unknown }) => void;
     const listeners = new Set<LiveListener>();
     const createSession = vi.fn(async () => record);
-    setupBridge(taskHostFixture({
-      ...settingsApiStub,
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, workspaceRoot: "/tmp/workspace" }],
-      getRecord: async () => record,
-      "sessions.create": projectRecord(createSession),
-      "approvals.listPending": async () => [],
-      "events.agentStream": () => () => {},
-      "events.sessionLive": (listener: LiveListener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    }));
+    setupBridge(
+      taskHostFixture({
+        ...settingsApiStub,
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => [
+          {
+            id: record.meta.id,
+            title: record.meta.title,
+            updatedAt: record.meta.updatedAt,
+            agentRunCount: 0,
+            workspaceRoot: "/tmp/workspace",
+          },
+        ],
+        getRecord: async () => record,
+        "sessions.create": projectRecord(createSession),
+        "approvals.listPending": async () => [],
+        "events.agentStream": () => () => {},
+        "events.sessionLive": (listener: LiveListener) => {
+          listeners.add(listener);
+          return () => {
+            listeners.delete(listener);
+          };
+        },
+      }),
+    );
     renderApp();
     await screen.findByRole("button", { name: "查看会话详情： New chat" });
     await userEvent.click(screen.getByRole("button", { name: "新建会话" }));
     expect(createSession).not.toHaveBeenCalled();
-    await userEvent.click(within(document.querySelector('[data-session-id="title-session"]') as HTMLElement).getByRole("button", { name: "New chat" }));
+    await userEvent.click(
+      within(document.querySelector('[data-session-id="title-session"]') as HTMLElement).getByRole("button", {
+        name: "New chat",
+      }),
+    );
     record = { ...record, meta: { ...record.meta, title: "项目架构分析" } };
-    act(() => listeners.forEach(listener => { listener({ event: { kind: "runtime-live", sessionId: record.meta.id, message: "session-title-updated" } }); }));
+    act(() =>
+      listeners.forEach((listener) => {
+        listener({ event: { kind: "runtime-live", sessionId: record.meta.id, message: "session-title-updated" } });
+      }),
+    );
     await screen.findByRole("button", { name: "查看会话详情： 项目架构分析" });
     expect(document.querySelector('[data-session-id="title-session"]')).toHaveTextContent("项目架构分析");
   });
@@ -612,26 +788,27 @@ describe("App streaming user message", () => {
       value: scrollIntoViewMock,
     });
 
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": () => () => {},
-      execute: () =>
-        new Promise((resolve) => {
-          resolveExecution = resolve;
-        }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": () => () => {},
+        execute: () =>
+          new Promise((resolve) => {
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -674,34 +851,35 @@ describe("App streaming user message", () => {
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          resolveExecution = resolve;
-        }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) {
+              streamHandler = null;
+            }
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -735,34 +913,42 @@ describe("App streaming user message", () => {
   it("restores the draft when preparation rejects before task admission", async () => {
     const sessionId = "session-preparation-failed";
     const record = createEmptySessionRecord(sessionId);
-    const sessions: SessionListItem[] = [{
-      id: sessionId,
-      title: "New chat",
-      updatedAt: record.meta.updatedAt,
-      agentRunCount: 0,
-      workspaceRoot: "/tmp/workspace",
-    }];
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "New chat",
+        updatedAt: record.meta.updatedAt,
+        agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
+      },
+    ];
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) streamHandler = null;
-        };
-      },
-      prepare: async () => ({ status: "submission-failed", acknowledgement: "rejected", message: "Git repository has no commits yet." }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) streamHandler = null;
+          };
+        },
+        prepare: async () => ({
+          status: "submission-failed",
+          acknowledgement: "rejected",
+          message: "Git repository has no commits yet.",
+        }),
+      }),
+    );
 
     renderApp();
 
@@ -776,182 +962,189 @@ describe("App streaming user message", () => {
     });
   });
 
-  it.each(["", " \n\t"])("ignores blank thinking deltas (%j) while preserving waiting and visible reasoning", async (blankDelta) => {
-    const sessionId = "session-model-wait";
-    const record = createEmptySessionRecord(sessionId);
-    const sessions: SessionListItem[] = [
-      {
-        id: sessionId,
-        title: "Model wait",
-        updatedAt: record.meta.updatedAt,
-        agentRunCount: 0,
-        workspaceRoot: "/tmp/workspace",
-      },
-    ];
-
-    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let activeAgentRunId = "";
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
-
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
-      },
-      execute: (input: FixtureRunInput) => new Promise((resolve) => {
-        activeAgentRunId = input.agentRunId;
-        streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-        resolveExecution = resolve;
-      }),
-    }));
-
-    renderApp();
-
-    const composer = await screen.findByLabelText("消息输入框");
-    await userEvent.type(composer, "wait for the model");
-    await userEvent.click(screen.getByLabelText("发送消息"));
-
-    // The 300ms visibility boundary is covered with a controlled clock in
-    // model-waiting-status.test.tsx; userEvent may itself exceed that delay.
-    const initialWaitingText = await screen.findByText("Operating Space · Expanding");
-    expect(initialWaitingText).toHaveClass("tool-log-text-running");
-    expect(initialWaitingText).toHaveAttribute("data-shimmer-text", "Operating Space · Expanding");
-
-    await act(async () => {
-      streamHandler?.({
-        type: "assistant_thinking_delta",
-        turnId: "turn-stream",
-        llmCallId: "llm-call-stream",
-        sessionId,
-        agentRunId: activeAgentRunId,
-        messageId: "evt-wait-thinking",
-        delta: blankDelta,
-      });
-    });
-
-    expect(screen.queryByRole("button", { name: "Thinking..." })).toBeNull();
-    expect(screen.getByText("Operating Space · Expanding")).toHaveClass("tool-log-text-running");
-
-    await act(async () => {
-      streamHandler?.({
-        type: "assistant_thinking_delta",
-        turnId: "turn-stream",
-        llmCallId: "llm-call-stream",
-        sessionId,
-        agentRunId: activeAgentRunId,
-        messageId: "evt-wait-thinking",
-        delta: "Inspect the request before using a tool.",
-      });
-    });
-
-    const runningThinkingTitle = await screen.findByText("Thinking...");
-    expect(runningThinkingTitle).toHaveClass("tool-log-text-running");
-    expect(runningThinkingTitle).toHaveAttribute("data-shimmer-text", "Thinking...");
-    expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
-
-    await act(async () => {
-      streamHandler?.({
-        type: "tool_started",
-        turnId: "turn-stream",
-        llmCallId: "llm-call-stream",
-sessionId,
-        agentRunId: activeAgentRunId,
-        toolCallId: "tool-wait-read",
-        toolName: "read_file",
-        argsPreview: "{\"path\":\"README.md\"}",
-        preview: {
-          kind: "read",
-          filePath: "README.md",
-          displayText: "Read README.md",
+  it.each(["", " \n\t"])(
+    "ignores blank thinking deltas (%j) while preserving waiting and visible reasoning",
+    async (blankDelta) => {
+      const sessionId = "session-model-wait";
+      const record = createEmptySessionRecord(sessionId);
+      const sessions: SessionListItem[] = [
+        {
+          id: sessionId,
+          title: "Model wait",
+          updatedAt: record.meta.updatedAt,
+          agentRunCount: 0,
+          workspaceRoot: "/tmp/workspace",
         },
+      ];
+
+      let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+      let activeAgentRunId = "";
+      let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
+
+      setupBridge(
+        taskHostFixture({
+          "app.getBootstrapState": async () => bootstrapState,
+          "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+          "sessions.list": async () => sessions,
+          getRecord: async () => record,
+          "sessions.create": projectRecord(async () => record),
+          "tasks.abort": async () => true,
+          "approvals.submit": async () => ({ ok: true }),
+          "sessions.pin": async () => ({ ok: true }),
+          "approvals.listPending": async () => [],
+          ...settingsApiStub,
+          "events.agentStream": (callback) => {
+            streamHandler = callback;
+            return () => {
+              if (streamHandler === callback) {
+                streamHandler = null;
+              }
+            };
+          },
+          execute: (input: FixtureRunInput) =>
+            new Promise((resolve) => {
+              activeAgentRunId = input.agentRunId;
+              streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+              resolveExecution = resolve;
+            }),
+        }),
+      );
+
+      renderApp();
+
+      const composer = await screen.findByLabelText("消息输入框");
+      await userEvent.type(composer, "wait for the model");
+      await userEvent.click(screen.getByLabelText("发送消息"));
+
+      // The 300ms visibility boundary is covered with a controlled clock in
+      // model-waiting-status.test.tsx; userEvent may itself exceed that delay.
+      const initialWaitingText = await screen.findByText("Operating Space · Expanding");
+      expect(initialWaitingText).toHaveClass("tool-log-text-running");
+      expect(initialWaitingText).toHaveAttribute("data-shimmer-text", "Operating Space · Expanding");
+
+      await act(async () => {
+        streamHandler?.({
+          type: "assistant_thinking_delta",
+          turnId: "turn-stream",
+          llmCallId: "llm-call-stream",
+          sessionId,
+          agentRunId: activeAgentRunId,
+          messageId: "evt-wait-thinking",
+          delta: blankDelta,
+        });
       });
-    });
-    expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
-    expect(screen.getByText("Thinking...")).not.toHaveClass("tool-log-text-running");
 
-    await act(async () => {
-      streamHandler?.({
-        type: "tool_finished",
-        turnId: "turn-stream",
-        llmCallId: "llm-call-stream",
-sessionId,
-        agentRunId: activeAgentRunId,
-        toolCallId: "tool-wait-read",
-        toolName: "read_file",
-        resultEventId: "evt-wait-read-finished",
-        isError: false,
-        preview: {
-          kind: "read",
-          filePath: "README.md",
-          displayText: "Read README.md",
-        },
+      expect(screen.queryByRole("button", { name: "Thinking..." })).toBeNull();
+      expect(screen.getByText("Operating Space · Expanding")).toHaveClass("tool-log-text-running");
+
+      await act(async () => {
+        streamHandler?.({
+          type: "assistant_thinking_delta",
+          turnId: "turn-stream",
+          llmCallId: "llm-call-stream",
+          sessionId,
+          agentRunId: activeAgentRunId,
+          messageId: "evt-wait-thinking",
+          delta: "Inspect the request before using a tool.",
+        });
       });
-    });
 
-    expect(await screen.findByText("Operating Space · Expanding")).toHaveClass("tool-log-text-running");
+      const runningThinkingTitle = await screen.findByText("Thinking...");
+      expect(runningThinkingTitle).toHaveClass("tool-log-text-running");
+      expect(runningThinkingTitle).toHaveAttribute("data-shimmer-text", "Thinking...");
+      expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
 
-    await act(async () => {
-      streamHandler?.({
-        type: "assistant_text_delta",
-        turnId: "turn-stream",
-        llmCallId: "llm-call-stream",
-sessionId,
-        agentRunId: activeAgentRunId,
-        messageId: "evt-wait-answer",
-        delta: "Model response",
+      await act(async () => {
+        streamHandler?.({
+          type: "tool_started",
+          turnId: "turn-stream",
+          llmCallId: "llm-call-stream",
+          sessionId,
+          agentRunId: activeAgentRunId,
+          toolCallId: "tool-wait-read",
+          toolName: "read_file",
+          argsPreview: '{"path":"README.md"}',
+          preview: {
+            kind: "read",
+            filePath: "README.md",
+            displayText: "Read README.md",
+          },
+        });
       });
-    });
+      expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
+      expect(screen.getByText("Thinking...")).not.toHaveClass("tool-log-text-running");
 
-    expect(await screen.findByText(replyText("Model response"))).toBeInTheDocument();
-    expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
-
-    await act(async () => {
-      streamHandler?.({
-        type: "assistant_thinking_delta",
-        turnId: "turn-stream",
-        llmCallId: "llm-call-stream",
-        sessionId,
-        agentRunId: activeAgentRunId,
-        messageId: "evt-empty-thinking-after-answer",
-        delta: blankDelta,
+      await act(async () => {
+        streamHandler?.({
+          type: "tool_finished",
+          turnId: "turn-stream",
+          llmCallId: "llm-call-stream",
+          sessionId,
+          agentRunId: activeAgentRunId,
+          toolCallId: "tool-wait-read",
+          toolName: "read_file",
+          resultEventId: "evt-wait-read-finished",
+          isError: false,
+          preview: {
+            kind: "read",
+            filePath: "README.md",
+            displayText: "Read README.md",
+          },
+        });
       });
-    });
 
-    expect(screen.getAllByRole("button", { name: "Thinking..." })).toHaveLength(1);
-    expect(screen.getByText("Thinking...")).not.toHaveClass("tool-log-text-running");
-    expect(screen.getByText("Inspect the request before using a tool.").textContent).toBe(`${blankDelta}Inspect the request before using a tool.`);
+      expect(await screen.findByText("Operating Space · Expanding")).toHaveClass("tool-log-text-running");
 
-    await act(async () => {
-      resolveExecution?.({
-        sessionId,
-        agentRunId: activeAgentRunId,
-        status: "completed",
-        events: [],
-        contextSnapshot: {
-          totalTokens: 0,
-          maxTokens: 200_000,
-          percentUsed: 0,
-          buckets: [],
-        },
-        contextState: null,
+      await act(async () => {
+        streamHandler?.({
+          type: "assistant_text_delta",
+          turnId: "turn-stream",
+          llmCallId: "llm-call-stream",
+          sessionId,
+          agentRunId: activeAgentRunId,
+          messageId: "evt-wait-answer",
+          delta: "Model response",
+        });
       });
-    });
-  });
+
+      expect(await screen.findByText(replyText("Model response"))).toBeInTheDocument();
+      expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
+
+      await act(async () => {
+        streamHandler?.({
+          type: "assistant_thinking_delta",
+          turnId: "turn-stream",
+          llmCallId: "llm-call-stream",
+          sessionId,
+          agentRunId: activeAgentRunId,
+          messageId: "evt-empty-thinking-after-answer",
+          delta: blankDelta,
+        });
+      });
+
+      expect(screen.getAllByRole("button", { name: "Thinking..." })).toHaveLength(1);
+      expect(screen.getByText("Thinking...")).not.toHaveClass("tool-log-text-running");
+      expect(screen.getByText("Inspect the request before using a tool.").textContent).toBe(
+        `${blankDelta}Inspect the request before using a tool.`,
+      );
+
+      await act(async () => {
+        resolveExecution?.({
+          sessionId,
+          agentRunId: activeAgentRunId,
+          status: "completed",
+          events: [],
+          contextSnapshot: {
+            totalTokens: 0,
+            maxTokens: 200_000,
+            percentUsed: 0,
+            buckets: [],
+          },
+          contextState: null,
+        });
+      });
+    },
+  );
 
   it("routes overlapping turns through one stream listener without duplicating or clearing the visible turn", async () => {
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -992,51 +1185,56 @@ sessionId,
       for (const listener of streamListeners) listener(event);
     };
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => sessions,
-      getRecord: async ({ sessionId }) => records[sessionId] ?? null,
-      "sessions.create": projectRecord(async () => alphaRecord),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamListeners.add(callback);
-        return () => {
-          streamListeners.delete(callback);
-        };
-      },
-      execute: (input: FixtureRunInput) => new Promise((resolve) => {
-        agentRunIds.set(input.sessionId, input.agentRunId);
-        emit({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-        if (input.sessionId === betaSessionId) {
-          emit({
-            type: "assistant_text_delta",
-            turnId: "turn-stream",
-            llmCallId: "llm-call-stream",
-sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            messageId: "evt-beta-text",
-            delta: "beta streamed once",
-          });
-        }
-        resolveTurns.set(input.sessionId, () => resolve({
-          sessionId: input.sessionId,
-          agentRunId: input.agentRunId,
-          status: "completed" as const,
-          events: [],
-          contextSnapshot: {
-            totalTokens: 0,
-            maxTokens: 200_000,
-            percentUsed: 0,
-            buckets: [],
-          },
-          contextState: null,
-        }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => sessions,
+        getRecord: async ({ sessionId }) => records[sessionId] ?? null,
+        "sessions.create": projectRecord(async () => alphaRecord),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamListeners.add(callback);
+          return () => {
+            streamListeners.delete(callback);
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            agentRunIds.set(input.sessionId, input.agentRunId);
+            emit({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            if (input.sessionId === betaSessionId) {
+              emit({
+                type: "assistant_text_delta",
+                turnId: "turn-stream",
+                llmCallId: "llm-call-stream",
+                sessionId: input.sessionId,
+                agentRunId: input.agentRunId,
+                messageId: "evt-beta-text",
+                delta: "beta streamed once",
+              });
+            }
+            resolveTurns.set(input.sessionId, () =>
+              resolve({
+                sessionId: input.sessionId,
+                agentRunId: input.agentRunId,
+                status: "completed" as const,
+                events: [],
+                contextSnapshot: {
+                  totalTokens: 0,
+                  maxTokens: 200_000,
+                  percentUsed: 0,
+                  buckets: [],
+                },
+                contextState: null,
+              }),
+            );
+          }),
       }),
-    }));
+    );
 
     renderApp();
 
@@ -1065,7 +1263,7 @@ sessionId: input.sessionId,
         type: "assistant_text_delta",
         turnId: "turn-stream",
         llmCallId: "llm-call-stream",
-sessionId: alphaSessionId,
+        sessionId: alphaSessionId,
         agentRunId: alphaAgentRunId,
         messageId: "evt-stale-alpha",
         delta: "stale alpha text",
@@ -1103,81 +1301,82 @@ sessionId: alphaSessionId,
     ];
     let currentRecord = record;
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
     let resolveFinalSessionList: ((value: SessionListItem[]) => void) | null = null;
     let listSessionsCallCount = 0;
     const getSession = vi.fn(async () => currentRecord);
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": () => {
-        listSessionsCallCount += 1;
-        if (listSessionsCallCount === 1) return Promise.resolve(sessions);
-        return new Promise((resolve) => {
-          resolveFinalSessionList = resolve;
-        });
-      },
-      getRecord: getSession,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) streamHandler = null;
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          streamHandler?.({ type: "agent_run_started", sessionId, agentRunId: input.agentRunId });
-          streamHandler?.({
-            type: "assistant_text_delta",
-            turnId: "turn-stream",
-            llmCallId: "llm-call-stream",
-sessionId,
-            agentRunId: input.agentRunId,
-            messageId: "evt-stream-delta",
-            delta: "handoff reply",
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": () => {
+          listSessionsCallCount += 1;
+          if (listSessionsCallCount === 1) return Promise.resolve(sessions);
+          return new Promise((resolve) => {
+            resolveFinalSessionList = resolve;
           });
-          const timestamp = new Date().toISOString();
-          const events: SessionEvent[] = [
-            {
-              id: "evt-handoff-user",
-              sessionId,
-              agentRunId: input.agentRunId,
-              type: "user_message",
-              timestamp,
-              schemaVersion: 2,
-              payload: { content: "handoff prompt" },
-            },
-            {
-              id: "evt-handoff-assistant",
-              sessionId,
-              agentRunId: input.agentRunId,
-              type: "assistant_message",
-              timestamp,
-              schemaVersion: 2,
-              payload: {
-                content: "handoff reply",
-                stopReason: "stop",
-                model: "test-model",
-                provider: "test-provider",
-              },
-            },
-          ];
-          currentRecord = {
-            ...record,
-            meta: { ...record.meta, updatedAt: timestamp, agentRunCount: 1 },
-            events,
-            messageBlocks: createMessageBlocks(events),
+        },
+        getRecord: getSession,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) streamHandler = null;
           };
-          resolveExecution = resolve;
-        }),
-    }));
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            streamHandler?.({ type: "agent_run_started", sessionId, agentRunId: input.agentRunId });
+            streamHandler?.({
+              type: "assistant_text_delta",
+              turnId: "turn-stream",
+              llmCallId: "llm-call-stream",
+              sessionId,
+              agentRunId: input.agentRunId,
+              messageId: "evt-stream-delta",
+              delta: "handoff reply",
+            });
+            const timestamp = new Date().toISOString();
+            const events: SessionEvent[] = [
+              {
+                id: "evt-handoff-user",
+                sessionId,
+                agentRunId: input.agentRunId,
+                type: "user_message",
+                timestamp,
+                schemaVersion: 2,
+                payload: { content: "handoff prompt" },
+              },
+              {
+                id: "evt-handoff-assistant",
+                sessionId,
+                agentRunId: input.agentRunId,
+                type: "assistant_message",
+                timestamp,
+                schemaVersion: 2,
+                payload: {
+                  content: "handoff reply",
+                  stopReason: "stop",
+                  model: "test-model",
+                  provider: "test-provider",
+                },
+              },
+            ];
+            currentRecord = {
+              ...record,
+              meta: { ...record.meta, updatedAt: timestamp, agentRunCount: 1 },
+              events,
+              messageBlocks: createMessageBlocks(events),
+            };
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -1238,21 +1437,23 @@ sessionId,
       contextState: null,
     }));
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => [],
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "sessions.setWorkspace": async () => ({ ok: true }),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": () => () => {},
-      execute,
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+        "sessions.list": async () => [],
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "sessions.setWorkspace": async () => ({ ok: true }),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": () => () => {},
+        execute,
+      }),
+    );
 
     renderApp();
 
@@ -1281,33 +1482,51 @@ sessionId,
     ]);
   });
 
-  function installCompactBridge(sessionId: string, compactContext: ((input: FixtureCompactionInput) => Promise<FixtureCompactionResult>), execute = vi.fn(), controls: { onStream?: (callback: (event: RuntimeStreamEvent) => void) => void; abort?: () => Promise<boolean> } = {}) {
+  function installCompactBridge(
+    sessionId: string,
+    compactContext: (input: FixtureCompactionInput) => Promise<FixtureCompactionResult>,
+    execute = vi.fn(),
+    controls: {
+      onStream?: (callback: (event: RuntimeStreamEvent) => void) => void;
+      abort?: () => Promise<boolean>;
+    } = {},
+  ) {
     const record = createEmptySessionRecord(sessionId);
-    const sessions: SessionListItem[] = [{ id: sessionId, title: "New chat", updatedAt: record.meta.updatedAt, agentRunCount: 0, workspaceRoot: "/tmp/workspace" }];
-    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": controls.abort ?? (async () => true),
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      executeCompaction: compactContext,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        controls.onStream?.(callback);
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "New chat",
+        updatedAt: record.meta.updatedAt,
+        agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
       },
-      execute,
-    }));
+    ];
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": controls.abort ?? (async () => true),
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        executeCompaction: compactContext,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          controls.onStream?.(callback);
+          return () => {
+            if (streamHandler === callback) {
+              streamHandler = null;
+            }
+          };
+        },
+        execute,
+      }),
+    );
 
     return execute;
   }
@@ -1323,9 +1542,14 @@ sessionId,
 
   it("routes /compact through task submission, shows the running block and blocks stop until it settles", async () => {
     let resolveCompactContext: (() => void) | null = null;
-    const compactContext = vi.fn((input: FixtureCompactionInput) => new Promise<Awaited<ReturnType<((input: FixtureCompactionInput) => Promise<FixtureCompactionResult>)>>>((resolve) => {
-      resolveCompactContext = () => resolve(compactedResult(input, "skipped"));
-    }));
+    const compactContext = vi.fn(
+      (input: FixtureCompactionInput) =>
+        new Promise<Awaited<ReturnType<(input: FixtureCompactionInput) => Promise<FixtureCompactionResult>>>>(
+          (resolve) => {
+            resolveCompactContext = () => resolve(compactedResult(input, "skipped"));
+          },
+        ),
+    );
     const execute = installCompactBridge("session-compact", compactContext);
 
     renderApp();
@@ -1350,7 +1574,8 @@ sessionId,
   });
 
   it("keeps a failed manual compaction in the stream and retries through the same command", async () => {
-    const compactContext = vi.fn()
+    const compactContext = vi
+      .fn()
       .mockRejectedValueOnce(new Error("模型请求超时"))
       .mockImplementationOnce(async (input: FixtureCompactionInput) => compactedResult(input, "skipped"));
     installCompactBridge("session-compact-failed", compactContext);
@@ -1373,144 +1598,252 @@ sessionId,
     });
   });
 
-  it.each(["context_compaction_failed", "context_compaction_finished"] as const)("retains automatic failure after completion and retries (%s)", async (type) => {
-    let emit!: (event: RuntimeStreamEvent) => void;
-    let finish!: () => void;
-    let input!: FixtureRunInput;
-    const compact = vi.fn(async (value: FixtureCompactionInput) => compactedResult(value, "skipped"));
-    const execute = vi.fn((value: FixtureRunInput) => {
-      input = value;
-      return new Promise<FixtureRunResult>(resolve => { finish = () => resolve({ ...compactedResult({ sessionId: value.sessionId, agentRunId: value.agentRunId }, "skipped"), status: "completed" }); });
-    });
-    installCompactBridge("auto-failed", compact, execute, { onStream: callback => { emit = callback; } });
-    renderApp();
-    await userEvent.type(await screen.findByLabelText("消息输入框"), "automatic failure");
-    await userEvent.click(screen.getByLabelText("发送消息"));
-    await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
-    await act(async () => {
-      const identity = { sessionId: input.sessionId, agentRunId: input.agentRunId };
-      emit(type === "context_compaction_failed"
-        ? { ...identity, type, error: { code: "TEST", message: "自动压缩超时", recoverable: true } }
-        : { ...identity, type, payload: { triggerTokens: 100, thresholdTokens: 90, summaryChars: 0, historyRefPath: "session.jsonl", status: "failed", beforeCount: 10, afterCount: 10, reason: "自动压缩超时" } });
-    });
-    expect(await screen.findByText("自动压缩超时")).toBeInTheDocument();
-    await act(async () => { finish(); });
-    await waitFor(() => expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument());
-    expect(screen.getByText("自动压缩超时")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "重试" }));
-    await waitFor(() => expect(compact).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.queryByText("自动压缩超时")).not.toBeInTheDocument());
-  });
+  it.each(["context_compaction_failed", "context_compaction_finished"] as const)(
+    "retains automatic failure after completion and retries (%s)",
+    async (type) => {
+      let emit!: (event: RuntimeStreamEvent) => void;
+      let finish!: () => void;
+      let input!: FixtureRunInput;
+      const compact = vi.fn(async (value: FixtureCompactionInput) => compactedResult(value, "skipped"));
+      const execute = vi.fn((value: FixtureRunInput) => {
+        input = value;
+        return new Promise<FixtureRunResult>((resolve) => {
+          finish = () =>
+            resolve({
+              ...compactedResult({ sessionId: value.sessionId, agentRunId: value.agentRunId }, "skipped"),
+              status: "completed",
+            });
+        });
+      });
+      installCompactBridge("auto-failed", compact, execute, {
+        onStream: (callback) => {
+          emit = callback;
+        },
+      });
+      renderApp();
+      await userEvent.type(await screen.findByLabelText("消息输入框"), "automatic failure");
+      await userEvent.click(screen.getByLabelText("发送消息"));
+      await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        const identity = { sessionId: input.sessionId, agentRunId: input.agentRunId };
+        emit(
+          type === "context_compaction_failed"
+            ? { ...identity, type, error: { code: "TEST", message: "自动压缩超时", recoverable: true } }
+            : {
+                ...identity,
+                type,
+                payload: {
+                  triggerTokens: 100,
+                  thresholdTokens: 90,
+                  summaryChars: 0,
+                  historyRefPath: "session.jsonl",
+                  status: "failed",
+                  beforeCount: 10,
+                  afterCount: 10,
+                  reason: "自动压缩超时",
+                },
+              },
+        );
+      });
+      expect(await screen.findByText("自动压缩超时")).toBeInTheDocument();
+      await act(async () => {
+        finish();
+      });
+      await waitFor(() => expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument());
+      expect(screen.getByText("自动压缩超时")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "重试" }));
+      await waitFor(() => expect(compact).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.queryByText("自动压缩超时")).not.toBeInTheDocument());
+    },
+  );
 
   it("aborts an Agent while automatic compaction is running", async () => {
     let emit!: (event: RuntimeStreamEvent) => void;
     let input!: FixtureRunInput;
     let finish!: () => void;
-    const abort = vi.fn(async () => { finish(); return true; });
+    const abort = vi.fn(async () => {
+      finish();
+      return true;
+    });
     const execute = vi.fn((value: FixtureRunInput) => {
       input = value;
-      return new Promise<FixtureRunResult>(resolve => { finish = () => resolve({ ...compactedResult({ sessionId: value.sessionId, agentRunId: value.agentRunId }, "skipped"), status: "aborted" }); });
+      return new Promise<FixtureRunResult>((resolve) => {
+        finish = () =>
+          resolve({
+            ...compactedResult({ sessionId: value.sessionId, agentRunId: value.agentRunId }, "skipped"),
+            status: "aborted",
+          });
+      });
     });
-    installCompactBridge("auto-abort", vi.fn(), execute, { onStream: callback => { emit = callback; }, abort });
+    installCompactBridge("auto-abort", vi.fn(), execute, {
+      onStream: (callback) => {
+        emit = callback;
+      },
+      abort,
+    });
     renderApp();
     await userEvent.type(await screen.findByLabelText("消息输入框"), "automatic compaction");
     await userEvent.click(screen.getByLabelText("发送消息"));
     await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
-    await act(async () => { emit({ type: "context_compaction_started", sessionId: input.sessionId, agentRunId: input.agentRunId, startedAt: new Date().toISOString() }); });
+    await act(async () => {
+      emit({
+        type: "context_compaction_started",
+        sessionId: input.sessionId,
+        agentRunId: input.agentRunId,
+        startedAt: new Date().toISOString(),
+      });
+    });
     expect(await screen.findByText("正在压缩上下文")).toBeInTheDocument();
     await userEvent.click(screen.getByLabelText("停止 Agent"));
     await waitFor(() => expect(abort).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByText("正在压缩上下文")).not.toBeInTheDocument());
   });
 
-  it.each([false, true])("renders real loop tools and rehydrates without duplicates (finishOnly=%s)", async (finishOnly) => {
-    const sessionId = "session-test";
-    let record = createEmptySessionRecord(sessionId);
-    const sessions: SessionListItem[] = [
-      {
-        id: sessionId,
-        title: "New chat",
-        updatedAt: record.meta.updatedAt,
-        agentRunCount: 0,
-        workspaceRoot: "/tmp/workspace",
-      },
-    ];
+  it.each([false, true])(
+    "renders real loop tools and rehydrates without duplicates (finishOnly=%s)",
+    async (finishOnly) => {
+      const sessionId = "session-test";
+      let record = createEmptySessionRecord(sessionId);
+      const sessions: SessionListItem[] = [
+        {
+          id: sessionId,
+          title: "New chat",
+          updatedAt: record.meta.updatedAt,
+          agentRunCount: 0,
+          workspaceRoot: "/tmp/workspace",
+        },
+      ];
 
-    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let storedProjection = recordProjectionFixture(record);
-    const adapter = new FixedRendererStreamAdapter();
-    let finishTool!: () => void;
-    let finishText!: () => void;
-    const toolGate = new Promise<void>((resolve) => { finishTool = resolve; });
-    const textGate = new Promise<void>((resolve) => { finishText = resolve; });
-    let lastFinished: Extract<RuntimeStreamEvent, { type: "tool_finished" }> | undefined;
-    adapter.subscribe((event) => {
-      if (event.type === "tool_finished") lastFinished = event;
-      if (finishOnly && (event.type === "tool_call_streaming" || event.type === "tool_started")) return;
-      streamHandler?.(event);
-    });
+      let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+      let storedProjection = recordProjectionFixture(record);
+      const adapter = new FixedRendererStreamAdapter();
+      let finishTool!: () => void;
+      let finishText!: () => void;
+      const toolGate = new Promise<void>((resolve) => {
+        finishTool = resolve;
+      });
+      const textGate = new Promise<void>((resolve) => {
+        finishText = resolve;
+      });
+      let lastFinished: Extract<RuntimeStreamEvent, { type: "tool_finished" }> | undefined;
+      adapter.subscribe((event) => {
+        if (event.type === "tool_finished") lastFinished = event;
+        if (finishOnly && (event.type === "tool_call_streaming" || event.type === "tool_started")) return;
+        streamHandler?.(event);
+      });
 
+      setupBridge(
+        taskHostFixture({
+          "app.getBootstrapState": async () => bootstrapState,
+          "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+          "sessions.list": async () => sessions,
+          getRecord: async () => record,
+          "sessions.create": projectRecord(async () => record),
+          "tasks.abort": async () => true,
+          "approvals.submit": async () => ({ ok: true }),
+          "sessions.pin": async () => ({ ok: true }),
+          "approvals.listPending": async () => [],
+          ...settingsApiStub,
+          "sessions.getPage": async () => storedProjection,
+          "events.agentStream": (callback) => {
+            streamHandler = callback;
+            return () => {
+              if (streamHandler === callback) {
+                streamHandler = null;
+              }
+            };
+          },
+          execute: async (input: FixtureRunInput) => {
+            const fixture = await runToolStreamFixture({
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              onLiveEvent: (event) => adapter.accept(event),
+              execute: async () => {
+                await toolGate;
+                return {
+                  status: "completed",
+                  summary: "Read fixture.txt",
+                  modelOutput: [{ type: "text", text: "fixture" }],
+                };
+              },
+              beforeFinalText: () => textGate,
+            });
+            const model = new SessionReadModel(fixture.header, fixture.registry, new Map()).replay(fixture.journal);
+            const snapshot = model.snapshot();
+            storedProjection = {
+              ...recordProjectionFixture(record),
+              throughJournalSeq: snapshot.throughJournalSeq,
+              snapshot,
+              values: model.projections.snapshot(input.sessionId).values,
+              activeMessageIds: snapshot.messages.map((message) => message.messageId),
+              window: {
+                events: fixture.journal,
+                fromSeq: 0,
+                throughJournalSeq: snapshot.throughJournalSeq,
+                beforeSeq: null,
+                turnOffset: 0,
+                requestOffset: 0,
+              },
+            };
+            record = projectChatSession(snapshot, fixture.journal, "/tmp/workspace");
+            return {
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              status: "completed",
+              events: record.events,
+              contextSnapshot: { totalTokens: 0, maxTokens: 200_000, percentUsed: 0, buckets: [] },
+              contextState: null,
+            };
+          },
+        }),
+      );
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "sessions.getPage": async () => storedProjection,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
-      },
-      execute: async (input: FixtureRunInput) => {
-        const fixture = await runToolStreamFixture({ sessionId: input.sessionId, agentRunId: input.agentRunId,
-          onLiveEvent: (event) => adapter.accept(event),
-          execute: async () => { await toolGate; return { status: "completed", summary: "Read fixture.txt", modelOutput: [{ type: "text", text: "fixture" }] }; },
-          beforeFinalText: () => textGate,
+      renderApp();
+
+      const composer = await screen.findByLabelText("消息输入框");
+      await userEvent.type(composer, "read that file");
+      await userEvent.click(screen.getByLabelText("发送消息"));
+
+      if (!finishOnly) expect(await screen.findByText("Read fixture.txt")).toHaveAttribute("data-shimmer-text");
+      expect(screen.queryByText(/\{"path"/)).not.toBeInTheDocument();
+      await act(async () => {
+        finishTool();
+      });
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Read fixture.txt" })).not.toHaveAttribute("data-shimmer-text"),
+      );
+      expect(screen.queryByText(/已结束\./)).not.toBeInTheDocument();
+      await act(async () => {
+        if (!lastFinished) throw new Error("Expected a tool result before final text");
+        streamHandler?.({
+          ...lastFinished,
+          type: "tool_call_streaming",
+          preview: { kind: "read", filePath: "late.txt", displayText: "late" },
         });
-        const model = new SessionReadModel(fixture.header, fixture.registry, new Map()).replay(fixture.journal);
-        const snapshot = model.snapshot();
-        storedProjection = { ...recordProjectionFixture(record), throughJournalSeq: snapshot.throughJournalSeq, snapshot, values: model.projections.snapshot(input.sessionId).values, activeMessageIds: snapshot.messages.map(message => message.messageId), window: { events: fixture.journal, fromSeq: 0, throughJournalSeq: snapshot.throughJournalSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0 } };
-        record = projectChatSession(snapshot, fixture.journal, "/tmp/workspace");
-        return { sessionId: input.sessionId, agentRunId: input.agentRunId, status: "completed", events: record.events, contextSnapshot: { totalTokens: 0, maxTokens: 200_000, percentUsed: 0, buckets: [] }, contextState: null };
-      },
-    }));
-
-    renderApp();
-
-    const composer = await screen.findByLabelText("消息输入框");
-    await userEvent.type(composer, "read that file");
-    await userEvent.click(screen.getByLabelText("发送消息"));
-
-    if (!finishOnly) expect(await screen.findByText("Read fixture.txt")).toHaveAttribute("data-shimmer-text");
-    expect(screen.queryByText(/\{"path"/)).not.toBeInTheDocument();
-    await act(async () => { finishTool(); });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Read fixture.txt" })).not.toHaveAttribute("data-shimmer-text"));
-    expect(screen.queryByText(/已结束\./)).not.toBeInTheDocument();
-    await act(async () => {
-      if (!lastFinished) throw new Error("Expected a tool result before final text");
-      streamHandler?.({ ...lastFinished, type: "tool_call_streaming", preview: { kind: "read", filePath: "late.txt", displayText: "late" } });
-      streamHandler?.({ type: "tool_approval_required", sessionId, agentRunId: lastFinished.agentRunId, toolCallId: lastFinished.toolCallId, toolName: "read_file", requestId: "late-approval", summary: "Late", reason: "Late" });
-      streamHandler?.(lastFinished);
-    });
-    expect(screen.getByRole("button", { name: "Read fixture.txt" })).not.toHaveAttribute("data-shimmer-text");
-    expect(screen.queryByText("Read late.txt")).not.toBeInTheDocument();
-    await act(async () => { finishText(); });
-    expect(await screen.findByText(/body JSON/)).toBeInTheDocument();
-    await userEvent.click(await screen.findByRole("button", { name: /Worked for/ }));
-    await waitFor(() => expect(screen.getAllByRole("button", { name: "Read fixture.txt" })).toHaveLength(1));
-    expect(screen.queryByText(/\{"path"/)).not.toBeInTheDocument();
-    adapter.dispose();
-  });
+        streamHandler?.({
+          type: "tool_approval_required",
+          sessionId,
+          agentRunId: lastFinished.agentRunId,
+          toolCallId: lastFinished.toolCallId,
+          toolName: "read_file",
+          requestId: "late-approval",
+          summary: "Late",
+          reason: "Late",
+        });
+        streamHandler?.(lastFinished);
+      });
+      expect(screen.getByRole("button", { name: "Read fixture.txt" })).not.toHaveAttribute("data-shimmer-text");
+      expect(screen.queryByText("Read late.txt")).not.toBeInTheDocument();
+      await act(async () => {
+        finishText();
+      });
+      expect(await screen.findByText(/body JSON/)).toBeInTheDocument();
+      await userEvent.click(await screen.findByRole("button", { name: /Worked for/ }));
+      await waitFor(() => expect(screen.getAllByRole("button", { name: "Read fixture.txt" })).toHaveLength(1));
+      expect(screen.queryByText(/\{"path"/)).not.toBeInTheDocument();
+      adapter.dispose();
+    },
+  );
 
   it("finishes multiple write tools independently as each tool_finished event arrives", async () => {
     const sessionId = "session-write-status";
@@ -1527,57 +1860,58 @@ sessionId,
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     let activeAgentRunId = "";
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          activeAgentRunId = input.agentRunId;
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          for (const [index, filePath] of ["first.ts", "second.ts", "third.ts"].entries()) {
-            streamHandler?.({
-              type: "tool_started",
-              turnId: "turn-stream",
-              llmCallId: "llm-call-stream",
-sessionId: input.sessionId,
-              agentRunId: input.agentRunId,
-              toolCallId: `tool-write-${index + 1}`,
-              toolName: "write_file",
-              argsPreview: JSON.stringify({ path: filePath }),
-              preview: {
-                kind: "write",
-                filePath,
-                additions: 0,
-                deletions: 0,
-                diff: "",
-                collapsedLines: 5,
-                status: "running",
-                streamingContent: `export const value${index + 1} = ${index + 1};`,
-              },
-            });
-          }
-          resolveExecution = resolve;
-        }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) {
+              streamHandler = null;
+            }
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            activeAgentRunId = input.agentRunId;
+            streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            for (const [index, filePath] of ["first.ts", "second.ts", "third.ts"].entries()) {
+              streamHandler?.({
+                type: "tool_started",
+                turnId: "turn-stream",
+                llmCallId: "llm-call-stream",
+                sessionId: input.sessionId,
+                agentRunId: input.agentRunId,
+                toolCallId: `tool-write-${index + 1}`,
+                toolName: "write_file",
+                argsPreview: JSON.stringify({ path: filePath }),
+                preview: {
+                  kind: "write",
+                  filePath,
+                  additions: 0,
+                  deletions: 0,
+                  diff: "",
+                  collapsedLines: 5,
+                  status: "running",
+                  streamingContent: `export const value${index + 1} = ${index + 1};`,
+                },
+              });
+            }
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -1596,7 +1930,7 @@ sessionId: input.sessionId,
           type: "tool_finished",
           turnId: "turn-stream",
           llmCallId: "llm-call-stream",
-sessionId,
+          sessionId,
           agentRunId: activeAgentRunId,
           toolCallId: `tool-write-${index}`,
           toolName: "write_file",
@@ -1660,58 +1994,61 @@ sessionId,
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     let activeAgentRunId = "";
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) streamHandler = null;
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          activeAgentRunId = input.agentRunId;
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          streamHandler?.({
-            type: "tool_started",
-            turnId: "turn-todo-stream",
-            llmCallId: "llm-todo-stream",
-            sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-todo-1",
-            toolName: "todo_write",
-            argsPreview: "{}",
-            preview: {
-              kind: "todo",
-              todos: [{
-                id: "todo-1",
-                content: "Inspect current behavior",
-                status: "in_progress",
-                activeForm: "Inspecting current behavior",
-                createdAt: now,
-                updatedAt: now,
-              }],
-              completedCount: 0,
-              totalCount: 1,
-              revision: 1,
-              displayText: "0/1 completed",
-            },
-          });
-          resolveExecution = resolve;
-        }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) streamHandler = null;
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            activeAgentRunId = input.agentRunId;
+            streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            streamHandler?.({
+              type: "tool_started",
+              turnId: "turn-todo-stream",
+              llmCallId: "llm-todo-stream",
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              toolCallId: "tool-todo-1",
+              toolName: "todo_write",
+              argsPreview: "{}",
+              preview: {
+                kind: "todo",
+                todos: [
+                  {
+                    id: "todo-1",
+                    content: "Inspect current behavior",
+                    status: "in_progress",
+                    activeForm: "Inspecting current behavior",
+                    createdAt: now,
+                    updatedAt: now,
+                  },
+                ],
+                completedCount: 0,
+                totalCount: 1,
+                revision: 1,
+                displayText: "0/1 completed",
+              },
+            });
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -1837,90 +2174,118 @@ sessionId,
     const getReviewSnapshot = vi.fn(async () => createReviewChanges(7, 2));
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      // 卡片按子智能体 id 打开右侧面板，面板从列表里找到它。
-      "sessions.getSubagents": async () => [{ agentId: "run-1", kind: "local", preset: "explore", description: "Explore renderer flow", status: "running", activationCount: 1, background: false, createdAt: "2026-06-03T10:00:00.000Z", activeSince: "2026-06-03T10:00:00.000Z", transcriptPath: "/tmp/run-1.md" }],
-      "sessions.getSubAgentTranscript": async () => [{ ...transcriptEvent, type: "tool_result", payload: { toolCallId: "tool-read-app", status: "running", uiPreview: { kind: "read", filePath: "apps/desktop/src/renderer/App.tsx", displayText: "Read apps/desktop/src/renderer/App.tsx" } } }],
-      ...settingsApiStub,
-      "review.getSnapshot": getReviewSnapshot,
-      "review.refreshSnapshot": getReviewSnapshot,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          streamHandler?.({
-            type: "tool_call_streaming",
-            turnId: "turn-stream",
-            llmCallId: "llm-call-stream",
-sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-agent-1",
-            toolName: "agent",
-            isInitial: true,
-            preview: {
-              kind: "agent",
-              description: "Explore renderer flow",
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        // 卡片按子智能体 id 打开右侧面板，面板从列表里找到它。
+        "sessions.getSubagents": async () => [
+          {
+            agentId: "run-1",
+            kind: "local",
+            preset: "explore",
+            description: "Explore renderer flow",
+            status: "running",
+            activationCount: 1,
+            background: false,
+            createdAt: "2026-06-03T10:00:00.000Z",
+            activeSince: "2026-06-03T10:00:00.000Z",
+            transcriptPath: "/tmp/run-1.md",
+          },
+        ],
+        "sessions.getSubAgentTranscript": async () => [
+          {
+            ...transcriptEvent,
+            type: "tool_result",
+            payload: {
+              toolCallId: "tool-read-app",
               status: "running",
-              subagentType: "explore",
-              displayText: "正在读取 · App.tsx",
+              uiPreview: {
+                kind: "read",
+                filePath: "apps/desktop/src/renderer/App.tsx",
+                displayText: "Read apps/desktop/src/renderer/App.tsx",
+              },
             },
-          });
-          streamHandler?.({
-            type: "subagent_event",
-            sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-agent-1",
-            transcriptRef: {
-              kind: "subagent_transcript",
-              sessionId,
+          },
+        ],
+        ...settingsApiStub,
+        "review.getSnapshot": getReviewSnapshot,
+        "review.refreshSnapshot": getReviewSnapshot,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) {
+              streamHandler = null;
+            }
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            streamHandler?.({
+              type: "tool_call_streaming",
+              turnId: "turn-stream",
+              llmCallId: "llm-call-stream",
+              sessionId: input.sessionId,
               agentRunId: input.agentRunId,
-              runId: "run-1",
-            },
-            event: transcriptEvent,
-            preview: {
-              kind: "agent",
-              description: "Explore renderer flow",
-              status: "running",
-              subagentType: "explore",
-              displayText: "正在读取 · App.tsx",
+              toolCallId: "tool-agent-1",
+              toolName: "agent",
+              isInitial: true,
+              preview: {
+                kind: "agent",
+                description: "Explore renderer flow",
+                status: "running",
+                subagentType: "explore",
+                displayText: "正在读取 · App.tsx",
+              },
+            });
+            streamHandler?.({
+              type: "subagent_event",
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              toolCallId: "tool-agent-1",
               transcriptRef: {
                 kind: "subagent_transcript",
                 sessionId,
                 agentRunId: input.agentRunId,
                 runId: "run-1",
               },
-              recentEvents: [
-                {
-                  id: "evt-subagent-tool",
-                  type: "tool_call",
-                  title: "Read",
-                  summary: "Read apps/desktop/src/renderer/App.tsx",
-                  timestamp: "2026-06-03T10:00:00.000Z",
+              event: transcriptEvent,
+              preview: {
+                kind: "agent",
+                description: "Explore renderer flow",
+                status: "running",
+                subagentType: "explore",
+                displayText: "正在读取 · App.tsx",
+                transcriptRef: {
+                  kind: "subagent_transcript",
+                  sessionId,
+                  agentRunId: input.agentRunId,
+                  runId: "run-1",
                 },
-              ],
-            },
-          });
-          resolveExecution = resolve;
-        }),
-    }));
+                recentEvents: [
+                  {
+                    id: "evt-subagent-tool",
+                    type: "tool_call",
+                    title: "Read",
+                    summary: "Read apps/desktop/src/renderer/App.tsx",
+                    timestamp: "2026-06-03T10:00:00.000Z",
+                  },
+                ],
+              },
+            });
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -1940,7 +2305,9 @@ sessionId: input.sessionId,
     const panel = await screen.findByRole("region", { name: "子 Agent 详情" });
     expect(panel).toBeTruthy();
     expect(await within(panel).findByText("Read apps/desktop/src/renderer/App.tsx")).toBeTruthy();
-    expect(screen.queryByRole("dialog", { name: /SubAgent transcript: Explore renderer flow/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: /SubAgent transcript: Explore renderer flow/ }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "审查待处理变更 +7 -2" })).toBeInTheDocument();
 
     await act(async () => {
@@ -1980,32 +2347,34 @@ sessionId: input.sessionId,
     }));
     const createSession = vi.fn(async () => createdRecord);
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(createSession),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      "dialogs.selectWorkspaceDirectory": selectWorkspaceDirectory,
-      ...settingsApiStub,
-      "events.agentStream": () => () => {},
-      execute: async () => ({
-        sessionId,
-        agentRunId: "turn-unused",
-        status: "completed",
-        events: [],
-        contextSnapshot: {
-          totalTokens: 0,
-          maxTokens: 200_000,
-          percentUsed: 0,
-          buckets: [],
-        },
-        contextState: null,
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(createSession),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        "dialogs.selectWorkspaceDirectory": selectWorkspaceDirectory,
+        ...settingsApiStub,
+        "events.agentStream": () => () => {},
+        execute: async () => ({
+          sessionId,
+          agentRunId: "turn-unused",
+          status: "completed",
+          events: [],
+          contextSnapshot: {
+            totalTokens: 0,
+            maxTokens: 200_000,
+            percentUsed: 0,
+            buckets: [],
+          },
+          contextState: null,
+        }),
       }),
-    }));
+    );
 
     renderApp();
 
@@ -2067,21 +2436,23 @@ sessionId: input.sessionId,
       };
     });
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "sessions.setWorkspace": setSessionWorkspace,
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": () => () => {},
-      execute,
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "sessions.setWorkspace": setSessionWorkspace,
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": () => () => {},
+        execute,
+      }),
+    );
 
     renderApp();
 
@@ -2125,51 +2496,54 @@ sessionId: input.sessionId,
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     let capturedInput: FixtureRunInput | null = null;
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      "dialogs.selectImages": async () => ({ canceled: false, attachments: [selectedAttachment] }),
-      "models.listUsable": async () => ({
-        models: [{
-          key: "deepseek:deepseek-v4-pro",
-          label: "DeepSeek V4 Pro",
-          provider: "deepseek",
-          apiModel: "deepseek-v4-pro",
-          contextWindow: 1_000_000,
-          thinkingDefault: true,
-          capabilities: {
-            input: ["text"],
-            toolUse: "verified",
-            reasoning: true,
-            thinkingToggle: true,
-          },
-        }],
-      }),
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          capturedInput = input;
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          resolveExecution = resolve;
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        "dialogs.selectImages": async () => ({ canceled: false, attachments: [selectedAttachment] }),
+        "models.listUsable": async () => ({
+          models: [
+            {
+              key: "deepseek:deepseek-v4-pro",
+              label: "DeepSeek V4 Pro",
+              provider: "deepseek",
+              apiModel: "deepseek-v4-pro",
+              contextWindow: 1_000_000,
+              thinkingDefault: true,
+              capabilities: {
+                input: ["text"],
+                toolUse: "verified",
+                reasoning: true,
+                thinkingToggle: true,
+              },
+            },
+          ],
         }),
-    }));
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) {
+              streamHandler = null;
+            }
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            capturedInput = input;
+            streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -2187,13 +2561,15 @@ sessionId: input.sessionId,
     await userEvent.click(screen.getByLabelText("发送消息"));
 
     await waitFor(() => {
-      expect(capturedInput?.attachments).toEqual([{
-        id: "att-screenshot",
-        kind: "image",
-        name: "screenshot.png",
-        path: "/Users/test/screenshot.png",
-        mimeType: "image/png",
-      }]);
+      expect(capturedInput?.attachments).toEqual([
+        {
+          id: "att-screenshot",
+          kind: "image",
+          name: "screenshot.png",
+          path: "/Users/test/screenshot.png",
+          mimeType: "image/png",
+        },
+      ]);
       expect(capturedInput?.mode).toBe("agent");
       expect(capturedInput?.selectedSkills).toEqual([]);
     });
@@ -2238,49 +2614,50 @@ sessionId: input.sessionId,
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          streamHandler?.({
-            type: "tool_started",
-            turnId: "turn-stream",
-            llmCallId: "llm-call-stream",
-sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-web-search-1",
-            toolName: "web_search",
-            argsPreview: "{\"query\":\"最新新闻 今天\"}",
-            preview: {
-              kind: "web_search",
-              mode: "query",
-              query: "最新新闻 今天",
-              displayText: "Web Search 最新新闻 今天",
-            },
-          });
-          resolveExecution = resolve;
-        }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) {
+              streamHandler = null;
+            }
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            streamHandler?.({
+              type: "tool_started",
+              turnId: "turn-stream",
+              llmCallId: "llm-call-stream",
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              toolCallId: "tool-web-search-1",
+              toolName: "web_search",
+              argsPreview: '{"query":"最新新闻 今天"}',
+              preview: {
+                kind: "web_search",
+                mode: "query",
+                query: "最新新闻 今天",
+                displayText: "Web Search 最新新闻 今天",
+              },
+            });
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -2323,65 +2700,66 @@ sessionId: input.sessionId,
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          streamHandler?.({
-            type: "tool_started",
-            turnId: "turn-stream",
-            llmCallId: "llm-call-stream",
-sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-grep-1",
-            toolName: "grep",
-            argsPreview: "{\"pattern\":\"ToolUiPreview\",\"glob\":\"*.ts\"}",
-            preview: {
-              kind: "grep",
-              pattern: "ToolUiPreview",
-              scope: "*.ts",
-              displayText: "Grep ToolUiPreview in *.ts",
-            },
-          });
-          streamHandler?.({
-            type: "tool_started",
-            turnId: "turn-stream",
-            llmCallId: "llm-call-stream",
-sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-glob-1",
-            toolName: "glob",
-            argsPreview: "{\"pattern\":\"src/**/*.ts\",\"path\":\"packages/agent-core\"}",
-            preview: {
-              kind: "glob",
-              pattern: "src/**/*.ts",
-              scope: "packages/agent-core",
-              displayText: "Glob src/**/*.ts in packages/agent-core",
-            },
-          });
-          resolveExecution = resolve;
-        }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) {
+              streamHandler = null;
+            }
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            streamHandler?.({
+              type: "tool_started",
+              turnId: "turn-stream",
+              llmCallId: "llm-call-stream",
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              toolCallId: "tool-grep-1",
+              toolName: "grep",
+              argsPreview: '{"pattern":"ToolUiPreview","glob":"*.ts"}',
+              preview: {
+                kind: "grep",
+                pattern: "ToolUiPreview",
+                scope: "*.ts",
+                displayText: "Grep ToolUiPreview in *.ts",
+              },
+            });
+            streamHandler?.({
+              type: "tool_started",
+              turnId: "turn-stream",
+              llmCallId: "llm-call-stream",
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              toolCallId: "tool-glob-1",
+              toolName: "glob",
+              argsPreview: '{"pattern":"src/**/*.ts","path":"packages/agent-core"}',
+              preview: {
+                kind: "glob",
+                pattern: "src/**/*.ts",
+                scope: "packages/agent-core",
+                displayText: "Glob src/**/*.ts in packages/agent-core",
+              },
+            });
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -2426,75 +2804,78 @@ sessionId: input.sessionId,
     let approvalPending = false;
     let activeAgentRunId = "";
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async (input) =>
-        input?.sessionId === sessionId && approvalPending
-          ? [{
-              requestId: "approval-bash-1",
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async (input) =>
+          input?.sessionId === sessionId && approvalPending
+            ? [
+                {
+                  requestId: "approval-bash-1",
+                  toolName: "bash",
+                  summary: "Run install",
+                  reason: "Bash command requires approval",
+                  command: "pnpm install",
+                  createdAt: Date.now(),
+                  expiresAt: Date.now() + 60_000,
+                },
+              ]
+            : [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) {
+              streamHandler = null;
+            }
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            activeAgentRunId = input.agentRunId;
+            streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            streamHandler?.({
+              type: "tool_started",
+              turnId: "turn-stream",
+              llmCallId: "llm-call-stream",
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              toolCallId: "tool-bash-approval",
               toolName: "bash",
+              argsPreview: '{"command":"pnpm install"}',
+              preview: {
+                kind: "bash",
+                status: "running",
+                title: "Run install",
+                command: "pnpm install",
+                commandPreview: "pnpm install",
+              },
+            });
+            approvalPending = true;
+            streamHandler?.({
+              type: "tool_approval_required",
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              toolCallId: "tool-bash-approval",
+              toolName: "bash",
+              requestId: "approval-bash-1",
               summary: "Run install",
               reason: "Bash command requires approval",
               command: "pnpm install",
-              createdAt: Date.now(),
-              expiresAt: Date.now() + 60_000,
-            }]
-          : [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          activeAgentRunId = input.agentRunId;
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          streamHandler?.({
-            type: "tool_started",
-            turnId: "turn-stream",
-            llmCallId: "llm-call-stream",
-sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-bash-approval",
-            toolName: "bash",
-            argsPreview: "{\"command\":\"pnpm install\"}",
-            preview: {
-              kind: "bash",
-              status: "running",
-              title: "Run install",
-              command: "pnpm install",
-              commandPreview: "pnpm install",
-            },
-          });
-          approvalPending = true;
-          streamHandler?.({
-            type: "tool_approval_required",
-            sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-bash-approval",
-            toolName: "bash",
-            requestId: "approval-bash-1",
-            summary: "Run install",
-            reason: "Bash command requires approval",
-            command: "pnpm install",
-            executionEnvironment: "sandbox",
-          });
-          resolveExecution = resolve;
-        }),
-    }));
+              executionEnvironment: "sandbox",
+            });
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -2519,7 +2900,7 @@ sessionId: input.sessionId,
         type: "tool_finished",
         turnId: "turn-stream",
         llmCallId: "llm-call-stream",
-sessionId,
+        sessionId,
         agentRunId: activeAgentRunId,
         toolCallId: "tool-bash-approval",
         toolName: "bash",
@@ -2566,73 +2947,76 @@ sessionId,
     let approvalPending = false;
     let activeAgentRunId = "";
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
     const submitApproval = vi.fn(async () => ({ ok: true }));
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": submitApproval,
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async (input) =>
-        input?.sessionId === sessionId && approvalPending
-          ? [{
-              requestId: "approval-delete-1",
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": submitApproval,
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async (input) =>
+          input?.sessionId === sessionId && approvalPending
+            ? [
+                {
+                  requestId: "approval-delete-1",
+                  toolName: "delete_file",
+                  summary: "Delete notes.md",
+                  reason: "delete_file is a destructive file operation and requires approval.",
+                  createdAt: Date.now(),
+                  expiresAt: Date.now() + 60_000,
+                },
+              ]
+            : [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) {
+              streamHandler = null;
+            }
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            activeAgentRunId = input.agentRunId;
+            streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            streamHandler?.({
+              type: "tool_call_streaming",
+              turnId: "turn-stream",
+              llmCallId: "llm-call-stream",
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              toolCallId: "tool-delete-1",
               toolName: "delete_file",
+              isInitial: true,
+              preview: {
+                kind: "delete",
+                filePath: "/tmp/workspace/notes.md",
+                displayText: "",
+                status: "running",
+              },
+            });
+            approvalPending = true;
+            streamHandler?.({
+              type: "tool_approval_required",
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              toolCallId: "tool-delete-1",
+              toolName: "delete_file",
+              requestId: "approval-delete-1",
               summary: "Delete notes.md",
               reason: "delete_file is a destructive file operation and requires approval.",
-              createdAt: Date.now(),
-              expiresAt: Date.now() + 60_000,
-            }]
-          : [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          activeAgentRunId = input.agentRunId;
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          streamHandler?.({
-            type: "tool_call_streaming",
-            turnId: "turn-stream",
-            llmCallId: "llm-call-stream",
-sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-delete-1",
-            toolName: "delete_file",
-            isInitial: true,
-            preview: {
-              kind: "delete",
-              filePath: "/tmp/workspace/notes.md",
-              displayText: "",
-              status: "running",
-            },
-          });
-          approvalPending = true;
-          streamHandler?.({
-            type: "tool_approval_required",
-            sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-delete-1",
-            toolName: "delete_file",
-            requestId: "approval-delete-1",
-            summary: "Delete notes.md",
-            reason: "delete_file is a destructive file operation and requires approval.",
-            riskLevel: "high",
-          });
-          resolveExecution = resolve;
-        }),
-    }));
+              riskLevel: "high",
+            });
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -2669,7 +3053,7 @@ sessionId: input.sessionId,
         type: "tool_finished",
         turnId: "turn-stream",
         llmCallId: "llm-call-stream",
-sessionId,
+        sessionId,
         agentRunId: activeAgentRunId,
         toolCallId: "tool-delete-1",
         toolName: "delete_file",
@@ -2711,53 +3095,54 @@ sessionId,
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
     const submitApproval = vi.fn(async () => ({ ok: true }));
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": submitApproval,
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) streamHandler = null;
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          streamHandler?.({
-            type: "tool_started",
-            turnId: "turn-stream",
-            llmCallId: "llm-call-stream",
-sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-browser-1",
-            toolName: "browser_tabs",
-            argsPreview: '{"action":"list"}',
-          });
-          streamHandler?.({
-            type: "tool_approval_required",
-            sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-browser-1",
-            toolName: "browser_tabs",
-            requestId: "approval-browser-1",
-            summary: "允许当前会话使用浏览器",
-            reason: "Browser tools require session authorization.",
-            approvalScope: "browser_session",
-          });
-          resolveExecution = resolve;
-        }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": submitApproval,
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) streamHandler = null;
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            streamHandler?.({
+              type: "tool_started",
+              turnId: "turn-stream",
+              llmCallId: "llm-call-stream",
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              toolCallId: "tool-browser-1",
+              toolName: "browser_tabs",
+              argsPreview: '{"action":"list"}',
+            });
+            streamHandler?.({
+              type: "tool_approval_required",
+              sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
+              toolCallId: "tool-browser-1",
+              toolName: "browser_tabs",
+              requestId: "approval-browser-1",
+              summary: "允许当前会话使用浏览器",
+              reason: "Browser tools require session authorization.",
+              approvalScope: "browser_session",
+            });
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -2803,39 +3188,41 @@ sessionId: input.sessionId,
       },
     ];
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => sessions,
-      getRecord: async () => record,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": async () => true,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        return () => {
-          void callback;
-        };
-      },
-      execute: async (input: FixtureRunInput) => ({
-        sessionId: input.sessionId,
-        agentRunId: input.agentRunId,
-        status: "failed",
-        events: [],
-        contextSnapshot: {
-          totalTokens: 0,
-          maxTokens: 200_000,
-          percentUsed: 0,
-          buckets: [],
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => sessions,
+        getRecord: async () => record,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          return () => {
+            void callback;
+          };
         },
-        contextState: null,
-        error: {
-          code: "provider_error",
-          message: "Provider failed",
-        },
+        execute: async (input: FixtureRunInput) => ({
+          sessionId: input.sessionId,
+          agentRunId: input.agentRunId,
+          status: "failed",
+          events: [],
+          contextSnapshot: {
+            totalTokens: 0,
+            maxTokens: 200_000,
+            percentUsed: 0,
+            buckets: [],
+          },
+          contextState: null,
+          error: {
+            code: "provider_error",
+            message: "Provider failed",
+          },
+        }),
       }),
-    }));
+    );
 
     renderApp();
 
@@ -2936,33 +3323,34 @@ sessionId: input.sessionId,
 
     const abortAgentRunMock = vi.fn(async () => true);
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: FixtureRunResult) => void) | null =
-      null;
+    let resolveExecution: ((value: FixtureRunResult) => void) | null = null;
 
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => sessions,
-      getRecord: getSessionMock,
-      "sessions.create": projectRecord(async () => record),
-      "tasks.abort": abortAgentRunMock,
-      "approvals.submit": async () => ({ ok: true }),
-      "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [],
-      ...settingsApiStub,
-      "events.agentStream": (callback) => {
-        streamHandler = callback;
-        return () => {
-          if (streamHandler === callback) {
-            streamHandler = null;
-          }
-        };
-      },
-      execute: (input: FixtureRunInput) =>
-        new Promise((resolve) => {
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          resolveExecution = resolve;
-        }),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () => sessions,
+        getRecord: getSessionMock,
+        "sessions.create": projectRecord(async () => record),
+        "tasks.abort": abortAgentRunMock,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "events.agentStream": (callback) => {
+          streamHandler = callback;
+          return () => {
+            if (streamHandler === callback) {
+              streamHandler = null;
+            }
+          };
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise((resolve) => {
+            streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+            resolveExecution = resolve;
+          }),
+      }),
+    );
 
     renderApp();
 
@@ -3025,11 +3413,24 @@ sessionId: input.sessionId,
     expect((screen.getByLabelText("消息输入框") as HTMLTextAreaElement).disabled).toBe(false);
     expect(getSessionMock.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
-  it('loads only the latest message page, prepends older messages, and keeps them when a live event arrives', async () => {
-    const latest = createEmptySessionRecord('paged');
-    latest.meta.title = 'Paged session';
-    latest.events = [{ id: 'v2-20', sessionId: 'paged', agentRunId: 'r2', schemaVersion: 2, timestamp: latest.meta.createdAt, type: 'user_message', payload: { content: 'Latest question' } }];
-    const earlier = { ...latest, events: [{ ...latest.events[0], id: 'v2-0', agentRunId: 'r1', payload: { content: 'Earlier question' } }] } as SessionRecord;
+  it("loads only the latest message page, prepends older messages, and keeps them when a live event arrives", async () => {
+    const latest = createEmptySessionRecord("paged");
+    latest.meta.title = "Paged session";
+    latest.events = [
+      {
+        id: "v2-20",
+        sessionId: "paged",
+        agentRunId: "r2",
+        schemaVersion: 2,
+        timestamp: latest.meta.createdAt,
+        type: "user_message",
+        payload: { content: "Latest question" },
+      },
+    ];
+    const earlier = {
+      ...latest,
+      events: [{ ...latest.events[0], id: "v2-0", agentRunId: "r1", payload: { content: "Earlier question" } }],
+    } as SessionRecord;
     const getSession = vi.fn(async () => ({ ...latest, events: [...earlier.events, ...latest.events] }));
     const projectionPage = (record: SessionRecord, eventSeq: number, beforeSeq: number | null) => {
       const base = recordProjectionFixture(record);
@@ -3039,96 +3440,214 @@ sessionId: input.sessionId,
         throughJournalSeq: 20,
         snapshot: { ...base.snapshot, throughJournalSeq: 20 },
         activeMessageIds: ["v2-20", "v2-0"],
-        window: { ...base.window, events, fromSeq: eventSeq, throughJournalSeq: beforeSeq === null ? 9 : 20, beforeSeq },
+        window: {
+          ...base.window,
+          events,
+          fromSeq: eventSeq,
+          throughJournalSeq: beforeSeq === null ? 9 : 20,
+          beforeSeq,
+        },
       };
     };
     const latestProjection = projectionPage(latest, 10, 10);
     const earlierProjection = projectionPage(earlier, 0, null);
-    const getSessionPage = vi.fn(async ({ beforeSeq }: { sessionId: string; beforeSeq?: number }) => beforeSeq === undefined ? latestProjection : earlierProjection);
+    const getSessionPage = vi.fn(async ({ beforeSeq }: { sessionId: string; beforeSeq?: number }) =>
+      beforeSeq === undefined ? latestProjection : earlierProjection,
+    );
     const listSessions = vi.fn(async () => []);
     const live = new Set<(envelope: { event: unknown }) => void>();
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState,
-      "workspaces.list": async () => createWorkspaceRegistryFixture(latest.meta.createdAt),
-      "events.sessionLive": (listener: (envelope: { event: unknown }) => void) => { live.add(listener); return () => { live.delete(listener); }; },
-      "sessions.listPage": async () => ({ items: [{ id: 'paged', title: 'Paged session', updatedAt: latest.meta.updatedAt, agentRunCount: 2, workspaceRoot: "/tmp/workspace" }], groups: [], indexing: false, failed: 0 }),
-      "sessions.list": listSessions, getRecord: getSession,
-      "sessions.create": projectRecord(async () => latest), "tasks.abort": async () => true, "approvals.submit": async () => ({ ok: true }), "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [], ...settingsApiStub, "sessions.getPage": getSessionPage,
-      "events.agentStream": () => () => {}, execute: vi.fn(),
-    }));
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(latest.meta.createdAt),
+        "events.sessionLive": (listener: (envelope: { event: unknown }) => void) => {
+          live.add(listener);
+          return () => {
+            live.delete(listener);
+          };
+        },
+        "sessions.listPage": async () => ({
+          items: [
+            {
+              id: "paged",
+              title: "Paged session",
+              updatedAt: latest.meta.updatedAt,
+              agentRunCount: 2,
+              workspaceRoot: "/tmp/workspace",
+            },
+          ],
+          groups: [],
+          indexing: false,
+          failed: 0,
+        }),
+        "sessions.list": listSessions,
+        getRecord: getSession,
+        "sessions.create": projectRecord(async () => latest),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "sessions.getPage": getSessionPage,
+        "events.agentStream": () => () => {},
+        execute: vi.fn(),
+      }),
+    );
     renderApp();
-    await screen.findByText('Latest question');
-    expect(screen.queryByText('Earlier question')).not.toBeInTheDocument();
-    expect(getSession).not.toHaveBeenCalled(); expect(listSessions).not.toHaveBeenCalled();
+    await screen.findByText("Latest question");
+    expect(screen.queryByText("Earlier question")).not.toBeInTheDocument();
+    expect(getSession).not.toHaveBeenCalled();
+    expect(listSessions).not.toHaveBeenCalled();
     // 已在顶部时继续向上滚（没有 scroll 事件）也会自动加载更早消息。
-    fireEvent.wheel(screen.getByLabelText('会话消息'), { deltaY: -120 });
-    await screen.findByText('Earlier question');
-    expect(getSessionPage).toHaveBeenLastCalledWith({ sessionId: 'paged', beforeSeq: 10 });
-    expect(screen.getByText('Latest question')).toBeInTheDocument();
+    fireEvent.wheel(screen.getByLabelText("会话消息"), { deltaY: -120 });
+    await screen.findByText("Earlier question");
+    expect(getSessionPage).toHaveBeenLastCalledWith({ sessionId: "paged", beforeSeq: 10 });
+    expect(screen.getByText("Latest question")).toBeInTheDocument();
     // 早期页并入 store 之后再收到 live 的 journal 更新：接在窗口末尾，早期内容不丢（14 T10）。
     const pageCalls = getSessionPage.mock.calls.length;
-    const liveMessage = { recordKind: 'event', seq: 21, type: 'user/message', eventVersion: 1, criticality: 'ignorable', time: latest.meta.createdAt, source: { ownerPluginId: '@actspace/core' },
-      data: { agentRunId: 'r3', messageId: 'v2-21', content: 'Live question' }, surface: { kind: 'append' },
-      provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
-    act(() => live.forEach(listener => { listener({ event: { kind: 'journal-update', schemaVersion: 1, runtimeInstanceId: 'runtime-1', liveSeq: 1, throughJournalSeq: 21, sessionId: 'paged',
-      update: { sessionId: 'paged', throughJournalSeq: 21, event: liveMessage, values: {} } } }); }));
-    await screen.findByText('Live question');
-    expect(screen.getByText('Earlier question')).toBeInTheDocument();
-    expect(screen.getByText('Latest question')).toBeInTheDocument();
+    const liveMessage = {
+      recordKind: "event",
+      seq: 21,
+      type: "user/message",
+      eventVersion: 1,
+      criticality: "ignorable",
+      time: latest.meta.createdAt,
+      source: { ownerPluginId: "@actspace/core" },
+      data: { agentRunId: "r3", messageId: "v2-21", content: "Live question" },
+      surface: { kind: "append" },
+      provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
+    };
+    act(() =>
+      live.forEach((listener) => {
+        listener({
+          event: {
+            kind: "journal-update",
+            schemaVersion: 1,
+            runtimeInstanceId: "runtime-1",
+            liveSeq: 1,
+            throughJournalSeq: 21,
+            sessionId: "paged",
+            update: { sessionId: "paged", throughJournalSeq: 21, event: liveMessage, values: {} },
+          },
+        });
+      }),
+    );
+    await screen.findByText("Live question");
+    expect(screen.getByText("Earlier question")).toBeInTheDocument();
+    expect(screen.getByText("Latest question")).toBeInTheDocument();
     expect(getSessionPage).toHaveBeenCalledTimes(pageCalls);
   });
 
-  it('ignores a slow page response after selecting a different session', async () => {
-    const a = createEmptySessionRecord('page-a'); a.meta.title = 'Page A';
-    const b = createEmptySessionRecord('page-b'); b.meta.title = 'Page B';
-    b.events = [{ id: 'v2-1', sessionId: 'page-b', agentRunId: 'rb', schemaVersion: 2, timestamp: b.meta.createdAt, type: 'user_message', payload: { content: 'B visible question' } }];
-    let resolveA!: (page: import('@actspace/shared/runtime-v2').RuntimeDesktopSessionProjection) => void;
-    setupBridge(taskHostFixture({
-      "app.getBootstrapState": async () => bootstrapState, "workspaces.list": async () => createWorkspaceRegistryFixture(a.meta.createdAt),
-      "sessions.listPage": async () => ({ items: [a, b].map(record => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, workspaceRoot: "/tmp/workspace" })), groups: [], indexing: false, failed: 0 }),
-      "sessions.list": async () => [], getRecord: vi.fn(),
-      "sessions.create": projectRecord(async () => a), "tasks.abort": async () => true, "approvals.submit": async () => ({ ok: true }), "sessions.pin": async () => ({ ok: true }),
-      "approvals.listPending": async () => [], ...settingsApiStub,
-      "sessions.getPage": ({ sessionId }: { sessionId: string }) => sessionId === 'page-a' ? new Promise(resolve => { resolveA = resolve; }) : Promise.resolve(recordProjectionFixture(b)),
-      "events.agentStream": () => () => {}, execute: vi.fn(),
-    }));
+  it("ignores a slow page response after selecting a different session", async () => {
+    const a = createEmptySessionRecord("page-a");
+    a.meta.title = "Page A";
+    const b = createEmptySessionRecord("page-b");
+    b.meta.title = "Page B";
+    b.events = [
+      {
+        id: "v2-1",
+        sessionId: "page-b",
+        agentRunId: "rb",
+        schemaVersion: 2,
+        timestamp: b.meta.createdAt,
+        type: "user_message",
+        payload: { content: "B visible question" },
+      },
+    ];
+    let resolveA!: (page: import("@actspace/shared/runtime-v2").RuntimeDesktopSessionProjection) => void;
+    setupBridge(
+      taskHostFixture({
+        "app.getBootstrapState": async () => bootstrapState,
+        "workspaces.list": async () => createWorkspaceRegistryFixture(a.meta.createdAt),
+        "sessions.listPage": async () => ({
+          items: [a, b].map((record) => ({
+            id: record.meta.id,
+            title: record.meta.title,
+            updatedAt: record.meta.updatedAt,
+            agentRunCount: 0,
+            workspaceRoot: "/tmp/workspace",
+          })),
+          groups: [],
+          indexing: false,
+          failed: 0,
+        }),
+        "sessions.list": async () => [],
+        getRecord: vi.fn(),
+        "sessions.create": projectRecord(async () => a),
+        "tasks.abort": async () => true,
+        "approvals.submit": async () => ({ ok: true }),
+        "sessions.pin": async () => ({ ok: true }),
+        "approvals.listPending": async () => [],
+        ...settingsApiStub,
+        "sessions.getPage": ({ sessionId }: { sessionId: string }) =>
+          sessionId === "page-a"
+            ? new Promise((resolve) => {
+                resolveA = resolve;
+              })
+            : Promise.resolve(recordProjectionFixture(b)),
+        "events.agentStream": () => () => {},
+        execute: vi.fn(),
+      }),
+    );
     renderApp();
-    await userEvent.click(await screen.findByText('Page B'));
-    await screen.findByText('B visible question');
+    await userEvent.click(await screen.findByText("Page B"));
+    await screen.findByText("B visible question");
     await act(async () => resolveA(recordProjectionFixture(a)));
-    expect(screen.getByText('B visible question')).toBeInTheDocument();
+    expect(screen.getByText("B visible question")).toBeInTheDocument();
   });
 
   function setupBackgroundSessions() {
-    const records = new Map(['background-a', 'background-b'].map(id => {
-      const record = createEmptySessionRecord(id);
-      record.meta.title = id === 'background-a' ? 'Background A' : 'Background B';
-      return [id, record] as const;
-    }));
-    let emit!: (event: RuntimeStreamEvent) => void;
-    const pending = new Map<string, { input: FixtureRunInput; resolve: (result: FixtureRunResult) => void; reject: (error: Error) => void }>();
-    const abort = vi.fn(async () => true);
-    setupBridge(taskHostFixture({
-      ...settingsApiStub,
-      "app.getBootstrapState": async () => bootstrapState,
-      "sessions.list": async () => [...records.values()].map(r => ({ id: r.meta.id, title: r.meta.title, updatedAt: r.meta.updatedAt, agentRunCount: r.meta.agentRunCount, workspaceRoot: "/tmp/workspace" })),
-      getRecord: async ({ sessionId }: { sessionId: string }) => records.get(sessionId),
-      "sessions.create": projectRecord(async () => createEmptySessionRecord('background-new')),
-      "tasks.abort": abort, "approvals.listPending": async () => [],
-      "events.agentStream": (callback: typeof emit) => { emit = callback; return () => {}; },
-      execute: (input: FixtureRunInput) => new Promise<FixtureRunResult>((resolve, reject) => {
-        pending.set(input.sessionId, { input, resolve, reject });
-        emit({ type: 'agent_run_started', sessionId: input.sessionId, agentRunId: input.agentRunId });
+    const records = new Map(
+      ["background-a", "background-b"].map((id) => {
+        const record = createEmptySessionRecord(id);
+        record.meta.title = id === "background-a" ? "Background A" : "Background B";
+        return [id, record] as const;
       }),
-    }));
+    );
+    let emit!: (event: RuntimeStreamEvent) => void;
+    const pending = new Map<
+      string,
+      { input: FixtureRunInput; resolve: (result: FixtureRunResult) => void; reject: (error: Error) => void }
+    >();
+    const abort = vi.fn(async () => true);
+    setupBridge(
+      taskHostFixture({
+        ...settingsApiStub,
+        "app.getBootstrapState": async () => bootstrapState,
+        "sessions.list": async () =>
+          [...records.values()].map((r) => ({
+            id: r.meta.id,
+            title: r.meta.title,
+            updatedAt: r.meta.updatedAt,
+            agentRunCount: r.meta.agentRunCount,
+            workspaceRoot: "/tmp/workspace",
+          })),
+        getRecord: async ({ sessionId }: { sessionId: string }) => records.get(sessionId),
+        "sessions.create": projectRecord(async () => createEmptySessionRecord("background-new")),
+        "tasks.abort": abort,
+        "approvals.listPending": async () => [],
+        "events.agentStream": (callback: typeof emit) => {
+          emit = callback;
+          return () => {};
+        },
+        execute: (input: FixtureRunInput) =>
+          new Promise<FixtureRunResult>((resolve, reject) => {
+            pending.set(input.sessionId, { input, resolve, reject });
+            emit({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+          }),
+      }),
+    );
     const send = async (text: string) => {
-      await userEvent.type(await screen.findByLabelText('消息输入框'), text);
-      await userEvent.click(screen.getByLabelText('发送消息'));
+      await userEvent.type(await screen.findByLabelText("消息输入框"), text);
+      await userEvent.click(screen.getByLabelText("发送消息"));
     };
     const select = async (id: string) => {
       const row = document.querySelector(`[data-session-id="${id}"]`);
-      await userEvent.click(within(row as HTMLElement).getByRole('button', { name: id === 'background-a' ? 'Background A' : 'Background B' }));
+      await userEvent.click(
+        within(row as HTMLElement).getByRole("button", {
+          name: id === "background-a" ? "Background A" : "Background B",
+        }),
+      );
     };
     const event = (id: string, value: Record<string, unknown>) => {
       emit({ sessionId: id, agentRunId: pending.get(id)!.input.agentRunId, ...value } as RuntimeStreamEvent);
@@ -3137,184 +3656,316 @@ sessionId: input.sessionId,
       const { input, resolve } = pending.get(id)!;
       const record = records.get(id)!;
       const events: SessionEvent[] = [
-        { id: 'v2-1', sessionId: id, agentRunId: input.agentRunId, type: 'user_message', timestamp: record.meta.createdAt, schemaVersion: 2, payload: { content: input.userInput } },
-        { id: 'v2-2', sessionId: id, agentRunId: input.agentRunId, type: 'assistant_message', timestamp: record.meta.createdAt, schemaVersion: 2, payload: { content: `${id} finished` } },
+        {
+          id: "v2-1",
+          sessionId: id,
+          agentRunId: input.agentRunId,
+          type: "user_message",
+          timestamp: record.meta.createdAt,
+          schemaVersion: 2,
+          payload: { content: input.userInput },
+        },
+        {
+          id: "v2-2",
+          sessionId: id,
+          agentRunId: input.agentRunId,
+          type: "assistant_message",
+          timestamp: record.meta.createdAt,
+          schemaVersion: 2,
+          payload: { content: `${id} finished` },
+        },
       ];
       records.set(id, { ...record, events, messageBlocks: createMessageBlocks(events) });
-      event(id, { type: 'agent_run_finished' });
-      resolve({ sessionId: id, agentRunId: input.agentRunId, status: 'completed', events, contextSnapshot: null });
+      event(id, { type: "agent_run_finished" });
+      resolve({ sessionId: id, agentRunId: input.agentRunId, status: "completed", events, contextSnapshot: null });
     };
     return { records, pending, send, select, event, complete, abort };
   }
 
-  it('keeps background runs and tool state alive across session switches', async () => {
+  it("keeps background runs and tool state alive across session switches", async () => {
     const fixture = setupBackgroundSessions();
     renderApp();
-    await fixture.send('A running question');
-    await act(async () => fixture.event('background-a', { type: 'assistant_text_delta', delta: 'A partial reply' }));
-    await fixture.select('background-b');
-    expect(screen.queryByText('A partial reply')).not.toBeInTheDocument();
-    expect(within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText('会话状态： 运行中')).toBeInTheDocument();
-    await act(async () => fixture.event('background-a', { type: 'assistant_text_delta', delta: ' continued in background' }));
-    await fixture.send('B running question');
-    await fixture.select('background-a');
-    expect(await screen.findByText(replyText('A partial reply continued in background'))).toBeInTheDocument();
-    expect(screen.getAllByText('A running question')).toHaveLength(1);
-    expect(screen.queryByText('B running question')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByLabelText('停止 Agent'));
-    expect(fixture.abort).toHaveBeenCalledWith({ sessionId: 'background-a', agentRunId: fixture.pending.get('background-a')!.input.agentRunId });
-    await fixture.select('background-b');
-    expect(screen.getByLabelText('停止 Agent')).toBeEnabled();
-    await act(async () => fixture.complete('background-a'));
-    expect(screen.getByLabelText('停止 Agent')).toBeEnabled();
-    expect(screen.queryByText('background-a finished')).not.toBeInTheDocument();
-    await fixture.select('background-a');
-    expect(await screen.findByText('background-a finished')).toBeInTheDocument();
-    expect(screen.queryByLabelText('停止 Agent')).not.toBeInTheDocument();
+    await fixture.send("A running question");
+    await act(async () => fixture.event("background-a", { type: "assistant_text_delta", delta: "A partial reply" }));
+    await fixture.select("background-b");
+    expect(screen.queryByText("A partial reply")).not.toBeInTheDocument();
+    expect(
+      within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText(
+        "会话状态： 运行中",
+      ),
+    ).toBeInTheDocument();
+    await act(async () =>
+      fixture.event("background-a", { type: "assistant_text_delta", delta: " continued in background" }),
+    );
+    await fixture.send("B running question");
+    await fixture.select("background-a");
+    expect(await screen.findByText(replyText("A partial reply continued in background"))).toBeInTheDocument();
+    expect(screen.getAllByText("A running question")).toHaveLength(1);
+    expect(screen.queryByText("B running question")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("停止 Agent"));
+    expect(fixture.abort).toHaveBeenCalledWith({
+      sessionId: "background-a",
+      agentRunId: fixture.pending.get("background-a")!.input.agentRunId,
+    });
+    await fixture.select("background-b");
+    expect(screen.getByLabelText("停止 Agent")).toBeEnabled();
+    await act(async () => fixture.complete("background-a"));
+    expect(screen.getByLabelText("停止 Agent")).toBeEnabled();
+    expect(screen.queryByText("background-a finished")).not.toBeInTheDocument();
+    await fixture.select("background-a");
+    expect(await screen.findByText("background-a finished")).toBeInTheDocument();
+    expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument();
   });
 
-  it('retains completed tools and subagent activity when returning to a running session', async () => {
+  it("retains completed tools and subagent activity when returning to a running session", async () => {
     const fixture = setupBackgroundSessions();
     renderApp();
-    await fixture.send('Inspect background tools');
-    const read = { kind: 'read', filePath: '/tmp/background.txt', displayText: 'Read background.txt', resultPreview: 'read result' };
-    await act(async () => fixture.event('background-a', { type: 'tool_started', toolCallId: 'read-a', toolName: 'read_file', preview: read }));
-    await fixture.select('background-b');
+    await fixture.send("Inspect background tools");
+    const read = {
+      kind: "read",
+      filePath: "/tmp/background.txt",
+      displayText: "Read background.txt",
+      resultPreview: "read result",
+    };
+    await act(async () =>
+      fixture.event("background-a", {
+        type: "tool_started",
+        toolCallId: "read-a",
+        toolName: "read_file",
+        preview: read,
+      }),
+    );
+    await fixture.select("background-b");
     await act(async () => {
-      fixture.event('background-a', { type: 'tool_finished', toolCallId: 'read-a', toolName: 'read_file', status: 'completed', preview: read });
-      fixture.event('background-a', { type: 'tool_call_streaming', toolCallId: 'read-a', toolName: 'read_file', preview: { ...read, displayText: 'stale tool progress' } });
-      fixture.event('background-a', {
-        type: 'subagent_event', toolCallId: 'child-a',
-        preview: { kind: 'agent', description: 'Background child', status: 'running', agentKind: 'agent', subagentType: 'general', displayText: '正在读取 · background files' },
-        event: { id: 'child-event', sessionId: 'child-session', agentRunId: 'child-run', type: 'assistant_message', schemaVersion: 2, timestamp: new Date().toISOString(), payload: { content: 'Child progress' } },
+      fixture.event("background-a", {
+        type: "tool_finished",
+        toolCallId: "read-a",
+        toolName: "read_file",
+        status: "completed",
+        preview: read,
+      });
+      fixture.event("background-a", {
+        type: "tool_call_streaming",
+        toolCallId: "read-a",
+        toolName: "read_file",
+        preview: { ...read, displayText: "stale tool progress" },
+      });
+      fixture.event("background-a", {
+        type: "subagent_event",
+        toolCallId: "child-a",
+        preview: {
+          kind: "agent",
+          description: "Background child",
+          status: "running",
+          agentKind: "agent",
+          subagentType: "general",
+          displayText: "正在读取 · background files",
+        },
+        event: {
+          id: "child-event",
+          sessionId: "child-session",
+          agentRunId: "child-run",
+          type: "assistant_message",
+          schemaVersion: 2,
+          timestamp: new Date().toISOString(),
+          payload: { content: "Child progress" },
+        },
       });
     });
     // A history response may already include the in-flight turn. It must not duplicate its live overlay.
-    const record = fixture.records.get('background-a')!;
-    const runId = fixture.pending.get('background-a')!.input.agentRunId;
+    const record = fixture.records.get("background-a")!;
+    const runId = fixture.pending.get("background-a")!.input.agentRunId;
     record.events = [
-      { id: 'v2-1', sessionId: record.meta.id, agentRunId: runId, type: 'user_message', schemaVersion: 2, timestamp: record.meta.createdAt, payload: { content: 'Inspect background tools' } },
-      { id: 'v2-2', sessionId: record.meta.id, agentRunId: runId, type: 'tool_result', schemaVersion: 2, timestamp: record.meta.createdAt, payload: { toolCallId: 'read-a', uiPreview: read, ok: true } },
+      {
+        id: "v2-1",
+        sessionId: record.meta.id,
+        agentRunId: runId,
+        type: "user_message",
+        schemaVersion: 2,
+        timestamp: record.meta.createdAt,
+        payload: { content: "Inspect background tools" },
+      },
+      {
+        id: "v2-2",
+        sessionId: record.meta.id,
+        agentRunId: runId,
+        type: "tool_result",
+        schemaVersion: 2,
+        timestamp: record.meta.createdAt,
+        payload: { toolCallId: "read-a", uiPreview: read, ok: true },
+      },
     ];
     record.messageBlocks = createMessageBlocks(record.events);
-    await fixture.select('background-a');
-    expect(screen.getAllByText('Inspect background tools')).toHaveLength(1);
+    await fixture.select("background-a");
+    expect(screen.getAllByText("Inspect background tools")).toHaveLength(1);
     // 子智能体卡片还在（单行，只有标题和状态）；它的动态不写在卡片上。
-    expect(screen.getByRole('button', { name: /Open SubAgent transcript for Background child/ })).toHaveTextContent('运行中');
-    expect(screen.queryByText('正在读取 · background files')).not.toBeInTheDocument();
-    expect(screen.queryByText('stale tool progress')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('停止 Agent')).toBeInTheDocument();
-    expect(document.querySelectorAll('.tool-log-line.is-running')).toHaveLength(0);
-    expect(screen.getAllByText('/tmp/background.txt')).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /Open SubAgent transcript for Background child/ })).toHaveTextContent(
+      "运行中",
+    );
+    expect(screen.queryByText("正在读取 · background files")).not.toBeInTheDocument();
+    expect(screen.queryByText("stale tool progress")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("停止 Agent")).toBeInTheDocument();
+    expect(document.querySelectorAll(".tool-log-line.is-running")).toHaveLength(0);
+    expect(screen.getAllByText("/tmp/background.txt")).toHaveLength(1);
   });
 
-  it('marks a background run that finished as unread until the session is opened', async () => {
+  it("marks a background run that finished as unread until the session is opened", async () => {
     const fixture = setupBackgroundSessions();
     renderApp();
-    await fixture.send('Finish in the background');
-    await fixture.select('background-b');
-    await act(async () => fixture.complete('background-a'));
+    await fixture.send("Finish in the background");
+    await fixture.select("background-b");
+    await act(async () => fixture.complete("background-a"));
     const row = () => document.querySelector('[data-session-id="background-a"]') as HTMLElement;
-    expect(within(row()).getByLabelText('会话状态： 已完成')).toBeInTheDocument();
-    await fixture.select('background-a');
-    expect(within(row()).queryByLabelText('会话状态： 已完成')).not.toBeInTheDocument();
+    expect(within(row()).getByLabelText("会话状态： 已完成")).toBeInTheDocument();
+    await fixture.select("background-a");
+    expect(within(row()).queryByLabelText("会话状态： 已完成")).not.toBeInTheDocument();
   });
 
-  it('keeps an accepted background failure separate from another running composer', async () => {
+  it("keeps an accepted background failure separate from another running composer", async () => {
     const fixture = setupBackgroundSessions();
-    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
     renderApp();
-    await fixture.send('A failed input');
-    await fixture.select('background-b');
-    await fixture.send('B must continue');
-    await act(async () => fixture.pending.get('background-a')!.reject(new Error('Background preparation failed')));
-    expect(screen.getByLabelText('停止 Agent')).toBeInTheDocument();
-    expect(screen.queryByText('Background preparation failed')).not.toBeInTheDocument();
-    expect(within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText('会话状态： 失败')).toBeInTheDocument();
-    await fixture.select('background-a');
-    expect(screen.getByLabelText('消息输入框')).toHaveValue('');
-    expect(screen.queryByText('提交结果尚未确认，正文和附件已保留；重试将核对同一次提交。')).not.toBeInTheDocument();
+    await fixture.send("A failed input");
+    await fixture.select("background-b");
+    await fixture.send("B must continue");
+    await act(async () => fixture.pending.get("background-a")!.reject(new Error("Background preparation failed")));
+    expect(screen.getByLabelText("停止 Agent")).toBeInTheDocument();
+    expect(screen.queryByText("Background preparation failed")).not.toBeInTheDocument();
+    expect(
+      within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText(
+        "会话状态： 失败",
+      ),
+    ).toBeInTheDocument();
+    await fixture.select("background-a");
+    expect(screen.getByLabelText("消息输入框")).toHaveValue("");
+    expect(screen.queryByText("提交结果尚未确认，正文和附件已保留；重试将核对同一次提交。")).not.toBeInTheDocument();
     errorLog.mockRestore();
   });
 
-  it('does not let a delayed stop response change another session stop state', async () => {
+  it("does not let a delayed stop response change another session stop state", async () => {
     const fixture = setupBackgroundSessions();
     let resolveAbort!: (value: boolean) => void;
-    fixture.abort.mockImplementation(() => new Promise(resolve => { resolveAbort = resolve; }));
+    fixture.abort.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveAbort = resolve;
+        }),
+    );
     renderApp();
-    await fixture.send('A stop request');
-    await userEvent.click(screen.getByLabelText('停止 Agent'));
-    await fixture.select('background-b');
-    await fixture.send('B stop request');
+    await fixture.send("A stop request");
+    await userEvent.click(screen.getByLabelText("停止 Agent"));
+    await fixture.select("background-b");
+    await fixture.send("B stop request");
     await act(async () => resolveAbort(false));
-    expect(screen.getByLabelText('停止 Agent')).toHaveAttribute('aria-disabled', 'false');
-    await fixture.select('background-a');
-    expect(screen.getByLabelText('停止 Agent')).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByLabelText("停止 Agent")).toHaveAttribute("aria-disabled", "false");
+    await fixture.select("background-a");
+    expect(screen.getByLabelText("停止 Agent")).toHaveAttribute("aria-disabled", "false");
   });
 
-  it('rejects a stale history page after a background run completes', async () => {
+  it("rejects a stale history page after a background run completes", async () => {
     // 陈旧页是 run 完成前发出的读取，修订号更旧：store 的 applyEnvelope 按修订拒绝它（14 T10），App 的页版本号是第二道防线。
     const fixture = setupBackgroundSessions();
     renderApp();
-    await fixture.send('A durable question');
-    await fixture.select('background-b');
+    await fixture.send("A durable question");
+    await fixture.select("background-b");
     let resolveStale!: (record: SessionRecord) => void;
-    const stale = { ...fixture.records.get('background-a')!, events: [] };
+    const stale = { ...fixture.records.get("background-a")!, events: [] };
     let delayNext = true;
-    overrideBridge({ "sessions.getPage": projectRecord(vi.fn(async (input: { sessionId: string }) => {
-      if (input.sessionId === 'background-a' && delayNext) {
-        delayNext = false;
-        return new Promise<SessionRecord>(resolve => { resolveStale = resolve; });
-      }
-      return fixture.records.get(input.sessionId);
-    })) });
-    await fixture.select('background-a');
-    expect(screen.getByText('A durable question')).toBeInTheDocument();
-    await act(async () => fixture.complete('background-a'));
-    expect(await screen.findByText('background-a finished')).toBeInTheDocument();
+    overrideBridge({
+      "sessions.getPage": projectRecord(
+        vi.fn(async (input: { sessionId: string }) => {
+          if (input.sessionId === "background-a" && delayNext) {
+            delayNext = false;
+            return new Promise<SessionRecord>((resolve) => {
+              resolveStale = resolve;
+            });
+          }
+          return fixture.records.get(input.sessionId);
+        }),
+      ),
+    });
+    await fixture.select("background-a");
+    expect(screen.getByText("A durable question")).toBeInTheDocument();
+    await act(async () => fixture.complete("background-a"));
+    expect(await screen.findByText("background-a finished")).toBeInTheDocument();
     await act(async () => resolveStale(stale));
-    expect(screen.getByText('background-a finished')).toBeInTheDocument();
-    expect(screen.getAllByText('A durable question')).toHaveLength(1);
-    expect(screen.queryByLabelText('停止 Agent')).not.toBeInTheDocument();
+    expect(screen.getByText("background-a finished")).toBeInTheDocument();
+    expect(screen.getAllByText("A durable question")).toHaveLength(1);
+    expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument();
   });
 
-  it('keeps a background approval newer than an in-flight approval query', async () => {
+  it("keeps a background approval newer than an in-flight approval query", async () => {
     const fixture = setupBackgroundSessions();
     renderApp();
-    await fixture.send('A requires approval');
-    await fixture.select('background-b');
+    await fixture.send("A requires approval");
+    await fixture.select("background-b");
     let resolveApproval!: (items: []) => void;
-    overrideBridge({ "approvals.listPending": vi.fn(() => new Promise<[]>(resolve => { resolveApproval = resolve; })) });
-    await fixture.select('background-a');
+    overrideBridge({
+      "approvals.listPending": vi.fn(
+        () =>
+          new Promise<[]>((resolve) => {
+            resolveApproval = resolve;
+          }),
+      ),
+    });
+    await fixture.select("background-a");
     await act(async () => {
-      fixture.event('background-a', { type: 'tool_started', toolCallId: 'approval-tool', toolName: 'browser_tabs' });
-      fixture.event('background-a', { type: 'tool_approval_required', toolCallId: 'approval-tool', toolName: 'browser_tabs', requestId: 'approval-a', summary: 'Approval required', reason: 'Browser session', approvalScope: 'browser_session' });
+      fixture.event("background-a", { type: "tool_started", toolCallId: "approval-tool", toolName: "browser_tabs" });
+      fixture.event("background-a", {
+        type: "tool_approval_required",
+        toolCallId: "approval-tool",
+        toolName: "browser_tabs",
+        requestId: "approval-a",
+        summary: "Approval required",
+        reason: "Browser session",
+        approvalScope: "browser_session",
+      });
       resolveApproval([]);
     });
-    expect(within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText('会话状态： 等待审批')).toBeInTheDocument();
-    expect(screen.getByText('确认浏览器操作')).toBeInTheDocument();
+    expect(
+      within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText(
+        "会话状态： 等待审批",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("确认浏览器操作")).toBeInTheDocument();
   });
 
-  it('keeps a running session resident while more than five other histories are viewed', async () => {
+  it("keeps a running session resident while more than five other histories are viewed", async () => {
     // 保留策略（14 T9）：运行中的会话不占 5 个名额；查看 6 个别的会话后再回到它，即使页请求一直不返回，历史和流式内容都还在。
     const fixture = setupBackgroundSessions();
-    const others = ['c', 'd', 'e', 'f', 'g', 'h'];
-    for (const id of others) fixture.records.set(id, { ...createEmptySessionRecord(id), meta: { ...createEmptySessionRecord(id).meta, title: `Cache ${id}` } });
-    const pinned = fixture.records.get('background-a')!;
-    fixture.records.set('background-a', { ...pinned, events: [{ id: 'v2-0', sessionId: 'background-a', agentRunId: 'earlier-run', schemaVersion: 2, timestamp: pinned.meta.createdAt, type: 'user_message', payload: { content: 'Durable earlier question' } }] });
+    const others = ["c", "d", "e", "f", "g", "h"];
+    for (const id of others)
+      fixture.records.set(id, {
+        ...createEmptySessionRecord(id),
+        meta: { ...createEmptySessionRecord(id).meta, title: `Cache ${id}` },
+      });
+    const pinned = fixture.records.get("background-a")!;
+    fixture.records.set("background-a", {
+      ...pinned,
+      events: [
+        {
+          id: "v2-0",
+          sessionId: "background-a",
+          agentRunId: "earlier-run",
+          schemaVersion: 2,
+          timestamp: pinned.meta.createdAt,
+          type: "user_message",
+          payload: { content: "Durable earlier question" },
+        },
+      ],
+    });
     renderApp();
-    await screen.findByText('Durable earlier question');
-    await fixture.send('Pinned live question');
-    await act(async () => fixture.event('background-a', { type: 'assistant_text_delta', delta: 'Pinned reply' }));
+    await screen.findByText("Durable earlier question");
+    await fixture.send("Pinned live question");
+    await act(async () => fixture.event("background-a", { type: "assistant_text_delta", delta: "Pinned reply" }));
     // 8 个会话在同一个工作区，每组先显示 5 个，其余点「展开其余」露出来。
-    await userEvent.click(screen.getByRole('button', { name: /^展开其余/ }));
-    for (const id of others) await userEvent.click(screen.getByRole('button', { name: `Cache ${id}` }));
+    await userEvent.click(screen.getByRole("button", { name: /^展开其余/ }));
+    for (const id of others) await userEvent.click(screen.getByRole("button", { name: `Cache ${id}` }));
     overrideBridge({ "sessions.getPage": () => new Promise(() => {}) });
-    await fixture.select('background-a');
-    expect(screen.getByText('Durable earlier question')).toBeInTheDocument();
-    expect(screen.getByText('Pinned live question')).toBeInTheDocument();
-    expect(screen.getByText(replyText('Pinned reply'))).toBeInTheDocument();
-    expect(screen.getByLabelText('停止 Agent')).toBeInTheDocument();
+    await fixture.select("background-a");
+    expect(screen.getByText("Durable earlier question")).toBeInTheDocument();
+    expect(screen.getByText("Pinned live question")).toBeInTheDocument();
+    expect(screen.getByText(replyText("Pinned reply"))).toBeInTheDocument();
+    expect(screen.getByLabelText("停止 Agent")).toBeInTheDocument();
   }, 10_000);
-
 });

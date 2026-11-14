@@ -13,7 +13,10 @@ export type ModelThinking = { levels: ThinkingLevel[]; default?: ThinkingLevel }
  * id 先去掉 `vendor/` 前缀并转小写，OpenRouter 的点号版本（4.5）和官方的连字符版本（4-5）都能命中。
  */
 const PROFILES: ReadonlyArray<readonly [RegExp, ModelThinking]> = [
-  [/^claude-(opus-(4[-.][7-9]|5)|fable)/, { levels: ["off", "low", "medium", "high", "xhigh", "max"], default: "high" }],
+  [
+    /^claude-(opus-(4[-.][7-9]|5)|fable)/,
+    { levels: ["off", "low", "medium", "high", "xhigh", "max"], default: "high" },
+  ],
   [/^claude-(opus|sonnet)/, { levels: ["off", "low", "medium", "high", "max"], default: "high" }],
   [/^claude-haiku/, { levels: ["off", "low", "medium", "high"], default: "off" }],
   [/^gpt-5[-.]?\d*-(mini|nano)|^o\d/, { levels: ["low", "medium", "high"], default: "medium" }],
@@ -51,7 +54,7 @@ export function normalizeThinking(thinking: ModelThinking): ModelThinking {
   if (!levels.length) return { levels: [] };
   if (thinking.default && levels.includes(thinking.default)) return { levels, default: thinking.default };
   const on = levels.filter((level) => level !== "off");
-  const fallback = on.includes("high") ? "high" : on[Math.floor(on.length / 2)] ?? levels[0];
+  const fallback = on.includes("high") ? "high" : (on[Math.floor(on.length / 2)] ?? levels[0]);
   return { levels, default: fallback };
 }
 

@@ -40,7 +40,11 @@ function positionOf(event: ContextPanelEvent): string {
 function Delta({ value }: { value: number | null }) {
   if (value === null) return null;
   if (value === 0) return <span className="text-act-xs font-semibold tabular-nums text-text-faint">±0</span>;
-  return <span className={cn("text-act-xs font-semibold tabular-nums", value > 0 ? "text-success" : "text-danger")}>{formatSignedTokens(value)}</span>;
+  return (
+    <span className={cn("text-act-xs font-semibold tabular-nums", value > 0 ? "text-success" : "text-danger")}>
+      {formatSignedTokens(value)}
+    </span>
+  );
 }
 
 /**
@@ -62,15 +66,31 @@ export function ContextEvents({ events }: { events: readonly ContextPanelEvent[]
           const hint = [label, event.detail, event.inferred ? "根据请求推导" : ""].filter(Boolean).join("\n");
           const position = positionOf(event);
           return (
-            <li key={event.id} data-context-event={kind} title={hint} className="flex items-start gap-2 border-b border-dashed border-line py-1.5 text-act-xs last:border-b-0">
-              <span className={cn("mt-px shrink-0 whitespace-nowrap rounded-act-xs px-1.5 text-act-xxs font-medium leading-4.5", KIND_CLASS[kind])}>{KIND_LABEL[kind]}</span>
+            <li
+              key={event.id}
+              data-context-event={kind}
+              title={hint}
+              className="flex items-start gap-2 border-b border-dashed border-line py-1.5 text-act-xs last:border-b-0"
+            >
+              <span
+                className={cn(
+                  "mt-px shrink-0 whitespace-nowrap rounded-act-xs px-1.5 text-act-xxs font-medium leading-4.5",
+                  KIND_CLASS[kind],
+                )}
+              >
+                {KIND_LABEL[kind]}
+              </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-text-main">{label}</div>
-                {event.detail ? <div className="mt-px truncate text-act-xxs text-text-faint">{event.detail}</div> : null}
+                {event.detail ? (
+                  <div className="mt-px truncate text-act-xxs text-text-faint">{event.detail}</div>
+                ) : null}
               </div>
               <div className="flex shrink-0 flex-col items-end">
                 <Delta value={event.tokenDelta} />
-                {position ? <span className="mt-px whitespace-nowrap text-act-xxs tabular-nums text-text-faint">{position}</span> : null}
+                {position ? (
+                  <span className="mt-px whitespace-nowrap text-act-xxs tabular-nums text-text-faint">{position}</span>
+                ) : null}
               </div>
             </li>
           );

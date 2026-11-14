@@ -26,33 +26,71 @@ export function createReviewContext(): ReviewContextState {
 
 /** 纯函数：不相关的事件原样返回状态；有变化才建新对象。工作量和这一条事件有关，和会话长度无关。 */
 export function reduceReviewContext(state: ReviewContextState, event: SessionEventEnvelopeV1): ReviewContextState {
-  const node = event.surface?.kind === "append" ? surfaceNode(event) ?? undefined : undefined;
+  const node = event.surface?.kind === "append" ? (surfaceNode(event) ?? undefined) : undefined;
   if (node && (event.type === "user/message" || event.type === "assistant/message")) {
     // 超限之后审查一律报错，不必再积累原文，状态就不随会话继续增长。
     if (state.overflow) return state;
-    const content = typeof node.content === "string" ? node.content : Array.isArray(node.content) ? node.content.filter(b => b && typeof b === "object" && !Array.isArray(b) && b.type === "text") : node.content;
+    const content =
+      typeof node.content === "string"
+        ? node.content
+        : Array.isArray(node.content)
+          ? node.content.filter((b) => b && typeof b === "object" && !Array.isArray(b) && b.type === "text")
+          : node.content;
     const message = { seq: event.seq, role: event.type === "user/message" ? "user" : "assistant", content };
     const size = state.size + JSON.stringify(message).length;
-    return { ...state, messages: [...state.messages, message], size, users: state.users + (event.type === "user/message" ? 1 : 0), overflow: state.overflow || size > MAX_MESSAGE_CHARS };
+    return {
+      ...state,
+      messages: [...state.messages, message],
+      size,
+      users: state.users + (event.type === "user/message" ? 1 : 0),
+      overflow: state.overflow || size > MAX_MESSAGE_CHARS,
+    };
   }
   if (event.type === "permission/asked") {
     const data = event.data as Record<string, unknown>;
     if (typeof data.requestId !== "string") return state;
-    const approvals = new Map(state.approvals); approvals.set(data.requestId, data.callId);
+    const approvals = new Map(state.approvals);
+    approvals.set(data.requestId, data.callId);
     return { ...state, approvals };
   }
   if (event.type === "permission/decided") {
     const data = event.data as Record<string, unknown>;
     if (typeof data.requestId !== "string" || !state.approvals.has(data.requestId)) return state;
-    const approvals = new Map(state.approvals); approvals.delete(data.requestId);
-    return { ...state, approvals, calls: pushBounded(state.calls, { seq: event.seq, type: "human-tool-decision", callId: state.approvals.get(data.requestId), decision: data.kind, code: data.code }, RECENT_CALLS) };
+    const approvals = new Map(state.approvals);
+    approvals.delete(data.requestId);
+    return {
+      ...state,
+      approvals,
+      calls: pushBounded(
+        state.calls,
+        {
+          seq: event.seq,
+          type: "human-tool-decision",
+          callId: state.approvals.get(data.requestId),
+          decision: data.kind,
+          code: data.code,
+        },
+        RECENT_CALLS,
+      ),
+    };
   }
   if (event.type === "tool/call" || event.type === "tool/result") {
     const data = event.data as Record<string, unknown>;
-    const calls = pushBounded(state.calls, event.type === "tool/call" ? { seq: event.seq, type: "call", callId: data.callId, name: data.name, args: data.args } : { seq: event.seq, type: "result", callId: data.callId, status: data.status }, RECENT_CALLS);
+    const calls = pushBounded(
+      state.calls,
+      event.type === "tool/call"
+        ? { seq: event.seq, type: "call", callId: data.callId, name: data.name, args: data.args }
+        : { seq: event.seq, type: "result", callId: data.callId, status: data.status },
+      RECENT_CALLS,
+    );
     if (event.type !== "tool/call" || typeof data.callId !== "string") return { ...state, calls };
-    const toolCalls = new Map(state.toolCalls); toolCalls.delete(data.callId); toolCalls.set(data.callId, data);
-    for (const oldest of toolCalls.keys()) { if (toolCalls.size <= RECENT_TOOL_CALLS) break; toolCalls.delete(oldest); }
+    const toolCalls = new Map(state.toolCalls);
+    toolCalls.delete(data.callId);
+    toolCalls.set(data.callId, data);
+    for (const oldest of toolCalls.keys()) {
+      if (toolCalls.size <= RECENT_TOOL_CALLS) break;
+      toolCalls.delete(oldest);
+    }
     return { ...state, calls, toolCalls };
   }
   return state;

@@ -4,24 +4,29 @@ import type { AgentLiveEvent } from "@actspace/shared/runtime-v2";
 import { FixedRendererStreamAdapter } from "../live/stream-adapter.js";
 
 const ids = { sessionId: "s", agentRunId: "run", turnId: "turn", stepId: "step", requestId: "req", messageId: "msg" };
-const delta = (kind: "assistant-delta" | "reasoning-delta", message: string, overrides: Partial<typeof ids> = {}) => ({ ...ids, ...overrides, kind, message }) as unknown as AgentLiveEvent;
+const delta = (kind: "assistant-delta" | "reasoning-delta", message: string, overrides: Partial<typeof ids> = {}) =>
+  ({ ...ids, ...overrides, kind, message }) as unknown as AgentLiveEvent;
 const runState = (message: string) => ({ ...ids, kind: "run-state", message }) as unknown as AgentLiveEvent;
 
 function collect(coalesceMs: number) {
   const adapter = new FixedRendererStreamAdapter(() => undefined, coalesceMs);
   const events: RuntimeStreamEvent[] = [];
-  adapter.subscribe(event => events.push(event));
+  adapter.subscribe((event) => events.push(event));
   return { adapter, events };
 }
 
 describe("stream adapter delta coalescing", () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("emits every delta immediately by default", () => {
     const { adapter, events } = collect(0);
     for (const text of ["a", "b", "c"]) adapter.accept(delta("assistant-delta", text));
-    expect(events.map(event => event.type)).toEqual(Array(3).fill("assistant_text_delta"));
+    expect(events.map((event) => event.type)).toEqual(Array(3).fill("assistant_text_delta"));
   });
 
   it("merges consecutive deltas of one message into one event per window, text intact and in order", () => {
@@ -31,7 +36,9 @@ describe("stream adapter delta coalescing", () => {
     vi.advanceTimersByTime(33);
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ type: "assistant_text_delta", messageId: "msg", llmCallId: "req" });
-    expect((events[0] as { delta: string }).delta).toBe(Array.from({ length: 100 }, (_, index) => `${index},`).join(""));
+    expect((events[0] as { delta: string }).delta).toBe(
+      Array.from({ length: 100 }, (_, index) => `${index},`).join(""),
+    );
     adapter.accept(delta("assistant-delta", "tail"));
     vi.advanceTimersByTime(33);
     expect(events).toHaveLength(2);
@@ -44,8 +51,10 @@ describe("stream adapter delta coalescing", () => {
     adapter.accept(delta("assistant-delta", "answer"));
     adapter.accept(delta("reasoning-delta", "again"));
     vi.advanceTimersByTime(33);
-    expect(events.map(event => [event.type, (event as { delta: string }).delta])).toEqual([
-      ["assistant_thinking_delta", "think more"], ["assistant_text_delta", "answer"], ["assistant_thinking_delta", "again"],
+    expect(events.map((event) => [event.type, (event as { delta: string }).delta])).toEqual([
+      ["assistant_thinking_delta", "think more"],
+      ["assistant_text_delta", "answer"],
+      ["assistant_thinking_delta", "again"],
     ]);
   });
 
@@ -55,15 +64,21 @@ describe("stream adapter delta coalescing", () => {
     adapter.accept(delta("assistant-delta", "b", { messageId: "m2" }));
     adapter.accept(delta("assistant-delta", "c", { agentRunId: "other" }));
     vi.advanceTimersByTime(33);
-    expect(events.map(event => (event as { delta: string }).delta)).toEqual(["a", "b", "c"]);
+    expect(events.map((event) => (event as { delta: string }).delta)).toEqual(["a", "b", "c"]);
   });
 
   it("flushes pending text before any other event, so a tool or run boundary never overtakes it", () => {
     const { adapter, events } = collect(33);
     adapter.accept(delta("assistant-delta", "before "));
     adapter.accept(delta("assistant-delta", "tool"));
-    adapter.accept({ ...ids, kind: "tool-prepared", callId: "c", name: "read_file", arguments: { path: "a" } } as unknown as AgentLiveEvent);
-    expect(events.map(event => event.type)).toEqual(["assistant_text_delta", "tool_call_streaming"]);
+    adapter.accept({
+      ...ids,
+      kind: "tool-prepared",
+      callId: "c",
+      name: "read_file",
+      arguments: { path: "a" },
+    } as unknown as AgentLiveEvent);
+    expect(events.map((event) => event.type)).toEqual(["assistant_text_delta", "tool_call_streaming"]);
     expect((events[0] as { delta: string }).delta).toBe("before tool");
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -93,8 +108,10 @@ describe("stream adapter delta coalescing", () => {
   it("a listener that throws does not lose the rest of the batch", () => {
     const adapter = new FixedRendererStreamAdapter(() => undefined, 33);
     const seen: string[] = [];
-    adapter.subscribe(() => { throw new Error("observer"); });
-    adapter.subscribe(event => seen.push((event as { delta: string }).delta));
+    adapter.subscribe(() => {
+      throw new Error("observer");
+    });
+    adapter.subscribe((event) => seen.push((event as { delta: string }).delta));
     adapter.accept(delta("assistant-delta", "a"));
     adapter.accept(delta("assistant-delta", "b"));
     vi.advanceTimersByTime(33);

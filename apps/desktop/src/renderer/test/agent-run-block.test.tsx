@@ -11,7 +11,9 @@ const transcriptRef = {
   runId: "run-1",
 };
 
-function makeAgentBlock(partial: Partial<Extract<MessageBlock, { kind: "agent" }>> = {}): Extract<MessageBlock, { kind: "agent" }> {
+function makeAgentBlock(
+  partial: Partial<Extract<MessageBlock, { kind: "agent" }>> = {},
+): Extract<MessageBlock, { kind: "agent" }> {
   return {
     kind: "agent",
     id: "agent-1",
@@ -32,7 +34,6 @@ function makeAgentBlock(partial: Partial<Extract<MessageBlock, { kind: "agent" }
     ...partial,
   };
 }
-
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -75,13 +76,27 @@ describe("AgentRunBlock", () => {
           model: "claude-sonnet-5-5",
           summary: "private streamed reply",
           displayText: "正在读取 · ConversationView.tsx",
-          recentEvents: [{ id: "recent-1", type: "tool_call", title: "Read", summary: "Read ConversationView.tsx", timestamp: "2026-06-02T10:00:01.000Z" }],
+          recentEvents: [
+            {
+              id: "recent-1",
+              type: "tool_call",
+              title: "Read",
+              summary: "Read ConversationView.tsx",
+              timestamp: "2026-06-02T10:00:01.000Z",
+            },
+          ],
         })}
       />,
     );
     expect(screen.getByText("运行中")).toBeInTheDocument();
     expect(container.querySelector("img")).toHaveAttribute("width", "20");
-    for (const hidden of ["claude-sonnet-5-5", "正在读取 · ConversationView.tsx", "Read ConversationView.tsx", "private streamed reply", "Found the relevant renderer components."]) {
+    for (const hidden of [
+      "claude-sonnet-5-5",
+      "正在读取 · ConversationView.tsx",
+      "Read ConversationView.tsx",
+      "private streamed reply",
+      "Found the relevant renderer components.",
+    ]) {
       expect(screen.queryByText(hidden)).not.toBeInTheDocument();
     }
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
@@ -89,7 +104,10 @@ describe("AgentRunBlock", () => {
 
   it("puts a failure's reason in the hover title and marks the status", () => {
     render(<AgentRunBlock message={makeAgentBlock({ status: "failed", error: "达到 300 步执行上限" })} />);
-    expect(screen.getByRole("button", { name: /Open SubAgent transcript/ })).toHaveAttribute("title", "Inspect Agent block\n达到 300 步执行上限");
+    expect(screen.getByRole("button", { name: /Open SubAgent transcript/ })).toHaveAttribute(
+      "title",
+      "Inspect Agent block\n达到 300 步执行上限",
+    );
     expect(screen.getByText("失败")).toHaveClass("text-danger");
     expect(screen.queryByText("达到 300 步执行上限")).not.toBeInTheDocument();
   });
@@ -97,16 +115,31 @@ describe("AgentRunBlock", () => {
   it("names the kind of new subagents and opens only the list before the subagent exists", async () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();
-    const { rerender } = render(<AgentRunBlock message={makeAgentBlock({ agentKind: undefined, subagentKind: "local", preset: "explore" })} />);
+    const { rerender } = render(
+      <AgentRunBlock message={makeAgentBlock({ agentKind: undefined, subagentKind: "local", preset: "explore" })} />,
+    );
     expect(screen.getByText("探索")).toBeInTheDocument();
-    for (const [subagentKind, label] of [["fork", "Fork"], ["codex", "Codex"], ["claude-code", "Claude Code"]] as const) {
+    for (const [subagentKind, label] of [
+      ["fork", "Fork"],
+      ["codex", "Codex"],
+      ["claude-code", "Claude Code"],
+    ] as const) {
       rerender(<AgentRunBlock message={makeAgentBlock({ agentKind: undefined, subagentKind })} />);
       expect(screen.getByText(label)).toBeInTheDocument();
     }
-    rerender(<AgentRunBlock message={makeAgentBlock({ agentKind: undefined, subagentKind: "local", preset: "general", background: true })} />);
+    rerender(
+      <AgentRunBlock
+        message={makeAgentBlock({ agentKind: undefined, subagentKind: "local", preset: "general", background: true })}
+      />,
+    );
     expect(screen.getByText("通用")).toBeInTheDocument();
     expect(screen.getByText("后台")).toBeInTheDocument();
-    rerender(<AgentRunBlock message={makeAgentBlock({ agentKind: undefined, subagentKind: "codex", transcriptRef: undefined })} onOpen={onOpen} />);
+    rerender(
+      <AgentRunBlock
+        message={makeAgentBlock({ agentKind: undefined, subagentKind: "codex", transcriptRef: undefined })}
+        onOpen={onOpen}
+      />,
+    );
     await user.click(screen.getByRole("button", { name: /Open SubAgent transcript/ }));
     expect(onOpen).toHaveBeenCalledWith(undefined);
   });

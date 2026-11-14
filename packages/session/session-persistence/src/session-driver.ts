@@ -1,2 +1,5 @@
 /** Session lifecycle needs no backend layout or writer implementation. */
-export type SessionPersistenceDriver = Pick<import("@actspace/session-storage").SessionStorageHandle, "history" | "append" | "flush" | "assertOwned" | "close">;
+export type SessionPersistenceDriver = Pick<
+  import("@actspace/session-storage").SessionStorageHandle,
+  "history" | "append" | "flush" | "assertOwned" | "close"
+>;

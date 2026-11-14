@@ -1,4 +1,18 @@
-export type LlmFailureKind = "authentication" | "permission" | "quota" | "rate-limit" | "provider" | "proxy" | "network" | "timeout" | "abort" | "context-overflow" | "invalid-request" | "malformed-stream" | "unsupported-capability" | "unknown";
+export type LlmFailureKind =
+  | "authentication"
+  | "permission"
+  | "quota"
+  | "rate-limit"
+  | "provider"
+  | "proxy"
+  | "network"
+  | "timeout"
+  | "abort"
+  | "context-overflow"
+  | "invalid-request"
+  | "malformed-stream"
+  | "unsupported-capability"
+  | "unknown";
 
 export type LlmFailure = {
   readonly kind: LlmFailureKind;
@@ -13,13 +27,24 @@ export type LlmFailure = {
 };
 
 export class LlmRuntimeError extends Error {
-  constructor(readonly failure: LlmFailure, cause?: unknown) { super(failure.message, { cause }); this.name = "LlmRuntimeError"; }
+  constructor(
+    readonly failure: LlmFailure,
+    cause?: unknown,
+  ) {
+    super(failure.message, { cause });
+    this.name = "LlmRuntimeError";
+  }
 }
 
 export function retryAfterMsFromUnknown(error: unknown): number | undefined {
   if (error === null || typeof error !== "object") return undefined;
-  const object = error as { readonly headers?: unknown; readonly retryAfterMs?: unknown; readonly retryAfter?: unknown };
-  if (typeof object.retryAfterMs === "number" && Number.isFinite(object.retryAfterMs) && object.retryAfterMs >= 0) return Math.round(object.retryAfterMs);
+  const object = error as {
+    readonly headers?: unknown;
+    readonly retryAfterMs?: unknown;
+    readonly retryAfter?: unknown;
+  };
+  if (typeof object.retryAfterMs === "number" && Number.isFinite(object.retryAfterMs) && object.retryAfterMs >= 0)
+    return Math.round(object.retryAfterMs);
   const value = object.retryAfter ?? headersValue(object.headers, "retry-after");
   if (typeof value === "number" && Number.isFinite(value) && value >= 0) return Math.round(value * 1_000);
   if (typeof value !== "string" || value.trim() === "") return undefined;
@@ -31,12 +56,20 @@ export function retryAfterMsFromUnknown(error: unknown): number | undefined {
 
 export function providerCodeFromUnknown(error: unknown): string | undefined {
   if (error === null || typeof error !== "object") return undefined;
-  const value = (error as { readonly code?: unknown }).code ?? ((error as { readonly error?: { readonly code?: unknown } }).error?.code);
+  const value =
+    (error as { readonly code?: unknown }).code ??
+    (error as { readonly error?: { readonly code?: unknown } }).error?.code;
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function headersValue(headers: unknown, name: string): unknown {
-  if (headers !== null && typeof headers === "object" && "get" in headers && typeof (headers as { get?: unknown }).get === "function") return (headers as { get(key: string): unknown }).get(name);
+  if (
+    headers !== null &&
+    typeof headers === "object" &&
+    "get" in headers &&
+    typeof (headers as { get?: unknown }).get === "function"
+  )
+    return (headers as { get(key: string): unknown }).get(name);
   if (headers !== null && typeof headers === "object") {
     const record = headers as Record<string, unknown>;
     return record[name] ?? record[name.toLowerCase()] ?? record["Retry-After"];

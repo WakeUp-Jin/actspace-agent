@@ -129,7 +129,13 @@ export async function openWorkspaceInTool(
     const info = await stat(workspaceRoot);
     if (!info.isDirectory()) throw new Error("not a directory");
   } catch {
-    return { ok: false, workspaceRoot, toolId: input.toolId, error: "invalid_workspace", message: "Workspace root was not found." };
+    return {
+      ok: false,
+      workspaceRoot,
+      toolId: input.toolId,
+      error: "invalid_workspace",
+      message: "Workspace root was not found.",
+    };
   }
 
   // 目标解析必须在「root 是合法目录」之后做，否则越界判断的基准本身就不可信。
@@ -139,36 +145,85 @@ export async function openWorkspaceInTool(
   if (requested) {
     const abs = resolve(workspaceRoot, requested);
     if (!isLexicallyInside(nodePath, workspaceRoot, abs, { includeRoot: true })) {
-      return { ok: false, workspaceRoot, toolId: input.toolId, relativePath: requested, error: "escapes_root", message: "Target escapes the workspace root." };
+      return {
+        ok: false,
+        workspaceRoot,
+        toolId: input.toolId,
+        relativePath: requested,
+        error: "escapes_root",
+        message: "Target escapes the workspace root.",
+      };
     }
     try {
       targetIsDirectory = (await stat(abs)).isDirectory();
     } catch {
-      return { ok: false, workspaceRoot, toolId: input.toolId, relativePath: requested, error: "invalid_workspace", message: "Target was not found." };
+      return {
+        ok: false,
+        workspaceRoot,
+        toolId: input.toolId,
+        relativePath: requested,
+        error: "invalid_workspace",
+        message: "Target was not found.",
+      };
     }
     target = abs;
   }
   const relativePath = requested || undefined;
 
   if (process.platform !== "darwin") {
-    return { ok: false, workspaceRoot, toolId: input.toolId, relativePath, error: "unsupported_platform", message: "Workspace opening is currently available on macOS." };
+    return {
+      ok: false,
+      workspaceRoot,
+      toolId: input.toolId,
+      relativePath,
+      error: "unsupported_platform",
+      message: "Workspace opening is currently available on macOS.",
+    };
   }
 
   const installed = await runner(["-Ra", definition.appName]);
   if (!installed.ok) {
-    return { ok: false, workspaceRoot, toolId: input.toolId, relativePath, error: "not_installed", message: `${definition.label} is not installed.` };
+    return {
+      ok: false,
+      workspaceRoot,
+      toolId: input.toolId,
+      relativePath,
+      error: "not_installed",
+      message: `${definition.label} is not installed.`,
+    };
   }
 
   const opened = await runner(openArgsFor(input.toolId, definition.appName, target, targetIsDirectory));
   return opened.ok
     ? { ok: true, workspaceRoot, toolId: input.toolId, relativePath }
-    : { ok: false, workspaceRoot, toolId: input.toolId, relativePath, error: "open_failed", message: opened.message ?? `Failed to open ${definition.label}.` };
+    : {
+        ok: false,
+        workspaceRoot,
+        toolId: input.toolId,
+        relativePath,
+        error: "open_failed",
+        message: opened.message ?? `Failed to open ${definition.label}.`,
+      };
 }
 
 function runOpenCommand(args: string[]): Promise<{ ok: boolean; message?: string }> {
   return new Promise((resolveResult) => {
-    execFile("/usr/bin/open", args, { timeout: 8_000, windowsHide: true, encoding: "utf8" }, (error, _stdout, stderr) => {
-      resolveResult(error ? { ok: false, message: String(stderr ?? error.message).trim().slice(0, 500) } : { ok: true });
-    });
+    execFile(
+      "/usr/bin/open",
+      args,
+      { timeout: 8_000, windowsHide: true, encoding: "utf8" },
+      (error, _stdout, stderr) => {
+        resolveResult(
+          error
+            ? {
+                ok: false,
+                message: String(stderr ?? error.message)
+                  .trim()
+                  .slice(0, 500),
+              }
+            : { ok: true },
+        );
+      },
+    );
   });
 }

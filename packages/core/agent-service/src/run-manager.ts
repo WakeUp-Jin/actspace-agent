@@ -1,13 +1,26 @@
 import { randomUUID } from "node:crypto";
 import { getLeasedService, serviceKey } from "@actspace/cordis-adapter";
 import { snapshotSessionJson } from "@actspace/session-journal";
-import { BACKGROUND_WAKE_KIND, isBackgroundWake, type RuntimeJsonValue, type RuntimeAgentMode } from "@actspace/shared/runtime-v2";
+import {
+  BACKGROUND_WAKE_KIND,
+  isBackgroundWake,
+  type RuntimeJsonValue,
+  type RuntimeAgentMode,
+} from "@actspace/shared/runtime-v2";
 import { TaskError, type HarnessIdentity, type RunOutcome, type TaskRecord, type TaskReceipt } from "./contracts.js";
 import { RunBudget } from "./execution-budget.js";
 import type { TaskLedger } from "./task-ledger.js";
 
 export const RUN_FACTORY_SERVICE = "agent.run-factory";
-export type ExecutionConfiguration = { readonly durationMs?: number; readonly deadline?: number; readonly mode: RuntimeAgentMode; readonly model?: string; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly selectedSkillIds?: readonly string[] };
+export type ExecutionConfiguration = {
+  readonly durationMs?: number;
+  readonly deadline?: number;
+  readonly mode: RuntimeAgentMode;
+  readonly model?: string;
+  readonly thinkingEnabled?: boolean;
+  readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort;
+  readonly selectedSkillIds?: readonly string[];
+};
 export type RunExecutionResult = { readonly outcome: RunOutcome; readonly value: RuntimeJsonValue };
 /** Structural port: factory implementations do not depend on the concrete default Loop. */
 export interface RunInstance {
@@ -27,7 +40,10 @@ export interface RunFactory {
     readonly signal: AbortSignal;
     readonly budget?: Pick<RunBudget, "waitForApproval" | "settleApproval">;
     readonly hasPendingSupplements: () => boolean;
-    readonly claimSupplements: () => Promise<{ readonly tasks: readonly TaskRecord[]; readonly configuration: ExecutionConfiguration }>;
+    readonly claimSupplements: () => Promise<{
+      readonly tasks: readonly TaskRecord[];
+      readonly configuration: ExecutionConfiguration;
+    }>;
   }): Promise<RunInstance>;
 }
 /** 每个 Harness 都要提供的 Run 工厂；`RunManager` 在租约内按它取。 */
@@ -44,7 +60,9 @@ export type RunManagerOptions = {
   readonly canStart?: () => boolean;
   readonly ledger: TaskLedger;
   readonly harnessId: string | (() => string);
-  readonly operationForTask?: (task: TaskRecord) => ((signal: AbortSignal) => Promise<RuntimeJsonValue | void>) | undefined;
+  readonly operationForTask?: (
+    task: TaskRecord,
+  ) => ((signal: AbortSignal) => Promise<RuntimeJsonValue | void>) | undefined;
   readonly runIdForTask?: (task: TaskRecord) => string | undefined;
   readonly acquire: (harnessId: string, signal?: AbortSignal) => RunLease | Promise<RunLease>;
   readonly readConfiguration: () => ExecutionConfiguration | Promise<ExecutionConfiguration>;
@@ -52,15 +70,27 @@ export type RunManagerOptions = {
   readonly hasPendingNotifications?: () => boolean;
   readonly onFailure?: (error: unknown) => void;
 };
-type ActiveRun = { readonly runId: string; readonly taskId: string; readonly controller: AbortController; readonly done: Promise<void> };
+type ActiveRun = {
+  readonly runId: string;
+  readonly taskId: string;
+  readonly controller: AbortController;
+  readonly done: Promise<void>;
+};
 
 /** One owner per Session; persistent acceptance is separate from the execution promise. */
 export class SessionRunManager {
   readonly ledger: TaskLedger;
   #active: ActiveRun | undefined;
   readonly #failureListeners = new Set<(error: unknown) => void>();
-  subscribeFailure(listener: (error: unknown) => void): () => void { this.#failureListeners.add(listener); return () => { this.#failureListeners.delete(listener); }; }
-  get blocked(): boolean { return this.#failed || this.ledger.blocked; }
+  subscribeFailure(listener: (error: unknown) => void): () => void {
+    this.#failureListeners.add(listener);
+    return () => {
+      this.#failureListeners.delete(listener);
+    };
+  }
+  get blocked(): boolean {
+    return this.#failed || this.ledger.blocked;
+  }
   #maintenance: Promise<unknown> | undefined;
   #closed = false;
   #closing: Promise<void> | undefined;
@@ -69,25 +99,40 @@ export class SessionRunManager {
   #waking = false;
   /** A wake Run that did not complete must not retry itself; the next user action re-arms it. */
   #wakeSuspended = false;
-  constructor(private readonly options: RunManagerOptions) { this.ledger = options.ledger; }
-  get failure(): unknown { return this.#failure; }
+  constructor(private readonly options: RunManagerOptions) {
+    this.ledger = options.ledger;
+  }
+  get failure(): unknown {
+    return this.#failure;
+  }
   /**
    * Nothing runs, nothing is queued and no failure is cached, so the owner may drop this manager and
    * release its Session handle; a later request opens a fresh one. Failed or blocked managers are kept:
    * they cache recovery and durability failures that protect accepted writes.
    */
   get releasable(): boolean {
-    if (this.#closed || this.#failed || this.#active || this.#maintenance || this.#waking || this.ledger.blocked) return false;
+    if (this.#closed || this.#failed || this.#active || this.#maintenance || this.#waking || this.ledger.blocked)
+      return false;
     const snapshot = this.ledger.snapshot();
-    return snapshot.queue.length === 0 && !snapshot.runs.some(run => run.state === "running") && !snapshot.tasks.some(task => task.state === "claimed");
+    return (
+      snapshot.queue.length === 0 &&
+      !snapshot.runs.some((run) => run.state === "running") &&
+      !snapshot.tasks.some((task) => task.state === "claimed")
+    );
   }
 
-  async submit(submissionId: string, content: RuntimeJsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
+  async submit(
+    submissionId: string,
+    content: RuntimeJsonValue,
+    continuationOf: string | null = null,
+  ): Promise<TaskReceipt> {
     this.#assertOpen();
     const userMessage = !isBackgroundWake(content);
     if (userMessage) this.#wakeSuspended = false;
     // A new user message after a stop/failure runs at once; stale queued work keeps the pause.
-    const receipt = await this.ledger.submit(submissionId, content, continuationOf, { resumeWhenIdle: userMessage && !this.#active && !this.#maintenance });
+    const receipt = await this.ledger.submit(submissionId, content, continuationOf, {
+      resumeWhenIdle: userMessage && !this.#active && !this.#maintenance,
+    });
     this.kick();
     return receipt;
   }
@@ -103,8 +148,9 @@ export class SessionRunManager {
     const active = this.#active;
     if (!active || active.runId !== runId) return false;
     // Stop must not let queued work escape even when the current Run is settling.
-    try { await this.ledger.pause(); }
-    catch (error) {
+    try {
+      await this.ledger.pause();
+    } catch (error) {
       active.controller.abort("host-stop");
       throw error;
     }
@@ -125,16 +171,26 @@ export class SessionRunManager {
     if (this.#active || this.#maintenance) return Promise.reject(new TaskError("SESSION_BUSY", this.ledger.snapshot()));
     const work = Promise.resolve().then(operation);
     this.#maintenance = work;
-    return work.finally(() => { this.#maintenance = undefined; this.wake(); this.kick(); });
+    return work.finally(() => {
+      this.#maintenance = undefined;
+      this.wake();
+      this.kick();
+    });
   }
   dispose(): Promise<void> {
     if (this.#closing) return this.#closing;
     this.#closed = true;
     this.#active?.controller.abort("host-shutdown");
-    return this.#closing = this.waitForIdle().then(() => {
-      for (const listener of this.#failureListeners) { try { listener(new Error("Agent service is closed")); } catch { /* observer */ } }
+    return (this.#closing = this.waitForIdle().then(() => {
+      for (const listener of this.#failureListeners) {
+        try {
+          listener(new Error("Agent service is closed"));
+        } catch {
+          /* observer */
+        }
+      }
       if (this.#failed) throw this.#failure;
-    });
+    }));
   }
 
   /**
@@ -142,50 +198,121 @@ export class SessionRunManager {
    * (the user stopped the last Run) or drain all take precedence.
    */
   wake(): void {
-    if (this.#waking || this.#wakeSuspended || this.#closed || this.#maintenance || this.#active || this.#failed || this.ledger.blocked || this.options.canStart?.() === false) return;
+    if (
+      this.#waking ||
+      this.#wakeSuspended ||
+      this.#closed ||
+      this.#maintenance ||
+      this.#active ||
+      this.#failed ||
+      this.ledger.blocked ||
+      this.options.canStart?.() === false
+    )
+      return;
     const snapshot = this.ledger.snapshot();
-    if (snapshot.paused || snapshot.queue.length || snapshot.runs.some(run => run.state === "running") || !this.options.hasPendingNotifications?.()) return;
+    if (
+      snapshot.paused ||
+      snapshot.queue.length ||
+      snapshot.runs.some((run) => run.state === "running") ||
+      !this.options.hasPendingNotifications?.()
+    )
+      return;
     this.#waking = true;
     void this.submit(`background-wake:${randomUUID()}`, { kind: BACKGROUND_WAKE_KIND })
-      .catch(error => { try { this.options.onFailure?.(error); } catch { /* observer */ } })
-      .finally(() => { this.#waking = false; });
+      .catch((error) => {
+        try {
+          this.options.onFailure?.(error);
+        } catch {
+          /* observer */
+        }
+      })
+      .finally(() => {
+        this.#waking = false;
+      });
   }
 
   /** Called after queue edits or initial acceptance; never blocks an acceptance receipt. */
   kick(): void {
-    if (this.#closed || this.#maintenance || this.#active || this.#failed || this.ledger.blocked || this.options.canStart?.() === false) return;
+    if (
+      this.#closed ||
+      this.#maintenance ||
+      this.#active ||
+      this.#failed ||
+      this.ledger.blocked ||
+      this.options.canStart?.() === false
+    )
+      return;
     const snapshot = this.ledger.snapshot();
-    if (snapshot.paused || snapshot.runs.some(run => run.state === "running")) return;
-    const task = snapshot.queue.map(id => snapshot.tasks.find(item => item.taskId === id)!).find(item => item.targetRunId === null);
+    if (snapshot.paused || snapshot.runs.some((run) => run.state === "running")) return;
+    const task = snapshot.queue
+      .map((id) => snapshot.tasks.find((item) => item.taskId === id)!)
+      .find((item) => item.targetRunId === null);
     if (!task) return;
     const runId = this.options.runIdForTask?.(task) ?? randomUUID();
     const controller = new AbortController();
     // Reserve ownership synchronously before the factory/configuration can yield.
     const operation = this.options.operationForTask?.(task);
-    const done = Promise.resolve().then(() => operation ? this.#executeOperation(task, operation, controller.signal) : this.#execute(task, runId, controller)).catch(error => {
-      this.#failure = error; this.#failed = true;
-      for (const listener of this.#failureListeners) { try { listener(error); } catch { /* observer */ } }
-      try { this.options.onFailure?.(error); } catch { /* observation cannot restart work */ }
-    }).finally(() => {
-      this.#active = undefined;
-      if (isBackgroundWake(task.content) && this.ledger.snapshot().runs.find(run => run.runId === runId)?.state !== "completed") this.#wakeSuspended = true;
-      this.wake(); this.kick();
-    });
+    const done = Promise.resolve()
+      .then(() =>
+        operation ? this.#executeOperation(task, operation, controller.signal) : this.#execute(task, runId, controller),
+      )
+      .catch((error) => {
+        this.#failure = error;
+        this.#failed = true;
+        for (const listener of this.#failureListeners) {
+          try {
+            listener(error);
+          } catch {
+            /* observer */
+          }
+        }
+        try {
+          this.options.onFailure?.(error);
+        } catch {
+          /* observation cannot restart work */
+        }
+      })
+      .finally(() => {
+        this.#active = undefined;
+        if (
+          isBackgroundWake(task.content) &&
+          this.ledger.snapshot().runs.find((run) => run.runId === runId)?.state !== "completed"
+        )
+          this.#wakeSuspended = true;
+        this.wake();
+        this.kick();
+      });
     this.#active = { runId, taskId: task.taskId, controller, done };
   }
 
-  async #executeOperation(task: TaskRecord, operation: (signal: AbortSignal) => Promise<RuntimeJsonValue | void>, signal: AbortSignal): Promise<void> {
+  async #executeOperation(
+    task: TaskRecord,
+    operation: (signal: AbortSignal) => Promise<RuntimeJsonValue | void>,
+    signal: AbortSignal,
+  ): Promise<void> {
     let started = false;
     try {
       signal.throwIfAborted();
-      await this.ledger.startOperation(task.taskId); started = true;
+      await this.ledger.startOperation(task.taskId);
+      started = true;
       const result = await operation(signal);
       await this.ledger.finishOperation(task.taskId, signal.aborted ? "cancelled" : "completed", result ?? null);
     } catch (error) {
-      if (started && !this.ledger.blocked) await this.ledger.finishOperation(task.taskId, signal.aborted ? "cancelled" : "failed", { error: error instanceof Error ? error.message : String(error) });
-      else if (error instanceof TaskError && ["QUEUE_PAUSED", "QUEUE_ORDER", "TASK_NOT_PENDING", "SESSION_BUSY"].includes(error.code)) return;
+      if (started && !this.ledger.blocked)
+        await this.ledger.finishOperation(task.taskId, signal.aborted ? "cancelled" : "failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      else if (
+        error instanceof TaskError &&
+        ["QUEUE_PAUSED", "QUEUE_ORDER", "TASK_NOT_PENDING", "SESSION_BUSY"].includes(error.code)
+      )
+        return;
       if (!started || this.ledger.blocked) throw error;
-      try { this.options.onFailure?.(error); } catch { /* observation only */ }
+      try {
+        this.options.onFailure?.(error);
+      } catch {
+        /* observation only */
+      }
     }
   }
   async #execute(task: TaskRecord, runId: string, controller: AbortController): Promise<void> {
@@ -210,7 +337,10 @@ export class SessionRunManager {
         return;
       }
       acquiring = true;
-      lease = await this.options.acquire(typeof this.options.harnessId === "function" ? this.options.harnessId() : this.options.harnessId, signal);
+      lease = await this.options.acquire(
+        typeof this.options.harnessId === "function" ? this.options.harnessId() : this.options.harnessId,
+        signal,
+      );
       acquiring = false;
       signal.throwIfAborted();
       const configuration = snapshotSessionJson(await this.options.readConfiguration());
@@ -222,12 +352,34 @@ export class SessionRunManager {
       }
       const factory = getLeasedService(lease, RUN_FACTORY);
       if (!factory) throw new Error(`Harness ${lease.harnessId} does not provide ${RUN_FACTORY_SERVICE}`);
-      const initial = await this.ledger.start(task.taskId, runId, { harnessId: lease.harnessId, generationId: lease.generationId, revision: lease.revision }, { ...configuration, ...(lease.executionDigest ? { harnessExecutionDigest: lease.executionDigest } : {}) } as RuntimeJsonValue);
+      const initial = await this.ledger.start(
+        task.taskId,
+        runId,
+        { harnessId: lease.harnessId, generationId: lease.generationId, revision: lease.revision },
+        {
+          ...configuration,
+          ...(lease.executionDigest ? { harnessExecutionDigest: lease.executionDigest } : {}),
+        } as RuntimeJsonValue,
+      );
       started = true;
       signal.throwIfAborted();
-      if (configuration.durationMs !== undefined || configuration.deadline !== undefined) budget = new RunBudget(configuration.durationMs ?? Number.MAX_SAFE_INTEGER, configuration.deadline ?? null, () => controller.abort("execution-budget"));
-      instance = await factory.create({ session: this.ledger.session, scope: lease.scope, context: lease.context, runId, initial, configuration, signal, budget,
-        hasPendingSupplements: () => this.ledger.snapshot().tasks.some(task => task.state === "pending" && task.targetRunId === runId),
+      if (configuration.durationMs !== undefined || configuration.deadline !== undefined)
+        budget = new RunBudget(
+          configuration.durationMs ?? Number.MAX_SAFE_INTEGER,
+          configuration.deadline ?? null,
+          () => controller.abort("execution-budget"),
+        );
+      instance = await factory.create({
+        session: this.ledger.session,
+        scope: lease.scope,
+        context: lease.context,
+        runId,
+        initial,
+        configuration,
+        signal,
+        budget,
+        hasPendingSupplements: () =>
+          this.ledger.snapshot().tasks.some((task) => task.state === "pending" && task.targetRunId === runId),
         claimSupplements: async () => {
           signal.throwIfAborted();
           const current = snapshotSessionJson(await this.options.readConfiguration());
@@ -245,33 +397,84 @@ export class SessionRunManager {
       // Once execution begins, normal cancellation is a returned outcome.
       // An exception still signals failure, even if cancellation happened concurrently.
       if (signal.aborted && !executing) result = { outcome: "cancelled", value: null };
-      else if (acquiring && ["RECOVERY_BLOCKED", "DURABILITY_BLOCKED", "STORE_LOCKED"].includes((error as { code?: string })?.code ?? "")) {
+      else if (
+        acquiring &&
+        ["RECOVERY_BLOCKED", "DURABILITY_BLOCKED", "STORE_LOCKED"].includes((error as { code?: string })?.code ?? "")
+      ) {
         // No task was claimed: retain content and permit explicit resume after Host repair.
-        await this.ledger.pause(); lostClaim = true;
-        for (const listener of this.#failureListeners) { try { listener(error); } catch { /* observer */ } }
-        try { this.options.onFailure?.(error); } catch { /* observer */ }
+        await this.ledger.pause();
+        lostClaim = true;
+        for (const listener of this.#failureListeners) {
+          try {
+            listener(error);
+          } catch {
+            /* observer */
+          }
+        }
+        try {
+          this.options.onFailure?.(error);
+        } catch {
+          /* observer */
+        }
       }
       // A concurrent queue edit or pause won before the initial claim: leave it queued.
-      else if (!started && error instanceof TaskError && ["QUEUE_PAUSED", "QUEUE_ORDER", "TASK_NOT_PENDING"].includes(error.code)) lostClaim = true;
-      else { errors.push(error); result = { outcome: "failed", value: null }; }
+      else if (
+        !started &&
+        error instanceof TaskError &&
+        ["QUEUE_PAUSED", "QUEUE_ORDER", "TASK_NOT_PENDING"].includes(error.code)
+      )
+        lostClaim = true;
+      else {
+        errors.push(error);
+        result = { outcome: "failed", value: null };
+      }
     } finally {
       budget?.dispose();
       // dispose is a stop-and-join barrier; never release a lease while work uses it.
-      try { await instance?.dispose(); } catch (error) { disposed = false; fatal = true; errors.push(error); result = { outcome: "failed", value: null }; }
-      if (started) {
-        try { await this.ledger.finish(runId, result.outcome, result.value); } catch (error) { fatal = true; errors.push(error); }
-      } else if (signal.aborted && !this.ledger.blocked) {
-        try { await this.ledger.pause(); } catch (error) { fatal = true; errors.push(error); }
+      try {
+        await instance?.dispose();
+      } catch (error) {
+        disposed = false;
+        fatal = true;
+        errors.push(error);
+        result = { outcome: "failed", value: null };
       }
-      try { if (disposed) await lease?.release(); } catch (error) { fatal = true; errors.push(error); }
+      if (started) {
+        try {
+          await this.ledger.finish(runId, result.outcome, result.value);
+        } catch (error) {
+          fatal = true;
+          errors.push(error);
+        }
+      } else if (signal.aborted && !this.ledger.blocked) {
+        try {
+          await this.ledger.pause();
+        } catch (error) {
+          fatal = true;
+          errors.push(error);
+        }
+      }
+      try {
+        if (disposed) await lease?.release();
+      } catch (error) {
+        fatal = true;
+        errors.push(error);
+      }
     }
     if (errors.length) {
       const failure = new AggregateError(errors, `Run ${runId} failed`);
       if (fatal || !started) throw failure;
       this.#failure = failure;
-      try { this.options.onFailure?.(failure); } catch { /* observation only */ }
+      try {
+        this.options.onFailure?.(failure);
+      } catch {
+        /* observation only */
+      }
     }
     if (lostClaim) return;
   }
-  #assertOpen(): void { if (this.#closed) throw new Error("Agent service is closed"); if (this.#failed) throw this.#failure; }
+  #assertOpen(): void {
+    if (this.#closed) throw new Error("Agent service is closed");
+    if (this.#failed) throw this.#failure;
+  }
 }

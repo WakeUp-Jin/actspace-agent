@@ -34,9 +34,11 @@ export function isTestFile(filePath) {
   const normalized = filePath.replaceAll("\\", "/");
   const fileName = basename(normalized);
 
-  return /\.(?:test|spec)\.[^/]+$/u.test(fileName)
-    || /_test\.go$/u.test(fileName)
-    || /(?:^|\/)tests\/[^/]+\.rs$/u.test(normalized);
+  return (
+    /\.(?:test|spec)\.[^/]+$/u.test(fileName) ||
+    /_test\.go$/u.test(fileName) ||
+    /(?:^|\/)tests\/[^/]+\.rs$/u.test(normalized)
+  );
 }
 
 export function isSourceFile(filePath) {

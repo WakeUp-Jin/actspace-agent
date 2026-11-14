@@ -1,6 +1,10 @@
 import { getService, type CordisContext } from "@actspace/cordis-adapter";
 import type { ContextSource } from "@actspace/context-engine";
-import { BACKGROUND_TASK_HOST_PORT, type BackgroundTaskHost, type BackgroundTaskRecord } from "@actspace/background-tasks";
+import {
+  BACKGROUND_TASK_HOST_PORT,
+  type BackgroundTaskHost,
+  type BackgroundTaskRecord,
+} from "@actspace/background-tasks";
 import { publish } from "@actspace/context-assembly";
 
 export const BACKGROUND_TASKS_CONTEXT_OWNER = "actspace.context-background-tasks";
@@ -11,19 +15,39 @@ export const BACKGROUND_TASKS_CONTEXT_OWNER = "actspace.context-background-tasks
  * re-mounts it after compaction; a Session that never had background work gets nothing.
  */
 export function createBackgroundTasksSource(tasks: Pick<BackgroundTaskHost, "list">): ContextSource {
-  let turn: string | undefined; let text: string | undefined;
-  return { id: "context-background-tasks", owner: BACKGROUND_TASKS_CONTEXT_OWNER, order: 15, criticality: "optional", fields: ["supplements"],
+  let turn: string | undefined;
+  let text: string | undefined;
+  return {
+    id: "context-background-tasks",
+    owner: BACKGROUND_TASKS_CONTEXT_OWNER,
+    order: 15,
+    criticality: "optional",
+    fields: ["supplements"],
     get: (context, write) => {
-      if (turn !== context.request.turnId) { turn = context.request.turnId; text = render(tasks.list(context.request.sessionId)); }
+      if (turn !== context.request.turnId) {
+        turn = context.request.turnId;
+        text = render(tasks.list(context.request.sessionId));
+      }
       if (text === undefined) return;
       // Ending all tasks writes a closing text instead of removing the list, so earlier prompt-cache prefixes stay valid.
-      write({ supplements: [{ id: "background-tasks", owner: BACKGROUND_TASKS_CONTEXT_OWNER, text, sourceEventSeq: -1, afterEventSeq: -1 }] });
-    } };
+      write({
+        supplements: [
+          {
+            id: "background-tasks",
+            owner: BACKGROUND_TASKS_CONTEXT_OWNER,
+            text,
+            sourceEventSeq: -1,
+            afterEventSeq: -1,
+          },
+        ],
+      });
+    },
+  };
 }
 
 function render(all: readonly BackgroundTaskRecord[]): string | undefined {
   if (all.length === 0) return undefined;
-  const running = all.filter(task => task.status === "running").sort((a, b) => a.startedAt - b.startedAt);
+  const running = all.filter((task) => task.status === "running").sort((a, b) => a.startedAt - b.startedAt);
   if (running.length === 0) return "No background tasks are running.";
   return [
     "Background tasks still running (this list supersedes earlier lists; completion notifications supersede it):",
@@ -36,11 +60,16 @@ function render(all: readonly BackgroundTaskRecord[]): string | undefined {
 function line(task: BackgroundTaskRecord): string {
   const head = `- ${task.taskId} · ${task.kind} · ${task.description}`;
   const started = `started ${localIso(task.startedAt)}`;
-  return task.agent ? `${head} · ${task.agent.label} · ${started} · transcript: ${task.agent.transcriptPath}` : `${head} · ${started}`;
+  return task.agent
+    ? `${head} · ${task.agent.label} · ${started} · transcript: ${task.agent.transcriptPath}`
+    : `${head} · ${started}`;
 }
 
 function localIso(ms: number): string {
-  const date = new Date(ms), offset = -date.getTimezoneOffset(), sign = offset >= 0 ? "+" : "-", pad = (value: number) => String(Math.trunc(Math.abs(value))).padStart(2, "0");
+  const date = new Date(ms),
+    offset = -date.getTimezoneOffset(),
+    sign = offset >= 0 ? "+" : "-",
+    pad = (value: number) => String(Math.trunc(Math.abs(value))).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${sign}${pad(offset / 60)}:${pad(offset % 60)}`;
 }
 

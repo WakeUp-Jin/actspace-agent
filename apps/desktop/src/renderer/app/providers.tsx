@@ -8,7 +8,10 @@ import { SessionActionsContext, type SessionActionsValue } from "../session/sess
 import { SessionBrowseContext, type SessionBrowseState } from "../session/SessionBrowseContext";
 import { SessionLocalStoreContext, type SessionLocalStore } from "../session/session-local-store";
 import { RunTargetContext, type RunTargetValue } from "../target/run-target-context";
-import { SideChatRuntimeContext, type SideChatRuntimeValue } from "../components/right-panel/side-chat/side-chat-runtime";
+import {
+  SideChatRuntimeContext,
+  type SideChatRuntimeValue,
+} from "../components/right-panel/side-chat/side-chat-runtime";
 
 /**
  * App 的 Provider 嵌套（14 S7；15 T5 加入 RunTargetContext；侧边对话加入 SideChatRuntimeContext）。各 value 由 App 用 `useMemo` 生成，这里只负责按固定顺序挂上。

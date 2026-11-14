@@ -2,7 +2,14 @@ import type * as S from "../index";
 import type * as RV2 from "../runtime-v2/index";
 import type { RuntimeSessionSnapshot } from "../runtime-v2/projection";
 import type { SessionEventEnvelopeV1 } from "../runtime-v2/session-events";
-import type { AddHostInput, HostArtifactPreview, HostConnection, HostEvent, HostMethod, HostUploadProgress } from "../host-protocol/index";
+import type {
+  AddHostInput,
+  HostArtifactPreview,
+  HostConnection,
+  HostEvent,
+  HostMethod,
+  HostUploadProgress,
+} from "../host-protocol/index";
 import { ENGLISH_LEARNING_CHANNELS } from "../english-learning";
 import { HOST_IPC } from "../host-protocol/connections";
 import { RESOURCE_MONITOR_CHANNELS } from "../resource-monitor";
@@ -57,9 +64,13 @@ export const desktopBridgeContract = {
   dialogs: {
     selectFiles: invoke<{ remote?: boolean } | undefined, S.SelectFilesResult>(CH.selectFiles),
     selectImages: invoke<void, S.SelectImagesResult>(CH.selectImages),
-    selectWorkspaceDirectory: invoke<S.SelectWorkspaceDirectoryInput | undefined, S.SelectWorkspaceDirectoryResult>(CH.selectWorkspaceDirectory),
+    selectWorkspaceDirectory: invoke<S.SelectWorkspaceDirectoryInput | undefined, S.SelectWorkspaceDirectoryResult>(
+      CH.selectWorkspaceDirectory,
+    ),
     importComposerImage: invoke<S.ImportComposerImageInput, S.ImportComposerImageResult>(CH.importComposerImage),
-    showArtifactContextMenu: invoke<S.ArtifactContextMenuInput, S.ArtifactContextMenuResult>(CH.showArtifactContextMenu),
+    showArtifactContextMenu: invoke<S.ArtifactContextMenuInput, S.ArtifactContextMenuResult>(
+      CH.showArtifactContextMenu,
+    ),
     getPathForFile: local<(file: DesktopFileHandle) => string>(),
   },
   workspaces: {
@@ -68,18 +79,26 @@ export const desktopBridgeContract = {
     setVisibility: invoke<S.WorkspaceVisibilityInput, S.WorkspaceVisibilityResult>(CH.setWorkspaceVisibility),
     getGitContext: invoke<S.WorkspaceGitContextInput, S.WorkspaceGitContext>(CH.getWorkspaceGitContext),
     createFolder: invoke<S.WorkspaceCreateFolderInput, S.WorkspaceCreateFolderResult>(CH.createWorkspaceFolder),
-    listMarkdownFiles: invoke<S.WorkspaceListMarkdownFilesInput, S.WorkspaceListMarkdownFilesResult>(CH.listWorkspaceMarkdownFiles),
+    listMarkdownFiles: invoke<S.WorkspaceListMarkdownFilesInput, S.WorkspaceListMarkdownFilesResult>(
+      CH.listWorkspaceMarkdownFiles,
+    ),
     readFile: invoke<S.WorkspaceReadFileInput, S.WorkspaceReadFileResult>(CH.readWorkspaceFile),
     statFile: invoke<S.WorkspaceStatFileInput, S.WorkspaceStatFileResult>(CH.statWorkspaceFile),
-    writeMarkdownFile: invoke<S.WorkspaceWriteMarkdownFileInput, S.WorkspaceWriteMarkdownFileResult>(CH.writeWorkspaceMarkdownFile),
-    listFileApplications: invoke<S.WorkspaceFileApplicationsInput, S.WorkspaceFileApplicationsResult>(CH.listWorkspaceFileApplications),
+    writeMarkdownFile: invoke<S.WorkspaceWriteMarkdownFileInput, S.WorkspaceWriteMarkdownFileResult>(
+      CH.writeWorkspaceMarkdownFile,
+    ),
+    listFileApplications: invoke<S.WorkspaceFileApplicationsInput, S.WorkspaceFileApplicationsResult>(
+      CH.listWorkspaceFileApplications,
+    ),
     openFile: invoke<S.WorkspaceOpenFileInput, S.WorkspaceOpenFileResult>(CH.openWorkspaceFile),
     getEnvironment: invoke<S.WorkspaceEnvironmentGetInput, S.WorkspaceEnvironmentSnapshot>(CH.getWorkspaceEnvironment),
     createBranch: invoke<S.WorkspaceGitCreateBranchInput, S.WorkspaceGitMutationResult>(CH.createWorkspaceBranch),
     switchBranch: invoke<S.WorkspaceGitSwitchBranchInput, S.WorkspaceGitMutationResult>(CH.switchWorkspaceBranch),
     commit: invoke<S.WorkspaceGitCommitInput, S.WorkspaceGitMutationResult>(CH.commitWorkspaceChanges),
     push: invoke<S.WorkspaceGitPushInput, S.WorkspaceGitMutationResult>(CH.pushWorkspaceBranch),
-    commitAndPush: invoke<S.WorkspaceGitCommitAndPushInput, S.WorkspaceGitMutationResult>(CH.commitAndPushWorkspaceChanges),
+    commitAndPush: invoke<S.WorkspaceGitCommitAndPushInput, S.WorkspaceGitMutationResult>(
+      CH.commitAndPushWorkspaceChanges,
+    ),
     listOpenTools: invoke<void, S.WorkspaceOpenToolsResult>(CH.listWorkspaceOpenTools),
     openInTool: invoke<S.WorkspaceOpenInput, S.WorkspaceOpenResult>(CH.openWorkspaceInTool),
   },
@@ -97,7 +116,9 @@ export const desktopBridgeContract = {
     /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */
     get: invoke<S.SessionGetInput, RV2.RuntimeDesktopSessionProjection | null>(CH.getSession),
     getPage: invoke<RV2.RuntimeSessionProjectionInput, RV2.RuntimeDesktopSessionProjection>(CH.getSessionPage),
-    getProjectionSnapshot: invoke<RV2.RuntimeSessionProjectionInput, RV2.RuntimeDesktopSessionProjection>(CH.getSessionProjectionSnapshot),
+    getProjectionSnapshot: invoke<RV2.RuntimeSessionProjectionInput, RV2.RuntimeDesktopSessionProjection>(
+      CH.getSessionProjectionSnapshot,
+    ),
     getObservation: invoke<RV2.RuntimeSessionProjectionInput, RV2.RuntimeSessionObservation>(CH.getSessionObservation),
     /** 原始页；`apps/desktop/src/renderer/api/sessions.ts` 负责投影成 MessageBlock。 */
     getToolDetail: invoke<{ sessionId: string; callId: string }, DesktopToolDetailPage>(CH.getSessionToolDetail),
@@ -111,7 +132,9 @@ export const desktopBridgeContract = {
      */
     liveOutput: invoke<{ sessionId: string }, RV2.LiveOutputBaseline | null>(CH.getSessionLiveOutput),
     /** 子 Agent 面板的「停止」：后台的走后台任务的用户停止（模型下一步读到「用户停止了它」），同步的直接中断、等着的工具调用返回停止结果。 */
-    interruptSubagent: invoke<{ sessionId: string; agentId: string }, { ok: boolean; message: string }>(CH.interruptSubagent),
+    interruptSubagent: invoke<{ sessionId: string; agentId: string }, { ok: boolean; message: string }>(
+      CH.interruptSubagent,
+    ),
     /** 外部子智能体详情的「在 Finder 中显示」：路径由主进程从父 Journal 的 `subagent/spawned` 取，renderer 不传路径。 */
     revealSubagentRecord: invoke<{ sessionId: string; agentId: string }, { ok: boolean }>(CH.revealSubagentRecord),
     /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */
@@ -158,7 +181,9 @@ export const desktopBridgeContract = {
     updateV4: invoke<S.SettingsV4UpdateInput, S.SettingsV4UpdateResult>(CH.updateSettingsV4),
     readSystemPrompt: invoke<void, S.AgentSystemPromptFile>(CH.readAgentSystemPrompt),
     writeSystemPrompt: invoke<S.WriteAgentSystemPromptInput, S.AgentSystemPromptFile>(CH.writeAgentSystemPrompt),
-    updateImageGeneration: invoke<S.UpdateImageGenerationSettingsInput, S.UpdateImageGenerationSettingsResult>(CH.updateImageGeneration),
+    updateImageGeneration: invoke<S.UpdateImageGenerationSettingsInput, S.UpdateImageGenerationSettingsResult>(
+      CH.updateImageGeneration,
+    ),
     getSearchUsage: invoke<void, S.SearchUsageResult>(CH.getSearchUsage),
   },
   quickOpen: {

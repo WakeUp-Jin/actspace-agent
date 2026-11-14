@@ -51,7 +51,10 @@ export function splitRows(hunk: DiffHunk): SplitRow[] {
     else if (row.kind === "add") adds.push({ no: row.new!, text: row.text, kind: "add" });
     else {
       flush();
-      rows.push({ left: { no: row.old!, text: row.text, kind: "context" }, right: { no: row.new!, text: row.text, kind: "context" } });
+      rows.push({
+        left: { no: row.old!, text: row.text, kind: "context" },
+        right: { no: row.new!, text: row.text, kind: "context" },
+      });
     }
   }
   flush();
@@ -89,7 +92,12 @@ function noteOf(file: TurnChangedFile): string | undefined {
  * @param split 左右对比；只有新增或只有删除时始终单栏。
  * @param preview 悬停浮层：隐藏 hunk 头和说明行。
  */
-export function TurnFileDiff({ file, split, wrap, preview = false }: {
+export function TurnFileDiff({
+  file,
+  split,
+  wrap,
+  preview = false,
+}: {
   file: TurnChangedFile;
   split: boolean;
   wrap: boolean;
@@ -103,32 +111,44 @@ export function TurnFileDiff({ file, split, wrap, preview = false }: {
   return (
     <div className="turn-diff min-h-0 flex-1" data-preview={preview || undefined}>
       <div className="turn-diff-body" data-view={sideBySide ? "split" : "unified"} data-wrap={wrap || undefined}>
-        {note ? <p className="turn-diff-note" data-note={hunks.length === 0 ? "empty" : "metadata"}>{note}</p> : null}
+        {note ? (
+          <p className="turn-diff-note" data-note={hunks.length === 0 ? "empty" : "metadata"}>
+            {note}
+          </p>
+        ) : null}
         {truncated ? <p className="turn-diff-note">只显示前 {MAX_RENDERED_LINES} 行</p> : null}
-        {sideBySide && !wrap ? <SplitColumns hunks={hunks} /> : hunks.map((hunk, position) => (
-          <section key={position} className="turn-diff-hunk">
-            <div className="turn-diff-hunk-header">{hunkHeader(hunk)}</div>
-            {sideBySide ? splitRows(hunk).map((row, at) => (
-              <div key={at} className="turn-diff-split-line" data-diff-line={splitRowKind(row)}>
-                <span className={`turn-diff-cell ${row.left ? `is-${row.left.kind}` : "is-empty"}`}>
-                  <span className="turn-diff-number">{row.left?.no ?? ""}</span>
-                  <span className="turn-diff-text">{row.left?.text ?? ""}</span>
-                </span>
-                <span className={`turn-diff-cell ${row.right ? `is-${row.right.kind}` : "is-empty"}`}>
-                  <span className="turn-diff-number">{row.right?.no ?? ""}</span>
-                  <span className="turn-diff-text">{row.right?.text ?? ""}</span>
-                </span>
-              </div>
-            )) : hunkRows(hunk).map((row, at) => (
-              <div key={at} className={`turn-diff-line is-${row.kind}`} data-diff-line={row.kind}>
-                <span className="turn-diff-number">{row.old ?? ""}</span>
-                <span className="turn-diff-number">{row.new ?? ""}</span>
-                <span className="turn-diff-sign">{row.kind === "add" ? "+" : row.kind === "del" ? "-" : " "}</span>
-                <span className="turn-diff-text">{row.text}</span>
-              </div>
-            ))}
-          </section>
-        ))}
+        {sideBySide && !wrap ? (
+          <SplitColumns hunks={hunks} />
+        ) : (
+          hunks.map((hunk, position) => (
+            <section key={position} className="turn-diff-hunk">
+              <div className="turn-diff-hunk-header">{hunkHeader(hunk)}</div>
+              {sideBySide
+                ? splitRows(hunk).map((row, at) => (
+                    <div key={at} className="turn-diff-split-line" data-diff-line={splitRowKind(row)}>
+                      <span className={`turn-diff-cell ${row.left ? `is-${row.left.kind}` : "is-empty"}`}>
+                        <span className="turn-diff-number">{row.left?.no ?? ""}</span>
+                        <span className="turn-diff-text">{row.left?.text ?? ""}</span>
+                      </span>
+                      <span className={`turn-diff-cell ${row.right ? `is-${row.right.kind}` : "is-empty"}`}>
+                        <span className="turn-diff-number">{row.right?.no ?? ""}</span>
+                        <span className="turn-diff-text">{row.right?.text ?? ""}</span>
+                      </span>
+                    </div>
+                  ))
+                : hunkRows(hunk).map((row, at) => (
+                    <div key={at} className={`turn-diff-line is-${row.kind}`} data-diff-line={row.kind}>
+                      <span className="turn-diff-number">{row.old ?? ""}</span>
+                      <span className="turn-diff-number">{row.new ?? ""}</span>
+                      <span className="turn-diff-sign">
+                        {row.kind === "add" ? "+" : row.kind === "del" ? "-" : " "}
+                      </span>
+                      <span className="turn-diff-text">{row.text}</span>
+                    </div>
+                  ))}
+            </section>
+          ))
+        )}
       </div>
     </div>
   );
@@ -162,7 +182,9 @@ function SplitColumns({ hunks }: { hunks: readonly DiffHunk[] }) {
           key={side}
           className="turn-diff-column"
           data-diff-side={side}
-          ref={(element) => { columns.current[side] = element; }}
+          ref={(element) => {
+            columns.current[side] = element;
+          }}
           onScroll={follow(side)}
         >
           {paired.map((hunk, position) => (
@@ -171,7 +193,11 @@ function SplitColumns({ hunks }: { hunks: readonly DiffHunk[] }) {
               {hunk.rows.map((row, at) => {
                 const cell = row[side];
                 return (
-                  <div key={at} className={`turn-diff-side-line ${cell ? `is-${cell.kind}` : "is-empty"}`} data-diff-line={splitRowKind(row)}>
+                  <div
+                    key={at}
+                    className={`turn-diff-side-line ${cell ? `is-${cell.kind}` : "is-empty"}`}
+                    data-diff-line={splitRowKind(row)}
+                  >
                     <span className="turn-diff-number">{cell?.no ?? ""}</span>
                     <span className="turn-diff-text">{cell?.text ?? ""}</span>
                   </div>

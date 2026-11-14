@@ -13,7 +13,13 @@ import { markdownSyntax } from "../components/markdown-editor/core/syntax";
 import { createEditorView, type EditorOptions } from "../components/markdown-editor/core";
 
 export function mermaidResult(source: string): MermaidRenderResult {
-  return { svg: `<svg id="mm-1" data-len="${source.length}"><g id="mm-1-g"></g></svg>`, renderId: "mm-1", diagramType: "flowchart", width: 100, height: 50 };
+  return {
+    svg: `<svg id="mm-1" data-len="${source.length}"><g id="mm-1-g"></g></svg>`,
+    renderId: "mm-1",
+    diagramType: "flowchart",
+    width: 100,
+    height: 50,
+  };
 }
 
 export function makeHost(overrides: Partial<MarkdownEditorHost> = {}): MarkdownEditorHost {
@@ -51,7 +57,9 @@ export function makeState(doc: string, options: StateOptions = {}): EditorState 
   const host = options.host === undefined ? makeHost() : options.host;
   let state = EditorState.create({
     doc,
-    selection: Array.isArray(cursor) ? EditorSelection.single(clamp(cursor[0]), clamp(cursor[1])) : EditorSelection.cursor(clamp(cursor)),
+    selection: Array.isArray(cursor)
+      ? EditorSelection.single(clamp(cursor[0]), clamp(cursor[1]))
+      : EditorSelection.cursor(clamp(cursor)),
     extensions: [markdownSyntax(), focusExtension, blockField, host ? hostFacet.of(host) : []],
   });
   ensureSyntaxTree(state, state.doc.length, 5000);
@@ -71,7 +79,11 @@ export interface Deco {
 }
 
 function describe(from: number, to: number, value: Decoration): Deco {
-  const spec = value.spec as { class?: string; widget?: { constructor: { name: string } }; attributes?: Record<string, string> };
+  const spec = value.spec as {
+    class?: string;
+    widget?: { constructor: { name: string } };
+    attributes?: Record<string, string>;
+  };
   const widget = spec.widget?.constructor.name;
   let kind: Deco["kind"];
   if (from === to && !widget && spec.class !== undefined) kind = "line";
@@ -101,7 +113,8 @@ export const lineHas = (list: Deco[], lineStart: number, cls: string): boolean =
   list.some((d) => d.kind === "line" && d.from === lineStart && d.cls.split(/\s+/).includes(cls));
 
 /** `[from, to]` 被完整隐藏（replace 且没有 widget）。 */
-export const isHidden = (list: Deco[], from: number, to: number): boolean => list.some((d) => d.kind === "hide" && d.from === from && d.to === to);
+export const isHidden = (list: Deco[], from: number, to: number): boolean =>
+  list.some((d) => d.kind === "hide" && d.from === from && d.to === to);
 
 export const widgetsIn = (list: Deco[]): string[] => list.filter((d) => d.widget).map((d) => d.widget as string);
 
@@ -117,7 +130,11 @@ export function polyfillLayout(): void {
 const mounted: EditorView[] = [];
 
 /** 挂到 document 的真实 EditorView；用例结束后用 `cleanupViews` 销毁。 */
-export function mountEditor(options: Partial<EditorOptions> & { doc: string }): { view: EditorView; host: MarkdownEditorHost; parent: HTMLElement } {
+export function mountEditor(options: Partial<EditorOptions> & { doc: string }): {
+  view: EditorView;
+  host: MarkdownEditorHost;
+  parent: HTMLElement;
+} {
   polyfillLayout();
   const parent = document.createElement("div");
   document.body.append(parent);
@@ -146,7 +163,12 @@ export function findEditorView(root: ParentNode = document): EditorView {
 
 /** 在文档末尾（或指定位置）输入文字，走和键盘输入一样的 userEvent，会进撤销历史、触发 onChange。 */
 export function typeInto(view: EditorView, text: string, at: number = view.state.doc.length): void {
-  view.dispatch({ changes: { from: at, insert: text }, selection: { anchor: at + text.length }, userEvent: "input.type", scrollIntoView: true });
+  view.dispatch({
+    changes: { from: at, insert: text },
+    selection: { anchor: at + text.length },
+    userEvent: "input.type",
+    scrollIntoView: true,
+  });
 }
 
 /** 在编辑器内容区按键（⌘S 在非 Mac 的 jsdom 里是 Ctrl+S）。 */

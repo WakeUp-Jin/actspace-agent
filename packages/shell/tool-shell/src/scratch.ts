@@ -14,6 +14,8 @@ export class ScratchOwners {
   readonly ownerOf = (sessionId: string): string => this.#owners.get(sessionId) ?? sessionId;
   share(sessionId: string, ownerSessionId: string): () => void {
     this.#owners.set(sessionId, this.ownerOf(ownerSessionId));
-    return () => { this.#owners.delete(sessionId); };
+    return () => {
+      this.#owners.delete(sessionId);
+    };
   }
 }

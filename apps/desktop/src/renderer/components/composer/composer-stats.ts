@@ -25,7 +25,14 @@ export type ComposerSessionStats = {
 };
 
 const EMPTY_STATS: ComposerSessionStats = {
-  turns: 0, steps: 0, llmMs: 0, toolMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0,
+  turns: 0,
+  steps: 0,
+  llmMs: 0,
+  toolMs: 0,
+  ttftMs: 0,
+  ttftSteps: 0,
+  decodeMs: 0,
+  decodeTokens: 0,
 };
 
 /**
@@ -56,7 +63,9 @@ export function sessionStats(snapshot: RuntimeSessionSnapshot | null | undefined
 }
 
 /** 计费输入 = 未缓存输入 + 缓存读取 + 缓存写入（三个互不重叠的提示侧桶）。 */
-export function billedInputTokens(usage: Pick<RuntimeUsageSummary, "inputTokens" | "cacheReadTokens" | "cacheWriteTokens">): number {
+export function billedInputTokens(
+  usage: Pick<RuntimeUsageSummary, "inputTokens" | "cacheReadTokens" | "cacheWriteTokens">,
+): number {
   return usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
 }
 
@@ -68,7 +77,11 @@ export function billedInputTokens(usage: Pick<RuntimeUsageSummary, "inputTokens"
  * @param decimalPlaces - 常规精度，0 或 1。
  * @returns 百分比文本；无计费输入时为 null。
  */
-export function formatCacheHitPercent(cacheReadTokens: number, promptTokens: number, decimalPlaces: 0 | 1 = 0): string | null {
+export function formatCacheHitPercent(
+  cacheReadTokens: number,
+  promptTokens: number,
+  decimalPlaces: 0 | 1 = 0,
+): string | null {
   if (promptTokens === 0) return null;
   const missedInputTokens = promptTokens - cacheReadTokens;
   if (missedInputTokens === 0) return "100";
@@ -88,7 +101,7 @@ export function formatCacheHitPercent(cacheReadTokens: number, promptTokens: num
   let roundedLoss = 5;
   for (let loss = 1; loss < 5; loss += 1) {
     const factor = loss * 2 + 1;
-    const threshold = factor * denominatorTens + Math.floor(factor * denominatorOnes / 10);
+    const threshold = factor * denominatorTens + Math.floor((factor * denominatorOnes) / 10);
     if (scaledDoubleGap <= threshold) {
       roundedLoss = loss;
       break;
@@ -109,7 +122,7 @@ function roundedPercentUnits(cacheReadTokens: number, denominator: number, decim
   while (lower < upper) {
     const candidate = Math.floor((lower + upper + 1) / 2);
     const factor = candidate * 2 - 1;
-    const threshold = factor * denominatorQuotient + Math.ceil(factor * denominatorRemainder / doubledScale);
+    const threshold = factor * denominatorQuotient + Math.ceil((factor * denominatorRemainder) / doubledScale);
     if (cacheReadTokens >= threshold) lower = candidate;
     else upper = candidate - 1;
   }
@@ -151,9 +164,8 @@ export function formatTokensPerSecond(tokensPerSecond: number): string {
  * @returns 展示文本。
  */
 export function formatTokens(value: number): string {
-  const scaled = (candidate: number): string => candidate >= 100
-    ? String(Math.round(candidate))
-    : String(Math.round(candidate * 10) / 10);
+  const scaled = (candidate: number): string =>
+    candidate >= 100 ? String(Math.round(candidate)) : String(Math.round(candidate * 10) / 10);
   if (value < 1_000) return String(value);
   if (value < 1_000_000) return `${scaled(value / 1_000)}K`;
   return `${scaled(value / 1_000_000)}M`;

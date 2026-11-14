@@ -6,6 +6,21 @@ const DISPLAY = /(?:^|\s)(?:flex|grid|inline-flex|inline-grid|inline-block|inlin
 const WIDTH = /(?:^|\s)w-/;
 
 /** 不带样式的可点击区域（列表行、可展开的工具行等）；按下时显示 hover 背景。 */
-export const Pressable = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(function Pressable({ className, type = "button", ...rest }, ref) {
-  return <button ref={ref} type={type} className={cx(!DISPLAY.test(className ?? "") && "block", !WIDTH.test(className ?? "") && "w-full", "text-left transition-colors duration-(--motion-fast) active:bg-hover-overlay disabled:cursor-default", className)} {...rest} />;
+export const Pressable = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(function Pressable(
+  { className, type = "button", ...rest },
+  ref,
+) {
+  return (
+    <button
+      ref={ref}
+      type={type}
+      className={cx(
+        !DISPLAY.test(className ?? "") && "block",
+        !WIDTH.test(className ?? "") && "w-full",
+        "text-left transition-colors duration-(--motion-fast) active:bg-hover-overlay disabled:cursor-default",
+        className,
+      )}
+      {...rest}
+    />
+  );
 });

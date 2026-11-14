@@ -3,7 +3,12 @@ import { loadAppearance } from "../../appearance/storage";
 import { useOpenWorkspacePath } from "../files/open-file-fallback-context";
 import { readWorkspaceImage } from "../files/read-workspace-image";
 import { MermaidPreviewDialog } from "../messages/MermaidPreviewDialog";
-import { downloadMermaidPng, mermaidTheme, renderMermaid, type MermaidRenderResult } from "../messages/mermaid-renderer";
+import {
+  downloadMermaidPng,
+  mermaidTheme,
+  renderMermaid,
+  type MermaidRenderResult,
+} from "../messages/mermaid-renderer";
 import { useRightPanel } from "../right-panel/RightPanelContext";
 import { readFailureTab } from "../right-panel/workspaceFileTab";
 import type { MarkdownEditorHost } from "./host";
@@ -34,34 +39,46 @@ export function useMarkdownEditorHost({ docPath, workspaceRoot }: { docPath: str
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
-    return () => { alive.current = false; };
+    return () => {
+      alive.current = false;
+    };
   }, []);
 
-  const host = useMemo<MarkdownEditorHost>(() => ({
-    docPath,
-    workspaceRoot,
-    openPath(relativePath, line) {
-      if (!workspaceRoot) return;
-      const { openTab: open, openWorkspacePath: openPath } = latest.current;
-      void openPath({ workspaceRoot, relativePath, line, openTab: open }).then((result) => {
-        // `no_app` 已由兜底对话框处理；读不到文件时开一个说明失败的标签，与聊天区一致。
-        if (result.ok === false && result.reason === "error") {
-          open(readFailureTab(relativePath, relativePath.split("/").pop() || relativePath, { workspaceRoot }, result.message));
-        }
-      });
-    },
-    openUrl(url) {
-      window.open(url, "_blank", "noopener");
-    },
-    loadImage(relativePath) {
-      return workspaceRoot ? readWorkspaceImage(workspaceRoot, relativePath) : Promise.resolve(null);
-    },
-    // 每次渲染时读外观设置，主题改了下一次渲染就生效。
-    renderMermaid: (source) => renderMermaid(source, loadAppearance().mermaidTheme),
-    previewMermaid(result) {
-      if (alive.current) setPreview(result);
-    },
-  }), [docPath, workspaceRoot]);
+  const host = useMemo<MarkdownEditorHost>(
+    () => ({
+      docPath,
+      workspaceRoot,
+      openPath(relativePath, line) {
+        if (!workspaceRoot) return;
+        const { openTab: open, openWorkspacePath: openPath } = latest.current;
+        void openPath({ workspaceRoot, relativePath, line, openTab: open }).then((result) => {
+          // `no_app` 已由兜底对话框处理；读不到文件时开一个说明失败的标签，与聊天区一致。
+          if (result.ok === false && result.reason === "error") {
+            open(
+              readFailureTab(
+                relativePath,
+                relativePath.split("/").pop() || relativePath,
+                { workspaceRoot },
+                result.message,
+              ),
+            );
+          }
+        });
+      },
+      openUrl(url) {
+        window.open(url, "_blank", "noopener");
+      },
+      loadImage(relativePath) {
+        return workspaceRoot ? readWorkspaceImage(workspaceRoot, relativePath) : Promise.resolve(null);
+      },
+      // 每次渲染时读外观设置，主题改了下一次渲染就生效。
+      renderMermaid: (source) => renderMermaid(source, loadAppearance().mermaidTheme),
+      previewMermaid(result) {
+        if (alive.current) setPreview(result);
+      },
+    }),
+    [docPath, workspaceRoot],
+  );
 
   const theme = mermaidTheme(loadAppearance().mermaidTheme);
   const previewDialog = preview ? (

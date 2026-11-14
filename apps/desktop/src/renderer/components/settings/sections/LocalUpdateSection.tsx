@@ -18,7 +18,8 @@ export function LocalUpdateSection() {
   const [status, setStatus] = useState<string | null>(null);
   const [progressOpen, setProgressOpen] = useState(false);
   useEffect(() => {
-    updatesApi.getState()
+    updatesApi
+      .getState()
       .then(setState)
       .catch(() => {
         setStatus("读取本地更新状态失败。");
@@ -75,7 +76,7 @@ export function LocalUpdateSection() {
     try {
       const result = await updatesApi.start();
       setState(result.state);
-      setStatus(result.ok ? "本地更新已启动，正在构建。" : result.message ?? "本地更新启动失败。");
+      setStatus(result.ok ? "本地更新已启动，正在构建。" : (result.message ?? "本地更新启动失败。"));
       if (!result.ok) setProgressOpen(false);
     } catch {
       setStatus("本地更新启动失败。");
@@ -93,55 +94,57 @@ export function LocalUpdateSection() {
 
   return (
     <>
-        <SettingGroup title="更新来源" headingLevel={3}>
-          <SettingRow
-            title="源码目录"
-            description={
-              <span className="break-all font-mono text-act-xs text-text-faint">
-                {sourceText}
-                {state?.sourceRoot && !state.sourceValid ? <span className="ml-2 text-on-danger">目录不可用</span> : null}
-              </span>
-            }
-            control={
-              <Button variant="secondary" onClick={() => void chooseSource()} disabled={busy || active}>
-                选择目录
-              </Button>
-            }
-            align="start"
-          />
-          <SettingRow
-            title="安装目标"
-            description={
-              <span className="flex max-w-[430px] flex-col gap-1">
-                <span className="break-all font-mono text-act-xs text-text-faint">{appTargetText}</span>
-                {state?.appExecutablePath ? (
-                  <span className="break-all text-text-subtle">当前进程：{state.appExecutablePath}</span>
-                ) : null}
-                {typeof state?.appIsPackaged === "boolean" ? (
-                  <span className="text-text-subtle">Electron packaged：{state.appIsPackaged ? "是" : "否"}</span>
-                ) : null}
-              </span>
-            }
-            align="start"
-          />
-          <SettingRow
-            title="构建并更新"
-            description={
-              <span className="flex max-w-[430px] flex-col gap-1">
-                <span>构建完成后将退出并重启。</span>
-                {state?.logPath ? <span className="break-all text-text-subtle">日志：{state.logPath}</span> : null}
-                {reason ? <span className="text-on-danger">{reason}</span> : null}
-                {status ? <span className={status.includes("失败") ? "text-on-danger" : "text-text-muted"}>{status}</span> : null}
-              </span>
-            }
-            control={
-              <Button variant="primary" onClick={() => void startUpdate()} disabled={!canStart}>
-                {busy || active ? "处理中…" : "构建并更新"}
-              </Button>
-            }
-            align="start"
-          />
-        </SettingGroup>
+      <SettingGroup title="更新来源" headingLevel={3}>
+        <SettingRow
+          title="源码目录"
+          description={
+            <span className="break-all font-mono text-act-xs text-text-faint">
+              {sourceText}
+              {state?.sourceRoot && !state.sourceValid ? <span className="ml-2 text-on-danger">目录不可用</span> : null}
+            </span>
+          }
+          control={
+            <Button variant="secondary" onClick={() => void chooseSource()} disabled={busy || active}>
+              选择目录
+            </Button>
+          }
+          align="start"
+        />
+        <SettingRow
+          title="安装目标"
+          description={
+            <span className="flex max-w-[430px] flex-col gap-1">
+              <span className="break-all font-mono text-act-xs text-text-faint">{appTargetText}</span>
+              {state?.appExecutablePath ? (
+                <span className="break-all text-text-subtle">当前进程：{state.appExecutablePath}</span>
+              ) : null}
+              {typeof state?.appIsPackaged === "boolean" ? (
+                <span className="text-text-subtle">Electron packaged：{state.appIsPackaged ? "是" : "否"}</span>
+              ) : null}
+            </span>
+          }
+          align="start"
+        />
+        <SettingRow
+          title="构建并更新"
+          description={
+            <span className="flex max-w-[430px] flex-col gap-1">
+              <span>构建完成后将退出并重启。</span>
+              {state?.logPath ? <span className="break-all text-text-subtle">日志：{state.logPath}</span> : null}
+              {reason ? <span className="text-on-danger">{reason}</span> : null}
+              {status ? (
+                <span className={status.includes("失败") ? "text-on-danger" : "text-text-muted"}>{status}</span>
+              ) : null}
+            </span>
+          }
+          control={
+            <Button variant="primary" onClick={() => void startUpdate()} disabled={!canStart}>
+              {busy || active ? "处理中…" : "构建并更新"}
+            </Button>
+          }
+          align="start"
+        />
+      </SettingGroup>
       {progressOpen && state ? (
         <LocalUpdateProgressDialog state={state} onClose={() => setProgressOpen(false)} />
       ) : null}

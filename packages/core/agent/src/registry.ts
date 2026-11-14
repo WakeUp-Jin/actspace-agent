@@ -7,13 +7,24 @@ import { AGENT_REGISTRY_SERVICE } from "./service-keys.js";
 export class AgentRegistry {
   readonly #agents = new Map<string, AgentHandle>();
   publish(agent: AgentHandle): () => void {
-    if (this.#agents.has(agent.agentId)) throw new AgentRuntimeError("AGENT_CONFLICT", `Agent ${agent.agentId} already exists.`);
+    if (this.#agents.has(agent.agentId))
+      throw new AgentRuntimeError("AGENT_CONFLICT", `Agent ${agent.agentId} already exists.`);
     this.#agents.set(agent.agentId, agent);
     let active = true;
-    return () => { if (!active) return; active = false; if (this.#agents.get(agent.agentId) === agent) this.#agents.delete(agent.agentId); };
+    return () => {
+      if (!active) return;
+      active = false;
+      if (this.#agents.get(agent.agentId) === agent) this.#agents.delete(agent.agentId);
+    };
   }
-  get(agentId: string): AgentHandle { const agent = this.#agents.get(agentId); if (agent === undefined) throw new AgentRuntimeError("AGENT_NOT_FOUND", `Agent ${agentId} is not published.`); return agent; }
-  list(): readonly AgentHandle[] { return Object.freeze([...this.#agents.values()].sort((a, b) => a.agentId.localeCompare(b.agentId))); }
+  get(agentId: string): AgentHandle {
+    const agent = this.#agents.get(agentId);
+    if (agent === undefined) throw new AgentRuntimeError("AGENT_NOT_FOUND", `Agent ${agentId} is not published.`);
+    return agent;
+  }
+  list(): readonly AgentHandle[] {
+    return Object.freeze([...this.#agents.values()].sort((a, b) => a.agentId.localeCompare(b.agentId)));
+  }
 }
 
 /** `AgentRegistry` 的公开成员。`agent.registry` 下注册的是包装服务，取用方的参数写这个类型。 */
@@ -27,7 +38,8 @@ export class AgentRegistryService extends Service implements AgentRegistryContra
       version: 1,
       vendor: "actspace",
       validate(value: unknown) {
-        if (value === undefined || (value !== null && typeof value === "object" && !Array.isArray(value))) return { value: value ?? {} };
+        if (value === undefined || (value !== null && typeof value === "object" && !Array.isArray(value)))
+          return { value: value ?? {} };
         return { issues: [{ message: "Agent registry config must be an object." }] };
       },
     },
@@ -40,7 +52,13 @@ export class AgentRegistryService extends Service implements AgentRegistryContra
     this.registry = new AgentRegistry();
   }
 
-  publish(agent: AgentHandle): () => void { return this.registry.publish(agent); }
-  get(agentId: string): AgentHandle { return this.registry.get(agentId); }
-  list(): readonly AgentHandle[] { return this.registry.list(); }
+  publish(agent: AgentHandle): () => void {
+    return this.registry.publish(agent);
+  }
+  get(agentId: string): AgentHandle {
+    return this.registry.get(agentId);
+  }
+  list(): readonly AgentHandle[] {
+    return this.registry.list();
+  }
 }

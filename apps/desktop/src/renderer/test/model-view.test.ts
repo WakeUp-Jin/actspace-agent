@@ -36,7 +36,14 @@ function effective(patch: Partial<EffectiveModel> = {}, source: FactSource = "ca
     ratesUnsupported: false,
     ratesScaled: true,
     multiplier: 1,
-    sources: { label: source, contextWindow: source, maxOutput: source, input: source, thinking: source, rates: source },
+    sources: {
+      label: source,
+      contextWindow: source,
+      maxOutput: source,
+      input: source,
+      thinking: source,
+      rates: source,
+    },
     catalog: { apiModel: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", exact: true },
     aliased: false,
     ...patch,
@@ -44,10 +51,21 @@ function effective(patch: Partial<EffectiveModel> = {}, source: FactSource = "ca
 }
 
 function model(key: string, patch: Partial<ConnectionModelView> = {}): ConnectionModelView {
-  return { key: key as ModelKey, apiModel: key.split("/").pop()!, effective: effective({ label: key }), overrides: null, usedBy: [], ...patch };
+  return {
+    key: key as ModelKey,
+    apiModel: key.split("/").pop()!,
+    effective: effective({ label: key }),
+    overrides: null,
+    usedBy: [],
+    ...patch,
+  };
 }
 
-function connection(connectionId: string, models: ConnectionModelView[], patch: Partial<ConnectionView> = {}): ConnectionView {
+function connection(
+  connectionId: string,
+  models: ConnectionModelView[],
+  patch: Partial<ConnectionView> = {},
+): ConnectionView {
   return {
     connectionId,
     templateId: "custom",
@@ -119,7 +137,9 @@ describe("model-view", () => {
   it("notes only models that nothing knows about", () => {
     expect(unknownNote(effective())).toBeNull();
     expect(unknownNote(UNKNOWN)).toBe("不在模型目录中");
-    expect(unknownNote({ ...UNKNOWN, catalog: { apiModel: "deepseek-chat", name: "DeepSeek V3", exact: false } })).toBe("像是 DeepSeek V3 的日期版本");
+    expect(unknownNote({ ...UNKNOWN, catalog: { apiModel: "deepseek-chat", name: "DeepSeek V3", exact: false } })).toBe(
+      "像是 DeepSeek V3 的日期版本",
+    );
     // 服务商给了上下文就不算未知。
     expect(unknownNote({ ...UNKNOWN, sources: { ...UNKNOWN.sources, contextWindow: "provider" } })).toBeNull();
   });
@@ -144,7 +164,10 @@ describe("model-view", () => {
   });
 
   it("toggles levels in canonical order and keeps a still-valid default", () => {
-    expect(toggleLevel({ levels: ["high"], default: "high" }, "off")).toEqual({ levels: ["off", "high"], default: "high" });
+    expect(toggleLevel({ levels: ["high"], default: "high" }, "off")).toEqual({
+      levels: ["off", "high"],
+      default: "high",
+    });
     expect(toggleLevel({ levels: ["off", "high"], default: "high" }, "high")).toEqual({ levels: ["off"] });
     expect(toggleLevel(null, "low")).toEqual({ levels: ["low"] });
   });
@@ -152,14 +175,15 @@ describe("model-view", () => {
   it("groups models per enabled connection, filtered by purpose and query", () => {
     const vision = model("a/vision-pro", { effective: effective({ label: "Vision Pro", input: ["text", "image"] }) });
     const text = model("a/text-only");
-    const connections = [
-      connection("a", [vision, text]),
-      connection("b", [model("b/other")], { enabled: false }),
-    ];
+    const connections = [connection("a", [vision, text]), connection("b", [model("b/other")], { enabled: false })];
     const chat = PURPOSES.find((purpose) => purpose.id === "chat")!;
     const visionPurpose = PURPOSES.find((purpose) => purpose.id === "vision")!;
-    expect(pickerGroups(connections, chat, "").map((group) => group.models.map((item) => item.key))).toEqual([["a/vision-pro", "a/text-only"]]);
-    expect(pickerGroups(connections, visionPurpose, "").map((group) => group.models.map((item) => item.key))).toEqual([["a/vision-pro"]]);
+    expect(pickerGroups(connections, chat, "").map((group) => group.models.map((item) => item.key))).toEqual([
+      ["a/vision-pro", "a/text-only"],
+    ]);
+    expect(pickerGroups(connections, visionPurpose, "").map((group) => group.models.map((item) => item.key))).toEqual([
+      ["a/vision-pro"],
+    ]);
     expect(pickerGroups(connections, chat, "VISION").map((group) => group.models.length)).toEqual([1]);
     expect(pickerGroups(connections, chat, "nothing")).toEqual([]);
   });
@@ -167,7 +191,11 @@ describe("model-view", () => {
   it("summarises purpose bindings and flags missing models", () => {
     const connections = [connection("a", [model("a/m1")])];
     expect(purposeSummary(connections, { model: null, thinking: null })).toBeNull();
-    expect(purposeSummary(connections, { model: "a/m1" as ModelKey, thinking: "low" })).toEqual({ label: "a/m1", level: "低", missing: false });
+    expect(purposeSummary(connections, { model: "a/m1" as ModelKey, thinking: "low" })).toEqual({
+      label: "a/m1",
+      level: "低",
+      missing: false,
+    });
     expect(purposeSummary(connections, { model: "gone" as ModelKey, thinking: null })).toMatchObject({ missing: true });
   });
 
@@ -191,9 +219,30 @@ describe("model-view", () => {
   });
 
   it("summarises a collapsed card and knows when a field can be restored", () => {
-    expect(modelMeta(effective({ contextWindow: 256_000, thinking: { levels: ["off", "low", "high"], default: "high" }, input: ["text", "image"] }))).toBe("256K · 思考高 · 看图");
-    expect(modelMeta(effective({ contextWindow: null, thinking: { levels: ["off", "high"], default: "off" }, input: ["text"] }))).toBe("思考关");
-    const edited = effective({ sources: { label: "catalog", contextWindow: "user", maxOutput: "catalog", input: "catalog", thinking: "catalog", rates: "catalog" } });
+    expect(
+      modelMeta(
+        effective({
+          contextWindow: 256_000,
+          thinking: { levels: ["off", "low", "high"], default: "high" },
+          input: ["text", "image"],
+        }),
+      ),
+    ).toBe("256K · 思考高 · 看图");
+    expect(
+      modelMeta(
+        effective({ contextWindow: null, thinking: { levels: ["off", "high"], default: "off" }, input: ["text"] }),
+      ),
+    ).toBe("思考关");
+    const edited = effective({
+      sources: {
+        label: "catalog",
+        contextWindow: "user",
+        maxOutput: "catalog",
+        input: "catalog",
+        thinking: "catalog",
+        rates: "catalog",
+      },
+    });
     expect(canRestore(edited, "contextWindow")).toBe(true);
     expect(canRestore(edited, "rates")).toBe(false);
     expect(canRestore({ ...edited, catalog: null }, "contextWindow")).toBe(false);

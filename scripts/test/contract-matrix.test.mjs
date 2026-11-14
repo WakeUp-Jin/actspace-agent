@@ -1,16 +1,31 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildMatrix, interventionContractPaths, renderJson, renderMarkdown, validateRows } from "../contract-matrix/generate.mjs";
+import {
+  buildMatrix,
+  interventionContractPaths,
+  renderJson,
+  renderMarkdown,
+  validateRows,
+} from "../contract-matrix/generate.mjs";
 
 test("contract matrix is deterministic and preserves declared event surfaces", async () => {
   const first = await buildMatrix();
   const second = await buildMatrix();
   assert.deepEqual(first, second);
   assert.equal(first.events.filter((item) => item.category === "core").length, 14);
-  assert.equal(first.services.find(item => item.id === "session.checkpoint")?.providerId, "session.checkpoint:default");
-  assert.equal(first.events.some(item => item.eventType === "session/checkpoint"), false);
-  assert.equal(first.events.find(item => item.eventType === "agent/tasks-updated")?.mode, "emit");
-  assert.deepEqual(validateRows(first).filter(item => item.severity === "error"), []);
+  assert.equal(
+    first.services.find((item) => item.id === "session.checkpoint")?.providerId,
+    "session.checkpoint:default",
+  );
+  assert.equal(
+    first.events.some((item) => item.eventType === "session/checkpoint"),
+    false,
+  );
+  assert.equal(first.events.find((item) => item.eventType === "agent/tasks-updated")?.mode, "emit");
+  assert.deepEqual(
+    validateRows(first).filter((item) => item.severity === "error"),
+    [],
+  );
   assert.equal(first.events.find((item) => item.eventType === "goal/change")?.producerStatus, "not-implemented");
   assert.equal(first.events.find((item) => item.eventType === "schedule/change")?.producerStatus, "not-implemented");
   assert.doesNotMatch(renderJson(first), /\/Users\//u);
@@ -23,28 +38,53 @@ test("contract matrix validator fails closed for duplicate ids and notification 
   const duplicate = structuredClone(matrix);
   duplicate.services.push(structuredClone(duplicate.services[0]));
   const duplicateDiagnostics = validateRows(duplicate);
-  assert.equal(duplicateDiagnostics.some((item) => item.code === "DUPLICATE_ID"), true);
+  assert.equal(
+    duplicateDiagnostics.some((item) => item.code === "DUPLICATE_ID"),
+    true,
+  );
 
   const veto = structuredClone(matrix);
   const notification = veto.events.find((item) => item.category === "notification");
   assert.ok(notification);
   notification.mode = "waterfall";
   const vetoDiagnostics = validateRows(veto);
-  assert.equal(vetoDiagnostics.some((item) => item.code === "NOTIFICATION_VETO"), true);
+  assert.equal(
+    vetoDiagnostics.some((item) => item.code === "NOTIFICATION_VETO"),
+    true,
+  );
 });
 
 test("every intervention cites the file that declares its payload contract", async () => {
   const matrix = await buildMatrix();
   const loop = "packages/core/agent-loop/src/hooks.ts";
   const tools = "packages/core/tool-runtime/src/hooks.ts";
-  assert.deepEqual(Object.fromEntries(matrix.events.filter((item) => item.category === "agent-loop").map((item) => [item.eventType, item.sourceRefs.at(-1)])), {
-    "agent/pre-step": loop, "agent/request": loop, "agent/request-error": loop, "agent/turn-stopping": loop, "llm/stream": loop,
-    "tools/execute": tools, "tools/post-execute": tools, "tools/pre-execute": tools,
-  });
+  assert.deepEqual(
+    Object.fromEntries(
+      matrix.events
+        .filter((item) => item.category === "agent-loop")
+        .map((item) => [item.eventType, item.sourceRefs.at(-1)]),
+    ),
+    {
+      "agent/pre-step": loop,
+      "agent/request": loop,
+      "agent/request-error": loop,
+      "agent/turn-stopping": loop,
+      "llm/stream": loop,
+      "tools/execute": tools,
+      "tools/post-execute": tools,
+      "tools/pre-execute": tools,
+    },
+  );
   const declared = [{ path: "a.ts", mode: "waterfall", eventType: "agent/request" }];
   assert.deepEqual([...interventionContractPaths(["agent/request"], declared)], [["agent/request", "a.ts"]]);
-  assert.throws(() => interventionContractPaths(["agent/request", "llm/stream"], declared), /Intervention llm\/stream has no @mode contract/);
-  assert.throws(() => interventionContractPaths(["agent/request"], [{ ...declared[0], mode: "serial" }]), /Intervention agent\/request is declared as serial in a\.ts, but the matrix metadata says waterfall/);
+  assert.throws(
+    () => interventionContractPaths(["agent/request", "llm/stream"], declared),
+    /Intervention llm\/stream has no @mode contract/,
+  );
+  assert.throws(
+    () => interventionContractPaths(["agent/request"], [{ ...declared[0], mode: "serial" }]),
+    /Intervention agent\/request is declared as serial in a\.ts, but the matrix metadata says waterfall/,
+  );
 });
 
 test("matrix covers workspace packages and plugin manifests without stale sources", async () => {
@@ -56,24 +96,34 @@ test("matrix covers workspace packages and plugin manifests without stale source
     for (const entry of await readdir(root, { withFileTypes: true })) {
       if (["node_modules", "dist", ".git"].includes(entry.name)) continue;
       const path = join(root, entry.name);
-      if (entry.isDirectory() && depth > 0) result.push(...await files(path, depth - 1));
+      if (entry.isDirectory() && depth > 0) result.push(...(await files(path, depth - 1)));
       else if (entry.isFile()) result.push(path);
     }
     return result;
   }
-  const source = [...await files("packages", 4), ...await files("apps", 1)];
-  const packages = source.filter(path => /^(packages\/[^/]+(?:\/[^/]+)?|apps\/[^/]+)\/package\.json$/.test(path));
+  const source = [...(await files("packages", 4)), ...(await files("apps", 1))];
+  const packages = source.filter((path) => /^(packages\/[^/]+(?:\/[^/]+)?|apps\/[^/]+)\/package\.json$/.test(path));
   assert.deepEqual([...PACKAGE_PATHS].sort(), packages.sort());
-  const manifests = source.filter(path => /^packages\/.*\/src\/manifest\.ts$/.test(path) && !path.includes("cordis-adapter/"));
+  const manifests = source.filter(
+    (path) => /^packages\/.*\/src\/manifest\.ts$/.test(path) && !path.includes("cordis-adapter/"),
+  );
   assert.deepEqual([...MANIFEST_PATHS].sort(), manifests.sort());
   const matrix = await buildMatrix();
-  for (const id of ["agent.service", "harness.control", "host.application", "session.storage"]) assert.ok(matrix.services.some(row => row.id === id), id);
-  for (const event of ["harness/selection-updated", "application/run-preparing", "session/disposed"]) assert.ok(matrix.events.some(row => row.eventType === event), event);
+  for (const id of ["agent.service", "harness.control", "host.application", "session.storage"])
+    assert.ok(
+      matrix.services.some((row) => row.id === id),
+      id,
+    );
+  for (const event of ["harness/selection-updated", "application/run-preparing", "session/disposed"])
+    assert.ok(
+      matrix.events.some((row) => row.eventType === event),
+      event,
+    );
   const invalid = structuredClone(matrix);
   invalid.services[0].sourceRefs = ["missing/source.ts#value"];
   invalid.sourceDigest = "forged";
-  assert.ok(validateRows(invalid).some(row => row.code === "INVALID_SOURCE_REF"));
-  assert.ok(validateRows(invalid).some(row => row.code === "INVALID_DIGEST"));
+  assert.ok(validateRows(invalid).some((row) => row.code === "INVALID_SOURCE_REF"));
+  assert.ok(validateRows(invalid).some((row) => row.code === "INVALID_DIGEST"));
 });
 
 test("clean checkout checks Markdown without artifacts and rejects source drift", async () => {
@@ -85,18 +135,32 @@ test("clean checkout checks Markdown without artifacts and rejects source drift"
   const root = await realpath(await mkdtemp(join(tmpdir(), "actspace-matrix-")));
   const markdown = "docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md";
   const paths = new Set([
-    "scripts/contract-matrix/generate.mjs", "scripts/contract-matrix/source-registry.mjs", "scripts/check-harness-event-contracts.mjs", markdown,
-    ...Object.values(registry.EVENT_SOURCES).map(item => item.path), registry.SERVICE_SOURCE.path,
-    ...registry.DOMAIN_EVENT_PATHS, ...registry.MANIFEST_PATHS, ...registry.COMPOSITION_SOURCES,
-    ...registry.PACKAGE_PATHS, ...registry.VERIFICATION_SOURCES.map(item => item.path),
+    "scripts/contract-matrix/generate.mjs",
+    "scripts/contract-matrix/source-registry.mjs",
+    "scripts/check-harness-event-contracts.mjs",
+    markdown,
+    ...Object.values(registry.EVENT_SOURCES).map((item) => item.path),
+    registry.SERVICE_SOURCE.path,
+    ...registry.DOMAIN_EVENT_PATHS,
+    ...registry.MANIFEST_PATHS,
+    ...registry.COMPOSITION_SOURCES,
+    ...registry.PACKAGE_PATHS,
+    ...registry.VERIFICATION_SOURCES.map((item) => item.path),
   ]);
   const matrix = await buildMatrix();
   for (const key of ["services", "events", "sessions", "capabilities", "plugins", "packages", "verification"])
     for (const row of matrix[key]) for (const ref of row.sourceRefs) paths.add(ref.split("#")[0]);
-  const run = (...args) => spawnSync(process.execPath, [join(root, "scripts/contract-matrix/generate.mjs"), ...args], { encoding: "utf8" });
+  const run = (...args) =>
+    spawnSync(process.execPath, [join(root, "scripts/contract-matrix/generate.mjs"), ...args], { encoding: "utf8" });
   try {
-    for (const path of paths) { await mkdir(dirname(join(root, path)), { recursive: true }); await copyFile(path, join(root, path)); }
-    { const result = run("--check"); assert.equal(result.status, 0, result.stdout + result.stderr); }
+    for (const path of paths) {
+      await mkdir(dirname(join(root, path)), { recursive: true });
+      await copyFile(path, join(root, path));
+    }
+    {
+      const result = run("--check");
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+    }
     await assert.rejects(access(join(root, "artifacts")));
     const manifest = join(root, registry.MANIFEST_PATHS[0]);
     await writeFile(manifest, (await readFile(manifest, "utf8")) + "\n// source drift fixture\n");
@@ -109,6 +173,11 @@ test("clean checkout checks Markdown without artifacts and rejects source drift"
     assert.equal(run().status, 0);
     assert.equal(await readFile(join(root, "artifacts/agent-contract-matrix.json"), "utf8"), first);
     assert.equal(await readFile(join(root, markdown), "utf8"), firstMarkdown);
-    { const result = run("--check"); assert.equal(result.status, 0, result.stdout + result.stderr); }
-  } finally { await rm(root, { recursive: true, force: true }); }
+    {
+      const result = run("--check");
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

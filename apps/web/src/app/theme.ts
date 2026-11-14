@@ -10,7 +10,9 @@ export function readTheme(storage: Storage = localStorage): ThemePreference {
   try {
     const value = storage.getItem(KEY);
     return value === "light" || value === "dark" ? value : "system";
-  } catch { return "system"; }
+  } catch {
+    return "system";
+  }
 }
 
 /** 系统模式下按当前系统明暗解析。 */
@@ -28,7 +30,7 @@ const listeners = new Set<() => void>();
 export function applyTheme(preference: ThemePreference, root: HTMLElement = document.documentElement): void {
   root.dataset.theme = preference;
   const metas = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]');
-  metas.forEach(meta => {
+  metas.forEach((meta) => {
     const media = meta.getAttribute("data-media") ?? meta.getAttribute("media") ?? "";
     if (!meta.hasAttribute("data-media")) meta.setAttribute("data-media", media);
     const tone = preference === "system" ? (media.includes("dark") ? "dark" : "light") : preference;
@@ -38,18 +40,27 @@ export function applyTheme(preference: ThemePreference, root: HTMLElement = docu
 
 export function setTheme(preference: ThemePreference, storage: Storage = localStorage): void {
   try {
-    if (preference === "system") storage.removeItem(KEY); else storage.setItem(KEY, preference);
-  } catch { /* 只在本次页面内有效 */ }
+    if (preference === "system") storage.removeItem(KEY);
+    else storage.setItem(KEY, preference);
+  } catch {
+    /* 只在本次页面内有效 */
+  }
   applyTheme(preference);
   for (const listener of [...listeners]) listener();
 }
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 export function useTheme(): { preference: ThemePreference; resolved: "light" | "dark" } {
-  const preference = useSyncExternalStore(subscribe, () => readTheme(), () => "system" as const);
+  const preference = useSyncExternalStore(
+    subscribe,
+    () => readTheme(),
+    () => "system" as const,
+  );
   return { preference, resolved: resolveTheme(preference, typeof window !== "undefined" && prefersDark()) };
 }

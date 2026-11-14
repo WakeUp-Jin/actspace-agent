@@ -10,19 +10,67 @@ import { overrideBridge } from "./helpers/bridge";
 /** 迁移前 preload 的实现（`apps/desktop/src/preload/index.ts`，desktop-fe-13 T4 之前），原样保留做对照。 */
 const legacyPreload = {
   createSession: (projection: RuntimeDesktopSessionProjection) => projectChatWindow(projection),
-  getSession: (projection: RuntimeDesktopSessionProjection | null) => projection ? projectChatWindow(projection) : null,
-  getSessionToolDetail: (page: DesktopToolDetailPage) => createMessageBlocks(projectChatEvents(page.snapshot, page.journal)),
+  getSession: (projection: RuntimeDesktopSessionProjection | null) =>
+    projection ? projectChatWindow(projection) : null,
+  getSessionToolDetail: (page: DesktopToolDetailPage) =>
+    createMessageBlocks(projectChatEvents(page.snapshot, page.journal)),
 };
 
 function conversation(): RuntimeDesktopSessionProjection {
   const at = "2026-09-21T00:00:00Z";
   const record: SessionRecord = {
-    meta: { schemaVersion: 2, id: "s1", title: "Projected", createdAt: at, updatedAt: at, agentRunCount: 1, workspaceRoot: "/tmp/workspace" },
+    meta: {
+      schemaVersion: 2,
+      id: "s1",
+      title: "Projected",
+      createdAt: at,
+      updatedAt: at,
+      agentRunCount: 1,
+      workspaceRoot: "/tmp/workspace",
+    },
     events: [
-      { id: "u1", sessionId: "s1", agentRunId: "r1", schemaVersion: 2, timestamp: at, type: "user_message", payload: { content: "列出文件" } },
-      { id: "t1", sessionId: "s1", agentRunId: "r1", schemaVersion: 2, timestamp: at, type: "tool_call", payload: { id: "call-1", name: "glob", arguments: { pattern: "**/*.ts" } } },
-      { id: "t2", sessionId: "s1", agentRunId: "r1", schemaVersion: 2, timestamp: at, type: "tool_result", payload: { toolCallId: "call-1", toolName: "glob", status: "completed", summary: "2 files", modelOutput: "a.ts\nb.ts" } },
-      { id: "a1", sessionId: "s1", agentRunId: "r1", schemaVersion: 2, timestamp: at, type: "assistant_message", payload: { content: "共 2 个文件。" } },
+      {
+        id: "u1",
+        sessionId: "s1",
+        agentRunId: "r1",
+        schemaVersion: 2,
+        timestamp: at,
+        type: "user_message",
+        payload: { content: "列出文件" },
+      },
+      {
+        id: "t1",
+        sessionId: "s1",
+        agentRunId: "r1",
+        schemaVersion: 2,
+        timestamp: at,
+        type: "tool_call",
+        payload: { id: "call-1", name: "glob", arguments: { pattern: "**/*.ts" } },
+      },
+      {
+        id: "t2",
+        sessionId: "s1",
+        agentRunId: "r1",
+        schemaVersion: 2,
+        timestamp: at,
+        type: "tool_result",
+        payload: {
+          toolCallId: "call-1",
+          toolName: "glob",
+          status: "completed",
+          summary: "2 files",
+          modelOutput: "a.ts\nb.ts",
+        },
+      },
+      {
+        id: "a1",
+        sessionId: "s1",
+        agentRunId: "r1",
+        schemaVersion: 2,
+        timestamp: at,
+        type: "assistant_message",
+        payload: { content: "共 2 个文件。" },
+      },
     ],
     messageBlocks: [],
     contextSnapshot: null,
@@ -31,7 +79,9 @@ function conversation(): RuntimeDesktopSessionProjection {
   return recordProjectionFixture(record);
 }
 
-function installSessions(sessions: Partial<Record<"create" | "fork" | "get" | "getToolDetail", (...args: unknown[]) => Promise<unknown>>>) {
+function installSessions(
+  sessions: Partial<Record<"create" | "fork" | "get" | "getToolDetail", (...args: unknown[]) => Promise<unknown>>>,
+) {
   overrideBridge(Object.fromEntries(Object.entries(sessions).map(([member, fn]) => [`sessions.${member}`, fn])));
 }
 

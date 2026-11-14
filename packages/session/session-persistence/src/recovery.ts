@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
-import { coreEvent, type CoreEventDataMap, type CoreEventType, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
+import {
+  coreEvent,
+  type CoreEventDataMap,
+  type CoreEventType,
+  type RuntimeJsonValue,
+} from "@actspace/shared/runtime-v2";
 import type { SessionInspection } from "./session-store.js";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHandle } from "./session.js";
@@ -9,8 +14,14 @@ export type SessionRecoveryAccess = "read-write" | "read-only" | "forensic-requi
 
 /** Maps storage inspection to the product recovery posture. */
 export function classifySessionRecoveryAccess(inspection: SessionInspection): SessionRecoveryAccess {
-  if (inspection.accessState === "corrupt" || inspection.header === null || inspection.validation === null) return "forensic-required";
-  if (inspection.integrity !== "complete" || inspection.accessState === "degraded" || inspection.accessState === "browse-only") return "read-only";
+  if (inspection.accessState === "corrupt" || inspection.header === null || inspection.validation === null)
+    return "forensic-required";
+  if (
+    inspection.integrity !== "complete" ||
+    inspection.accessState === "degraded" ||
+    inspection.accessState === "browse-only"
+  )
+    return "read-only";
   return "read-write";
 }
 
@@ -33,11 +44,17 @@ export type SessionRecoveryOptions = {
  * `events` 可以只是日志的一段：没有结果的请求和工具调用只会出现在还开着的 Turn 里，
  * 所以从这个 Turn 的 `turn/start` 读起就够了。
  */
-export function planSessionRecovery(events: readonly SessionEventEnvelopeV1[], options: SessionRecoveryOptions = {}): SessionRecoveryPlan | null {
+export function planSessionRecovery(
+  events: readonly SessionEventEnvelopeV1[],
+  options: SessionRecoveryOptions = {},
+): SessionRecoveryPlan | null {
   const closeTurn = options.closeTurn ?? true;
   let openTurnId: string | null = null;
   let openStepId: string | null = null;
-  const requests = new Map<string, { headerSeq: number; turnId: string; stepId: string; context: boolean; terminal: boolean }>();
+  const requests = new Map<
+    string,
+    { headerSeq: number; turnId: string; stepId: string; context: boolean; terminal: boolean }
+  >();
   const tools = new Map<string, { callSeq: number; started: boolean; terminal: boolean }>();
   let activeRepairId: string | null = null;
   const committed = new Set<string>();
@@ -45,11 +62,27 @@ export function planSessionRecovery(events: readonly SessionEventEnvelopeV1[], o
   for (const event of events) {
     const data = record(event.data);
     switch (event.type) {
-      case "turn/start": openTurnId = string(data.turnId); break;
-      case "turn/end": openTurnId = null; break;
-      case "step/start": openStepId = string(data.stepId); break;
-      case "step/end": openStepId = null; break;
-      case "request/header": requests.set(string(data.requestId), { headerSeq: event.seq, turnId: string(data.turnId), stepId: string(data.stepId), context: false, terminal: false }); break;
+      case "turn/start":
+        openTurnId = string(data.turnId);
+        break;
+      case "turn/end":
+        openTurnId = null;
+        break;
+      case "step/start":
+        openStepId = string(data.stepId);
+        break;
+      case "step/end":
+        openStepId = null;
+        break;
+      case "request/header":
+        requests.set(string(data.requestId), {
+          headerSeq: event.seq,
+          turnId: string(data.turnId),
+          stepId: string(data.stepId),
+          context: false,
+          terminal: false,
+        });
+        break;
       case "request/context": {
         const request = requests.get(string(data.requestId));
         if (request) request.context = true;
@@ -61,7 +94,9 @@ export function planSessionRecovery(events: readonly SessionEventEnvelopeV1[], o
         if (request) request.terminal = true;
         break;
       }
-      case "tool/call": tools.set(string(data.callId ?? data.toolCallId), { callSeq: event.seq, started: false, terminal: false }); break;
+      case "tool/call":
+        tools.set(string(data.callId ?? data.toolCallId), { callSeq: event.seq, started: false, terminal: false });
+        break;
       case "tool-workflow/run-start":
       case "tool-workflow/agent-start":
       case "tool/code-dispatch-start": {
@@ -75,14 +110,17 @@ export function planSessionRecovery(events: readonly SessionEventEnvelopeV1[], o
         if (tool) tool.terminal = true;
         break;
       }
-      case "recovery/start": activeRepairId = string(data.repairId); break;
+      case "recovery/start":
+        activeRepairId = string(data.repairId);
+        break;
       case "recovery/committed": {
         const repairId = string(data.repairId);
         committed.add(repairId);
         if (activeRepairId === repairId) activeRepairId = null;
         break;
       }
-      default: break;
+      default:
+        break;
     }
   }
 
@@ -99,29 +137,57 @@ export function planSessionRecovery(events: readonly SessionEventEnvelopeV1[], o
   }
   for (const [requestId, request] of openRequests) {
     // 只写了 header 的请求（context 那条没写进去）先补一条只有 id 的 context：assistant/message 只能了结有 context 的请求。
-    if (!request.context) candidates.push(recoveryEvent("request/context", { requestId, turnId: request.turnId, stepId: request.stepId, repairId }, [request.headerSeq]));
-    candidates.push(recoveryEvent("assistant/message", {
-      requestId,
-      messageId: `recovery-${repairId}-${requestId}`,
-      content: "",
-      finishReason: "aborted",
-      recovery: "outcome-unknown",
-      repairId,
-    }, [request.headerSeq]));
+    if (!request.context)
+      candidates.push(
+        recoveryEvent("request/context", { requestId, turnId: request.turnId, stepId: request.stepId, repairId }, [
+          request.headerSeq,
+        ]),
+      );
+    candidates.push(
+      recoveryEvent(
+        "assistant/message",
+        {
+          requestId,
+          messageId: `recovery-${repairId}-${requestId}`,
+          content: "",
+          finishReason: "aborted",
+          recovery: "outcome-unknown",
+          repairId,
+        },
+        [request.headerSeq],
+      ),
+    );
   }
   for (const [callId, tool] of openTools) {
     const outcome: SessionRecoveryOutcome = tool.started ? "outcome-unknown" : "not-started";
     const sources = [tool.callSeq];
-    const content = outcome === "not-started"
-      ? "The tool body was not started. Retry only if it is still needed."
-      : "The tool body may have run, but no result was durable. Verify external state before retrying.";
+    const content =
+      outcome === "not-started"
+        ? "The tool body was not started. Retry only if it is still needed."
+        : "The tool body may have run, but no result was durable. Verify external state before retrying.";
     // 节点 recovery-${repairId}-${callId}、isError: true 由 surfaceNode 推出（agent-spec-surface-derived.md §4.2）。
-    candidates.push(recoveryEvent("tool/recovery-outcome", { callId, repairId, outcome, retryAllowed: outcome === "not-started", content }, sources, { kind: "append" }));
+    candidates.push(
+      recoveryEvent(
+        "tool/recovery-outcome",
+        { callId, repairId, outcome, retryAllowed: outcome === "not-started", content },
+        sources,
+        { kind: "append" },
+      ),
+    );
   }
-  if (closeTurn && openStepId !== null && openTurnId !== null) candidates.push(recoveryEvent("step/end", { turnId: openTurnId, stepId: openStepId, reason: "interrupted", repairId }));
-  if (closeTurn && openTurnId !== null) candidates.push(recoveryEvent("turn/end", { turnId: openTurnId, reason: "interrupted", repairId }));
+  if (closeTurn && openStepId !== null && openTurnId !== null)
+    candidates.push(
+      recoveryEvent("step/end", { turnId: openTurnId, stepId: openStepId, reason: "interrupted", repairId }),
+    );
+  if (closeTurn && openTurnId !== null)
+    candidates.push(recoveryEvent("turn/end", { turnId: openTurnId, reason: "interrupted", repairId }));
   candidates.push(recoveryEvent("recovery/committed", { repairId, sourceBoundarySeq }));
-  return Object.freeze({ repairId, sourceBoundarySeq, candidates: Object.freeze(candidates), resumedTransaction: activeRepairId !== null });
+  return Object.freeze({
+    repairId,
+    sourceBoundarySeq,
+    candidates: Object.freeze(candidates),
+    resumedTransaction: activeRepairId !== null,
+  });
 }
 
 export async function applySessionRecovery(session: SessionHandle): Promise<SessionRecoveryPlan | null> {
@@ -140,13 +206,15 @@ export async function applySessionRecovery(session: SessionHandle): Promise<Sess
  * `turnStartSeq` 是这个回合 `turn/start` 的 seq，只读这之后的记录，工作量不随会话长度增长。
  * 没有需要了结的内容时返回 null，不写任何记录。
  */
-export async function settleOpenTurnWork(session: SessionHandle, turnStartSeq: number): Promise<SessionRecoveryPlan | null> {
+export async function settleOpenTurnWork(
+  session: SessionHandle,
+  turnStartSeq: number,
+): Promise<SessionRecoveryPlan | null> {
   const plan = planSessionRecovery(session.journal.readEvents(Math.max(0, turnStartSeq)), { closeTurn: false });
   if (plan === null) return null;
   await session.appendMany(plan.candidates);
   return plan;
 }
-
 
 /** 恢复事务写的每条记录都记同一个贡献者，`sourceEventSeqs` 指向它要了结的那条记录。 */
 function recoveryEvent<T extends CoreEventType>(
@@ -155,16 +223,24 @@ function recoveryEvent<T extends CoreEventType>(
   sourceEventSeqs: readonly number[] = [],
   surface: SessionEventCandidateV1["surface"] = null,
 ): SessionEventCandidateV1 {
-  return coreEvent(type, data, { surface, provenance: { sourceEventSeqs, contributorIds: ["@actspace/core/recovery"], runtimeSelectionSeq: null } });
+  return coreEvent(type, data, {
+    surface,
+    provenance: { sourceEventSeqs, contributorIds: ["@actspace/core/recovery"], runtimeSelectionSeq: null },
+  });
 }
 
 function stableRepairId(events: readonly SessionEventEnvelopeV1[]): string {
-  const hash = createHash("sha256").update(JSON.stringify(events.map((event) => [event.seq, event.type]))).digest("hex").slice(0, 24);
+  const hash = createHash("sha256")
+    .update(JSON.stringify(events.map((event) => [event.seq, event.type])))
+    .digest("hex")
+    .slice(0, 24);
   return `repair-${hash}`;
 }
 
 function record(value: RuntimeJsonValue): Readonly<Record<string, RuntimeJsonValue>> {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : {};
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Readonly<Record<string, RuntimeJsonValue>>)
+    : {};
 }
 
 function string(value: RuntimeJsonValue | undefined): string {

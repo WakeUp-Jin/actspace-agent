@@ -7,7 +7,8 @@ import type { HastNode } from "./hast-types";
  * 已经带前缀的（脚注）不动，脚注标题 `footnote-label` 由链接 / 标题组件映射。
  */
 export function rehypeScopeIds({ prefix }: { prefix: string }) {
-  const scope = (value: string) => (value.startsWith(prefix) || value === "footnote-label" ? value : `${prefix}${value}`);
+  const scope = (value: string) =>
+    value.startsWith(prefix) || value === "footnote-label" ? value : `${prefix}${value}`;
   return (tree: HastNode) => {
     const walk = (node: HastNode) => {
       for (const child of node.children ?? []) {
@@ -20,7 +21,8 @@ export function rehypeScopeIds({ prefix }: { prefix: string }) {
           for (const key of ["ariaDescribedBy", "ariaLabelledBy"] as const) {
             const value = properties[key];
             if (Array.isArray(value)) properties[key] = value.map((item) => scope(String(item)));
-            else if (typeof value === "string") properties[key] = value.split(/\s+/).filter(Boolean).map(scope).join(" ");
+            else if (typeof value === "string")
+              properties[key] = value.split(/\s+/).filter(Boolean).map(scope).join(" ");
           }
           if (typeof properties.href === "string" && properties.href.startsWith("#") && properties.href.length > 1) {
             const target = properties.href.slice(1);

@@ -20,7 +20,9 @@ const relayKey = (apiModel: string) => `custom:connection/${encodeURIComponent(R
 beforeEach(() => {
   const mock = createModelConnectionsMock() as Api;
   api = Object.fromEntries(Object.entries(mock).map(([name, fn]) => [name, vi.fn(fn)])) as typeof api;
-  setupBridge(Object.fromEntries(Object.entries(api).map(([name, fn]) => [`modelConnections.${name}`, fn])) as BridgeOverrides);
+  setupBridge(
+    Object.fromEntries(Object.entries(api).map(([name, fn]) => [`modelConnections.${name}`, fn])) as BridgeOverrides,
+  );
 });
 
 function renderModels() {
@@ -45,7 +47,11 @@ describe("设置 › 模型", () => {
     const row = await screen.findByRole("button", { name: /OpenCode Go/ });
     expect(row).toHaveTextContent("opencode.ai");
     // 一个 Key 接多厂模型：和 OpenRouter 同组，不进「官方」。
-    expect(within(screen.getByRole("heading", { name: "聚合平台" }).closest("section")!).getByRole("button", { name: /OpenCode Go/ })).toBe(row);
+    expect(
+      within(screen.getByRole("heading", { name: "聚合平台" }).closest("section")!).getByRole("button", {
+        name: /OpenCode Go/,
+      }),
+    ).toBe(row);
   });
 
   it("returns focus to the stable fetch button after an automatically opened picker closes", async () => {
@@ -74,20 +80,30 @@ describe("设置 › 模型", () => {
     await userEvent.click(screen.getByRole("button", { name: "轻量任务模型" }));
     const list = await screen.findByRole("menu", { name: "轻量任务可选模型" });
     await userEvent.click(within(list).getByRole("button", { name: /Claude Haiku 4\.5/ }));
-    await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ utility: { model: relayKey("claude-haiku-4-5"), thinking: null } }));
+    await waitFor(() =>
+      expect(api.updatePurposes).toHaveBeenLastCalledWith({
+        utility: { model: relayKey("claude-haiku-4-5"), thinking: null },
+      }),
+    );
 
     // 档位在行上「编辑」打开的二级浮层里，和输入框的模型菜单一样。
     await userEvent.click(screen.getByRole("button", { name: "轻量任务模型" }));
     await userEvent.click(await screen.findByRole("button", { name: `编辑 ${relayKey("claude-haiku-4-5")} 选项` }));
     await userEvent.click(screen.getByRole("menuitemradio", { name: /^开/ }));
-    await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ utility: { model: relayKey("claude-haiku-4-5"), thinking: "high" } }));
+    await waitFor(() =>
+      expect(api.updatePurposes).toHaveBeenLastCalledWith({
+        utility: { model: relayKey("claude-haiku-4-5"), thinking: "high" },
+      }),
+    );
   });
 
   it("看图只列能看图的模型；选「跟随」清空绑定", async () => {
     await renderModels();
     await userEvent.click(screen.getByRole("button", { name: "自动审批模型" }));
     await userEvent.click(within(await screen.findByRole("menu")).getByRole("button", { name: "跟随会话默认" }));
-    await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ autoReview: { model: null, thinking: "off" } }));
+    await waitFor(() =>
+      expect(api.updatePurposes).toHaveBeenLastCalledWith({ autoReview: { model: null, thinking: "off" } }),
+    );
 
     await userEvent.click(screen.getByRole("button", { name: "看图模型" }));
     const list = await screen.findByRole("menu", { name: "看图可选模型" });
@@ -103,7 +119,11 @@ describe("设置 › 模型", () => {
     expect(within(list).getByRole("button", { name: "跟随主智能体" })).toBeInTheDocument();
     expect(within(list).queryByRole("button", { name: /^编辑 / })).not.toBeInTheDocument();
     await userEvent.click(within(list).getByRole("button", { name: /Claude Haiku 4\.5/ }));
-    await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ subagent: { model: relayKey("claude-haiku-4-5"), thinking: null } }));
+    await waitFor(() =>
+      expect(api.updatePurposes).toHaveBeenLastCalledWith({
+        subagent: { model: relayKey("claude-haiku-4-5"), thinking: null },
+      }),
+    );
   });
 
   it("添加官方连接：填 Key 后直接建好，弹窗里一个都不预选，勾了才添加", async () => {
@@ -114,17 +134,30 @@ describe("设置 › 模型", () => {
     await userEvent.type(screen.getByLabelText("API Key"), "sk-ant-test");
     await userEvent.click(screen.getByRole("button", { name: "连接" }));
 
-    await waitFor(() => expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ templateId: "anthropic", apiKey: "sk-ant-test", models: [] })));
+    await waitFor(() =>
+      expect(api.create).toHaveBeenCalledWith(
+        expect.objectContaining({ templateId: "anthropic", apiKey: "sk-ant-test", models: [] }),
+      ),
+    );
     // 弹窗打开时页面其余部分对读屏隐藏，所以标题用 hidden 查。
     expect(await screen.findByRole("heading", { name: "Anthropic", level: 2, hidden: true })).toBeInTheDocument();
     const dialog = await screen.findByRole("dialog", { name: "选择要添加的模型" });
     expect(dialog).toHaveTextContent("Anthropic · 3 个模型");
-    expect(within(dialog).getAllByRole("checkbox").every((box) => box.getAttribute("aria-checked") === "false")).toBe(true);
+    expect(
+      within(dialog)
+        .getAllByRole("checkbox")
+        .every((box) => box.getAttribute("aria-checked") === "false"),
+    ).toBe(true);
     expect(within(dialog).getByRole("button", { name: "添加所选" })).toBeDisabled();
 
     await userEvent.click(within(dialog).getByRole("checkbox", { name: "Claude Opus 4.1" }));
     await userEvent.click(within(dialog).getByRole("button", { name: "添加 1 个" }));
-    await waitFor(() => expect(api.addModels).toHaveBeenCalledWith({ connectionId: "anthropic:default", models: [{ apiModel: "claude-opus-4-1", providerFacts: {} }] }));
+    await waitFor(() =>
+      expect(api.addModels).toHaveBeenCalledWith({
+        connectionId: "anthropic:default",
+        models: [{ apiModel: "claude-opus-4-1", providerFacts: {} }],
+      }),
+    );
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "展开 Claude Opus 4.1" })).toBeInTheDocument();
   });
@@ -153,7 +186,9 @@ describe("设置 › 模型", () => {
     expect(await screen.findByText(/认出来了：GPT-5/)).toBeInTheDocument();
     expect(screen.getByLabelText("上下文")).toHaveValue("400K");
     await userEvent.click(screen.getByRole("button", { name: "添加" }));
-    await waitFor(() => expect(api.addModels).toHaveBeenCalledWith({ connectionId: "custom:relay-2", models: [{ apiModel: "gpt-5" }] }));
+    await waitFor(() =>
+      expect(api.addModels).toHaveBeenCalledWith({ connectionId: "custom:relay-2", models: [{ apiModel: "gpt-5" }] }),
+    );
     expect(await screen.findByRole("button", { name: "展开 GPT-5" })).toBeInTheDocument();
   });
 
@@ -168,7 +203,12 @@ describe("设置 › 模型", () => {
     await userEvent.type(screen.getByLabelText("模型 ID"), "claude-haiku-4-5-20251001{Enter}");
     expect(await screen.findByText(/按 Claude Haiku 4\.5 填好了/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "添加" }));
-    await waitFor(() => expect(api.addModels).toHaveBeenCalledWith({ connectionId: RELAY, models: [{ apiModel: "claude-haiku-4-5-20251001", overrides: { canonical: "claude-haiku-4-5" } }] }));
+    await waitFor(() =>
+      expect(api.addModels).toHaveBeenCalledWith({
+        connectionId: RELAY,
+        models: [{ apiModel: "claude-haiku-4-5-20251001", overrides: { canonical: "claude-haiku-4-5" } }],
+      }),
+    );
   });
 
   it("模型卡片：失焦保存字段，改过的可以恢复；认不出的给提示，可以按相近模型填", async () => {
@@ -178,15 +218,27 @@ describe("设置 › 模型", () => {
     expect(context).toHaveValue("200K");
     await userEvent.clear(context);
     await userEvent.type(context, "180K{Enter}");
-    await waitFor(() => expect(api.updateModel).toHaveBeenLastCalledWith({ key: relayKey("claude-sonnet-4-5"), overrides: { contextWindow: 180_000 } }));
+    await waitFor(() =>
+      expect(api.updateModel).toHaveBeenLastCalledWith({
+        key: relayKey("claude-sonnet-4-5"),
+        overrides: { contextWindow: 180_000 },
+      }),
+    );
     await userEvent.click(await screen.findByRole("button", { name: "恢复" }));
-    await waitFor(() => expect(api.updateModel).toHaveBeenLastCalledWith({ key: relayKey("claude-sonnet-4-5"), overrides: null }));
+    await waitFor(() =>
+      expect(api.updateModel).toHaveBeenLastCalledWith({ key: relayKey("claude-sonnet-4-5"), overrides: null }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "收起 Claude Sonnet 4.5" }));
 
     await userEvent.click(screen.getByRole("button", { name: "展开 claude-sonnet-4-5-20250929" }));
     expect(screen.getByText(/没认出来/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "按 Claude Sonnet 4.5 填" }));
-    await waitFor(() => expect(api.updateModel).toHaveBeenLastCalledWith({ key: relayKey("claude-sonnet-4-5-20250929"), overrides: { canonical: "claude-sonnet-4-5" } }));
+    await waitFor(() =>
+      expect(api.updateModel).toHaveBeenLastCalledWith({
+        key: relayKey("claude-sonnet-4-5-20250929"),
+        overrides: { canonical: "claude-sonnet-4-5" },
+      }),
+    );
     expect(await screen.findByRole("button", { name: "不按 Claude Sonnet 4.5 填" })).toBeInTheDocument();
   });
 
@@ -216,7 +268,12 @@ describe("设置 › 模型", () => {
     expect(added).toHaveAttribute("aria-disabled", "true");
     await userEvent.click(within(dialog).getByRole("button", { name: "全选" }));
     await userEvent.click(within(dialog).getByRole("button", { name: "添加 1 个" }));
-    await waitFor(() => expect(api.addModels).toHaveBeenCalledWith({ connectionId: RELAY, models: [{ apiModel: "gpt-5-mini", providerFacts: {} }] }));
+    await waitFor(() =>
+      expect(api.addModels).toHaveBeenCalledWith({
+        connectionId: RELAY,
+        models: [{ apiModel: "gpt-5-mini", providerFacts: {} }],
+      }),
+    );
     expect(await screen.findByRole("button", { name: "展开 GPT-5 mini" })).toBeInTheDocument();
   });
 
@@ -251,7 +308,12 @@ describe("设置 › 模型", () => {
 
     const restored = await (createModelConnectionsMock() as Api).getBalance({ connectionId: "deepseek:default" });
     let finishRetry!: (value: typeof restored) => void;
-    api.getBalance.mockImplementationOnce(() => new Promise((resolve) => { finishRetry = resolve; }));
+    api.getBalance.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRetry = resolve;
+        }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "重试余额" }));
     const retry = screen.getByRole("button", { name: "重试余额" });
     expect(retry).toBeDisabled();
@@ -267,7 +329,12 @@ describe("设置 › 模型", () => {
 
   it("离开连接详情后忽略迟到的余额失败", async () => {
     let failBalance!: (reason: Error) => void;
-    api.getBalance.mockImplementationOnce(() => new Promise((_resolve, reject) => { failBalance = reject; }));
+    api.getBalance.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          failBalance = reject;
+        }),
+    );
     await openConnection(/^DeepSeek/);
     expect(screen.getByText("余额读取中…")).toHaveAttribute("role", "status");
     await userEvent.click(screen.getByRole("button", { name: "返回模型" }));
@@ -289,6 +356,8 @@ describe("设置 › 模型", () => {
     await userEvent.click(await screen.findByRole("button", { name: /^OpenRouter/ }));
     await userEvent.type(await screen.findByLabelText("管理 Key"), "sk-or-mgmt");
     await userEvent.click(screen.getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(api.update).toHaveBeenCalledWith({ connectionId: "openrouter:default", managementKey: "sk-or-mgmt" }));
+    await waitFor(() =>
+      expect(api.update).toHaveBeenCalledWith({ connectionId: "openrouter:default", managementKey: "sk-or-mgmt" }),
+    );
   });
 });

@@ -1,7 +1,17 @@
 import type { ApprovalRequest, RuntimeSessionListItem } from "@actspace/shared/runtime-v2";
-import { approvalSummary, formatRowTime, groupSessions, rowStatus, sessionTitle, splitSessions, timeBucket, workspaceOf } from "../session-row-model";
+import {
+  approvalSummary,
+  formatRowTime,
+  groupSessions,
+  rowStatus,
+  sessionTitle,
+  splitSessions,
+  timeBucket,
+  workspaceOf,
+} from "../session-row-model";
 
-const item = (id: string, updatedAt: string, archived = false, title: string | null = null) => ({ sessionId: id, updatedAt, metadata: { title, pinned: false, archived } }) as unknown as RuntimeSessionListItem;
+const item = (id: string, updatedAt: string, archived = false, title: string | null = null) =>
+  ({ sessionId: id, updatedAt, metadata: { title, pinned: false, archived } }) as unknown as RuntimeSessionListItem;
 
 it("orders status approval > running > unread > idle", () => {
   expect(rowStatus({ approvals: 1, running: true, unread: true })).toBe("approval");
@@ -30,15 +40,24 @@ it("falls back to a default title", () => {
 });
 
 it("splits archived and sorts by updatedAt desc", () => {
-  const { active, archived } = splitSessions([item("a", "2026-01-01"), item("b", "2026-02-01"), item("c", "2026-03-01", true)]);
-  expect(active.map(s => s.sessionId)).toEqual(["b", "a"]);
-  expect(archived.map(s => s.sessionId)).toEqual(["c"]);
+  const { active, archived } = splitSessions([
+    item("a", "2026-01-01"),
+    item("b", "2026-02-01"),
+    item("c", "2026-03-01", true),
+  ]);
+  expect(active.map((s) => s.sessionId)).toEqual(["b", "a"]);
+  expect(archived.map((s) => s.sessionId)).toEqual(["c"]);
 });
 
 it("summarizes approvals", () => {
   const base = { toolName: "Bash", resources: [] } as unknown as ApprovalRequest;
   expect(approvalSummary(base)).toBe("Bash");
-  expect(approvalSummary({ ...base, resources: [{ kind: "file", access: "write", path: "/a/b/c.ts", targetKind: "file" }] } as unknown as ApprovalRequest)).toBe("修改 b/c.ts");
+  expect(
+    approvalSummary({
+      ...base,
+      resources: [{ kind: "file", access: "write", path: "/a/b/c.ts", targetKind: "file" }],
+    } as unknown as ApprovalRequest),
+  ).toBe("修改 b/c.ts");
 });
 
 it("derives a short host name", async () => {
@@ -62,7 +81,15 @@ it("buckets time into 今天 / 昨天 / 近 7 天 / 本月更早 / months", () =
 
 it("puts attention rows first and groups the rest by time in order", () => {
   const now = new Date(2026, 9, 17, 15, 0);
-  const rows = [item("a", new Date(2026, 9, 17, 14).toISOString()), item("b", new Date(2026, 9, 17, 9).toISOString()), item("c", new Date(2026, 9, 16, 9).toISOString())];
-  const groups = groupSessions(rows, row => row.sessionId === "b", now);
-  expect(groups.map(group => [group.label, group.items.map(row => row.sessionId)])).toEqual([["需要处理", ["b"]], ["今天", ["a"]], ["昨天", ["c"]]]);
+  const rows = [
+    item("a", new Date(2026, 9, 17, 14).toISOString()),
+    item("b", new Date(2026, 9, 17, 9).toISOString()),
+    item("c", new Date(2026, 9, 16, 9).toISOString()),
+  ];
+  const groups = groupSessions(rows, (row) => row.sessionId === "b", now);
+  expect(groups.map((group) => [group.label, group.items.map((row) => row.sessionId)])).toEqual([
+    ["需要处理", ["b"]],
+    ["今天", ["a"]],
+    ["昨天", ["c"]],
+  ]);
 });

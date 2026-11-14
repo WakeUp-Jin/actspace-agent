@@ -29,12 +29,20 @@ describe("Button", () => {
   it("shows a spinner and aria-busy while busy, and blocks clicks when disabled", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
-    const { rerender } = render(<Button busy onClick={onClick}>测试连接</Button>);
+    const { rerender } = render(
+      <Button busy onClick={onClick}>
+        测试连接
+      </Button>,
+    );
     const button = screen.getByRole("button", { name: "测试连接" });
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(button.querySelector("svg.animate-spin")).not.toBeNull();
 
-    rerender(<Button disabled onClick={onClick}>测试连接</Button>);
+    rerender(
+      <Button disabled onClick={onClick}>
+        测试连接
+      </Button>,
+    );
     await user.click(screen.getByRole("button", { name: "测试连接" }));
     expect(onClick).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "测试连接" })).toHaveClass("disabled:opacity-50");

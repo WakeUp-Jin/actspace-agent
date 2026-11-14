@@ -19,13 +19,7 @@ const TRIGGER_CLASS =
   "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
 const MENU_ERROR_CLASS = "mt-1 border-t border-line px-2 pt-1.5 pb-1 text-act-xxs leading-relaxed text-danger";
 
-export function OpenInAppMenu({
-  workspaceRoot,
-  relativePath,
-}: {
-  workspaceRoot?: string;
-  relativePath: string;
-}) {
+export function OpenInAppMenu({ workspaceRoot, relativePath }: { workspaceRoot?: string; relativePath: string }) {
   const [open, setOpen] = useState(false);
   const [tools, setTools] = useState<WorkspaceOpenTool[]>([]);
   const [busy, setBusy] = useState(false);
@@ -109,7 +103,11 @@ export function OpenInAppMenu({
             ) : null}
           </MenuItem>
         ))}
-        {error ? <div className={MENU_ERROR_CLASS} role="alert">{error}</div> : null}
+        {error ? (
+          <div className={MENU_ERROR_CLASS} role="alert">
+            {error}
+          </div>
+        ) : null}
       </MenuContent>
     </Menu>
   );

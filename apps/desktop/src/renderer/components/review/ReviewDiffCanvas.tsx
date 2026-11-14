@@ -18,13 +18,39 @@ type DiffRow =
   | { key: string; kind: "hunk"; file: ReviewFileSummary; hunk: ReviewHunk }
   | { key: string; kind: "line"; file: ReviewFileSummary; line: ReviewLine; side: "old" | "new" }
   | { key: string; kind: "split-line"; file: ReviewFileSummary; oldLine?: ReviewLine; newLine?: ReviewLine }
-  | { key: string; kind: "state"; file: ReviewFileSummary; state: "loading" | "failed" | "empty" | "binary" | "image"; message?: string };
+  | {
+      key: string;
+      kind: "state";
+      file: ReviewFileSummary;
+      state: "loading" | "failed" | "empty" | "binary" | "image";
+      message?: string;
+    };
 
 const UNIFIED_DIFF_GUTTER_COLUMNS = 16;
 const SPLIT_DIFF_GUTTER_COLUMNS = UNIFIED_DIFF_GUTTER_COLUMNS * 2;
 const MAX_STABLE_DIFF_COLUMNS = 480;
 
-export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fileContents, capabilities, expandedFileIds, selectedFileId, mode, wrap, wordDiff, richPreview, loadFullFiles, singleFileMode, onToggleFile, onSelectFile, onExpandContext, onRetryDiff, onVisibleFiles }: {
+export function ReviewDiffCanvas({
+  workspaceRoot,
+  files,
+  diffs,
+  fileRequests,
+  fileContents,
+  capabilities,
+  expandedFileIds,
+  selectedFileId,
+  mode,
+  wrap,
+  wordDiff,
+  richPreview,
+  loadFullFiles,
+  singleFileMode,
+  onToggleFile,
+  onSelectFile,
+  onExpandContext,
+  onRetryDiff,
+  onVisibleFiles,
+}: {
   workspaceRoot?: string;
   files: ReviewFileSummary[];
   diffs: Map<string, ReviewFileDiff>;
@@ -47,13 +73,22 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
 }) {
   const parentRef = useRef<HTMLElement>(null);
   const [viewportWidth, setViewportWidth] = useState(600);
-  const observeElementRect = useCallback((instance: Virtualizer<HTMLElement, Element>, callback: (rect: { width: number; height: number }) => void) => observeReviewElementRect(instance, callback, setViewportWidth), []);
+  const observeElementRect = useCallback(
+    (instance: Virtualizer<HTMLElement, Element>, callback: (rect: { width: number; height: number }) => void) =>
+      observeReviewElementRect(instance, callback, setViewportWidth),
+    [],
+  );
   const visibleSignature = useRef("");
-  const rows = useMemo(() => buildRows(files, diffs, fileRequests, fileContents, expandedFileIds, mode, loadFullFiles, richPreview), [diffs, expandedFileIds, fileContents, fileRequests, files, loadFullFiles, mode, richPreview]);
+  const rows = useMemo(
+    () => buildRows(files, diffs, fileRequests, fileContents, expandedFileIds, mode, loadFullFiles, richPreview),
+    [diffs, expandedFileIds, fileContents, fileRequests, files, loadFullFiles, mode, richPreview],
+  );
   const canvasColumns = useMemo(() => estimateCanvasColumns(rows), [rows]);
   const fileIndexes = useMemo(() => {
     const indexes = new Map<string, number>();
-    rows.forEach((row, index) => { if (row.kind === "file") indexes.set(row.file.id, index); });
+    rows.forEach((row, index) => {
+      if (row.kind === "file") indexes.set(row.file.id, index);
+    });
     return indexes;
   }, [rows]);
   const getItemKey = useCallback((index: number) => rows[index]?.key ?? index, [rows]);
@@ -87,8 +122,19 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
   const footerHeight = singleFileMode ? 34 : 0;
   const canvasWidth = wrap ? "100%" : `max(100%, ${canvasColumns}ch)`;
   return (
-    <main ref={parentRef} className="min-h-0 min-w-0 flex-1 overflow-auto bg-surface" aria-label="变更差异视图" data-review-horizontal-scroll="canvas">
-      <div className="relative min-w-full" style={{ height: virtualizer.getTotalSize() + footerHeight, width: canvasWidth }} data-review-content-width={canvasWidth} data-review-total-row-count={rows.length} data-review-virtual-row-count={virtualItems.length}>
+    <main
+      ref={parentRef}
+      className="min-h-0 min-w-0 flex-1 overflow-auto bg-surface"
+      aria-label="变更差异视图"
+      data-review-horizontal-scroll="canvas"
+    >
+      <div
+        className="relative min-w-full"
+        style={{ height: virtualizer.getTotalSize() + footerHeight, width: canvasWidth }}
+        data-review-content-width={canvasWidth}
+        data-review-total-row-count={rows.length}
+        data-review-virtual-row-count={virtualItems.length}
+      >
         {virtualItems.map((item) => {
           const row = rows[item.index];
           if (!row) return null;
@@ -101,7 +147,10 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
               data-review-row={row.kind}
               style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${item.start}px)` }}
             >
-              <div className={isCodeRow ? undefined : "sticky left-0"} style={isCodeRow ? undefined : { width: viewportWidth }}>
+              <div
+                className={isCodeRow ? undefined : "sticky left-0"}
+                style={isCodeRow ? undefined : { width: viewportWidth }}
+              >
                 <RowView
                   row={row}
                   workspaceRoot={workspaceRoot}
@@ -123,8 +172,12 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
         })}
         {singleFileMode ? (
           <div className="absolute inset-x-0" style={{ top: virtualizer.getTotalSize() }}>
-            <div className="sticky left-0 flex h-[34px] items-center gap-2 border-t border-line bg-surface px-3 text-act-xxs text-text-faint" style={{ width: viewportWidth }}>
-              <span aria-hidden="true">ⓘ</span><span>变更较多，每次显示一个文件</span>
+            <div
+              className="sticky left-0 flex h-[34px] items-center gap-2 border-t border-line bg-surface px-3 text-act-xxs text-text-faint"
+              style={{ width: viewportWidth }}
+            >
+              <span aria-hidden="true">ⓘ</span>
+              <span>变更较多，每次显示一个文件</span>
             </div>
           </div>
         ) : null}
@@ -133,7 +186,11 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
   );
 }
 
-function observeReviewElementRect(instance: Virtualizer<HTMLElement, Element>, callback: (rect: { width: number; height: number }) => void, onWidth: (width: number) => void): (() => void) | undefined {
+function observeReviewElementRect(
+  instance: Virtualizer<HTMLElement, Element>,
+  callback: (rect: { width: number; height: number }) => void,
+  onWidth: (width: number) => void,
+): (() => void) | undefined {
   const element = instance.scrollElement;
   if (!element) return undefined;
   const publish = () => {
@@ -152,7 +209,21 @@ function observeReviewElementRect(instance: Virtualizer<HTMLElement, Element>, c
   return () => observer.disconnect();
 }
 
-function RowView({ row, workspaceRoot, capabilities, selected, expanded, wrap, wordDiff, richPreview, loadFullFiles, onToggle, onSelect, onExpandContext, onRetry }: {
+function RowView({
+  row,
+  workspaceRoot,
+  capabilities,
+  selected,
+  expanded,
+  wrap,
+  wordDiff,
+  richPreview,
+  loadFullFiles,
+  onToggle,
+  onSelect,
+  onExpandContext,
+  onRetry,
+}: {
   row: DiffRow;
   workspaceRoot?: string;
   capabilities: ReviewCapabilities;
@@ -170,41 +241,113 @@ function RowView({ row, workspaceRoot, capabilities, selected, expanded, wrap, w
   if (row.kind === "file") {
     const file = row.file;
     return (
-      <div className={`flex min-h-10 items-center gap-2 border-b border-line bg-surface-raised px-3 ${selected ? "ring-1 ring-inset ring-focus-ring/40" : ""}`} onFocus={onSelect}>
-        <button type="button" className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle" onClick={onToggle} aria-label={`${expanded ? "收起" : "展开"} ${file.path}`}>
+      <div
+        className={`flex min-h-10 items-center gap-2 border-b border-line bg-surface-raised px-3 ${selected ? "ring-1 ring-inset ring-focus-ring/40" : ""}`}
+        onFocus={onSelect}
+      >
+        <button
+          type="button"
+          className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle"
+          onClick={onToggle}
+          aria-label={`${expanded ? "收起" : "展开"} ${file.path}`}
+        >
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
-        <button type="button" className="min-w-0 flex-1 truncate text-left font-mono text-act-xs font-medium text-text-main" onClick={onSelect} title={file.path}>{file.path}</button>
-        {file.additions > 0 || file.deletions > 0 ? <span className="text-act-xxs tabular-nums">{file.additions > 0 ? <span className="text-success">+{file.additions}</span> : null}{file.additions > 0 && file.deletions > 0 ? " " : null}{file.deletions > 0 ? <span className="text-danger">-{file.deletions}</span> : null}</span> : null}
-        <FileActions file={file} canExpandContext={Boolean(!loadFullFiles && expanded && capabilities.canLoadFullFile && file.renderKind === "text")} onExpandContext={onExpandContext} />
+        <button
+          type="button"
+          className="min-w-0 flex-1 truncate text-left font-mono text-act-xs font-medium text-text-main"
+          onClick={onSelect}
+          title={file.path}
+        >
+          {file.path}
+        </button>
+        {file.additions > 0 || file.deletions > 0 ? (
+          <span className="text-act-xxs tabular-nums">
+            {file.additions > 0 ? <span className="text-success">+{file.additions}</span> : null}
+            {file.additions > 0 && file.deletions > 0 ? " " : null}
+            {file.deletions > 0 ? <span className="text-danger">-{file.deletions}</span> : null}
+          </span>
+        ) : null}
+        <FileActions
+          file={file}
+          canExpandContext={Boolean(
+            !loadFullFiles && expanded && capabilities.canLoadFullFile && file.renderKind === "text",
+          )}
+          onExpandContext={onExpandContext}
+        />
       </div>
     );
   }
   if (row.kind === "hunk") return <HunkHeader hunk={row.hunk} />;
   if (row.kind === "line") return <DiffLine line={row.line} side={row.side} wrap={wrap} wordDiff={wordDiff} />;
-  if (row.kind === "split-line") return <SplitDiffLine oldLine={row.oldLine} newLine={row.newLine} wrap={wrap} wordDiff={wordDiff} />;
+  if (row.kind === "split-line")
+    return <SplitDiffLine oldLine={row.oldLine} newLine={row.newLine} wrap={wrap} wordDiff={wordDiff} />;
   if (row.state === "image" && richPreview) return <ReviewImageDiff workspaceRoot={workspaceRoot} file={row.file} />;
-  const message = row.state === "loading" ? "正在加载变更差异…"
-    : row.state === "binary" ? "二进制文件已变更，无法显示文本差异。"
-      : row.state === "image" ? "图片已变更，启用富预览可查看当前图片。"
-        : row.state === "empty" ? "暂无文本差异。"
-          : row.message ?? "加载差异失败。";
-  return <div className="flex min-h-16 items-center gap-3 border-b border-line px-12 py-4 text-act-xs text-text-faint"><span className="min-w-0 flex-1">{message}</span>{row.state === "failed" ? <button type="button" className="h-7 rounded-act-sm border border-line px-2 text-act-xxs text-text-main hover:bg-surface-subtle" onClick={onRetry}>重试</button> : null}</div>;
+  const message =
+    row.state === "loading"
+      ? "正在加载变更差异…"
+      : row.state === "binary"
+        ? "二进制文件已变更，无法显示文本差异。"
+        : row.state === "image"
+          ? "图片已变更，启用富预览可查看当前图片。"
+          : row.state === "empty"
+            ? "暂无文本差异。"
+            : (row.message ?? "加载差异失败。");
+  return (
+    <div className="flex min-h-16 items-center gap-3 border-b border-line px-12 py-4 text-act-xs text-text-faint">
+      <span className="min-w-0 flex-1">{message}</span>
+      {row.state === "failed" ? (
+        <button
+          type="button"
+          className="h-7 rounded-act-sm border border-line px-2 text-act-xxs text-text-main hover:bg-surface-subtle"
+          onClick={onRetry}
+        >
+          重试
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
-function buildRows(files: ReviewFileSummary[], diffs: Map<string, ReviewFileDiff>, requests: Map<string, ReviewFileRequestState>, contents: Map<string, ReviewFileContents>, expandedIds: Set<string>, mode: ReviewDiffMode, loadFullFiles: boolean, richPreview: boolean): DiffRow[] {
+function buildRows(
+  files: ReviewFileSummary[],
+  diffs: Map<string, ReviewFileDiff>,
+  requests: Map<string, ReviewFileRequestState>,
+  contents: Map<string, ReviewFileContents>,
+  expandedIds: Set<string>,
+  mode: ReviewDiffMode,
+  loadFullFiles: boolean,
+  richPreview: boolean,
+): DiffRow[] {
   const rows: DiffRow[] = [];
   for (const file of files) {
     rows.push({ key: `file:${file.id}`, kind: "file", file });
     if (!expandedIds.has(file.id)) continue;
-    if (file.renderKind === "binary") { rows.push({ key: `state:${file.id}:binary`, kind: "state", file, state: "binary" }); continue; }
-    if (file.renderKind === "image") { rows.push({ key: `state:${file.id}:image:${richPreview}`, kind: "state", file, state: "image" }); continue; }
+    if (file.renderKind === "binary") {
+      rows.push({ key: `state:${file.id}:binary`, kind: "state", file, state: "binary" });
+      continue;
+    }
+    if (file.renderKind === "image") {
+      rows.push({ key: `state:${file.id}:image:${richPreview}`, kind: "state", file, state: "image" });
+      continue;
+    }
     const request = requests.get(file.id);
-    if (request?.status === "failed") { rows.push({ key: `state:${file.id}:failed`, kind: "state", file, state: "failed", message: request.error }); continue; }
+    if (request?.status === "failed") {
+      rows.push({ key: `state:${file.id}:failed`, kind: "state", file, state: "failed", message: request.error });
+      continue;
+    }
     const diff = diffs.get(file.id);
-    if (!diff) { rows.push({ key: `state:${file.id}:loading`, kind: "state", file, state: "loading" }); continue; }
-    if (diff.hunks.length === 0) { rows.push({ key: `state:${file.id}:empty`, kind: "state", file, state: "empty" }); continue; }
-    const fullContext = loadFullFiles ? contextBeforeHunks(diff, contents.get(file.id)) : new Map<number, ReviewLine[]>();
+    if (!diff) {
+      rows.push({ key: `state:${file.id}:loading`, kind: "state", file, state: "loading" });
+      continue;
+    }
+    if (diff.hunks.length === 0) {
+      rows.push({ key: `state:${file.id}:empty`, kind: "state", file, state: "empty" });
+      continue;
+    }
+    const fullContext = loadFullFiles
+      ? contextBeforeHunks(diff, contents.get(file.id))
+      : new Map<number, ReviewLine[]>();
     for (let hunkIndex = 0; hunkIndex < diff.hunks.length; hunkIndex += 1) {
       const hunk = diff.hunks[hunkIndex];
       const context = fullContext.get(hunkIndex) ?? [];
@@ -217,15 +360,34 @@ function buildRows(files: ReviewFileSummary[], diffs: Map<string, ReviewFileDiff
   return rows;
 }
 
-function appendLineRows(rows: DiffRow[], file: ReviewFileSummary, lines: ReviewLine[], mode: ReviewDiffMode, groupKey: string): void {
+function appendLineRows(
+  rows: DiffRow[],
+  file: ReviewFileSummary,
+  lines: ReviewLine[],
+  mode: ReviewDiffMode,
+  groupKey: string,
+): void {
   if (mode === "unified") {
-    for (const line of lines) rows.push({ key: `line:${file.id}:${groupKey}:${line.id}`, kind: "line", file, line, side: line.kind === "deletion" ? "old" : "new" });
+    for (const line of lines)
+      rows.push({
+        key: `line:${file.id}:${groupKey}:${line.id}`,
+        kind: "line",
+        file,
+        line,
+        side: line.kind === "deletion" ? "old" : "new",
+      });
     return;
   }
   const oldLines = lines.filter((line) => line.kind !== "addition");
   const newLines = lines.filter((line) => line.kind !== "deletion");
   for (let index = 0; index < Math.max(oldLines.length, newLines.length); index += 1) {
-    rows.push({ key: `split:${file.id}:${groupKey}:${index}:${oldLines[index]?.id ?? ""}:${newLines[index]?.id ?? ""}`, kind: "split-line", file, oldLine: oldLines[index], newLine: newLines[index] });
+    rows.push({
+      key: `split:${file.id}:${groupKey}:${index}:${oldLines[index]?.id ?? ""}:${newLines[index]?.id ?? ""}`,
+      kind: "split-line",
+      file,
+      oldLine: oldLines[index],
+      newLine: newLines[index],
+    });
   }
 }
 
@@ -239,24 +401,30 @@ function contextBeforeHunks(diff: ReviewFileDiff, contents?: ReviewFileContents)
   for (let index = 0; index < diff.hunks.length; index += 1) {
     const hunk = diff.hunks[index];
     const count = Math.max(0, Math.min(hunk.oldStart - oldCursor, hunk.newStart - newCursor));
-    result.set(index, Array.from({ length: count }, (_, offset) => ({
-      id: `full-${oldCursor + offset}-${newCursor + offset}`,
-      kind: "context" as const,
-      oldLine: oldCursor + offset,
-      newLine: newCursor + offset,
-      text: targetLines[newCursor + offset - 1] ?? "",
-    })));
+    result.set(
+      index,
+      Array.from({ length: count }, (_, offset) => ({
+        id: `full-${oldCursor + offset}-${newCursor + offset}`,
+        kind: "context" as const,
+        oldLine: oldCursor + offset,
+        newLine: newCursor + offset,
+        text: targetLines[newCursor + offset - 1] ?? "",
+      })),
+    );
     oldCursor = hunk.oldStart + hunk.oldLines;
     newCursor = hunk.newStart + hunk.newLines;
   }
   const tailCount = Math.max(0, targetLines.length - newCursor + 1);
-  result.set(diff.hunks.length, Array.from({ length: tailCount }, (_, offset) => ({
-    id: `full-tail-${oldCursor + offset}-${newCursor + offset}`,
-    kind: "context" as const,
-    oldLine: oldCursor + offset,
-    newLine: newCursor + offset,
-    text: targetLines[newCursor + offset - 1] ?? "",
-  })));
+  result.set(
+    diff.hunks.length,
+    Array.from({ length: tailCount }, (_, offset) => ({
+      id: `full-tail-${oldCursor + offset}-${newCursor + offset}`,
+      kind: "context" as const,
+      oldLine: oldCursor + offset,
+      newLine: newCursor + offset,
+      text: targetLines[newCursor + offset - 1] ?? "",
+    })),
+  );
   return result;
 }
 
@@ -306,31 +474,121 @@ function ReviewImageDiff({ workspaceRoot, file }: { workspaceRoot?: string; file
       if (result.error || !result.dataUrl) setError("当前图片预览不可用。");
       else setSrc(result.dataUrl);
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [file.path, file.status, workspaceRoot]);
-  if (file.status === "deleted") return <div className="px-12 py-5 text-act-xs text-text-muted">图片已删除，暂未加载历史版本。</div>;
+  if (file.status === "deleted")
+    return <div className="px-12 py-5 text-act-xs text-text-muted">图片已删除，暂未加载历史版本。</div>;
   if (error) return <div className="px-12 py-5 text-act-xs text-text-muted">{error}</div>;
   if (!src) return <div className="px-12 py-5 text-act-xs text-text-faint">正在加载图片预览…</div>;
-  return <div className="grid min-h-40 place-items-center bg-surface-subtle p-4"><img src={src} alt={`当前版本 ${file.path}`} className="max-h-[520px] max-w-full rounded-act-sm border border-line bg-surface object-contain" /></div>;
+  return (
+    <div className="grid min-h-40 place-items-center bg-surface-subtle p-4">
+      <img
+        src={src}
+        alt={`当前版本 ${file.path}`}
+        className="max-h-[520px] max-w-full rounded-act-sm border border-line bg-surface object-contain"
+      />
+    </div>
+  );
 }
 
-function FileActions({ file, canExpandContext, onExpandContext }: { file: ReviewFileSummary; canExpandContext: boolean; onExpandContext: () => void }) {
+function FileActions({
+  file,
+  canExpandContext,
+  onExpandContext,
+}: {
+  file: ReviewFileSummary;
+  canExpandContext: boolean;
+  onExpandContext: () => void;
+}) {
   if (!canExpandContext) return null;
-  return <div className="flex items-center gap-0.5">
-    <button type="button" title="加载更多上下文" aria-label={`加载更多上下文： ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" onClick={onExpandContext}><ListTree size={13} /></button>
-  </div>;
+  return (
+    <div className="flex items-center gap-0.5">
+      <button
+        type="button"
+        title="加载更多上下文"
+        aria-label={`加载更多上下文： ${file.path}`}
+        className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main"
+        onClick={onExpandContext}
+      >
+        <ListTree size={13} />
+      </button>
+    </div>
+  );
 }
 
 function HunkHeader({ hunk }: { hunk: ReviewHunk }) {
-  return <div className="flex min-h-8 items-center gap-2 border-b border-line bg-info-soft px-3 font-mono text-act-xxs text-info"><span className="min-w-0 flex-1 truncate">{hunk.header}</span></div>;
+  return (
+    <div className="flex min-h-8 items-center gap-2 border-b border-line bg-info-soft px-3 font-mono text-act-xxs text-info">
+      <span className="min-w-0 flex-1 truncate">{hunk.header}</span>
+    </div>
+  );
 }
 
-function SplitDiffLine({ oldLine, newLine, wrap, wordDiff }: { oldLine?: ReviewLine; newLine?: ReviewLine; wrap: boolean; wordDiff: boolean }) {
-  return <div className="grid grid-cols-2 divide-x divide-line border-b border-line/60"><DiffLine line={oldLine} side="old" wrap={wrap} wordDiff={wordDiff} /><DiffLine line={newLine} side="new" wrap={wrap} wordDiff={wordDiff} /></div>;
+function SplitDiffLine({
+  oldLine,
+  newLine,
+  wrap,
+  wordDiff,
+}: {
+  oldLine?: ReviewLine;
+  newLine?: ReviewLine;
+  wrap: boolean;
+  wordDiff: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-2 divide-x divide-line border-b border-line/60">
+      <DiffLine line={oldLine} side="old" wrap={wrap} wordDiff={wordDiff} />
+      <DiffLine line={newLine} side="new" wrap={wrap} wordDiff={wordDiff} />
+    </div>
+  );
 }
 
-function DiffLine({ line, side, wrap, wordDiff }: { line?: ReviewLine; side: "old" | "new"; wrap: boolean; wordDiff: boolean }) {
+function DiffLine({
+  line,
+  side,
+  wrap,
+  wordDiff,
+}: {
+  line?: ReviewLine;
+  side: "old" | "new";
+  wrap: boolean;
+  wordDiff: boolean;
+}) {
   const number = side === "old" ? line?.oldLine : line?.newLine;
-  const tone = line?.kind === "addition" ? "bg-success-soft" : line?.kind === "deletion" ? "bg-danger-soft" : "bg-surface";
-  return <div className={`${tone} min-w-0`}><div className="grid min-h-[22px] grid-cols-[42px_22px_minmax(0,1fr)] font-mono text-act-xxs leading-5.5"><span className="select-none border-r border-line/70 pr-2 text-right tabular-nums text-text-faint">{number ?? ""}</span><span className="select-none text-center text-text-faint">{line?.kind === "addition" ? "+" : line?.kind === "deletion" ? "−" : ""}</span><code className={`${wrap ? "whitespace-pre-wrap break-all" : "whitespace-pre"} block min-w-0 pr-8 text-text-main`}>{line && wordDiff && line.wordDiffs?.length ? line.wordDiffs.map((part, index) => <span key={index} className={part.kind === "addition" ? "rounded-[2px] bg-success/20" : part.kind === "deletion" ? "rounded-[2px] bg-danger/20" : ""}>{part.text}</span>) : line?.text || " "}</code></div></div>;
+  const tone =
+    line?.kind === "addition" ? "bg-success-soft" : line?.kind === "deletion" ? "bg-danger-soft" : "bg-surface";
+  return (
+    <div className={`${tone} min-w-0`}>
+      <div className="grid min-h-[22px] grid-cols-[42px_22px_minmax(0,1fr)] font-mono text-act-xxs leading-5.5">
+        <span className="select-none border-r border-line/70 pr-2 text-right tabular-nums text-text-faint">
+          {number ?? ""}
+        </span>
+        <span className="select-none text-center text-text-faint">
+          {line?.kind === "addition" ? "+" : line?.kind === "deletion" ? "−" : ""}
+        </span>
+        <code
+          className={`${wrap ? "whitespace-pre-wrap break-all" : "whitespace-pre"} block min-w-0 pr-8 text-text-main`}
+        >
+          {line && wordDiff && line.wordDiffs?.length
+            ? line.wordDiffs.map((part, index) => (
+                <span
+                  key={index}
+                  className={
+                    part.kind === "addition"
+                      ? "rounded-[2px] bg-success/20"
+                      : part.kind === "deletion"
+                        ? "rounded-[2px] bg-danger/20"
+                        : ""
+                  }
+                >
+                  {part.text}
+                </span>
+              ))
+            : line?.text || " "}
+        </code>
+      </div>
+    </div>
+  );
 }

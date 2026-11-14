@@ -1,7 +1,21 @@
 import type { ModelCatalogEntry, ModelCatalogSnapshot } from "./model-catalog";
 import { findCatalogEntry, matchCatalogModel } from "./model-catalog-match";
-import type { ModelApi, ModelCapabilities, ModelDefinition, ModelInputKind, ModelPricing, ModelReasoningEffort } from "./model-config";
-import { cloneThinking, isThinkingLevel, normalizeThinking, thinkingProfileFor, type ModelThinking, type ThinkingLevel } from "./model-thinking-profiles";
+import type {
+  ModelApi,
+  ModelCapabilities,
+  ModelDefinition,
+  ModelInputKind,
+  ModelPricing,
+  ModelReasoningEffort,
+} from "./model-config";
+import {
+  cloneThinking,
+  isThinkingLevel,
+  normalizeThinking,
+  thinkingProfileFor,
+  type ModelThinking,
+  type ThinkingLevel,
+} from "./model-thinking-profiles";
 import { CNY_PER_USD } from "./usage-cost";
 
 /**
@@ -75,14 +89,25 @@ export function resolveEffectiveModel(input: ResolveEffectiveInput): EffectiveMo
   const overrides = input.overrides ?? {};
   const provider = input.providerFacts ?? {};
   const multiplier = Number.isFinite(input.multiplier) && input.multiplier! >= 0 ? input.multiplier! : 1;
-  const aliasedEntry = overrides.canonical ? findCatalogEntry(input.catalog, overrides.canonical, input.catalogProvider) : null;
-  const match = aliasedEntry ? { entry: aliasedEntry, exact: true } : matchCatalogModel(input.catalog, input.apiModel, input.catalogProvider);
+  const aliasedEntry = overrides.canonical
+    ? findCatalogEntry(input.catalog, overrides.canonical, input.catalogProvider)
+    : null;
+  const match = aliasedEntry
+    ? { entry: aliasedEntry, exact: true }
+    : matchCatalogModel(input.catalog, input.apiModel, input.catalogProvider);
   const catalog = match?.exact ? catalogFacts(match.entry, input.protocol) : {};
   const sources = {} as Record<EffectiveField, FactSource>;
   const pick = <K extends EffectiveField>(field: K): ModelFacts[K] | undefined => {
-    for (const [source, facts] of [["user", overrides], ["provider", provider], ["catalog", catalog]] as const) {
+    for (const [source, facts] of [
+      ["user", overrides],
+      ["provider", provider],
+      ["catalog", catalog],
+    ] as const) {
       const value = facts[field];
-      if (value !== undefined && value !== null) { sources[field] = source; return value; }
+      if (value !== undefined && value !== null) {
+        sources[field] = source;
+        return value;
+      }
     }
     sources[field] = "unknown";
     return undefined;
@@ -94,8 +119,10 @@ export function resolveEffectiveModel(input: ResolveEffectiveInput): EffectiveMo
   const thinking = pick("thinking");
   const rates = pick("rates");
   const ratesScaled = sources.rates === "provider" || sources.rates === "catalog";
-  const ratesUnsupported = sources.rates === "user" ? false
-    : Boolean(sources.rates === "provider" ? provider.ratesUnsupported : catalog.ratesUnsupported);
+  const ratesUnsupported =
+    sources.rates === "user"
+      ? false
+      : Boolean(sources.rates === "provider" ? provider.ratesUnsupported : catalog.ratesUnsupported);
   return {
     label: label ?? input.apiModel,
     contextWindow: contextWindow ?? null,
@@ -107,7 +134,9 @@ export function resolveEffectiveModel(input: ResolveEffectiveInput): EffectiveMo
     ratesScaled,
     multiplier,
     sources,
-    catalog: match ? { apiModel: match.entry.apiModel, name: catalogFacts(match.entry, input.protocol).label!, exact: match.exact } : null,
+    catalog: match
+      ? { apiModel: match.entry.apiModel, name: catalogFacts(match.entry, input.protocol).label!, exact: match.exact }
+      : null,
     aliased: Boolean(aliasedEntry),
   };
 }
@@ -134,15 +163,22 @@ function scaleRates(rates: ModelRates, factor: number): ModelRates {
  */
 export function thinkingToCapabilities(thinking: ModelThinking | null): {
   thinkingDefault: boolean;
-  capabilities: Pick<ModelCapabilities, "reasoning" | "thinkingToggle" | "reasoningEfforts" | "reasoningDefaultEffort" | "reasoningMandatory">;
+  capabilities: Pick<
+    ModelCapabilities,
+    "reasoning" | "thinkingToggle" | "reasoningEfforts" | "reasoningDefaultEffort" | "reasoningMandatory"
+  >;
 } {
   if (!thinking?.levels.length) {
     return { thinkingDefault: false, capabilities: { reasoning: false, thinkingToggle: false } };
   }
   const { levels, default: def } = normalizeThinking(thinking);
   const canOff = levels.includes("off");
-  const efforts = levels.filter((level): level is Exclude<ThinkingLevel, "off"> => level !== "off") as ModelReasoningEffort[];
-  const onDefault = (def && def !== "off" ? def : efforts.includes("medium") ? "medium" : efforts[Math.floor(efforts.length / 2)]) as ModelReasoningEffort;
+  const efforts = levels.filter(
+    (level): level is Exclude<ThinkingLevel, "off"> => level !== "off",
+  ) as ModelReasoningEffort[];
+  const onDefault = (
+    def && def !== "off" ? def : efforts.includes("medium") ? "medium" : efforts[Math.floor(efforts.length / 2)]
+  ) as ModelReasoningEffort;
   const multi = efforts.length >= 2;
   return {
     thinkingDefault: canOff ? def !== "off" : true,
@@ -158,13 +194,18 @@ export function thinkingToCapabilities(thinking: ModelThinking | null): {
 /** ModelCapabilities → 思考档位；用于把内置定义、旧的自定义模型读成服务商数据。 */
 export function capabilitiesToThinking(capabilities: ModelCapabilities, thinkingDefault: boolean): ModelThinking {
   if (!capabilities.reasoning) return { levels: [] };
-  const efforts = (capabilities.reasoningEfforts ?? []).filter((effort): effort is Exclude<ThinkingLevel, "off"> =>
-    effort === "low" || effort === "medium" || effort === "high" || effort === "xhigh" || effort === "max");
+  const efforts = (capabilities.reasoningEfforts ?? []).filter(
+    (effort): effort is Exclude<ThinkingLevel, "off"> =>
+      effort === "low" || effort === "medium" || effort === "high" || effort === "xhigh" || effort === "max",
+  );
   const on: ThinkingLevel[] = efforts.length ? efforts : ["high"];
   const canOff = capabilities.thinkingToggle && !capabilities.reasoningMandatory;
-  const onDefault = capabilities.reasoningDefaultEffort && on.includes(capabilities.reasoningDefaultEffort as ThinkingLevel)
-    ? capabilities.reasoningDefaultEffort as ThinkingLevel
-    : on.includes("high") ? "high" : on[0];
+  const onDefault =
+    capabilities.reasoningDefaultEffort && on.includes(capabilities.reasoningDefaultEffort as ThinkingLevel)
+      ? (capabilities.reasoningDefaultEffort as ThinkingLevel)
+      : on.includes("high")
+        ? "high"
+        : on[0];
   return normalizeThinking({
     levels: canOff ? ["off", ...on] : on,
     default: canOff && !thinkingDefault ? "off" : onDefault,
@@ -203,10 +244,12 @@ export function cloneFacts<T extends ModelFacts>(facts: T): T {
   };
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
 const positiveInt = (value: unknown, max: number): number | undefined =>
   typeof value === "number" && Number.isInteger(value) && value > 0 && value <= max ? value : undefined;
-const price = (value: unknown): number | undefined => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100_000 ? value : undefined;
+const price = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100_000 ? value : undefined;
 
 /** 从磁盘或 renderer 来的 facts：只保留合法字段。 */
 export function sanitizeModelFacts(value: unknown): ModelFacts {
@@ -220,13 +263,21 @@ export function sanitizeModelFacts(value: unknown): ModelFacts {
   if (Array.isArray(value.input)) facts.input = value.input.includes("image") ? ["text", "image"] : ["text"];
   if (isRecord(value.thinking) && Array.isArray(value.thinking.levels)) {
     const levels = value.thinking.levels.filter(isThinkingLevel);
-    facts.thinking = normalizeThinking({ levels, ...(isThinkingLevel(value.thinking.default) ? { default: value.thinking.default } : {}) });
+    facts.thinking = normalizeThinking({
+      levels,
+      ...(isThinkingLevel(value.thinking.default) ? { default: value.thinking.default } : {}),
+    });
   }
   if (isRecord(value.rates)) {
     const input = price(value.rates.input);
     const output = price(value.rates.output);
     if (input !== undefined && output !== undefined) {
-      facts.rates = { input, output, cacheRead: price(value.rates.cacheRead) ?? null, cacheWrite: price(value.rates.cacheWrite) ?? null };
+      facts.rates = {
+        input,
+        output,
+        cacheRead: price(value.rates.cacheRead) ?? null,
+        cacheWrite: price(value.rates.cacheWrite) ?? null,
+      };
     }
   }
   if (typeof value.ratesUnsupported === "boolean") facts.ratesUnsupported = value.ratesUnsupported;
@@ -236,7 +287,8 @@ export function sanitizeModelFacts(value: unknown): ModelFacts {
 export function sanitizeModelOverrides(value: unknown): ModelOverrides {
   const overrides: ModelOverrides = sanitizeModelFacts(value);
   delete overrides.ratesUnsupported;
-  if (isRecord(value) && typeof value.canonical === "string" && value.canonical.trim()) overrides.canonical = value.canonical.trim().slice(0, 200);
+  if (isRecord(value) && typeof value.canonical === "string" && value.canonical.trim())
+    overrides.canonical = value.canonical.trim().slice(0, 200);
   return overrides;
 }
 
@@ -252,20 +304,31 @@ export function factsFromDefinition(definition: ModelDefinition): ModelFacts {
     ...(definition.maxTokens ? { maxOutput: definition.maxTokens } : {}),
     input: definition.capabilities.input.includes("image") ? ["text", "image"] : ["text"],
     thinking: capabilitiesToThinking(definition.capabilities, definition.thinkingDefault),
-    ...(definition.pricing ? { rates: pricingToRates(definition.pricing), ratesUnsupported: definition.pricing.reasoningPerMillion !== undefined } : {}),
+    ...(definition.pricing
+      ? {
+          rates: pricingToRates(definition.pricing),
+          ratesUnsupported: definition.pricing.reasoningPerMillion !== undefined,
+        }
+      : {}),
   };
 }
 
 /** 服务商数据层：内置定义自带，其余来自连接 /models。 */
 export function providerFactsOf(definition: ModelDefinition): ModelFacts | undefined {
-  return definition.source === "builtin" || definition.source === "curated" ? factsFromDefinition(definition) : definition.providerFacts;
+  return definition.source === "builtin" || definition.source === "curated"
+    ? factsFromDefinition(definition)
+    : definition.providerFacts;
 }
 
 /**
  * 把有效值写回 definition：运行时、对话框、用量都读这一份。
  * 内置模型的思考字段只有在用户改过时才重写，避免丢掉 reasoningEfforts:null 这类内置细节。
  */
-export function applyEffectiveToDefinition(definition: ModelDefinition, effective: EffectiveModel, protocol: ModelApi): ModelDefinition {
+export function applyEffectiveToDefinition(
+  definition: ModelDefinition,
+  effective: EffectiveModel,
+  protocol: ModelApi,
+): ModelDefinition {
   const builtin = definition.source === "builtin" || definition.source === "curated";
   const keepThinking = builtin && effective.sources.thinking === "provider";
   const thinking = thinkingToCapabilities(effective.thinking);

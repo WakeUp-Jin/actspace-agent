@@ -2,11 +2,13 @@ import { Children, isValidElement, type ReactNode } from "react";
 
 /** 取一段 React 子树里的纯文本（代码块复制、Mermaid 源码都靠它）。 */
 export function codeText(children: ReactNode): string {
-  return Children.toArray(children).map((child) => {
-    if (typeof child === "string" || typeof child === "number") return String(child);
-    if (isValidElement<{ children?: ReactNode }>(child)) return codeText(child.props.children);
-    return "";
-  }).join("");
+  return Children.toArray(children)
+    .map((child) => {
+      if (typeof child === "string" || typeof child === "number") return String(child);
+      if (isValidElement<{ children?: ReactNode }>(child)) return codeText(child.props.children);
+      return "";
+    })
+    .join("");
 }
 
 type CodeElementProps = { className?: string; "data-meta"?: string };

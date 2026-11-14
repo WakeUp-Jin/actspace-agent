@@ -47,10 +47,29 @@ function ActiveFileProbe() {
 
 describe("image generation presentation", () => {
   it("previews a Browser screenshot stored as a generic tool artifact", async () => {
-    const readSessionArtifact = vi.fn(async () => ({ name: "screenshot.jpeg", relativePath: "browser-shot", mimeType: "image/jpeg" as const, size: 68, dataUrl: "data:image/jpeg;base64,AAAA" }));
+    const readSessionArtifact = vi.fn(async () => ({
+      name: "screenshot.jpeg",
+      relativePath: "browser-shot",
+      mimeType: "image/jpeg" as const,
+      size: 68,
+      dataUrl: "data:image/jpeg;base64,AAAA",
+    }));
     setupBridge({ "sessions.readArtifact": readSessionArtifact });
-    const screenshot: MessageBlock = { kind: "tool", id: "browser-shot", createdAt: "now", toolName: "browser_cua", title: "Screenshot", content: "Captured", artifacts: [{ type: "image", name: "Chrome 截图", path: "browser-artifact-id", mimeType: "image/jpeg" }] };
-    render(<RightPanelProvider><TurnOutputArtifacts messages={[screenshot]} sessionId="session-1" /><ActiveTabProbe /></RightPanelProvider>);
+    const screenshot: MessageBlock = {
+      kind: "tool",
+      id: "browser-shot",
+      createdAt: "now",
+      toolName: "browser_cua",
+      title: "Screenshot",
+      content: "Captured",
+      artifacts: [{ type: "image", name: "Chrome 截图", path: "browser-artifact-id", mimeType: "image/jpeg" }],
+    };
+    render(
+      <RightPanelProvider>
+        <TurnOutputArtifacts messages={[screenshot]} sessionId="session-1" />
+        <ActiveTabProbe />
+      </RightPanelProvider>,
+    );
     expect(screen.getByText("1 image")).toBeInTheDocument();
     expect(screen.getByText("Chrome 截图")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Open Chrome 截图" }));
@@ -67,15 +86,19 @@ describe("image generation presentation", () => {
   });
 
   it("keeps image failures compact until the error disclosure is opened", async () => {
-    render(<ToolLogLine message={{
-      ...imageMessage,
-      id: "evt-image-failed",
-      status: "failed",
-      generatedCount: 0,
-      displayText: "Generate image failed",
-      errorMessage: "Image generation provider returned HTML instead of JSON.",
-      images: undefined,
-    }} />);
+    render(
+      <ToolLogLine
+        message={{
+          ...imageMessage,
+          id: "evt-image-failed",
+          status: "failed",
+          generatedCount: 0,
+          displayText: "Generate image failed",
+          errorMessage: "Image generation provider returned HTML instead of JSON.",
+          images: undefined,
+        }}
+      />,
+    );
 
     expect(screen.getByRole("button", { name: /Generate image failed/ })).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Image generation provider returned HTML instead of JSON.")).not.toBeInTheDocument();
@@ -183,7 +206,12 @@ describe("image generation presentation", () => {
   it("keeps the completed conversation and follow-up composer visible when projection phase lags", () => {
     const messages: MessageBlock[] = [
       { kind: "user", id: "user-1", content: "Hello", createdAt: "2026-07-28T00:00:00.000Z" },
-      { kind: "assistant", id: "assistant-1", content: "你好，我已经完成回复。", createdAt: "2026-07-28T00:00:03.000Z" },
+      {
+        kind: "assistant",
+        id: "assistant-1",
+        content: "你好，我已经完成回复。",
+        createdAt: "2026-07-28T00:00:03.000Z",
+      },
     ];
 
     render(
@@ -221,7 +249,12 @@ describe("image generation presentation", () => {
     const messages: MessageBlock[] = [
       { kind: "user", id: "user-1", content: "Generate it", createdAt: "2026-07-28T00:00:00.000Z" },
       imageMessage,
-      { kind: "assistant", id: "assistant-streaming", content: "正在整理结果。", createdAt: "2026-07-28T00:00:03.000Z" },
+      {
+        kind: "assistant",
+        id: "assistant-streaming",
+        content: "正在整理结果。",
+        createdAt: "2026-07-28T00:00:03.000Z",
+      },
     ];
 
     render(
@@ -299,7 +332,10 @@ describe("generic tool result presentation", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Read docs/ARCHITECTURE.md" }));
     expect(onOpenFile).toHaveBeenCalledWith(message);
-    expect(screen.getByRole("button", { name: "Show result for Read docs/ARCHITECTURE.md" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "Show result for Read docs/ARCHITECTURE.md" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
   });
 
   it("opens a safe workspace Markdown read in the docs panel and selects the file", async () => {
@@ -310,7 +346,15 @@ describe("generic tool result presentation", () => {
         <TestConversationView
           messages={[
             { kind: "user", id: "user-read", content: "Read it", createdAt: "2026-07-28T00:00:00.000Z" },
-            { kind: "read", id: "read-1", filePath: "docs/ARCHITECTURE.md", displayText: "Read docs/ARCHITECTURE.md", resultPreview: ["# Architecture"], status: "completed", createdAt: "2026-07-28T00:00:01.000Z" },
+            {
+              kind: "read",
+              id: "read-1",
+              filePath: "docs/ARCHITECTURE.md",
+              displayText: "Read docs/ARCHITECTURE.md",
+              resultPreview: ["# Architecture"],
+              status: "completed",
+              createdAt: "2026-07-28T00:00:01.000Z",
+            },
           ]}
           contextSnapshot={null}
           sessionId="session-1"
@@ -323,7 +367,10 @@ describe("generic tool result presentation", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^Worked/ }));
     await userEvent.click(screen.getByRole("button", { name: "Read docs/ARCHITECTURE.md" }));
-    expect(statWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/ARCHITECTURE.md" });
+    expect(statWorkspaceFile).toHaveBeenCalledWith({
+      workspaceRoot: "/workspace",
+      relativePath: "docs/ARCHITECTURE.md",
+    });
     expect(screen.getByTestId("active-file-tab")).toHaveTextContent("docs:docs/ARCHITECTURE.md");
   });
 
@@ -341,7 +388,15 @@ describe("generic tool result presentation", () => {
         <TestConversationView
           messages={[
             { kind: "user", id: "user-read", content: "Read it", createdAt: "2026-07-28T00:00:00.000Z" },
-            { kind: "read", id: "read-1", filePath: "docs/ARCHITECTURE.md", displayText: "Read docs/ARCHITECTURE.md", resultPreview: ["# Architecture"], status: "completed", createdAt: "2026-07-28T00:00:01.000Z" },
+            {
+              kind: "read",
+              id: "read-1",
+              filePath: "docs/ARCHITECTURE.md",
+              displayText: "Read docs/ARCHITECTURE.md",
+              resultPreview: ["# Architecture"],
+              status: "completed",
+              createdAt: "2026-07-28T00:00:01.000Z",
+            },
           ]}
           contextSnapshot={null}
           sessionId={remoteKey}
@@ -355,7 +410,11 @@ describe("generic tool result presentation", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^Worked/ }));
     await userEvent.click(screen.getByRole("button", { name: "Read docs/ARCHITECTURE.md" }));
-    expect(call).toHaveBeenCalledWith({ hostId: "server", method: "files.reference", params: { sessionId: "remote-1", path: "docs/ARCHITECTURE.md" } });
+    expect(call).toHaveBeenCalledWith({
+      hostId: "server",
+      method: "files.reference",
+      params: { sessionId: "remote-1", path: "docs/ARCHITECTURE.md" },
+    });
     expect(readWorkspaceFile).not.toHaveBeenCalled();
     expect(await screen.findByTestId("active-tab-title")).toHaveTextContent("text:ARCHITECTURE.md");
   });

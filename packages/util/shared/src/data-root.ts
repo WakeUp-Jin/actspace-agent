@@ -16,11 +16,18 @@ export function resolveActSpaceDataRoot(options: ActSpaceDataRootOptions): strin
   const explicit = options.explicit ?? env.ACTSPACE_DATA_DIR;
   if (explicit !== undefined && explicit.trim() !== "") return normalizeAbsolute(explicit, options.platform);
 
-  if (options.platform === "darwin") return join(options.homeDir, "Library", "Application Support", ACTSPACE_DATA_DIRECTORY_NAME);
-  if (options.platform === "win32") return join(env.APPDATA ?? join(options.homeDir, "AppData", "Roaming"), ACTSPACE_DATA_DIRECTORY_NAME);
+  if (options.platform === "darwin")
+    return join(options.homeDir, "Library", "Application Support", ACTSPACE_DATA_DIRECTORY_NAME);
+  if (options.platform === "win32")
+    return join(env.APPDATA ?? join(options.homeDir, "AppData", "Roaming"), ACTSPACE_DATA_DIRECTORY_NAME);
 
   const dataHome = env.XDG_DATA_HOME;
-  return join(dataHome !== undefined && isAbsolute(dataHome, options.platform) ? dataHome : join(options.homeDir, ".local", "share"), ACTSPACE_DATA_DIRECTORY_NAME);
+  return join(
+    dataHome !== undefined && isAbsolute(dataHome, options.platform)
+      ? dataHome
+      : join(options.homeDir, ".local", "share"),
+    ACTSPACE_DATA_DIRECTORY_NAME,
+  );
 }
 
 function normalizeAbsolute(value: string, platform: ActSpaceDataRootPlatform): string {
@@ -35,5 +42,8 @@ function isAbsolute(value: string, platform: ActSpaceDataRootPlatform): boolean 
 function join(...parts: string[]): string {
   const first = parts[0] ?? "";
   const separator = first.includes("\\") ? "\\" : "/";
-  return parts.map((part, index) => trimTrailing(index === 0 ? part : part.replace(/^[\\/]+/, ""), "\\/")).filter(Boolean).join(separator);
+  return parts
+    .map((part, index) => trimTrailing(index === 0 ? part : part.replace(/^[\\/]+/, ""), "\\/"))
+    .filter(Boolean)
+    .join(separator);
 }

@@ -2,9 +2,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostConnection } from "@actspace/shared/host-protocol";
 import { createHostDirectory, type HostDescription, type HostDirectorySource } from "../target/host-directory";
 
-const host = (hostId: string, state: HostConnection["state"] = "connected"): HostConnection =>
-  ({ id: hostId, hostId, name: hostId, endpoint: { kind: "wss", url: `wss://${hostId}` }, state });
-const description = (state = "ready"): HostDescription => ({ state, workspaces: [{ id: "w", name: "w", path: "/w" }], models: [{ id: "m", name: "m" }], defaultModel: "m" });
+const host = (hostId: string, state: HostConnection["state"] = "connected"): HostConnection => ({
+  id: hostId,
+  hostId,
+  name: hostId,
+  endpoint: { kind: "wss", url: `wss://${hostId}` },
+  state,
+});
+const description = (state = "ready"): HostDescription => ({
+  state,
+  workspaces: [{ id: "w", name: "w", path: "/w" }],
+  models: [{ id: "m", name: "m" }],
+  defaultModel: "m",
+});
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function fakeSource(initial: HostConnection[]) {
@@ -12,20 +22,42 @@ function fakeSource(initial: HostConnection[]) {
   let event: Parameters<HostDirectorySource["onEvent"]>[0] | null = null;
   const source = {
     list: vi.fn(async () => initial),
-    onChanged: vi.fn((listener: (hosts: HostConnection[]) => void) => { changed = listener; return () => { changed = null; }; }),
-    onEvent: vi.fn((listener: Parameters<HostDirectorySource["onEvent"]>[0]) => { event = listener; return () => { event = null; }; }),
+    onChanged: vi.fn((listener: (hosts: HostConnection[]) => void) => {
+      changed = listener;
+      return () => {
+        changed = null;
+      };
+    }),
+    onEvent: vi.fn((listener: Parameters<HostDirectorySource["onEvent"]>[0]) => {
+      event = listener;
+      return () => {
+        event = null;
+      };
+    }),
     describe: vi.fn(async (_hostId: string) => description()),
   };
-  return { source, change: (hosts: HostConnection[]) => changed?.(hosts), event: (...args: Parameters<Parameters<HostDirectorySource["onEvent"]>[0]>) => event?.(...args), subscribed: () => changed !== null };
+  return {
+    source,
+    change: (hosts: HostConnection[]) => changed?.(hosts),
+    event: (...args: Parameters<Parameters<HostDirectorySource["onEvent"]>[0]>) => event?.(...args),
+    subscribed: () => changed !== null,
+  };
 }
 
 describe("HostDirectory", () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it("subscribes once for many consumers and releases after the last one", async () => {
     const fake = fakeSource([host("a")]);
     const directory = createHostDirectory(fake.source);
-    const offs = [directory.subscribe(() => {}), directory.subscribe(() => {}), directory.onHostsChanged(() => {}), directory.onHostRemoved(() => {})];
+    const offs = [
+      directory.subscribe(() => {}),
+      directory.subscribe(() => {}),
+      directory.onHostsChanged(() => {}),
+      directory.onHostRemoved(() => {}),
+    ];
     await flush();
     expect(fake.source.list).toHaveBeenCalledTimes(1);
     expect(fake.source.onChanged).toHaveBeenCalledTimes(1);
@@ -80,7 +112,12 @@ describe("HostDirectory", () => {
     await flush();
     expect(directory.getSnapshot().describeErrors.a).toBe("describe timed out");
     let resolve!: (value: HostDescription) => void;
-    fake.source.describe.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    fake.source.describe.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
     fake.change([host("a")]);
     expect(fake.source.describe).toHaveBeenCalledTimes(2);
     // 新的结果回来之前显示「正在读取」，不再显示上次的失败。
@@ -99,7 +136,12 @@ describe("HostDirectory", () => {
   it("drops a describe result that arrives after the Host disconnected", async () => {
     const fake = fakeSource([host("a")]);
     let resolve!: (value: HostDescription) => void;
-    fake.source.describe.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    fake.source.describe.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
     const directory = createHostDirectory(fake.source);
     const off = directory.subscribe(() => {});
     await flush();

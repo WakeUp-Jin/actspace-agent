@@ -5,7 +5,7 @@ import { apply } from "../plugin.js";
 describe("approval plugin", () => {
   it("publishes the host approval seam and disposes", async () => {
     const ctx = new CordisContextClass();
-    await ctx.plugin({ apply: inner => apply(inner as never) });
+    await ctx.plugin({ apply: (inner) => apply(inner as never) });
     expect(ctx.get("tools.approval")).toBeDefined();
     await ctx.fiber.dispose();
   });

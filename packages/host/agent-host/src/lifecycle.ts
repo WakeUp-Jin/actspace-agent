@@ -23,17 +23,26 @@ export class HostLifecycle {
   #forceRequested = false;
   readonly #forceSignal = new AbortController();
   #signalForce!: () => void;
-  readonly #forced = new Promise<void>(resolve => { this.#signalForce = resolve; });
-  constructor(private readonly runtime: Omit<HostRuntime, "shutdown">, private readonly options: {
-    shutdown(): Promise<unknown>;
-    beforeShutdown(): Promise<void>;
-    close(): Promise<void>;
-    onState(state: HostState): void;
-    forceExit?: () => void;
-    forceDeadlineMs?: number;
-  }) { this.#state = runtime.recovery().blocked ? "blocked" : "ready"; }
+  readonly #forced = new Promise<void>((resolve) => {
+    this.#signalForce = resolve;
+  });
+  constructor(
+    private readonly runtime: Omit<HostRuntime, "shutdown">,
+    private readonly options: {
+      shutdown(): Promise<unknown>;
+      beforeShutdown(): Promise<void>;
+      close(): Promise<void>;
+      onState(state: HostState): void;
+      forceExit?: () => void;
+      forceDeadlineMs?: number;
+    },
+  ) {
+    this.#state = runtime.recovery().blocked ? "blocked" : "ready";
+  }
 
-  state(): HostState { return this.#state; }
+  state(): HostState {
+    return this.#state;
+  }
   block(): void {
     if (this.#state === "draining") return;
     this.#state = "blocked";
@@ -53,11 +62,11 @@ export class HostLifecycle {
       this.#forceSignal.abort();
       return this.#forcing;
     }
-    return this.#stopping ??= (async () => {
+    return (this.#stopping ??= (async () => {
       await Promise.race([this.#drain(), this.#forced]);
       if (this.#forceRequested) return this.#forcing;
       await this.#finish();
-    })();
+    })());
   }
   async #drain(): Promise<void> {
     await this.runtime.waitForOwnedRuns();
@@ -68,42 +77,66 @@ export class HostLifecycle {
       let busy = this.runtime.activeSubagents() > 0;
       for (const session of await this.runtime.application.listSessions()) {
         if (this.#forceRequested) return;
-        busy = await this.runtime.backgroundTask(session.sessionId) || busy;
+        busy = (await this.runtime.backgroundTask(session.sessionId)) || busy;
       }
       if (!busy) return;
-      await delay(100, undefined, { signal: this.#forceSignal.signal }).catch(error => { if (!this.#forceRequested) throw error; });
+      await delay(100, undefined, { signal: this.#forceSignal.signal }).catch((error) => {
+        if (!this.#forceRequested) throw error;
+      });
     }
   }
   #finish(): Promise<void> {
-    return this.#finishing ??= (async () => {
+    return (this.#finishing ??= (async () => {
       const errors: unknown[] = [];
-      for (const release of [() => this.options.beforeShutdown(), () => this.options.shutdown(), () => this.options.close()]) {
-        try { await release(); } catch (error) { errors.push(error); }
+      for (const release of [
+        () => this.options.beforeShutdown(),
+        () => this.options.shutdown(),
+        () => this.options.close(),
+      ]) {
+        try {
+          await release();
+        } catch (error) {
+          errors.push(error);
+        }
       }
       if (errors.length) throw new AggregateError(errors, "Host shutdown failed");
-    })();
+    })());
   }
   async #force(): Promise<void> {
     const deadline = setTimeout(() => this.options.forceExit?.(), this.options.forceDeadlineMs ?? 15_000);
-    try { await this.#finish(); clearTimeout(deadline); }
-    catch (error) { if (!this.options.forceExit) clearTimeout(deadline); throw error; }
+    try {
+      await this.#finish();
+      clearTimeout(deadline);
+    } catch (error) {
+      if (!this.options.forceExit) clearTimeout(deadline);
+      throw error;
+    }
   }
   async diagnostics() {
     const diagnostics: { sessionId?: string; component: string; reason?: string }[] = [];
     const blocked = this.runtime.recovery().blocked;
     if (blocked) diagnostics.push({ component: "harness-recovery", reason: blocked });
     let sessions: Awaited<ReturnType<AgentApplicationContract["listSessions"]>> = [];
-    try { sessions = await this.runtime.application.listSessions(); }
-    catch { diagnostics.push({ component: "session-list" }); }
+    try {
+      sessions = await this.runtime.application.listSessions();
+    } catch {
+      diagnostics.push({ component: "session-list" });
+    }
     const waiting: { sessionId: string; runs: string[]; background: boolean | null }[] = [];
     for (const session of sessions) {
-      let runs: string[] = [], background: boolean | null = null;
+      let runs: string[] = [],
+        background: boolean | null = null;
       try {
         const snapshot = await this.runtime.application.taskCommand({ sessionId: session.sessionId, op: "snapshot" });
-        runs = snapshot.snapshot.runs.filter(run => run.state === "running").map(run => run.runId);
-      } catch { diagnostics.push({ sessionId: session.sessionId, component: "tasks" }); }
-      try { background = await this.runtime.backgroundTask(session.sessionId); }
-      catch { diagnostics.push({ sessionId: session.sessionId, component: "shell-capability" }); }
+        runs = snapshot.snapshot.runs.filter((run) => run.state === "running").map((run) => run.runId);
+      } catch {
+        diagnostics.push({ sessionId: session.sessionId, component: "tasks" });
+      }
+      try {
+        background = await this.runtime.backgroundTask(session.sessionId);
+      } catch {
+        diagnostics.push({ sessionId: session.sessionId, component: "shell-capability" });
+      }
       if (runs.length || background !== false) waiting.push({ sessionId: session.sessionId, runs, background });
     }
     return { subagents: this.runtime.activeSubagents(), waiting, diagnostics };
@@ -111,12 +144,24 @@ export class HostLifecycle {
 }
 
 /** One in-flight maintenance pass; stopping waits for it before storage is released. */
-export function startUploadMaintenance(cleanup: () => Promise<unknown>, onFailure: (error: unknown) => void, intervalMs = 60_000) {
+export function startUploadMaintenance(
+  cleanup: () => Promise<unknown>,
+  onFailure: (error: unknown) => void,
+  intervalMs = 60_000,
+) {
   let pending: Promise<void> | undefined;
   const timer = setInterval(() => {
     if (pending) return;
-    pending = Promise.resolve().then(cleanup).then(() => undefined, onFailure).finally(() => { pending = undefined; });
+    pending = Promise.resolve()
+      .then(cleanup)
+      .then(() => undefined, onFailure)
+      .finally(() => {
+        pending = undefined;
+      });
   }, intervalMs);
   timer.unref();
-  return async () => { clearInterval(timer); await pending; };
+  return async () => {
+    clearInterval(timer);
+    await pending;
+  };
 }

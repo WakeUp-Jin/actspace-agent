@@ -20,7 +20,9 @@ export function SpaceBlank({ space }: { space: Space }) {
         <SpaceAvatar space={space} size={56} className="space-pop" />
         <div>
           <h2 className="text-act-lg font-semibold text-text-main">{space.name}</h2>
-          <p className="mt-1 max-w-[46ch] text-act-sm text-text-muted">为「{space.goal || "一个还没写下的目标"}」而设</p>
+          <p className="mt-1 max-w-[46ch] text-act-sm text-text-muted">
+            为「{space.goal || "一个还没写下的目标"}」而设
+          </p>
         </div>
         <ul className="flex flex-wrap justify-center gap-[18px]">
           {space.members.map((m, i) => (

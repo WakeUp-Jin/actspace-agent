@@ -8,33 +8,56 @@ export function reasoningPayload(route: string, provider: string, options: LlmRe
   if (provider === "custom" && enabled && effort === undefined) return {};
   if (provider === "custom" && route === "anthropic-messages") {
     if (!enabled) return { thinking: { type: "disabled" } };
-    if (!["low", "medium", "high", "xhigh", "max"].includes(effort!)) throw new Error("Anthropic effort must be low, medium, high, xhigh or max.");
+    if (!["low", "medium", "high", "xhigh", "max"].includes(effort!))
+      throw new Error("Anthropic effort must be low, medium, high, xhigh or max.");
     return { thinking: { type: "adaptive" }, output_config: { effort } };
   }
   if (route === "openai-responses") return { reasoning: { effort: enabled ? effort : "none", summary: "auto" } };
   if (route !== "openai-completions") return {};
-  if (provider === "deepseek" || provider === "kimi") return {
-    thinking: { type: enabled ? "enabled" : "disabled" },
-    ...(enabled && provider === "deepseek" ? { reasoning_effort: effort } : {}),
-  };
+  if (provider === "deepseek" || provider === "kimi")
+    return {
+      thinking: { type: enabled ? "enabled" : "disabled" },
+      ...(enabled && provider === "deepseek" ? { reasoning_effort: effort } : {}),
+    };
   if (provider === "openrouter") return { reasoning: enabled ? { effort } : { enabled: false } };
   return { reasoning_effort: enabled ? effort : "none" };
 }
 
 /** Remove SDK inferred defaults for generic connections before applying explicit choices. */
-export function withReasoningPayload(payload: Record<string, unknown>, route: string, provider: string, options: LlmRequestOptions): Record<string, unknown> {
+export function withReasoningPayload(
+  payload: Record<string, unknown>,
+  route: string,
+  provider: string,
+  options: LlmRequestOptions,
+): Record<string, unknown> {
   const result = provider === "custom" ? withoutReasoningPayload(payload) : { ...payload };
   const patch = reasoningPayload(route, provider, options);
-  return { ...result, ...patch, ...(patch.output_config ? { output_config: { ...(result.output_config as Record<string, unknown> | undefined), ...(patch.output_config as Record<string, unknown>) } } : {}) };
+  return {
+    ...result,
+    ...patch,
+    ...(patch.output_config
+      ? {
+          output_config: {
+            ...(result.output_config as Record<string, unknown> | undefined),
+            ...(patch.output_config as Record<string, unknown>),
+          },
+        }
+      : {}),
+  };
 }
 
 /** Payload without SDK-inferred thinking fields, so the provider applies its own default. */
 export function withoutReasoningPayload(payload: Record<string, unknown>): Record<string, unknown> {
   const result = { ...payload };
-  delete result.reasoning; delete result.reasoning_effort; delete result.thinking; delete result.enable_thinking;
+  delete result.reasoning;
+  delete result.reasoning_effort;
+  delete result.thinking;
+  delete result.enable_thinking;
   if (result.output_config && typeof result.output_config === "object") {
-    const output = { ...result.output_config as Record<string, unknown> }; delete output.effort;
-    if (Object.keys(output).length) result.output_config = output; else delete result.output_config;
+    const output = { ...(result.output_config as Record<string, unknown>) };
+    delete output.effort;
+    if (Object.keys(output).length) result.output_config = output;
+    else delete result.output_config;
   }
   return result;
 }

@@ -16,14 +16,30 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ROOTS = ["packages", "apps"];
-const SKIP_DIRS = new Set(["node_modules", "dist", "dist-electron", "build", "out", "coverage", "test", "tests", "__tests__", "fixtures"]);
+const SKIP_DIRS = new Set([
+  "node_modules",
+  "dist",
+  "dist-electron",
+  "build",
+  "out",
+  "coverage",
+  "test",
+  "tests",
+  "__tests__",
+  "fixtures",
+]);
 
 export const ALLOWED = [
-  { file: "packages/util/shared/src/runtime-v2/core-events.ts", count: 1, reason: "`coreEvent` 的实现：core 的来源只在这里写一次。" },
+  {
+    file: "packages/util/shared/src/runtime-v2/core-events.ts",
+    count: 1,
+    reason: "`coreEvent` 的实现：core 的来源只在这里写一次。",
+  },
   {
     file: "packages/session/session-journal/src/testing.ts",
     count: 1,
-    reason: "给规模测试生成合成会话的辅助函数，直接往 Journal 里写；事件只带规模测试用得到的几个字段，不是 `CoreEventDataMap` 里的完整形状。",
+    reason:
+      "给规模测试生成合成会话的辅助函数，直接往 Journal 里写；事件只带规模测试用得到的几个字段，不是 `CoreEventDataMap` 里的完整形状。",
   },
   {
     file: "apps/desktop/src/renderer/mock/mock-db.ts",
@@ -37,7 +53,10 @@ const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*)/;
 
 /** 整行注释换成空行，行号不变。 */
 function withoutCommentLines(text) {
-  return text.split("\n").map((line) => (COMMENT_LINE.test(line) ? "" : line)).join("\n");
+  return text
+    .split("\n")
+    .map((line) => (COMMENT_LINE.test(line) ? "" : line))
+    .join("\n");
 }
 
 function lineOf(text, index) {
@@ -70,7 +89,9 @@ export function auditCoreEventWrites(sources, allowed) {
     if (limit === undefined) {
       for (const line of lines) errors.push(`${file}:${line} 手写了 core 的事件来源`);
     } else if (lines.length > limit) {
-      errors.push(`${file}：手写 core 事件来源的有 ${lines.length} 处（第 ${lines.join("、")} 行），清单只允许 ${limit} 处`);
+      errors.push(
+        `${file}：手写 core 事件来源的有 ${lines.length} 处（第 ${lines.join("、")} 行），清单只允许 ${limit} 处`,
+      );
     } else if (lines.length < limit) {
       errors.push(`${file}：清单记了 ${limit} 处，现在只有 ${lines.length} 处，请同步修改 ALLOWED`);
     }
@@ -79,7 +100,11 @@ export function auditCoreEventWrites(sources, allowed) {
 }
 
 function isSourceFile(name) {
-  return /\.(ts|tsx|mts|cts)$/.test(name) && !/\.d\.[cm]?ts$/.test(name) && !/\.(test|spec|bench|perf)\.[cm]?tsx?$/.test(name);
+  return (
+    /\.(ts|tsx|mts|cts)$/.test(name) &&
+    !/\.d\.[cm]?ts$/.test(name) &&
+    !/\.(test|spec|bench|perf)\.[cm]?tsx?$/.test(name)
+  );
 }
 
 function readSources(root) {
@@ -88,7 +113,10 @@ function readSources(root) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.name.startsWith(".")) continue;
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) { if (!SKIP_DIRS.has(entry.name)) walk(full); continue; }
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name)) walk(full);
+        continue;
+      }
       if (!entry.isFile() || !isSourceFile(entry.name)) continue;
       out.push({ path: path.relative(root, full).split(path.sep).join("/"), text: fs.readFileSync(full, "utf8") });
     }
@@ -107,7 +135,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (errors.length > 0) {
     console.error(`核心事件写入检查失败（${errors.length} 处）：`);
     for (const error of errors) console.error(`  - ${error}`);
-    console.error("归 core 所有的事件用 coreEvent(type, data) 写，新事件或新字段先加进 CoreEventDataMap；两者都在 packages/util/shared/src/runtime-v2/core-events.ts。");
+    console.error(
+      "归 core 所有的事件用 coreEvent(type, data) 写，新事件或新字段先加进 CoreEventDataMap；两者都在 packages/util/shared/src/runtime-v2/core-events.ts。",
+    );
     console.error("写的不是待写入的事件的，把文件记进 scripts/check-core-event-writes.mjs 的 ALLOWED，写明理由。");
     process.exit(1);
   }

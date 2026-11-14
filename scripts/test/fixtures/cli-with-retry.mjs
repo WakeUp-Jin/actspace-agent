@@ -11,12 +11,24 @@ require("./runtime-v2/loader.js").setRuntimeLoaderForTest(async () => ({
   ...runtime,
   createRuntimeHostServices(input) {
     const port = input.services[runtime.LLM_HOST_PORT_ID];
-    return runtime.createRuntimeHostServices({ ...input, services: {
-      ...input.services,
-      [runtime.LLM_HOST_PORT_ID]: { ...port, routes: port.routes.map(route => ({
-        ...route, retryPolicy: { maxAttempts: 2, baseDelayMs: delay, maxDelayMs: delay, shouldRetry: failure => failure.retryable },
-      })) },
-    } });
+    return runtime.createRuntimeHostServices({
+      ...input,
+      services: {
+        ...input.services,
+        [runtime.LLM_HOST_PORT_ID]: {
+          ...port,
+          routes: port.routes.map((route) => ({
+            ...route,
+            retryPolicy: {
+              maxAttempts: 2,
+              baseDelayMs: delay,
+              maxDelayMs: delay,
+              shouldRetry: (failure) => failure.retryable,
+            },
+          })),
+        },
+      },
+    });
   },
 }));
 process.exitCode = await require(entry).main();

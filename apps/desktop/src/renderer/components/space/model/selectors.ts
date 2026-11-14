@@ -2,12 +2,25 @@
 import { createActors, createSpaces, DEFAULT_OPEN_DIRS } from "./fixtures";
 import { contextUsage, type ContextUsage } from "./panel-fixtures";
 import type {
-  CoordinatorMessage, SoloMessage,
-  MemberStatus, PanelContext, PanelKind, PanelState, PanelTab, RosterActor, Space, SpaceDemoState, SpaceMember,
+  CoordinatorMessage,
+  SoloMessage,
+  MemberStatus,
+  PanelContext,
+  PanelKind,
+  PanelState,
+  PanelTab,
+  RosterActor,
+  Space,
+  SpaceDemoState,
+  SpaceMember,
 } from "./types";
 
 export const STATUS_LABEL: Record<MemberStatus, string> = {
-  wait: "等你决定", fail: "出错", run: "工作中", result: "有结果", idle: "空闲",
+  wait: "等你决定",
+  fail: "出错",
+  run: "工作中",
+  result: "有结果",
+  idle: "空闲",
 };
 /** 右栏分组顺序（D11） */
 export const STATUS_ORDER: readonly MemberStatus[] = ["wait", "fail", "run", "result", "idle"];
@@ -40,7 +53,8 @@ export function filterRoster(actors: Record<string, RosterActor>, query: string)
   return rosterActors(actors).filter((a) => !q || (a.name + a.scene + a.abilities.join("")).toLowerCase().includes(q));
 }
 
-export const hasDiff = (m: SpaceMember | undefined): boolean => !!m && m.transcript.some((b) => b.k === "line" && !!b.diff);
+export const hasDiff = (m: SpaceMember | undefined): boolean =>
+  !!m && m.transcript.some((b) => b.k === "line" && !!b.diff);
 
 /* ---------- 分组、胶囊、托盘 ---------- */
 
@@ -51,8 +65,9 @@ export interface MemberGroup {
 
 /** 按 wait → fail → run → result → idle 分组，空组去掉 */
 export function groupMembers(members: readonly SpaceMember[]): MemberGroup[] {
-  return STATUS_ORDER.map((status) => ({ status, members: members.filter((m) => m.status === status) }))
-    .filter((g) => g.members.length > 0);
+  return STATUS_ORDER.map((status) => ({ status, members: members.filter((m) => m.status === status) })).filter(
+    (g) => g.members.length > 0,
+  );
 }
 
 export const waitCount = (space: Space): number => space.members.filter((m) => m.status === "wait").length;
@@ -62,7 +77,10 @@ export function pillCounts(space: Space, tab: string): Record<MemberStatus, numb
   const count = (st: MemberStatus) => space.members.filter((m) => m.status === st).length;
   return {
     wait: space.members.filter((m) => m.status === "wait" && m.id !== tab).length,
-    fail: count("fail"), run: count("run"), result: count("result"), idle: count("idle"),
+    fail: count("fail"),
+    run: count("run"),
+    result: count("result"),
+    idle: count("idle"),
   };
 }
 
@@ -136,7 +154,14 @@ export const plainOf = (text: string, actors: Record<string, RosterActor>): stri
 /** 协调 Agent 能开的标签（D26） */
 export const COORD_PANEL_KINDS: readonly PanelKind[] = ["actors", "library", "memory", "files", "terminal"];
 /** Actor 和一对一对话能开的标签：和普通会话一样（D27），顺序即启动页顺序 */
-export const SESSION_PANEL_KINDS: readonly PanelKind[] = ["subagents", "files", "review", "context", "terminal", "reply"];
+export const SESSION_PANEL_KINDS: readonly PanelKind[] = [
+  "subagents",
+  "files",
+  "review",
+  "context",
+  "terminal",
+  "reply",
+];
 
 export const availablePanelKinds = (context: PanelContext): readonly PanelKind[] =>
   context === "coord" ? COORD_PANEL_KINDS : SESSION_PANEL_KINDS;
@@ -231,7 +256,11 @@ export function contextUsageOf(state: SpaceDemoState): ContextUsage | null {
   if (!scope) return null;
   const space = state.view === "space" ? currentSpace(state) : null;
   const m = scope.member;
-  const messageCount = m ? m.transcript.length : scope.coord && space ? space.msgs.length : (state.chats[state.chatWith ?? ""] ?? []).length;
+  const messageCount = m
+    ? m.transcript.length
+    : scope.coord && space
+      ? space.msgs.length
+      : (state.chats[state.chatWith ?? ""] ?? []).length;
   return contextUsage({
     coord: !!scope.coord,
     inSpace: !!space,
@@ -250,13 +279,28 @@ export const splitDirs = (text: string): string[] => text.split(/[,，\s]+/).fil
 export function initialState(): SpaceDemoState {
   const spaces = createSpaces();
   return materialize({
-    view: "space", spaceId: spaces[0].id, actors: createActors(), spaces,
-    panels: {}, panelOpen: true, collapsed: {},
-    ftOpen: [...DEFAULT_OPEN_DIRS], ftQuery: "", ftSelected: null,
-    trayOpen: false, trayIdx: 0,
-    chatWith: null, chats: {}, soloChats: [], rosterQuery: "",
-    notice: null, freshCard: null, justGrown: null,
-    litRows: [], rowsRevision: 0, approvalPulse: 0,
+    view: "space",
+    spaceId: spaces[0].id,
+    actors: createActors(),
+    spaces,
+    panels: {},
+    panelOpen: true,
+    collapsed: {},
+    ftOpen: [...DEFAULT_OPEN_DIRS],
+    ftQuery: "",
+    ftSelected: null,
+    trayOpen: false,
+    trayIdx: 0,
+    chatWith: null,
+    chats: {},
+    soloChats: [],
+    rosterQuery: "",
+    notice: null,
+    freshCard: null,
+    justGrown: null,
+    litRows: [],
+    rowsRevision: 0,
+    approvalPulse: 0,
   });
 }
 
@@ -271,30 +315,35 @@ export function materialize(s: SpaceDemoState): SpaceDemoState {
 export const mapSpace = (s: SpaceDemoState, id: string, fn: (sp: Space) => Space): Space[] =>
   s.spaces.map((sp) => (sp.id === id ? fn(sp) : sp));
 export const mapMember = (sp: Space, id: string, fn: (m: SpaceMember) => SpaceMember): Space => ({
-  ...sp, members: sp.members.map((m) => (m.id === id ? fn(m) : m)),
+  ...sp,
+  members: sp.members.map((m) => (m.id === id ? fn(m) : m)),
 });
 export const bumpRows = (s: SpaceDemoState, lit: string[]): Pick<SpaceDemoState, "litRows" | "rowsRevision"> => ({
-  litRows: lit, rowsRevision: s.rowsRevision + 1,
+  litRows: lit,
+  rowsRevision: s.rowsRevision + 1,
 });
 
 /** 流式中的消息立刻收成完整文字（不触发后续动作），切走后不会卡在半截 */
 export function settleStreams(s: SpaceDemoState): SpaceDemoState {
-  const streaming = (m: { typing?: boolean; shown?: number | null }) => !!m.typing || (m.shown != null);
+  const streaming = (m: { typing?: boolean; shown?: number | null }) => !!m.typing || m.shown != null;
   let changed = false;
   const spaces = s.spaces.map((sp) => {
     if (!sp.msgs.some((m) => m.k === "coord" && streaming(m))) return sp;
     changed = true;
     return {
       ...sp,
-      msgs: sp.msgs.map((m): CoordinatorMessage => (m.k === "coord" && streaming(m) ? { ...m, t: m.plain, typing: false, shown: null } : m)),
+      msgs: sp.msgs.map(
+        (m): CoordinatorMessage =>
+          m.k === "coord" && streaming(m) ? { ...m, t: m.plain, typing: false, shown: null } : m,
+      ),
     };
   });
   const chats: Record<string, SoloMessage[]> = {};
   for (const [id, list] of Object.entries(s.chats)) {
     chats[id] = list.some((m) => m.k === "actor" && streaming(m))
-      ? (changed = true, list.map((m): SoloMessage => (m.k === "actor" && streaming(m) ? { ...m, typing: false, shown: null } : m)))
+      ? ((changed = true),
+        list.map((m): SoloMessage => (m.k === "actor" && streaming(m) ? { ...m, typing: false, shown: null } : m)))
       : list;
   }
   return changed ? { ...s, spaces, chats } : s;
 }
-

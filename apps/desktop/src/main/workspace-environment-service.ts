@@ -19,9 +19,7 @@ const GIT_PUSH_TIMEOUT_MS = 30_000;
 const GIT_MAX_OUTPUT_CHARS = 256 * 1024;
 const DEFAULT_COMMIT_MESSAGE = "Update workspace changes";
 
-type ResolvedWorkspace =
-  | { ok: true; workspaceRoot: string }
-  | { ok: false; workspaceRoot: string; message: string };
+type ResolvedWorkspace = { ok: true; workspaceRoot: string } | { ok: false; workspaceRoot: string; message: string };
 
 type GitRepositoryState = {
   available: boolean;
@@ -85,25 +83,55 @@ export async function createWorkspaceBranch(
 
   const branchName = input.branchName.trim();
   if (!branchName) {
-    return mutationFailure("create_branch", "branch", workspace.workspaceRoot, "invalid_branch", "Branch name is required.");
+    return mutationFailure(
+      "create_branch",
+      "branch",
+      workspace.workspaceRoot,
+      "invalid_branch",
+      "Branch name is required.",
+    );
   }
 
   const state = await readGitRepositoryState(workspace.workspaceRoot, runner);
   if (!state.available) {
-    return mutationFailure("create_branch", "branch", workspace.workspaceRoot, "git_not_found", "Git is not available on this Mac.");
+    return mutationFailure(
+      "create_branch",
+      "branch",
+      workspace.workspaceRoot,
+      "git_not_found",
+      "Git is not available on this Mac.",
+    );
   }
   if (!state.repository) {
-    return mutationFailure("create_branch", "branch", workspace.workspaceRoot, "not_repository", "Current workspace is not a Git repository.");
+    return mutationFailure(
+      "create_branch",
+      "branch",
+      workspace.workspaceRoot,
+      "not_repository",
+      "Current workspace is not a Git repository.",
+    );
   }
 
   const validation = await runGit(runner, ["check-ref-format", "--branch", branchName], workspace.workspaceRoot);
   if (!isGitRunSuccess(validation)) {
-    return mutationFailure("create_branch", "branch", workspace.workspaceRoot, "invalid_branch", "Branch name is not valid.");
+    return mutationFailure(
+      "create_branch",
+      "branch",
+      workspace.workspaceRoot,
+      "invalid_branch",
+      "Branch name is not valid.",
+    );
   }
 
   const created = await runGit(runner, ["switch", "-c", branchName], workspace.workspaceRoot);
   if (!isGitRunSuccess(created)) {
-    return mutationFailure("create_branch", "branch", workspace.workspaceRoot, gitMissing(created) ? "git_not_found" : "command_failed", sanitizeGitError(created, workspace.workspaceRoot));
+    return mutationFailure(
+      "create_branch",
+      "branch",
+      workspace.workspaceRoot,
+      gitMissing(created) ? "git_not_found" : "command_failed",
+      sanitizeGitError(created, workspace.workspaceRoot),
+    );
   }
 
   return {
@@ -127,23 +155,53 @@ export async function switchWorkspaceBranch(
 
   const branchName = input.branchName.trim();
   if (!branchName) {
-    return mutationFailure("switch_branch", "branch", workspace.workspaceRoot, "invalid_branch", "Branch name is required.");
+    return mutationFailure(
+      "switch_branch",
+      "branch",
+      workspace.workspaceRoot,
+      "invalid_branch",
+      "Branch name is required.",
+    );
   }
 
   const state = await readGitRepositoryState(workspace.workspaceRoot, runner);
   if (!state.available) {
-    return mutationFailure("switch_branch", "branch", workspace.workspaceRoot, "git_not_found", "Git is not available on this Mac.");
+    return mutationFailure(
+      "switch_branch",
+      "branch",
+      workspace.workspaceRoot,
+      "git_not_found",
+      "Git is not available on this Mac.",
+    );
   }
   if (!state.repository) {
-    return mutationFailure("switch_branch", "branch", workspace.workspaceRoot, "not_repository", "Current workspace is not a Git repository.");
+    return mutationFailure(
+      "switch_branch",
+      "branch",
+      workspace.workspaceRoot,
+      "not_repository",
+      "Current workspace is not a Git repository.",
+    );
   }
   if (branchName === state.branch) {
-    return { ok: true, action: "switch_branch", phase: "branch", workspaceRoot: workspace.workspaceRoot, branch: branchName };
+    return {
+      ok: true,
+      action: "switch_branch",
+      phase: "branch",
+      workspaceRoot: workspace.workspaceRoot,
+      branch: branchName,
+    };
   }
 
   const target = state.branches.find((branch) => branch.name === branchName);
   if (!target) {
-    return mutationFailure("switch_branch", "branch", workspace.workspaceRoot, "invalid_branch", "Selected local branch is no longer available.");
+    return mutationFailure(
+      "switch_branch",
+      "branch",
+      workspace.workspaceRoot,
+      "invalid_branch",
+      "Selected local branch is no longer available.",
+    );
   }
   if (target.checkedOutPath) {
     return mutationFailure(
@@ -168,7 +226,13 @@ export async function switchWorkspaceBranch(
     );
   }
 
-  return { ok: true, action: "switch_branch", phase: "branch", workspaceRoot: workspace.workspaceRoot, branch: branchName };
+  return {
+    ok: true,
+    action: "switch_branch",
+    phase: "branch",
+    workspaceRoot: workspace.workspaceRoot,
+    branch: branchName,
+  };
 }
 
 export async function commitWorkspaceChanges(
@@ -211,14 +275,26 @@ export async function commitAndPushWorkspaceChanges(
 ): Promise<WorkspaceGitMutationResult> {
   const workspace = await resolveWorkspace(input.workspaceRoot, roots);
   if (workspace.ok === false) {
-    return mutationFailure("commit_and_push", "commit", workspace.workspaceRoot, "invalid_workspace", workspace.message);
+    return mutationFailure(
+      "commit_and_push",
+      "commit",
+      workspace.workspaceRoot,
+      "invalid_workspace",
+      workspace.message,
+    );
   }
 
   const branchName = input.branchName?.trim();
   if (branchName) {
     const validation = await validateBranchName(workspace.workspaceRoot, branchName, runner);
     if (validation.ok === false) {
-      return mutationFailure("commit_and_push", "branch", workspace.workspaceRoot, validation.error, validation.message);
+      return mutationFailure(
+        "commit_and_push",
+        "branch",
+        workspace.workspaceRoot,
+        validation.error,
+        validation.message,
+      );
     }
   }
 
@@ -260,7 +336,13 @@ async function commitChangesInWorkspace(
     return mutationFailure(action, "commit", workspaceRoot, "git_not_found", "Git is not available on this Mac.");
   }
   if (!state.repository) {
-    return mutationFailure(action, "commit", workspaceRoot, "not_repository", "Current workspace is not a Git repository.");
+    return mutationFailure(
+      action,
+      "commit",
+      workspaceRoot,
+      "not_repository",
+      "Current workspace is not a Git repository.",
+    );
   }
   if (branchName) {
     const validation = await validateBranchName(workspaceRoot, branchName, runner);
@@ -268,7 +350,13 @@ async function commitChangesInWorkspace(
       return mutationFailure(action, "branch", workspaceRoot, validation.error, validation.message);
     }
   } else if (!state.branch) {
-    return mutationFailure(action, "commit", workspaceRoot, "detached_head", "Create a branch before committing changes.");
+    return mutationFailure(
+      action,
+      "commit",
+      workspaceRoot,
+      "detached_head",
+      "Create a branch before committing changes.",
+    );
   }
 
   const statusArgs = includeUnstagedChanges
@@ -276,7 +364,13 @@ async function commitChangesInWorkspace(
     : ["diff", "--cached", "--name-only", "--", "."];
   const status = await runGit(runner, statusArgs, workspaceRoot);
   if (!isGitRunSuccess(status)) {
-    return mutationFailure(action, "commit", workspaceRoot, gitMissing(status) ? "git_not_found" : "command_failed", sanitizeGitError(status, workspaceRoot));
+    return mutationFailure(
+      action,
+      "commit",
+      workspaceRoot,
+      gitMissing(status) ? "git_not_found" : "command_failed",
+      sanitizeGitError(status, workspaceRoot),
+    );
   }
   if (!status.stdout.trim()) {
     return mutationFailure(action, "commit", workspaceRoot, "nothing_to_commit", "No workspace changes to commit.");
@@ -287,7 +381,13 @@ async function commitChangesInWorkspace(
   if (branchName) {
     const created = await runGit(runner, ["switch", "-c", branchName], workspaceRoot);
     if (!isGitRunSuccess(created)) {
-      return mutationFailure(action, "branch", workspaceRoot, gitMissing(created) ? "git_not_found" : "command_failed", sanitizeGitError(created, workspaceRoot));
+      return mutationFailure(
+        action,
+        "branch",
+        workspaceRoot,
+        gitMissing(created) ? "git_not_found" : "command_failed",
+        sanitizeGitError(created, workspaceRoot),
+      );
     }
     branchCreated = true;
   }
@@ -295,19 +395,33 @@ async function commitChangesInWorkspace(
   if (includeUnstagedChanges) {
     const added = await runGit(runner, ["add", "-A", "--", "."], workspaceRoot);
     if (!isGitRunSuccess(added)) {
-      return mutationFailure(action, "commit", workspaceRoot, gitMissing(added) ? "git_not_found" : "command_failed", sanitizeGitError(added, workspaceRoot), {
-        branch: commitBranch,
-        branchCreated,
-      });
+      return mutationFailure(
+        action,
+        "commit",
+        workspaceRoot,
+        gitMissing(added) ? "git_not_found" : "command_failed",
+        sanitizeGitError(added, workspaceRoot),
+        {
+          branch: commitBranch,
+          branchCreated,
+        },
+      );
     }
   }
 
   const committed = await runGit(runner, ["commit", "-m", message], workspaceRoot);
   if (!isGitRunSuccess(committed)) {
-    return mutationFailure(action, "commit", workspaceRoot, gitMissing(committed) ? "git_not_found" : "command_failed", sanitizeGitError(committed, workspaceRoot), {
-      branch: commitBranch,
-      branchCreated,
-    });
+    return mutationFailure(
+      action,
+      "commit",
+      workspaceRoot,
+      gitMissing(committed) ? "git_not_found" : "command_failed",
+      sanitizeGitError(committed, workspaceRoot),
+      {
+        branch: commitBranch,
+        branchCreated,
+      },
+    );
   }
 
   const hash = await runGit(runner, ["rev-parse", "--short", "HEAD"], workspaceRoot);
@@ -380,7 +494,8 @@ async function validateBranchName(
 ): Promise<{ ok: true } | { ok: false; error: "git_not_found" | "invalid_branch"; message: string }> {
   const validation = await runGit(runner, ["check-ref-format", "--branch", branchName], workspaceRoot);
   if (isGitRunSuccess(validation)) return { ok: true };
-  if (gitMissing(validation)) return { ok: false, error: "git_not_found", message: "Git is not available on this Mac." };
+  if (gitMissing(validation))
+    return { ok: false, error: "git_not_found", message: "Git is not available on this Mac." };
   return { ok: false, error: "invalid_branch", message: "Branch name is not valid." };
 }
 
@@ -393,10 +508,17 @@ async function pushResolvedTarget(
   const args = target.useUpstream ? ["push"] : ["push", "-u", target.remote!, target.branch];
   const pushed = await runGit(runner, args, workspaceRoot, GIT_PUSH_TIMEOUT_MS);
   if (!isGitRunSuccess(pushed)) {
-    return mutationFailure(action, "push", workspaceRoot, gitMissing(pushed) ? "git_not_found" : "command_failed", sanitizeGitError(pushed, workspaceRoot), {
-      branch: target.branch,
-      remote: target.remote,
-    });
+    return mutationFailure(
+      action,
+      "push",
+      workspaceRoot,
+      gitMissing(pushed) ? "git_not_found" : "command_failed",
+      sanitizeGitError(pushed, workspaceRoot),
+      {
+        branch: target.branch,
+        remote: target.remote,
+      },
+    );
   }
   return {
     ok: true,
@@ -410,10 +532,7 @@ async function pushResolvedTarget(
   };
 }
 
-async function readGitRepositoryState(
-  workspaceRoot: string,
-  runner: GitRunner,
-): Promise<GitRepositoryState> {
+async function readGitRepositoryState(workspaceRoot: string, runner: GitRunner): Promise<GitRepositoryState> {
   const repo = await runGit(runner, ["rev-parse", "--is-inside-work-tree"], workspaceRoot);
   if (gitMissing(repo)) {
     return emptyGitState(false);
@@ -422,7 +541,16 @@ async function readGitRepositoryState(
     return emptyGitState(true);
   }
 
-  const [branchResult, headResult, branchesResult, worktreesResult, upstreamResult, remotesResult, gitDirResult, commonDirResult] = await Promise.all([
+  const [
+    branchResult,
+    headResult,
+    branchesResult,
+    worktreesResult,
+    upstreamResult,
+    remotesResult,
+    gitDirResult,
+    commonDirResult,
+  ] = await Promise.all([
     runGit(runner, ["symbolic-ref", "--quiet", "--short", "HEAD"], workspaceRoot),
     runGit(runner, ["rev-parse", "--verify", "HEAD"], workspaceRoot),
     runGit(runner, ["for-each-ref", "--format=%(refname:short)", "refs/heads"], workspaceRoot),
@@ -445,18 +573,20 @@ async function readGitRepositoryState(
   }
 
   const branch = isGitRunSuccess(branchResult) ? branchResult.stdout.trim() || undefined : undefined;
-  const checkedOutBranches = isGitRunSuccess(worktreesResult) ? parseWorktreeBranches(worktreesResult.stdout) : new Map<string, string>();
+  const checkedOutBranches = isGitRunSuccess(worktreesResult)
+    ? parseWorktreeBranches(worktreesResult.stdout)
+    : new Map<string, string>();
   const branches = isGitRunSuccess(branchesResult)
     ? branchesResult.stdout
-      .split(/\r?\n/)
-      .map((name) => name.trim())
-      .filter(Boolean)
-      .sort((left, right) => Number(right === branch) - Number(left === branch) || left.localeCompare(right))
-      .map((name) => ({
-        name,
-        current: name === branch,
-        ...(name !== branch && checkedOutBranches.get(name) ? { checkedOutPath: checkedOutBranches.get(name) } : {}),
-      }))
+        .split(/\r?\n/)
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .sort((left, right) => Number(right === branch) - Number(left === branch) || left.localeCompare(right))
+        .map((name) => ({
+          name,
+          current: name === branch,
+          ...(name !== branch && checkedOutBranches.get(name) ? { checkedOutPath: checkedOutBranches.get(name) } : {}),
+        }))
     : [];
   if (branch && !branches.some((item) => item.name === branch)) {
     branches.unshift({ name: branch, current: true });
@@ -469,7 +599,12 @@ async function readGitRepositoryState(
     detached: !branch,
     hasHead: isGitRunSuccess(headResult),
     upstream: isGitRunSuccess(upstreamResult) ? upstreamResult.stdout.trim() || undefined : undefined,
-    remotes: isGitRunSuccess(remotesResult) ? remotesResult.stdout.split(/\r?\n/).map((item) => item.trim()).filter(Boolean) : [],
+    remotes: isGitRunSuccess(remotesResult)
+      ? remotesResult.stdout
+          .split(/\r?\n/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [],
     locationKind,
   };
 }
@@ -525,12 +660,7 @@ function mutationFailure(
   return { ok: false, action, phase, workspaceRoot, error, message, ...extra };
 }
 
-function runGit(
-  runner: GitRunner,
-  args: string[],
-  cwd: string,
-  timeoutMs = GIT_TIMEOUT_MS,
-): Promise<GitRunResult> {
+function runGit(runner: GitRunner, args: string[], cwd: string, timeoutMs = GIT_TIMEOUT_MS): Promise<GitRunResult> {
   return runner(args, { cwd, timeoutMs, maxOutputChars: GIT_MAX_OUTPUT_CHARS });
 }
 
@@ -542,8 +672,10 @@ function sanitizeGitError(result: GitRunResult, workspaceRoot: string): string {
   if (result.timedOut) return "Git command timed out.";
   if (gitMissing(result)) return "Git is not available on this Mac.";
   const raw = (result.stderr || result.stdout || result.startError?.code || "Git command failed.").trim();
-  return raw
-    .replaceAll(workspaceRoot, "<workspace>")
-    .replace(/([a-z][a-z0-9+.-]*:\/\/)([^\s/@]+)@/gi, "$1<redacted>@")
-    .slice(0, 1_200) || "Git command failed.";
+  return (
+    raw
+      .replaceAll(workspaceRoot, "<workspace>")
+      .replace(/([a-z][a-z0-9+.-]*:\/\/)([^\s/@]+)@/gi, "$1<redacted>@")
+      .slice(0, 1_200) || "Git command failed."
+  );
 }

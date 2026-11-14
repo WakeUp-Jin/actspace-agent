@@ -9,10 +9,22 @@ export const DOMAIN_EVENT_PATHS = HARNESS_EVENT_DECLARATION_PATHS.slice(1);
 export const GENERATOR_VERSION = "1.0.0";
 
 export const EVENT_SOURCES = Object.freeze({
-  sessionCore: Object.freeze({ path: "packages/session/session-journal/src/core-codecs.ts", symbol: "CORE_EVENT_TYPES" }),
-  sessionExtensions: Object.freeze({ path: "packages/session/session-journal/src/core-codecs.ts", symbol: "PERSISTED_EXTENSION_EVENT_TYPES" }),
-  loopInterventions: Object.freeze({ path: "packages/composition/cordis-adapter/src/event-contract.ts", symbol: "AgentLoopIntervention" }),
-  notifications: Object.freeze({ path: "packages/composition/cordis-adapter/src/event-contract.ts", symbol: "AgentNotification" }),
+  sessionCore: Object.freeze({
+    path: "packages/session/session-journal/src/core-codecs.ts",
+    symbol: "CORE_EVENT_TYPES",
+  }),
+  sessionExtensions: Object.freeze({
+    path: "packages/session/session-journal/src/core-codecs.ts",
+    symbol: "PERSISTED_EXTENSION_EVENT_TYPES",
+  }),
+  loopInterventions: Object.freeze({
+    path: "packages/composition/cordis-adapter/src/event-contract.ts",
+    symbol: "AgentLoopIntervention",
+  }),
+  notifications: Object.freeze({
+    path: "packages/composition/cordis-adapter/src/event-contract.ts",
+    symbol: "AgentNotification",
+  }),
 });
 
 export const SERVICE_SOURCE = Object.freeze({
@@ -168,16 +180,64 @@ export const PACKAGE_PATHS = Object.freeze([
 ]);
 
 export const VERIFICATION_SOURCES = Object.freeze([
-  Object.freeze({ id: "session-journal/core-codec-contract", path: "packages/session/session-journal/src/test/journal.test.ts", kind: "contract" }),
-  Object.freeze({ id: "session-journal/lifecycle-contract", path: "packages/session/session-journal/src/test/lifecycle.test.ts", kind: "lifecycle" }),
-  Object.freeze({ id: "session-journal/auxiliary-request-contract", path: "packages/session/session-journal/src/test/auxiliary-requests.test.ts", kind: "contract" }),
-  Object.freeze({ id: "runtime/auxiliary-request-recorder", path: "packages/core/runtime/src/session/auxiliary-request-recorder.test.ts", kind: "lifecycle" }),
-  Object.freeze({ id: "image-inspection/auxiliary-request-lifecycle", path: "packages/image/tool-image-inspection/src/test/auxiliary-requests.test.ts", kind: "lifecycle" }),
-  Object.freeze({ id: "session-persistence/provider-seam", path: "packages/session/session-persistence/src/test/provider-seam.test.ts", kind: "contract" }),
-  Object.freeze({ id: "cordis-adapter/event-contract", path: "packages/composition/cordis-adapter/tests/contract.spec.ts", kind: "contract" }),
-  Object.freeze({ id: "cordis-adapter/service-contract", path: "packages/composition/cordis-adapter/tests/service-contract.spec.ts", kind: "contract" }),
-  Object.freeze({ id: "composition/admission-contract", path: "packages/composition/composition/tests/composition.spec.ts", kind: "contract" }),
-  Object.freeze({ id: "runtime/lifecycle-contract", path: "packages/core/runtime/src/harness/agent-runtime-lifecycle.test.ts", kind: "lifecycle" }),
-  Object.freeze({ id: "runtime/profile-composition-contract", path: "packages/core/runtime/src/profiles/composition.test.ts", kind: "contract" }),
-  Object.freeze({ id: "desktop-app/lifecycle-contract", path: "packages/host/desktop-app/src/test/lifecycle.test.ts", kind: "lifecycle" }),
+  Object.freeze({
+    id: "session-journal/core-codec-contract",
+    path: "packages/session/session-journal/src/test/journal.test.ts",
+    kind: "contract",
+  }),
+  Object.freeze({
+    id: "session-journal/lifecycle-contract",
+    path: "packages/session/session-journal/src/test/lifecycle.test.ts",
+    kind: "lifecycle",
+  }),
+  Object.freeze({
+    id: "session-journal/auxiliary-request-contract",
+    path: "packages/session/session-journal/src/test/auxiliary-requests.test.ts",
+    kind: "contract",
+  }),
+  Object.freeze({
+    id: "runtime/auxiliary-request-recorder",
+    path: "packages/core/runtime/src/session/auxiliary-request-recorder.test.ts",
+    kind: "lifecycle",
+  }),
+  Object.freeze({
+    id: "image-inspection/auxiliary-request-lifecycle",
+    path: "packages/image/tool-image-inspection/src/test/auxiliary-requests.test.ts",
+    kind: "lifecycle",
+  }),
+  Object.freeze({
+    id: "session-persistence/provider-seam",
+    path: "packages/session/session-persistence/src/test/provider-seam.test.ts",
+    kind: "contract",
+  }),
+  Object.freeze({
+    id: "cordis-adapter/event-contract",
+    path: "packages/composition/cordis-adapter/tests/contract.spec.ts",
+    kind: "contract",
+  }),
+  Object.freeze({
+    id: "cordis-adapter/service-contract",
+    path: "packages/composition/cordis-adapter/tests/service-contract.spec.ts",
+    kind: "contract",
+  }),
+  Object.freeze({
+    id: "composition/admission-contract",
+    path: "packages/composition/composition/tests/composition.spec.ts",
+    kind: "contract",
+  }),
+  Object.freeze({
+    id: "runtime/lifecycle-contract",
+    path: "packages/core/runtime/src/harness/agent-runtime-lifecycle.test.ts",
+    kind: "lifecycle",
+  }),
+  Object.freeze({
+    id: "runtime/profile-composition-contract",
+    path: "packages/core/runtime/src/profiles/composition.test.ts",
+    kind: "contract",
+  }),
+  Object.freeze({
+    id: "desktop-app/lifecycle-contract",
+    path: "packages/host/desktop-app/src/test/lifecycle.test.ts",
+    kind: "lifecycle",
+  }),
 ]);

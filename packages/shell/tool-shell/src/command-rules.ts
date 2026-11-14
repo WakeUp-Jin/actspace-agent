@@ -18,9 +18,12 @@ const DELETE_COMMANDS = new Set(["rm", "rmdir"]);
 const SHELL_GLOB_RE = /[*?\[]/;
 const DEVICE_TARGETS = new Set(["/dev/null", "/dev/stdout", "/dev/stderr"]);
 
-const SUBSTITUTION_REASON = "Command uses variable or command substitution ($, `) that cannot be safely classified. Put inline script source in single quotes, or write the script to a file and run the file.";
-const GROUPING_REASON = "Command uses subshells, brace groups, or process substitution that cannot be safely classified. Run one pipeline at a time, or write the script to a file and run the file.";
-const HEREDOC_REASON = "Quote the heredoc delimiter (<<'EOF') so the body is not expanded, or write the script to a file and run the file.";
+const SUBSTITUTION_REASON =
+  "Command uses variable or command substitution ($, `) that cannot be safely classified. Put inline script source in single quotes, or write the script to a file and run the file.";
+const GROUPING_REASON =
+  "Command uses subshells, brace groups, or process substitution that cannot be safely classified. Run one pipeline at a time, or write the script to a file and run the file.";
+const HEREDOC_REASON =
+  "Quote the heredoc delimiter (<<'EOF') so the body is not expanded, or write the script to a file and run the file.";
 const REDIRECT_REASON = "Redirection targets must stay inside the workspace or the temp directory.";
 
 type Word = {
@@ -62,7 +65,10 @@ function classify(simple: SimpleCommand, cwd: string, workspaceRoot: string): st
       if (nested.split(/[\\/]+/).includes(".git")) return "Delete command targets repository metadata.";
     }
   }
-  if ((first === "rm" || first === "rmdir" || first === "mv") && tokens.slice(1).some((token) => token.replace(/\/+$/, "").endsWith(".git"))) {
+  if (
+    (first === "rm" || first === "rmdir" || first === "mv") &&
+    tokens.slice(1).some((token) => token.replace(/\/+$/, "").endsWith(".git"))
+  ) {
     return "Command deletes or moves repository metadata.";
   }
   for (const redirect of simple.redirects) {
@@ -91,21 +97,40 @@ function tempRoots(): readonly string[] {
   const roots = new Set<string>(["/tmp", "/private/tmp"]);
   for (const candidate of [tmpdir()]) {
     roots.add(resolve(candidate));
-    try { roots.add(realpathSync(candidate)); } catch { /* keep the unresolved path */ }
+    try {
+      roots.add(realpathSync(candidate));
+    } catch {
+      /* keep the unresolved path */
+    }
   }
   cachedTempRoots = Object.freeze([...roots]);
   return cachedTempRoots;
 }
 
 function isCriticalPath(token: string): boolean {
-  return token === "/" || token === "~" || token === "$HOME" || token === "/tmp" || token === "/var" || token === "/usr" || token === "/bin" || token === "/sbin" || token === "/etc" || token === "/Applications" || /^\/Users\/[^/]+$/.test(token);
+  return (
+    token === "/" ||
+    token === "~" ||
+    token === "$HOME" ||
+    token === "/tmp" ||
+    token === "/var" ||
+    token === "/usr" ||
+    token === "/bin" ||
+    token === "/sbin" ||
+    token === "/etc" ||
+    token === "/Applications" ||
+    /^\/Users\/[^/]+$/.test(token)
+  );
 }
 
 function commandTargets(tokens: readonly string[]): readonly string[] {
   const targets: string[] = [];
   let optionsEnded = false;
   for (const token of tokens.slice(1)) {
-    if (!optionsEnded && token === "--") { optionsEnded = true; continue; }
+    if (!optionsEnded && token === "--") {
+      optionsEnded = true;
+      continue;
+    }
     if (!optionsEnded && token.startsWith("-")) continue;
     targets.push(token);
   }
@@ -119,7 +144,10 @@ function commandTargets(tokens: readonly string[]): readonly string[] {
 function lex(command: string): Lexed {
   const commands: SimpleCommand[] = [];
   let current: SimpleCommand = { words: [], redirects: [] };
-  let text = "", unquoted = "", started = false, quote: "'" | '"' | undefined;
+  let text = "",
+    unquoted = "",
+    started = false,
+    quote: "'" | '"' | undefined;
   let pendingRedirect: Redirect | undefined;
   const pendingHeredocs: { delimiter: string; stripTabs: boolean }[] = [];
   let expectHeredocDelimiter: boolean | undefined;
@@ -127,7 +155,9 @@ function lex(command: string): Lexed {
   const endWord = (): string | undefined => {
     if (!started) return undefined;
     const word: Word = { text, unquoted };
-    text = ""; unquoted = ""; started = false;
+    text = "";
+    unquoted = "";
+    started = false;
     if (expectHeredocDelimiter !== undefined) {
       // A delimiter with any quoted character keeps the body literal; an unquoted one lets the shell expand the body.
       if (word.unquoted.length === word.text.length) return HEREDOC_REASON;
@@ -147,38 +177,68 @@ function lex(command: string): Lexed {
     const reason = endWord();
     if (reason) return reason;
     if (pendingRedirect !== undefined || expectHeredocDelimiter !== undefined) return "Redirection has no target.";
-    if (current.words.length === 0 && current.redirects.length === 0) return "Command contains an empty or unparseable segment.";
+    if (current.words.length === 0 && current.redirects.length === 0)
+      return "Command contains an empty or unparseable segment.";
     commands.push(current);
     current = { words: [], redirects: [] };
     return undefined;
   };
-  const redirect = (output: boolean): void => { pendingRedirect = { output, target: undefined }; };
+  const redirect = (output: boolean): void => {
+    pendingRedirect = { output, target: undefined };
+  };
 
   let i = 0;
   while (i < command.length) {
     const char = command[i]!;
     if (quote === "'") {
-      if (char === "'") quote = undefined; else text += char;
-      i++; continue;
+      if (char === "'") quote = undefined;
+      else text += char;
+      i++;
+      continue;
     }
     if (quote === '"') {
-      if (char === '"') { quote = undefined; i++; continue; }
+      if (char === '"') {
+        quote = undefined;
+        i++;
+        continue;
+      }
       if (char === "$" || char === "`") return { reason: SUBSTITUTION_REASON };
-      if (char === "\\" && i + 1 < command.length && '"\\$`\n'.includes(command[i + 1]!)) { if (command[i + 1] !== "\n") text += command[i + 1]!; i += 2; continue; }
-      text += char; i++; continue;
+      if (char === "\\" && i + 1 < command.length && '"\\$`\n'.includes(command[i + 1]!)) {
+        if (command[i + 1] !== "\n") text += command[i + 1]!;
+        i += 2;
+        continue;
+      }
+      text += char;
+      i++;
+      continue;
     }
     if (char === "\\") {
       if (i + 1 >= command.length) return { reason: "Command has an unterminated quote or escape." };
-      if (command[i + 1] !== "\n") { text += command[i + 1]!; started = true; }
-      i += 2; continue;
+      if (command[i + 1] !== "\n") {
+        text += command[i + 1]!;
+        started = true;
+      }
+      i += 2;
+      continue;
     }
-    if (char === "'" || char === '"') { quote = char; started = true; i++; continue; }
+    if (char === "'" || char === '"') {
+      quote = char;
+      started = true;
+      i++;
+      continue;
+    }
     if (char === "$" || char === "`") return { reason: SUBSTITUTION_REASON };
     if (char === "(" || char === ")" || char === "{" || char === "}") return { reason: GROUPING_REASON };
-    if (char === " " || char === "\t") { const reason = endWord(); if (reason) return { reason }; i++; continue; }
+    if (char === " " || char === "\t") {
+      const reason = endWord();
+      if (reason) return { reason };
+      i++;
+      continue;
+    }
     if (char === "\n") {
       if (pendingHeredocs.length > 0 || current.words.length > 0 || current.redirects.length > 0 || started) {
-        const reason = endCommand(); if (reason) return { reason };
+        const reason = endCommand();
+        if (reason) return { reason };
       }
       i++;
       while (pendingHeredocs.length > 0) {
@@ -192,20 +252,34 @@ function lex(command: string): Lexed {
     if (char === ";" || char === "&" || char === "|") {
       const two = command.slice(i, i + 2);
       if (two === "&>") {
-        const reason = endWord(); if (reason) return { reason };
-        redirect(true); i += command[i + 2] === ">" ? 3 : 2; continue;
+        const reason = endWord();
+        if (reason) return { reason };
+        redirect(true);
+        i += command[i + 2] === ">" ? 3 : 2;
+        continue;
       }
       if (two === "<(" || two === ">(") return { reason: GROUPING_REASON };
-      const reason = endCommand(); if (reason) return { reason };
+      const reason = endCommand();
+      if (reason) return { reason };
       i += two === "&&" || two === "||" || two === "|&" ? 2 : 1;
       continue;
     }
     if (char === "<" || char === ">") {
       if (command[i + 1] === "(") return { reason: GROUPING_REASON };
       // `2>file`, `2>&1`: a word made only of digits directly before the operator is the descriptor.
-      if (started && /^\d+$/.test(unquoted) && unquoted === text) { text = ""; unquoted = ""; started = false; }
-      else { const reason = endWord(); if (reason) return { reason }; }
-      if (char === "<" && command.startsWith("<<<", i)) { redirect(false); i += 3; continue; }
+      if (started && /^\d+$/.test(unquoted) && unquoted === text) {
+        text = "";
+        unquoted = "";
+        started = false;
+      } else {
+        const reason = endWord();
+        if (reason) return { reason };
+      }
+      if (char === "<" && command.startsWith("<<<", i)) {
+        redirect(false);
+        i += 3;
+        continue;
+      }
       if (char === "<" && command.startsWith("<<", i)) {
         const stripTabs = command[i + 2] === "-";
         expectHeredocDelimiter = stripTabs;
@@ -215,18 +289,33 @@ function lex(command: string): Lexed {
       if (command[i + 1] === "&") {
         // `>&2` duplicates a descriptor; `>&file` is an output redirect. Decide when the target word ends.
         const target = readDupTarget(command, i + 2);
-        if (target !== undefined) { i = target; continue; }
-        redirect(char === ">"); i += 2; continue;
+        if (target !== undefined) {
+          i = target;
+          continue;
+        }
+        redirect(char === ">");
+        i += 2;
+        continue;
       }
       redirect(char === ">");
       i += command[i + 1] === char || (char === ">" && command[i + 1] === "|") ? 2 : 1;
       continue;
     }
-    text += char; unquoted += char; started = true; i++;
+    text += char;
+    unquoted += char;
+    started = true;
+    i++;
   }
   if (quote !== undefined) return { reason: "Command has an unterminated quote or escape." };
-  if (current.words.length > 0 || current.redirects.length > 0 || started || pendingRedirect !== undefined || expectHeredocDelimiter !== undefined) {
-    const reason = endCommand(); if (reason) return { reason };
+  if (
+    current.words.length > 0 ||
+    current.redirects.length > 0 ||
+    started ||
+    pendingRedirect !== undefined ||
+    expectHeredocDelimiter !== undefined
+  ) {
+    const reason = endCommand();
+    if (reason) return { reason };
   }
   if (pendingHeredocs.length > 0) return { reason: "Heredoc body is not terminated." };
   return { commands };
@@ -246,7 +335,8 @@ function skipHeredocBody(command: string, start: number, delimiter: string, stri
   while (i <= command.length) {
     const newline = command.indexOf("\n", i);
     const line = command.slice(i, newline === -1 ? command.length : newline);
-    if ((stripTabs ? line.replace(/^\t+/, "") : line) === delimiter) return newline === -1 ? command.length : newline + 1;
+    if ((stripTabs ? line.replace(/^\t+/, "") : line) === delimiter)
+      return newline === -1 ? command.length : newline + 1;
     if (newline === -1) return undefined;
     i = newline + 1;
   }

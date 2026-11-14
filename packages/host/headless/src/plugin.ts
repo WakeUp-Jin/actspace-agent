@@ -1,6 +1,12 @@
 import { getService, provideService, type CordisContext } from "@actspace/cordis-adapter";
-import { HEADLESS_AGENT_RUNTIME_VIEW, HEADLESS_HOST_PORT, HEADLESS_HOST_PORT_ID, HEADLESS_RUNNER_SERVICE, HEADLESS_SESSIONS_VIEW, HeadlessRunner } from "./runner.js";
-
+import {
+  HEADLESS_AGENT_RUNTIME_VIEW,
+  HEADLESS_HOST_PORT,
+  HEADLESS_HOST_PORT_ID,
+  HEADLESS_RUNNER_SERVICE,
+  HEADLESS_SESSIONS_VIEW,
+  HeadlessRunner,
+} from "./runner.js";
 
 export const inject = Object.freeze([HEADLESS_HOST_PORT_ID, "session.runtime", "agent.runtime"]);
 

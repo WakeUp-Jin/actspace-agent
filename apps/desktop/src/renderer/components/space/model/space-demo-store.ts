@@ -2,12 +2,33 @@
 // 不引入状态库；React 侧见 use-space-demo.ts。
 import { spaceColorAt } from "../avatar/avatar-assets";
 import {
-  bumpRows, COORD_TAB, currentSpace, currentTab, findMember, initialState, mapMember, mapSpace, materialize, nameOf,
-  panelFor, panelKey, plainOf, settleStreams, trayList,
+  bumpRows,
+  COORD_TAB,
+  currentSpace,
+  currentTab,
+  findMember,
+  initialState,
+  mapMember,
+  mapSpace,
+  materialize,
+  nameOf,
+  panelFor,
+  panelKey,
+  plainOf,
+  settleStreams,
+  trayList,
 } from "./selectors";
 import type {
-  CreateSpaceInput, PanelKind, PanelState, RosterActor, Space, SpaceDemoActions, SpaceDemoClock, SpaceDemoState,
-  SpaceDemoStore, SpaceMember,
+  CreateSpaceInput,
+  PanelKind,
+  PanelState,
+  RosterActor,
+  Space,
+  SpaceDemoActions,
+  SpaceDemoClock,
+  SpaceDemoState,
+  SpaceDemoStore,
+  SpaceMember,
 } from "./types";
 
 export type { CreateSpaceInput, SpaceDemoActions, SpaceDemoClock, SpaceDemoStore };
@@ -45,14 +66,18 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
   let resetEpoch = 0;
   let noticeTimer: unknown = null;
 
-  const emit = () => listeners.forEach((l) => { l(); });
+  const emit = () =>
+    listeners.forEach((l) => {
+      l();
+    });
   const update = (patch: Partial<SpaceDemoState> | ((s: SpaceDemoState) => Partial<SpaceDemoState>)) => {
     const p = typeof patch === "function" ? patch(state) : patch;
     state = materialize({ ...state, ...p });
     emit();
   };
   const after = (scope: "space" | "global", ms: number, fn: () => void): unknown => {
-    const se = spaceEpoch, re = resetEpoch;
+    const se = spaceEpoch,
+      re = resetEpoch;
     const h = clock.setTimeout(() => {
       timers[scope].delete(h);
       if (se !== spaceEpoch && scope === "space") return;
@@ -63,7 +88,9 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     return h;
   };
   const clearScope = (scope: "space" | "global") => {
-    timers[scope].forEach((h) => { clock.clearTimeout(h); });
+    timers[scope].forEach((h) => {
+      clock.clearTimeout(h);
+    });
     timers[scope].clear();
   };
   /** 离开当前 Space / 视图前调用：清定时器，把流式中的消息收成完整文字 */
@@ -74,7 +101,10 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
   };
 
   function notify(text: string) {
-    if (noticeTimer != null) { clock.clearTimeout(noticeTimer); timers.global.delete(noticeTimer); }
+    if (noticeTimer != null) {
+      clock.clearTimeout(noticeTimer);
+      timers.global.delete(noticeTimer);
+    }
     const id = makeId();
     update({ notice: { id, text } });
     noticeTimer = after("global", TIMING.notice, () => {
@@ -85,24 +115,39 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
 
   /* ---------- 流式回复 ---------- */
   type Streamable = { plain: string; typing?: boolean; shown?: number | null };
-  interface StreamRef { get(): Streamable | undefined; patch(fn: (m: Streamable) => Streamable): void }
+  interface StreamRef {
+    get(): Streamable | undefined;
+    patch(fn: (m: Streamable) => Streamable): void;
+  }
 
   function coordRef(sid: string, idx: number): StreamRef {
     return {
-      get: () => { const m = state.spaces.find((s) => s.id === sid)?.msgs[idx]; return m?.k === "coord" ? m : undefined; },
-      patch: (fn) => update((s) => ({
-        spaces: mapSpace(s, sid, (sp) => ({
-          ...sp, msgs: sp.msgs.map((m, i) => (i === idx && m.k === "coord" ? { ...m, ...fn(m) } : m)),
+      get: () => {
+        const m = state.spaces.find((s) => s.id === sid)?.msgs[idx];
+        return m?.k === "coord" ? m : undefined;
+      },
+      patch: (fn) =>
+        update((s) => ({
+          spaces: mapSpace(s, sid, (sp) => ({
+            ...sp,
+            msgs: sp.msgs.map((m, i) => (i === idx && m.k === "coord" ? { ...m, ...fn(m) } : m)),
+          })),
         })),
-      })),
     };
   }
   function soloRef(aid: string, idx: number): StreamRef {
     return {
-      get: () => { const m = state.chats[aid]?.[idx]; return m?.k === "actor" ? m : undefined; },
-      patch: (fn) => update((s) => ({
-        chats: { ...s.chats, [aid]: (s.chats[aid] ?? []).map((m, i) => (i === idx && m.k === "actor" ? { ...m, ...fn(m) } : m)) },
-      })),
+      get: () => {
+        const m = state.chats[aid]?.[idx];
+        return m?.k === "actor" ? m : undefined;
+      },
+      patch: (fn) =>
+        update((s) => ({
+          chats: {
+            ...s.chats,
+            [aid]: (s.chats[aid] ?? []).map((m, i) => (i === idx && m.k === "actor" ? { ...m, ...fn(m) } : m)),
+          },
+        })),
     };
   }
 
@@ -111,14 +156,19 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     after("space", delay, () => {
       if (!ref.get()) return;
       ref.patch((m) => ({ ...m, typing: false, shown: 0 }));
-      const tick = () => after("space", TIMING.streamTick, () => {
-        const m = ref.get();
-        if (!m || m.shown == null) return;
-        const next = m.shown + TIMING.streamChars;
-        if (next >= m.plain.length) { ref.patch((x) => ({ ...x, shown: null })); onEnd?.(); return; }
-        ref.patch((x) => ({ ...x, shown: next }));
-        tick();
-      });
+      const tick = () =>
+        after("space", TIMING.streamTick, () => {
+          const m = ref.get();
+          if (!m || m.shown == null) return;
+          const next = m.shown + TIMING.streamChars;
+          if (next >= m.plain.length) {
+            ref.patch((x) => ({ ...x, shown: null }));
+            onEnd?.();
+            return;
+          }
+          ref.patch((x) => ({ ...x, shown: next }));
+          tick();
+        });
       tick();
     });
   }
@@ -130,12 +180,20 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
       const target = sp?.members.find((m) => m.status === "run" && !m.approval);
       if (!target) return;
       update((s) => ({
-        spaces: mapSpace(s, sid, (x) => mapMember(x, target.id, (m) => ({
-          ...m, status: "wait", ask: "想跑带覆盖率的测试", time: "刚刚",
-          todo: m.todo ? [1, m.todo[1]] : m.todo,
-          approval: { cmd: "pnpm test --coverage", why: "需要跑带覆盖率的完整测试，耗时约 2 分钟，会写入 coverage/ 目录。" },
-          transcript: [...m.transcript, { k: "approval" }],
-        }))),
+        spaces: mapSpace(s, sid, (x) =>
+          mapMember(x, target.id, (m) => ({
+            ...m,
+            status: "wait",
+            ask: "想跑带覆盖率的测试",
+            time: "刚刚",
+            todo: m.todo ? [1, m.todo[1]] : m.todo,
+            approval: {
+              cmd: "pnpm test --coverage",
+              why: "需要跑带覆盖率的完整测试，耗时约 2 分钟，会写入 coverage/ 目录。",
+            },
+            transcript: [...m.transcript, { k: "approval" }],
+          })),
+        ),
         ...bumpRows(s, []),
         approvalPulse: s.approvalPulse + 1,
       }));
@@ -154,7 +212,11 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     const idle = space.members.find((m) => m.status === "idle" && !state.actors[m.id]?.nascent);
     const nid = "n" + makeId();
     const nascent: RosterActor = {
-      id: nid, name: "排查现有实现", nascent: true, scene: "把现有实现摸清楚。", abilities: [],
+      id: nid,
+      name: "排查现有实现",
+      nascent: true,
+      scene: "把现有实现摸清楚。",
+      abilities: [],
       growImg: (hashCode(nid) % 9) + 1,
     };
     const short = text.length > 16 ? text.slice(0, 16) + "…" : text;
@@ -165,7 +227,8 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     const idx = space.msgs.length + 1;
     update((s) => ({
       spaces: mapSpace(s, sid, (sp) => ({
-        ...sp, activeTab: COORD_TAB,
+        ...sp,
+        activeTab: COORD_TAB,
         msgs: [...sp.msgs, { k: "user", t: text }, { k: "coord", t, plain, typing: true }],
       })),
     }));
@@ -177,7 +240,12 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
           let next = sp;
           if (idle) {
             next = mapMember(next, idle.id, (m) => ({
-              ...m, status: "run", task: short, todo: [0, 3], time: "", note: null,
+              ...m,
+              status: "run",
+              task: short,
+              todo: [0, 3],
+              time: "",
+              note: null,
               transcript: [
                 ...m.transcript,
                 { k: "task", t: short, at: "刚刚" },
@@ -187,7 +255,11 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
             }));
           }
           const member: SpaceMember = {
-            id: nid, status: "run", task: "排查现有实现", todo: [0, 3], dir: sp.dirs[0] || "checkout-web",
+            id: nid,
+            status: "run",
+            task: "排查现有实现",
+            todo: [0, 3],
+            dir: sp.dirs[0] || "checkout-web",
             transcript: [
               { k: "task", t: "排查现有实现", at: "刚刚" },
               { k: "brief", t: text },
@@ -210,25 +282,44 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     const reply = "收到。这在我的场景里，我先看一下，有结论直接告诉你。";
     const idx = (state.chats[id] ?? []).length + 1;
     update((s) => ({
-      chats: { ...s.chats, [id]: [...(s.chats[id] ?? []), { k: "user", t: text }, { k: "actor", t: reply, plain: reply, typing: true }] },
+      chats: {
+        ...s.chats,
+        [id]: [...(s.chats[id] ?? []), { k: "user", t: text }, { k: "actor", t: reply, plain: reply, typing: true }],
+      },
     }));
     streamReply(soloRef(id, idx), TIMING.soloTyping);
   }
 
-  function afterDecision(s: SpaceDemoState, sid: string, id: string, fn: (m: SpaceMember) => SpaceMember): Partial<SpaceDemoState> {
+  function afterDecision(
+    s: SpaceDemoState,
+    sid: string,
+    id: string,
+    fn: (m: SpaceMember) => SpaceMember,
+  ): Partial<SpaceDemoState> {
     const spaces = mapSpace(s, sid, (sp) => mapMember(sp, id, fn));
     const next = { ...s, spaces };
-    return { spaces, trayIdx: 0, trayOpen: s.trayOpen && trayList(currentSpace(next), currentTab(next)).length > 0, ...bumpRows(s, []) };
+    return {
+      spaces,
+      trayIdx: 0,
+      trayOpen: s.trayOpen && trayList(currentSpace(next), currentTab(next)).length > 0,
+      ...bumpRows(s, []),
+    };
   }
 
   function approve(id: string) {
     const sp = currentSpace(state);
     const m = findMember(sp, id);
     if (m?.status !== "wait") return;
-    update((s) => afterDecision(s, sp.id, id, (x) => ({
-      ...x, status: "run", ask: null, time: "", denied: false,
-      todo: x.todo && x.todo[0] < x.todo[1] ? [x.todo[0] + 1, x.todo[1]] : x.todo,
-    })));
+    update((s) =>
+      afterDecision(s, sp.id, id, (x) => ({
+        ...x,
+        status: "run",
+        ask: null,
+        time: "",
+        denied: false,
+        todo: x.todo && x.todo[0] < x.todo[1] ? [x.todo[0] + 1, x.todo[1]] : x.todo,
+      })),
+    );
     notify("已批准，" + nameOf(state.actors, id) + " 继续了");
   }
 
@@ -236,9 +327,17 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     const sp = currentSpace(state);
     const m = findMember(sp, id);
     if (m?.status !== "wait") return;
-    update((s) => afterDecision(s, sp.id, id, (x) => ({
-      ...x, status: "idle", last: x.task, note: "命令被拒绝，等你给方向", time: "刚刚", denied: true, ask: null,
-    })));
+    update((s) =>
+      afterDecision(s, sp.id, id, (x) => ({
+        ...x,
+        status: "idle",
+        last: x.task,
+        note: "命令被拒绝，等你给方向",
+        time: "刚刚",
+        denied: true,
+        ask: null,
+      })),
+    );
     notify("已拒绝，" + nameOf(state.actors, id) + " 等你给别的方向");
   }
 
@@ -259,15 +358,16 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
       after("space", TIMING.resultSettles, () => {
         if (findMember(state.spaces.find((x) => x.id === sid)!, id)?.status !== "result") return;
         update((s) => ({
-          spaces: mapSpace(s, sid, (sp) => mapMember(sp, id, (x) => ({ ...x, status: "idle", last: x.task, task: null }))),
+          spaces: mapSpace(s, sid, (sp) =>
+            mapMember(sp, id, (x) => ({ ...x, status: "idle", last: x.task, task: null })),
+          ),
           ...bumpRows(s, []),
         }));
       });
     }
   }
 
-  const setActive = (s: SpaceDemoState, tab: string) =>
-    mapSpace(s, s.spaceId, (sp) => ({ ...sp, activeTab: tab }));
+  const setActive = (s: SpaceDemoState, tab: string) => mapSpace(s, s.spaceId, (sp) => ({ ...sp, activeTab: tab }));
 
   function selectTab(id: string) {
     const sp = currentSpace(state);
@@ -281,13 +381,15 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     if (id === COORD_TAB || i < 0) return;
     const rest = sp.openTabs.filter((x) => x !== id);
     // 关掉当前标签：跳到左边那个，没有就回到协调 Agent
-    const active = currentTab(state) === id ? rest[i - 1] ?? COORD_TAB : sp.activeTab;
+    const active = currentTab(state) === id ? (rest[i - 1] ?? COORD_TAB) : sp.activeTab;
     update((s) => ({ spaces: mapSpace(s, sp.id, (x) => ({ ...x, openTabs: rest, activeTab: active })) }));
   }
 
   function closeOtherTabs() {
     const tab = currentTab(state);
-    update((s) => ({ spaces: mapSpace(s, s.spaceId, (sp) => ({ ...sp, openTabs: tab === COORD_TAB ? [] : [tab], activeTab: tab })) }));
+    update((s) => ({
+      spaces: mapSpace(s, s.spaceId, (sp) => ({ ...sp, openTabs: tab === COORD_TAB ? [] : [tab], activeTab: tab })),
+    }));
   }
 
   function switchSpace(id: string) {
@@ -306,14 +408,24 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     if (!state.actors[id]) return;
     if (state.view !== "chat" || state.chatWith !== id) leave();
     update((s) => ({
-      view: "chat", chatWith: id, chats: { ...s.chats, [id]: s.chats[id] ?? [] },
-      soloChats: [id, ...s.soloChats.filter((x) => x !== id)].slice(0, 3), trayOpen: false,
+      view: "chat",
+      chatWith: id,
+      chats: { ...s.chats, [id]: s.chats[id] ?? [] },
+      soloChats: [id, ...s.soloChats.filter((x) => x !== id)].slice(0, 3),
+      trayOpen: false,
     }));
   }
 
-  const setKeepState = (s: SpaceDemoState, sid: string, aid: string, from: string[], to: "growing" | "kept" | "declined"): Space[] =>
+  const setKeepState = (
+    s: SpaceDemoState,
+    sid: string,
+    aid: string,
+    from: string[],
+    to: "growing" | "kept" | "declined",
+  ): Space[] =>
     mapSpace(s, sid, (sp) => ({
-      ...sp, msgs: sp.msgs.map((m) => (m.k === "keep" && m.aid === aid && from.includes(m.state) ? { ...m, state: to } : m)),
+      ...sp,
+      msgs: sp.msgs.map((m) => (m.k === "keep" && m.aid === aid && from.includes(m.state) ? { ...m, state: to } : m)),
     }));
 
   function keepActor(id: string) {
@@ -326,7 +438,18 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
       const a = state.actors[id];
       if (!a) return;
       update((s) => ({
-        actors: { ...s.actors, [id]: { ...a, nascent: false, img: a.growImg, abilities: ["环境检查", "健康探测"], memN: 1, last: "刚刚长成", spaces: 1 } },
+        actors: {
+          ...s.actors,
+          [id]: {
+            ...a,
+            nascent: false,
+            img: a.growImg,
+            abilities: ["环境检查", "健康探测"],
+            memN: 1,
+            last: "刚刚长成",
+            spaces: 1,
+          },
+        },
         spaces: setKeepState(s, sid, id, ["growing"], "kept"),
         freshCard: id,
         justGrown: { id, revision: (s.justGrown?.revision ?? 0) + 1 },
@@ -351,7 +474,9 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
   }
 
   function forgetMemory(id: string) {
-    update((s) => ({ spaces: mapSpace(s, s.spaceId, (sp) => ({ ...sp, memory: sp.memory.filter((x) => x.id !== id) })) }));
+    update((s) => ({
+      spaces: mapSpace(s, s.spaceId, (sp) => ({ ...sp, memory: sp.memory.filter((x) => x.id !== id) })),
+    }));
     notify("已忘记");
   }
 
@@ -360,12 +485,29 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     const id = "sp" + makeId();
     leave();
     update((s) => ({
-      spaces: [...s.spaces, {
-        id, name, goal: input.goal.trim(), img: spaceColorAt(s.spaces.length), dirs: input.dirs, instructions: "",
-        members: input.crew.map((aid): SpaceMember => ({ id: aid, status: "idle", dir: input.dirs[0] || "checkout-web", transcript: [] })),
-        msgs: [], memory: [], library: [], openTabs: [], activeTab: COORD_TAB,
-      }],
-      spaceId: id, view: "space", trayOpen: false, trayIdx: 0,
+      spaces: [
+        ...s.spaces,
+        {
+          id,
+          name,
+          goal: input.goal.trim(),
+          img: spaceColorAt(s.spaces.length),
+          dirs: input.dirs,
+          instructions: "",
+          members: input.crew.map(
+            (aid): SpaceMember => ({ id: aid, status: "idle", dir: input.dirs[0] || "checkout-web", transcript: [] }),
+          ),
+          msgs: [],
+          memory: [],
+          library: [],
+          openTabs: [],
+          activeTab: COORD_TAB,
+        },
+      ],
+      spaceId: id,
+      view: "space",
+      trayOpen: false,
+      trayIdx: 0,
     }));
     notify("创建了「" + name + "」");
     return id;
@@ -399,7 +541,7 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
       if (i < 0) return null;
       const tabs = p.tabs.filter((t) => t.id !== id);
       // 关当前：先跳左边，没有左边就取剩下的第一个，都没有就显示启动页
-      return { tabs, active: p.active === id ? (tabs[i - 1] ?? tabs[0])?.id ?? null : p.active };
+      return { tabs, active: p.active === id ? ((tabs[i - 1] ?? tabs[0])?.id ?? null) : p.active };
     });
   }
 
@@ -409,19 +551,42 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
   }
 
   const actions: SpaceDemoActions = {
-    send, sendSolo, approve, deny, openActorTab, selectTab, closeTab, closeOtherTabs, switchSpace,
-    goRoster, openSoloChat, keepActor, declineActor, undoMemory, forgetMemory, createSpace,
+    send,
+    sendSolo,
+    approve,
+    deny,
+    openActorTab,
+    selectTab,
+    closeTab,
+    closeOtherTabs,
+    switchSpace,
+    goRoster,
+    openSoloChat,
+    keepActor,
+    declineActor,
+    undoMemory,
+    forgetMemory,
+    createSpace,
     toggleGroup: (status) => update((s) => ({ collapsed: { ...s.collapsed, [status]: !s.collapsed[status] } })),
-    openPanelTab, selectPanelTab, closePanelTab,
+    openPanelTab,
+    selectPanelTab,
+    closePanelTab,
     togglePanel: () => update((s) => ({ panelOpen: !s.panelOpen })),
     setPanelOpen: (open) => update({ panelOpen: open }),
-    showActorsPanel: () => { selectTab(COORD_TAB); openPanelTab("actors"); },
+    showActorsPanel: () => {
+      selectTab(COORD_TAB);
+      openPanelTab("actors");
+    },
     toggleTray: () => update((s) => ({ trayOpen: !s.trayOpen })),
     closeTray: () => update({ trayOpen: false }),
     trayPrev: () => trayStep(-1),
     trayNext: () => trayStep(1),
-    trayView: (id) => { update({ trayOpen: false }); openActorTab(id); },
-    toggleFileDir: (path) => update((s) => ({ ftOpen: s.ftOpen.includes(path) ? s.ftOpen.filter((p) => p !== path) : [...s.ftOpen, path] })),
+    trayView: (id) => {
+      update({ trayOpen: false });
+      openActorTab(id);
+    },
+    toggleFileDir: (path) =>
+      update((s) => ({ ftOpen: s.ftOpen.includes(path) ? s.ftOpen.filter((p) => p !== path) : [...s.ftOpen, path] })),
     setFileQuery: (query) => update({ ftQuery: query }),
     openFile: (path) => {
       update({ ftSelected: path });
@@ -430,8 +595,12 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     setRosterQuery: (query) => update({ rosterQuery: query }),
     showNotice: notify,
     dismissNotice: () => update({ notice: null }),
-    clearFreshCard: () => { if (state.freshCard) update({ freshCard: null }); },
-    clearJustGrown: () => { if (state.justGrown) update({ justGrown: null }); },
+    clearFreshCard: () => {
+      if (state.freshCard) update({ freshCard: null });
+    },
+    clearJustGrown: () => {
+      if (state.justGrown) update({ justGrown: null });
+    },
     reset: () => {
       leave();
       resetEpoch += 1;
@@ -444,12 +613,22 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
   };
 
   return {
-    subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
     getSnapshot: () => state,
     actions,
     panelKey: () => panelKey(state),
     panelOpen: () => state.panelOpen && state.view !== "roster",
-    dispose() { spaceEpoch += 1; resetEpoch += 1; clearScope("space"); clearScope("global"); },
+    dispose() {
+      spaceEpoch += 1;
+      resetEpoch += 1;
+      clearScope("space");
+      clearScope("global");
+    },
   };
 }
 

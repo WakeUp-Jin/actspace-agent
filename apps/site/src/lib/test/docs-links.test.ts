@@ -7,29 +7,39 @@ import { docsLinks } from "../docs-links.mjs";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const dir = join(root, "src/content/docs");
-const files = readdirSync(dir).filter(file => file.endsWith(".md"));
+const files = readdirSync(dir).filter((file) => file.endsWith(".md"));
 
 describe("public documentation links", () => {
-  it.each(["/", "/actspace-agent", "/preview/site/"])("renders links under %s, including the welcome alias", async (base) => {
-    const prefix = base === "/" ? "" : base.replace(/\/$/, "");
-    // 文档也可以链到站内其它页面（开发计划、更新日志、博客）。
-    const pages = ["/roadmap/", "/updates/", "/blog/"].map(page => `${prefix}${page}`);
-    const routes = new Set([...files.map(file => `${prefix}/docs/${file.replace(/\.md$/, "")}/`), ...pages]);
-    const renderer = await satteri({mdastPlugins:[docsLinks({base})]}).createRenderer({syntaxHighlight:false});
-    for (const file of files) {
-      const markdown = readFileSync(join(dir, file), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
-      const {code} = await renderer.render(markdown, {fileURL:pathToFileURL(join(dir,file))});
-      for (const [, href] of code.matchAll(/<a\b[^>]*href="([^"]+)"/g)) {
-        expect(href, `${file}: unresolved relative link`).not.toMatch(/^\.{1,2}\//);
-        if (href.startsWith("/")) expect(routes.has(href.split("#")[0]), `${file}: unknown document ${href}`).toBe(true);
+  it.each(["/", "/actspace-agent", "/preview/site/"])(
+    "renders links under %s, including the welcome alias",
+    async (base) => {
+      const prefix = base === "/" ? "" : base.replace(/\/$/, "");
+      // 文档也可以链到站内其它页面（开发计划、更新日志、博客）。
+      const pages = ["/roadmap/", "/updates/", "/blog/"].map((page) => `${prefix}${page}`);
+      const routes = new Set([...files.map((file) => `${prefix}/docs/${file.replace(/\.md$/, "")}/`), ...pages]);
+      const renderer = await satteri({ mdastPlugins: [docsLinks({ base })] }).createRenderer({
+        syntaxHighlight: false,
+      });
+      for (const file of files) {
+        const markdown = readFileSync(join(dir, file), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
+        const { code } = await renderer.render(markdown, { fileURL: pathToFileURL(join(dir, file)) });
+        for (const [, href] of code.matchAll(/<a\b[^>]*href="([^"]+)"/g)) {
+          expect(href, `${file}: unresolved relative link`).not.toMatch(/^\.{1,2}\//);
+          if (href.startsWith("/"))
+            expect(routes.has(href.split("#")[0]), `${file}: unknown document ${href}`).toBe(true);
+        }
+        if (file === "what-is-actspace.md") expect(code).toContain(`href="${prefix}/docs/getting-started/"`);
       }
-      if(file === "what-is-actspace.md") expect(code).toContain(`href="${prefix}/docs/getting-started/"`);
-    }
-  });
+    },
+  );
 
   it("does not rewrite blog article links", async () => {
-    const renderer = await satteri({mdastPlugins:[docsLinks({base:"/actspace-agent"})]}).createRenderer({syntaxHighlight:false});
-    const {code} = await renderer.render('[original](../source/)', {fileURL:pathToFileURL(join(root,"src/content/blog/example.md"))});
+    const renderer = await satteri({ mdastPlugins: [docsLinks({ base: "/actspace-agent" })] }).createRenderer({
+      syntaxHighlight: false,
+    });
+    const { code } = await renderer.render("[original](../source/)", {
+      fileURL: pathToFileURL(join(root, "src/content/blog/example.md")),
+    });
     expect(code).toContain('href="../source/"');
   });
 });

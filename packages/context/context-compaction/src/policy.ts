@@ -6,7 +6,11 @@ export type CompactionPolicy = {
 
 export type TokenUsage = import("@actspace/context-engine").CompactionUsage;
 
-export const DEFAULT_COMPACTION_POLICY: CompactionPolicy = Object.freeze({ reserveTokens: 16_000, triggerRatio: 0.8, minimumRegionEntries: 4 });
+export const DEFAULT_COMPACTION_POLICY: CompactionPolicy = Object.freeze({
+  reserveTokens: 16_000,
+  triggerRatio: 0.8,
+  minimumRegionEntries: 4,
+});
 
 export function compactionThreshold(capacity: number | null, policy: CompactionPolicy): number | null {
   if (typeof capacity !== "number" || !Number.isFinite(capacity) || capacity <= 0) return null;

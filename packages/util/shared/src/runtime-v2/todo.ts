@@ -10,10 +10,10 @@ export type RuntimeTodoWriteItem = Readonly<Record<string, unknown>>;
 export function mergeRuntimeTodoItems(
   previous: readonly RuntimeTodoItem[],
   rawItems: readonly RuntimeTodoWriteItem[],
-  redact: (value: string, limit?: number) => string = value => value,
+  redact: (value: string, limit?: number) => string = (value) => value,
   eventTime?: string,
 ): readonly RuntimeTodoItem[] {
-  const items = new Map(previous.map(item => [item.todoId, item] as const));
+  const items = new Map(previous.map((item) => [item.todoId, item] as const));
   for (const raw of rawItems) {
     const todoId = stringValue(raw.todoId) ?? stringValue(raw.id);
     const revision = integerValue(raw.revision);
@@ -47,5 +47,7 @@ function integerValue(value: unknown): number | null {
 }
 
 function todoState(value: unknown): RuntimeTodoItem["state"] | undefined {
-  return value === "pending" || value === "in_progress" || value === "completed" || value === "cancelled" ? value : undefined;
+  return value === "pending" || value === "in_progress" || value === "completed" || value === "cancelled"
+    ? value
+    : undefined;
 }

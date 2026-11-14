@@ -20,7 +20,12 @@ export type RunTargetValue = Omit<RunTargetState, "choices"> & {
 const LOCAL: RunTarget = { kind: "local" };
 
 /** 没有 Provider 时（直接渲染组件的测试）当作本机、未锁定。 */
-export const DEFAULT_RUN_TARGET: RunTargetValue = { target: LOCAL, capabilities: capabilitiesOf(LOCAL), locked: false, readiness: { state: "ready" } };
+export const DEFAULT_RUN_TARGET: RunTargetValue = {
+  target: LOCAL,
+  capabilities: capabilitiesOf(LOCAL),
+  locked: false,
+  readiness: { state: "ready" },
+};
 
 export const RunTargetContext = createContext<RunTargetValue>(DEFAULT_RUN_TARGET);
 

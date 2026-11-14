@@ -21,11 +21,15 @@ export async function writeArtifacts(input: WriteArtifactsInput): Promise<void> 
 
   if (input.contextSnapshots?.length) {
     await mkdir(artifactPath(outDir, "context-snapshots"), { recursive: true });
-    await Promise.all(input.contextSnapshots.map((snapshot, index) => writeJsonWithin(
-      outDir,
-      join("context-snapshots", `${String(index + 1).padStart(3, "0")}-${snapshot.kind}.json`),
-      snapshot,
-    )));
+    await Promise.all(
+      input.contextSnapshots.map((snapshot, index) =>
+        writeJsonWithin(
+          outDir,
+          join("context-snapshots", `${String(index + 1).padStart(3, "0")}-${snapshot.kind}.json`),
+          snapshot,
+        ),
+      ),
+    );
   }
 }
 

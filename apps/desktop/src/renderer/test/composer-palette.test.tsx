@@ -9,10 +9,23 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 import { mockContextSnapshot } from "./fixtures/workbenchFixture";
 
 function skill(name: string, description: string): SkillCatalogItem {
-  return { name, description, scope: "project", source: "project", location: `/work/.skills/${name}`, directory: `/work/.skills/${name}`, status: "available", removable: true, enabledForAgent: true, shadowed: false };
+  return {
+    name,
+    description,
+    scope: "project",
+    source: "project",
+    location: `/work/.skills/${name}`,
+    directory: `/work/.skills/${name}`,
+    status: "available",
+    removable: true,
+    enabledForAgent: true,
+    shadowed: false,
+  };
 }
 
-type HarnessProps = Partial<Omit<ComposerPaletteProps, "open" | "onOpenChange" | "children">> & { initiallyOpen?: boolean };
+type HarnessProps = Partial<Omit<ComposerPaletteProps, "open" | "onOpenChange" | "children">> & {
+  initiallyOpen?: boolean;
+};
 
 function renderPalette(overrides: HarnessProps = {}) {
   const calls = {
@@ -33,18 +46,24 @@ function renderPalette(overrides: HarnessProps = {}) {
         modeDisabled={overrides.modeDisabled ?? false}
         onSelectMode={calls.onSelectMode}
         attachment={overrides.attachment ?? { label: "图片", icon: "images", onSelect: calls.onSelectAttachment }}
-        skills={overrides.skills === undefined ? {
-          items: [skill("frontend-design", "前端设计规范"), skill("release", "发布流程")],
-          loading: false,
-          error: null,
-          selected: [],
-          onToggle: calls.onToggleSkill,
-          onRetry: vi.fn(),
-        } : overrides.skills}
+        skills={
+          overrides.skills === undefined
+            ? {
+                items: [skill("frontend-design", "前端设计规范"), skill("release", "发布流程")],
+                loading: false,
+                error: null,
+                selected: [],
+                onToggle: calls.onToggleSkill,
+                onRetry: vi.fn(),
+              }
+            : overrides.skills
+        }
       >
         <div>
           <textarea aria-label="消息输入框" />
-          <button type="button" onClick={() => setOpen(!open)}>加号</button>
+          <button type="button" onClick={() => setOpen(!open)}>
+            加号
+          </button>
         </div>
       </ComposerPalette>
     );
@@ -55,7 +74,10 @@ function renderPalette(overrides: HarnessProps = {}) {
 
 const search = () => screen.getByRole("combobox");
 const activeOption = () => document.getElementById(search().getAttribute("aria-activedescendant") ?? "");
-const optionNames = (name: string) => within(screen.getByRole("listbox", { name })).getAllByRole("option").map((option) => option.getAttribute("aria-label"));
+const optionNames = (name: string) =>
+  within(screen.getByRole("listbox", { name }))
+    .getAllByRole("option")
+    .map((option) => option.getAttribute("aria-label"));
 
 afterEach(() => cleanup());
 
@@ -85,7 +107,12 @@ describe("ComposerPalette", () => {
     renderPalette({ mode: "plan", sessionStarted: true });
     expect(optionNames("添加上下文或工具")).toEqual(["图片", "Skills"]);
     cleanup();
-    renderPalette({ mode: "chat", sessionStarted: true, skills: null, attachment: { label: "图片与文件", icon: "files", onSelect: vi.fn() } });
+    renderPalette({
+      mode: "chat",
+      sessionStarted: true,
+      skills: null,
+      attachment: { label: "图片与文件", icon: "files", onSelect: vi.fn() },
+    });
     expect(optionNames("添加上下文或工具")).toEqual(["图片与文件"]);
   });
 
@@ -93,7 +120,9 @@ describe("ComposerPalette", () => {
     const user = userEvent.setup();
     renderPalette();
     await user.type(search(), "发布");
-    expect(within(screen.getByRole("group", { name: "Skills" })).getByRole("option", { name: "release" })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("group", { name: "Skills" })).getByRole("option", { name: "release" }),
+    ).toBeInTheDocument();
     await user.clear(search());
     await user.type(search(), "zzz");
     expect(screen.queryAllByRole("option")).toEqual([]);
@@ -190,7 +219,11 @@ describe("ComposerPalette", () => {
 describe("Composer + panel", () => {
   it("returns focus to the message input after Escape", async () => {
     const user = userEvent.setup();
-    render(<TooltipProvider delayDuration={0}><Composer contextSnapshot={mockContextSnapshot} /></TooltipProvider>);
+    render(
+      <TooltipProvider delayDuration={0}>
+        <Composer contextSnapshot={mockContextSnapshot} />
+      </TooltipProvider>,
+    );
     const plus = screen.getByRole("button", { name: "添加 Agent、上下文或工具" });
     await user.click(plus);
     expect(plus).toHaveAttribute("aria-expanded", "true");

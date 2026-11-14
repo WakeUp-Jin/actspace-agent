@@ -1,4 +1,15 @@
-import { BookOpen, Brain, Eye, File, FolderTree, GitBranch, MessageSquare, SquareTerminal, Users, type LucideIcon } from "lucide-react";
+import {
+  BookOpen,
+  Brain,
+  Eye,
+  File,
+  FolderTree,
+  GitBranch,
+  MessageSquare,
+  SquareTerminal,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import type { PanelKind } from "../model/types";
 
 // 右栏标签种类的图标。和普通会话右栏对得上的种类（子 Agent、文件、Review、上下文、终端、可视化回复）用同一个图标。

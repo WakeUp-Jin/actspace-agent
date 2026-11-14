@@ -79,7 +79,10 @@ describe("workspace Git context service", () => {
     vi.stubEnv("LC_MESSAGES", "");
     try {
       const roots = await createRoots();
-      expect(await getWorkspaceGitContext(roots.workspaceRoot)).toMatchObject({ status: "not_repository", branches: [] });
+      expect(await getWorkspaceGitContext(roots.workspaceRoot)).toMatchObject({
+        status: "not_repository",
+        branches: [],
+      });
     } finally {
       vi.unstubAllEnvs();
     }
@@ -99,10 +102,26 @@ describe("workspace Git context service", () => {
   // 15 T13：run-git 的 startError 改为 { code, message } 后，git 缺失和非仓库的判断不变。
   it("classifies an ENOENT start error as git_not_found and an English non-repository error as not_repository", async () => {
     const roots = await createRoots();
-    const missing: GitRunner = async () => ({ stdout: "", stderr: "", exitCode: null, timedOut: false, truncated: false, startError: { code: "ENOENT", message: "spawn git ENOENT" } });
+    const missing: GitRunner = async () => ({
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      timedOut: false,
+      truncated: false,
+      startError: { code: "ENOENT", message: "spawn git ENOENT" },
+    });
     expect(await getWorkspaceGitContext(roots.workspaceRoot, missing)).toMatchObject({ status: "git_not_found" });
-    const outside: GitRunner = async () => ({ stdout: "", stderr: "fatal: not a git repository (or any of the parent directories): .git\n", exitCode: 128, timedOut: false, truncated: false });
-    expect(await getWorkspaceGitContext(roots.workspaceRoot, outside)).toMatchObject({ status: "not_repository", branches: [] });
+    const outside: GitRunner = async () => ({
+      stdout: "",
+      stderr: "fatal: not a git repository (or any of the parent directories): .git\n",
+      exitCode: 128,
+      timedOut: false,
+      truncated: false,
+    });
+    expect(await getWorkspaceGitContext(roots.workspaceRoot, outside)).toMatchObject({
+      status: "not_repository",
+      branches: [],
+    });
   });
 
   it("lists local branches and marks the current checkout", async () => {
@@ -146,11 +165,14 @@ describe("workspace Git context service", () => {
     await writeFile(join(roots.workspaceRoot, "README.md"), "staged\n", "utf8");
     await git(roots.workspaceRoot, ["add", "README.md"]);
 
-    const result = await prepareExecutionContext({
-      runLocation: "this_mac",
-      sourceWorkspaceRoot: roots.workspaceRoot,
-      branch: "main",
-    }, roots);
+    const result = await prepareExecutionContext(
+      {
+        runLocation: "this_mac",
+        sourceWorkspaceRoot: roots.workspaceRoot,
+        branch: "main",
+      },
+      roots,
+    );
 
     expect(result).toEqual({
       ok: true,
@@ -166,11 +188,14 @@ describe("workspace Git context service", () => {
     await initRepository(roots);
     await git(roots.workspaceRoot, ["branch", "feature/ui"]);
 
-    const result = await prepareExecutionContext({
-      runLocation: "this_mac",
-      sourceWorkspaceRoot: roots.workspaceRoot,
-      branch: "feature/ui",
-    }, roots);
+    const result = await prepareExecutionContext(
+      {
+        runLocation: "this_mac",
+        sourceWorkspaceRoot: roots.workspaceRoot,
+        branch: "feature/ui",
+      },
+      roots,
+    );
 
     expect(result).toMatchObject({ ok: true, workspaceRoot: roots.workspaceRoot, branch: "feature/ui" });
     expect(await git(roots.workspaceRoot, ["branch", "--show-current"])).toBe("feature/ui");
@@ -184,14 +209,18 @@ describe("workspace Git context service", () => {
     const baseCommit = await initRepository(roots);
     await writeFile(join(roots.workspaceRoot, ".env.local"), "SECRET=not-copied\n", "utf8");
 
-    const result = await prepareExecutionContext({
-      runLocation: "worktree",
-      sourceWorkspaceRoot: roots.workspaceRoot,
-      branch: "main",
-    }, roots, {
-      createId: () => "12345678",
-      now: () => new Date("2026-07-29T06:00:00.000Z"),
-    });
+    const result = await prepareExecutionContext(
+      {
+        runLocation: "worktree",
+        sourceWorkspaceRoot: roots.workspaceRoot,
+        branch: "main",
+      },
+      roots,
+      {
+        createId: () => "12345678",
+        now: () => new Date("2026-07-29T06:00:00.000Z"),
+      },
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -222,11 +251,15 @@ describe("workspace Git context service", () => {
     const roots = await createRoots();
     await git(roots.workspaceRoot, ["init", "-b", "main"]);
 
-    const result = await prepareExecutionContext({
-      runLocation: "worktree",
-      sourceWorkspaceRoot: roots.workspaceRoot,
-      branch: "main",
-    }, roots, { createId: () => "87654321" });
+    const result = await prepareExecutionContext(
+      {
+        runLocation: "worktree",
+        sourceWorkspaceRoot: roots.workspaceRoot,
+        branch: "main",
+      },
+      roots,
+      { createId: () => "87654321" },
+    );
 
     expect(result).toEqual({ ok: false, code: "no_head", message: "Git repository has no commits yet." });
   });

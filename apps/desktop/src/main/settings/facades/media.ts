@@ -56,9 +56,14 @@ export function getImageGenerationSettingsView(store: SettingsStore): ImageGener
   };
 }
 
-export function getSpeechSettings(store: SettingsStore): SpeechSettings { return { ...store.v4Metadata.speech }; }
+export function getSpeechSettings(store: SettingsStore): SpeechSettings {
+  return { ...store.v4Metadata.speech };
+}
 
-export async function setSpeechKey(store: SettingsStore, apiKey: string | null): Promise<{ ok: boolean; error?: string }> {
+export async function setSpeechKey(
+  store: SettingsStore,
+  apiKey: string | null,
+): Promise<{ ok: boolean; error?: string }> {
   return store.enqueueMutation(async () => {
     const previous = { ...store.secrets };
     try {
@@ -71,7 +76,13 @@ export async function setSpeechKey(store: SettingsStore, apiKey: string | null):
       return { ok: false, error: "语音 Key 保存失败，请检查凭据存储。" };
     }
     const notification = { revision: store.getV4().revision, changedNamespaces: ["media" as const] };
-    for (const listener of store.v4ChangeListeners) { try { listener(notification); } catch { /* Storage already committed. */ } }
+    for (const listener of store.v4ChangeListeners) {
+      try {
+        listener(notification);
+      } catch {
+        /* Storage already committed. */
+      }
+    }
     return { ok: true };
   });
 }

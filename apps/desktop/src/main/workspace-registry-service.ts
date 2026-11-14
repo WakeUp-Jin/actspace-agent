@@ -25,9 +25,7 @@ export type WorkspaceSelectionResult =
   | { ok: true; workspaceId: string; workspaceRoot: string }
   | { ok: false; error: string };
 
-export type WorkspaceVisibilityResult =
-  | { ok: true }
-  | { ok: false; error: "workspace_not_found" };
+export type WorkspaceVisibilityResult = { ok: true } | { ok: false; error: "workspace_not_found" };
 
 export function readWorkspaceRegistry(options: WorkspaceRegistryOptions): Promise<WorkspaceRegistry> {
   return runWorkspaceRegistryOperation(options.dataRoot, () => readWorkspaceRegistryUnsafe(options));
@@ -61,9 +59,10 @@ async function readWorkspaceRegistryUnsafe(options: WorkspaceRegistryOptions): P
 export function createFallbackRegistry(options: WorkspaceRegistryOptions): WorkspaceRegistry {
   const fallbackRoot = normalizeWorkspacePath(options.fallbackWorkspaceRoot);
   // 打包版的 fallback 就是兜底目录，交给 addFirstRunWorkspace 建目录并起名；开发版是仓库根或环境变量指定的目录。
-  const items = fallbackRoot && fallbackRoot !== normalizeWorkspacePath(options.defaultWorkspaceRoot)
-    ? [createFolderWorkspaceEntry(fallbackRoot, 0)]
-    : [];
+  const items =
+    fallbackRoot && fallbackRoot !== normalizeWorkspacePath(options.defaultWorkspaceRoot)
+      ? [createFolderWorkspaceEntry(fallbackRoot, 0)]
+      : [];
   return mergeSessionWorkspaces({ version: 1, items }, options.sessions ?? []);
 }
 
@@ -88,10 +87,7 @@ export function resolveWorkspaceSelection(
   options: WorkspaceRegistryOptions,
   input: WorkspaceSelectionInput = {},
 ): Promise<WorkspaceSelectionResult> {
-  return runWorkspaceRegistryOperation(
-    options.dataRoot,
-    () => resolveWorkspaceSelectionUnsafe(options, input),
-  );
+  return runWorkspaceRegistryOperation(options.dataRoot, () => resolveWorkspaceSelectionUnsafe(options, input));
 }
 
 async function resolveWorkspaceSelectionUnsafe(
@@ -115,9 +111,9 @@ async function resolveWorkspaceSelectionUnsafe(
       if (existing.hidden) {
         await writeWorkspaceRegistry(options.dataRoot, {
           ...registry,
-          items: registry.items.map((item) => item.id === existing.id
-            ? { ...item, hidden: false, updatedAt: new Date().toISOString() }
-            : item),
+          items: registry.items.map((item) =>
+            item.id === existing.id ? { ...item, hidden: false, updatedAt: new Date().toISOString() } : item,
+          ),
         });
       }
       return { ok: true, workspaceId: existing.id, workspaceRoot: existing.path };
@@ -137,10 +133,7 @@ export function setWorkspaceHidden(
   workspaceId: string,
   hidden: boolean,
 ): Promise<WorkspaceVisibilityResult> {
-  return runWorkspaceRegistryOperation(
-    options.dataRoot,
-    () => setWorkspaceHiddenUnsafe(options, workspaceId, hidden),
-  );
+  return runWorkspaceRegistryOperation(options.dataRoot, () => setWorkspaceHiddenUnsafe(options, workspaceId, hidden));
 }
 
 async function setWorkspaceHiddenUnsafe(
@@ -155,9 +148,9 @@ async function setWorkspaceHiddenUnsafe(
 
   await writeWorkspaceRegistry(options.dataRoot, {
     ...registry,
-    items: registry.items.map((item) => item.id === workspaceId
-      ? { ...item, hidden, updatedAt: new Date().toISOString() }
-      : item),
+    items: registry.items.map((item) =>
+      item.id === workspaceId ? { ...item, hidden, updatedAt: new Date().toISOString() } : item,
+    ),
   });
   return { ok: true };
 }
@@ -284,11 +277,12 @@ function createFolderWorkspaceEntry(path: string, order: number, timestamp = new
 }
 
 function workspaceIdFromPath(path: string): string {
-  const slug = (basename(path) || "workspace")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 36) || "workspace";
+  const slug =
+    (basename(path) || "workspace")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 36) || "workspace";
   const hash = hashString(path);
   return `ws_${slug}_${hash}`;
 }
@@ -297,7 +291,13 @@ function runWorkspaceRegistryOperation<T>(dataRoot: string, operation: () => Pro
   const key = workspaceRegistryPath(dataRoot);
   const previous = workspaceRegistryOperationChains.get(key) ?? Promise.resolve();
   const result = previous.then(operation, operation);
-  workspaceRegistryOperationChains.set(key, result.then(() => undefined, () => undefined));
+  workspaceRegistryOperationChains.set(
+    key,
+    result.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
   return result;
 }
 

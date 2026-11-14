@@ -65,11 +65,15 @@ export function SearchSettings({
       const result = await onUpdateNamespace({ namespace: "tools", patch });
       if (!result) throw new Error("保存失败，请重试。");
       notifySaved();
-    } catch { setWriteError("保存失败，请重试。"); }
-    finally { setWriting(false); }
+    } catch {
+      setWriteError("保存失败，请重试。");
+    } finally {
+      setWriting(false);
+    }
   };
   const hasDeepseekKey = settings.searchProviders.deepseek?.hasApiKey === true || settings.providers.deepseek.hasApiKey;
-  const hasKey = (provider: SearchProviderId) => provider === "deepseek" ? hasDeepseekKey : settings.searchProviders[provider]?.hasApiKey === true;
+  const hasKey = (provider: SearchProviderId) =>
+    provider === "deepseek" ? hasDeepseekKey : settings.searchProviders[provider]?.hasApiKey === true;
   const tools = useToolToggle({ settings, settingsV4, onUpdate, onUpdateNamespace });
   const editor = useSingleEditor<SearchProviderId>();
   const connectedCount = SEARCH_PROVIDER_ROWS.filter(({ provider }) => hasKey(provider)).length;
@@ -100,7 +104,10 @@ export function SearchSettings({
             key={row.provider}
             {...row}
             hasApiKey={hasKey(row.provider)}
-            enabled={hasKey(row.provider) && (settingsV4?.settings.tools.searchProviders[row.provider]?.enabled ?? (row.provider !== "deepseek"))}
+            enabled={
+              hasKey(row.provider) &&
+              (settingsV4?.settings.tools.searchProviders[row.provider]?.enabled ?? row.provider !== "deepseek")
+            }
             toggleDisabled={!settingsV4 || writing || !hasKey(row.provider)}
             onToggle={(enabled) => void saveTools({ searchProviders: { [row.provider]: { enabled } } })}
             editing={editor.isOpen(row.provider)}
@@ -115,12 +122,14 @@ export function SearchSettings({
         <SettingRow
           title="使用 DeepSeek 抓取网页"
           description={hasDeepseekKey ? "网址将发送至 DeepSeek · ¥0.005 / 次" : "请先连接 DeepSeek"}
-          control={<Toggle
-            ariaLabel="使用 DeepSeek 抓取网页"
-            checked={hasDeepseekKey && settingsV4?.settings.tools.deepseekFetchEnabled === true}
-            disabled={!settingsV4 || writing || !hasDeepseekKey}
-            onChange={(deepseekFetchEnabled) => void saveTools({ deepseekFetchEnabled })}
-          />}
+          control={
+            <Toggle
+              ariaLabel="使用 DeepSeek 抓取网页"
+              checked={hasDeepseekKey && settingsV4?.settings.tools.deepseekFetchEnabled === true}
+              disabled={!settingsV4 || writing || !hasDeepseekKey}
+              onChange={(deepseekFetchEnabled) => void saveTools({ deepseekFetchEnabled })}
+            />
+          }
         />
       </SettingGroup>
     </>
@@ -203,12 +212,27 @@ function SearchProviderRow({
     <>
       {error && !editing ? <p role="alert">{error}</p> : null}
       <SettingRow
-        title={<>{label}{tag ? <SettingTag>{tag}</SettingTag> : null}</>}
-        description={<>{description}{usage}</>}
+        title={
+          <>
+            {label}
+            {tag ? <SettingTag>{tag}</SettingTag> : null}
+          </>
+        }
+        description={
+          <>
+            {description}
+            {usage}
+          </>
+        }
         control={
           hasApiKey ? (
             <>
-              <Toggle ariaLabel={`启用 ${label} 搜索`} checked={enabled} disabled={toggleDisabled} onChange={onToggle} />
+              <Toggle
+                ariaLabel={`启用 ${label} 搜索`}
+                checked={enabled}
+                disabled={toggleDisabled}
+                onChange={onToggle}
+              />
               <StatusDot tone="ok">已连接</StatusDot>
               <SettingsMenuButton
                 id={`${editorId}-trigger`}
@@ -216,12 +240,20 @@ function SearchProviderRow({
                 ariaLabel={`管理 ${label}`}
                 items={[
                   { label: "更换 Key", onSelect: onEdit },
-                  ...(provider === "deepseek" ? [] : [{ label: "断开连接", danger: true, onSelect: () => void clear() }]),
+                  ...(provider === "deepseek"
+                    ? []
+                    : [{ label: "断开连接", danger: true, onSelect: () => void clear() }]),
                 ]}
               />
             </>
           ) : (
-            <Button id={`${editorId}-trigger`} aria-label={`连接 ${label}`} aria-expanded={editing} aria-controls={editorId} onClick={onEdit}>
+            <Button
+              id={`${editorId}-trigger`}
+              aria-label={`连接 ${label}`}
+              aria-expanded={editing}
+              aria-controls={editorId}
+              onClick={onEdit}
+            >
               连接
             </Button>
           )
@@ -269,7 +301,8 @@ function TavilyUsage({ hasApiKey }: { hasApiKey: boolean }) {
       return;
     }
     let cancelled = false;
-    settingsApi.getSearchUsage()
+    settingsApi
+      .getSearchUsage()
       .then((result) => {
         if (!cancelled) setUsage(result);
       })
@@ -285,7 +318,8 @@ function TavilyUsage({ hasApiKey }: { hasApiKey: boolean }) {
   const { planUsage, planLimit } = usage.tavily;
   return (
     <span className="block text-text-faint">
-      本周期已用 {planUsage}{planLimit !== null ? ` / ${planLimit}` : ""} credits
+      本周期已用 {planUsage}
+      {planLimit !== null ? ` / ${planLimit}` : ""} credits
       {planLimit !== null ? `，剩余 ${Math.max(planLimit - planUsage, 0)}` : ""}
     </span>
   );

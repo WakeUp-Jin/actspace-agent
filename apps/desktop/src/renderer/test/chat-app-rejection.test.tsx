@@ -37,12 +37,29 @@ const defaultSettings: AppSettings = {
 
 const settingsApiStub = {
   "settings.get": async () => defaultSettings,
-  "tasks.command": async (input: { sessionId: string }) => ({ snapshot: { sessionId: input.sessionId, revision: 0, paused: false, tasks: [], queue: [], runs: [] } }),
+  "tasks.command": async (input: { sessionId: string }) => ({
+    snapshot: { sessionId: input.sessionId, revision: 0, paused: false, tasks: [], queue: [], runs: [] },
+  }),
   "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
-  "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
+  "appearance.setUiZoom": () => {},
+  "appearance.setNativeTheme": () => {},
+  "events.shuttingDown": () => () => {},
 };
 function createWorkspaceRegistryFixture(createdAt: string): WorkspaceListResult {
-  return { version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt, updatedAt: createdAt }] };
+  return {
+    version: 1,
+    items: [
+      {
+        id: "default",
+        kind: "folder",
+        label: "workspace",
+        path: "/tmp/workspace",
+        order: 0,
+        createdAt,
+        updatedAt: createdAt,
+      },
+    ],
+  };
 }
 
 function createEmptySessionRecord(sessionId: string): SessionRecord {
@@ -71,8 +88,9 @@ function renderApp() {
   );
 }
 
-
-afterEach(() => { window.localStorage.clear(); });
+afterEach(() => {
+  window.localStorage.clear();
+});
 it("restores a rejected Chat draft without a phantom message, failed turn, or workspace controls", async () => {
   window.localStorage.clear();
   const record = createEmptySessionRecord("chat-rejection");
@@ -80,18 +98,37 @@ it("restores a rejected Chat draft without a phantom message, failed turn, or wo
   record.meta.agentMode = "chat";
   record.meta.workspaceRoot = "/tmp/workspace";
   const attachment = { id: "bad", kind: "file" as const, name: "bad.txt", path: "/fixture/bad.txt" };
-  const submitTask = vi.fn(async (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => ({ status: "submission-failed" as const, acknowledgement: "rejected" as const, message: "附件校验失败", attachmentIssue: { code: "invalid_utf8" as const, fileName: "bad.txt", attachmentId: "bad" } }));
+  const submitTask = vi.fn(async (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => ({
+    status: "submission-failed" as const,
+    acknowledgement: "rejected" as const,
+    message: "附件校验失败",
+    attachmentIssue: { code: "invalid_utf8" as const, fileName: "bad.txt", attachmentId: "bad" },
+  }));
   setupBridge({
     ...settingsApiStub,
     "app.getBootstrapState": async () => bootstrapState,
     "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt),
-    "sessions.list": async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, agentForm: "chat", agentMode: "chat", workspaceRoot: "/tmp/workspace" }],
-    "sessions.get": projectRecord(async () => record), "sessions.getPage": projectRecord(async () => record), "sessions.create": projectRecord(async () => record),
-    "approvals.listPending": async () => [], "events.agentStream": () => () => {},
+    "sessions.list": async () => [
+      {
+        id: record.meta.id,
+        title: record.meta.title,
+        updatedAt: record.meta.updatedAt,
+        agentRunCount: 0,
+        agentForm: "chat",
+        agentMode: "chat",
+        workspaceRoot: "/tmp/workspace",
+      },
+    ],
+    "sessions.get": projectRecord(async () => record),
+    "sessions.getPage": projectRecord(async () => record),
+    "sessions.create": projectRecord(async () => record),
+    "approvals.listPending": async () => [],
+    "events.agentStream": () => () => {},
     "dialogs.selectFiles": async () => ({ canceled: false, attachments: [attachment] }),
     "tasks.submit": submitTask,
   });
-  const user = userEvent.setup(); renderApp();
+  const user = userEvent.setup();
+  renderApp();
   await screen.findByText("Chat");
   expect(screen.queryByLabelText("初始工作区与运行位置选择")).toBeNull();
   expect(screen.queryByLabelText("查看工作区环境")).toBeNull();
@@ -115,14 +152,31 @@ it("restores the draft with a readable message when references are rejected", as
   const record = createEmptySessionRecord("reference-rejection");
   record.meta.agentForm = "chat";
   record.meta.workspaceRoot = "/tmp/workspace";
-  const submitTask = vi.fn(async (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => ({ status: "submission-failed" as const, acknowledgement: "rejected" as const, message: "引用失效", referenceIssue: { code: "annotation_source_missing" as const, kind: "annotation" as const, index: 0 } }));
+  const submitTask = vi.fn(async (input: import("@actspace/shared/runtime-v2").SubmitTaskInput) => ({
+    status: "submission-failed" as const,
+    acknowledgement: "rejected" as const,
+    message: "引用失效",
+    referenceIssue: { code: "annotation_source_missing" as const, kind: "annotation" as const, index: 0 },
+  }));
   setupBridge({
     ...settingsApiStub,
     "app.getBootstrapState": async () => bootstrapState,
     "workspaces.list": async () => createWorkspaceRegistryFixture(record.meta.createdAt),
-    "sessions.list": async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, agentForm: "chat", workspaceRoot: "/tmp/workspace" }],
-    "sessions.get": projectRecord(async () => record), "sessions.getPage": projectRecord(async () => record), "sessions.create": projectRecord(async () => record),
-    "approvals.listPending": async () => [], "events.agentStream": () => () => {},
+    "sessions.list": async () => [
+      {
+        id: record.meta.id,
+        title: record.meta.title,
+        updatedAt: record.meta.updatedAt,
+        agentRunCount: 0,
+        agentForm: "chat",
+        workspaceRoot: "/tmp/workspace",
+      },
+    ],
+    "sessions.get": projectRecord(async () => record),
+    "sessions.getPage": projectRecord(async () => record),
+    "sessions.create": projectRecord(async () => record),
+    "approvals.listPending": async () => [],
+    "events.agentStream": () => () => {},
     "tasks.submit": submitTask,
   });
   renderApp();

@@ -1,7 +1,12 @@
 import { RightPanelLauncherList, type RightPanelLauncherItem } from "../right-panel/RightPanelLauncherList";
 import { RightPanelTabStrip } from "../right-panel/RightPanelTabStrip";
 import {
-  availablePanelKinds, contextUsageOf, PANEL_KIND_META, panelContextOf, panelFor, panelScope,
+  availablePanelKinds,
+  contextUsageOf,
+  PANEL_KIND_META,
+  panelContextOf,
+  panelFor,
+  panelScope,
 } from "./model/selectors";
 import type { PanelContext, PanelTab } from "./model/types";
 import { useSpaceDemoActions, useSpaceDemoState } from "./model/use-space-demo";
@@ -28,7 +33,11 @@ const tabLabel = (t: PanelTab): string => t.label || PANEL_KIND_META[t.kind].lab
 function Caption({ context }: { context: PanelContext }) {
   if (context !== "coord") return <>和打开一个普通会话时的右栏一样。</>;
   const b = (text: string) => <strong className="font-medium text-text-muted">{text}</strong>;
-  return <>协调 Agent 的右栏：{b("Actor、库、记忆")}，再加只给你用的{b("文件")}和{b("终端")}。</>;
+  return (
+    <>
+      协调 Agent 的右栏：{b("Actor、库、记忆")}，再加只给你用的{b("文件")}和{b("终端")}。
+    </>
+  );
 }
 
 export function SpaceRightPanel() {
@@ -52,28 +61,68 @@ export function SpaceRightPanel() {
 
   let body;
   switch (active?.kind) {
-    case undefined: body = <RightPanelLauncherList label="右侧面板对象" caption={<Caption context={context} />} items={launcher} />; break;
-    case "actors": body = <div className={SCROLL_CLASS}><ActorGroups /></div>; break;
-    case "library": body = <div className={SCROLL_CLASS}><LibraryList /></div>; break;
-    case "memory": body = <div className={SCROLL_CLASS}><MemoryList /></div>; break;
-    case "files": body = <SpaceFilesView roots={scope.roots} />; break;
-    case "file": body = <SpaceFileView path={active.path ?? ""} />; break;
-    case "terminal": body = <SpaceTerminalView scope={scope} />; break;
-    case "review": body = <div className={SCROLL_CLASS}><SpaceReviewView scope={scope} /></div>; break;
+    case undefined:
+      body = <RightPanelLauncherList label="右侧面板对象" caption={<Caption context={context} />} items={launcher} />;
+      break;
+    case "actors":
+      body = (
+        <div className={SCROLL_CLASS}>
+          <ActorGroups />
+        </div>
+      );
+      break;
+    case "library":
+      body = (
+        <div className={SCROLL_CLASS}>
+          <LibraryList />
+        </div>
+      );
+      break;
+    case "memory":
+      body = (
+        <div className={SCROLL_CLASS}>
+          <MemoryList />
+        </div>
+      );
+      break;
+    case "files":
+      body = <SpaceFilesView roots={scope.roots} />;
+      break;
+    case "file":
+      body = <SpaceFileView path={active.path ?? ""} />;
+      break;
+    case "terminal":
+      body = <SpaceTerminalView scope={scope} />;
+      break;
+    case "review":
+      body = (
+        <div className={SCROLL_CLASS}>
+          <SpaceReviewView scope={scope} />
+        </div>
+      );
+      break;
     case "context": {
       const usage = contextUsageOf(state);
       body = <div className={SCROLL_CLASS}>{usage ? <SpaceContextView usage={usage} /> : null}</div>;
       break;
     }
-    case "subagents": body = <SpaceSubagentsView />; break;
-    case "reply": body = <SpaceReplyView />; break;
+    case "subagents":
+      body = <SpaceSubagentsView />;
+      break;
+    case "reply":
+      body = <SpaceReplyView />;
+      break;
   }
 
   return (
     <aside className={RIGHT_PANEL_CLASS} aria-label="Space 右栏">
       <RightPanelTabStrip
-        label="右侧面板标签" emptyTitle="对象" items={items} activeId={panel.active}
-        onSelect={selectPanelTab} onClose={closePanelTab}
+        label="右侧面板标签"
+        emptyTitle="对象"
+        items={items}
+        activeId={panel.active}
+        onSelect={selectPanelTab}
+        onClose={closePanelTab}
       />
       {body}
     </aside>

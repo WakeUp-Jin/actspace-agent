@@ -8,14 +8,23 @@ import { manifest } from "../manifest.js";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 
 describe("auto reviewer", () => {
-  it.each(['{"approved":true}', '{"approved":false,"reason":null}', '{"approved":true,"reason":""}'])("accepts optional reason: %s", value => expect(parseReview(value)).toHaveProperty("approved"));
-  it.each(['true', '{"approved":"true"}', '```json\n{"approved":true}\n```', '{"approved":true,"risk":0}', '{"approved":true,"reason":1}'])("rejects malformed result: %s", value => expect(() => parseReview(value)).toThrow());
+  it.each(['{"approved":true}', '{"approved":false,"reason":null}', '{"approved":true,"reason":""}'])(
+    "accepts optional reason: %s",
+    (value) => expect(parseReview(value)).toHaveProperty("approved"),
+  );
+  it.each([
+    "true",
+    '{"approved":"true"}',
+    '```json\n{"approved":true}\n```',
+    '{"approved":true,"risk":0}',
+    '{"approved":true,"reason":1}',
+  ])("rejects malformed result: %s", (value) => expect(() => parseReview(value)).toThrow());
   it("loads the service without tools or event codecs", async () => {
     const ctx = new CordisContextClass();
     ctx.provide("llm.auxiliary-requests", { start: async () => ({ finish: async () => {} }) });
     expect(() => apply(ctx)).toThrow("llm.service");
     ctx.provide?.("llm.service", {});
-    await ctx.plugin({ inject: ["llm.service"], apply: inner => apply(inner as never) });
+    await ctx.plugin({ inject: ["llm.service"], apply: (inner) => apply(inner as never) });
     expect(ctx.get?.("approval.auto-review")).toHaveProperty("review");
     expect(manifest).toBeDefined();
     await ctx.fiber.dispose();
@@ -24,15 +33,29 @@ describe("auto reviewer", () => {
   it("retains original user revisions, excludes reasoning and ordinary tool bodies", () => {
     const events = [
       { type: "user/message", data: { messageId: "u1", content: "inspect files" }, surface: { kind: "append" } },
-      { type: "assistant/message", data: { messageId: "a1", content: [{ type: "text", text: "May I inspect?" }, { type: "reasoning", text: "hidden-canary" }] }, surface: { kind: "append" } },
+      {
+        type: "assistant/message",
+        data: {
+          messageId: "a1",
+          content: [
+            { type: "text", text: "May I inspect?" },
+            { type: "reasoning", text: "hidden-canary" },
+          ],
+        },
+        surface: { kind: "append" },
+      },
       { type: "user/message", data: { messageId: "u2", content: "yes, but no deletion" }, surface: { kind: "append" } },
       { type: "tool/result", data: { callId: "x", status: "completed", modelOutput: "tool-body-canary" } },
     ] as unknown as SessionEventEnvelopeV1[];
     const content = JSON.stringify(reviewConversation(events));
-    expect(content).toContain("no deletion"); expect(content).toContain("May I inspect");
-    expect(content).not.toContain("hidden-canary"); expect(content).not.toContain("tool-body-canary");
+    expect(content).toContain("no deletion");
+    expect(content).toContain("May I inspect");
+    expect(content).not.toContain("hidden-canary");
+    expect(content).not.toContain("tool-body-canary");
     expect(() => reviewConversation([])).toThrow();
-    expect(() => reviewConversation([{ ...events[0], data: { messageId: "u1", content: "x".repeat(65_000) } }] as never)).toThrow();
+    expect(() =>
+      reviewConversation([{ ...events[0], data: { messageId: "u1", content: "x".repeat(65_000) } }] as never),
+    ).toThrow();
   });
 });
 
@@ -40,9 +63,55 @@ it("makes a tool-free bounded model request and releases the prepared call", asy
   const { createAutoReviewer } = await import("../review.js");
   let request: unknown;
   let released = false;
-  const reviewer = createAutoReviewer({ prepareAsync: async (input: unknown) => { request = input; return { request: { requestId: "fixture-request", routeId: "auto-review", model: "current-main" }, dispatch: async () => (async function* () { yield { type: "done", usage: EMPTY_LLM_USAGE, stopReason: "stop", content: [{ type: "text", text: '{"approved":true,"reason":"Task matches"}' }] }; })(), release: () => { released = true; } }; } } as never, { start: async () => ({ finish: async () => {} }) });
-  expect(await reviewer.review({ sessionId: "s", agentRunId: "r", turnId: "t", stepId: "step", callId: "c", logicalRequestId: "logical", model: "current-main", snapshot: { action: { command: "ls" } }, signal: new AbortController().signal })).toEqual({ approved: true, reason: "Task matches" });
+  const reviewer = createAutoReviewer(
+    {
+      prepareAsync: async (input: unknown) => {
+        request = input;
+        return {
+          request: { requestId: "fixture-request", routeId: "auto-review", model: "current-main" },
+          dispatch: async () =>
+            (async function* () {
+              yield {
+                type: "done",
+                usage: EMPTY_LLM_USAGE,
+                stopReason: "stop",
+                content: [{ type: "text", text: '{"approved":true,"reason":"Task matches"}' }],
+              };
+            })(),
+          release: () => {
+            released = true;
+          },
+        };
+      },
+    } as never,
+    { start: async () => ({ finish: async () => {} }) },
+  );
+  expect(
+    await reviewer.review({
+      sessionId: "s",
+      agentRunId: "r",
+      turnId: "t",
+      stepId: "step",
+      callId: "c",
+      logicalRequestId: "logical",
+      model: "current-main",
+      snapshot: { action: { command: "ls" } },
+      signal: new AbortController().signal,
+    }),
+  ).toEqual({ approved: true, reason: "Task matches" });
   expect(request).toMatchObject({ routeId: "auto-review", model: "current-main", tools: [] });
   expect(released).toBe(true);
-  await expect(reviewer.review({ sessionId: "s", agentRunId: "r", turnId: "t", stepId: "step", callId: "c", logicalRequestId: "logical", model: "m", snapshot: "x".repeat(96_001), signal: new AbortController().signal })).rejects.toThrow("exceeds limit");
+  await expect(
+    reviewer.review({
+      sessionId: "s",
+      agentRunId: "r",
+      turnId: "t",
+      stepId: "step",
+      callId: "c",
+      logicalRequestId: "logical",
+      model: "m",
+      snapshot: "x".repeat(96_001),
+      signal: new AbortController().signal,
+    }),
+  ).rejects.toThrow("exceeds limit");
 });

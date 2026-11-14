@@ -128,7 +128,9 @@ describe("原始 HTML 清理（T22）", () => {
   });
 
   it("script、iframe、style 元素被整个去掉", async () => {
-    const { root } = reply('正文 <kbd>k</kbd>\n\n<script>window.hacked = 1</script>\n\n<iframe src="https://evil.test"></iframe>\n\n<style>p{display:none}</style>');
+    const { root } = reply(
+      '正文 <kbd>k</kbd>\n\n<script>window.hacked = 1</script>\n\n<iframe src="https://evil.test"></iframe>\n\n<style>p{display:none}</style>',
+    );
     await waitFor(() => expect(root.querySelector("kbd")).not.toBeNull());
     expect(root.querySelector("script, iframe, style")).toBeNull();
     expect(root.textContent).not.toContain("hacked");
@@ -158,7 +160,9 @@ describe("原始 HTML 清理（T22）", () => {
 
   it("回复自己写的 data-path / data-line 不会变成可点的路径", async () => {
     const calls: string[] = [];
-    const { root } = reply('<code data-path="etc/passwd" data-line="3" class="md-path">x</code> <kbd>k</kbd>', (path) => calls.push(path));
+    const { root } = reply('<code data-path="etc/passwd" data-line="3" class="md-path">x</code> <kbd>k</kbd>', (path) =>
+      calls.push(path),
+    );
     await waitFor(() => expect(root.querySelector("kbd")).not.toBeNull());
     const code = root.querySelector("code");
     expect(code?.getAttribute("data-path")).toBeNull();

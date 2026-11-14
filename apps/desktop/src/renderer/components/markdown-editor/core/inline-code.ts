@@ -26,7 +26,13 @@ export const fencedCode: InlineHandler = (ctx, n) => {
     const isFirst = line.number === first.number;
     const isLast = line.number === last.number;
     const fence = open && (isFirst || isLast);
-    lineClass(ctx, line.from, ["md-code-line", isFirst && "md-code-first", isLast && "md-code-last", fence && "md-code-fence"].filter(Boolean).join(" "));
+    lineClass(
+      ctx,
+      line.from,
+      ["md-code-line", isFirst && "md-code-first", isLast && "md-code-last", fence && "md-code-fence"]
+        .filter(Boolean)
+        .join(" "),
+    );
     if (open || !(isFirst || isLast) || line.to <= line.from) return;
     if (isFirst) replaceWith(ctx, line.from, line.to, Decoration.replace({ widget: new CodeHeaderWidget(lang) }));
     else hide(ctx, line.from, line.to);
@@ -45,6 +51,7 @@ export const mathBlock: InlineHandler = (ctx, n) => {
 /** Frontmatter：属性卡片收起（光标进入）时，把 YAML 源码按淡色等宽显示。 */
 export const frontmatter: InlineHandler = (ctx, n) => {
   const extent = lineExtent(ctx.state, n);
-  if (isRevealed(ctx, extent.from, extent.to)) forEachLine(ctx, n.from, n.to, (line) => lineClass(ctx, line.from, "md-fm-raw"));
+  if (isRevealed(ctx, extent.from, extent.to))
+    forEachLine(ctx, n.from, n.to, (line) => lineClass(ctx, line.from, "md-fm-raw"));
   return false;
 };

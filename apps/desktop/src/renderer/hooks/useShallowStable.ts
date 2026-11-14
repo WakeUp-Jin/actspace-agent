@@ -13,8 +13,11 @@ export function useShallowStable<T extends object>(value: T): T {
 }
 
 function shallowEqual(a: object, b: object): boolean {
-  const left = a as Record<string, unknown>, right = b as Record<string, unknown>;
+  const left = a as Record<string, unknown>,
+    right = b as Record<string, unknown>;
   const keys = Object.keys(left);
-  return keys.length === Object.keys(right).length &&
-    keys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && Object.is(left[key], right[key]));
+  return (
+    keys.length === Object.keys(right).length &&
+    keys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && Object.is(left[key], right[key]))
+  );
 }

@@ -1,6 +1,11 @@
 import { desktopBridgeContract, type DesktopBridge } from "@actspace/shared/desktop-bridge";
 import { installBridge } from "../../api/bridge";
-import { createMockBridge, type MockBridgeHandle, type MockHandlers, type MockScenario } from "../../mock/create-mock-bridge";
+import {
+  createMockBridge,
+  type MockBridgeHandle,
+  type MockHandlers,
+  type MockScenario,
+} from "../../mock/create-mock-bridge";
 
 type Domain = keyof DesktopBridge;
 
@@ -8,7 +13,9 @@ type Domain = keyof DesktopBridge;
 export type BridgePath = { [D in Domain]: `${D}.${keyof DesktopBridge[D] & string}` }[Domain];
 
 type MemberAt<P extends BridgePath> = P extends `${infer D extends Domain}.${infer M}`
-  ? M extends keyof DesktopBridge[D] ? DesktopBridge[D][M] : never
+  ? M extends keyof DesktopBridge[D]
+    ? DesktopBridge[D][M]
+    : never
   : never;
 
 type ParamsOf<F> = F extends (...args: infer A) => unknown ? A : never;
@@ -30,7 +37,8 @@ function toHandlers(overrides: BridgeOverrides): MockHandlers {
   const handlers: Record<string, Record<string, unknown>> = {};
   for (const [path, implementation] of Object.entries(overrides)) {
     const [domain, member, ...rest] = path.split(".");
-    if (!domain || !member || rest.length > 0 || !contract[domain]?.[member]) throw new Error(`Unknown bridge path in test overrides: ${path}`);
+    if (!domain || !member || rest.length > 0 || !contract[domain]?.[member])
+      throw new Error(`Unknown bridge path in test overrides: ${path}`);
     if (typeof implementation !== "function") throw new Error(`Bridge override ${path} must be a function`);
     (handlers[domain] ??= {})[member] = implementation;
   }

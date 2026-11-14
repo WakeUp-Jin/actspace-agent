@@ -4,10 +4,7 @@ import { hasVisibleText, type MessageBlock } from "@actspace/shared";
 import { useSimplifyThinking } from "../conversation/display-settings";
 import { formatThinkingElapsed, thinkingOpeningClause } from "./thinking-title";
 import { ToolLogShimmer } from "./ToolLogShimmer";
-import {
-  getToolLogRunningTextAttrs,
-  TOOL_LOG_LINE_TEXT_RUNNING_CLASS,
-} from "./toolLogStyles";
+import { getToolLogRunningTextAttrs, TOOL_LOG_LINE_TEXT_RUNNING_CLASS } from "./toolLogStyles";
 
 type ThinkingMessage = Extract<MessageBlock, { kind: "thinking" }>;
 
@@ -20,7 +17,11 @@ const THINKING_CONTENT_CLASS =
 /** 简化样式收起时箭头占位但隐藏，标题每秒变化时箭头不跳；hover / 聚焦 / 展开时可见。 */
 const QUIET_CHEVRON_CLASS = "shrink-0 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100";
 
-export function ThinkingBlock({ message, className, replyCompleted = false }: {
+export function ThinkingBlock({
+  message,
+  className,
+  replyCompleted = false,
+}: {
   message: ThinkingMessage;
   className?: string;
   replyCompleted?: boolean;
@@ -55,9 +56,11 @@ export function ThinkingBlock({ message, className, replyCompleted = false }: {
   return (
     <article className={blockClassName}>
       <button className={THINKING_TOGGLE_CLASS} type="button" aria-expanded={expanded} onClick={toggle}>
-        {simplify
-          ? <SimplifiedThinkingTitle message={message} running={running} />
-          : <ThinkingTitleText text={message.title} running={running} />}
+        {simplify ? (
+          <SimplifiedThinkingTitle message={message} running={running} />
+        ) : (
+          <ThinkingTitleText text={message.title} running={running} />
+        )}
         <Chevron size={14} className={simplify && !expanded ? QUIET_CHEVRON_CLASS : undefined} />
       </button>
       {expanded ? <pre className={THINKING_CONTENT_CLASS}>{message.content}</pre> : null}
@@ -68,7 +71,9 @@ export function ThinkingBlock({ message, className, replyCompleted = false }: {
 function ThinkingTitleText({ text, running, className }: { text: string; running: boolean; className?: string }) {
   return (
     <span
-      className={[running ? TOOL_LOG_LINE_TEXT_RUNNING_CLASS : "", className ?? ""].filter(Boolean).join(" ") || undefined}
+      className={
+        [running ? TOOL_LOG_LINE_TEXT_RUNNING_CLASS : "", className ?? ""].filter(Boolean).join(" ") || undefined
+      }
       {...(running ? getToolLogRunningTextAttrs(text) : {})}
     >
       {text}
@@ -88,8 +93,12 @@ function SimplifiedThinkingTitle({ message, running }: { message: ThinkingMessag
   useEffect(() => {
     if (!running) return;
     setNow(Date.now());
-    const timer = window.setInterval(() => { setNow(Date.now()); }, 1000);
-    return () => { window.clearInterval(timer); };
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      window.clearInterval(timer);
+    };
   }, [running]);
 
   let text: string;

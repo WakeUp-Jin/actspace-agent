@@ -33,13 +33,22 @@ export type RendererAllowlist = ReadonlyMap<string, RendererAllowlistEntry>;
 
 export function createArgsSummary(args: RuntimeJsonValue): RuntimeToolArgsSummary {
   const fields = isRecord(args)
-    ? Object.entries(args).slice(0, 32).map(([name, value]) => Object.freeze({ name, value: formatValue(value), redacted: isRedactedValue(value, name) }))
+    ? Object.entries(args)
+        .slice(0, 32)
+        .map(([name, value]) =>
+          Object.freeze({ name, value: formatValue(value), redacted: isRedactedValue(value, name) }),
+        )
     : [];
   const text = fields.length === 0 ? "{}" : `{ ${fields.map((field) => `${field.name}: ${field.value}`).join(", ")} }`;
   return Object.freeze({ text: truncate(text, 1200), fields: Object.freeze(fields) });
 }
 
-export function createRunningToolView(identity: ToolProjectionIdentity, event: SessionEventEnvelopeV1, args: RuntimeJsonValue, renderer: RuntimeToolRendererHint | null = null): RuntimeToolView {
+export function createRunningToolView(
+  identity: ToolProjectionIdentity,
+  event: SessionEventEnvelopeV1,
+  args: RuntimeJsonValue,
+  renderer: RuntimeToolRendererHint | null = null,
+): RuntimeToolView {
   return Object.freeze({
     kind: "tool",
     schemaVersion: 1,
@@ -59,7 +68,12 @@ export function createRunningToolView(identity: ToolProjectionIdentity, event: S
   });
 }
 
-export function completeToolView(previous: RuntimeToolView, result: ToolExecutionResult, finishedAt: string, renderer: RuntimeToolRendererHint | null = previous.renderer): RuntimeToolView {
+export function completeToolView(
+  previous: RuntimeToolView,
+  result: ToolExecutionResult,
+  finishedAt: string,
+  renderer: RuntimeToolRendererHint | null = previous.renderer,
+): RuntimeToolView {
   const failure = result.status === "outcome-unknown" || result.failure !== undefined ? toFailure(result) : null;
   const state = result.status === "outcome-unknown" ? "failed" : result.status;
   return Object.freeze({
@@ -73,41 +87,101 @@ export function completeToolView(previous: RuntimeToolView, result: ToolExecutio
     modelOutput: Object.freeze(result.modelOutput.map(toModelOutput)),
     summary: redactProjectionText(result.summary),
     detail: Object.freeze(result.detail.map(toDetail)),
-    artifacts: Object.freeze(result.artifacts.map((artifact) => projectUnknownArtifact(artifact)).filter((artifact): artifact is NonNullable<typeof artifact> => artifact !== null)),
+    artifacts: Object.freeze(
+      result.artifacts
+        .map((artifact) => projectUnknownArtifact(artifact))
+        .filter((artifact): artifact is NonNullable<typeof artifact> => artifact !== null),
+    ),
     failure,
     renderer,
   });
 }
 
-export function projectRendererHint(value: unknown, allowlist: RendererAllowlist | undefined): RuntimeToolRendererHint | null {
-  if (!isRecord(value) || typeof value.id !== "string" || !Number.isSafeInteger(value.schemaVersion) || allowlist === undefined) return null;
+export function projectRendererHint(
+  value: unknown,
+  allowlist: RendererAllowlist | undefined,
+): RuntimeToolRendererHint | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    !Number.isSafeInteger(value.schemaVersion) ||
+    allowlist === undefined
+  )
+    return null;
   const entry = allowlist.get(value.id);
-  if (entry === undefined || entry.schemaVersion !== value.schemaVersion || !isRuntimeJson(value.props) || !entry.validate(value.props)) return null;
+  if (
+    entry === undefined ||
+    entry.schemaVersion !== value.schemaVersion ||
+    !isRuntimeJson(value.props) ||
+    !entry.validate(value.props)
+  )
+    return null;
   return Object.freeze({ id: entry.id, schemaVersion: entry.schemaVersion, props: redactProjectionValue(value.props) });
 }
 
-export function projectFailure(status: "denied" | "aborted" | "failed" | "outcome-unknown", message: string, code?: string): RuntimeToolFailure {
-  return Object.freeze({ code: code ?? (status === "outcome-unknown" ? "TOOL_OUTCOME_UNKNOWN" : `TOOL_${status.toUpperCase()}`), message: redactProjectionText(message), retryable: false, outcomeUnknown: status === "outcome-unknown" });
+export function projectFailure(
+  status: "denied" | "aborted" | "failed" | "outcome-unknown",
+  message: string,
+  code?: string,
+): RuntimeToolFailure {
+  return Object.freeze({
+    code: code ?? (status === "outcome-unknown" ? "TOOL_OUTCOME_UNKNOWN" : `TOOL_${status.toUpperCase()}`),
+    message: redactProjectionText(message),
+    retryable: false,
+    outcomeUnknown: status === "outcome-unknown",
+  });
 }
 
 function toFailure(result: ToolExecutionResult): RuntimeToolFailure {
-  return projectFailure(result.status === "outcome-unknown" ? "outcome-unknown" : "failed", result.failure?.message ?? "Tool outcome is unknown.", result.failure?.code);
+  return projectFailure(
+    result.status === "outcome-unknown" ? "outcome-unknown" : "failed",
+    result.failure?.message ?? "Tool outcome is unknown.",
+    result.failure?.code,
+  );
 }
 
 function toModelOutput(block: ToolModelOutputBlock): RuntimeToolModelOutputBlock {
   if (!isRecord(block)) return Object.freeze({ type: "text", text: "[UNAVAILABLE]" });
-  if (block.type === "text" && typeof block.text === "string") return Object.freeze({ type: "text", text: redactProjectionText(block.text) });
-  if (block.type === "artifact" && isRecord(block.artifact) && typeof block.artifact.artifactId === "string" && typeof block.artifact.mediaType === "string") return Object.freeze({ type: "artifact-ref", artifactId: block.artifact.artifactId, mimeType: block.artifact.mediaType, alt: redactProjectionText(typeof block.label === "string" ? block.label : block.artifact.artifactId, 160) });
+  if (block.type === "text" && typeof block.text === "string")
+    return Object.freeze({ type: "text", text: redactProjectionText(block.text) });
+  if (
+    block.type === "artifact" &&
+    isRecord(block.artifact) &&
+    typeof block.artifact.artifactId === "string" &&
+    typeof block.artifact.mediaType === "string"
+  )
+    return Object.freeze({
+      type: "artifact-ref",
+      artifactId: block.artifact.artifactId,
+      mimeType: block.artifact.mediaType,
+      alt: redactProjectionText(typeof block.label === "string" ? block.label : block.artifact.artifactId, 160),
+    });
   const value = (block as { readonly value?: unknown }).value;
-  return Object.freeze({ type: "text", text: redactProjectionText(JSON.stringify(redactProjectionValue(isRuntimeJson(value) ? value : null)) ?? "null") });
+  return Object.freeze({
+    type: "text",
+    text: redactProjectionText(JSON.stringify(redactProjectionValue(isRuntimeJson(value) ? value : null)) ?? "null"),
+  });
 }
 
 function toDetail(block: ToolDetailBlock): RuntimeToolDetailBlock {
-  return Object.freeze({ type: "key-value", items: Object.freeze([{ label: redactProjectionText(typeof block.label === "string" ? block.label : "detail", 160), value: redactProjectionText(JSON.stringify(redactProjectionValue(isRuntimeJson(block.value) ? block.value : null)) ?? "null") }]) });
+  return Object.freeze({
+    type: "key-value",
+    items: Object.freeze([
+      {
+        label: redactProjectionText(typeof block.label === "string" ? block.label : "detail", 160),
+        value: redactProjectionText(
+          JSON.stringify(redactProjectionValue(isRuntimeJson(block.value) ? block.value : null)) ?? "null",
+        ),
+      },
+    ]),
+  });
 }
 
 function formatValue(value: RuntimeJsonValue): string {
-  return redactProjectionText(typeof value === "string" ? value : JSON.stringify(redactProjectionValue(value)) ?? "null", 240);
+  return redactProjectionText(
+    typeof value === "string" ? value : (JSON.stringify(redactProjectionValue(value)) ?? "null"),
+    240,
+  );
 }
 
 function isRedactedValue(value: RuntimeJsonValue, key: string): boolean {

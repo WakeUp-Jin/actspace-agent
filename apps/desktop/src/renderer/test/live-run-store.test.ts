@@ -20,7 +20,9 @@ describe("live run store", () => {
 
   it("refreshes a re-marked runId to newest so it outlives older ones", () => {
     const set = createBoundedSet(3);
-    set.add("a"); set.add("b"); set.add("c");
+    set.add("a");
+    set.add("b");
+    set.add("c");
     set.add("a");
     set.add("d");
     expect(["a", "b", "c", "d"].filter(set.has)).toEqual(["a", "c", "d"]);
@@ -71,16 +73,36 @@ describe("live run store", () => {
   it("puts the task-snapshot user block first and shows the steered message where it was read", () => {
     const store = createLiveRunStore();
     const current = run("s1", "run-1");
-    current.userBlock = { kind: "user", id: "turn:run-1:user:0", runId: "run-1", content: "first", createdAt: "2026-10-06T00:00:00.000Z" };
+    current.userBlock = {
+      kind: "user",
+      id: "turn:run-1:user:0",
+      runId: "run-1",
+      content: "first",
+      createdAt: "2026-10-06T00:00:00.000Z",
+    };
     store.start(current);
-    const onSteered = vi.fn(() => ({ id: "m-1", text: "steer", options: { mode: "agent", selectedSkills: [] } }) as never);
-    store.applyStreamEvent({ type: "assistant_text_delta", sessionId: "s1", agentRunId: "run-1", delta: "reply" } as never, onSteered);
-    store.applyStreamEvent({ type: "user_message_steered", sessionId: "s1", agentRunId: "run-1", messageId: "m-1" } as never, onSteered);
+    const onSteered = vi.fn(
+      () => ({ id: "m-1", text: "steer", options: { mode: "agent", selectedSkills: [] } }) as never,
+    );
+    store.applyStreamEvent(
+      { type: "assistant_text_delta", sessionId: "s1", agentRunId: "run-1", delta: "reply" } as never,
+      onSteered,
+    );
+    store.applyStreamEvent(
+      { type: "user_message_steered", sessionId: "s1", agentRunId: "run-1", messageId: "m-1" } as never,
+      onSteered,
+    );
     // 不属于当前 run 的事件不生效，也不取 steer 正文。
-    store.applyStreamEvent({ type: "user_message_steered", sessionId: "s1", agentRunId: "run-old", messageId: "m-2" } as never, onSteered);
+    store.applyStreamEvent(
+      { type: "user_message_steered", sessionId: "s1", agentRunId: "run-old", messageId: "m-2" } as never,
+      onSteered,
+    );
     expect(onSteered).toHaveBeenCalledTimes(1);
     expect(store.view("s1").blocks.map((block) => [block.kind, block.id])).toEqual([
-      ["user", "turn:run-1:user:0"], ["assistant", "turn:run-1:assistant:0"], ["user", "turn:run-1:steer:m-1"], ["status", "turn:run-1:model-wait"],
+      ["user", "turn:run-1:user:0"],
+      ["assistant", "turn:run-1:assistant:0"],
+      ["user", "turn:run-1:steer:m-1"],
+      ["status", "turn:run-1:model-wait"],
     ]);
   });
 
@@ -88,37 +110,102 @@ describe("live run store", () => {
     const store = createLiveRunStore();
     store.start(run("s1", "run-b"));
     const ids = { sessionId: "s1", agentRunId: "run-b", turnId: "t1", llmCallId: "l1" };
-    const bashPreview = (command: string) => ({ kind: "bash", status: "running", title: "Bash command", command, commandPreview: command });
-    const apply = (event: Record<string, unknown>) => store.applyStreamEvent({ ...ids, ...event } as never, () => undefined);
+    const bashPreview = (command: string) => ({
+      kind: "bash",
+      status: "running",
+      title: "Bash command",
+      command,
+      commandPreview: command,
+    });
+    const apply = (event: Record<string, unknown>) =>
+      store.applyStreamEvent({ ...ids, ...event } as never, () => undefined);
     // runtime 对一批调用先全部 prepared；`ls ~/Desktop` 在 stage 里等审批，`ls ~` 还没轮到。
-    apply({ type: "tool_call_streaming", toolCallId: "call-a", toolName: "bash", preview: bashPreview("ls ~/Desktop") });
+    apply({
+      type: "tool_call_streaming",
+      toolCallId: "call-a",
+      toolName: "bash",
+      preview: bashPreview("ls ~/Desktop"),
+    });
     apply({ type: "tool_call_streaming", toolCallId: "call-b", toolName: "bash", preview: bashPreview("ls ~") });
-    apply({ type: "tool_approval_required", toolCallId: "call-a", toolName: "bash", requestId: "approval-a", summary: "List Desktop contents", reason: "Bash command requires approval", command: "ls ~/Desktop" });
+    apply({
+      type: "tool_approval_required",
+      toolCallId: "call-a",
+      toolName: "bash",
+      requestId: "approval-a",
+      summary: "List Desktop contents",
+      reason: "Bash command requires approval",
+      command: "ls ~/Desktop",
+    });
     const toolBlocks = () => store.view("s1").blocks.filter((block) => block.kind === "bash");
-    expect(toolBlocks().map((block) => [block.id, "status" in block ? block.status : null])).toEqual([["turn:run-b:tool:call-a", "pending"]]);
+    expect(toolBlocks().map((block) => [block.id, "status" in block ? block.status : null])).toEqual([
+      ["turn:run-b:tool:call-a", "pending"],
+    ]);
 
     // 审批通过、两个调用各自开始执行后，后面的调用才作为运行中出现。
     apply({ type: "tool_approval_resolved", toolCallId: "call-a", decision: "once" });
-    apply({ type: "tool_started", toolCallId: "call-a", toolName: "bash", argsPreview: "", preview: bashPreview("ls ~/Desktop") });
-    apply({ type: "tool_started", toolCallId: "call-b", toolName: "bash", argsPreview: "", preview: bashPreview("ls ~") });
-    expect(toolBlocks().map((block) => "status" in block ? block.status : null)).toEqual(["running", "running"]);
+    apply({
+      type: "tool_started",
+      toolCallId: "call-a",
+      toolName: "bash",
+      argsPreview: "",
+      preview: bashPreview("ls ~/Desktop"),
+    });
+    apply({
+      type: "tool_started",
+      toolCallId: "call-b",
+      toolName: "bash",
+      argsPreview: "",
+      preview: bashPreview("ls ~"),
+    });
+    expect(toolBlocks().map((block) => ("status" in block ? block.status : null))).toEqual(["running", "running"]);
   });
 
   it("puts the background notice divider first in a wake run and keys it like the durable block", () => {
     const store = createLiveRunStore();
     store.start(run("s1", "run-w"));
     const notice = { taskId: "bash_1", taskKind: "bash", title: "pnpm test", status: "completed" };
-    store.applyStreamEvent({ type: "assistant_text_delta", sessionId: "s1", agentRunId: "run-w", delta: "done" } as never, () => undefined);
-    store.applyStreamEvent({ type: "background_notice_claimed", sessionId: "s1", agentRunId: "run-w", messageId: "n-1", notice, content: "<task_notification/>" } as never, () => undefined);
-    expect(store.view("s1").blocks[0]).toMatchObject({ kind: "background_notice", id: "turn:run-w:background-notice:0", renderKey: "turn:run-w:background-notice:0", ...notice });
+    store.applyStreamEvent(
+      { type: "assistant_text_delta", sessionId: "s1", agentRunId: "run-w", delta: "done" } as never,
+      () => undefined,
+    );
+    store.applyStreamEvent(
+      {
+        type: "background_notice_claimed",
+        sessionId: "s1",
+        agentRunId: "run-w",
+        messageId: "n-1",
+        notice,
+        content: "<task_notification/>",
+      } as never,
+      () => undefined,
+    );
+    expect(store.view("s1").blocks[0]).toMatchObject({
+      kind: "background_notice",
+      id: "turn:run-w:background-notice:0",
+      renderKey: "turn:run-w:background-notice:0",
+      ...notice,
+    });
   });
 
   it("keeps a notice read inside a running turn where it was read, numbered after the earlier ones", () => {
     const store = createLiveRunStore();
     store.start(run("s1", "run-r"));
-    const claim = (messageId: string, title: string) => store.applyStreamEvent({ type: "background_notice_claimed", sessionId: "s1", agentRunId: "run-r", messageId,
-      notice: { taskId: messageId, taskKind: "subagent", title, status: "completed", opensTurn: false }, content: "<subagent_notification/>" } as never, () => undefined);
-    store.applyStreamEvent({ type: "assistant_text_delta", sessionId: "s1", agentRunId: "run-r", delta: "working" } as never, () => undefined);
+    const claim = (messageId: string, title: string) =>
+      store.applyStreamEvent(
+        {
+          type: "background_notice_claimed",
+          sessionId: "s1",
+          agentRunId: "run-r",
+          messageId,
+          notice: { taskId: messageId, taskKind: "subagent", title, status: "completed", opensTurn: false },
+          content: "<subagent_notification/>",
+        } as never,
+        () => undefined,
+      );
+    store.applyStreamEvent(
+      { type: "assistant_text_delta", sessionId: "s1", agentRunId: "run-r", delta: "working" } as never,
+      () => undefined,
+    );
     claim("sa-1", "探索");
     claim("sa-1", "探索");
     claim("sa-2", "Fork");
@@ -131,7 +218,14 @@ describe("live run store", () => {
 });
 
 describe("task queue store", () => {
-  const snapshot = (sessionId: string, revision: number, runs: TaskSnapshot["runs"] = []): TaskSnapshot => ({ sessionId, revision, paused: false, queue: [], tasks: [], runs });
+  const snapshot = (sessionId: string, revision: number, runs: TaskSnapshot["runs"] = []): TaskSnapshot => ({
+    sessionId,
+    revision,
+    paused: false,
+    queue: [],
+    tasks: [],
+    runs,
+  });
 
   it("keeps newer revisions and releases everything a session held on evict", () => {
     const tasks = createTaskQueueStore();
@@ -151,8 +245,22 @@ describe("task queue store", () => {
   it("attaches a recovered run from a snapshot and detaches it once the Host reports it finished", () => {
     const tasks = createTaskQueueStore();
     const runs = createLiveRunStore();
-    const effects = { tasks, runs, patchLocal: vi.fn(), notice: vi.fn(), refreshSession: vi.fn(), attachLiveBaseline: vi.fn() };
-    const running = { runId: "run-1", taskId: "t-1", state: "running", result: null, configuration: {}, harness: { harnessId: "main", generationId: "g", revision: 1 } } as TaskSnapshot["runs"][number];
+    const effects = {
+      tasks,
+      runs,
+      patchLocal: vi.fn(),
+      notice: vi.fn(),
+      refreshSession: vi.fn(),
+      attachLiveBaseline: vi.fn(),
+    };
+    const running = {
+      runId: "run-1",
+      taskId: "t-1",
+      state: "running",
+      result: null,
+      configuration: {},
+      harness: { harnessId: "main", generationId: "g", revision: 1 },
+    } as TaskSnapshot["runs"][number];
     applyTaskSnapshot(snapshot("s1", 1, [running]), effects);
     expect(runs.view("s1")).toMatchObject({ isStreaming: true, runId: "run-1", recovered: true });
     expect(effects.attachLiveBaseline).toHaveBeenCalledExactlyOnceWith("s1", "run-1");
@@ -170,18 +278,39 @@ describe("task queue store", () => {
     const runs = createLiveRunStore();
     const patchLocal = vi.fn();
     const effects = { tasks, runs, patchLocal, notice: vi.fn(), refreshSession: vi.fn() };
-    const task = (taskId: string, submissionId: string, state: string) => ({ taskId, submissionId, content: { kind: "composer-task", original: { userInput: taskId }, prepared: taskId }, acceptedSeq: 1, state, targetRunId: null, runId: null, continuationOf: null });
+    const task = (taskId: string, submissionId: string, state: string) => ({
+      taskId,
+      submissionId,
+      content: { kind: "composer-task", original: { userInput: taskId }, prepared: taskId },
+      acceptedSeq: 1,
+      state,
+      targetRunId: null,
+      runId: null,
+      continuationOf: null,
+    });
     tasks.rememberOptions("s1", "sub-a", { mode: "agent", selectedSkills: [] } as never, "optimistic-run");
     expect(tasks.requestedRun("sub-a")).toBe("optimistic-run");
     const optimistic = run("s1", "optimistic-run");
     runs.start(optimistic);
-    const pending = { ...snapshot("s1", 1), queue: ["a", "b"], tasks: [task("a", "sub-a", "pending"), task("b", "sub-b", "pending")] } as unknown as TaskSnapshot;
+    const pending = {
+      ...snapshot("s1", 1),
+      queue: ["a", "b"],
+      tasks: [task("a", "sub-a", "pending"), task("b", "sub-b", "pending")],
+    } as unknown as TaskSnapshot;
     applyTaskSnapshot(pending, effects);
     expect(patchLocal.mock.calls.at(-1)![1].messageQueue.items.map((item: { id: string }) => item.id)).toEqual(["b"]);
     expect(runs.get("s1")).toBe(optimistic);
 
     // Cancelled before it started: the optimistic run goes away.
-    applyTaskSnapshot({ ...pending, revision: 2, queue: ["b"], tasks: [task("a", "sub-a", "cancelled"), task("b", "sub-b", "pending")] } as unknown as TaskSnapshot, effects);
+    applyTaskSnapshot(
+      {
+        ...pending,
+        revision: 2,
+        queue: ["b"],
+        tasks: [task("a", "sub-a", "cancelled"), task("b", "sub-b", "pending")],
+      } as unknown as TaskSnapshot,
+      effects,
+    );
     expect(runs.has("s1")).toBe(false);
   });
 

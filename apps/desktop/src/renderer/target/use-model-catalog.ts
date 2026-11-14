@@ -7,10 +7,21 @@ import type { RunTarget } from "./run-target";
 
 /** 15 S6：本机和远端共用的模型目录结构（03 §2.5）。09 的 ModelPicker 只读这个结构。 */
 export type CatalogModel = { readonly id: string; readonly label: string; readonly detail?: string };
-export type ModelCatalogGroup = { readonly key: string; readonly label: string; readonly models: readonly CatalogModel[] };
-export type ModelCatalog = { readonly source: "local-providers" | "host"; readonly groups: readonly ModelCatalogGroup[]; readonly defaultModelId?: string };
+export type ModelCatalogGroup = {
+  readonly key: string;
+  readonly label: string;
+  readonly models: readonly CatalogModel[];
+};
+export type ModelCatalog = {
+  readonly source: "local-providers" | "host";
+  readonly groups: readonly ModelCatalogGroup[];
+  readonly defaultModelId?: string;
+};
 
-export function localModelCatalog<T extends ProviderModelOptionLike & { readonly id: string }>(models: T[], defaultModelId?: string): ModelCatalog {
+export function localModelCatalog<T extends ProviderModelOptionLike & { readonly id: string }>(
+  models: T[],
+  defaultModelId?: string,
+): ModelCatalog {
   return {
     source: "local-providers",
     groups: groupModelsByProvider(models).map((group) => ({
@@ -27,7 +38,13 @@ export function hostModelCatalog(hostName: string, description: HostDescription 
   if (!description) return { source: "host", groups: [] };
   return {
     source: "host",
-    groups: [{ key: "host", label: hostName, models: description.models.map((model) => ({ id: model.id, label: model.name })) }],
+    groups: [
+      {
+        key: "host",
+        label: hostName,
+        models: description.models.map((model) => ({ id: model.id, label: model.name })),
+      },
+    ],
     ...(description.defaultModel ? { defaultModelId: description.defaultModel } : {}),
   };
 }
@@ -49,35 +66,56 @@ export function createNewSessionModelStore(storage: () => StorageLike | undefine
   const listeners = new Set<() => void>();
   return {
     get: (hostId) => {
-      try { return storage()?.getItem(NEW_SESSION_MODEL_PREFIX + hostId) || undefined; } catch { return undefined; }
+      try {
+        return storage()?.getItem(NEW_SESSION_MODEL_PREFIX + hostId) || undefined;
+      } catch {
+        return undefined;
+      }
     },
     set: (hostId, modelId) => {
       try {
         if (storage()?.getItem(NEW_SESSION_MODEL_PREFIX + hostId) === modelId) return;
         storage()?.setItem(NEW_SESSION_MODEL_PREFIX + hostId, modelId);
-      } catch { return; }
+      } catch {
+        return;
+      }
       for (const listener of [...listeners]) listener();
     },
-    subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
   };
 }
 
-const browserStorage = () => typeof window === "undefined" ? undefined : window.localStorage;
+const browserStorage = () => (typeof window === "undefined" ? undefined : window.localStorage);
 export const newSessionModels = createNewSessionModelStore(browserStorage);
 
 /**
  * 一次性迁移 `actspace:remote-models`：远端会话的条目写进 remote-session-prefs，`new:<hostId>` 写进新建页记录，
  * 已有新记录的不覆盖；本机条目（`new:local`、本地会话）丢弃。迁移后删除旧 key。
  */
-export function migrateLegacyRemoteModels(storage: StorageLike | undefined, prefs: RemoteSessionPrefsStore, newModels: NewSessionModelStore): void {
+export function migrateLegacyRemoteModels(
+  storage: StorageLike | undefined,
+  prefs: RemoteSessionPrefsStore,
+  newModels: NewSessionModelStore,
+): void {
   let raw: string | null | undefined;
-  try { raw = storage?.getItem(LEGACY_REMOTE_MODELS_KEY); } catch { return; }
+  try {
+    raw = storage?.getItem(LEGACY_REMOTE_MODELS_KEY);
+  } catch {
+    return;
+  }
   if (raw == null) return;
   let entries: Record<string, unknown> = {};
   try {
     const value: unknown = JSON.parse(raw);
     if (value && typeof value === "object" && !Array.isArray(value)) entries = value as Record<string, unknown>;
-  } catch { /* 内容损坏时直接删除。 */ }
+  } catch {
+    /* 内容损坏时直接删除。 */
+  }
   for (const [key, modelId] of Object.entries(entries)) {
     if (typeof modelId !== "string" || !modelId) continue;
     if (key.startsWith("new:")) {
@@ -87,7 +125,11 @@ export function migrateLegacyRemoteModels(storage: StorageLike | undefined, pref
       prefs.set(key, { modelId });
     }
   }
-  try { storage?.removeItem(LEGACY_REMOTE_MODELS_KEY); } catch { /* 删不掉下次再迁移，结果相同。 */ }
+  try {
+    storage?.removeItem(LEGACY_REMOTE_MODELS_KEY);
+  } catch {
+    /* 删不掉下次再迁移，结果相同。 */
+  }
 }
 
 /**
@@ -105,19 +147,28 @@ const selectDescriptions = (snapshot: HostDirectorySnapshot) => snapshot.descrip
 const noop = () => () => {};
 
 /** 远端模型的选择与记忆。`hostId` 为 null（本机）时返回空串，`selectModel` 不做事。 */
-export function useRemoteModel(sessionId: string | null, hostId: string | null): { readonly modelId: string; readonly selectModel: (modelId: string) => void } {
+export function useRemoteModel(
+  sessionId: string | null,
+  hostId: string | null,
+): { readonly modelId: string; readonly selectModel: (modelId: string) => void } {
   const description = useHostDirectory(selectDescriptions)[hostId ?? ""];
   const sessionRemote = sessionId !== null && locateSession(sessionId).kind === "remote";
   const recorded = useSyncExternalStore(
     !hostId ? noop : sessionRemote ? remoteSessionPrefs.subscribe : newSessionModels.subscribe,
-    () => !hostId ? undefined : sessionRemote ? remoteSessionPrefs.get(sessionId)?.modelId : newSessionModels.get(hostId),
+    () =>
+      !hostId ? undefined : sessionRemote ? remoteSessionPrefs.get(sessionId)?.modelId : newSessionModels.get(hostId),
   );
-  const hostDefault = useSyncExternalStore(sessionRemote && hostId ? newSessionModels.subscribe : noop, () => sessionRemote && hostId ? newSessionModels.get(hostId) : undefined);
-  const selectModel = useCallback((modelId: string) => {
-    if (!hostId) return;
-    if (sessionRemote) remoteSessionPrefs.set(sessionId, { modelId });
-    else newSessionModels.set(hostId, modelId);
-  }, [hostId, sessionId, sessionRemote]);
+  const hostDefault = useSyncExternalStore(sessionRemote && hostId ? newSessionModels.subscribe : noop, () =>
+    sessionRemote && hostId ? newSessionModels.get(hostId) : undefined,
+  );
+  const selectModel = useCallback(
+    (modelId: string) => {
+      if (!hostId) return;
+      if (sessionRemote) remoteSessionPrefs.set(sessionId, { modelId });
+      else newSessionModels.set(hostId, modelId);
+    },
+    [hostId, sessionId, sessionRemote],
+  );
   return { modelId: hostId ? resolveRemoteModel(recorded ?? hostDefault, description) : "", selectModel };
 }
 
@@ -128,15 +179,32 @@ export type LocalModelSource<T extends ProviderModelOptionLike & { readonly id: 
   readonly onSelect: (modelId: string) => void;
 };
 
-export type ModelCatalogState = { readonly catalog: ModelCatalog; readonly selectedModelId: string; readonly selectModel: (modelId: string) => void };
+export type ModelCatalogState = {
+  readonly catalog: ModelCatalog;
+  readonly selectedModelId: string;
+  readonly selectModel: (modelId: string) => void;
+};
 
 /**
  * 当前运行目标的模型目录和选中值。本机的选择仍由会话配置管理（调用方传入）；远端走 `useRemoteModel` 的记忆规则。
  */
-export function useModelCatalog<T extends ProviderModelOptionLike & { readonly id: string }>(target: RunTarget, sessionId: string | null, local: LocalModelSource<T>): ModelCatalogState {
+export function useModelCatalog<T extends ProviderModelOptionLike & { readonly id: string }>(
+  target: RunTarget,
+  sessionId: string | null,
+  local: LocalModelSource<T>,
+): ModelCatalogState {
   const hostId = target.kind === "remote" ? target.hostId : null;
   const remote = useRemoteModel(sessionId, hostId);
   const description = useHostDirectory(selectDescriptions)[hostId ?? ""];
-  if (target.kind === "remote") return { catalog: hostModelCatalog(target.hostName, description), selectedModelId: remote.modelId, selectModel: remote.selectModel };
-  return { catalog: localModelCatalog(local.models, local.defaultModelId), selectedModelId: local.selectedModelId, selectModel: local.onSelect };
+  if (target.kind === "remote")
+    return {
+      catalog: hostModelCatalog(target.hostName, description),
+      selectedModelId: remote.modelId,
+      selectModel: remote.selectModel,
+    };
+  return {
+    catalog: localModelCatalog(local.models, local.defaultModelId),
+    selectedModelId: local.selectedModelId,
+    selectModel: local.onSelect,
+  };
 }

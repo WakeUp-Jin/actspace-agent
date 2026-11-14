@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
-import { ApprovalActions, ApprovalCard, ApprovalPath, ApprovalReason, useApprovalDecision, useFileGrantSuggestions } from "./ApprovalParts";
+import {
+  ApprovalActions,
+  ApprovalCard,
+  ApprovalPath,
+  ApprovalReason,
+  useApprovalDecision,
+  useFileGrantSuggestions,
+} from "./ApprovalParts";
 import { ToolLogShimmer } from "./ToolLogShimmer";
 import {
   getToolLogRunningTextAttrs,
@@ -13,24 +20,14 @@ import {
 } from "./toolLogStyles";
 import { settingsApi } from "../../api/settings";
 
-type FileDiffMessage =
-  | Extract<MessageBlock, { kind: "edit_diff" }>
-  | Extract<MessageBlock, { kind: "write_diff" }>;
+type FileDiffMessage = Extract<MessageBlock, { kind: "edit_diff" }> | Extract<MessageBlock, { kind: "write_diff" }>;
 
 const DIFF_APPROVAL_STATS_CLASS =
   "file-diff-approval-stats inline-flex h-5 flex-none items-center gap-1 rounded-act-xs border-0 bg-transparent px-1 font-mono text-act-xs leading-4 hover:bg-hover-overlay focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring aria-expanded:bg-hover-overlay";
 const DIFF_ERROR_DETAIL_CLASS =
   "file-diff-error-detail mx-[var(--conversation-text-inset)] mt-1 rounded-act-sm bg-surface-subtle px-[9px] py-[7px] font-mono text-act-xs leading-relaxed text-text-muted [overflow-wrap:anywhere]";
 
-function StatusLine({
-  text,
-  isError,
-  className,
-}: {
-  text: string;
-  isError?: boolean;
-  className?: string;
-}) {
+function StatusLine({ text, isError, className }: { text: string; isError?: boolean; className?: string }) {
   return (
     <div
       className={`${TOOL_LOG_LINE_CLASS}${isError ? ` ${TOOL_LOG_LINE_ERROR_CLASS}` : ""}${className ? ` ${className}` : ""}`}
@@ -46,9 +43,7 @@ function DiffLines({ message }: { message: FileDiffMessage }) {
       {message.diff.split("\n").map((line, index) => (
         <span
           className={
-            line.startsWith("+") ? "diff-line is-add"
-            : line.startsWith("-") ? "diff-line is-remove"
-            : "diff-line"
+            line.startsWith("+") ? "diff-line is-add" : line.startsWith("-") ? "diff-line is-remove" : "diff-line"
           }
           key={`${message.id}-${index}`}
         >
@@ -76,63 +71,93 @@ function FileDiffApprovalCard({
   const canOpenDiff = hasStats && message.diff.trim().length > 0;
 
   if (decision.resolved === "deny") {
-    return <StatusLine className={className} isError text={`Denied ${actionLabel.toLowerCase()} ${message.filePath}`} />;
+    return (
+      <StatusLine className={className} isError text={`Denied ${actionLabel.toLowerCase()} ${message.filePath}`} />
+    );
   }
   if (decision.resolved) {
     return <StatusLine className={className} text={`${actionLabel} ${message.filePath}`} />;
   }
 
-  const stats = hasStats ? <>
-    {message.additions > 0 ? <span className="diff-additions">+{message.additions}</span> : null}
-    {message.deletions > 0 ? <span className="diff-deletions">-{message.deletions}</span> : null}
-  </> : null;
+  const stats = hasStats ? (
+    <>
+      {message.additions > 0 ? <span className="diff-additions">+{message.additions}</span> : null}
+      {message.deletions > 0 ? <span className="diff-deletions">-{message.deletions}</span> : null}
+    </>
+  ) : null;
 
   return (
     <ApprovalCard
       className={className}
       verb={isWrite ? "写入" : "编辑"}
       target={<ApprovalPath path={message.filePath} />}
-      meta={<>
-        {canOpenDiff ? (
-          <button
-            className={DIFF_APPROVAL_STATS_CLASS}
-            type="button"
-            aria-expanded={diffOpen}
-            aria-label={diffOpen ? "收起改动" : "查看改动"}
-            onClick={() => setDiffOpen((value) => !value)}
-          >
-            {stats}
-            {/* 箭头提示这里可以展开：收起朝右，展开朝下。 */}
-            {diffOpen
-              ? <ChevronDown className="text-text-faint" size={12} aria-hidden />
-              : <ChevronRight className="text-text-faint" size={12} aria-hidden />}
-          </button>
-        ) : stats ? <span className="inline-flex flex-none items-center font-mono text-act-xs leading-4">{stats}</span> : null}
-        <ApprovalReason reason={message.reason} />
-      </>}
-      actions={<ApprovalActions state={decision} primaryLabel={isWrite ? "写入" : "应用"} fileSuggestions={suggestions} />}
+      meta={
+        <>
+          {canOpenDiff ? (
+            <button
+              className={DIFF_APPROVAL_STATS_CLASS}
+              type="button"
+              aria-expanded={diffOpen}
+              aria-label={diffOpen ? "收起改动" : "查看改动"}
+              onClick={() => setDiffOpen((value) => !value)}
+            >
+              {stats}
+              {/* 箭头提示这里可以展开：收起朝右，展开朝下。 */}
+              {diffOpen ? (
+                <ChevronDown className="text-text-faint" size={12} aria-hidden />
+              ) : (
+                <ChevronRight className="text-text-faint" size={12} aria-hidden />
+              )}
+            </button>
+          ) : stats ? (
+            <span className="inline-flex flex-none items-center font-mono text-act-xs leading-4">{stats}</span>
+          ) : null}
+          <ApprovalReason reason={message.reason} />
+        </>
+      }
+      actions={
+        <ApprovalActions state={decision} primaryLabel={isWrite ? "写入" : "应用"} fileSuggestions={suggestions} />
+      }
     >
-      {diffOpen ? <div className="file-diff-approval-preview mx-3"><DiffLines message={message} /></div> : null}
+      {diffOpen ? (
+        <div className="file-diff-approval-preview mx-3">
+          <DiffLines message={message} />
+        </div>
+      ) : null}
     </ApprovalCard>
   );
 }
 
-export function FileDiffBlock({ message, className, onExpand }: { message: FileDiffMessage; className?: string; onExpand?: () => void }) {
+export function FileDiffBlock({
+  message,
+  className,
+  onExpand,
+}: {
+  message: FileDiffMessage;
+  className?: string;
+  onExpand?: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [showFileChangeStats, setShowFileChangeStats] = useState(true);
   const actionLabel = message.kind === "write_diff" ? "Write" : "Edit";
   const isRunning = message.status === "running";
   const fileLabel = message.filePath || "file\u2026";
-  const changeStats = showFileChangeStats && (message.additions > 0 || message.deletions > 0)
-    ? ` · +${message.additions} -${message.deletions}`
-    : "";
+  const changeStats =
+    showFileChangeStats && (message.additions > 0 || message.deletions > 0)
+      ? ` · +${message.additions} -${message.deletions}`
+      : "";
 
   useEffect(() => {
     let active = true;
-    void settingsApi.getV4().then((snapshot) => {
-      if (active) setShowFileChangeStats(snapshot.settings.tools.showFileChangeStats !== false);
-    }).catch(() => undefined);
-    return () => { active = false; };
+    void settingsApi
+      .getV4()
+      .then((snapshot) => {
+        if (active) setShowFileChangeStats(snapshot.settings.tools.showFileChangeStats !== false);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, []);
 
   if (message.status === "pending") {
@@ -140,22 +165,14 @@ export function FileDiffBlock({ message, className, onExpand }: { message: FileD
   }
 
   if (message.status === "denied") {
-    return (
-      <StatusLine
-        className={className}
-        isError
-        text={`Denied ${actionLabel.toLowerCase()} ${fileLabel}`}
-      />
-    );
+    return <StatusLine className={className} isError text={`Denied ${actionLabel.toLowerCase()} ${fileLabel}`} />;
   }
 
   if (message.status === "failed") {
     return (
       <div className={className}>
         <StatusLine isError text={`${actionLabel} ${fileLabel}${changeStats} failed`} />
-        {message.errorMessage ? (
-          <div className={DIFF_ERROR_DETAIL_CLASS}>{message.errorMessage}</div>
-        ) : null}
+        {message.errorMessage ? <div className={DIFF_ERROR_DETAIL_CLASS}>{message.errorMessage}</div> : null}
       </div>
     );
   }
@@ -163,10 +180,18 @@ export function FileDiffBlock({ message, className, onExpand }: { message: FileD
   if (isRunning) {
     const progress = message.generationProgress;
     const characters = progress?.characters ?? 0;
-    const amount = characters >= 1_000 ? `${(Math.floor(characters / 100) / 10).toFixed(1)} 千字符` : `${Math.floor(characters / 10) * 10} 字符`;
-    const activity = progress?.phase === "saving" ? "正在保存"
-      : progress?.phase === "preparing" ? "准备保存"
-      : showFileChangeStats && characters >= 10 ? `已生成 ${amount}` : "正在生成";
+    const amount =
+      characters >= 1_000
+        ? `${(Math.floor(characters / 100) / 10).toFixed(1)} 千字符`
+        : `${Math.floor(characters / 10) * 10} 字符`;
+    const activity =
+      progress?.phase === "saving"
+        ? "正在保存"
+        : progress?.phase === "preparing"
+          ? "准备保存"
+          : showFileChangeStats && characters >= 10
+            ? `已生成 ${amount}`
+            : "正在生成";
     const text = `${actionLabel} ${fileLabel} · ${activity}`;
     return (
       <div className={`${TOOL_LOG_LINE_CLASS} ${TOOL_LOG_LINE_RUNNING_CLASS}${className ? ` ${className}` : ""}`}>
@@ -187,10 +212,17 @@ export function FileDiffBlock({ message, className, onExpand }: { message: FileD
         className="file-diff-toggle"
         type="button"
         aria-expanded={expanded}
-        onClick={() => { if (!expanded) onExpand?.(); setExpanded((value) => !value); }}
+        onClick={() => {
+          if (!expanded) onExpand?.();
+          setExpanded((value) => !value);
+        }}
       >
         <span className="file-diff-summary tool-summary-parts">
-          <span className="tool-summary-action">{actionLabel}</span>{" "}<span className="tool-summary-target" title={message.filePath}>{message.filePath}</span>{showFileChangeStats && (message.additions > 0 || message.deletions > 0) ? (
+          <span className="tool-summary-action">{actionLabel}</span>{" "}
+          <span className="tool-summary-target" title={message.filePath}>
+            {message.filePath}
+          </span>
+          {showFileChangeStats && (message.additions > 0 || message.deletions > 0) ? (
             <>
               {" "}
               {message.additions > 0 ? <span className="diff-additions">+{message.additions}</span> : null}
@@ -199,9 +231,7 @@ export function FileDiffBlock({ message, className, onExpand }: { message: FileD
             </>
           ) : null}
         </span>
-        {expanded
-          ? <ChevronDown size={14} />
-          : <ChevronRight size={14} />}
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </button>
       {expanded ? <DiffLines message={message} /> : null}
     </article>

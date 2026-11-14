@@ -74,10 +74,22 @@ export class ProviderNetworkService {
       for (const scheme of authAttempts(runtime)) {
         const listed = await this.#listModels(fetchImpl, runtime, scheme);
         if ("models" in listed) {
-          return { ok: true, message: `连接成功 · ${listed.models.length} 个模型。`, checkedAt, models: listed.models, ...resolvedAuthField(runtime, scheme) };
+          return {
+            ok: true,
+            message: `连接成功 · ${listed.models.length} 个模型。`,
+            checkedAt,
+            models: listed.models,
+            ...resolvedAuthField(runtime, scheme),
+          };
         }
         if (listed.status === 404 || listed.status === 405 || listed.status === 501) {
-          return { ok: true, message: "已连通 · 服务未提供模型列表。", checkedAt, statusCode: listed.status, models: null };
+          return {
+            ok: true,
+            message: "已连通 · 服务未提供模型列表。",
+            checkedAt,
+            statusCode: listed.status,
+            models: null,
+          };
         }
         failure = { ...customStatusFailure(listed.status, checkedAt), models: null };
         if (failure.errorKind !== "auth") break;
@@ -88,7 +100,11 @@ export class ProviderNetworkService {
     }
   }
 
-  async #listModels(fetchImpl: ProviderFetch, runtime: CustomConnectionProbeRuntime, scheme: CustomConnectionResolvedAuth): Promise<{ readonly models: { id: string; label?: string; facts?: ModelFacts }[] } | { readonly status: number }> {
+  async #listModels(
+    fetchImpl: ProviderFetch,
+    runtime: CustomConnectionProbeRuntime,
+    scheme: CustomConnectionResolvedAuth,
+  ): Promise<{ readonly models: { id: string; label?: string; facts?: ModelFacts }[] } | { readonly status: number }> {
     const base = runtime.baseUrl.replace(/\/+$/, "");
     const anthropic = runtime.protocol === "anthropic-messages";
     const models = new Map<string, { id: string; label?: string; facts?: ModelFacts }>();
@@ -97,17 +113,20 @@ export class ProviderNetworkService {
       const url = anthropic
         ? `${base}/v1/models?limit=1000${afterId ? `&after_id=${encodeURIComponent(afterId)}` : ""}`
         : `${base}/models`;
-      const response = await this.#withTimeout((signal) => fetchImpl(url, { method: "GET", headers: customConnectionHeaders(runtime, scheme), signal }));
+      const response = await this.#withTimeout((signal) =>
+        fetchImpl(url, { method: "GET", headers: customConnectionHeaders(runtime, scheme), signal }),
+      );
       if (!response.ok) {
         // 后续页失败时保留已经拿到的部分，不让整次探测失败。
         if (page > 0) break;
         return { status: response.status };
       }
-      const payload = await response.json().catch(() => null) as unknown;
+      const payload = (await response.json().catch(() => null)) as unknown;
       const rows = isRecord(payload) && Array.isArray(payload.data) ? payload.data.filter(isRecord) : [];
       for (const row of rows) {
         if (typeof row.id !== "string" || !row.id.trim() || models.has(row.id)) continue;
-        const label = typeof row.display_name === "string" && row.display_name.trim() ? row.display_name.trim() : undefined;
+        const label =
+          typeof row.display_name === "string" && row.display_name.trim() ? row.display_name.trim() : undefined;
         // 服务商自带的上下文、价格、能力等字段原样留下，优先级高于目录。
         const facts = normalizeProviderModelFacts(row, runtime.protocol);
         models.set(row.id, { id: row.id, ...(label ? { label } : {}), ...(isEmptyFacts(facts) ? {} : { facts }) });
@@ -134,13 +153,16 @@ export class ProviderNetworkService {
     }
   }
 
-  async getBalance(provider: BalanceProviderId, runtime: ProviderNetworkRuntime | undefined): Promise<ProviderBalanceSnapshot> {
+  async getBalance(
+    provider: BalanceProviderId,
+    runtime: ProviderNetworkRuntime | undefined,
+  ): Promise<ProviderBalanceSnapshot> {
     const generatedAt = this.#now().toISOString();
     if (!runtime) return { provider, isConfigured: false, isAvailable: null, generatedAt, displayBalance: null };
     try {
       const response = await this.#request(runtime, balanceUrl(runtime));
       if (!response.ok) throw new Error(`provider_status_${response.status}`);
-      const payload = await response.json() as unknown;
+      const payload = (await response.json()) as unknown;
       return balanceSnapshot(provider, payload, generatedAt);
     } catch (error) {
       const kind = classifyNetworkFailure(error);
@@ -167,7 +189,9 @@ export class ProviderNetworkService {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${runtime.apiKey}`,
-          ...(runtime.provider === "openrouter" ? { "HTTP-Referer": "https://actspace.ai", "X-Title": "ActSpace" } : {}),
+          ...(runtime.provider === "openrouter"
+            ? { "HTTP-Referer": "https://actspace.ai", "X-Title": "ActSpace" }
+            : {}),
         },
         signal: controller.signal,
       });
@@ -184,31 +208,62 @@ function authAttempts(runtime: CustomConnectionProbeRuntime): readonly CustomCon
   return ["x-api-key"];
 }
 
-function resolvedAuthField(runtime: CustomConnectionProbeRuntime, scheme: CustomConnectionResolvedAuth): { resolvedAuth?: CustomConnectionResolvedAuth } {
+function resolvedAuthField(
+  runtime: CustomConnectionProbeRuntime,
+  scheme: CustomConnectionResolvedAuth,
+): { resolvedAuth?: CustomConnectionResolvedAuth } {
   return runtime.protocol === "anthropic-messages" && runtime.authMode === "auto" ? { resolvedAuth: scheme } : {};
 }
 
 /** 两种认证方式互斥：走 Bearer 时不能同时带 x-api-key，否则部分中转站会按 x-api-key 校验失败。 */
-function customConnectionHeaders(runtime: CustomConnectionProbeRuntime, scheme: CustomConnectionResolvedAuth): Record<string, string> {
-  const auth: Record<string, string> = scheme === "bearer" ? { Authorization: `Bearer ${runtime.apiKey}` } : { "x-api-key": runtime.apiKey };
-  return { Accept: "application/json", ...auth, ...(runtime.protocol === "anthropic-messages" ? { "anthropic-version": "2023-06-01" } : {}) };
+function customConnectionHeaders(
+  runtime: CustomConnectionProbeRuntime,
+  scheme: CustomConnectionResolvedAuth,
+): Record<string, string> {
+  const auth: Record<string, string> =
+    scheme === "bearer" ? { Authorization: `Bearer ${runtime.apiKey}` } : { "x-api-key": runtime.apiKey };
+  return {
+    Accept: "application/json",
+    ...auth,
+    ...(runtime.protocol === "anthropic-messages" ? { "anthropic-version": "2023-06-01" } : {}),
+  };
 }
 
 /** 面向自定义连接的中文结果；不包含 Key 或响应正文。 */
 function customStatusFailure(status: number, checkedAt: string): Omit<CustomConnectionProbeResult, "models"> {
   const { errorKind } = statusFailure(status, checkedAt);
-  const reason = errorKind === "auth" ? "API Key 无效，或认证方式不被接受"
-    : errorKind === "insufficient_balance" ? "账户余额不足"
-      : errorKind === "rate_limit" ? "请求过于频繁"
-        : errorKind === "server" ? "服务端出错"
-          : status === 404 ? "接口地址或模型不存在，请检查服务地址和协议"
-            : "请求被拒绝";
+  const reason =
+    errorKind === "auth"
+      ? "API Key 无效，或认证方式不被接受"
+      : errorKind === "insufficient_balance"
+        ? "账户余额不足"
+        : errorKind === "rate_limit"
+          ? "请求过于频繁"
+          : errorKind === "server"
+            ? "服务端出错"
+            : status === 404
+              ? "接口地址或模型不存在，请检查服务地址和协议"
+              : "请求被拒绝";
   return { ok: false, message: `${reason}（HTTP ${status}）。`, checkedAt, errorKind, statusCode: status };
 }
 
-function customNetworkFailure(error: unknown, checkedAt: string, action: string): Omit<CustomConnectionProbeResult, "models"> {
+function customNetworkFailure(
+  error: unknown,
+  checkedAt: string,
+  action: string,
+): Omit<CustomConnectionProbeResult, "models"> {
   const errorKind = classifyNetworkFailure(error);
-  return { ok: false, checkedAt, errorKind, message: errorKind === "timeout" ? `${action}超时。` : errorKind === "proxy" ? "代理连接失败。" : "网络请求失败，请检查服务地址。" };
+  return {
+    ok: false,
+    checkedAt,
+    errorKind,
+    message:
+      errorKind === "timeout"
+        ? `${action}超时。`
+        : errorKind === "proxy"
+          ? "代理连接失败。"
+          : "网络请求失败，请检查服务地址。",
+  };
 }
 
 function balanceUrl(runtime: ProviderNetworkRuntime): string {
@@ -219,16 +274,23 @@ function balanceUrl(runtime: ProviderNetworkRuntime): string {
 }
 
 function statusFailure(status: number, checkedAt: string): ProviderConnectionProbe {
-  const errorKind: ProviderConnectionErrorKind = status === 401 || status === 403
-    ? "auth"
-    : status === 402
-      ? "insufficient_balance"
-      : status === 429
-        ? "rate_limit"
-        : status >= 500
-          ? "server"
-          : "invalid_request";
-  return { ok: false, message: `Provider connection failed with HTTP ${status}.`, checkedAt, errorKind, statusCode: status };
+  const errorKind: ProviderConnectionErrorKind =
+    status === 401 || status === 403
+      ? "auth"
+      : status === 402
+        ? "insufficient_balance"
+        : status === 429
+          ? "rate_limit"
+          : status >= 500
+            ? "server"
+            : "invalid_request";
+  return {
+    ok: false,
+    message: `Provider connection failed with HTTP ${status}.`,
+    checkedAt,
+    errorKind,
+    statusCode: status,
+  };
 }
 
 function classifyNetworkFailure(error: unknown): Extract<ProviderConnectionErrorKind, "proxy" | "timeout" | "network"> {
@@ -242,16 +304,37 @@ function balanceSnapshot(provider: BalanceProviderId, payload: unknown, generate
   if (provider === "deepseek") {
     const rows = Array.isArray(record.balance_infos) ? record.balance_infos.filter(isRecord) : [];
     const selected = rows.find((row) => row.currency === "CNY") ?? rows[0];
-    return { provider, isConfigured: true, isAvailable: typeof record.is_available === "boolean" ? record.is_available : null, generatedAt, displayBalance: selected ? amount(String(selected.total_balance ?? ""), String(selected.currency ?? "").toUpperCase()) : null };
+    return {
+      provider,
+      isConfigured: true,
+      isAvailable: typeof record.is_available === "boolean" ? record.is_available : null,
+      generatedAt,
+      displayBalance: selected
+        ? amount(String(selected.total_balance ?? ""), String(selected.currency ?? "").toUpperCase())
+        : null,
+    };
   }
   if (provider === "kimi") {
     const data = isRecord(record.data) ? record.data : {};
-    return { provider, isConfigured: true, isAvailable: typeof record.status === "boolean" ? record.status : null, generatedAt, displayBalance: amount(String(data.available_balance ?? ""), "CNY") };
+    return {
+      provider,
+      isConfigured: true,
+      isAvailable: typeof record.status === "boolean" ? record.status : null,
+      generatedAt,
+      displayBalance: amount(String(data.available_balance ?? ""), "CNY"),
+    };
   }
   const data = isRecord(record.data) ? record.data : {};
   const total = Number(data.total_credits);
   const used = Number(data.total_usage);
-  return { provider, isConfigured: true, isAvailable: true, generatedAt, displayBalance: Number.isFinite(total) && Number.isFinite(used) ? amount(String(Math.max(0, total - used)), "USD") : null };
+  return {
+    provider,
+    isConfigured: true,
+    isAvailable: true,
+    generatedAt,
+    displayBalance:
+      Number.isFinite(total) && Number.isFinite(used) ? amount(String(Math.max(0, total - used)), "USD") : null,
+  };
 }
 
 function amount(raw: string, currency: string): ProviderBalanceSnapshot["displayBalance"] {

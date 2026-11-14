@@ -1,5 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
-import { createCompactionTransaction, type SessionEventCandidateV1, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import {
+  createCompactionTransaction,
+  type SessionEventCandidateV1,
+  type SessionEventEnvelopeV1,
+} from "@actspace/session-journal";
 import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { Context } from "./types.js";
 import { contextEvents, latestContextEvent, type ContextSession } from "./supplements.js";
@@ -9,7 +13,11 @@ export interface CompactionSession extends ContextSession {
   appendMany(events: readonly SessionEventCandidateV1[]): Promise<readonly SessionEventEnvelopeV1[]>;
 }
 export type CompactionRegion = { readonly start: number; readonly end: number };
-export type CompactionResult = { readonly content: string; readonly metadata?: RuntimeJsonValue; readonly pathlist?: readonly string[] };
+export type CompactionResult = {
+  readonly content: string;
+  readonly metadata?: RuntimeJsonValue;
+  readonly pathlist?: readonly string[];
+};
 export type CompactionTrigger = "manual" | "auto";
 /**
  * What a committed compaction recorded on `compaction/end`. Tokens are absent when no measured baseline exists yet;
@@ -30,7 +38,11 @@ export type CompactionObserver = {
   readonly signal?: AbortSignal;
 };
 /** Input includes the disjoint cache-read/cache-write buckets exactly once. */
-export type CompactionUsage = { readonly inputTokens: number; readonly outputTokens: number; readonly contextWindow: number | null };
+export type CompactionUsage = {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly contextWindow: number | null;
+};
 export interface ContextCompactionStrategy {
   threshold?(contextWindow: number | null): number | null;
   shouldCompact(usage: CompactionUsage): boolean;
@@ -46,7 +58,13 @@ export interface CompactionDisclosure {
   /** Restores the disclosure state into a resolved Context; the engine applies it when the strategy offers one. */
   hydrate?(context: Context, session: CompactionSession): Promise<Context>;
   recover(session: CompactionSession): Promise<boolean | void>;
-  prepare(session: CompactionSession, context: Context, region: CompactionRegion, result: CompactionResult, compactionId: string): Promise<void>;
+  prepare(
+    session: CompactionSession,
+    context: Context,
+    region: CompactionRegion,
+    result: CompactionResult,
+    compactionId: string,
+  ): Promise<void>;
   applied(session: CompactionSession, compactionId: string): Promise<void>;
 }
 export type ContextHydrator = { hydrate(context: Context, session: CompactionSession): Promise<Context> };
@@ -60,12 +78,16 @@ export class ContextCompactionCoordinator implements ContextCompactor {
   register(strategy: ContextCompactionStrategy): () => void {
     if (this.strategy) throw new Error("A compaction strategy is already registered.");
     this.strategy = strategy;
-    return () => { if (this.strategy === strategy) this.strategy = undefined; };
+    return () => {
+      if (this.strategy === strategy) this.strategy = undefined;
+    };
   }
   registerDisclosure(disclosure: CompactionDisclosure): () => void {
     if (this.disclosure) throw new Error("A disclosure strategy is already registered.");
     this.disclosure = disclosure;
-    return () => { if (this.disclosure === disclosure) this.disclosure = undefined; };
+    return () => {
+      if (this.disclosure === disclosure) this.disclosure = undefined;
+    };
   }
   /** The registered disclosure as a Context hydrator, when it hydrates. */
   hydrator(): ContextHydrator | undefined {
@@ -73,70 +95,150 @@ export class ContextCompactionCoordinator implements ContextCompactor {
     return disclosure?.hydrate ? { hydrate: (context, session) => disclosure.hydrate!(context, session) } : undefined;
   }
   withStrategy(strategy: ContextCompactionStrategy): ContextCompactor {
-    return { threshold: capacity => strategy.threshold?.(capacity) ?? null, compact: (session, observer) => this.perform(session, strategy, observer, "manual"), maybeCompact: (session, usage, observer) => strategy.shouldCompact(usage) ? this.perform(session, strategy, observer, "auto") : Promise.resolve(false) };
+    return {
+      threshold: (capacity) => strategy.threshold?.(capacity) ?? null,
+      compact: (session, observer) => this.perform(session, strategy, observer, "manual"),
+      maybeCompact: (session, usage, observer) =>
+        strategy.shouldCompact(usage) ? this.perform(session, strategy, observer, "auto") : Promise.resolve(false),
+    };
   }
-  threshold(capacity: number | null): number | null { return this.strategy?.threshold?.(capacity) ?? null; }
-  async maybeCompact(session: CompactionSession, usage: CompactionUsage, observer?: CompactionObserver): Promise<boolean> {
+  threshold(capacity: number | null): number | null {
+    return this.strategy?.threshold?.(capacity) ?? null;
+  }
+  async maybeCompact(
+    session: CompactionSession,
+    usage: CompactionUsage,
+    observer?: CompactionObserver,
+  ): Promise<boolean> {
     return this.strategy?.shouldCompact(usage) ? this.perform(session, this.strategy, observer, "auto") : false;
   }
   async compact(session: CompactionSession, observer?: CompactionObserver): Promise<boolean> {
     if (!this.strategy) throw new Error("Context compaction capability is unavailable.");
     return this.perform(session, this.strategy, observer, "manual");
   }
-  private perform(session: CompactionSession, strategy: ContextCompactionStrategy, observer: CompactionObserver | undefined, trigger: CompactionTrigger): Promise<boolean> {
+  private perform(
+    session: CompactionSession,
+    strategy: ContextCompactionStrategy,
+    observer: CompactionObserver | undefined,
+    trigger: CompactionTrigger,
+  ): Promise<boolean> {
     const previous = this.pending.get(session) ?? Promise.resolve();
     const next = previous.then(async () => {
       if (await this.disclosure?.recover(session)) return true;
       observer?.signal?.throwIfAborted();
       const surface = session.journal.surface;
-      const context: Context = { request: { sessionId: session.header.sessionId, requestId: `compaction:${randomUUID()}`, routeId: "utility", model: "default", options: {} },
+      const context: Context = {
+        request: {
+          sessionId: session.header.sessionId,
+          requestId: `compaction:${randomUUID()}`,
+          routeId: "utility",
+          model: "default",
+          options: {},
+        },
         content: { system: { sections: [], modelFacts: [] }, conversation: surface, supplements: [], tools: [] },
-        status: { throughJournalSeq: session.lastSeq, cycle: 0, paths: [], facts: [], plugins: { "actspace.context.compaction": { summaryIds: surface.entries.flatMap(entry => { const seq = entry.sourceEventSeqs.reduce((a, b) => Math.max(a, b), -1); const event = contextEvents(session, seq, seq + 1).next().value; return event?.surface?.kind === "replace" ? [entry.node.messageId] : []; }) } } },
+        status: {
+          throughJournalSeq: session.lastSeq,
+          cycle: 0,
+          paths: [],
+          facts: [],
+          plugins: {
+            "actspace.context.compaction": {
+              summaryIds: surface.entries.flatMap((entry) => {
+                const seq = entry.sourceEventSeqs.reduce((a, b) => Math.max(a, b), -1);
+                const event = contextEvents(session, seq, seq + 1).next().value;
+                return event?.surface?.kind === "replace" ? [entry.node.messageId] : [];
+              }),
+            },
+          },
+        },
       };
       const region = strategy.select(context);
       if (!region) return false;
       const started = Date.now();
-      try { observer?.onStarted?.({ entryCount: region.end - region.start }); } catch { /* Progress observers cannot change durability. */ }
+      try {
+        observer?.onStarted?.({ entryCount: region.end - region.start });
+      } catch {
+        /* Progress observers cannot change durability. */
+      }
       await session.flush();
       const result = await strategy.summarize(context, region, observer?.signal);
       observer?.signal?.throwIfAborted();
       if (!result.content.trim()) throw new Error("Compaction returned an empty summary.");
-      if (surface.replaceGeneration !== session.journal.surface.replaceGeneration || JSON.stringify(surface.entries) !== JSON.stringify(session.journal.surface.entries)) return false;
-      const content: RuntimeJsonValue = result.metadata === undefined ? result.content : { text: result.content, metadata: result.metadata };
+      if (
+        surface.replaceGeneration !== session.journal.surface.replaceGeneration ||
+        JSON.stringify(surface.entries) !== JSON.stringify(session.journal.surface.entries)
+      )
+        return false;
+      const content: RuntimeJsonValue =
+        result.metadata === undefined ? result.content : { text: result.content, metadata: result.metadata };
       const compactionId = randomUUID();
       await this.disclosure?.prepare(session, context, region, result, compactionId);
-      if (surface.replaceGeneration !== session.journal.surface.replaceGeneration || JSON.stringify(surface.entries) !== JSON.stringify(session.journal.surface.entries)) return false;
+      if (
+        surface.replaceGeneration !== session.journal.surface.replaceGeneration ||
+        JSON.stringify(surface.entries) !== JSON.stringify(session.journal.surface.entries)
+      )
+        return false;
       const durationMs = Math.max(0, Date.now() - started);
       // The trigger's pressure value mixes estimates, so both manual and auto runs recount from the journal.
       const summary = { kind: "user" as const, messageId: `compaction-${randomUUID()}`, content };
-      const replacedTokens = replacedEstimate(surface.entries.slice(region.start, region.end), contextSummaryKeys(context.status.plugins["actspace.context.compaction"]));
+      const replacedTokens = replacedEstimate(
+        surface.entries.slice(region.start, region.end),
+        contextSummaryKeys(context.status.plugins["actspace.context.compaction"]),
+      );
       const stats = { trigger, ...compactionTokens(session, surface.entries, replacedTokens, summary) };
-      const transaction = createCompactionTransaction({ surface, ...region, summary, compactionId,
-        contributorIds: ["core/compaction"], summaryDigest: createHash("sha256").update(JSON.stringify(content)).digest("hex"), durationMs, stats, replacedTokens, estimatorVersion: ESTIMATOR_VERSION });
+      const transaction = createCompactionTransaction({
+        surface,
+        ...region,
+        summary,
+        compactionId,
+        contributorIds: ["core/compaction"],
+        summaryDigest: createHash("sha256").update(JSON.stringify(content)).digest("hex"),
+        durationMs,
+        stats,
+        replacedTokens,
+        estimatorVersion: ESTIMATOR_VERSION,
+      });
       await session.appendMany(transaction);
       await session.flush();
       await this.disclosure?.applied(session, compactionId);
-      try { observer?.onFinished?.({ compactionId, entryCount: region.end - region.start, durationMs, ...stats }); } catch { /* Progress observers cannot change durability. */ }
+      try {
+        observer?.onFinished?.({ compactionId, entryCount: region.end - region.start, durationMs, ...stats });
+      } catch {
+        /* Progress observers cannot change durability. */
+      }
       return true;
     });
     const settled = next.catch(() => {});
     this.pending.set(session, settled);
-    void settled.then(() => { if (this.pending.get(session) === settled) this.pending.delete(session); });
+    void settled.then(() => {
+      if (this.pending.get(session) === settled) this.pending.delete(session);
+    });
     return next;
   }
 }
 
 /** The newest token count the journal can vouch for: a request's reported usage, or a later compaction's after count. */
-function tokenBaseline(session: ContextSession): { readonly tokens: number; readonly seq: number; readonly estimated: boolean } | null {
+function tokenBaseline(
+  session: ContextSession,
+): { readonly tokens: number; readonly seq: number; readonly estimated: boolean } | null {
   let request: { tokens: number; seq: number } | null = null;
-  for (let event = latestContextEvent(session, "assistant/message"); event; event = latestContextEvent(session, "assistant/message", event.seq - 1)) {
+  for (
+    let event = latestContextEvent(session, "assistant/message");
+    event;
+    event = latestContextEvent(session, "assistant/message", event.seq - 1)
+  ) {
     const tokens = requestTokens(event.data);
-    if (tokens > 0) { request = { tokens, seq: event.seq }; break; }
+    if (tokens > 0) {
+      request = { tokens, seq: event.seq };
+      break;
+    }
   }
   const compaction = latestContextEvent(session, "compaction/end");
   if (compaction && compaction.seq > (request?.seq ?? -1)) {
     const after = record(compaction.data)?.afterTokens;
-    return typeof after === "number" && Number.isFinite(after) && after >= 0 ? { tokens: after, seq: compaction.seq, estimated: true } : null;
+    return typeof after === "number" && Number.isFinite(after) && after >= 0
+      ? { tokens: after, seq: compaction.seq, estimated: true }
+      : null;
   }
   return request && { ...request, estimated: false };
 }
@@ -145,20 +247,31 @@ function tokenBaseline(session: ContextSession): { readonly tokens: number; read
 function requestTokens(data: unknown): number {
   const usage = record(record(data)?.usage);
   if (!usage) return 0;
-  const value = (key: string) => { const number = usage[key]; return typeof number === "number" && Number.isFinite(number) && number >= 0 ? number : 0; };
+  const value = (key: string) => {
+    const number = usage[key];
+    return typeof number === "number" && Number.isFinite(number) && number >= 0 ? number : 0;
+  };
   return value("inputTokens") + value("cacheReadTokens") + value("cacheWriteTokens") + value("outputTokens");
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 /** 被替换范围的估算，按节点是否是之前的压缩摘要分开记（agent-spec-request-record.md §6.3.1）。 */
-function replacedEstimate(entries: ContextSession["journal"]["surface"]["entries"], summaries: ReadonlyMap<string, string>): { conversation: number; summarizedConversation: number } {
+function replacedEstimate(
+  entries: ContextSession["journal"]["surface"]["entries"],
+  summaries: ReadonlyMap<string, string>,
+): { conversation: number; summarizedConversation: number } {
   const replaced = { conversation: 0, summarizedConversation: 0 };
   for (const { node } of entries) {
     const summary = summaries.get(node.messageId);
-    replaced[summary === undefined ? "conversation" : "summarizedConversation"] += estimateConversationNode(node, summary);
+    replaced[summary === undefined ? "conversation" : "summarizedConversation"] += estimateConversationNode(
+      node,
+      summary,
+    );
   }
   return replaced;
 }
@@ -167,11 +280,22 @@ function replacedEstimate(entries: ContextSession["journal"]["surface"]["entries
  * Before = baseline + estimate of entries appended after it (tool results the model has not seen yet), flagged when
  * any estimate is included. After swaps the replaced estimate for the summary's, so it is available at commit time.
  */
-function compactionTokens(session: ContextSession, entries: ContextSession["journal"]["surface"]["entries"], replaced: { conversation: number; summarizedConversation: number }, summary: { kind: "user"; messageId: string; content: RuntimeJsonValue }): { beforeTokens?: number; afterTokens?: number; beforeEstimated?: true } {
+function compactionTokens(
+  session: ContextSession,
+  entries: ContextSession["journal"]["surface"]["entries"],
+  replaced: { conversation: number; summarizedConversation: number },
+  summary: { kind: "user"; messageId: string; content: RuntimeJsonValue },
+): { beforeTokens?: number; afterTokens?: number; beforeEstimated?: true } {
   const baseline = tokenBaseline(session);
   if (baseline === null) return {};
-  const appended = entries.filter(entry => entry.sourceEventSeqs.some(seq => seq > baseline.seq)).reduce((sum, entry) => sum + estimateConversationNode(entry.node), 0);
+  const appended = entries
+    .filter((entry) => entry.sourceEventSeqs.some((seq) => seq > baseline.seq))
+    .reduce((sum, entry) => sum + estimateConversationNode(entry.node), 0);
   const beforeTokens = baseline.tokens + appended;
   const removed = replaced.conversation + replaced.summarizedConversation;
-  return { beforeTokens, afterTokens: Math.max(0, beforeTokens - removed + estimateConversationNode(summary, summary.messageId)), ...(baseline.estimated || appended > 0 ? { beforeEstimated: true as const } : {}) };
+  return {
+    beforeTokens,
+    afterTokens: Math.max(0, beforeTokens - removed + estimateConversationNode(summary, summary.messageId)),
+    ...(baseline.estimated || appended > 0 ? { beforeEstimated: true as const } : {}),
+  };
 }

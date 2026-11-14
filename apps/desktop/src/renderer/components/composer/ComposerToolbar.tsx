@@ -55,32 +55,32 @@ export function composerSendButtonState(state: ComposerSendState) {
     ? "压缩完成后可继续"
     : stopUnreachable
       ? stopUnreachable.reason
-    : showStop
-      ? "停止 Agent"
-      : queueing
-        ? "加入队列，当前运行结束后发送"
-        : state.notReady
-          ? state.notReady.reason
-        : modelUnavailable
-          ? "请先在设置中连接模型服务"
-          : state.canSend
-            ? "发送消息"
-            : "输入消息后发送";
+      : showStop
+        ? "停止 Agent"
+        : queueing
+          ? "加入队列，当前运行结束后发送"
+          : state.notReady
+            ? state.notReady.reason
+            : modelUnavailable
+              ? "请先在设置中连接模型服务"
+              : state.canSend
+                ? "发送消息"
+                : "输入消息后发送";
   const ariaLabel = stopBlockedByCompaction
     ? "正在压缩上下文，压缩完成后可继续"
     : stopUnreachable
       ? stopUnreachable.reason
-    : showStop
-      ? "停止 Agent"
-      : queueing
-        ? "加入队列"
-        : state.notReady
-          ? state.notReady.reason
-        : modelUnavailable
-          ? "暂无可用模型，请在设置中连接服务商"
-          : state.canSend
-            ? "发送消息"
-            : "输入消息后发送";
+      : showStop
+        ? "停止 Agent"
+        : queueing
+          ? "加入队列"
+          : state.notReady
+            ? state.notReady.reason
+            : modelUnavailable
+              ? "暂无可用模型，请在设置中连接服务商"
+              : state.canSend
+                ? "发送消息"
+                : "输入消息后发送";
   return { showStop, disabled, tooltip, ariaLabel };
 }
 
@@ -101,7 +101,17 @@ export type ComposerToolbarProps = {
  * 09 T29：输入框工具栏。display:contents 让 toolbar 保留分组语义（aria / 测试定位），
  * 同时让 + / 模式 / 模型 / 发送直接参与外层 grid 的 grid-template-areas 排布。
  */
-export function ComposerToolbar({ mode, isStreaming, paletteOpen, onTogglePalette, onExitMode, model, send, onSend, onAbort }: ComposerToolbarProps) {
+export function ComposerToolbar({
+  mode,
+  isStreaming,
+  paletteOpen,
+  onTogglePalette,
+  onExitMode,
+  model,
+  send,
+  onSend,
+  onAbort,
+}: ComposerToolbarProps) {
   const sendButton = composerSendButtonState({ ...send, canAbort: Boolean(onAbort) });
   const modeMeta = mode === "agent" ? null : MODE_META[mode];
   const ModeIcon = modeMeta?.icon;

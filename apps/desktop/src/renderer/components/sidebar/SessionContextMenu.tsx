@@ -1,24 +1,37 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { TextAlignStart, Archive, ArchiveArrowUp, Copy, GitFork, Hash, Pencil, Pin } from "lucide-react";
 import {
-  ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
 } from "../ui/ContextMenu";
 import { SESSION_CONTEXT_MENU_ICON_CLASS } from "./styles";
 
 /** Shift+F10 / 菜单键：在 anchor 左下方派发 contextmenu，交给 ContextMenuTrigger 打开菜单。 */
-export function openContextMenuFromKeyboard(event: ReactKeyboardEvent, trigger: HTMLElement | null, anchor: HTMLElement | null = trigger) {
+export function openContextMenuFromKeyboard(
+  event: ReactKeyboardEvent,
+  trigger: HTMLElement | null,
+  anchor: HTMLElement | null = trigger,
+) {
   if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
   if (!trigger || !anchor) return;
   event.preventDefault();
   const rect = anchor.getBoundingClientRect();
-  trigger.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom + 4 }));
+  trigger.dispatchEvent(
+    new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom + 4 }),
+  );
 }
 
 /** 行上的「⋯」按钮：在按钮左下方打开同一份右键菜单，不另做一份下拉菜单。 */
 export function openContextMenuAt(trigger: HTMLElement | null, anchor: HTMLElement) {
   if (!trigger) return;
   const rect = anchor.getBoundingClientRect();
-  trigger.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom + 4 }));
+  trigger.dispatchEvent(
+    new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom + 4 }),
+  );
 }
 
 type SessionContextMenuContentProps = {
@@ -70,7 +83,12 @@ export function SessionContextMenuContent({
       }}
     >
       <ContextMenuItem disabled={!onTogglePin || archived} onSelect={() => onTogglePin?.()}>
-        <Pin size={16} fill={pinned ? "currentColor" : "none"} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+        <Pin
+          size={16}
+          fill={pinned ? "currentColor" : "none"}
+          className={SESSION_CONTEXT_MENU_ICON_CLASS}
+          aria-hidden="true"
+        />
         {pinned ? "取消置顶" : "置顶"}
       </ContextMenuItem>
       <ContextMenuItem disabled={!onRename} onSelect={onStartRename}>

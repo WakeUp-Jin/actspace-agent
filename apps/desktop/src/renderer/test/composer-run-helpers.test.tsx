@@ -10,14 +10,20 @@ describe("composerSendOptions", () => {
   const base = { model: MODEL_LIST[0].id, mode: "agent" as const, selectedSkills: [] };
 
   it("sends the reasoning effort only while thinking is on", () => {
-    expect(composerSendOptions({ ...base, runtimeOptions: { thinkingEnabled: false, reasoningEffort: "high" } })).not.toHaveProperty("reasoningEffort");
-    expect(composerSendOptions({ ...base, runtimeOptions: { thinkingEnabled: true, reasoningEffort: "high" } }).reasoningEffort).toBe("high");
+    expect(
+      composerSendOptions({ ...base, runtimeOptions: { thinkingEnabled: false, reasoningEffort: "high" } }),
+    ).not.toHaveProperty("reasoningEffort");
+    expect(
+      composerSendOptions({ ...base, runtimeOptions: { thinkingEnabled: true, reasoningEffort: "high" } })
+        .reasoningEffort,
+    ).toBe("high");
   });
 });
 
 describe("contextUsageDisplay", () => {
   it("turns the ring warning at 75% and danger at 90%", () => {
-    const at = (percentUsed: number) => contextUsageDisplay({ totalTokens: 1, maxTokens: 100, percentUsed, buckets: [] }).ringColor;
+    const at = (percentUsed: number) =>
+      contextUsageDisplay({ totalTokens: 1, maxTokens: 100, percentUsed, buckets: [] }).ringColor;
 
     expect(at(74)).toBe("var(--act-color-text-faint)");
     expect(at(75)).toBe("var(--act-color-warning)");
@@ -26,11 +32,15 @@ describe("contextUsageDisplay", () => {
 });
 
 describe("composerLocalRunTarget", () => {
-  const workspaces = [{ value: "/a", label: "alpha" }, { value: "/b", label: "beta" }];
+  const workspaces = [
+    { value: "/a", label: "alpha" },
+    { value: "/b", label: "beta" },
+  ];
 
   it("falls back to the first workspace, then asks to pick one", () => {
     const label = (workspaceOptions: typeof workspaces, selectedWorkspaceRoot?: string) =>
-      composerLocalRunTarget({ workspaceOptions, selectedWorkspaceRoot, newWorktree: { enabled: true } }).workspaceLabel;
+      composerLocalRunTarget({ workspaceOptions, selectedWorkspaceRoot, newWorktree: { enabled: true } })
+        .workspaceLabel;
 
     expect(label(workspaces, "/b")).toBe("beta");
     expect(label(workspaces, "/missing")).toBe("alpha");
@@ -41,13 +51,17 @@ describe("composerLocalRunTarget", () => {
 describe("useComposerModel", () => {
   it("stops following the default model once the user picked one", () => {
     const [first, second, third] = MODEL_LIST.map((spec) => spec.id);
-    const { result, rerender } = renderHook((props: Partial<ComposerModelSource>) => useComposerModel({
-      target: { kind: "local" },
-      sessionId: null,
-      remoteReady: true,
-      selectedSkills: [],
-      ...props,
-    }), { initialProps: { defaultModelId: first } });
+    const { result, rerender } = renderHook(
+      (props: Partial<ComposerModelSource>) =>
+        useComposerModel({
+          target: { kind: "local" },
+          sessionId: null,
+          remoteReady: true,
+          selectedSkills: [],
+          ...props,
+        }),
+      { initialProps: { defaultModelId: first } },
+    );
 
     rerender({ defaultModelId: second });
     expect(result.current.selectedModelId).toBe(second);

@@ -44,28 +44,36 @@ const bridge = buildBridge(desktopBridgeContract, transport, locals);
 contextBridge.exposeInMainWorld("actspace", bridge);
 `;
 
-const audit = (main, preload = consistentPreload, input = {}) => auditIpcChannels({
-  constants,
-  contract,
-  mainSources: [{ path: "main.ts", text: main }],
-  preloadSources: [{ path: "preload.ts", text: preload }],
-  ...input,
-});
+const audit = (main, preload = consistentPreload, input = {}) =>
+  auditIpcChannels({
+    constants,
+    contract,
+    mainSources: [{ path: "main.ts", text: main }],
+    preloadSources: [{ path: "preload.ts", text: preload }],
+    ...input,
+  });
 
 test("parses channel constants, with or without Object.freeze", () => {
-  assert.deepEqual([...constants[0].channels], [["ping", "demo:ping"], ["theme", "demo:theme"], ["changed", "demo:changed"]]);
   assert.deepEqual(
-    [...parseChannelConstant('export const X = { a: "x:a" } as const;', "X")],
-    [["a", "x:a"]],
+    [...constants[0].channels],
+    [
+      ["ping", "demo:ping"],
+      ["theme", "demo:theme"],
+      ["changed", "demo:changed"],
+    ],
   );
+  assert.deepEqual([...parseChannelConstant('export const X = { a: "x:a" } as const;', "X")], [["a", "x:a"]]);
 });
 
 test("parses contract members with their kind through the import alias, skipping local members", () => {
-  assert.deepEqual([...contract], [
-    ["demo.ping", { channel: "demo:ping", kind: "invoke" }],
-    ["demo.setTheme", { channel: "demo:theme", kind: "send" }],
-    ["events.changed", { channel: "demo:changed", kind: "event" }],
-  ]);
+  assert.deepEqual(
+    [...contract],
+    [
+      ["demo.ping", { channel: "demo:ping", kind: "invoke" }],
+      ["demo.setTheme", { channel: "demo:theme", kind: "send" }],
+      ["events.changed", { channel: "demo:changed", kind: "event" }],
+    ],
+  );
 });
 
 test("rejects a contract member that points at an unknown constant key", () => {
@@ -105,14 +113,26 @@ export const later = { other: { ping: invoke<void>(CH.ping) } };
 
 test("rejects contract shapes it cannot read instead of skipping them", () => {
   const cases = [
-    [contractSource.replace("send<", "sendLater<"), /第 6 行的 sendLater 认不出来：demo\.setTheme 用了本检查不认识的构造函数/],
-    [contractSource.replace("changed: event<void>(CH.changed, { reason: \"normal\" }),", "changed: { nested: event<void>(CH.changed) },"), /第 10 行的 \{ 认不出来：这里应该是构造函数/],
+    [
+      contractSource.replace("send<", "sendLater<"),
+      /第 6 行的 sendLater 认不出来：demo\.setTheme 用了本检查不认识的构造函数/,
+    ],
+    [
+      contractSource.replace(
+        'changed: event<void>(CH.changed, { reason: "normal" }),',
+        "changed: { nested: event<void>(CH.changed) },",
+      ),
+      /第 10 行的 \{ 认不出来：这里应该是构造函数/,
+    ],
     [contractSource.replace("(CH.theme)", "()"), /第 6 行的 \) 认不出来：这里应该是常量名/],
     [contractSource.replace("(CH.theme)", '("demo:theme")'), /第 6 行的 "demo:theme" 认不出来：这里应该是常量名/],
     [contractSource.replace("setTheme: ", '"set-theme": '), /第 6 行的 "set-theme" 认不出来：这里应该是成员的名字/],
     [contractSource.replace("  events: {", "  ...shared,\n  events: {"), /第 9 行的 \. 认不出来：这里应该是域的名字/],
     [contractSource.replace("} as const;", ""), /末尾 认不出来/],
-    [contractSource.replace("desktopBridgeContract = {", "desktopBridgeContract: Contract = {"), /没有找到 desktopBridgeContract = \{ … \}/],
+    [
+      contractSource.replace("desktopBridgeContract = {", "desktopBridgeContract: Contract = {"),
+      /没有找到 desktopBridgeContract = \{ … \}/,
+    ],
   ];
   for (const [source, message] of cases) assert.throws(() => parseContract(source, constants), message);
 });
@@ -128,9 +148,7 @@ handle(channels.ping, () => "pong");
 ipcMain.on("demo:theme", () => undefined);
 win.webContents.send(DEMO_CHANNELS.changed, value);
 `;
-  assert.deepEqual(audit(main), [
-    "main 绕过统一注册器直接调用了 ipcMain.on（main.ts），请改用 ipc.on(contract.…)",
-  ]);
+  assert.deepEqual(audit(main), ["main 绕过统一注册器直接调用了 ipcMain.on（main.ts），请改用 ipc.on(contract.…)"]);
   assert.deepEqual(audit(main, consistentPreload, { registrarPath: "main.ts" }), []);
 });
 
@@ -179,7 +197,9 @@ test("fails when main uses a channel in the wrong direction", () => {
 });
 
 test("fails when a channel constant is not used by the contract", () => {
-  const extra = [{ constant: "DEMO_CHANNELS", channels: new Map([...constants[0].channels, ["orphan", "demo:orphan"]]) }];
+  const extra = [
+    { constant: "DEMO_CHANNELS", channels: new Map([...constants[0].channels, ["orphan", "demo:orphan"]]) },
+  ];
   assert.deepEqual(audit(consistentMain, consistentPreload, { constants: extra }), [
     '常量 DEMO_CHANNELS.orphan（"demo:orphan"）不在契约里',
   ]);
@@ -189,10 +209,16 @@ test("fails when preload does not build the bridge from the contract or referenc
   assert.deepEqual(audit(consistentMain, "const bridge = buildBridge(otherContract, transport, locals);"), [
     "preload 没有按 desktopBridgeContract 生成 bridge（buildBridge(desktopBridgeContract, …)）",
   ]);
-  assert.deepEqual(audit(consistentMain, `${consistentPreload}\nipcRenderer.invoke(DEMO_CHANNELS.ping);\nipcRenderer.on("demo:changed", cb);`), [
-    'preload 绕过契约直接引用了 channel "demo:ping"（preload.ts）',
-    'preload 绕过契约直接引用了 channel "demo:changed"（preload.ts）',
-  ]);
+  assert.deepEqual(
+    audit(
+      consistentMain,
+      `${consistentPreload}\nipcRenderer.invoke(DEMO_CHANNELS.ping);\nipcRenderer.on("demo:changed", cb);`,
+    ),
+    [
+      'preload 绕过契约直接引用了 channel "demo:ping"（preload.ts）',
+      'preload 绕过契约直接引用了 channel "demo:changed"（preload.ts）',
+    ],
+  );
 });
 
 test("runCheck audits the tree it is given, with paths relative to that tree", () => {
@@ -203,9 +229,18 @@ test("runCheck audits the tree it is given, with paths relative to that tree", (
       fs.writeFileSync(path.join(root, relative), content);
     };
     const shared = "packages/util/shared/src";
-    write(`${shared}/runtime-v2/fixed-renderer.ts`, 'export const RUNTIME_FIXED_RENDERER_CHANNELS = { ping: "fixed:ping" } as const;');
-    write(`${shared}/resource-monitor.ts`, 'export const RESOURCE_MONITOR_CHANNELS = { watch: "monitor:watch" } as const;');
-    write(`${shared}/english-learning.ts`, 'export const ENGLISH_LEARNING_CHANNELS = { lookup: "english:lookup" } as const;');
+    write(
+      `${shared}/runtime-v2/fixed-renderer.ts`,
+      'export const RUNTIME_FIXED_RENDERER_CHANNELS = { ping: "fixed:ping" } as const;',
+    );
+    write(
+      `${shared}/resource-monitor.ts`,
+      'export const RESOURCE_MONITOR_CHANNELS = { watch: "monitor:watch" } as const;',
+    );
+    write(
+      `${shared}/english-learning.ts`,
+      'export const ENGLISH_LEARNING_CHANNELS = { lookup: "english:lookup" } as const;',
+    );
     write(`${shared}/host-protocol/connections.ts`, 'export const HOST_IPC = { changed: "host:changed" } as const;');
     write(
       `${shared}/desktop-bridge/contract.ts`,
@@ -221,7 +256,10 @@ test("runCheck audits the tree it is given, with paths relative to that tree", (
       ].join("\n"),
     );
     // 注册器自己可以碰 ipcMain；它的路径要按传进来的根目录算，才认得出是注册器。
-    write("apps/desktop/src/main/ipc/registry.ts", "export const ipc = { handle: (spec, fn) => ipcMain.handle(spec.channel, fn) };");
+    write(
+      "apps/desktop/src/main/ipc/registry.ts",
+      "export const ipc = { handle: (spec, fn) => ipcMain.handle(spec.channel, fn) };",
+    );
     write(
       "apps/desktop/src/main/index.ts",
       [
@@ -250,5 +288,8 @@ test("the repository passes the audit", () => {
   const { constants: repoConstants, contract: repoContract, errors } = runCheck();
   assert.deepEqual(errors, []);
   assert.ok(repoConstants.every(({ channels }) => channels.size > 0));
-  assert.equal(repoContract.size, repoConstants.reduce((sum, { channels }) => sum + channels.size, 0));
+  assert.equal(
+    repoContract.size,
+    repoConstants.reduce((sum, { channels }) => sum + channels.size, 0),
+  );
 });

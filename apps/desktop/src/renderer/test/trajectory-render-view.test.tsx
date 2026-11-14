@@ -18,9 +18,39 @@ const snapshot: RuntimeTrajectorySnapshot = {
   sessionId: "session-1",
   throughJournalSeq: 2,
   nodes: [
-    { key: "session-1:0", sessionId: "session-1", eventSeq: 0, eventType: "turn/start", time: "2026-08-31T00:00:00.000Z", kind: "turn", state: "started", callId: null, data: {} },
-    { key: "session-1:1", sessionId: "session-1", eventSeq: 1, eventType: "tool/call", time: "2026-08-31T00:00:01.000Z", kind: "tool", state: "observed", callId: "call-1", data: { callId: "call-1" } },
-    { key: "session-1:2", sessionId: "session-1", eventSeq: 2, eventType: "turn/end", time: "2026-08-31T00:00:02.000Z", kind: "turn", state: "completed", callId: null, data: {} },
+    {
+      key: "session-1:0",
+      sessionId: "session-1",
+      eventSeq: 0,
+      eventType: "turn/start",
+      time: "2026-08-31T00:00:00.000Z",
+      kind: "turn",
+      state: "started",
+      callId: null,
+      data: {},
+    },
+    {
+      key: "session-1:1",
+      sessionId: "session-1",
+      eventSeq: 1,
+      eventType: "tool/call",
+      time: "2026-08-31T00:00:01.000Z",
+      kind: "tool",
+      state: "observed",
+      callId: "call-1",
+      data: { callId: "call-1" },
+    },
+    {
+      key: "session-1:2",
+      sessionId: "session-1",
+      eventSeq: 2,
+      eventType: "turn/end",
+      time: "2026-08-31T00:00:02.000Z",
+      kind: "turn",
+      state: "completed",
+      callId: null,
+      data: {},
+    },
   ],
 };
 
@@ -56,7 +86,7 @@ describe("TrajectoryView", () => {
   });
 
   it("reads the active Session trajectory directly from ClientSessionStore selectors", async () => {
-    const events: SessionEventEnvelopeV1[] = snapshot.nodes.map(node => ({
+    const events: SessionEventEnvelopeV1[] = snapshot.nodes.map((node) => ({
       recordKind: "event",
       seq: node.eventSeq,
       type: node.eventType,
@@ -89,7 +119,11 @@ describe("TrajectoryView", () => {
       ...snapshot,
       nodes: [
         { ...snapshot.nodes[0], data: { turnId: "turn-1", stepId: "step-1" } },
-        { ...snapshot.nodes[1], eventType: "tool/call", data: { turnId: "turn-1", stepId: "step-1", name: "read_file", path: "src/App.tsx" } },
+        {
+          ...snapshot.nodes[1],
+          eventType: "tool/call",
+          data: { turnId: "turn-1", stepId: "step-1", name: "read_file", path: "src/App.tsx" },
+        },
         { ...snapshot.nodes[2], data: { turnId: "turn-1", status: "completed" } },
       ],
     };
@@ -150,7 +184,7 @@ describe("TrajectoryView", () => {
     const details = screen.getByRole("complementary", { name: "事件详情" });
     expect(within(details).getByText("第 1 轮 · 第 2 步")).toBeInTheDocument();
     expect(within(details).getByText(/2026-09-03 \d{2}:20:10\.100/)).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual(["概述", "预览", "原始内容"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["概述", "预览", "原始内容"]);
     await user.click(screen.getByRole("button", { name: "关闭详情" }));
 
     await user.click(screen.getByRole("row", { name: /用户，帮我检查/ }));
@@ -174,7 +208,7 @@ describe("TrajectoryView", () => {
     await user.click(screen.getByRole("button", { name: "请求 #2" }));
     expect(screen.getByRole("row", { name: /助手，Journal 保留/ })).not.toHaveAttribute("data-selected");
     expect(screen.getByRole("button", { name: "请求 #2" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual(["概述", "选项", "用量", "计时"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["概述", "选项", "用量", "计时"]);
     await user.click(screen.getByRole("button", { name: "关闭详情" }));
 
     await user.click(screen.getAllByRole("row", { name: /系统，系统提示词已更新/ })[0]);
@@ -201,22 +235,35 @@ describe("TrajectoryView", () => {
 
   it("selects the record a Context panel reveal points at and opens its details", async () => {
     const onShowTrajectory = vi.fn();
-    render(<TooltipProvider><TrajectoryNavigationProvider onShowTrajectory={onShowTrajectory}>
-      <RevealTrigger target={{ callId: "call-1" }} />
-      <TrajectoryView snapshot={snapshot} />
-    </TrajectoryNavigationProvider></TooltipProvider>);
+    render(
+      <TooltipProvider>
+        <TrajectoryNavigationProvider onShowTrajectory={onShowTrajectory}>
+          <RevealTrigger target={{ callId: "call-1" }} />
+          <TrajectoryView snapshot={snapshot} />
+        </TrajectoryNavigationProvider>
+      </TooltipProvider>,
+    );
 
     await userEvent.click(screen.getByRole("button", { name: "reveal" }));
     expect(onShowTrajectory).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(screen.getAllByRole("row").find((row) => row.getAttribute("data-event-seq") === "1")).toHaveAttribute("data-selected", "true"));
+    await waitFor(() =>
+      expect(screen.getAllByRole("row").find((row) => row.getAttribute("data-event-seq") === "1")).toHaveAttribute(
+        "data-selected",
+        "true",
+      ),
+    );
     expect(screen.getByRole("button", { name: "关闭详情" })).toBeInTheDocument();
   });
 
   it("explains a reveal that does not match any loaded record", async () => {
-    render(<TooltipProvider><TrajectoryNavigationProvider onShowTrajectory={() => undefined}>
-      <RevealTrigger target={{ callId: "missing" }} />
-      <TrajectoryView snapshot={snapshot} />
-    </TrajectoryNavigationProvider></TooltipProvider>);
+    render(
+      <TooltipProvider>
+        <TrajectoryNavigationProvider onShowTrajectory={() => undefined}>
+          <RevealTrigger target={{ callId: "missing" }} />
+          <TrajectoryView snapshot={snapshot} />
+        </TrajectoryNavigationProvider>
+      </TooltipProvider>,
+    );
 
     await userEvent.click(screen.getByRole("button", { name: "reveal" }));
     expect(await screen.findByText(/没有在已加载的轨迹里找到这条记录/)).toBeInTheDocument();
@@ -227,5 +274,9 @@ describe("TrajectoryView", () => {
 
 function RevealTrigger({ target }: { target: TrajectoryRevealTarget }) {
   const navigation = useTrajectoryNavigation();
-  return <button type="button" onClick={() => navigation?.revealInTrajectory(target)}>reveal</button>;
+  return (
+    <button type="button" onClick={() => navigation?.revealInTrajectory(target)}>
+      reveal
+    </button>
+  );
 }

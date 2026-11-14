@@ -70,7 +70,7 @@ export function useReviewSummary(target: { workspaceRoot: string | null; session
     run.inFlight = false;
     if (runRef.current !== run) return;
     // 内容没变就保留原引用，避免整个 App 跟着重渲染。
-    setReviewSummary((current) => current && sameReviewSummary(current, next) ? current : next);
+    setReviewSummary((current) => (current && sameReviewSummary(current, next) ? current : next));
     if (run.pending) void load(run.pendingForce);
   }, []);
 
@@ -81,11 +81,15 @@ export function useReviewSummary(target: { workspaceRoot: string | null; session
     void load(true);
   }, [workspaceRoot, sessionId, load]);
 
-  useEffect(() => eventsApi.reviewChanged((notification) => {
-    const run = runRef.current;
-    // 身份未知时只在首个请求在途期间记一次补查，不让其他工作区的通知反复触发查询。
-    if (run.workspaceId === notification.workspaceId || (run.workspaceId === null && run.inFlight)) void load();
-  }), [load]);
+  useEffect(
+    () =>
+      eventsApi.reviewChanged((notification) => {
+        const run = runRef.current;
+        // 身份未知时只在首个请求在途期间记一次补查，不让其他工作区的通知反复触发查询。
+        if (run.workspaceId === notification.workspaceId || (run.workspaceId === null && run.inFlight)) void load();
+      }),
+    [load],
+  );
 
   /** 默认强制刷新；只有明确要读缓存时才传 `false`。 */
   const refreshReviewSummary = useCallback((force = true) => load(force), [load]);

@@ -17,29 +17,92 @@ function listItem(id: string, title: string): SessionListItem {
 
 function record(id: string, title: string): SessionRecord {
   return {
-    meta: { schemaVersion: 2, id, title, createdAt: NOW, updatedAt: NOW, agentRunCount: 1, workspaceRoot: "/tmp/workspace" },
-    events: [{ id: `v2-${id}`, schemaVersion: 2, sessionId: id, agentRunId: `run-${id}`, type: "user_message", timestamp: NOW, payload: { content: `hello ${id}` } }],
+    meta: {
+      schemaVersion: 2,
+      id,
+      title,
+      createdAt: NOW,
+      updatedAt: NOW,
+      agentRunCount: 1,
+      workspaceRoot: "/tmp/workspace",
+    },
+    events: [
+      {
+        id: `v2-${id}`,
+        schemaVersion: 2,
+        sessionId: id,
+        agentRunId: `run-${id}`,
+        type: "user_message",
+        timestamp: NOW,
+        payload: { content: `hello ${id}` },
+      },
+    ],
   };
 }
 
 function task(taskId: string, content: string, state: TaskRecord["state"], runId: string | null = null): TaskRecord {
-  return { taskId, submissionId: `sub-${taskId}`, content, acceptedSeq: 1, state, targetRunId: null, runId, continuationOf: null };
+  return {
+    taskId,
+    submissionId: `sub-${taskId}`,
+    content,
+    acceptedSeq: 1,
+    state,
+    targetRunId: null,
+    runId,
+    continuationOf: null,
+  };
 }
 
 function fixture() {
   const items = [listItem("s-1", "First"), listItem("s-2", "Second")];
   const archived = new Set<string>();
   const snapshots = new Map<string, TaskSnapshot>();
-  const empty = (sessionId: string, revision = 1): TaskSnapshot => ({ sessionId, revision, paused: false, tasks: [], queue: [], runs: [] });
+  const empty = (sessionId: string, revision = 1): TaskSnapshot => ({
+    sessionId,
+    revision,
+    paused: false,
+    tasks: [],
+    queue: [],
+    runs: [],
+  });
   const live = new Set<(payload: unknown) => void>();
   const holds = new Map<string, Promise<void>>();
   setupBridge({
-    "app.getBootstrapState": async () => ({ appVersion: "test", dataRoot: "/tmp/test", sessionRoot: "/tmp/test", logRoot: "/tmp/test", tmpRoot: "/tmp/test", workspaceRoot: "/tmp/workspace" }),
-    "workspaces.list": async () => ({ version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: NOW, updatedAt: NOW }] }),
+    "app.getBootstrapState": async () => ({
+      appVersion: "test",
+      dataRoot: "/tmp/test",
+      sessionRoot: "/tmp/test",
+      logRoot: "/tmp/test",
+      tmpRoot: "/tmp/test",
+      workspaceRoot: "/tmp/workspace",
+    }),
+    "workspaces.list": async () => ({
+      version: 1,
+      items: [
+        {
+          id: "default",
+          kind: "folder",
+          label: "workspace",
+          path: "/tmp/workspace",
+          order: 0,
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ],
+    }),
     "sessions.list": async () => items.filter((item) => !archived.has(item.id)),
-    "sessions.listPage": async () => ({ items: items.filter((item) => !archived.has(item.id)), groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }], indexing: false, failed: 0 }),
-    "sessions.archive": async ({ sessionId }: { sessionId: string }) => { archived.add(sessionId); return { ok: true }; },
-    "sessions.getPage": async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(record(sessionId, items.find((item) => item.id === sessionId)!.title)),
+    "sessions.listPage": async () => ({
+      items: items.filter((item) => !archived.has(item.id)),
+      groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }],
+      indexing: false,
+      failed: 0,
+    }),
+    "sessions.archive": async ({ sessionId }: { sessionId: string }) => {
+      archived.add(sessionId);
+      return { ok: true };
+    },
+    "sessions.getPage": async ({ sessionId }: { sessionId: string }) =>
+      recordProjectionFixture(record(sessionId, items.find((item) => item.id === sessionId)!.title)),
     "approvals.listPending": async () => [],
     "tasks.command": async (command: { sessionId: string }) => {
       await holds.get(command.sessionId);
@@ -47,21 +110,46 @@ function fixture() {
     },
     "tasks.submit": async () => ({ status: "submission-failed", acknowledgement: "rejected", message: "提交被拒绝" }),
     // 每次订阅单独计数，同一个函数订阅两次也算两个。
-    "events.sessionLive": (callback: (payload: unknown) => void) => { const entry = (payload: unknown) => callback(payload); live.add(entry); return () => { live.delete(entry); }; },
+    "events.sessionLive": (callback: (payload: unknown) => void) => {
+      const entry = (payload: unknown) => callback(payload);
+      live.add(entry);
+      return () => {
+        live.delete(entry);
+      };
+    },
     "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
   });
-  const emit = (sessionId: string, message: string) => act(() => { for (const listener of live) listener({ event: { sessionId, message } }); });
+  const emit = (sessionId: string, message: string) =>
+    act(() => {
+      for (const listener of live) listener({ event: { sessionId, message } });
+    });
   return {
     live,
     snapshots,
     empty,
-    unarchive: async (sessionId: string) => { archived.delete(sessionId); await emit(sessionId, "session-title-updated"); },
-    pushSnapshot: (snapshot: TaskSnapshot) => { snapshots.set(snapshot.sessionId, snapshot); return emit(snapshot.sessionId, "task-queue-updated"); },
+    unarchive: async (sessionId: string) => {
+      archived.delete(sessionId);
+      await emit(sessionId, "session-title-updated");
+    },
+    pushSnapshot: (snapshot: TaskSnapshot) => {
+      snapshots.set(snapshot.sessionId, snapshot);
+      return emit(snapshot.sessionId, "task-queue-updated");
+    },
     /** 让这个会话的快照请求先挂起，返回的函数放行。 */
     hold: (sessionId: string) => {
       let release!: () => void;
-      holds.set(sessionId, new Promise<void>((resolve) => { release = resolve; }));
-      return () => act(async () => { holds.delete(sessionId); release(); await Promise.resolve(); });
+      holds.set(
+        sessionId,
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+      );
+      return () =>
+        act(async () => {
+          holds.delete(sessionId);
+          release();
+          await Promise.resolve();
+        });
     },
   };
 }
@@ -90,7 +178,11 @@ async function archive(id: string) {
 }
 
 function renderApp() {
-  return render(<TooltipProvider><App /></TooltipProvider>);
+  return render(
+    <TooltipProvider>
+      <App />
+    </TooltipProvider>,
+  );
 }
 
 // 14 T17：任务队列、侧栏标题和会话投影三处都挂在同一个分发器上。
@@ -108,9 +200,15 @@ describe("live event subscription", () => {
 });
 
 describe("evicting session-local state", () => {
-  it("drops the draft and queue of an archived session, so unarchiving opens it clean", { timeout: 15_000 }, async () => {
+  it("drops the draft and queue of an archived session, so unarchiving opens it clean", {
+    timeout: 15_000,
+  }, async () => {
     const f = fixture();
-    f.snapshots.set("s-2", { ...f.empty("s-2"), tasks: [task("t-queued", "排队消息", "pending")], queue: ["t-queued"] });
+    f.snapshots.set("s-2", {
+      ...f.empty("s-2"),
+      tasks: [task("t-queued", "排队消息", "pending")],
+      queue: ["t-queued"],
+    });
     renderApp();
     await open("s-2", "Second");
     await screen.findByText("排队消息");
@@ -129,12 +227,23 @@ describe("evicting session-local state", () => {
     expect(screen.queryByText("排队消息")).toBeNull();
   });
 
-  it("keeps a running session's live state through archive, and evicts once its run ends", { timeout: 15_000 }, async () => {
+  it("keeps a running session's live state through archive, and evicts once its run ends", {
+    timeout: 15_000,
+  }, async () => {
     const f = fixture();
     const running: TaskSnapshot = {
       ...f.empty("s-2"),
       tasks: [task("t-bg", "后台任务", "claimed", "run-bg")],
-      runs: [{ runId: "run-bg", taskId: "t-bg", harness: { id: "actspace", version: "test" } as never, configuration: {}, state: "running", result: null }],
+      runs: [
+        {
+          runId: "run-bg",
+          taskId: "t-bg",
+          harness: { id: "actspace", version: "test" } as never,
+          configuration: {},
+          state: "running",
+          result: null,
+        },
+      ],
     };
     f.snapshots.set("s-2", running);
     renderApp();
@@ -153,7 +262,12 @@ describe("evicting session-local state", () => {
     // 再次在运行中归档，然后 run 结束：此时才释放。
     await open("s-1", "First");
     await archive("s-2");
-    await f.pushSnapshot({ ...running, revision: 2, tasks: [task("t-bg", "后台任务", "completed", "run-bg")], runs: [{ ...running.runs[0], state: "completed" }] });
+    await f.pushSnapshot({
+      ...running,
+      revision: 2,
+      tasks: [task("t-bg", "后台任务", "completed", "run-bg")],
+      runs: [{ ...running.runs[0], state: "completed" }],
+    });
     await act(async () => {});
     await f.unarchive("s-2");
     await open("s-2", "Second");

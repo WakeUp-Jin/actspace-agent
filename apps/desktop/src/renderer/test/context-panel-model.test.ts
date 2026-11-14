@@ -30,7 +30,11 @@ function view(patch: Partial<ContextPanelView> = {}): ContextPanelView {
       status: "ready",
     },
     previous: {
-      requestId: "r1", turnIndex: 1, stepIndex: 2, sentAt: "2026-10-11T00:00:00.000Z", totalEstimatedTokens: 300,
+      requestId: "r1",
+      turnIndex: 1,
+      stepIndex: 2,
+      sentAt: "2026-10-11T00:00:00.000Z",
+      totalEstimatedTokens: 300,
       buckets: { tools: 140, conversation: 160 },
       entries: [
         { key: "tool:bash", bucket: "tools", estimatedTokens: 80 },
@@ -49,20 +53,32 @@ function view(patch: Partial<ContextPanelView> = {}): ContextPanelView {
 
 describe("buildCategories", () => {
   it("lists every registry bucket in order, including empty ones", () => {
-    expect(buildCategories(view(), { compare: true }).map((category) => category.key))
-      .toEqual(["systemPrompt", "tools", "rules", "skills", "summarizedConversation", "conversation"]);
+    expect(buildCategories(view(), { compare: true }).map((category) => category.key)).toEqual([
+      "systemPrompt",
+      "tools",
+      "rules",
+      "skills",
+      "summarizedConversation",
+      "conversation",
+    ]);
   });
 
   it("marks new entries, same-key token deltas and removed entries against the previous request", () => {
     const tools = buildCategories(view(), { compare: true }).find((category) => category.key === "tools")!;
-    expect(tools.entries.map((entry) => [entry.key, entry.isNew, entry.tokenDelta])).toEqual([["tool:bash", false, 20], ["tool:new", true, 0]]);
+    expect(tools.entries.map((entry) => [entry.key, entry.isNew, entry.tokenDelta])).toEqual([
+      ["tool:bash", false, 20],
+      ["tool:new", true, 0],
+    ]);
     expect(tools.removed.map((entry) => entry.key)).toEqual(["tool:gone"]);
     expect(tools.itemDelta).toBe(0);
     expect(tools.tokenDelta).toBe(-10);
   });
 
   it("drops all deltas when comparison is off or there is no previous request", () => {
-    for (const categories of [buildCategories(view(), { compare: false }), buildCategories(view({ previous: null }), { compare: true })]) {
+    for (const categories of [
+      buildCategories(view(), { compare: false }),
+      buildCategories(view({ previous: null }), { compare: true }),
+    ]) {
       const tools = categories.find((category) => category.key === "tools")!;
       expect(tools.removed).toEqual([]);
       expect(tools.itemDelta).toBe(0);
@@ -94,20 +110,38 @@ describe("buildInterimPanelView", () => {
     totalEstimatedTokens: 120,
     maxTokens: 0,
     percentUsed: 0,
-    buckets: [{ key: "rules", tokens: 20 }, { key: "conversation", tokens: 100 }],
+    buckets: [
+      { key: "rules", tokens: 20 },
+      { key: "conversation", tokens: 100 },
+    ],
     entries: [
       { id: "rule-1", kind: "rules", title: "AGENTS.md", estimatedTokens: 20, included: true, preview: "# rules" },
-      { id: "managed-7-message-0", kind: "conversation", title: "hello", estimatedTokens: 100, included: true, preview: "hello world" },
+      {
+        id: "managed-7-message-0",
+        kind: "conversation",
+        title: "hello",
+        estimatedTokens: 100,
+        included: true,
+        preview: "hello world",
+      },
     ],
   } as ContextState;
 
   it("maps current entries without comparison, trend, events or conversation previews", () => {
-    const { view: interim, source } = buildInterimPanelView({ sessionId: "s1", contextState, activity: null, usage: null });
+    const { view: interim, source } = buildInterimPanelView({
+      sessionId: "s1",
+      contextState,
+      activity: null,
+      usage: null,
+    });
     expect(source).toBe("interim");
     expect(interim.previous).toBeNull();
     expect(interim.trend).toEqual([]);
     expect(interim.events).toEqual([]);
-    expect(interim.current.entries.map((entry) => [entry.bucket, entry.preview])).toEqual([["rules", "# rules"], ["conversation", undefined]]);
+    expect(interim.current.entries.map((entry) => [entry.bucket, entry.preview])).toEqual([
+      ["rules", "# rules"],
+      ["conversation", undefined],
+    ]);
     expect(interim.current.buckets).toEqual({ rules: 20, conversation: 100 });
   });
 
@@ -115,16 +149,40 @@ describe("buildInterimPanelView", () => {
     const { view: interim } = buildInterimPanelView({
       sessionId: "s1",
       contextState,
-      activity: { turnCount: 3, completedTurnCount: 3, stepCount: 9, activeTurnId: null, activeStepId: null, compactionCount: 1, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } },
-      usage: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 90, cacheWriteTokens: 0, totalTokens: 105, costUsd: null },
+      activity: {
+        turnCount: 3,
+        completedTurnCount: 3,
+        stepCount: 9,
+        activeTurnId: null,
+        activeStepId: null,
+        compactionCount: 1,
+        activeCompactionId: null,
+        lastCompactionSummary: null,
+        timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 },
+      },
+      usage: {
+        inputTokens: 10,
+        outputTokens: 5,
+        cacheReadTokens: 90,
+        cacheWriteTokens: 0,
+        totalTokens: 105,
+        costUsd: null,
+      },
     });
     expect(interim.model).toBeNull();
     expect(interim.stats).toMatchObject({ turnCount: 3, stepCount: 9, compactionCount: 1, costUsd: null });
-    expect(interim.stats?.cumulativeUsage).toEqual({ inputTokens: 10, outputTokens: 5, cacheReadTokens: 90, cacheWriteTokens: 0 });
+    expect(interim.stats?.cumulativeUsage).toEqual({
+      inputTokens: 10,
+      outputTokens: 5,
+      cacheReadTokens: 90,
+      cacheWriteTokens: 0,
+    });
   });
 
   it("reports an unavailable context without an estimate", () => {
-    expect(buildInterimPanelView({ sessionId: "s1", contextState: null, activity: null, usage: null }).view.current.status).toBe("unavailable");
+    expect(
+      buildInterimPanelView({ sessionId: "s1", contextState: null, activity: null, usage: null }).view.current.status,
+    ).toBe("unavailable");
   });
 });
 
@@ -142,11 +200,29 @@ describe("usage stats", () => {
 describe("trendLayout", () => {
   it("scales columns to the peak, splits by bucket and flags compaction", () => {
     const columns = trendLayout([
-      { requestId: "r1", turnIndex: 1, stepIndex: 1, sentAt: "", estimatedTokens: 200, buckets: { tools: 50, conversation: 150 } },
-      { requestId: "r2", turnIndex: 2, stepIndex: 2, sentAt: "", estimatedTokens: 50, buckets: { conversation: 50 }, compactedBefore: { compactionId: "c", reclaimedTokens: 150 } },
+      {
+        requestId: "r1",
+        turnIndex: 1,
+        stepIndex: 1,
+        sentAt: "",
+        estimatedTokens: 200,
+        buckets: { tools: 50, conversation: 150 },
+      },
+      {
+        requestId: "r2",
+        turnIndex: 2,
+        stepIndex: 2,
+        sentAt: "",
+        estimatedTokens: 50,
+        buckets: { conversation: 50 },
+        compactedBefore: { compactionId: "c", reclaimedTokens: 150 },
+      },
     ]);
     expect(columns.map((column) => column.height)).toEqual([1, 0.25]);
-    expect(columns[0].segments.map((segment) => [segment.key, segment.share])).toEqual([["tools", 0.25], ["conversation", 0.75]]);
+    expect(columns[0].segments.map((segment) => [segment.key, segment.share])).toEqual([
+      ["tools", 0.25],
+      ["conversation", 0.75],
+    ]);
     expect(columns.map((column) => column.compactedBefore)).toEqual([false, true]);
   });
 });

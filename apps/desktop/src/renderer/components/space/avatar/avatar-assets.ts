@@ -25,10 +25,31 @@ export const BALL_COLORS = ["lilac", "ink", "forest", "peach", "cream"] as const
 export type SpaceColor = (typeof SPACE_COLORS)[number];
 export type BallColor = (typeof BALL_COLORS)[number];
 
-const companions = [companion1, companion2, companion3, companion4, companion5, companion6, companion7, companion8, companion9];
-const balls: Record<BallColor, string> = { lilac: ballLilac, ink: ballInk, forest: ballForest, peach: ballPeach, cream: ballCream };
+const companions = [
+  companion1,
+  companion2,
+  companion3,
+  companion4,
+  companion5,
+  companion6,
+  companion7,
+  companion8,
+  companion9,
+];
+const balls: Record<BallColor, string> = {
+  lilac: ballLilac,
+  ink: ballInk,
+  forest: ballForest,
+  peach: ballPeach,
+  cream: ballCream,
+};
 const spaces: Record<SpaceColor, string> = {
-  peach: spacePeach, forest: spaceForest, cream: spaceCream, slate: spaceSlate, blush: spaceBlush, midnight: spaceMidnight,
+  peach: spacePeach,
+  forest: spaceForest,
+  cream: spaceCream,
+  slate: spaceSlate,
+  blush: spaceBlush,
+  midnight: spaceMidnight,
 };
 
 // 和 demo 完全一致：同一个 id 在 demo 和桌面端拿到同一种颜色
@@ -38,9 +59,11 @@ export const ballColorFor = (id: string): BallColor => BALL_COLORS[hashId(id) % 
 export const ballFor = (id: string): string => balls[ballColorFor(id)];
 
 /** n 是 1..9 的角色图序号 */
-export const companionFor = (n: number): string => companions[Math.min(Math.max(Math.round(n), 1), companions.length) - 1];
+export const companionFor = (n: number): string =>
+  companions[Math.min(Math.max(Math.round(n), 1), companions.length) - 1];
 
 export const spaceImageFor = (color: string): string => spaces[(color in spaces ? color : "peach") as SpaceColor];
 
 /** 第 index 个创建的 Space 用什么底色 */
-export const spaceColorAt = (index: number): SpaceColor => SPACE_COLORS[((index % SPACE_COLORS.length) + SPACE_COLORS.length) % SPACE_COLORS.length];
+export const spaceColorAt = (index: number): SpaceColor =>
+  SPACE_COLORS[((index % SPACE_COLORS.length) + SPACE_COLORS.length) % SPACE_COLORS.length];

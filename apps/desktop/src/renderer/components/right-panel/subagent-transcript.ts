@@ -18,12 +18,15 @@ export function reconcileTranscript(previous: TranscriptState | null, events: Se
     const prior = previous.blocks[index];
     return prior !== undefined && jsonEqual(prior, block) ? prior : block;
   });
-  const unchanged = blocks.length === previous.blocks.length && blocks.every((block, index) => block === previous.blocks[index]);
+  const unchanged =
+    blocks.length === previous.blocks.length && blocks.every((block, index) => block === previous.blocks[index]);
   return { events, blocks: unchanged ? previous.blocks : blocks };
 }
 
 /** Keep the previous list (and each unchanged item object) when the polled list carries no change. */
 export function reconcileSubagents(previous: SubagentListItem[], next: SubagentListItem[]): SubagentListItem[] {
-  const items = next.map((item) => previous.find((candidate) => candidate.agentId === item.agentId && jsonEqual(candidate, item)) ?? item);
+  const items = next.map(
+    (item) => previous.find((candidate) => candidate.agentId === item.agentId && jsonEqual(candidate, item)) ?? item,
+  );
   return items.length === previous.length && items.every((item, index) => item === previous[index]) ? previous : items;
 }

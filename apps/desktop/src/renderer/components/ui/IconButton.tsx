@@ -5,7 +5,16 @@ import { BUTTON_VARIANT_CLASS, cx } from "./Button";
 // 纯图标按钮。label 必填：同时生成 aria-label 和 Tooltip（front-组件与交互模式规范.md §3），
 // 从类型上保证不会再出现没有名字的图标按钮。className 只放布局与显隐类，不要覆盖尺寸、圆角、颜色。
 
-export type IconButtonVariant = "ghost" | "danger" | "soft" | "inherit" | "secondary" | "primary" | "accent" | "operational" | "warning";
+export type IconButtonVariant =
+  | "ghost"
+  | "danger"
+  | "soft"
+  | "inherit"
+  | "secondary"
+  | "primary"
+  | "accent"
+  | "operational"
+  | "warning";
 export type IconButtonSize = "xs" | "sm" | "md" | "lg";
 export type IconButtonShape = "square" | "round";
 
@@ -32,10 +41,12 @@ const ICON_BUTTON_SHAPE_CLASS: Record<IconButtonShape, string> = {
 // accent / operational / warning 只给 Composer 发送，分别对应 Agent / Chat / Plan：accent 跟随外观强调色，
 // 默认调色板下与 primary 完全一致（front-视觉token规范.md §4）；warning 的实心底配 on-warning-solid，不能用浅底上的 on-warning。
 const ICON_BUTTON_VARIANT_CLASS: Record<IconButtonVariant, string> = {
-  ghost: "border-transparent bg-transparent text-text-faint enabled:hover:bg-hover-overlay enabled:hover:text-text-main aria-expanded:bg-selected aria-expanded:text-text-main",
+  ghost:
+    "border-transparent bg-transparent text-text-faint enabled:hover:bg-hover-overlay enabled:hover:text-text-main aria-expanded:bg-selected aria-expanded:text-text-main",
   danger: "border-transparent bg-transparent text-text-faint enabled:hover:bg-danger-soft enabled:hover:text-on-danger",
   soft: "border-line bg-surface-subtle text-text-muted enabled:hover:border-line-strong enabled:hover:bg-hover-overlay enabled:hover:text-text-main aria-expanded:border-line-strong aria-expanded:bg-selected aria-expanded:text-text-main",
-  inherit: "border-transparent bg-transparent text-current opacity-75 enabled:hover:bg-hover-overlay enabled:hover:opacity-100",
+  inherit:
+    "border-transparent bg-transparent text-current opacity-75 enabled:hover:bg-hover-overlay enabled:hover:opacity-100",
   secondary: BUTTON_VARIANT_CLASS.secondary,
   primary: BUTTON_VARIANT_CLASS.primary,
   accent: BUTTON_VARIANT_CLASS.accent,
@@ -47,8 +58,17 @@ export function iconButtonClass({
   variant = "ghost",
   size = "sm",
   shape = "square",
-}: { variant?: IconButtonVariant; size?: IconButtonSize; shape?: IconButtonShape } = {}): string {
-  return cx(ICON_BUTTON_BASE_CLASS, ICON_BUTTON_VARIANT_CLASS[variant], ICON_BUTTON_SIZE_CLASS[size], ICON_BUTTON_SHAPE_CLASS[shape]);
+}: {
+  variant?: IconButtonVariant;
+  size?: IconButtonSize;
+  shape?: IconButtonShape;
+} = {}): string {
+  return cx(
+    ICON_BUTTON_BASE_CLASS,
+    ICON_BUTTON_VARIANT_CLASS[variant],
+    ICON_BUTTON_SIZE_CLASS[size],
+    ICON_BUTTON_SHAPE_CLASS[shape],
+  );
 }
 
 export type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label" | "children"> & {

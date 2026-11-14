@@ -18,25 +18,34 @@ export type ComposerDeps = {
   readonly pending?: { current: { text: string; id: string } | null };
 };
 
-const isConflict = (error: unknown) => isRecord(error) && (error.kind === "CONFLICT" || error.code === "REVISION_CONFLICT");
+const isConflict = (error: unknown) =>
+  isRecord(error) && (error.kind === "CONFLICT" || error.code === "REVISION_CONFLICT");
 type CommandResult = { snapshot: TaskSnapshot; error?: string };
 
 /** 输入框要发的所有 RPC（非 React，便于测试）。失败一律抛出，由调用方显示原因。 */
 export class ComposerController {
   readonly #box: { current: { text: string; id: string } | null };
-  constructor(private readonly deps: ComposerDeps) { this.#box = deps.pending ?? { current: null }; }
+  constructor(private readonly deps: ComposerDeps) {
+    this.#box = deps.pending ?? { current: null };
+  }
 
   /** 同一段文字重试沿用同一个 submissionId（Host 按它去重）；文字变了才换新的。 */
   async send(text: string): Promise<void> {
     const content = text.trim();
     if (!content) return;
-    const id = this.#box.current?.text === content ? this.#box.current.id : (this.#box.current = { text: content, id: (this.deps.randomId ?? (() => crypto.randomUUID()))() }).id;
+    const id =
+      this.#box.current?.text === content
+        ? this.#box.current.id
+        : (this.#box.current = { text: content, id: (this.deps.randomId ?? (() => crypto.randomUUID()))() }).id;
     await this.deps.client.call("tasks.submit", { sessionId: this.deps.sessionId, submissionId: id, content });
     this.#box.current = null;
   }
 
   async #command(params: Record<string, unknown>): Promise<CommandResult> {
-    const result = await this.deps.client.call("tasks.command", { sessionId: this.deps.sessionId, ...params }) as CommandResult;
+    const result = (await this.deps.client.call("tasks.command", {
+      sessionId: this.deps.sessionId,
+      ...params,
+    })) as CommandResult;
     if (result?.snapshot) this.deps.applyTasks(result.snapshot);
     return result;
   }
@@ -62,8 +71,9 @@ export class ComposerController {
       if (result.error) throw Object.assign(new Error(result.error), { code: result.error });
     };
     const known = this.deps.taskRevision();
-    try { await attempt(known ?? (await this.#command({ op: "snapshot" })).snapshot.revision); }
-    catch (error) {
+    try {
+      await attempt(known ?? (await this.#command({ op: "snapshot" })).snapshot.revision);
+    } catch (error) {
       if (!isConflict(error)) throw error;
       await attempt((await this.#command({ op: "snapshot" })).snapshot.revision);
     }
@@ -71,13 +81,20 @@ export class ComposerController {
 
   /** 切换模式；CONFLICT 时重新取 revision 再试一次，仍失败就抛出。 */
   async setMode(mode: AgentMode): Promise<void> {
-    const update = (revision: number) => this.deps.client.call("sessions.update", { sessionId: this.deps.sessionId, patch: { mode, expectedRevision: revision } });
+    const update = (revision: number) =>
+      this.deps.client.call("sessions.update", {
+        sessionId: this.deps.sessionId,
+        patch: { mode, expectedRevision: revision },
+      });
     const fresh = async () => {
-      const page = await this.deps.client.call("sessions.page", { sessionId: this.deps.sessionId }) as { snapshot?: { agentModeRevision?: number } };
+      const page = (await this.deps.client.call("sessions.page", { sessionId: this.deps.sessionId })) as {
+        snapshot?: { agentModeRevision?: number };
+      };
       return page.snapshot?.agentModeRevision ?? 0;
     };
-    try { await update(this.deps.modeRevision() ?? await fresh()); }
-    catch (error) {
+    try {
+      await update(this.deps.modeRevision() ?? (await fresh()));
+    } catch (error) {
       if (!isConflict(error)) throw error;
       await update(await fresh());
     }
@@ -91,13 +108,36 @@ export class ComposerController {
 
 const draftKey = (sessionId: string) => `actspace.web.draft.${sessionId}`;
 const prefsKey = (sessionId: string) => `actspace.web.model.${sessionId}`;
-function readStorage(key: string): string | null { try { return sessionStorage.getItem(key); } catch { return null; } }
-function writeStorage(key: string, value: string | null): void { try { if (value) sessionStorage.setItem(key, value); else sessionStorage.removeItem(key); } catch { /* 草稿丢了不影响使用 */ } }
-const reason = (error: unknown, fallback: string) => error instanceof Error && error.message ? error.message : fallback;
+function readStorage(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeStorage(key: string, value: string | null): void {
+  try {
+    if (value) sessionStorage.setItem(key, value);
+    else sessionStorage.removeItem(key);
+  } catch {
+    /* 草稿丢了不影响使用 */
+  }
+}
+const reason = (error: unknown, fallback: string) =>
+  error instanceof Error && error.message ? error.message : fallback;
 
 export type ComposerModelPrefs = { readonly model: string | null; readonly effort: string | null };
 function readPrefs(sessionId: string): ComposerModelPrefs {
-  try { const value = JSON.parse(readStorage(prefsKey(sessionId)) ?? "null"); if (isRecord(value)) return { model: typeof value.model === "string" ? value.model : null, effort: typeof value.effort === "string" ? value.effort : null }; } catch { /* 忽略 */ }
+  try {
+    const value = JSON.parse(readStorage(prefsKey(sessionId)) ?? "null");
+    if (isRecord(value))
+      return {
+        model: typeof value.model === "string" ? value.model : null,
+        effort: typeof value.effort === "string" ? value.effort : null,
+      };
+  } catch {
+    /* 忽略 */
+  }
   return { model: null, effort: null };
 }
 
@@ -115,23 +155,52 @@ export function useComposer(sessionId: string, observation: SessionObservation) 
   const client = connection?.client ?? null;
   const pending = useRef<{ text: string; id: string } | null>(null);
 
-  const controller = useMemo(() => client ? new ComposerController({
-    client, sessionId, pending, applyTasks: snapshot => latest.current.applyTasks(snapshot),
-    modeRevision: () => latest.current.agentModeRevision, taskRevision: () => latest.current.tasks?.revision ?? null,
-  }) : null, [client, sessionId]);
-  const setDraft = useCallback((value: string) => { setDraftState(value); writeStorage(draftKey(sessionId), value); }, [sessionId]);
+  const controller = useMemo(
+    () =>
+      client
+        ? new ComposerController({
+            client,
+            sessionId,
+            pending,
+            applyTasks: (snapshot) => latest.current.applyTasks(snapshot),
+            modeRevision: () => latest.current.agentModeRevision,
+            taskRevision: () => latest.current.tasks?.revision ?? null,
+          })
+        : null,
+    [client, sessionId],
+  );
+  const setDraft = useCallback(
+    (value: string) => {
+      setDraftState(value);
+      writeStorage(draftKey(sessionId), value);
+    },
+    [sessionId],
+  );
 
-  const guard = useCallback(async (fallback: string, run: (controller: ComposerController) => Promise<void>): Promise<boolean> => {
-    if (!controller) { setError("已断开，正在重连…"); return false; }
-    try { await run(controller); setError(null); return true; }
-    catch (failure) { store.reportError(failure); setError(reason(failure, fallback)); return false; }
-  }, [controller, store]);
+  const guard = useCallback(
+    async (fallback: string, run: (controller: ComposerController) => Promise<void>): Promise<boolean> => {
+      if (!controller) {
+        setError("已断开，正在重连…");
+        return false;
+      }
+      try {
+        await run(controller);
+        setError(null);
+        return true;
+      } catch (failure) {
+        store.reportError(failure);
+        setError(reason(failure, fallback));
+        return false;
+      }
+    },
+    [controller, store],
+  );
 
   const send = useCallback(async (): Promise<boolean> => {
     const text = draft.trim();
     if (!text || sending) return false;
     setSending(true);
-    const ok = await guard("发送失败，请重试", c => c.send(text));
+    const ok = await guard("发送失败，请重试", (c) => c.send(text));
     setSending(false);
     if (ok) setDraft("");
     return ok;
@@ -139,28 +208,65 @@ export function useComposer(sessionId: string, observation: SessionObservation) 
 
   const stop = useCallback(async () => {
     const runId = latest.current.runId;
-    if (runId) await guard("停止失败", c => c.stop(runId));
+    if (runId) await guard("停止失败", (c) => c.stop(runId));
   }, [guard]);
-  const cancelQueued = useCallback((taskId: string) => guard("撤回失败", c => c.cancel(taskId)), [guard]);
+  const cancelQueued = useCallback((taskId: string) => guard("撤回失败", (c) => c.cancel(taskId)), [guard]);
   const resume = useCallback(async () => {
     if (resumePending.current || !connection || maintenance) return;
     resumePending.current = true;
     setResuming(true);
-    try { await guard("恢复队列失败，请重试", c => c.resume()); }
-    finally { resumePending.current = false; setResuming(false); }
+    try {
+      await guard("恢复队列失败，请重试", (c) => c.resume());
+    } finally {
+      resumePending.current = false;
+      setResuming(false);
+    }
   }, [connection, maintenance, guard]);
-  const setMode = useCallback((mode: AgentMode) => guard("切换模式失败，请重试", c => c.setMode(mode)), [guard]);
+  const setMode = useCallback((mode: AgentMode) => guard("切换模式失败，请重试", (c) => c.setMode(mode)), [guard]);
 
   const model = prefs.model ?? observation.runModel ?? connection?.description.defaultModel ?? "";
   const effortOptions = useMemo(() => effortOptionsFor(model), [model]);
-  const effort = effortOptions.length ? (prefs.effort && effortOptions.includes(prefs.effort as never) ? prefs.effort : observation.runEffort && effortOptions.includes(observation.runEffort as never) ? observation.runEffort : null) : null;
-  const configure = useCallback(async (next: { model: string; effort: string | null }): Promise<boolean> => {
-    const efforts = effortOptionsFor(next.model);
-    const reasoningEffort = next.effort && efforts.includes(next.effort as never) ? next.effort : null;
-    const ok = await guard("切换模型失败，请重试", c => c.configure({ model: next.model, ...(reasoningEffort ? { reasoningEffort: reasoningEffort as never } : {}) }));
-    if (ok) { const value = { model: next.model, effort: reasoningEffort }; setPrefs(value); writeStorage(prefsKey(sessionId), JSON.stringify(value)); }
-    return ok;
-  }, [guard, sessionId]);
+  const effort = effortOptions.length
+    ? prefs.effort && effortOptions.includes(prefs.effort as never)
+      ? prefs.effort
+      : observation.runEffort && effortOptions.includes(observation.runEffort as never)
+        ? observation.runEffort
+        : null
+    : null;
+  const configure = useCallback(
+    async (next: { model: string; effort: string | null }): Promise<boolean> => {
+      const efforts = effortOptionsFor(next.model);
+      const reasoningEffort = next.effort && efforts.includes(next.effort as never) ? next.effort : null;
+      const ok = await guard("切换模型失败，请重试", (c) =>
+        c.configure({ model: next.model, ...(reasoningEffort ? { reasoningEffort: reasoningEffort as never } : {}) }),
+      );
+      if (ok) {
+        const value = { model: next.model, effort: reasoningEffort };
+        setPrefs(value);
+        writeStorage(prefsKey(sessionId), JSON.stringify(value));
+      }
+      return ok;
+    },
+    [guard, sessionId],
+  );
 
-  return { draft, setDraft, send, sending, stop, cancelQueued, resume, resuming, setMode, configure, model, effort, effortOptions, error, clearError: () => setError(null), connected: connection !== null, maintenance };
+  return {
+    draft,
+    setDraft,
+    send,
+    sending,
+    stop,
+    cancelQueued,
+    resume,
+    resuming,
+    setMode,
+    configure,
+    model,
+    effort,
+    effortOptions,
+    error,
+    clearError: () => setError(null),
+    connected: connection !== null,
+    maintenance,
+  };
 }

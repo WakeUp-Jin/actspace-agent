@@ -5,7 +5,10 @@ import type { AppSettings } from "@actspace/shared";
 import { SearchSettings } from "../components/settings/SearchSettings";
 import { SettingsSaveNoticeProvider } from "../components/settings/SettingsPrimitives";
 
-function makeSettings(connected: Array<"zhipu" | "tavily" | "tinyfish" | "exa"> = ["zhipu"], disabledTools: string[] = []): AppSettings {
+function makeSettings(
+  connected: Array<"zhipu" | "tavily" | "tinyfish" | "exa"> = ["zhipu"],
+  disabledTools: string[] = [],
+): AppSettings {
   return {
     version: 1,
     defaultModelId: null,
@@ -16,7 +19,13 @@ function makeSettings(connected: Array<"zhipu" | "tavily" | "tinyfish" | "exa"> 
       tinyfish: { hasApiKey: connected.includes("tinyfish") },
       exa: { hasApiKey: connected.includes("exa") },
     },
-    agent: { systemPromptPath: "/tmp/main-agent.md", temperature: null, maxTokens: null, disabledTools, bashAlwaysAsk: false },
+    agent: {
+      systemPromptPath: "/tmp/main-agent.md",
+      temperature: null,
+      maxTokens: null,
+      disabledTools,
+      bashAlwaysAsk: false,
+    },
     skills: { disabled: [] },
   } as AppSettings;
 }
@@ -31,10 +40,13 @@ function renderSearch(overrides: Partial<Parameters<typeof SearchSettings>[0]> =
     onClearProvider: vi.fn(async () => {}),
     ...overrides,
   };
-  render(<SettingsSaveNoticeProvider><SearchSettings {...props} /></SettingsSaveNoticeProvider>);
+  render(
+    <SettingsSaveNoticeProvider>
+      <SearchSettings {...props} />
+    </SettingsSaveNoticeProvider>,
+  );
   return props;
 }
-
 
 describe("SearchSettings", () => {
   it("lists the five channels without logos and counts connected ones", () => {
@@ -83,21 +95,39 @@ describe("SearchSettings", () => {
   });
 });
 
-
 describe("DeepSeek settings opt-in", () => {
   function snapshot() {
-    return { revision: "test", settings: { tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: { zhipu: { enabled: true }, deepseek: { enabled: false } }, deepseekFetchEnabled: false } } } as unknown as import("@actspace/shared").SettingsV4Snapshot;
+    return {
+      revision: "test",
+      settings: {
+        tools: {
+          disabledTools: [],
+          bash: { alwaysAsk: false },
+          searchProviders: { zhipu: { enabled: true }, deepseek: { enabled: false } },
+          deepseekFetchEnabled: false,
+        },
+      },
+    } as unknown as import("@actspace/shared").SettingsV4Snapshot;
   }
   it("reuses a model key but keeps both paid capabilities off and writes independent patches", async () => {
-    const settings = makeSettings(); settings.providers.deepseek.hasApiKey = true;
+    const settings = makeSettings();
+    settings.providers.deepseek.hasApiKey = true;
     const props = renderSearch({ settings, settingsV4: snapshot(), onUpdateNamespace: vi.fn(async () => snapshot()) });
     expect(screen.getByRole("switch", { name: "启用 DeepSeek 搜索" })).not.toBeChecked();
     expect(screen.getByRole("switch", { name: "使用 DeepSeek 抓取网页" })).not.toBeChecked();
     expect(screen.getByRole("switch", { name: "启用 智谱 Web Search 搜索" })).toBeChecked();
     await userEvent.click(screen.getByRole("switch", { name: "启用 DeepSeek 搜索" }));
-    await waitFor(() => expect(props.onUpdateNamespace).toHaveBeenCalledWith({ namespace: "tools", patch: { searchProviders: { deepseek: { enabled: true } } } }));
+    await waitFor(() =>
+      expect(props.onUpdateNamespace).toHaveBeenCalledWith({
+        namespace: "tools",
+        patch: { searchProviders: { deepseek: { enabled: true } } },
+      }),
+    );
     await userEvent.click(screen.getByRole("switch", { name: "使用 DeepSeek 抓取网页" }));
-    expect(props.onUpdateNamespace).toHaveBeenLastCalledWith({ namespace: "tools", patch: { deepseekFetchEnabled: true } });
+    expect(props.onUpdateNamespace).toHaveBeenLastCalledWith({
+      namespace: "tools",
+      patch: { deepseekFetchEnabled: true },
+    });
     expect(screen.getByRole("switch", { name: "启用 智谱 Web Search 搜索" })).toBeChecked();
   });
   it("disables paid fetch without a key and reports failed writes", async () => {

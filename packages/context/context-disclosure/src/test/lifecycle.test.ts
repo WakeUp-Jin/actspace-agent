@@ -8,8 +8,20 @@ async function tree(withHost: boolean) {
   const ctx = new CordisContextClass();
   const compaction = new ContextCompactionCoordinator();
   ctx.provide("context.engine", { compaction });
-  ctx.provide("actspace.host.agent", withHost ? { contextDisclosure: { normalizeFile: async () => undefined, historyPath: async () => "", createIndex: vi.fn(), resolveArtifact: vi.fn() } } : {});
-  await ctx.plugin({ apply: inner => applyAssembly(inner as never) });
+  ctx.provide(
+    "actspace.host.agent",
+    withHost
+      ? {
+          contextDisclosure: {
+            normalizeFile: async () => undefined,
+            historyPath: async () => "",
+            createIndex: vi.fn(),
+            resolveArtifact: vi.fn(),
+          },
+        }
+      : {},
+  );
+  await ctx.plugin({ apply: (inner) => applyAssembly(inner as never) });
   const assembly = ctx.get("context.assembly") as ContextAssemblyService;
   return { ctx, compaction, assembly };
 }
@@ -17,7 +29,7 @@ async function tree(withHost: boolean) {
 describe("context disclosure plugin lifecycle", () => {
   it("disables cleanly when the optional host capability is absent", async () => {
     const { ctx, compaction, assembly } = await tree(false);
-    await ctx.plugin({ apply: inner => apply(inner as never) });
+    await ctx.plugin({ apply: (inner) => apply(inner as never) });
     expect(ctx.get("context.disclosure")).toBeUndefined();
     expect(assembly.kinds("main")).not.toContain("disclosure");
     expect(compaction.hydrator()).toBeUndefined();
@@ -27,7 +39,7 @@ describe("context disclosure plugin lifecycle", () => {
 
   it("joins the engine through the coordinator and context.assembly, and leaves on dispose", async () => {
     const { ctx, compaction, assembly } = await tree(true);
-    await ctx.plugin({ apply: inner => apply(inner as never) });
+    await ctx.plugin({ apply: (inner) => apply(inner as never) });
     expect(ctx.get("context.disclosure")).toBeDefined();
     expect(assembly.kinds("main")).toContain("disclosure");
     expect(assembly.kinds("subagent")).toContain("disclosure");
@@ -41,6 +53,6 @@ describe("context disclosure plugin lifecycle", () => {
     const ctx = new CordisContextClass();
     ctx.provide("context.engine", { compaction: new ContextCompactionCoordinator() });
     ctx.provide("actspace.host.agent", { contextDisclosure: {} });
-    await expect(ctx.plugin({ apply: inner => apply(inner as never) })).rejects.toThrow("context.assembly");
+    await expect(ctx.plugin({ apply: (inner) => apply(inner as never) })).rejects.toThrow("context.assembly");
   });
 });

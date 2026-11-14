@@ -8,7 +8,15 @@
  */
 
 /** 页面按卡片需要并行取的几块数据。 */
-export const HARNESS_STATS_QUERY_KINDS = ["options", "overview", "usage-vs", "context", "disclosure", "plugins", "versions"] as const;
+export const HARNESS_STATS_QUERY_KINDS = [
+  "options",
+  "overview",
+  "usage-vs",
+  "context",
+  "disclosure",
+  "plugins",
+  "versions",
+] as const;
 export type HarnessStatsQueryKind = (typeof HARNESS_STATS_QUERY_KINDS)[number];
 
 export type HarnessStatsRange = "day" | "week" | "month" | "total";
@@ -265,7 +273,12 @@ export type HarnessServiceRow = {
   readonly errors: number;
   readonly p95Ms: number | null;
 };
-export type HarnessListenerRow = { readonly pluginId: string; readonly event: string; readonly calls: number; readonly errors: number };
+export type HarnessListenerRow = {
+  readonly pluginId: string;
+  readonly event: string;
+  readonly calls: number;
+  readonly errors: number;
+};
 export type HarnessPluginRow = {
   readonly pluginId: string;
   readonly source: HarnessPluginSource;
@@ -320,9 +333,12 @@ export function harnessHistogramQuantile(histogram: readonly number[], q: number
   }
   return harnessHistogramUpperBound(histogram.length - 1, base);
 }
-export function emptyHarnessHistogram(): number[] { return Array.from({ length: HARNESS_HISTOGRAM_BUCKETS }, () => 0); }
+export function emptyHarnessHistogram(): number[] {
+  return Array.from({ length: HARNESS_HISTOGRAM_BUCKETS }, () => 0);
+}
 export function addHarnessHistograms(target: number[], source: readonly number[]): number[] {
-  for (let index = 0; index < HARNESS_HISTOGRAM_BUCKETS; index++) target[index] = (target[index] ?? 0) + (source[index] ?? 0);
+  for (let index = 0; index < HARNESS_HISTOGRAM_BUCKETS; index++)
+    target[index] = (target[index] ?? 0) + (source[index] ?? 0);
   return target;
 }
 
@@ -399,6 +415,11 @@ export type HarnessToolOwnerLine = {
 /** 旧文件里还有 `health` / `dependency` 行，读取时忽略。 */
 export type HarnessStatsFileLine = HarnessRuntimeStatLine | HarnessInventoryLine | HarnessToolOwnerLine;
 
-export function harnessRevisionKey(harnessId: string | null | undefined, revision: number | null | undefined): HarnessRevisionKey {
-  return typeof harnessId === "string" && harnessId && typeof revision === "number" && Number.isFinite(revision) ? `${harnessId}@${revision}` : HARNESS_UNKNOWN_REVISION;
+export function harnessRevisionKey(
+  harnessId: string | null | undefined,
+  revision: number | null | undefined,
+): HarnessRevisionKey {
+  return typeof harnessId === "string" && harnessId && typeof revision === "number" && Number.isFinite(revision)
+    ? `${harnessId}@${revision}`
+    : HARNESS_UNKNOWN_REVISION;
 }

@@ -126,7 +126,12 @@ export interface PersistedSettingsV3 {
 }
 
 export type OpenRouterManagementSecretId = "openrouter-management";
-export type PersistedSecretProviderId = LlmProviderId | SearchProviderId | OpenRouterManagementSecretId | "image-generation" | "speech-minimax";
+export type PersistedSecretProviderId =
+  | LlmProviderId
+  | SearchProviderId
+  | OpenRouterManagementSecretId
+  | "image-generation"
+  | "speech-minimax";
 export type PersistedSecretsV1 = {
   version: 1;
   providerCredentials: Record<string, string>;
@@ -162,7 +167,9 @@ export interface ReadSettingsResult {
   blockingError?: string;
 }
 
-export type SettingsV4Metadata = Pick<SettingsV4, "general" | "tools" | "subagents" | "activity" | "models"> & { speech: SpeechSettings };
+export type SettingsV4Metadata = Pick<SettingsV4, "general" | "tools" | "subagents" | "activity" | "models"> & {
+  speech: SpeechSettings;
+};
 
 export type SettingsV4ChangeListener = (notification: SettingsV4ChangedNotification) => void;
 

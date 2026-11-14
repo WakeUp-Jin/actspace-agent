@@ -64,14 +64,31 @@ export type FileApplicationsDeps = {
 
 type MacApplication = WorkspaceFileApplication & { bundle: string | null; version: string | null };
 
-async function resolveTarget(input: { workspaceRoot?: string; relativePath: string }, roots: AppDataRoots): Promise<string | null> {
-  const target = await resolveArtifactContextTarget({ kind: "workspace_file", workspaceRoot: input.workspaceRoot, relativePath: input.relativePath }, roots);
+async function resolveTarget(
+  input: { workspaceRoot?: string; relativePath: string },
+  roots: AppDataRoots,
+): Promise<string | null> {
+  const target = await resolveArtifactContextTarget(
+    { kind: "workspace_file", workspaceRoot: input.workspaceRoot, relativePath: input.relativePath },
+    roots,
+  );
   return target?.path ?? null;
 }
 
-async function queryMacApplications(path: string, display: boolean, deps: FileApplicationsDeps): Promise<MacApplication[]> {
+async function queryMacApplications(
+  path: string,
+  display: boolean,
+  deps: FileApplicationsDeps,
+): Promise<MacApplication[]> {
   const run = deps.run ?? runCommand;
-  const stdout = await run("/usr/bin/osascript", ["-l", "JavaScript", "-e", MAC_APPLICATIONS, path, display ? "icons" : "handlers"]);
+  const stdout = await run("/usr/bin/osascript", [
+    "-l",
+    "JavaScript",
+    "-e",
+    MAC_APPLICATIONS,
+    path,
+    display ? "icons" : "handlers",
+  ]);
   return parseMacApplications(JSON.parse(stdout));
 }
 
@@ -83,7 +100,8 @@ export function parseMacApplications(value: unknown): MacApplication[] {
     if (typeof item.id !== "string" || !item.id || typeof item.name !== "string" || typeof item.default !== "boolean") {
       throw new Error("Invalid native application entry");
     }
-    const icon = typeof item.icon === "string" && item.icon.startsWith("data:image/png;base64,") ? item.icon : undefined;
+    const icon =
+      typeof item.icon === "string" && item.icon.startsWith("data:image/png;base64,") ? item.icon : undefined;
     return {
       id: item.id,
       name: item.name,
@@ -167,7 +185,8 @@ export async function openWorkspaceFile(
       return error ? { ok: false, error: "no_application", message: error } : { ok: true };
     }
     // 应用 id 来自 renderer，只接受当前仍关联到这个文件的应用（含去重前的全部副本）。
-    if ((deps.platform ?? process.platform) !== "darwin") return { ok: false, error: "not_registered", message: "Choosing an application is only available on macOS." };
+    if ((deps.platform ?? process.platform) !== "darwin")
+      return { ok: false, error: "not_registered", message: "Choosing an application is only available on macOS." };
     const registered = await queryMacApplications(path, false, deps);
     if (!registered.some((app) => app.id === input.applicationId)) {
       return { ok: false, error: "not_registered", message: "Application is not registered for this file." };
@@ -175,15 +194,24 @@ export async function openWorkspaceFile(
     await (deps.run ?? runCommand)("/usr/bin/open", ["-a", input.applicationId, path]);
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: "open_failed", message: error instanceof Error ? error.message.slice(0, 500) : String(error) };
+    return {
+      ok: false,
+      error: "open_failed",
+      message: error instanceof Error ? error.message.slice(0, 500) : String(error),
+    };
   }
 }
 
 function runCommand(file: string, args: string[]): Promise<string> {
   return new Promise((resolveResult, reject) => {
-    execFile(file, args, { timeout: 10_000, windowsHide: true, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) reject(new Error(String(stderr || error.message).trim()));
-      else resolveResult(stdout);
-    });
+    execFile(
+      file,
+      args,
+      { timeout: 10_000, windowsHide: true, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
+      (error, stdout, stderr) => {
+        if (error) reject(new Error(String(stderr || error.message).trim()));
+        else resolveResult(stdout);
+      },
+    );
   });
 }

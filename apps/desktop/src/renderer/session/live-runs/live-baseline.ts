@@ -11,13 +11,28 @@ const readFromHost: ReadLiveOutput = (sessionId) => sessionsApi.liveOutput({ ses
  * 远程会话返回 null：远程适配器会在 `agent_run_started(recoveredReset)` 之后自己推底稿。
  * 读取失败时给一个空底稿，缓存的增量照常显示，不让 run 一直等。
  */
-export async function attachLiveBaseline(runs: LiveRunStore, sessionId: string, agentRunId: string, read: ReadLiveOutput = readFromHost): Promise<void> {
+export async function attachLiveBaseline(
+  runs: LiveRunStore,
+  sessionId: string,
+  agentRunId: string,
+  read: ReadLiveOutput = readFromHost,
+): Promise<void> {
   let baseline: LiveOutputBaseline | null;
-  try { baseline = await read(sessionId); }
-  catch (error) { console.error("Failed to read the live output baseline", error); baseline = { runId: null, revision: 0, segments: [] }; }
+  try {
+    baseline = await read(sessionId);
+  } catch (error) {
+    console.error("Failed to read the live output baseline", error);
+    baseline = { runId: null, revision: 0, segments: [] };
+  }
   if (baseline === null) return;
-  runs.applyStreamEvent({
-    type: "live_output_baseline", sessionId, agentRunId, revision: baseline.revision,
-    segments: baseline.runId === agentRunId ? baseline.segments : [],
-  }, () => undefined);
+  runs.applyStreamEvent(
+    {
+      type: "live_output_baseline",
+      sessionId,
+      agentRunId,
+      revision: baseline.revision,
+      segments: baseline.runId === agentRunId ? baseline.segments : [],
+    },
+    () => undefined,
+  );
 }

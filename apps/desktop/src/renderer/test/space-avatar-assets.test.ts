@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { SPACE_COLORS, BALL_COLORS, ballColorFor, ballFor, companionFor, hashId, spaceColorAt, spaceImageFor } from "../components/space/avatar/avatar-assets";
+import {
+  SPACE_COLORS,
+  BALL_COLORS,
+  ballColorFor,
+  ballFor,
+  companionFor,
+  hashId,
+  spaceColorAt,
+  spaceImageFor,
+} from "../components/space/avatar/avatar-assets";
 
 describe("space avatar assets", () => {
   it("hashId 和 demo 一致", () => {

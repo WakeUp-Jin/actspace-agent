@@ -19,7 +19,12 @@ type Editing = { readonly key: number; readonly turnId: string; readonly draft: 
  * 以及发送（淡出后交给 App 的重发，失败时用刚才的内容重新打开编辑器）。
  */
 export function useTurnEditing({
-  sessionId, turns, busy, lineage, onResendTurn, readTaskSnapshot,
+  sessionId,
+  turns,
+  busy,
+  lineage,
+  onResendTurn,
+  readTaskSnapshot,
 }: {
   readonly sessionId: string | null;
   readonly turns: readonly ConversationTurn[];
@@ -49,43 +54,65 @@ export function useTurnEditing({
   const editableRef = useRef(editableTurnIds);
   editableRef.current = editableTurnIds;
 
-  const start = useCallback((turnId: string) => {
-    const turn = turnsRef.current.find((item) => item.id === turnId);
-    if (!sessionId || !turn?.user || !editableRef.current.has(turnId)) return;
-    setEditing({ key: ++openings.current, turnId, draft: turnPromptDraft(sessionId, turn.user, readTaskSnapshot?.(sessionId)) });
-  }, [readTaskSnapshot, sessionId]);
+  const start = useCallback(
+    (turnId: string) => {
+      const turn = turnsRef.current.find((item) => item.id === turnId);
+      if (!sessionId || !turn?.user || !editableRef.current.has(turnId)) return;
+      setEditing({
+        key: ++openings.current,
+        turnId,
+        draft: turnPromptDraft(sessionId, turn.user, readTaskSnapshot?.(sessionId)),
+      });
+    },
+    [readTaskSnapshot, sessionId],
+  );
 
-  const cancel = useCallback(() => { setEditing(null); setLeaving(false); }, []);
+  const cancel = useCallback(() => {
+    setEditing(null);
+    setLeaving(false);
+  }, []);
 
-  const submit = useCallback((draft: TurnPromptDraft, options: ComposerSendOptions) => {
-    const turn = editing && turnsRef.current.find((item) => item.id === editing.turnId);
-    const user = turn?.user;
-    if (!sessionId || !onResendTurn || !editing || !user?.runId || user.sourceSeq === undefined) return;
-    const { turnId } = editing;
-    const edit: TurnResend = { sessionId, runId: user.runId, fromSeq: user.sourceSeq, text: draft.text, options };
-    setLeaving(true);
-    window.setTimeout(() => {
-      setEditing(null);
-      setLeaving(false);
-      // 失败时 App 已经把原因放到 Composer 的提示行；消息流恢复原样，编辑器带着刚才的内容重新打开。
-      // 重发会同步更新外部 store，上面的清空可能还没生效、旧编辑器还挂着：换 key 让它按新内容重建。
-      void onResendTurn(edit).catch(() => setEditing({ key: ++openings.current, turnId, draft }));
-    }, LEAVE_MS);
-  }, [editing, onResendTurn, sessionId]);
+  const submit = useCallback(
+    (draft: TurnPromptDraft, options: ComposerSendOptions) => {
+      const turn = editing && turnsRef.current.find((item) => item.id === editing.turnId);
+      const user = turn?.user;
+      if (!sessionId || !onResendTurn || !editing || !user?.runId || user.sourceSeq === undefined) return;
+      const { turnId } = editing;
+      const edit: TurnResend = { sessionId, runId: user.runId, fromSeq: user.sourceSeq, text: draft.text, options };
+      setLeaving(true);
+      window.setTimeout(() => {
+        setEditing(null);
+        setLeaving(false);
+        // 失败时 App 已经把原因放到 Composer 的提示行；消息流恢复原样，编辑器带着刚才的内容重新打开。
+        // 重发会同步更新外部 store，上面的清空可能还没生效、旧编辑器还挂着：换 key 让它按新内容重建。
+        void onResendTurn(edit).catch(() => setEditing({ key: ++openings.current, turnId, draft }));
+      }, LEAVE_MS);
+    },
+    [editing, onResendTurn, sessionId],
+  );
 
   // 换会话、这一轮不见了、会话变忙：取消编辑。淡出期间不算（发送本身会让会话变忙）。
-  useEffect(() => { setEditing(null); setLeaving(false); }, [sessionId]);
+  useEffect(() => {
+    setEditing(null);
+    setLeaving(false);
+  }, [sessionId]);
   useEffect(() => {
     if (!editing || leaving) return;
     if (busy || !turns.some((turn) => turn.id === editing.turnId)) setEditing(null);
   }, [busy, editing, leaving, turns]);
 
   const editIndex = editing ? turns.findIndex((turn) => turn.id === editing.turnId) : -1;
-  const dimOf = useCallback((index: number): TurnDim | undefined => {
-    if (editIndex < 0 || index < editIndex) return undefined;
-    return index === editIndex ? "body" : "all";
-  }, [editIndex]);
+  const dimOf = useCallback(
+    (index: number): TurnDim | undefined => {
+      if (editIndex < 0 || index < editIndex) return undefined;
+      return index === editIndex ? "body" : "all";
+    },
+    [editIndex],
+  );
 
-  const value = useMemo<TurnEditValue | null>(() => sessionId ? { sessionId, editing, start, cancel, submit } : null, [sessionId, editing, start, cancel, submit]);
+  const value = useMemo<TurnEditValue | null>(
+    () => (sessionId ? { sessionId, editing, start, cancel, submit } : null),
+    [sessionId, editing, start, cancel, submit],
+  );
   return { value, editableTurnIds, editing: editing !== null, leaving, dimOf, start };
 }

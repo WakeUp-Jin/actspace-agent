@@ -5,28 +5,41 @@ import type { RunTargetValue } from "./target/run-target-context";
 import type { SideChatRuntimeValue } from "./components/right-panel/side-chat/side-chat-runtime";
 import { sideChatOpenError } from "./components/right-panel/side-chat/use-open-side-chat";
 import { REWIND_ERROR_MESSAGES, taskOperation } from "@actspace/shared/runtime-v2";
-import { createEmptyStreamingState, upsertStreamingTool, type CompactionBlock, type SessionRunState } from "@actspace/client/live";
+import {
+  createEmptyStreamingState,
+  upsertStreamingTool,
+  type CompactionBlock,
+  type SessionRunState,
+} from "@actspace/client/live";
 import { getSessionTitle } from "./session/session-title";
 import { createSessionCellRetention } from "./session/session-store";
 import { useChatSessionRecord } from "./session/session-store";
 import { SessionTranscriptProvider } from "./session/transcript-context";
 import { LiveRunsProvider } from "./session/live-runs/live-runs-context";
-import { createLiveRunStore, TERMINAL_RUN_LIMIT, useBusySessionIds, useLiveRunSelect, type LiveRunView, type StreamEvent } from "./session/live-runs/live-run-store";
+import {
+  createLiveRunStore,
+  TERMINAL_RUN_LIMIT,
+  useBusySessionIds,
+  useLiveRunSelect,
+  type LiveRunView,
+  type StreamEvent,
+} from "./session/live-runs/live-run-store";
 import { scheduleFrame } from "./session/frame-batch";
 import { applyTaskSnapshot as applyHostTaskSnapshot, createTaskQueueStore } from "./session/task-queue";
 import { attachLiveBaseline } from "./session/live-runs/live-baseline";
 import { loadEarlier } from "./session/session-pages";
-import { createSessionLocalStore, useSessionLocalIds, useSessionLocalState, type ComposerSessionState, type SessionLocalState } from "./session/session-local-store";
+import {
+  createSessionLocalStore,
+  useSessionLocalIds,
+  useSessionLocalState,
+  type ComposerSessionState,
+  type SessionLocalState,
+} from "./session/session-local-store";
 import type { SessionBrowseState } from "./session/SessionBrowseContext";
 import type { ActiveSessionValue, TurnResend } from "./session/active-session-context";
 import type { SessionActionsValue } from "./session/session-actions-context";
 import { useSessionDrafts, type ComposerContextValue } from "./components/composer/composer-context";
-import {
-  EMPTY_MESSAGE_QUEUE,
-  isQueueEmpty,
-  takeSteering,
-  type SessionMessageQueue,
-} from "./session/message-queue";
+import { EMPTY_MESSAGE_QUEUE, isQueueEmpty, takeSteering, type SessionMessageQueue } from "./session/message-queue";
 import type { MessageQueueControls } from "./components/composer/MessageQueueTray";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -58,7 +71,12 @@ import type {
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { useReviewSummary } from "./components/review/use-review-summary";
 import { AppProviders } from "./app/providers";
-import { clearPendingSubmission, readPendingSubmission, sweepExpiredPendingSubmissions, writePendingSubmission } from "./session/pending-submission";
+import {
+  clearPendingSubmission,
+  readPendingSubmission,
+  sweepExpiredPendingSubmissions,
+  writePendingSubmission,
+} from "./session/pending-submission";
 import { createSessionGateway } from "./session/session-gateway";
 import { ClientSessionStore, selectChatSession, projectChatWindow } from "@actspace/client/sessions";
 import { getSession, sessionsApi } from "./api/sessions";
@@ -83,7 +101,8 @@ import { isLocalSession, locateSession } from "./target/locate-session";
 
 function sessionReadError(error: unknown, fallback: string): string {
   const message = error instanceof Error ? error.message : "";
-  if (/HostDisconnectedError|Host is offline|Host connection lost/i.test(message)) return "远端连接已断开，暂时无法加载会话。连接恢复后将自动刷新，也可点击重试。";
+  if (/HostDisconnectedError|Host is offline|Host connection lost/i.test(message))
+    return "远端连接已断开，暂时无法加载会话。连接恢复后将自动刷新，也可点击重试。";
   if (/Error invoking remote method/.test(message)) return `${fallback}，请稍后重试。`;
   return message || fallback;
 }
@@ -94,14 +113,23 @@ const EMPTY_EVENTS: SessionEvent[] = [];
 const QUEUE_REFRESH_FAILED = "队列状态读取失败，请稍后重试。";
 const QUEUE_COMMAND_FAILED = "队列操作没有完成，请重试。";
 /** App 只关心 live run 的运行状态；流式 blocks 每帧都变，不进 App 的订阅（见 SessionTranscriptProvider）。 */
-type LiveStatus = { readonly isStreaming: boolean; readonly isAborting: boolean; readonly isCompacting: boolean; readonly hasStreamingBlocks: boolean };
+type LiveStatus = {
+  readonly isStreaming: boolean;
+  readonly isAborting: boolean;
+  readonly isCompacting: boolean;
+  readonly hasStreamingBlocks: boolean;
+};
 const selectLiveStatus = (view: LiveRunView): LiveStatus => ({
   isStreaming: view.isStreaming,
   isAborting: view.isAborting,
   isCompacting: view.blocks.some((block) => block.kind === "context_compaction" && block.status === "running"),
   hasStreamingBlocks: view.blocks.length > 0,
 });
-const sameLiveStatus = (left: LiveStatus, right: LiveStatus) => left.isStreaming === right.isStreaming && left.isAborting === right.isAborting && left.isCompacting === right.isCompacting && left.hasStreamingBlocks === right.hasStreamingBlocks;
+const sameLiveStatus = (left: LiveStatus, right: LiveStatus) =>
+  left.isStreaming === right.isStreaming &&
+  left.isAborting === right.isAborting &&
+  left.isCompacting === right.isCompacting &&
+  left.hasStreamingBlocks === right.hasStreamingBlocks;
 const selectComposerState = (state: SessionLocalState) => state.composer;
 const selectApprovalPending = (state: SessionLocalState) => state.approvalPending;
 const selectFailed = (state: SessionLocalState) => state.failed;
@@ -137,16 +165,21 @@ function createWorkspaceOptionsFromRoots(roots: Array<string | undefined | null>
 }
 
 /** 没选工作区时的兜底：最近活跃的可见工作区；一个都没有时为 null，新建会话页不能发送。 */
-function firstVisibleWorkspaceRoot(registry: WorkspaceListResult | null | undefined, sessions: SessionListItem[]): string | null {
+function firstVisibleWorkspaceRoot(
+  registry: WorkspaceListResult | null | undefined,
+  sessions: SessionListItem[],
+): string | null {
   return normalizeWorkspaceRoot(registry ? orderQuickOpenProjects(registry.items, sessions)[0]?.path : null);
 }
 
 function createWorkspaceOptionsFromRegistry(items: WorkspaceEntry[]): ComposerWorkspaceOption[] {
-  return items.filter((workspace) => !workspace.hidden).map((workspace) => ({
-    value: workspace.path,
-    label: workspace.label,
-    workspaceId: workspace.id,
-  }));
+  return items
+    .filter((workspace) => !workspace.hidden)
+    .map((workspace) => ({
+      value: workspace.path,
+      label: workspace.label,
+      workspaceId: workspace.id,
+    }));
 }
 
 function copyWithSelection(value: string): void {
@@ -174,14 +207,14 @@ async function copyTextToClipboard(value: string): Promise<void> {
   }
 }
 
-const selectKnownHosts = (snapshot: HostDirectorySnapshot) => snapshot.loaded ? snapshot.hosts : null;
+const selectKnownHosts = (snapshot: HostDirectorySnapshot) => (snapshot.loaded ? snapshot.hosts : null);
 
 export function App() {
   const sessionStore = useMemo(() => new ClientSessionStore(), []);
   const [cellRetention] = useState(() => createSessionCellRetention(sessionStore));
   const [bootstrapState, setBootstrapState] = useState<BootstrapState | null>(null);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
-  const [browseGroups, setBrowseGroups] = useState<import("@actspace/shared").SessionListPage['groups']>([]);
+  const [browseGroups, setBrowseGroups] = useState<import("@actspace/shared").SessionListPage["groups"]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [listRetry, setListRetry] = useState(0);
@@ -200,30 +233,62 @@ export function App() {
       const key = JSON.stringify([group.hostId ?? "local", group.workspaceRoot, group.pinned]);
       let hasMore = group.hasMore;
       for (let page = 1; page < (loadedListPages.current.get(key) ?? 1) && hasMore; page++) {
-        const after = items.filter(s => s.hostId === group.hostId && (s.worktree?.sourceWorkspaceRoot ?? s.workspaceRoot ?? '') === group.workspaceRoot && !!s.pinned === group.pinned).at(-1)?.id;
-        const next = await sessionsApi.listPage({ hostId: group.hostId, workspaceRoot: group.workspaceRoot, pinned: group.pinned, after });
-        items.push(...next.items); hasMore = next.groups[0]?.hasMore ?? false;
+        const after = items
+          .filter(
+            (s) =>
+              s.hostId === group.hostId &&
+              (s.worktree?.sourceWorkspaceRoot ?? s.workspaceRoot ?? "") === group.workspaceRoot &&
+              !!s.pinned === group.pinned,
+          )
+          .at(-1)?.id;
+        const next = await sessionsApi.listPage({
+          hostId: group.hostId,
+          workspaceRoot: group.workspaceRoot,
+          pinned: group.pinned,
+          after,
+        });
+        items.push(...next.items);
+        hasMore = next.groups[0]?.hasMore ?? false;
       }
       group.hasMore = hasMore;
     }
     // Removing a connection must not remove already displayed history. Its
     // Session remains bound to the absent Host and can never become local.
     const directory = hostDirectory.getSnapshot();
-    const known = new Set((directory.loaded && !directory.listError ? directory.hosts : await hostDirectory.refresh()).map(host => host.hostId));
+    const known = new Set(
+      (directory.loaded && !directory.listError ? directory.hosts : await hostDirectory.refresh()).map(
+        (host) => host.hostId,
+      ),
+    );
     for (const item of sidebarSessionsRef.current) {
-      if (!item.hostId || known.has(item.hostId) || items.some(next => next.id === item.id)) continue;
+      if (!item.hostId || known.has(item.hostId) || items.some((next) => next.id === item.id)) continue;
       items.push({ ...item, connectionState: "offline" });
-      if (!groups.some(group => group.hostId === item.hostId && group.workspaceRoot === (item.workspaceRoot ?? "") && group.pinned === !!item.pinned)) {
-        groups.push({ hostId: item.hostId, workspaceRoot: item.workspaceRoot ?? "", pinned: !!item.pinned, hasMore: false });
+      if (
+        !groups.some(
+          (group) =>
+            group.hostId === item.hostId &&
+            group.workspaceRoot === (item.workspaceRoot ?? "") &&
+            group.pinned === !!item.pinned,
+        )
+      ) {
+        groups.push({
+          hostId: item.hostId,
+          workspaceRoot: item.workspaceRoot ?? "",
+          pinned: !!item.pinned,
+          hasMore: false,
+        });
       }
     }
     setBrowseGroups(groups);
-    return [...new Map(items.map(s => [s.id, s])).values()];
+    return [...new Map(items.map((s) => [s.id, s])).values()];
   }, []);
   const messageRequestRef = useRef(0);
   const historyPendingRef = useRef<number | null>(null);
   const [workspaceRegistry, setWorkspaceRegistry] = useState<WorkspaceListResult | null>(null);
-  const fallbackWorkspaceRoot = useMemo(() => firstVisibleWorkspaceRoot(workspaceRegistry, sessions), [workspaceRegistry, sessions]);
+  const fallbackWorkspaceRoot = useMemo(
+    () => firstVisibleWorkspaceRoot(workspaceRegistry, sessions),
+    [workspaceRegistry, sessions],
+  );
   const [sessionBootstrapComplete, setSessionBootstrapComplete] = useState(false);
   // 运行中的 run 和 Host 任务队列缓存（14 T16）；当前会话的流式视图在 selectedSessionId 之后读取。
   // 流式增量按帧通知：一帧里来多少个 delta，App 都只渲染一次。
@@ -252,12 +317,18 @@ export function App() {
   const connectedHostIdsRef = useRef(new Set<string>());
   // 按会话的本地状态（草稿、composer 模式与技能……）；14 T5 起逐类从各个 ref / state 迁入。
   const [localStore] = useState(createSessionLocalStore);
-  const patchLocal = useCallback((sessionId: string, patch: Partial<SessionLocalState>) => {
-    localStore.update(sessionId, (state) => ({ ...state, ...patch }));
-  }, [localStore]);
-  const setLocalFlag = useCallback((sessionId: string, flag: "approvalPending" | "failed" | "unread", value: boolean) => {
-    localStore.update(sessionId, (state) => state[flag] === value ? state : { ...state, [flag]: value });
-  }, [localStore]);
+  const patchLocal = useCallback(
+    (sessionId: string, patch: Partial<SessionLocalState>) => {
+      localStore.update(sessionId, (state) => ({ ...state, ...patch }));
+    },
+    [localStore],
+  );
+  const setLocalFlag = useCallback(
+    (sessionId: string, flag: "approvalPending" | "failed" | "unread", value: boolean) => {
+      localStore.update(sessionId, (state) => (state[flag] === value ? state : { ...state, [flag]: value }));
+    },
+    [localStore],
+  );
   const approvalPendingSessionIds = useSessionLocalIds(localStore, selectApprovalPending);
   const failedSessionIds = useSessionLocalIds(localStore, selectFailed);
   const unreadSessionIds = useSessionLocalIds(localStore, selectUnread);
@@ -273,27 +344,39 @@ export function App() {
   // live run 只订阅运行状态（流式每帧都变的 blocks 不进 App）；消息序列由 SessionTranscriptProvider 单独订阅。
   const liveStatus = useLiveRunSelect(liveRuns, selectedSessionId, selectLiveStatus, sameLiveStatus);
   const { isStreaming, isAborting, isCompacting, hasStreamingBlocks } = liveStatus;
-  const { sessionRecord, historyBefore } = useChatSessionRecord(sessionStore, selectedSessionId, bootstrapState?.workspaceRoot);
+  const { sessionRecord, historyBefore } = useChatSessionRecord(
+    sessionStore,
+    selectedSessionId,
+    bootstrapState?.workspaceRoot,
+  );
   const runTarget = useRunTarget({
     sessionId: selectedSessionId,
     sessionWorkspacePath: sessionRecord?.meta.workspaceRoot,
     locked: !!sessionRecord,
-    local: { workspaceRoot: sessionRecord?.meta.workspaceRoot ?? selectedWorkspaceRoot ?? fallbackWorkspaceRoot ?? undefined, branch: selectedBranch, worktree: sessionRecord?.meta.worktree, gitStatus: workspaceGitContext?.status },
+    local: {
+      workspaceRoot: sessionRecord?.meta.workspaceRoot ?? selectedWorkspaceRoot ?? fallbackWorkspaceRoot ?? undefined,
+      branch: selectedBranch,
+      worktree: sessionRecord?.meta.worktree,
+      gitStatus: workspaceGitContext?.status,
+    },
   });
   const { choices: targetChoices } = runTarget;
   const isLocalTarget = runTarget.target.kind === "local";
-  const setActiveSessionId = useCallback((sessionId: string | null) => {
-    ++messageRequestRef.current;
-    historyPendingRef.current = null;
-    setEarlierLoading(false);
-    setEarlierError(null);
-    setMessageLoading(false);
-    setMessageError(null);
-    activeSessionIdRef.current = sessionId;
-    if (sessionId) pendingEvictionsRef.current.delete(sessionId);
-    if (sessionId) setLocalFlag(sessionId, "unread", false);
-    setSelectedSessionId(sessionId);
-  }, [setLocalFlag]);
+  const setActiveSessionId = useCallback(
+    (sessionId: string | null) => {
+      ++messageRequestRef.current;
+      historyPendingRef.current = null;
+      setEarlierLoading(false);
+      setEarlierError(null);
+      setMessageLoading(false);
+      setMessageError(null);
+      activeSessionIdRef.current = sessionId;
+      if (sessionId) pendingEvictionsRef.current.delete(sessionId);
+      if (sessionId) setLocalFlag(sessionId, "unread", false);
+      setSelectedSessionId(sessionId);
+    },
+    [setLocalFlag],
+  );
   const userPickedChatModelRef = useRef(false);
 
   const refreshWorkspaces = useCallback(async () => {
@@ -302,72 +385,115 @@ export function App() {
     return registry;
   }, []);
 
-  const setApprovalPendingForSession = useCallback((sessionId: string | null | undefined, pending: boolean) => {
-    if (!sessionId) return;
-    patchLocal(sessionId, { approvalVersion: ++requestVersionRef.current });
-    setLocalFlag(sessionId, "approvalPending", pending);
-  }, [patchLocal, setLocalFlag]);
+  const setApprovalPendingForSession = useCallback(
+    (sessionId: string | null | undefined, pending: boolean) => {
+      if (!sessionId) return;
+      patchLocal(sessionId, { approvalVersion: ++requestVersionRef.current });
+      setLocalFlag(sessionId, "approvalPending", pending);
+    },
+    [patchLocal, setLocalFlag],
+  );
 
-  const setFailedForSession = useCallback((sessionId: string | null | undefined, failed: boolean) => {
-    if (!sessionId) return;
-    setLocalFlag(sessionId, "failed", failed);
-  }, [setLocalFlag]);
+  const setFailedForSession = useCallback(
+    (sessionId: string | null | undefined, failed: boolean) => {
+      if (!sessionId) return;
+      setLocalFlag(sessionId, "failed", failed);
+    },
+    [setLocalFlag],
+  );
 
-  const updateMessageQueue = useCallback((sessionId: string, update: (queue: SessionMessageQueue) => SessionMessageQueue) => {
-    const current = localStore.get(sessionId).messageQueue;
-    const updated = update(current);
-    if (updated === current) return;
-    const next = isQueueEmpty(updated) ? EMPTY_MESSAGE_QUEUE : updated;
-    patchLocal(sessionId, { messageQueue: next });
-  }, [localStore, patchLocal]);
+  const updateMessageQueue = useCallback(
+    (sessionId: string, update: (queue: SessionMessageQueue) => SessionMessageQueue) => {
+      const current = localStore.get(sessionId).messageQueue;
+      const updated = update(current);
+      if (updated === current) return;
+      const next = isQueueEmpty(updated) ? EMPTY_MESSAGE_QUEUE : updated;
+      patchLocal(sessionId, { messageQueue: next });
+    },
+    [localStore, patchLocal],
+  );
 
   const refreshSessionRef = useRef<(id: string) => Promise<unknown>>(async () => {});
-  const applyTaskSnapshot = useCallback((snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot) => applyHostTaskSnapshot(snapshot, {
-    tasks: taskQueue, runs: liveRuns, patchLocal,
-    notice: (sessionId, text) => setComposerNotice({ sessionId, text }),
-    refreshSession: (sessionId) => { void refreshSessionRef.current(sessionId).catch(console.error); },
-    attachLiveBaseline: (sessionId, agentRunId) => { void attachLiveBaseline(liveRuns, sessionId, agentRunId); },
-  }), [taskQueue, liveRuns, patchLocal]);
+  const applyTaskSnapshot = useCallback(
+    (snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot) =>
+      applyHostTaskSnapshot(snapshot, {
+        tasks: taskQueue,
+        runs: liveRuns,
+        patchLocal,
+        notice: (sessionId, text) => setComposerNotice({ sessionId, text }),
+        refreshSession: (sessionId) => {
+          void refreshSessionRef.current(sessionId).catch(console.error);
+        },
+        attachLiveBaseline: (sessionId, agentRunId) => {
+          void attachLiveBaseline(liveRuns, sessionId, agentRunId);
+        },
+      }),
+    [taskQueue, liveRuns, patchLocal],
+  );
   // 14 S9：影响界面的后台请求失败时，在当前会话的输入框上方提示（3 秒后消失），同时打到控制台。
   // 只提示当前会话，避免后台会话的失败顶掉当前会话的提示。
-  const reportSessionFailure = useCallback((sessionId: string, text: string) => (error: unknown) => {
-    console.error(text, error);
-    if (activeSessionIdRef.current === sessionId) setComposerNotice({ sessionId, text });
-  }, []);
-  const refreshTaskQueue = useCallback(async (sessionId: string) => {
-    const evictions = evictionCountRef.current.get(sessionId);
-    const result = await tasksApi.command({ sessionId, op: "snapshot" });
-    if (evictionCountRef.current.get(sessionId) !== evictions) return;
-    applyTaskSnapshot(result.snapshot);
-  }, [applyTaskSnapshot]);
-  const taskCommand = useCallback(async (command: import("@actspace/shared/runtime-v2").TaskCommand) => {
-    const result = await tasksApi.command(command);
-    applyTaskSnapshot(result.snapshot);
-    if (result.error) { setComposerNotice({ sessionId: command.sessionId, text: "队列状态已变化，请根据最新状态重试。" }); return false; }
-    return true;
-  }, [applyTaskSnapshot]);
+  const reportSessionFailure = useCallback(
+    (sessionId: string, text: string) => (error: unknown) => {
+      console.error(text, error);
+      if (activeSessionIdRef.current === sessionId) setComposerNotice({ sessionId, text });
+    },
+    [],
+  );
+  const refreshTaskQueue = useCallback(
+    async (sessionId: string) => {
+      const evictions = evictionCountRef.current.get(sessionId);
+      const result = await tasksApi.command({ sessionId, op: "snapshot" });
+      if (evictionCountRef.current.get(sessionId) !== evictions) return;
+      applyTaskSnapshot(result.snapshot);
+    },
+    [applyTaskSnapshot],
+  );
+  const taskCommand = useCallback(
+    async (command: import("@actspace/shared/runtime-v2").TaskCommand) => {
+      const result = await tasksApi.command(command);
+      applyTaskSnapshot(result.snapshot);
+      if (result.error) {
+        setComposerNotice({ sessionId: command.sessionId, text: "队列状态已变化，请根据最新状态重试。" });
+        return false;
+      }
+      return true;
+    },
+    [applyTaskSnapshot],
+  );
   useEffect(() => {
-    if (selectedSessionId) void refreshTaskQueue(selectedSessionId).catch(reportSessionFailure(selectedSessionId, QUEUE_REFRESH_FAILED));
+    if (selectedSessionId)
+      void refreshTaskQueue(selectedSessionId).catch(reportSessionFailure(selectedSessionId, QUEUE_REFRESH_FAILED));
     return liveEvents.onMessage("task-queue-updated", ({ event }) => {
-      if (event.sessionId) void refreshTaskQueue(event.sessionId).catch(reportSessionFailure(event.sessionId, QUEUE_REFRESH_FAILED));
+      if (event.sessionId)
+        void refreshTaskQueue(event.sessionId).catch(reportSessionFailure(event.sessionId, QUEUE_REFRESH_FAILED));
     });
   }, [selectedSessionId, refreshTaskQueue, reportSessionFailure]);
   // 会话从某一轮重来（agent-edit-resend-rewind.md §5.4）：日志和任务快照的序号都变小了。丢掉旧快照、
   // 本地队列和压缩失败块后重新取；durable 页由 DesktopSessionBridge 整体替换，App 自己的读页也重读一次。
-  const handleSessionRewound = useCallback((sessionId: string) => {
-    taskQueue.forgetSnapshot(sessionId);
-    patchLocal(sessionId, { messageQueue: EMPTY_MESSAGE_QUEUE, compactionFailure: undefined });
-    sessionStore.reset(sessionId);
-    void refreshSessionRef.current(sessionId).finally(() => patchLocal(sessionId, { rewinding: undefined }));
-    void refreshTaskQueue(sessionId).catch(reportSessionFailure(sessionId, QUEUE_REFRESH_FAILED));
-  }, [taskQueue, patchLocal, sessionStore, refreshTaskQueue, reportSessionFailure]);
+  const handleSessionRewound = useCallback(
+    (sessionId: string) => {
+      taskQueue.forgetSnapshot(sessionId);
+      patchLocal(sessionId, { messageQueue: EMPTY_MESSAGE_QUEUE, compactionFailure: undefined });
+      sessionStore.reset(sessionId);
+      void refreshSessionRef.current(sessionId).finally(() => patchLocal(sessionId, { rewinding: undefined }));
+      void refreshTaskQueue(sessionId).catch(reportSessionFailure(sessionId, QUEUE_REFRESH_FAILED));
+    },
+    [taskQueue, patchLocal, sessionStore, refreshTaskQueue, reportSessionFailure],
+  );
   const handleSessionRewoundRef = useRef(handleSessionRewound);
   handleSessionRewoundRef.current = handleSessionRewound;
-  useEffect(() => liveEvents.subscribe(({ event }) => {
-    if (event.kind === "journal-update" && event.update?.event.type === "session/rewound") handleSessionRewoundRef.current(event.sessionId);
-  }), []);
+  useEffect(
+    () =>
+      liveEvents.subscribe(({ event }) => {
+        if (event.kind === "journal-update" && event.update?.event.type === "session/rewound")
+          handleSessionRewoundRef.current(event.sessionId);
+      }),
+    [],
+  );
   // 启动时清理超过 7 天的未确认提交记录。
-  useEffect(() => { sweepExpiredPendingSubmissions(); }, []);
+  useEffect(() => {
+    sweepExpiredPendingSubmissions();
+  }, []);
   // 14 S10：激活会话时，上次未确认的提交恢复为草稿（本地与远端会话相同）。先查任务快照：
   // 已有相同 submissionId 说明 Runtime 收到了，只清理记录；查询失败时降级为恢复草稿。永不自动重发。
   // 正在发送、或输入框里已有用户输入（文字或附件）时不恢复：前者会把正在发的内容放回去，后者会覆盖用户刚输入的内容。
@@ -375,7 +501,9 @@ export function App() {
     const sessionId = selectedSessionId;
     const blocked = (id: string) => {
       const local = localStore.get(id);
-      return Boolean(local.draft || local.composerText?.trim() || local.attachments?.length || sendsInFlightRef.current.get(id));
+      return Boolean(
+        local.draft || local.composerText?.trim() || local.attachments?.length || sendsInFlightRef.current.get(id),
+      );
     };
     if (!sessionId || blocked(sessionId)) return;
     const record = readPendingSubmission(sessionId);
@@ -386,18 +514,30 @@ export function App() {
       try {
         await refreshTaskQueue(sessionId);
         accepted = taskQueue.snapshot(sessionId)?.tasks.some((task) => task.submissionId === record.id) ?? false;
-      } catch (error) { console.error("Failed to check pending submission", error); }
-      if (accepted) { clearPendingSubmission(sessionId); return; }
+      } catch (error) {
+        console.error("Failed to check pending submission", error);
+      }
+      if (accepted) {
+        clearPendingSubmission(sessionId);
+        return;
+      }
       // 等待期间切走了会话、开始了发送、有了输入或草稿、记录变了，就不覆盖。
       if (cancelled || blocked(sessionId) || readPendingSubmission(sessionId)?.id !== record.id) return;
-      patchLocal(sessionId, { draft: { ...record.draft, id: Date.now(), error: "上次提交尚未确认，再次发送将核对同一次提交。" } });
+      patchLocal(sessionId, {
+        draft: { ...record.draft, id: Date.now(), error: "上次提交尚未确认，再次发送将核对同一次提交。" },
+      });
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [selectedSessionId, refreshTaskQueue, taskQueue, localStore, patchLocal]);
 
-  const setCompactionFailureForSession = useCallback((sessionId: string, block: CompactionBlock | null) => {
-    patchLocal(sessionId, { compactionFailure: block ?? undefined });
-  }, [patchLocal]);
+  const setCompactionFailureForSession = useCallback(
+    (sessionId: string, block: CompactionBlock | null) => {
+      patchLocal(sessionId, { compactionFailure: block ?? undefined });
+    },
+    [patchLocal],
+  );
 
   useEffect(() => {
     if (!composerNotice) return;
@@ -407,59 +547,77 @@ export function App() {
 
   const { reviewSummary, refreshReviewSummary } = useReviewSummary({
     workspaceRoot: normalizeWorkspaceRoot(
-      sessionRecord?.meta.worktree?.workspaceRoot ?? selectedWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
+      sessionRecord?.meta.worktree?.workspaceRoot ??
+        selectedWorkspaceRoot ??
+        sessionRecord?.meta.workspaceRoot ??
+        fallbackWorkspaceRoot,
     ),
     sessionId: sessionRecord?.meta.id ?? null,
   });
 
-  const refreshPendingApprovalStatuses = useCallback(async (sessionIds: string[]) => {
-    const uniqueSessionIds = [...new Set(sessionIds.filter(Boolean))];
-    if (uniqueSessionIds.length === 0) return;
+  const refreshPendingApprovalStatuses = useCallback(
+    async (sessionIds: string[]) => {
+      const uniqueSessionIds = [...new Set(sessionIds.filter(Boolean))];
+      if (uniqueSessionIds.length === 0) return;
 
-    const results = await Promise.all(uniqueSessionIds.map(async (sessionId) => {
-      const version = ++requestVersionRef.current;
-      patchLocal(sessionId, { approvalVersion: version });
-      try {
-        const pending = await approvalsApi.listPending({ sessionId });
-        return { sessionId, version, hasPending: pending.length > 0, pending };
-      } catch (error) {
-        console.error("Failed to load pending approvals", error);
-        return { sessionId, version, hasPending: null, pending: [] };
-      }
-    }));
+      const results = await Promise.all(
+        uniqueSessionIds.map(async (sessionId) => {
+          const version = ++requestVersionRef.current;
+          patchLocal(sessionId, { approvalVersion: version });
+          try {
+            const pending = await approvalsApi.listPending({ sessionId });
+            return { sessionId, version, hasPending: pending.length > 0, pending };
+          } catch (error) {
+            console.error("Failed to load pending approvals", error);
+            return { sessionId, version, hasPending: null, pending: [] };
+          }
+        }),
+      );
 
-    // The host owns pending requests across renderer reloads. Reattach only
-    // current host facts, never replay historical approval requests as grants.
-    for (const result of results) {
-      if (localStore.get(result.sessionId).approvalVersion !== result.version) continue;
-      for (const pending of result.pending) {
-        const recovery = pending.recovery;
-        if (!recovery || pending.expiresAt <= Date.now()) continue;
-        let run = liveRuns.get(result.sessionId);
-        if (run && (!run.recovered || run.agentRunId !== recovery.agentRunId)) continue;
-        if (!run) {
-          run = { sessionId: result.sessionId, agentRunId: recovery.agentRunId, recovered: true,
-            state: createEmptyStreamingState(), userBlock: null, aborting: false };
-          liveRuns.start(run);
-          void attachLiveBaseline(liveRuns, result.sessionId, recovery.agentRunId);
+      // The host owns pending requests across renderer reloads. Reattach only
+      // current host facts, never replay historical approval requests as grants.
+      for (const result of results) {
+        if (localStore.get(result.sessionId).approvalVersion !== result.version) continue;
+        for (const pending of result.pending) {
+          const recovery = pending.recovery;
+          if (!recovery || pending.expiresAt <= Date.now()) continue;
+          let run = liveRuns.get(result.sessionId);
+          if (run && (!run.recovered || run.agentRunId !== recovery.agentRunId)) continue;
+          if (!run) {
+            run = {
+              sessionId: result.sessionId,
+              agentRunId: recovery.agentRunId,
+              recovered: true,
+              state: createEmptyStreamingState(),
+              userBlock: null,
+              aborting: false,
+            };
+            liveRuns.start(run);
+            void attachLiveBaseline(liveRuns, result.sessionId, recovery.agentRunId);
+          }
+          if (run.state.activeTools.get(recovery.toolCallId)?.terminalStatus) continue;
+          upsertStreamingTool(run.state, recovery.toolCallId, pending.toolName, recovery.preview);
+          Object.assign(run.state.activeTools.get(recovery.toolCallId)!, {
+            approvalPending: true,
+            approvalRequestId: pending.requestId,
+            approvalReason: pending.reason,
+            approvalSummary: pending.summary,
+            approvalScope: recovery.approvalScope,
+          });
         }
-        if (run.state.activeTools.get(recovery.toolCallId)?.terminalStatus) continue;
-        upsertStreamingTool(run.state, recovery.toolCallId, pending.toolName, recovery.preview);
-        Object.assign(run.state.activeTools.get(recovery.toolCallId)!, {
-          approvalPending: true, approvalRequestId: pending.requestId, approvalReason: pending.reason,
-          approvalSummary: pending.summary, approvalScope: recovery.approvalScope,
-        });
+        liveRuns.refresh(result.sessionId);
       }
-      liveRuns.refresh(result.sessionId);
-    }
-    for (const result of results) {
-      if (result.hasPending === null || localStore.get(result.sessionId).approvalVersion !== result.version) continue;
-      setLocalFlag(result.sessionId, "approvalPending", result.hasPending);
-    }
-  }, [liveRuns, localStore, patchLocal, setLocalFlag]);
+      for (const result of results) {
+        if (result.hasPending === null || localStore.get(result.sessionId).approvalVersion !== result.version) continue;
+        setLocalFlag(result.sessionId, "approvalPending", result.hasPending);
+      }
+    },
+    [liveRuns, localStore, patchLocal, setLocalFlag],
+  );
 
   useEffect(() => {
-    appApi.getBootstrapState()
+    appApi
+      .getBootstrapState()
       .then(setBootstrapState)
       .catch((error: unknown) => {
         console.error("Failed to load bootstrap state", error);
@@ -469,10 +627,17 @@ export function App() {
 
   useEffect(() => {
     if (selectedWorkspaceRoot) return;
-    setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
-      sessionRecord?.meta.worktree?.sourceWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
-    ));
-  }, [fallbackWorkspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot, sessionRecord?.meta.worktree?.sourceWorkspaceRoot]);
+    setSelectedWorkspaceRoot(
+      normalizeWorkspaceRoot(
+        sessionRecord?.meta.worktree?.sourceWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
+      ),
+    );
+  }, [
+    fallbackWorkspaceRoot,
+    selectedWorkspaceRoot,
+    sessionRecord?.meta.workspaceRoot,
+    sessionRecord?.meta.worktree?.sourceWorkspaceRoot,
+  ]);
 
   useEffect(() => {
     const lockedWorktree = sessionRecord?.meta.worktree;
@@ -490,26 +655,34 @@ export function App() {
       return;
     }
     let cancelled = false;
-    workspacesApi.getGitContext({ workspaceRoot }).then((context) => {
-      if (cancelled) return;
-      setWorkspaceGitContext(context);
-      setSelectedBranch(
-        context.status === "ready" || context.status === "no_head"
-          ? context.currentBranch
-          : undefined,
-      );
-      setRunLocation("this_mac");
-    }).catch((error: unknown) => {
-      if (cancelled) return;
-      console.error("Failed to load workspace Git context", error);
-      setWorkspaceGitContext(null);
-      setSelectedBranch(undefined);
-      setRunLocation("this_mac");
-    });
+    workspacesApi
+      .getGitContext({ workspaceRoot })
+      .then((context) => {
+        if (cancelled) return;
+        setWorkspaceGitContext(context);
+        setSelectedBranch(
+          context.status === "ready" || context.status === "no_head" ? context.currentBranch : undefined,
+        );
+        setRunLocation("this_mac");
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        console.error("Failed to load workspace Git context", error);
+        setWorkspaceGitContext(null);
+        setSelectedBranch(undefined);
+        setRunLocation("this_mac");
+      });
     return () => {
       cancelled = true;
     };
-  }, [isLocalTarget, fallbackWorkspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.id, sessionRecord?.meta.agentRunCount, sessionRecord?.meta.worktree]);
+  }, [
+    isLocalTarget,
+    fallbackWorkspaceRoot,
+    selectedWorkspaceRoot,
+    sessionRecord?.meta.id,
+    sessionRecord?.meta.agentRunCount,
+    sessionRecord?.meta.worktree,
+  ]);
 
   const visibleSessions = useMemo(() => {
     if (!workspaceRegistry) return sessions;
@@ -519,26 +692,35 @@ export function App() {
     const hiddenWorkspacePaths = new Set(
       workspaceRegistry.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path),
     );
-    return sessions.filter((session) =>
-      !hiddenWorkspaceIds.has(session.workspaceId ?? "") &&
-      !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
+    return sessions.filter(
+      (session) =>
+        !hiddenWorkspaceIds.has(session.workspaceId ?? "") &&
+        !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
     );
   }, [sessions, workspaceRegistry]);
   // 分页列表的分组同样不显示已移除的工作区，否则侧栏会把它的空文件夹加回来。
   const visibleBrowseGroups = useMemo(() => {
-    const hiddenPaths = new Set(workspaceRegistry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path));
-    return hiddenPaths.size ? browseGroups.filter((group) => group.hostId || !hiddenPaths.has(normalizeWorkspaceRoot(group.workspaceRoot) ?? "")) : browseGroups;
+    const hiddenPaths = new Set(
+      workspaceRegistry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path),
+    );
+    return hiddenPaths.size
+      ? browseGroups.filter(
+          (group) => group.hostId || !hiddenPaths.has(normalizeWorkspaceRoot(group.workspaceRoot) ?? ""),
+        )
+      : browseGroups;
   }, [browseGroups, workspaceRegistry]);
   // 每个会话 id 只补齐一次审批徽标和任务队列；之后靠 live 事件和选中会话时的刷新保持最新（14 T3）。
   // 只补齐侧栏可见的会话：移除工作区后，它的会话被 evict，不能因为仍在 sessions 里又被补齐回来。
   // 远端会话等 Host 列表读到之后再补齐；Host 已被移除的不补齐（15 T4：移除时被 evict，侧栏仍显示为未连接）。
   const knownHosts = useHostDirectory(selectKnownHosts);
   useEffect(() => {
-    const fresh = visibleSessions.map((session) => session.id).filter((id) => {
-      if (hydratedSessionIdsRef.current.has(id)) return false;
-      const location = locateSession(id);
-      return location.kind !== "remote" || (knownHosts?.some((host) => host.hostId === location.hostId) ?? false);
-    });
+    const fresh = visibleSessions
+      .map((session) => session.id)
+      .filter((id) => {
+        if (hydratedSessionIdsRef.current.has(id)) return false;
+        const location = locateSession(id);
+        return location.kind !== "remote" || (knownHosts?.some((host) => host.hostId === location.hostId) ?? false);
+      });
     if (fresh.length === 0) return;
     for (const id of fresh) hydratedSessionIdsRef.current.add(id);
     refreshPendingApprovalStatuses(fresh).catch((error: unknown) => {
@@ -546,54 +728,68 @@ export function App() {
     });
     // Closed history with no pending tasks needs no write-lease/recovery merely
     // to show a sidebar row. Selection and live updates still read the Session.
-    for (const id of fresh) if (visibleSessions.find(session => session.id === id)?.hasPendingTasks !== false) void refreshTaskQueue(id).catch(reportSessionFailure(id, QUEUE_REFRESH_FAILED));
+    for (const id of fresh)
+      if (visibleSessions.find((session) => session.id === id)?.hasPendingTasks !== false)
+        void refreshTaskQueue(id).catch(reportSessionFailure(id, QUEUE_REFRESH_FAILED));
   }, [knownHosts, refreshPendingApprovalStatuses, refreshTaskQueue, reportSessionFailure, visibleSessions]);
 
   // 归档 / 移除后释放会话的本地状态，并让它重新出现时重新补齐。当前会话不释放；运行中的会话等 run 结束。
-  const evictSession = useCallback((sessionId: string) => {
-    if (sessionId === activeSessionIdRef.current) return;
-    if (liveRuns.has(sessionId)) { pendingEvictionsRef.current.add(sessionId); return; }
-    pendingEvictionsRef.current.delete(sessionId);
-    evictionCountRef.current.set(sessionId, (evictionCountRef.current.get(sessionId) ?? 0) + 1);
-    localStore.evict(sessionId);
-    liveRuns.evict(sessionId);
-    taskQueue.evict(sessionId);
-    cellRetention.forget(sessionId);
-    hydratedSessionIdsRef.current.delete(sessionId);
-    remoteSessionPrefs.remove(sessionId);
-  }, [localStore, liveRuns, taskQueue, cellRetention]);
+  const evictSession = useCallback(
+    (sessionId: string) => {
+      if (sessionId === activeSessionIdRef.current) return;
+      if (liveRuns.has(sessionId)) {
+        pendingEvictionsRef.current.add(sessionId);
+        return;
+      }
+      pendingEvictionsRef.current.delete(sessionId);
+      evictionCountRef.current.set(sessionId, (evictionCountRef.current.get(sessionId) ?? 0) + 1);
+      localStore.evict(sessionId);
+      liveRuns.evict(sessionId);
+      taskQueue.evict(sessionId);
+      cellRetention.forget(sessionId);
+      hydratedSessionIdsRef.current.delete(sessionId);
+      remoteSessionPrefs.remove(sessionId);
+    },
+    [localStore, liveRuns, taskQueue, cellRetention],
+  );
   useEffect(() => {
-    for (const sessionId of [...pendingEvictionsRef.current]) if (!busySessionIds.has(sessionId)) evictSession(sessionId);
+    for (const sessionId of [...pendingEvictionsRef.current])
+      if (!busySessionIds.has(sessionId)) evictSession(sessionId);
   }, [busySessionIds, evictSession]);
   // Host 被移除：释放它的会话的本地状态。会话仍留在侧栏，显示为「远端 · 未连接」（03-3）。
-  useEffect(() => hostDirectory.onHostRemoved((hostId) => {
-    for (const item of sidebarSessionsRef.current) {
-      const location = locateSession(item.id);
-      if (location.kind === "remote" && location.hostId === hostId) evictSession(item.id);
-    }
-  }), [evictSession]);
+  useEffect(
+    () =>
+      hostDirectory.onHostRemoved((hostId) => {
+        for (const item of sidebarSessionsRef.current) {
+          const location = locateSession(item.id);
+          if (location.kind === "remote" && location.hostId === hostId) evictSession(item.id);
+        }
+      }),
+    [evictSession],
+  );
   // 右栏打开着的侧边对话（按打开次数计数）：和当前会话一样常驻 store。
   const [openSideChatIds, setOpenSideChatIds] = useState<ReadonlyMap<string, number>>(() => new Map());
   const retainSideChat = useCallback((sessionId: string) => {
     setOpenSideChatIds((current) => new Map(current).set(sessionId, (current.get(sessionId) ?? 0) + 1));
-    return () => setOpenSideChatIds((current) => {
-      const next = new Map(current);
-      const count = (next.get(sessionId) ?? 1) - 1;
-      if (count > 0) next.set(sessionId, count); else next.delete(sessionId);
-      return next;
-    });
+    return () =>
+      setOpenSideChatIds((current) => {
+        const next = new Map(current);
+        const count = (next.get(sessionId) ?? 1) - 1;
+        if (count > 0) next.set(sessionId, count);
+        else next.delete(sessionId);
+        return next;
+      });
   }, []);
   // cell 保留：当前会话、运行中的会话和右栏打开着的侧边对话常驻，其余只留最近查看的几个（14 T9 / T10）。
   useEffect(() => {
-    cellRetention.retain(new Set([...busySessionIds, ...openSideChatIds.keys(), ...(selectedSessionId ? [selectedSessionId] : [])]));
+    cellRetention.retain(
+      new Set([...busySessionIds, ...openSideChatIds.keys(), ...(selectedSessionId ? [selectedSessionId] : [])]),
+    );
     if (selectedSessionId) cellRetention.viewed(selectedSessionId);
   }, [cellRetention, busySessionIds, selectedSessionId, openSideChatIds]);
 
   useEffect(() => {
-    Promise.all([
-      settingsApi.get(),
-      modelsApi.listUsable({ purpose: "chat" }),
-    ])
+    Promise.all([settingsApi.get(), modelsApi.listUsable({ purpose: "chat" })])
       .then(([settings, usable]) => {
         const configured = resolvePreferredChatModel(settings, usable.models);
         setUsableChatModels(usable.models);
@@ -639,61 +835,107 @@ export function App() {
           if (disposed) return;
           setSessions(items);
         } while (pending && !disposed);
-      } catch (error) { console.error("Failed to refresh session list", error); }
-      finally { refreshing = false; }
+      } catch (error) {
+        console.error("Failed to refresh session list", error);
+      } finally {
+        refreshing = false;
+      }
     };
-    const unsubscribe = liveEvents.onMessage("session-title-updated", () => { void refresh(); });
-    const unhosts = hostDirectory.onHostsChanged(() => { void refresh(); });
-    return () => { disposed = true; unsubscribe(); unhosts(); };
+    const unsubscribe = liveEvents.onMessage("session-title-updated", () => {
+      void refresh();
+    });
+    const unhosts = hostDirectory.onHostsChanged(() => {
+      void refresh();
+    });
+    return () => {
+      disposed = true;
+      unsubscribe();
+      unhosts();
+    };
   }, [readSidebarSessions]);
 
-  const readSessionPage = useCallback(async (sessionId: string) => {
-    const version = ++requestVersionRef.current;
-    patchLocal(sessionId, { pageVersion: version });
-    const visible = () => activeSessionIdRef.current === sessionId;
-    const request = visible() ? ++messageRequestRef.current : messageRequestRef.current;
-    if (visible()) {
-      historyPendingRef.current = null;
-      setEarlierLoading(false);
-      // store 里已有这个会话的 cell（保留策略留下的）时直接显示它，后台刷新。
-      const held = sessionStore.peek(sessionId);
-      setMessageLoading(!held?.snapshot || !held.window); setMessageError(null); setEarlierError(null);
-    }
-    try {
-      const projection = await sessionsApi.getPage({ sessionId });
-      if (version !== localStore.get(sessionId).pageVersion) return null;
-      // 合并（与已加载的早期页相邻时并入、较旧的修订不覆盖）由 applyEnvelope 负责。
-      sessionStore.applyEnvelope(projection);
-      const record = selectChatSession(sessionStore.get(sessionId));
-      if (!record) throw new Error('会话读取失败，请重试');
-      return record;
-    } catch (error) {
-      if (version === localStore.get(sessionId).pageVersion && visible() && request === messageRequestRef.current) setMessageError(sessionReadError(error, '消息加载失败'));
-      return null;
-    } finally {
-      if (version === localStore.get(sessionId).pageVersion && visible() && request === messageRequestRef.current) setMessageLoading(false);
-    }
-  }, [sessionStore, localStore, patchLocal]);
+  const readSessionPage = useCallback(
+    async (sessionId: string) => {
+      const version = ++requestVersionRef.current;
+      patchLocal(sessionId, { pageVersion: version });
+      const visible = () => activeSessionIdRef.current === sessionId;
+      const request = visible() ? ++messageRequestRef.current : messageRequestRef.current;
+      if (visible()) {
+        historyPendingRef.current = null;
+        setEarlierLoading(false);
+        // store 里已有这个会话的 cell（保留策略留下的）时直接显示它，后台刷新。
+        const held = sessionStore.peek(sessionId);
+        setMessageLoading(!held?.snapshot || !held.window);
+        setMessageError(null);
+        setEarlierError(null);
+      }
+      try {
+        const projection = await sessionsApi.getPage({ sessionId });
+        if (version !== localStore.get(sessionId).pageVersion) return null;
+        // 合并（与已加载的早期页相邻时并入、较旧的修订不覆盖）由 applyEnvelope 负责。
+        sessionStore.applyEnvelope(projection);
+        const record = selectChatSession(sessionStore.get(sessionId));
+        if (!record) throw new Error("会话读取失败，请重试");
+        return record;
+      } catch (error) {
+        if (version === localStore.get(sessionId).pageVersion && visible() && request === messageRequestRef.current)
+          setMessageError(sessionReadError(error, "消息加载失败"));
+        return null;
+      } finally {
+        if (version === localStore.get(sessionId).pageVersion && visible() && request === messageRequestRef.current)
+          setMessageLoading(false);
+      }
+    },
+    [sessionStore, localStore, patchLocal],
+  );
 
   refreshSessionRef.current = readSessionPage;
 
   const loadEarlierMessages = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
-    if (!sessionId || sessionStore.peek(sessionId)?.window?.beforeSeq == null || historyPendingRef.current !== null) return;
+    if (!sessionId || sessionStore.peek(sessionId)?.window?.beforeSeq == null || historyPendingRef.current !== null)
+      return;
     const request = messageRequestRef.current;
-    historyPendingRef.current = request; setEarlierLoading(true); setEarlierError(null);
-    try { await loadEarlier(sessionStore, sessionId); }
-    catch (error) { if (request === messageRequestRef.current) setEarlierError(sessionReadError(error, '历史消息加载失败')); }
-    finally { if (historyPendingRef.current === request) { historyPendingRef.current = null; setEarlierLoading(false); } }
+    historyPendingRef.current = request;
+    setEarlierLoading(true);
+    setEarlierError(null);
+    try {
+      await loadEarlier(sessionStore, sessionId);
+    } catch (error) {
+      if (request === messageRequestRef.current) setEarlierError(sessionReadError(error, "历史消息加载失败"));
+    } finally {
+      if (historyPendingRef.current === request) {
+        historyPendingRef.current = null;
+        setEarlierLoading(false);
+      }
+    }
   }, [sessionStore]);
 
   const loadMoreSessions = useCallback(async (input: import("@actspace/shared").SessionListPageInput) => {
     const page = await sessionsApi.listPage(input);
-    setListError(page.readModel?.status === "fallback" ? "查询索引暂不可用，已从会话文件读取" : page.failed ? `${page.failed} 个会话暂时无法读取，可重试` : null);
+    setListError(
+      page.readModel?.status === "fallback"
+        ? "查询索引暂不可用，已从会话文件读取"
+        : page.failed
+          ? `${page.failed} 个会话暂时无法读取，可重试`
+          : null,
+    );
     const key = JSON.stringify([input.hostId ?? "local", input.workspaceRoot ?? "", input.pinned === true]);
     loadedListPages.current.set(key, (loadedListPages.current.get(key) ?? 1) + 1);
-    setSessions(current => { const byId = new Map(current.map(s => [s.id, s])); for (const s of page.items) byId.set(s.id, s); return [...byId.values()]; });
-    setBrowseGroups(current => [...current.filter(g => !page.groups.some(n => n.hostId === g.hostId && n.workspaceRoot === g.workspaceRoot && n.pinned === g.pinned)), ...page.groups]);
+    setSessions((current) => {
+      const byId = new Map(current.map((s) => [s.id, s]));
+      for (const s of page.items) byId.set(s.id, s);
+      return [...byId.values()];
+    });
+    setBrowseGroups((current) => [
+      ...current.filter(
+        (g) =>
+          !page.groups.some(
+            (n) => n.hostId === g.hostId && n.workspaceRoot === g.workspaceRoot && n.pinned === g.pinned,
+          ),
+      ),
+      ...page.groups,
+    ]);
   }, []);
 
   useEffect(() => {
@@ -701,34 +943,49 @@ export function App() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     async function bootstrapSession() {
       const selectionRequest = messageRequestRef.current;
-      setListLoading(true); setListError(null);
+      setListLoading(true);
+      setListError(null);
       const registryRequest = workspacesApi.list();
       // 工作区不等会话目录：目录重建期间也要能选出兜底工作区、正常发送。
-      void registryRequest.then((registry) => { if (!disposed && registry) setWorkspaceRegistry(registry); }, () => {});
-      const [page, registry] = await Promise.all([
-        sessionsApi.listPage(),
-        registryRequest,
-      ]);
+      void registryRequest.then(
+        (registry) => {
+          if (!disposed && registry) setWorkspaceRegistry(registry);
+        },
+        () => {},
+      );
+      const [page, registry] = await Promise.all([sessionsApi.listPage(), registryRequest]);
       if (disposed) return;
       const listedSessions = page.items;
       const bootstrapWorkspaceRoot = firstVisibleWorkspaceRoot(registry, listedSessions);
-      setSessions(current => page.indexing ? [...new Map([...current, ...listedSessions].map(s => [s.id, s])).values()] : listedSessions);
+      setSessions((current) =>
+        page.indexing ? [...new Map([...current, ...listedSessions].map((s) => [s.id, s])).values()] : listedSessions,
+      );
       setBrowseGroups(page.groups);
       setListLoading(page.indexing);
       if (page.failed) setListError(`${page.failed} 个会话暂时无法读取，可重试`);
       else if (page.readModel?.status === "fallback") setListError("查询索引暂不可用，已从会话文件读取");
       if (page.indexing) {
-        timer = setTimeout(() => { void bootstrapSession().catch(handleBootstrapError); }, 500);
+        timer = setTimeout(() => {
+          void bootstrapSession().catch(handleBootstrapError);
+        }, 500);
       }
-      if (activeSessionIdRef.current || selectionRequest !== messageRequestRef.current) { setSessionBootstrapComplete(true); return; }
+      if (activeSessionIdRef.current || selectionRequest !== messageRequestRef.current) {
+        setSessionBootstrapComplete(true);
+        return;
+      }
       if (page.indexing) return;
 
-      const hiddenWorkspaceIds = new Set(registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.id));
-      const hiddenWorkspacePaths = new Set(registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path));
-      const existing = listedSessions.find((session) =>
-        !isOrphanSession(session, registry?.items ?? []) &&
-        !hiddenWorkspaceIds.has(session.workspaceId ?? "") &&
-        !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
+      const hiddenWorkspaceIds = new Set(
+        registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.id),
+      );
+      const hiddenWorkspacePaths = new Set(
+        registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path),
+      );
+      const existing = listedSessions.find(
+        (session) =>
+          !isOrphanSession(session, registry?.items ?? []) &&
+          !hiddenWorkspaceIds.has(session.workspaceId ?? "") &&
+          !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
       );
       if (existing) {
         setActiveSessionId(existing.id);
@@ -738,10 +995,10 @@ export function App() {
         setSelectedWorkspaceRoot(
           normalizeWorkspaceRoot(
             restored?.meta.worktree?.sourceWorkspaceRoot ??
-            restored?.meta.workspaceRoot ??
-            existing.worktree?.sourceWorkspaceRoot ??
-            existing.workspaceRoot ??
-            bootstrapWorkspaceRoot,
+              restored?.meta.workspaceRoot ??
+              existing.worktree?.sourceWorkspaceRoot ??
+              existing.workspaceRoot ??
+              bootstrapWorkspaceRoot,
           ),
         );
         setSessionBootstrapComplete(true);
@@ -755,29 +1012,48 @@ export function App() {
 
     function handleBootstrapError(error: unknown) {
       if (disposed) return;
-      setListLoading(false); setListError(sessionReadError(error, '会话列表加载失败'));
+      setListLoading(false);
+      setListError(sessionReadError(error, "会话列表加载失败"));
       setSessionBootstrapComplete(true);
     }
     void bootstrapSession().catch(handleBootstrapError);
-    return () => { disposed = true; if (timer) clearTimeout(timer); };
+    return () => {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [listRetry, readSessionPage, setActiveSessionId]);
 
   // 流式事件归并进 live run（规则在 live-run-store.ts）；steer 的正文取自任务队列缓存。
-  const handleStreamEvent = useCallback((event: StreamEvent) => liveRuns.applyStreamEvent(event, (sessionId, messageId) => {
-    const item = taskQueue.takeSteer(messageId);
-    updateMessageQueue(sessionId, (queue) => takeSteering(queue, messageId).queue);
-    return item;
-  }), [liveRuns, taskQueue, updateMessageQueue]);
+  const handleStreamEvent = useCallback(
+    (event: StreamEvent) =>
+      liveRuns.applyStreamEvent(event, (sessionId, messageId) => {
+        const item = taskQueue.takeSteer(messageId);
+        updateMessageQueue(sessionId, (queue) => takeSteering(queue, messageId).queue);
+        return item;
+      }),
+    [liveRuns, taskQueue, updateMessageQueue],
+  );
 
   useEffect(() => {
     return eventsApi.agentStream((event) => {
       if (event.type === "agent_run_started" && liveRuns.isTerminal(event.agentRunId)) return;
-      if (event.type === "agent_run_finished" || event.type === "agent_run_aborted" || event.type === "agent_run_failed") {
+      if (
+        event.type === "agent_run_finished" ||
+        event.type === "agent_run_aborted" ||
+        event.type === "agent_run_failed"
+      ) {
         liveRuns.markTerminal(event.agentRunId);
       }
       let run = liveRuns.get(event.sessionId);
       if (event.type === "agent_run_started" && (event.recoveredReset || !run || run.agentRunId !== event.agentRunId)) {
-        run = { sessionId: event.sessionId, agentRunId: event.agentRunId, recovered: event.recoveredReset === true, state: createEmptyStreamingState(), userBlock: null, aborting: false };
+        run = {
+          sessionId: event.sessionId,
+          agentRunId: event.agentRunId,
+          recovered: event.recoveredReset === true,
+          state: createEmptyStreamingState(),
+          userBlock: null,
+          aborting: false,
+        };
         liveRuns.start(run);
         void readSessionPage(event.sessionId);
       }
@@ -787,11 +1063,16 @@ export function App() {
         if (!event.parentSessionId) void refreshTaskQueue(event.sessionId);
       }
       if (run && run.agentRunId !== event.agentRunId) return;
-      if ((event.type === "tool_approval_required" || event.type === "tool_approval_resolved") &&
-        run?.agentRunId === event.agentRunId && run.state.activeTools.get(event.toolCallId)?.terminalStatus) return;
+      if (
+        (event.type === "tool_approval_required" || event.type === "tool_approval_resolved") &&
+        run?.agentRunId === event.agentRunId &&
+        run.state.activeTools.get(event.toolCallId)?.terminalStatus
+      )
+        return;
       if (event.type === "tool_approval_required") {
         setApprovalPendingForSession(event.sessionId, true);
-        if (!run || (run.recovered && !run.state.activeTools.has(event.toolCallId))) void refreshPendingApprovalStatuses([event.sessionId]);
+        if (!run || (run.recovered && !run.state.activeTools.has(event.toolCallId)))
+          void refreshPendingApprovalStatuses([event.sessionId]);
       } else if (
         event.type === "tool_approval_resolved" ||
         event.type === "agent_run_aborted" ||
@@ -806,239 +1087,413 @@ export function App() {
       if (event.type === "agent_run_finished" || event.type === "agent_run_aborted") {
         setFailedForSession(event.sessionId, false);
         // 不在当前会话时跑完的一轮记成未读，侧栏显示绿点，打开会话时清掉。
-        if (event.type === "agent_run_finished" && activeSessionIdRef.current !== event.sessionId) setLocalFlag(event.sessionId, "unread", true);
+        if (event.type === "agent_run_finished" && activeSessionIdRef.current !== event.sessionId)
+          setLocalFlag(event.sessionId, "unread", true);
       } else if (event.type === "agent_run_failed") {
         setFailedForSession(event.sessionId, true);
       }
 
       handleStreamEvent(event);
       // Live 压缩块随 run 释放；失败提示由会话本地状态接续，成功或再次开始压缩时清除。
-      if (run && run.agentRunId === event.agentRunId && !liveRuns.isTerminal(event.agentRunId) &&
-        (event.type === "context_compaction_failed" || event.type === "context_compaction_finished" || event.type === "context_compaction_started")) {
+      if (
+        run &&
+        run.agentRunId === event.agentRunId &&
+        !liveRuns.isTerminal(event.agentRunId) &&
+        (event.type === "context_compaction_failed" ||
+          event.type === "context_compaction_finished" ||
+          event.type === "context_compaction_started")
+      ) {
         const block = run.state.activeCompactions.get(event.agentRunId);
         setCompactionFailureForSession(event.sessionId, block?.status === "failed" ? block : null);
       }
-      if (run && (event.type === "agent_run_finished" || event.type === "agent_run_aborted" || event.type === "agent_run_failed")) {
+      if (
+        run &&
+        (event.type === "agent_run_finished" || event.type === "agent_run_aborted" || event.type === "agent_run_failed")
+      ) {
         // Host events settle every run; no renderer-owned execution promise.
         void readSidebarSessions().then(setSessions).catch(console.error);
         void readSessionPage(event.sessionId).finally(() => {
           if (!liveRuns.end(event.sessionId, run)) return;
           if (activeSessionIdRef.current === event.sessionId) void refreshReviewSummary();
           if (event.parentSessionId) return;
-          void continueQueueRef.current(event.sessionId, event.type === "agent_run_finished" ? "completed" : event.type === "agent_run_aborted" ? "aborted" : "failed");
+          void continueQueueRef.current(
+            event.sessionId,
+            event.type === "agent_run_finished"
+              ? "completed"
+              : event.type === "agent_run_aborted"
+                ? "aborted"
+                : "failed",
+          );
         });
       }
     });
-  }, [liveRuns, handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshReviewSummary, localStore, patchLocal, setLocalFlag, setCompactionFailureForSession, readSidebarSessions, refreshTaskQueue]);
+  }, [
+    liveRuns,
+    handleStreamEvent,
+    refreshPendingApprovalStatuses,
+    setApprovalPendingForSession,
+    setFailedForSession,
+    readSessionPage,
+    refreshReviewSummary,
+    localStore,
+    patchLocal,
+    setLocalFlag,
+    setCompactionFailureForSession,
+    readSidebarSessions,
+    refreshTaskQueue,
+  ]);
 
-  const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
-    const selectionRequest = messageRequestRef.current;
-    try {
-      const projection = await sessionsApi.create({
-        ...(input.hostId ? { hostId: input.hostId } : {}),
-        ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
-        ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
-        ...(input.agentForm ? { agentForm: input.agentForm } : {}),
-        ...(input.runLocation ? { runLocation: input.runLocation } : {}),
-        ...(input.branch ? { branch: input.branch } : {}),
-      });
-      sessionStore.applyEnvelope(projection);
-      const created = projectChatWindow(projection);
-      if (selectionRequest === messageRequestRef.current) {
-        setActiveSessionId(created.meta.id);
-        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.worktree?.sourceWorkspaceRoot ?? created.meta.workspaceRoot ?? fallbackWorkspaceRoot));
+  const createSessionForInput = useCallback(
+    async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
+      const selectionRequest = messageRequestRef.current;
+      try {
+        const projection = await sessionsApi.create({
+          ...(input.hostId ? { hostId: input.hostId } : {}),
+          ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+          ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
+          ...(input.agentForm ? { agentForm: input.agentForm } : {}),
+          ...(input.runLocation ? { runLocation: input.runLocation } : {}),
+          ...(input.branch ? { branch: input.branch } : {}),
+        });
+        sessionStore.applyEnvelope(projection);
+        const created = projectChatWindow(projection);
+        if (selectionRequest === messageRequestRef.current) {
+          setActiveSessionId(created.meta.id);
+          setSelectedWorkspaceRoot(
+            normalizeWorkspaceRoot(
+              created.meta.worktree?.sourceWorkspaceRoot ?? created.meta.workspaceRoot ?? fallbackWorkspaceRoot,
+            ),
+          );
+        }
+        // A cold catalog is optional navigation data, not a dependency of the
+        // first task in the newly created durable Session.
+        void readSidebarSessions().then(setSessions).catch(console.error);
+        void refreshWorkspaces().catch(console.error);
+        return created;
+      } catch (error) {
+        console.error("Failed to create session", error);
+        if (input.runLocation) throw error;
+        return null;
       }
-      // A cold catalog is optional navigation data, not a dependency of the
-      // first task in the newly created durable Session.
-      void readSidebarSessions().then(setSessions).catch(console.error);
-      void refreshWorkspaces().catch(console.error);
-      return created;
-    } catch (error) {
-      console.error("Failed to create session", error);
-      if (input.runLocation) throw error;
-      return null;
-    }
-  }, [fallbackWorkspaceRoot, refreshWorkspaces, readSidebarSessions, sessionStore, setActiveSessionId]);
+    },
+    [fallbackWorkspaceRoot, refreshWorkspaces, readSidebarSessions, sessionStore, setActiveSessionId],
+  );
 
   /** 首次发送保留结果兼容接口；执行与后续队列均由 Host 调度。 */
-  const continueQueue = useCallback(async (sessionId: string, _outcome: SessionRunOutcome) => { await refreshTaskQueue(sessionId); }, [refreshTaskQueue]);
+  const continueQueue = useCallback(
+    async (sessionId: string, _outcome: SessionRunOutcome) => {
+      await refreshTaskQueue(sessionId);
+    },
+    [refreshTaskQueue],
+  );
   continueQueueRef.current = continueQueue;
-  const handleSteerQueued = useCallback((id: string) => {
-    const sessionId = activeSessionIdRef.current;
-    const snapshot = sessionId ? taskQueue.snapshot(sessionId) : undefined;
-    const runId = snapshot?.runs.find(run => run.state === "running")?.runId;
-    if (!sessionId || !snapshot || !runId) return;
-    const item = localStore.get(sessionId).messageQueue.items.find(item => item.id === id);
-    if (item) taskQueue.rememberSteer(sessionId, id, item);
-    void taskCommand({ op: "designate", sessionId, taskId: id, runId, revision: snapshot.revision }).catch(reportSessionFailure(sessionId, QUEUE_COMMAND_FAILED));
-  }, [taskCommand, taskQueue, localStore, reportSessionFailure]);
-  const handleUnsteerQueued = useCallback(async (id: string) => {
-    const sessionId = activeSessionIdRef.current;
-    const snapshot = sessionId ? taskQueue.snapshot(sessionId) : undefined;
-    if (sessionId && snapshot) await taskCommand({ op: "designate", sessionId, taskId: id, runId: null, revision: snapshot.revision });
-  }, [taskCommand, taskQueue]);
+  const handleSteerQueued = useCallback(
+    (id: string) => {
+      const sessionId = activeSessionIdRef.current;
+      const snapshot = sessionId ? taskQueue.snapshot(sessionId) : undefined;
+      const runId = snapshot?.runs.find((run) => run.state === "running")?.runId;
+      if (!sessionId || !snapshot || !runId) return;
+      const item = localStore.get(sessionId).messageQueue.items.find((item) => item.id === id);
+      if (item) taskQueue.rememberSteer(sessionId, id, item);
+      void taskCommand({ op: "designate", sessionId, taskId: id, runId, revision: snapshot.revision }).catch(
+        reportSessionFailure(sessionId, QUEUE_COMMAND_FAILED),
+      );
+    },
+    [taskCommand, taskQueue, localStore, reportSessionFailure],
+  );
+  const handleUnsteerQueued = useCallback(
+    async (id: string) => {
+      const sessionId = activeSessionIdRef.current;
+      const snapshot = sessionId ? taskQueue.snapshot(sessionId) : undefined;
+      if (sessionId && snapshot)
+        await taskCommand({ op: "designate", sessionId, taskId: id, runId: null, revision: snapshot.revision });
+    },
+    [taskCommand, taskQueue],
+  );
   const handleResumeQueue = useCallback(() => {
     const sessionId = activeSessionIdRef.current;
     const snapshot = sessionId ? taskQueue.snapshot(sessionId) : undefined;
-    if (sessionId && snapshot) void taskCommand({ op: "resume", sessionId, revision: snapshot.revision }).catch(reportSessionFailure(sessionId, QUEUE_COMMAND_FAILED));
+    if (sessionId && snapshot)
+      void taskCommand({ op: "resume", sessionId, revision: snapshot.revision }).catch(
+        reportSessionFailure(sessionId, QUEUE_COMMAND_FAILED),
+      );
   }, [taskCommand, taskQueue, reportSessionFailure]);
-  const handleEditQueued = useCallback(async (id: string) => {
-    const sessionId = activeSessionIdRef.current;
-    const snapshot = sessionId ? taskQueue.snapshot(sessionId) : undefined;
-    const item = sessionId ? localStore.get(sessionId).messageQueue.items.find(item => item.id === id) : undefined;
-    if (!sessionId || !snapshot || !item) return;
-    const attachments = await Promise.all((item.options.attachments ?? []).map(async attachment => {
-      if (attachment.kind !== "image" || !attachment.remoteArtifact) return attachment;
-      try {
-        const preview = await sessionsApi.readArtifact({ sessionId, artifactPath: attachment.remoteArtifact.artifactId });
-        return { ...attachment, previewUrl: preview.dataUrl };
-      } catch { return attachment; } // Preview failure must not discard the durable attachment.
-    }));
-    if (!await taskCommand({ op: "cancel", sessionId, taskId: id, revision: snapshot.revision })) return;
-    const draft = { id: Date.now(), sessionId, text: item.text, ...item.options, attachments };
-    patchLocal(sessionId, { draft });
-  }, [taskCommand, taskQueue, localStore, patchLocal]);
+  const handleEditQueued = useCallback(
+    async (id: string) => {
+      const sessionId = activeSessionIdRef.current;
+      const snapshot = sessionId ? taskQueue.snapshot(sessionId) : undefined;
+      const item = sessionId ? localStore.get(sessionId).messageQueue.items.find((item) => item.id === id) : undefined;
+      if (!sessionId || !snapshot || !item) return;
+      const attachments = await Promise.all(
+        (item.options.attachments ?? []).map(async (attachment) => {
+          if (attachment.kind !== "image" || !attachment.remoteArtifact) return attachment;
+          try {
+            const preview = await sessionsApi.readArtifact({
+              sessionId,
+              artifactPath: attachment.remoteArtifact.artifactId,
+            });
+            return { ...attachment, previewUrl: preview.dataUrl };
+          } catch {
+            return attachment;
+          } // Preview failure must not discard the durable attachment.
+        }),
+      );
+      if (!(await taskCommand({ op: "cancel", sessionId, taskId: id, revision: snapshot.revision }))) return;
+      const draft = { id: Date.now(), sessionId, text: item.text, ...item.options, attachments };
+      patchLocal(sessionId, { draft });
+    },
+    [taskCommand, taskQueue, localStore, patchLocal],
+  );
 
   // 15 T12：建会话、configure、提交和 pending 记录在 session gateway 里。
-  const sessionGateway = useMemo(() => createSessionGateway({
-    createSession: createSessionForInput,
-    setPlanMode: (sessionId, expectedRevision) => sessionsApi.setAgentMode({ sessionId, mode: "plan", expectedRevision }),
-    recordRemoteSession: (sessionId, prefs) => remoteSessionPrefs.set(sessionId, prefs),
-    configure: async (sessionId, configuration) => Boolean(await taskCommand({ sessionId, op: "configure", configuration })),
-    submit: (input) => tasksApi.submit(input),
-    pending: { read: readPendingSubmission, write: writePendingSubmission, clear: clearPendingSubmission },
-    rememberOptions: (sessionId, submissionId, options, agentRunId) => taskQueue.rememberOptions(sessionId, submissionId, options, agentRunId),
-    forgetOptions: (submissionId) => taskQueue.forgetOptions(submissionId),
-    notice: (sessionId, text) => setComposerNotice({ sessionId, text }),
-    restoreDraft: (sessionId, draft) => patchLocal(sessionId, { draft }),
-    newSubmissionId: () => crypto.randomUUID(),
-    now: Date.now,
-  }), [createSessionForInput, taskCommand, taskQueue, patchLocal]);
+  const sessionGateway = useMemo(
+    () =>
+      createSessionGateway({
+        createSession: createSessionForInput,
+        setPlanMode: (sessionId, expectedRevision) =>
+          sessionsApi.setAgentMode({ sessionId, mode: "plan", expectedRevision }),
+        recordRemoteSession: (sessionId, prefs) => remoteSessionPrefs.set(sessionId, prefs),
+        configure: async (sessionId, configuration) =>
+          Boolean(await taskCommand({ sessionId, op: "configure", configuration })),
+        submit: (input) => tasksApi.submit(input),
+        pending: { read: readPendingSubmission, write: writePendingSubmission, clear: clearPendingSubmission },
+        rememberOptions: (sessionId, submissionId, options, agentRunId) =>
+          taskQueue.rememberOptions(sessionId, submissionId, options, agentRunId),
+        forgetOptions: (submissionId) => taskQueue.forgetOptions(submissionId),
+        notice: (sessionId, text) => setComposerNotice({ sessionId, text }),
+        restoreDraft: (sessionId, draft) => patchLocal(sessionId, { draft }),
+        newSubmissionId: () => crypto.randomUUID(),
+        now: Date.now,
+      }),
+    [createSessionForInput, taskCommand, taskQueue, patchLocal],
+  );
 
   /**
    * 乐观 run（agent-edit-resend-rewind.md §5.2、§5.5）：提交前就用申请的 run id 把用户消息挂进消息流，
    * Host 用同一个 id 开始这条任务，`agent_run_started` 对上它，消息原地继续。返回卸下它的函数（已被替换时什么也不做）。
    */
-  const startOptimisticRun = useCallback((sessionId: string, agentRunId: string, text: string, options: ComposerSendOptions) => {
-    const state = createEmptyStreamingState();
-    state.waitingForModel = true;
-    const run: SessionRunState = { sessionId, agentRunId, state, aborting: false,
-      userBlock: { kind: "user", id: `turn:${agentRunId}:user:0`, runId: agentRunId, content: text, createdAt: new Date().toISOString(),
-        attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } };
-    liveRuns.start(run);
-    return () => { liveRuns.end(sessionId, run); };
-  }, [liveRuns]);
+  const startOptimisticRun = useCallback(
+    (sessionId: string, agentRunId: string, text: string, options: ComposerSendOptions) => {
+      const state = createEmptyStreamingState();
+      state.waitingForModel = true;
+      const run: SessionRunState = {
+        sessionId,
+        agentRunId,
+        state,
+        aborting: false,
+        userBlock: {
+          kind: "user",
+          id: `turn:${agentRunId}:user:0`,
+          runId: agentRunId,
+          content: text,
+          createdAt: new Date().toISOString(),
+          attachments: options.attachments,
+          fileReferences: options.fileReferences,
+          responseAnnotations: options.responseAnnotations,
+        },
+      };
+      liveRuns.start(run);
+      return () => {
+        liveRuns.end(sessionId, run);
+      };
+    },
+    [liveRuns],
+  );
 
   // 向一个已存在的会话提交（主会话和右栏的侧边对话共用）：pending 记录、configure、提交和队列刷新。
-  const sendToSession = useCallback(async (
-    sessionId: string,
-    text: string,
-    options: ComposerSendOptions,
-    resumeAfterAcceptance = false,
-  ) => {
-    patchLocal(sessionId, { lastSendOptions: options });
-    setFailedForSession(sessionId, false);
-    setCompactionFailureForSession(sessionId, null);
-    let result: import("@actspace/shared/runtime-v2").TaskSubmissionResult;
-    const inFlight = sendsInFlightRef.current;
-    // 空闲（没有 run、队列为空、没暂停、没有别的发送在途）时这条消息马上开始：直接显示在消息流里，不进托盘。
-    // /compact 是独立操作，不开 Agent run。
-    const queued = taskQueue.snapshot(sessionId);
-    const idle = !liveRuns.has(sessionId) && !inFlight.get(sessionId) && !taskOperation(text) &&
-      !queued?.paused && !(queued?.tasks.some(task => task.state === "pending" || task.state === "claimed"));
-    const agentRunId = idle ? crypto.randomUUID() : undefined;
-    const endOptimistic = agentRunId ? startOptimisticRun(sessionId, agentRunId, text, options) : undefined;
-    inFlight.set(sessionId, (inFlight.get(sessionId) ?? 0) + 1);
-    try {
-      result = await sessionGateway.submit(sessionId, text, options, !isLocalSession(sessionId) ? targetChoices.modelId : options.model, agentRunId ? { agentRunId } : undefined);
-    } catch (error) {
-      endOptimistic?.();
-      throw error;
-    } finally {
-      const remaining = (inFlight.get(sessionId) ?? 1) - 1;
-      if (remaining > 0) inFlight.set(sessionId, remaining); else inFlight.delete(sessionId);
-    }
-    patchLocal(sessionId, { draft: undefined });
-    if (activeSessionIdRef.current === sessionId) setSendScrollRequestId(value => value + 1);
-    // Receipt already proves acceptance; a failed refresh must not restore a sent draft.
-    await refreshTaskQueue(sessionId).catch(reportSessionFailure(sessionId, QUEUE_REFRESH_FAILED));
-    const snapshot = taskQueue.snapshot(sessionId);
-    const acceptedTaskId = "task" in result ? result.task.taskId : null;
-    if (resumeAfterAcceptance && snapshot?.paused && snapshot.tasks.some(task => task.taskId === acceptedTaskId && task.state === "pending")) {
-      await taskCommand({ op: "resume", sessionId, revision: snapshot.revision });
-    }
-  }, [sessionGateway, targetChoices, setFailedForSession, setCompactionFailureForSession, taskCommand, taskQueue, refreshTaskQueue, reportSessionFailure, patchLocal, liveRuns, startOptimisticRun]);
+  const sendToSession = useCallback(
+    async (sessionId: string, text: string, options: ComposerSendOptions, resumeAfterAcceptance = false) => {
+      patchLocal(sessionId, { lastSendOptions: options });
+      setFailedForSession(sessionId, false);
+      setCompactionFailureForSession(sessionId, null);
+      let result: import("@actspace/shared/runtime-v2").TaskSubmissionResult;
+      const inFlight = sendsInFlightRef.current;
+      // 空闲（没有 run、队列为空、没暂停、没有别的发送在途）时这条消息马上开始：直接显示在消息流里，不进托盘。
+      // /compact 是独立操作，不开 Agent run。
+      const queued = taskQueue.snapshot(sessionId);
+      const idle =
+        !liveRuns.has(sessionId) &&
+        !inFlight.get(sessionId) &&
+        !taskOperation(text) &&
+        !queued?.paused &&
+        !queued?.tasks.some((task) => task.state === "pending" || task.state === "claimed");
+      const agentRunId = idle ? crypto.randomUUID() : undefined;
+      const endOptimistic = agentRunId ? startOptimisticRun(sessionId, agentRunId, text, options) : undefined;
+      inFlight.set(sessionId, (inFlight.get(sessionId) ?? 0) + 1);
+      try {
+        result = await sessionGateway.submit(
+          sessionId,
+          text,
+          options,
+          !isLocalSession(sessionId) ? targetChoices.modelId : options.model,
+          agentRunId ? { agentRunId } : undefined,
+        );
+      } catch (error) {
+        endOptimistic?.();
+        throw error;
+      } finally {
+        const remaining = (inFlight.get(sessionId) ?? 1) - 1;
+        if (remaining > 0) inFlight.set(sessionId, remaining);
+        else inFlight.delete(sessionId);
+      }
+      patchLocal(sessionId, { draft: undefined });
+      if (activeSessionIdRef.current === sessionId) setSendScrollRequestId((value) => value + 1);
+      // Receipt already proves acceptance; a failed refresh must not restore a sent draft.
+      await refreshTaskQueue(sessionId).catch(reportSessionFailure(sessionId, QUEUE_REFRESH_FAILED));
+      const snapshot = taskQueue.snapshot(sessionId);
+      const acceptedTaskId = "task" in result ? result.task.taskId : null;
+      if (
+        resumeAfterAcceptance &&
+        snapshot?.paused &&
+        snapshot.tasks.some((task) => task.taskId === acceptedTaskId && task.state === "pending")
+      ) {
+        await taskCommand({ op: "resume", sessionId, revision: snapshot.revision });
+      }
+    },
+    [
+      sessionGateway,
+      targetChoices,
+      setFailedForSession,
+      setCompactionFailureForSession,
+      taskCommand,
+      taskQueue,
+      refreshTaskQueue,
+      reportSessionFailure,
+      patchLocal,
+      liveRuns,
+      startOptimisticRun,
+    ],
+  );
 
   /**
    * 编辑提问重发（agent-edit-resend-rewind.md §5.2）：被编辑轮及之后先从消息流拿掉，新提问作为乐观 run 显示在原位置，
    * 再带 `rewind` 提交。成功后会话整体重载；失败时卸下乐观 run、恢复原来的消息流，错误抛给编辑器（它会重新打开）。
    */
-  const resendTurn = useCallback(async (edit: TurnResend) => {
-    const { sessionId, runId, fromSeq, text, options } = edit;
-    const refuse = (message: string) => {
-      setComposerNotice({ sessionId, text: message });
-      return new Error(message);
-    };
-    const expectedThroughSeq = sessionStore.peek(sessionId)?.snapshot?.throughJournalSeq;
-    if (expectedThroughSeq === undefined) throw refuse(REWIND_ERROR_MESSAGES.REWIND_CONFLICT);
-    if (liveRuns.has(sessionId) || sendsInFlightRef.current.get(sessionId)) throw refuse(REWIND_ERROR_MESSAGES.SESSION_BUSY);
-    patchLocal(sessionId, { lastSendOptions: options, rewinding: { fromSeq } });
-    setFailedForSession(sessionId, false);
-    setCompactionFailureForSession(sessionId, null);
-    const agentRunId = crypto.randomUUID();
-    const endOptimistic = startOptimisticRun(sessionId, agentRunId, text, options);
-    const inFlight = sendsInFlightRef.current;
-    inFlight.set(sessionId, (inFlight.get(sessionId) ?? 0) + 1);
-    try {
-      await sessionGateway.submit(sessionId, text, options, !isLocalSession(sessionId) ? targetChoices.modelId : options.model, { agentRunId, rewind: { runId, expectedThroughSeq } });
-    } catch (error) {
-      endOptimistic();
-      patchLocal(sessionId, { rewinding: undefined });
-      throw refuse(error instanceof Error ? error.message : String(error));
-    } finally {
-      const remaining = (inFlight.get(sessionId) ?? 1) - 1;
-      if (remaining > 0) inFlight.set(sessionId, remaining); else inFlight.delete(sessionId);
-    }
-    // 实时事件可能晚到或丢失：发起回退的窗口自己重载一次（重复的重载由 store 的整体替换标记合并）。
-    handleSessionRewound(sessionId);
-    if (activeSessionIdRef.current === sessionId) setSendScrollRequestId(value => value + 1);
-  }, [sessionStore, liveRuns, patchLocal, setFailedForSession, setCompactionFailureForSession, startOptimisticRun, sessionGateway, targetChoices, handleSessionRewound]);
+  const resendTurn = useCallback(
+    async (edit: TurnResend) => {
+      const { sessionId, runId, fromSeq, text, options } = edit;
+      const refuse = (message: string) => {
+        setComposerNotice({ sessionId, text: message });
+        return new Error(message);
+      };
+      const expectedThroughSeq = sessionStore.peek(sessionId)?.snapshot?.throughJournalSeq;
+      if (expectedThroughSeq === undefined) throw refuse(REWIND_ERROR_MESSAGES.REWIND_CONFLICT);
+      if (liveRuns.has(sessionId) || sendsInFlightRef.current.get(sessionId))
+        throw refuse(REWIND_ERROR_MESSAGES.SESSION_BUSY);
+      patchLocal(sessionId, { lastSendOptions: options, rewinding: { fromSeq } });
+      setFailedForSession(sessionId, false);
+      setCompactionFailureForSession(sessionId, null);
+      const agentRunId = crypto.randomUUID();
+      const endOptimistic = startOptimisticRun(sessionId, agentRunId, text, options);
+      const inFlight = sendsInFlightRef.current;
+      inFlight.set(sessionId, (inFlight.get(sessionId) ?? 0) + 1);
+      try {
+        await sessionGateway.submit(
+          sessionId,
+          text,
+          options,
+          !isLocalSession(sessionId) ? targetChoices.modelId : options.model,
+          { agentRunId, rewind: { runId, expectedThroughSeq } },
+        );
+      } catch (error) {
+        endOptimistic();
+        patchLocal(sessionId, { rewinding: undefined });
+        throw refuse(error instanceof Error ? error.message : String(error));
+      } finally {
+        const remaining = (inFlight.get(sessionId) ?? 1) - 1;
+        if (remaining > 0) inFlight.set(sessionId, remaining);
+        else inFlight.delete(sessionId);
+      }
+      // 实时事件可能晚到或丢失：发起回退的窗口自己重载一次（重复的重载由 store 的整体替换标记合并）。
+      handleSessionRewound(sessionId);
+      if (activeSessionIdRef.current === sessionId) setSendScrollRequestId((value) => value + 1);
+    },
+    [
+      sessionStore,
+      liveRuns,
+      patchLocal,
+      setFailedForSession,
+      setCompactionFailureForSession,
+      startOptimisticRun,
+      sessionGateway,
+      targetChoices,
+      handleSessionRewound,
+    ],
+  );
 
-  const handleSend = useCallback(async (
-    text: string,
-    options: ComposerSendOptions,
-    resumeAfterAcceptance = false,
-  ) => {
-    if (!text.trim() && !options.attachments?.length && !options.fileReferences?.length && !options.responseAnnotations?.length) return;
-    const visibleSessionId = await sessionGateway.ensureSession(activeSessionIdRef.current, {
-      target: runTarget.target, readiness: runTarget.readiness,
-      remoteWorkspaceId: runTarget.target.kind === "remote" ? runTarget.target.workspaceId : undefined, remoteModelId: targetChoices.modelId, localWorkspaceRoot: selectedWorkspaceRoot,
-      runLocation, branch: selectedBranch ?? undefined,
-    }, options);
-    const sessionId = visibleSessionId;
-    patchLocal(sessionId, { composer: { mode: options.mode, selectedSkills: options.selectedSkills } });
-    // Keep workspace changes on the idle Session boundary before task admission.
-    if (sessionRecord?.meta.id === sessionId && isLocalSession(sessionId) && !liveRuns.has(sessionId) && !sessionRecord.meta.worktree && selectedWorkspaceRoot &&
-        selectedWorkspaceRoot !== normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? fallbackWorkspaceRoot)) {
-      const result = await sessionsApi.setWorkspace({ sessionId, workspaceRoot: selectedWorkspaceRoot });
-      if (!result.ok) throw new Error(result.error ?? "无法更新会话工作区");
-    }
-    await sendToSession(visibleSessionId, text, options, resumeAfterAcceptance);
-  }, [sessionGateway, runTarget, targetChoices, sessionRecord, selectedWorkspaceRoot, runLocation, selectedBranch, fallbackWorkspaceRoot, liveRuns, patchLocal, sendToSession]);
+  const handleSend = useCallback(
+    async (text: string, options: ComposerSendOptions, resumeAfterAcceptance = false) => {
+      if (
+        !text.trim() &&
+        !options.attachments?.length &&
+        !options.fileReferences?.length &&
+        !options.responseAnnotations?.length
+      )
+        return;
+      const visibleSessionId = await sessionGateway.ensureSession(
+        activeSessionIdRef.current,
+        {
+          target: runTarget.target,
+          readiness: runTarget.readiness,
+          remoteWorkspaceId: runTarget.target.kind === "remote" ? runTarget.target.workspaceId : undefined,
+          remoteModelId: targetChoices.modelId,
+          localWorkspaceRoot: selectedWorkspaceRoot,
+          runLocation,
+          branch: selectedBranch ?? undefined,
+        },
+        options,
+      );
+      const sessionId = visibleSessionId;
+      patchLocal(sessionId, { composer: { mode: options.mode, selectedSkills: options.selectedSkills } });
+      // Keep workspace changes on the idle Session boundary before task admission.
+      if (
+        sessionRecord?.meta.id === sessionId &&
+        isLocalSession(sessionId) &&
+        !liveRuns.has(sessionId) &&
+        !sessionRecord.meta.worktree &&
+        selectedWorkspaceRoot &&
+        selectedWorkspaceRoot !== normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? fallbackWorkspaceRoot)
+      ) {
+        const result = await sessionsApi.setWorkspace({ sessionId, workspaceRoot: selectedWorkspaceRoot });
+        if (!result.ok) throw new Error(result.error ?? "无法更新会话工作区");
+      }
+      await sendToSession(visibleSessionId, text, options, resumeAfterAcceptance);
+    },
+    [
+      sessionGateway,
+      runTarget,
+      targetChoices,
+      sessionRecord,
+      selectedWorkspaceRoot,
+      runLocation,
+      selectedBranch,
+      fallbackWorkspaceRoot,
+      liveRuns,
+      patchLocal,
+      sendToSession,
+    ],
+  );
 
   useEffect(() => {
-    return hostDirectory.onHostsChanged(hosts => {
+    return hostDirectory.onHostsChanged((hosts) => {
       const id = activeSessionIdRef.current;
       // Host 断线期间的审批 / 队列事件收不到：重连后让它的后台会话在下一次列表刷新时重新补齐。
-      const connected = new Set(hosts.filter(host => host.state === "connected").map(host => host.hostId));
+      const connected = new Set(hosts.filter((host) => host.state === "connected").map((host) => host.hostId));
       for (const hostId of connected) {
         if (connectedHostIdsRef.current.has(hostId)) continue;
-        for (const item of sidebarSessionsRef.current) if (item.hostId === hostId && item.id !== id) hydratedSessionIdsRef.current.delete(item.id);
+        for (const item of sidebarSessionsRef.current)
+          if (item.hostId === hostId && item.id !== id) hydratedSessionIdsRef.current.delete(item.id);
       }
       connectedHostIdsRef.current = connected;
       const location = locateSession(id);
-      if (id && location.kind === "remote" && hosts.some(host => host.hostId === location.hostId && host.state === "connected")) {
-        void readSessionPage(id); void refreshTaskQueue(id); void refreshPendingApprovalStatuses([id]);
+      if (
+        id &&
+        location.kind === "remote" &&
+        hosts.some((host) => host.hostId === location.hostId && host.state === "connected")
+      ) {
+        void readSessionPage(id);
+        void refreshTaskQueue(id);
+        void refreshPendingApprovalStatuses([id]);
       }
     });
   }, [readSessionPage, refreshTaskQueue, refreshPendingApprovalStatuses]);
@@ -1053,61 +1508,80 @@ export function App() {
       selectedSkills: composerState?.selectedSkills ?? [],
       thinkingEnabled: false,
     };
-    void handleSend("/compact", { ...options, attachments: undefined, fileReferences: undefined, responseAnnotations: undefined }, true).catch(error => {
+    void handleSend(
+      "/compact",
+      { ...options, attachments: undefined, fileReferences: undefined, responseAnnotations: undefined },
+      true,
+    ).catch((error) => {
       setComposerNotice({ sessionId, text: error instanceof Error ? error.message : "重试未完成，请检查队列状态。" });
     });
   }, [localStore, handleSend, selectedChatModelId]);
 
-  const abortSession = useCallback(async (sessionId: string) => {
-    const run = liveRuns.get(sessionId);
-    if (!run) return;
-    // 乐观 run 还没开始（§5.5）：停止就是取消这条待执行任务；快照里任务结束后乐观 run 随之卸下。
-    const snapshot = taskQueue.snapshot(sessionId);
-    const pending = snapshot?.tasks.find(task => task.state === "pending" && taskQueue.requestedRun(task.submissionId) === run.agentRunId);
-    if (snapshot && pending && !snapshot.runs.some(item => item.runId === run.agentRunId)) {
-      run.aborting = true;
-      liveRuns.refresh(sessionId);
-      if (!await taskCommand({ op: "cancel", sessionId, taskId: pending.taskId, revision: snapshot.revision }).catch(() => false)) {
+  const abortSession = useCallback(
+    async (sessionId: string) => {
+      const run = liveRuns.get(sessionId);
+      if (!run) return;
+      // 乐观 run 还没开始（§5.5）：停止就是取消这条待执行任务；快照里任务结束后乐观 run 随之卸下。
+      const snapshot = taskQueue.snapshot(sessionId);
+      const pending = snapshot?.tasks.find(
+        (task) => task.state === "pending" && taskQueue.requestedRun(task.submissionId) === run.agentRunId,
+      );
+      if (snapshot && pending && !snapshot.runs.some((item) => item.runId === run.agentRunId)) {
+        run.aborting = true;
+        liveRuns.refresh(sessionId);
+        if (
+          !(await taskCommand({ op: "cancel", sessionId, taskId: pending.taskId, revision: snapshot.revision }).catch(
+            () => false,
+          ))
+        ) {
+          run.aborting = false;
+          liveRuns.refresh(sessionId);
+        }
+        return;
+      }
+
+      const input: AbortAgentRunInput = {
+        sessionId,
+        agentRunId: run.agentRunId,
+      };
+
+      try {
+        run.aborting = true;
+        liveRuns.refresh(sessionId);
+        const aborted = await tasksApi.abort(input);
+        if (!aborted) {
+          run.aborting = false;
+          liveRuns.refresh(sessionId);
+        }
+      } catch (error) {
+        console.error("Failed to abort turn", error);
         run.aborting = false;
         liveRuns.refresh(sessionId);
       }
-      return;
-    }
-
-    const input: AbortAgentRunInput = {
-      sessionId,
-      agentRunId: run.agentRunId,
-    };
-
-    try {
-      run.aborting = true;
-      liveRuns.refresh(sessionId);
-      const aborted = await tasksApi.abort(input);
-      if (!aborted) {
-        run.aborting = false;
-        liveRuns.refresh(sessionId);
-      }
-    } catch (error) {
-      console.error("Failed to abort turn", error);
-      run.aborting = false;
-      liveRuns.refresh(sessionId);
-    }
-  }, [liveRuns, taskQueue, taskCommand]);
+    },
+    [liveRuns, taskQueue, taskCommand],
+  );
   const handleAbort = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
     if (sessionId) await abortSession(sessionId);
   }, [abortSession]);
 
-  const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
-    // Create only on first send, after workspace / branch / worktree selection.
-    setActiveSessionId(null);
-    setSessionBootstrapComplete(true);
-    patchLocal(DRAFT_COMPOSER_KEY, { composer: { ...DEFAULT_COMPOSER_STATE, mode: input.agentForm === "chat" ? "chat" : "agent" } });
-    targetChoices.selectHost(input.hostId ?? null);
-    if (input.workspaceId) targetChoices.selectWorkspace(input.workspaceId);
-    if (input.workspaceRoot) setSelectedWorkspaceRoot(input.workspaceRoot);
-    else if (input.workspaceId) setSelectedWorkspaceRoot(workspaceRegistry?.items.find(item => item.id === input.workspaceId)?.path ?? null);
-  }, [targetChoices.selectHost, targetChoices.selectWorkspace, setActiveSessionId, workspaceRegistry, patchLocal]);
+  const handleCreateSession = useCallback(
+    async (input: NewSessionInput = {}) => {
+      // Create only on first send, after workspace / branch / worktree selection.
+      setActiveSessionId(null);
+      setSessionBootstrapComplete(true);
+      patchLocal(DRAFT_COMPOSER_KEY, {
+        composer: { ...DEFAULT_COMPOSER_STATE, mode: input.agentForm === "chat" ? "chat" : "agent" },
+      });
+      targetChoices.selectHost(input.hostId ?? null);
+      if (input.workspaceId) targetChoices.selectWorkspace(input.workspaceId);
+      if (input.workspaceRoot) setSelectedWorkspaceRoot(input.workspaceRoot);
+      else if (input.workspaceId)
+        setSelectedWorkspaceRoot(workspaceRegistry?.items.find((item) => item.id === input.workspaceId)?.path ?? null);
+    },
+    [targetChoices.selectHost, targetChoices.selectWorkspace, setActiveSessionId, workspaceRegistry, patchLocal],
+  );
 
   // 选目录时 main 已经把它登记进 registry；这里同步刷新，侧栏才能马上显示（新建会话不再立即创建，不能指望它顺带刷新）。
   const pickAndRegisterWorkspace = useCallback(async () => {
@@ -1137,24 +1611,27 @@ export function App() {
     }
   }, [pickAndRegisterWorkspace]);
 
-  const handleCreateWorkspaceFolder = useCallback(async (name: string) => {
-    try {
-      const parent = await dialogsApi.selectWorkspaceDirectory();
-      if (parent.canceled || !parent.workspaceRoot) return;
-      const result = await workspacesApi.createFolder({
-        parentRoot: parent.workspaceRoot,
-        name,
-      });
-      if ("error" in result) {
-        console.error("Failed to create workspace folder", result.error);
-        return;
+  const handleCreateWorkspaceFolder = useCallback(
+    async (name: string) => {
+      try {
+        const parent = await dialogsApi.selectWorkspaceDirectory();
+        if (parent.canceled || !parent.workspaceRoot) return;
+        const result = await workspacesApi.createFolder({
+          parentRoot: parent.workspaceRoot,
+          name,
+        });
+        if ("error" in result) {
+          console.error("Failed to create workspace folder", result.error);
+          return;
+        }
+        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(result.workspaceRoot));
+        await refreshWorkspaces();
+      } catch (error) {
+        console.error("Failed to create workspace folder", error);
       }
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(result.workspaceRoot));
-      await refreshWorkspaces();
-    } catch (error) {
-      console.error("Failed to create workspace folder", error);
-    }
-  }, [refreshWorkspaces]);
+    },
+    [refreshWorkspaces],
+  );
 
   const handleSelectSession = useCallback(
     async (sessionId: string) => {
@@ -1165,11 +1642,13 @@ export function App() {
         console.error("Failed to refresh selected session approvals", error);
       });
 
-      const restored = await readSessionPage(sessionId)
+      const restored = await readSessionPage(sessionId);
       if (activeSessionIdRef.current !== sessionId) return;
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
-        restored?.meta.worktree?.sourceWorkspaceRoot ?? restored?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
-      ));
+      setSelectedWorkspaceRoot(
+        normalizeWorkspaceRoot(
+          restored?.meta.worktree?.sourceWorkspaceRoot ?? restored?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
+        ),
+      );
     },
     [fallbackWorkspaceRoot, refreshPendingApprovalStatuses, readSessionPage, setActiveSessionId],
   );
@@ -1227,113 +1706,178 @@ export function App() {
   const persistedEvents = sessionRecord?.events ?? EMPTY_EVENTS;
 
   const contextSnapshot: ContextUsageSnapshot | null =
-    sessionRecord?.contextSnapshot ??
-    getLatestContextSnapshot(persistedEvents);
+    sessionRecord?.contextSnapshot ?? getLatestContextSnapshot(persistedEvents);
 
-  const contextState: ContextState | null =
-    sessionRecord?.contextState ?? null;
+  const contextState: ContextState | null = sessionRecord?.contextState ?? null;
 
   const activeSessionId = selectedSessionId;
   const steerBlockedReason = isCompacting
     ? "压缩中不能引导，完成后会自动发送"
-    : activeSessionId && approvalPendingSessionIds.has(activeSessionId) ? "等待审批时不能引导" : null;
+    : activeSessionId && approvalPendingSessionIds.has(activeSessionId)
+      ? "等待审批时不能引导"
+      : null;
   // 引用稳定，WorkbenchLayout / Composer 不随每次流式刷新重渲染队列托盘（14 T16）。
-  const messageQueueControls = useMemo<MessageQueueControls>(() => ({
-    queue: messageQueue,
-    running: isStreaming,
-    steerBlockedReason,
-    onSteer: handleSteerQueued,
-    onUnsteer: (id) => void handleUnsteerQueued(id),
-    onRemove: (id) => { const snapshot = activeSessionId ? taskQueue.snapshot(activeSessionId) : undefined; if (activeSessionId && snapshot) void taskCommand({ op: "cancel", sessionId: activeSessionId, taskId: id, revision: snapshot.revision }).catch(reportSessionFailure(activeSessionId, QUEUE_COMMAND_FAILED)); },
-    onMoveUp: (id) => { const snapshot = activeSessionId ? taskQueue.snapshot(activeSessionId) : undefined; const index = messageQueue.items.findIndex(item => item.id === id); if (activeSessionId && snapshot && index > 0) void taskCommand({ op: "move", sessionId: activeSessionId, taskId: id, beforeTaskId: messageQueue.items[index - 1].id, revision: snapshot.revision }).catch(reportSessionFailure(activeSessionId, QUEUE_COMMAND_FAILED)); },
-    onEdit: handleEditQueued,
-    onResume: handleResumeQueue,
-  }), [messageQueue, isStreaming, steerBlockedReason, handleSteerQueued, handleUnsteerQueued, activeSessionId, taskQueue, taskCommand, handleEditQueued, handleResumeQueue, reportSessionFailure]);
+  const messageQueueControls = useMemo<MessageQueueControls>(
+    () => ({
+      queue: messageQueue,
+      running: isStreaming,
+      steerBlockedReason,
+      onSteer: handleSteerQueued,
+      onUnsteer: (id) => void handleUnsteerQueued(id),
+      onRemove: (id) => {
+        const snapshot = activeSessionId ? taskQueue.snapshot(activeSessionId) : undefined;
+        if (activeSessionId && snapshot)
+          void taskCommand({ op: "cancel", sessionId: activeSessionId, taskId: id, revision: snapshot.revision }).catch(
+            reportSessionFailure(activeSessionId, QUEUE_COMMAND_FAILED),
+          );
+      },
+      onMoveUp: (id) => {
+        const snapshot = activeSessionId ? taskQueue.snapshot(activeSessionId) : undefined;
+        const index = messageQueue.items.findIndex((item) => item.id === id);
+        if (activeSessionId && snapshot && index > 0)
+          void taskCommand({
+            op: "move",
+            sessionId: activeSessionId,
+            taskId: id,
+            beforeTaskId: messageQueue.items[index - 1].id,
+            revision: snapshot.revision,
+          }).catch(reportSessionFailure(activeSessionId, QUEUE_COMMAND_FAILED));
+      },
+      onEdit: handleEditQueued,
+      onResume: handleResumeQueue,
+    }),
+    [
+      messageQueue,
+      isStreaming,
+      steerBlockedReason,
+      handleSteerQueued,
+      handleUnsteerQueued,
+      activeSessionId,
+      taskQueue,
+      taskCommand,
+      handleEditQueued,
+      handleResumeQueue,
+      reportSessionFailure,
+    ],
+  );
   const composerStateKey = activeSessionId ?? DRAFT_COMPOSER_KEY;
-  const storedComposerState = useSessionLocalState(localStore, composerStateKey, selectComposerState) ?? DEFAULT_COMPOSER_STATE;
+  const storedComposerState =
+    useSessionLocalState(localStore, composerStateKey, selectComposerState) ?? DEFAULT_COMPOSER_STATE;
   const projectedMode = activeSessionId
-    ? sessionRecord?.meta.id === activeSessionId ? sessionRecord.meta.agentMode : visibleSessions.find((session) => session.id === activeSessionId)?.agentMode
+    ? sessionRecord?.meta.id === activeSessionId
+      ? sessionRecord.meta.agentMode
+      : visibleSessions.find((session) => session.id === activeSessionId)?.agentMode
     : undefined;
   const activeComposerState = { ...storedComposerState, mode: projectedMode ?? storedComposerState.mode };
-  const handleComposerModeChange = useCallback(async (mode: ComposerMode) => {
-    const sessionId = activeSessionIdRef.current;
-    if (sessionId && (busySessionIds.has(sessionId) || modeChangePendingRef.current.has(sessionId))) throw new Error("会话正在执行，请等待任务结束后切换模式");
-    if (sessionId) modeChangePendingRef.current.add(sessionId);
-    try {
-      if (sessionId) {
-        const revision = sessionRecord?.meta.id === sessionId
-          ? sessionRecord.meta.agentModeRevision
-          : visibleSessions.find((session) => session.id === sessionId)?.agentModeRevision;
-        let result = await sessionsApi.setAgentMode({ sessionId, mode, expectedRevision: revision });
-        if (!result.ok && result.error === "WORKSPACE_REQUIRED") {
-          const workspaceRoot = await pickAndRegisterWorkspace();
-          if (!workspaceRoot) return;
-          const workspace = await sessionsApi.setWorkspace({ sessionId, workspaceRoot });
-          if (!workspace.ok) throw new Error(workspace.error ?? "设置工作区失败");
-          setSelectedWorkspaceRoot(normalizeWorkspaceRoot(workspaceRoot));
-          result = await sessionsApi.setAgentMode({ sessionId, mode, expectedRevision: revision });
+  const handleComposerModeChange = useCallback(
+    async (mode: ComposerMode) => {
+      const sessionId = activeSessionIdRef.current;
+      if (sessionId && (busySessionIds.has(sessionId) || modeChangePendingRef.current.has(sessionId)))
+        throw new Error("会话正在执行，请等待任务结束后切换模式");
+      if (sessionId) modeChangePendingRef.current.add(sessionId);
+      try {
+        if (sessionId) {
+          const revision =
+            sessionRecord?.meta.id === sessionId
+              ? sessionRecord.meta.agentModeRevision
+              : visibleSessions.find((session) => session.id === sessionId)?.agentModeRevision;
+          let result = await sessionsApi.setAgentMode({ sessionId, mode, expectedRevision: revision });
+          if (!result.ok && result.error === "WORKSPACE_REQUIRED") {
+            const workspaceRoot = await pickAndRegisterWorkspace();
+            if (!workspaceRoot) return;
+            const workspace = await sessionsApi.setWorkspace({ sessionId, workspaceRoot });
+            if (!workspace.ok) throw new Error(workspace.error ?? "设置工作区失败");
+            setSelectedWorkspaceRoot(normalizeWorkspaceRoot(workspaceRoot));
+            result = await sessionsApi.setAgentMode({ sessionId, mode, expectedRevision: revision });
+          }
+          if (!result.ok) {
+            if (result.error === "AGENT_MODE_CONFLICT") await readSessionPage(sessionId);
+            const message =
+              result.error === "SESSION_BUSY"
+                ? "当前会话仍有运行、审批或后台任务，请等待任务结束后再切换模式。"
+                : result.error === "AGENT_MODE_CONFLICT"
+                  ? "会话模式已更新，请重新选择模式。"
+                  : result.error === "AGENT_MODE_RECOVERY_REQUIRED"
+                    ? "会话模式需要恢复，请重新打开会话后再试。"
+                    : (result.error ?? "模式切换失败");
+            throw new Error(message);
+          }
+          await readSessionPage(sessionId);
+          setSessions((current) =>
+            current.map((session) =>
+              session.id === sessionId
+                ? { ...session, agentMode: result.mode ?? mode, agentModeRevision: result.revision }
+                : session,
+            ),
+          );
         }
-        if (!result.ok) {
-          if (result.error === "AGENT_MODE_CONFLICT") await readSessionPage(sessionId);
-          const message = result.error === "SESSION_BUSY"
-            ? "当前会话仍有运行、审批或后台任务，请等待任务结束后再切换模式。"
-            : result.error === "AGENT_MODE_CONFLICT"
-              ? "会话模式已更新，请重新选择模式。"
-              : result.error === "AGENT_MODE_RECOVERY_REQUIRED"
-                ? "会话模式需要恢复，请重新打开会话后再试。"
-                : result.error ?? "模式切换失败";
-          throw new Error(message);
-        }
-        await readSessionPage(sessionId);
-        setSessions((current) => current.map((session) => session.id === sessionId
-          ? { ...session, agentMode: result.mode ?? mode, agentModeRevision: result.revision }
-          : session));
+        localStore.update(composerStateKey, (state) => ({
+          ...state,
+          composer: { mode, selectedSkills: state.composer?.selectedSkills ?? [] },
+        }));
+      } finally {
+        if (sessionId) modeChangePendingRef.current.delete(sessionId);
       }
-      localStore.update(composerStateKey, (state) => ({ ...state, composer: { mode, selectedSkills: state.composer?.selectedSkills ?? [] } }));
-    } finally {
-      if (sessionId) modeChangePendingRef.current.delete(sessionId);
-    }
-  }, [busySessionIds, sessionRecord, visibleSessions, readSessionPage, localStore, composerStateKey, pickAndRegisterWorkspace]);
-  const handleSelectedSkillsChange = useCallback((selectedSkills: string[]) => {
-    localStore.update(composerStateKey, (state) => ({ ...state, composer: { mode: state.composer?.mode ?? "agent", selectedSkills } }));
-  }, [localStore, composerStateKey]);
+    },
+    [
+      busySessionIds,
+      sessionRecord,
+      visibleSessions,
+      readSessionPage,
+      localStore,
+      composerStateKey,
+      pickAndRegisterWorkspace,
+    ],
+  );
+  const handleSelectedSkillsChange = useCallback(
+    (selectedSkills: string[]) => {
+      localStore.update(composerStateKey, (state) => ({
+        ...state,
+        composer: { mode: state.composer?.mode ?? "agent", selectedSkills },
+      }));
+    },
+    [localStore, composerStateKey],
+  );
   const isSessionReady = Boolean(sessionRecord || hasStreamingBlocks || sessionBootstrapComplete);
   const title = getSessionTitle(sessionRecord, visibleSessions, activeSessionId);
-  const workspaceOptions = useMemo(
-    () => {
-      const registryOptions = workspaceRegistry
-        ? createWorkspaceOptionsFromRegistry(workspaceRegistry.items)
-        : [];
-      // 已隐藏的工作区不进选择器；当前会话和当前选择的目录照常显示。
-      const fallbackOptions = createWorkspaceOptionsFromRoots([
-        selectedWorkspaceRoot,
-        sessionRecord?.meta.worktree?.sourceWorkspaceRoot,
-        sessionRecord?.meta.workspaceRoot,
-      ]);
-      const merged = new Map(registryOptions.map((option) => [option.value, option]));
-      for (const option of fallbackOptions) {
-        if (!merged.has(option.value)) merged.set(option.value, option);
-      }
-      return [...merged.values()];
-    },
-    [selectedWorkspaceRoot, sessionRecord?.meta.worktree?.sourceWorkspaceRoot, sessionRecord?.meta.workspaceRoot, workspaceRegistry],
-  );
-  const executionContext = useMemo<ComposerExecutionContext>(() => ({
-    gitContext: isLocalTarget ? workspaceGitContext : null,
-    selectedBranch,
-    runLocation,
-    onSelectBranch: setSelectedBranch,
-    onSelectRunLocation: setRunLocation,
-    onUseExistingWorkspace: handleUseExistingWorkspace,
-    onCreateWorkspaceFolder: handleCreateWorkspaceFolder,
-  }), [
-    isLocalTarget,
-    handleCreateWorkspaceFolder,
-    handleUseExistingWorkspace,
-    runLocation,
-    selectedBranch,
-    workspaceGitContext,
+  const workspaceOptions = useMemo(() => {
+    const registryOptions = workspaceRegistry ? createWorkspaceOptionsFromRegistry(workspaceRegistry.items) : [];
+    // 已隐藏的工作区不进选择器；当前会话和当前选择的目录照常显示。
+    const fallbackOptions = createWorkspaceOptionsFromRoots([
+      selectedWorkspaceRoot,
+      sessionRecord?.meta.worktree?.sourceWorkspaceRoot,
+      sessionRecord?.meta.workspaceRoot,
+    ]);
+    const merged = new Map(registryOptions.map((option) => [option.value, option]));
+    for (const option of fallbackOptions) {
+      if (!merged.has(option.value)) merged.set(option.value, option);
+    }
+    return [...merged.values()];
+  }, [
+    selectedWorkspaceRoot,
+    sessionRecord?.meta.worktree?.sourceWorkspaceRoot,
+    sessionRecord?.meta.workspaceRoot,
+    workspaceRegistry,
   ]);
+  const executionContext = useMemo<ComposerExecutionContext>(
+    () => ({
+      gitContext: isLocalTarget ? workspaceGitContext : null,
+      selectedBranch,
+      runLocation,
+      onSelectBranch: setSelectedBranch,
+      onSelectRunLocation: setRunLocation,
+      onUseExistingWorkspace: handleUseExistingWorkspace,
+      onCreateWorkspaceFolder: handleCreateWorkspaceFolder,
+    }),
+    [
+      isLocalTarget,
+      handleCreateWorkspaceFolder,
+      handleUseExistingWorkspace,
+      runLocation,
+      selectedBranch,
+      workspaceGitContext,
+    ],
+  );
   const sessionStatuses = useMemo<Record<string, SessionUiStatusKind>>(() => {
     const statuses: Record<string, SessionUiStatusKind> = {};
     for (const sessionId of unreadSessionIds) {
@@ -1379,43 +1923,48 @@ export function App() {
     }
   }, []);
 
-  const handleForkSession = useCallback(async (sessionId: string, turnId?: string) => {
-    // 整个会话分叉要等本轮结束；从某条已完成的回复分叉不带当前运行中的一轮，可以随时做。
-    if (
-      !sessionId ||
-      (turnId === undefined && (busySessionIds.has(sessionId) || approvalPendingSessionIds.has(sessionId)))
-    ) {
-      return;
-    }
+  const handleForkSession = useCallback(
+    async (sessionId: string, turnId?: string) => {
+      // 整个会话分叉要等本轮结束；从某条已完成的回复分叉不带当前运行中的一轮，可以随时做。
+      if (
+        !sessionId ||
+        (turnId === undefined && (busySessionIds.has(sessionId) || approvalPendingSessionIds.has(sessionId)))
+      ) {
+        return;
+      }
 
-    try {
-      const projection = await sessionsApi.fork(turnId === undefined ? { sessionId } : { sessionId, turnId });
-      sessionStore.applyEnvelope(projection);
-      const forked = projectChatWindow(projection);
-      const refreshed = await readSidebarSessions();
-      setSessions(refreshed);
-      await refreshWorkspaces();
+      try {
+        const projection = await sessionsApi.fork(turnId === undefined ? { sessionId } : { sessionId, turnId });
+        sessionStore.applyEnvelope(projection);
+        const forked = projectChatWindow(projection);
+        const refreshed = await readSidebarSessions();
+        setSessions(refreshed);
+        await refreshWorkspaces();
 
-      setActiveSessionId(forked.meta.id);
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
-        forked.meta.worktree?.sourceWorkspaceRoot ?? forked.meta.workspaceRoot ?? fallbackWorkspaceRoot,
-      ));
-      setApprovalPendingForSession(forked.meta.id, false);
-      setFailedForSession(forked.meta.id, false);
-    } catch (error) {
-      console.error("Failed to fork session", error);
-    }
-  }, [
-    approvalPendingSessionIds,
-    fallbackWorkspaceRoot,
-    busySessionIds,
-    refreshWorkspaces,
-    setApprovalPendingForSession,
-    setFailedForSession,
-    readSidebarSessions,
-    sessionStore,
-    setActiveSessionId,
-  ]);
+        setActiveSessionId(forked.meta.id);
+        setSelectedWorkspaceRoot(
+          normalizeWorkspaceRoot(
+            forked.meta.worktree?.sourceWorkspaceRoot ?? forked.meta.workspaceRoot ?? fallbackWorkspaceRoot,
+          ),
+        );
+        setApprovalPendingForSession(forked.meta.id, false);
+        setFailedForSession(forked.meta.id, false);
+      } catch (error) {
+        console.error("Failed to fork session", error);
+      }
+    },
+    [
+      approvalPendingSessionIds,
+      fallbackWorkspaceRoot,
+      busySessionIds,
+      refreshWorkspaces,
+      setApprovalPendingForSession,
+      setFailedForSession,
+      readSidebarSessions,
+      sessionStore,
+      setActiveSessionId,
+    ],
+  );
 
   const handleTogglePin = useCallback(
     async (sessionId: string, nextPinned: boolean) => {
@@ -1479,79 +2028,118 @@ export function App() {
     }
   }, []);
 
-  const handleArchiveWorkspace = useCallback(async (groupKey: string, workspaceRoot?: string) => {
-    const archiveCandidates = await sessionsApi.list();
-    const groupSessions = sessionsByGroupKey(archiveCandidates, workspaceRegistry?.items ?? []).get(groupKey) ?? [];
-    const targetSessionIds = groupSessions.map((session) => session.id);
-    if (targetSessionIds.length === 0) return;
-    if (targetSessionIds.some((sessionId) => busySessionIds.has(sessionId) || approvalPendingSessionIds.has(sessionId))) {
-      return;
-    }
-
-    if (activeSessionId && targetSessionIds.includes(activeSessionId)) {
-      const hiddenWorkspaces = workspaceRegistry?.items.filter((workspace) => workspace.hidden) ?? [];
-      const hiddenIds = new Set(hiddenWorkspaces.map((workspace) => workspace.id));
-      const hiddenPaths = new Set(hiddenWorkspaces.map((workspace) => normalizeWorkspaceRoot(workspace.path)));
-      const fallback = sessions.find((session) =>
-        !targetSessionIds.includes(session.id) &&
-        !hiddenIds.has(session.workspaceId ?? "") &&
-        !hiddenPaths.has(normalizeWorkspaceRoot(session.workspaceRoot)),
-      );
-      // 没有别的会话可切时回到新建会话页，留在原工作区。
-      if (fallback) await handleSelectSession(fallback.id);
-      else await handleCreateSession({ workspaceRoot, hostId: groupSessions[0]?.hostId, workspaceId: groupSessions[0]?.workspaceId });
-    }
-
-    const result = await sessionsApi.archiveMany({ sessionIds: targetSessionIds });
-    const failed = new Set(result.ok ? [] : result.failedSessionIds);
-    for (const sessionId of targetSessionIds) if (!failed.has(sessionId)) evictSession(sessionId);
-    const refreshed = await readSidebarSessions();
-    setSessions(refreshed);
-    if (!result.ok) {
-      console.error("Some workspace sessions could not be archived", result.failedSessionIds);
-    }
-  }, [activeSessionId, approvalPendingSessionIds, busySessionIds, handleCreateSession, handleSelectSession, sessions, workspaceRegistry, evictSession, readSidebarSessions]);
-
-  const handleRemoveWorkspace = useCallback(async (workspaceId: string, workspaceRoot?: string) => {
-    if (!workspaceRegistry) return;
-    const targetSessionIds = new Set(sessions
-      .filter((session) =>
-        session.workspaceId === workspaceId ||
-        (!session.workspaceId && normalizeWorkspaceRoot(session.workspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)),
-      )
-      .map((session) => session.id));
-
-    if (activeSessionId && targetSessionIds.has(activeSessionId)) {
-      const hiddenWorkspaces = workspaceRegistry.items.filter((workspace) => workspace.hidden);
-      const hiddenIds = new Set(hiddenWorkspaces.map((workspace) => workspace.id));
-      const hiddenPaths = new Set(hiddenWorkspaces.map((workspace) => workspace.path));
-      const fallback = sessions.find((session) =>
-        !targetSessionIds.has(session.id) &&
-        !hiddenIds.has(session.workspaceId ?? "") &&
-        !hiddenPaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
-      );
-      if (fallback) {
-        setActiveSessionId(fallback.id);
-        const restored = await readSessionPage(fallback.id);
-        if (!restored || activeSessionIdRef.current !== fallback.id) return;
-        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(restored.meta.workspaceRoot ?? fallback.workspaceRoot));
-      } else {
-        // 没有别的会话可切时回到新建会话页；工作区在隐藏完成后重新挑。
-        await handleCreateSession();
+  const handleArchiveWorkspace = useCallback(
+    async (groupKey: string, workspaceRoot?: string) => {
+      const archiveCandidates = await sessionsApi.list();
+      const groupSessions = sessionsByGroupKey(archiveCandidates, workspaceRegistry?.items ?? []).get(groupKey) ?? [];
+      const targetSessionIds = groupSessions.map((session) => session.id);
+      if (targetSessionIds.length === 0) return;
+      if (
+        targetSessionIds.some((sessionId) => busySessionIds.has(sessionId) || approvalPendingSessionIds.has(sessionId))
+      ) {
+        return;
       }
-    }
 
-    const result = await workspacesApi.setVisibility({ workspaceId, hidden: true });
-    if (!result.ok) {
-      console.error("Failed to remove workspace from sidebar", result.error);
-      return;
-    }
-    for (const sessionId of targetSessionIds) evictSession(sessionId);
-    const refreshed = await refreshWorkspaces();
-    if (normalizeWorkspaceRoot(selectedWorkspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)) {
-      setSelectedWorkspaceRoot(firstVisibleWorkspaceRoot(refreshed, sessions));
-    }
-  }, [activeSessionId, handleCreateSession, readSessionPage, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry, evictSession, setActiveSessionId]);
+      if (activeSessionId && targetSessionIds.includes(activeSessionId)) {
+        const hiddenWorkspaces = workspaceRegistry?.items.filter((workspace) => workspace.hidden) ?? [];
+        const hiddenIds = new Set(hiddenWorkspaces.map((workspace) => workspace.id));
+        const hiddenPaths = new Set(hiddenWorkspaces.map((workspace) => normalizeWorkspaceRoot(workspace.path)));
+        const fallback = sessions.find(
+          (session) =>
+            !targetSessionIds.includes(session.id) &&
+            !hiddenIds.has(session.workspaceId ?? "") &&
+            !hiddenPaths.has(normalizeWorkspaceRoot(session.workspaceRoot)),
+        );
+        // 没有别的会话可切时回到新建会话页，留在原工作区。
+        if (fallback) await handleSelectSession(fallback.id);
+        else
+          await handleCreateSession({
+            workspaceRoot,
+            hostId: groupSessions[0]?.hostId,
+            workspaceId: groupSessions[0]?.workspaceId,
+          });
+      }
+
+      const result = await sessionsApi.archiveMany({ sessionIds: targetSessionIds });
+      const failed = new Set(result.ok ? [] : result.failedSessionIds);
+      for (const sessionId of targetSessionIds) if (!failed.has(sessionId)) evictSession(sessionId);
+      const refreshed = await readSidebarSessions();
+      setSessions(refreshed);
+      if (!result.ok) {
+        console.error("Some workspace sessions could not be archived", result.failedSessionIds);
+      }
+    },
+    [
+      activeSessionId,
+      approvalPendingSessionIds,
+      busySessionIds,
+      handleCreateSession,
+      handleSelectSession,
+      sessions,
+      workspaceRegistry,
+      evictSession,
+      readSidebarSessions,
+    ],
+  );
+
+  const handleRemoveWorkspace = useCallback(
+    async (workspaceId: string, workspaceRoot?: string) => {
+      if (!workspaceRegistry) return;
+      const targetSessionIds = new Set(
+        sessions
+          .filter(
+            (session) =>
+              session.workspaceId === workspaceId ||
+              (!session.workspaceId &&
+                normalizeWorkspaceRoot(session.workspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)),
+          )
+          .map((session) => session.id),
+      );
+
+      if (activeSessionId && targetSessionIds.has(activeSessionId)) {
+        const hiddenWorkspaces = workspaceRegistry.items.filter((workspace) => workspace.hidden);
+        const hiddenIds = new Set(hiddenWorkspaces.map((workspace) => workspace.id));
+        const hiddenPaths = new Set(hiddenWorkspaces.map((workspace) => workspace.path));
+        const fallback = sessions.find(
+          (session) =>
+            !targetSessionIds.has(session.id) &&
+            !hiddenIds.has(session.workspaceId ?? "") &&
+            !hiddenPaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
+        );
+        if (fallback) {
+          setActiveSessionId(fallback.id);
+          const restored = await readSessionPage(fallback.id);
+          if (!restored || activeSessionIdRef.current !== fallback.id) return;
+          setSelectedWorkspaceRoot(normalizeWorkspaceRoot(restored.meta.workspaceRoot ?? fallback.workspaceRoot));
+        } else {
+          // 没有别的会话可切时回到新建会话页；工作区在隐藏完成后重新挑。
+          await handleCreateSession();
+        }
+      }
+
+      const result = await workspacesApi.setVisibility({ workspaceId, hidden: true });
+      if (!result.ok) {
+        console.error("Failed to remove workspace from sidebar", result.error);
+        return;
+      }
+      for (const sessionId of targetSessionIds) evictSession(sessionId);
+      const refreshed = await refreshWorkspaces();
+      if (normalizeWorkspaceRoot(selectedWorkspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)) {
+        setSelectedWorkspaceRoot(firstVisibleWorkspaceRoot(refreshed, sessions));
+      }
+    },
+    [
+      activeSessionId,
+      handleCreateSession,
+      readSessionPage,
+      refreshWorkspaces,
+      selectedWorkspaceRoot,
+      sessions,
+      workspaceRegistry,
+      evictSession,
+      setActiveSessionId,
+    ],
+  );
 
   const handleArchivedSessionsChange = useCallback(async () => {
     try {
@@ -1562,17 +2150,23 @@ export function App() {
     }
   }, [readSidebarSessions]);
 
-  const handleRestoreSession = useCallback(async (sessionId: string) => {
-    try {
-      const result = await sessionsApi.archive({ sessionId, archived: false });
-      if (!result.ok) throw new Error(result.error ?? "Restore request failed");
-    } catch (error) {
-      console.error("Failed to restore session", error);
-    }
-    await handleArchivedSessionsChange();
-  }, [handleArchivedSessionsChange]);
+  const handleRestoreSession = useCallback(
+    async (sessionId: string) => {
+      try {
+        const result = await sessionsApi.archive({ sessionId, archived: false });
+        if (!result.ok) throw new Error(result.error ?? "Restore request failed");
+      } catch (error) {
+        console.error("Failed to restore session", error);
+      }
+      await handleArchivedSessionsChange();
+    },
+    [handleArchivedSessionsChange],
+  );
 
-  const visibleWorkspaces = useMemo(() => workspaceRegistry?.items.filter((workspace) => !workspace.hidden), [workspaceRegistry]);
+  const visibleWorkspaces = useMemo(
+    () => workspaceRegistry?.items.filter((workspace) => !workspace.hidden),
+    [workspaceRegistry],
+  );
   const getSessionPreview = useCallback(async (session: SessionListItem) => {
     return sessionsApi.getPreview({ sessionId: session.id });
   }, []);
@@ -1581,88 +2175,182 @@ export function App() {
     void refreshReviewSummary();
   }, [refreshReviewSummary]);
 
-  const retryList = useCallback(() => setListRetry(n => n + 1), []);
-  const retryMessages = useCallback(() => { if (activeSessionIdRef.current) void readSessionPage(activeSessionIdRef.current); }, [readSessionPage]);
+  const retryList = useCallback(() => setListRetry((n) => n + 1), []);
+  const retryMessages = useCallback(() => {
+    if (activeSessionIdRef.current) void readSessionPage(activeSessionIdRef.current);
+  }, [readSessionPage]);
   // Context value 用 useShallowStable 而不是 useMemo：工厂闭包会把 messages、contextState 等放进 App 的渲染作用域，
   // 旧作用域被 useCallback 链留住时，已归档会话的数据就释放不掉。
   const browse = useShallowStable<SessionBrowseState>({
-    groups: visibleBrowseGroups, listLoading, listError, retryList, loadMore: loadMoreSessions, messageLoading, messageError, retryMessages,
-    hasEarlier: historyBefore !== null, earlierLoading, earlierError, loadEarlier: loadEarlierMessages,
+    groups: visibleBrowseGroups,
+    listLoading,
+    listError,
+    retryList,
+    loadMore: loadMoreSessions,
+    messageLoading,
+    messageError,
+    retryMessages,
+    hasEarlier: historyBefore !== null,
+    earlierLoading,
+    earlierError,
+    loadEarlier: loadEarlierMessages,
   });
   const activeSession = useShallowStable<ActiveSessionValue>({
-    sessionId: activeSessionId, title, contextSnapshot, contextState, isStreaming, isAborting, isCompacting, isSessionReady,
-    sendScrollRequestId, composerFocusRequestId, onSend: handleSend, onAbort: activeSessionId && liveRuns.get(activeSessionId)?.operationTaskId ? undefined : handleAbort, onRetryCompaction: handleRetryCompaction,
-    onResendTurn: resendTurn, readTaskSnapshot: taskQueue.snapshot,
+    sessionId: activeSessionId,
+    title,
+    contextSnapshot,
+    contextState,
+    isStreaming,
+    isAborting,
+    isCompacting,
+    isSessionReady,
+    sendScrollRequestId,
+    composerFocusRequestId,
+    onSend: handleSend,
+    onAbort: activeSessionId && liveRuns.get(activeSessionId)?.operationTaskId ? undefined : handleAbort,
+    onRetryCompaction: handleRetryCompaction,
+    onResendTurn: resendTurn,
+    readTaskSnapshot: taskQueue.snapshot,
   });
   const drafts = useSessionDrafts(localStore, activeSessionId);
-  const activeComposerNotice = composerNotice && composerNotice.sessionId === activeSessionId ? composerNotice.text : null;
+  const activeComposerNotice =
+    composerNotice && composerNotice.sessionId === activeSessionId ? composerNotice.text : null;
   const composer = useShallowStable<ComposerContextValue>({
-    ...drafts, messageQueue: messageQueueControls, composerNotice: activeComposerNotice, defaultModelId, selectedModelId: selectedChatModelId,
-    onSelectedModelChange: handleSelectedChatModelChange, composerMode: activeComposerState.mode, onComposerModeChange: handleComposerModeChange,
-    selectedSkills: activeComposerState.selectedSkills, onSelectedSkillsChange: handleSelectedSkillsChange, models: usableChatModels, draftRestore: composerDraftRestore,
+    ...drafts,
+    messageQueue: messageQueueControls,
+    composerNotice: activeComposerNotice,
+    defaultModelId,
+    selectedModelId: selectedChatModelId,
+    onSelectedModelChange: handleSelectedChatModelChange,
+    composerMode: activeComposerState.mode,
+    onComposerModeChange: handleComposerModeChange,
+    selectedSkills: activeComposerState.selectedSkills,
+    onSelectedSkillsChange: handleSelectedSkillsChange,
+    models: usableChatModels,
+    draftRestore: composerDraftRestore,
   });
   const runTargetValue = useShallowStable<RunTargetValue>({
-    ...runTarget, workspaceOptions, selectedWorkspaceRoot, onSelectWorkspace: setSelectedWorkspaceRoot, execution: executionContext,
+    ...runTarget,
+    workspaceOptions,
+    selectedWorkspaceRoot,
+    onSelectWorkspace: setSelectedWorkspaceRoot,
+    execution: executionContext,
   });
   const sessionActions = useShallowStable<SessionActionsValue>({
-    onNewSession: handleCreateSession, onAddWorkspace: handleAddWorkspace, onSelectSession: handleSelectSession, onTogglePin: handleTogglePin,
-    onRenameSession: handleRenameSession, onCopySessionId: handleCopySessionId, onCopyTranscript: handleCopyTranscript, onForkSession: handleForkSession,
-    onArchiveSession: handleArchiveSession, onRestoreSession: handleRestoreSession, onOpenWorkspace: handleOpenWorkspace, onArchiveWorkspace: handleArchiveWorkspace, onRemoveWorkspace: handleRemoveWorkspace,
+    onNewSession: handleCreateSession,
+    onAddWorkspace: handleAddWorkspace,
+    onSelectSession: handleSelectSession,
+    onTogglePin: handleTogglePin,
+    onRenameSession: handleRenameSession,
+    onCopySessionId: handleCopySessionId,
+    onCopyTranscript: handleCopyTranscript,
+    onForkSession: handleForkSession,
+    onArchiveSession: handleArchiveSession,
+    onRestoreSession: handleRestoreSession,
+    onOpenWorkspace: handleOpenWorkspace,
+    onArchiveWorkspace: handleArchiveWorkspace,
+    onRemoveWorkspace: handleRemoveWorkspace,
   });
 
-  const openSideChat = useCallback(async (parentSessionId: string) => {
-    let result: import("@actspace/shared").SideChatOpenResult;
-    try { result = await sessionsApi.openSideChat({ parentSessionId }); }
-    catch (error) {
-      // 从 + 菜单、启动页或 /side 打开都在主会话输入框上方提示原因。
-      console.error("Failed to open side chat", error);
-      setComposerNotice({ sessionId: parentSessionId, text: sideChatOpenError(error) });
-      throw error;
-    }
-    sessionStore.applyEnvelope(result.session);
-    // 主会话行上的侧边对话数量随之变化。
-    void readSidebarSessions().then(setSessions).catch(console.error);
-    return result;
-  }, [sessionStore, readSidebarSessions]);
+  const openSideChat = useCallback(
+    async (parentSessionId: string) => {
+      let result: import("@actspace/shared").SideChatOpenResult;
+      try {
+        result = await sessionsApi.openSideChat({ parentSessionId });
+      } catch (error) {
+        // 从 + 菜单、启动页或 /side 打开都在主会话输入框上方提示原因。
+        console.error("Failed to open side chat", error);
+        setComposerNotice({ sessionId: parentSessionId, text: sideChatOpenError(error) });
+        throw error;
+      }
+      sessionStore.applyEnvelope(result.session);
+      // 主会话行上的侧边对话数量随之变化。
+      void readSidebarSessions().then(setSessions).catch(console.error);
+      return result;
+    },
+    [sessionStore, readSidebarSessions],
+  );
   const listSideChats = useCallback((parentSessionId: string) => sessionsApi.listSideChats({ parentSessionId }), []);
-  const abortSideChat = useCallback((sessionId: string) => { void abortSession(sessionId); }, [abortSession]);
-  const setSideChatMode = useCallback(async (sessionId: string, mode: ComposerMode) => {
-    if (busySessionIds.has(sessionId)) throw new Error("侧边对话正在执行，请等这一轮结束后再切换模式");
-    const expectedRevision = sessionStore.peek(sessionId)?.snapshot?.agentModeRevision;
-    const result = await sessionsApi.setAgentMode({ sessionId, mode, expectedRevision });
-    if (!result.ok) {
+  const abortSideChat = useCallback(
+    (sessionId: string) => {
+      void abortSession(sessionId);
+    },
+    [abortSession],
+  );
+  const setSideChatMode = useCallback(
+    async (sessionId: string, mode: ComposerMode) => {
+      if (busySessionIds.has(sessionId)) throw new Error("侧边对话正在执行，请等这一轮结束后再切换模式");
+      const expectedRevision = sessionStore.peek(sessionId)?.snapshot?.agentModeRevision;
+      const result = await sessionsApi.setAgentMode({ sessionId, mode, expectedRevision });
+      if (!result.ok) {
+        await readSessionPage(sessionId);
+        throw new Error(
+          result.error === "SESSION_BUSY"
+            ? "侧边对话仍有运行或审批，请稍后再切换模式。"
+            : result.error === "AGENT_MODE_CONFLICT"
+              ? "模式已更新，请重新选择。"
+              : (result.error ?? "模式切换失败"),
+        );
+      }
       await readSessionPage(sessionId);
-      throw new Error(result.error === "SESSION_BUSY" ? "侧边对话仍有运行或审批，请稍后再切换模式。" : result.error === "AGENT_MODE_CONFLICT" ? "模式已更新，请重新选择。" : result.error ?? "模式切换失败");
-    }
-    await readSessionPage(sessionId);
-  }, [busySessionIds, sessionStore, readSessionPage]);
+    },
+    [busySessionIds, sessionStore, readSessionPage],
+  );
   const markSideChatRead = useCallback((sessionId: string) => setLocalFlag(sessionId, "unread", false), [setLocalFlag]);
   const renameSideChat = useCallback(async (sessionId: string, title: string) => {
     const result = await sessionsApi.rename({ sessionId, title });
     if (!result.ok) throw new Error(result.error);
   }, []);
   const sideChat = useShallowStable<SideChatRuntimeValue>({
-    sessionStore, liveRuns, localStore, statuses: sessionStatuses, models: usableChatModels, defaultModelId, parentModelId: selectedChatModelId,
-    available: isLocalTarget, notice: composerNotice, open: openSideChat, list: listSideChats, send: sendToSession, abort: abortSideChat,
-    setMode: setSideChatMode, markRead: markSideChatRead, rename: renameSideChat, retain: retainSideChat,
+    sessionStore,
+    liveRuns,
+    localStore,
+    statuses: sessionStatuses,
+    models: usableChatModels,
+    defaultModelId,
+    parentModelId: selectedChatModelId,
+    available: isLocalTarget,
+    notice: composerNotice,
+    open: openSideChat,
+    list: listSideChats,
+    send: sendToSession,
+    abort: abortSideChat,
+    setMode: setSideChatMode,
+    markRead: markSideChatRead,
+    rename: renameSideChat,
+    retain: retainSideChat,
   });
 
   return (
-    <AppProviders sessionStore={sessionStore} browse={browse} localStore={localStore} activeSession={activeSession} composer={composer} sessionActions={sessionActions} runTarget={runTargetValue} sideChat={sideChat}>
+    <AppProviders
+      sessionStore={sessionStore}
+      browse={browse}
+      localStore={localStore}
+      activeSession={activeSession}
+      composer={composer}
+      sessionActions={sessionActions}
+      runTarget={runTargetValue}
+      sideChat={sideChat}
+    >
       <LiveRunsProvider store={liveRuns}>
-      <SessionTranscriptProvider liveRuns={liveRuns} localStore={localStore} sessionId={selectedSessionId} sessionRecord={sessionRecord}>
-        <WorkbenchLayout
-          sessions={visibleSessions}
-          busySessionIds={busySessionIds}
-          sessionStatuses={sessionStatuses}
-          onSettingsChange={handleSettingsChange}
-          onArchivedSessionsChange={handleArchivedSessionsChange}
-          workspaces={visibleWorkspaces}
-          getSessionPreview={getSessionPreview}
-          reviewSummary={reviewSummary}
-          onReviewChanged={handleReviewChanged}
-        />
-      </SessionTranscriptProvider>
+        <SessionTranscriptProvider
+          liveRuns={liveRuns}
+          localStore={localStore}
+          sessionId={selectedSessionId}
+          sessionRecord={sessionRecord}
+        >
+          <WorkbenchLayout
+            sessions={visibleSessions}
+            busySessionIds={busySessionIds}
+            sessionStatuses={sessionStatuses}
+            onSettingsChange={handleSettingsChange}
+            onArchivedSessionsChange={handleArchivedSessionsChange}
+            workspaces={visibleWorkspaces}
+            getSessionPreview={getSessionPreview}
+            reviewSummary={reviewSummary}
+            onReviewChanged={handleReviewChanged}
+          />
+        </SessionTranscriptProvider>
       </LiveRunsProvider>
       <ShutdownOverlay />
     </AppProviders>

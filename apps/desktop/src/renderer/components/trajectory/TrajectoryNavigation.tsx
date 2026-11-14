@@ -16,14 +16,23 @@ type TrajectoryNavigationValue = {
 
 const TrajectoryNavigationContext = createContext<TrajectoryNavigationValue | null>(null);
 
-export function TrajectoryNavigationProvider({ onShowTrajectory, children }: { onShowTrajectory: () => void; children: ReactNode }) {
+export function TrajectoryNavigationProvider({
+  onShowTrajectory,
+  children,
+}: {
+  onShowTrajectory: () => void;
+  children: ReactNode;
+}) {
   const [pending, setPending] = useState<PendingTrajectoryReveal | null>(null);
   const seqRef = useRef(0);
-  const revealInTrajectory = useCallback((target: TrajectoryRevealTarget) => {
-    seqRef.current += 1;
-    setPending({ seq: seqRef.current, target });
-    onShowTrajectory();
-  }, [onShowTrajectory]);
+  const revealInTrajectory = useCallback(
+    (target: TrajectoryRevealTarget) => {
+      seqRef.current += 1;
+      setPending({ seq: seqRef.current, target });
+      onShowTrajectory();
+    },
+    [onShowTrajectory],
+  );
   const consume = useCallback((seq: number) => {
     setPending((current) => (current?.seq === seq ? null : current));
   }, []);

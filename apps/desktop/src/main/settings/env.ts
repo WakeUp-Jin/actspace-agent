@@ -12,12 +12,23 @@ export function setOrDeleteEnv(key: string, value: string | undefined): void {
 
 /** 只同步偏好；历史上写过 env 的凭据键在这里清掉，避免旧进程状态残留。 */
 export function applyToEnv(settings: PersistedSettingsV3, reloadEnv: () => void): void {
-  for (const key of ["DEEPSEEK_API_KEY", "KIMI_API_KEY", "ZHIPU_API_KEY", "TAVILY_API_KEY", "TINYFISH_API_KEY", "EXA_API_KEY"]) delete process.env[key];
+  for (const key of [
+    "DEEPSEEK_API_KEY",
+    "KIMI_API_KEY",
+    "ZHIPU_API_KEY",
+    "TAVILY_API_KEY",
+    "TINYFISH_API_KEY",
+    "EXA_API_KEY",
+  ])
+    delete process.env[key];
   process.env.IMAGE_GENERATION_BASE_URL = settings.imageGeneration.baseUrl;
   process.env.IMAGE_GENERATION_MODEL = settings.imageGeneration.model;
   process.env.ACTSPACE_DISABLED_TOOLS = settings.agent.disabledTools.join(",");
   process.env.ACTSPACE_BASH_ALWAYS_ASK = settings.agent.bashAlwaysAsk ? "1" : "0";
-  setOrDeleteEnv("LLM_TEMPERATURE", settings.agent.temperature === null ? undefined : String(settings.agent.temperature));
+  setOrDeleteEnv(
+    "LLM_TEMPERATURE",
+    settings.agent.temperature === null ? undefined : String(settings.agent.temperature),
+  );
   setOrDeleteEnv("LLM_MAX_TOKENS", settings.agent.maxTokens === null ? undefined : String(settings.agent.maxTokens));
   reloadEnv();
 }

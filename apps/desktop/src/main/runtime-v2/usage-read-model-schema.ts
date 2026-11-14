@@ -116,7 +116,9 @@ export function createReadModelSchema(db: DatabaseSync): void {
     CREATE TABLE IF NOT EXISTS index_state (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
   `);
   db.exec("CREATE INDEX IF NOT EXISTS session_catalog_side_chat_idx ON session_catalog(side_chat_parent_id)");
-  db.exec("CREATE INDEX IF NOT EXISTS session_catalog_page_idx ON session_catalog(archived, COALESCE(json_extract(worktree_json,'$.sourceWorkspaceRoot'),workspace_root,''), pinned, updated_at DESC,session_id ASC)");
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS session_catalog_page_idx ON session_catalog(archived, COALESCE(json_extract(worktree_json,'$.sourceWorkspaceRoot'),workspace_root,''), pinned, updated_at DESC,session_id ASC)",
+  );
   createUsageJournalSchema(db);
   createUsageRollups(db);
   createHarnessStatsSchema(db);

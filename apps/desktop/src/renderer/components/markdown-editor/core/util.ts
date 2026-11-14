@@ -27,7 +27,9 @@ export function fenceCode(state: EditorState, node: SyntaxNode): string {
 
 /** 围栏是否闭合：有两个围栏标记，且结束围栏不在开头那一行。 */
 export function isFenceClosed(state: EditorState, node: SyntaxNode): boolean {
-  return node.getChildren("CodeMark").length >= 2 && state.doc.lineAt(node.to).number > state.doc.lineAt(node.from).number;
+  return (
+    node.getChildren("CodeMark").length >= 2 && state.doc.lineAt(node.to).number > state.doc.lineAt(node.from).number
+  );
 }
 
 /** 节点是不是文档最外层的块（块级 widget 只替换最外层的块，容器里的保持普通显示）。 */

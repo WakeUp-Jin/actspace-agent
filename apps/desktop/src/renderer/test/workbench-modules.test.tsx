@@ -8,7 +8,18 @@ import { useSessionHistory } from "../components/workbench/use-session-history";
 // 16 T15：WorkbenchLayout 拆出的布局 / 会话历史 / 编辑路径三个模块。
 
 function editBlock(id: string, partial: Partial<Extract<MessageBlock, { kind: "edit_diff" }>> = {}): MessageBlock {
-  return { kind: "edit_diff", id, filePath: `/repo/${id}.ts`, additions: 1, deletions: 0, diff: "+x", collapsedLines: 0, createdAt: "2026-10-06T00:00:00.000Z", status: "completed", ...partial };
+  return {
+    kind: "edit_diff",
+    id,
+    filePath: `/repo/${id}.ts`,
+    additions: 1,
+    deletions: 0,
+    diff: "+x",
+    collapsedLines: 0,
+    createdAt: "2026-10-06T00:00:00.000Z",
+    status: "completed",
+    ...partial,
+  };
 }
 
 describe("collectEditedFilePaths", () => {
@@ -30,7 +41,9 @@ describe("collectEditedFilePaths", () => {
 function panelLayout(initial: { isOpen?: boolean } = {}) {
   const closePanel = vi.fn();
   const openPanel = vi.fn();
-  const hook = renderHook(({ isOpen }) => usePanelLayout({ isOpen, openPanel, closePanel }), { initialProps: { isOpen: initial.isOpen ?? false } });
+  const hook = renderHook(({ isOpen }) => usePanelLayout({ isOpen, openPanel, closePanel }), {
+    initialProps: { isOpen: initial.isOpen ?? false },
+  });
   return { ...hook, closePanel, openPanel };
 }
 
@@ -40,7 +53,10 @@ describe("usePanelLayout", () => {
   });
 
   it("maps a stored legacy rail mode to hidden and clamps the stored widths", () => {
-    window.localStorage.setItem(WORKBENCH_LAYOUT_STORAGE_KEY, JSON.stringify({ leftMode: "rail", leftWidth: 999, rightWidth: 10 }));
+    window.localStorage.setItem(
+      WORKBENCH_LAYOUT_STORAGE_KEY,
+      JSON.stringify({ leftMode: "rail", leftWidth: 999, rightWidth: 10 }),
+    );
     const { result } = panelLayout();
     expect(result.current.leftMode).toBe("hidden");
     expect(result.current.displayedLeftWidth).toBe(0);
@@ -60,7 +76,11 @@ describe("usePanelLayout", () => {
     act(() => result.current.resizeLeftPanel(300));
     expect(result.current.displayedLeftWidth).toBe(300);
     // jsdom 的 innerWidth 是 1024：初始右栏宽度按 1024 - 260 - 560 收到下限 320。
-    expect(JSON.parse(window.localStorage.getItem(WORKBENCH_LAYOUT_STORAGE_KEY) ?? "{}")).toEqual({ leftMode: "expanded", leftWidth: 300, rightWidth: 320 });
+    expect(JSON.parse(window.localStorage.getItem(WORKBENCH_LAYOUT_STORAGE_KEY) ?? "{}")).toEqual({
+      leftMode: "expanded",
+      leftWidth: 300,
+      rightWidth: 320,
+    });
   });
 
   it("clamps right resizes to the room left for the conversation and resets on double click", () => {
@@ -98,11 +118,20 @@ describe("usePanelLayout", () => {
 
   // 主区 560 + 右栏 320 = 880：低于它两栏放不下，必须走覆盖层，否则右栏打开后会被收栏 effect 立刻关掉。
   it.each([
-    [820, true], [821, true], [832, true], [879, true], [880, false], [881, false],
+    [820, true],
+    [821, true],
+    [832, true],
+    [879, true],
+    [880, false],
+    [881, false],
   ])("opens the right panel and keeps it open at %ipx (compact=%s)", (width, compact) => {
     let open = false;
-    const closePanel = vi.fn(() => { open = false; });
-    const openPanel = vi.fn(() => { open = true; });
+    const closePanel = vi.fn(() => {
+      open = false;
+    });
+    const openPanel = vi.fn(() => {
+      open = true;
+    });
     const { result, rerender } = renderHook(() => usePanelLayout({ isOpen: open, openPanel, closePanel }));
     act(() => result.current.handleContainerWidthChange(width));
     expect(result.current.isCompactLayout).toBe(compact);
@@ -139,10 +168,14 @@ describe("usePanelLayout", () => {
 
     const handled = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
     handled.preventDefault();
-    act(() => { window.dispatchEvent(handled); });
+    act(() => {
+      window.dispatchEvent(handled);
+    });
     expect(result.current.compactSidebarOpen).toBe(true);
 
-    act(() => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
     expect(result.current.compactSidebarOpen).toBe(false);
     expect(closePanel).toHaveBeenCalledTimes(1);
   });
@@ -160,7 +193,9 @@ describe("usePanelLayout", () => {
 describe("useSessionHistory", () => {
   it("goes back and forward without recording the navigation, and truncates the forward branch on a new visit", async () => {
     const onSelectSession = vi.fn();
-    const { result, rerender } = renderHook(({ id }) => useSessionHistory(id, onSelectSession), { initialProps: { id: "a" as string | null } });
+    const { result, rerender } = renderHook(({ id }) => useSessionHistory(id, onSelectSession), {
+      initialProps: { id: "a" as string | null },
+    });
     expect(result.current.canGoBack).toBe(false);
     rerender({ id: "b" });
     rerender({ id: "c" });
@@ -184,7 +219,9 @@ describe("useSessionHistory", () => {
 
   it("puts the position back when switching fails", async () => {
     const onSelectSession = vi.fn().mockRejectedValue(new Error("打不开"));
-    const { result, rerender } = renderHook(({ id }) => useSessionHistory(id, onSelectSession), { initialProps: { id: "a" } });
+    const { result, rerender } = renderHook(({ id }) => useSessionHistory(id, onSelectSession), {
+      initialProps: { id: "a" },
+    });
     rerender({ id: "b" });
     act(() => result.current.navigateSessionHistory(-1));
     await act(async () => {});

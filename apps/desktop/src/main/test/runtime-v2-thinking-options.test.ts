@@ -4,30 +4,123 @@ import type { ModelCapabilities } from "@actspace/shared";
 import type { LlmAdapterDispatchInput, LlmAdapterPrepareInput } from "@actspace/llm-service";
 import { DesktopLlmAdapter } from "../runtime-v2/llm-adapter";
 const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn(async () => (async function* () {})()) }));
-vi.mock("@actspace/llm-pi-ai", async (importOriginal) => ({ ...await importOriginal<typeof import("@actspace/llm-pi-ai")>(), PiAiAdapter: class { dispatch = dispatch; }, PiAiWireEngine: class {}, LegacyProxyWireEngine: class {}, DeepSeekFileUploader: class {} }));
+vi.mock("@actspace/llm-pi-ai", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@actspace/llm-pi-ai")>()),
+  PiAiAdapter: class {
+    dispatch = dispatch;
+  },
+  PiAiWireEngine: class {},
+  LegacyProxyWireEngine: class {},
+  DeepSeekFileUploader: class {},
+}));
 beforeEach(() => dispatch.mockClear());
 it("freezes pricing against the selected connection endpoint and final reasoning model", async () => {
-  const resolution = { ok: true as const, model: { key: "fixture", definition: { api: "openai-completions" as const, provider: "deepseek", apiModel: "base", contextWindow: 1000, requestModelByReasoningEffort: { high: "actual-high" } }, providerRuntime: { baseUrl: "https://api.deepseek.com" } } };
+  const resolution = {
+    ok: true as const,
+    model: {
+      key: "fixture",
+      definition: {
+        api: "openai-completions" as const,
+        provider: "deepseek",
+        apiModel: "base",
+        contextWindow: 1000,
+        requestModelByReasoningEffort: { high: "actual-high" },
+      },
+      providerRuntime: { baseUrl: "https://api.deepseek.com" },
+    },
+  };
   const resolvePricing = vi.fn(() => null);
-  const adapter = new DesktopLlmAdapter({ resolvePricing, resolveMainModel: () => resolution, resolveImageInspectionModel: () => resolution, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); });
+  const adapter = new DesktopLlmAdapter(
+    {
+      resolvePricing,
+      resolveMainModel: () => resolution,
+      resolveImageInspectionModel: () => resolution,
+      getToolEnvironment: () => ({ searchCredentials: {} }),
+    },
+    async () => {
+      throw Error("unused");
+    },
+  );
   try {
-    await adapter.dispatch({ request: { model: "fixture", options: { reasoning: true, reasoningEffort: "high" } }, credential: { baseUrl: "https://custom.example/v1" }, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
-    expect(resolvePricing).toHaveBeenCalledWith(expect.objectContaining({ providerRuntime: expect.objectContaining({ baseUrl: "https://api.deepseek.com" }) }), "actual-high");
-  } finally { await adapter.dispose(); }
+    await adapter.dispatch({
+      request: { model: "fixture", options: { reasoning: true, reasoningEffort: "high" } },
+      credential: { baseUrl: "https://custom.example/v1" },
+      signal: new AbortController().signal,
+    } as unknown as LlmAdapterDispatchInput);
+    expect(resolvePricing).toHaveBeenCalledWith(
+      expect.objectContaining({ providerRuntime: expect.objectContaining({ baseUrl: "https://api.deepseek.com" }) }),
+      "actual-high",
+    );
+  } finally {
+    await adapter.dispose();
+  }
 });
 it.each([
-  { capabilities: { reasoning: true, thinkingToggle: true }, requested: { reasoning: false }, expected: { reasoning: false } },
-  { capabilities: { reasoning: true, thinkingToggle: false, reasoningMandatory: true }, requested: { reasoning: false }, expected: { reasoning: true } },
-  { capabilities: { reasoning: true, thinkingToggle: true, reasoningEfforts: ["high", "max"], reasoningDefaultEffort: "high" }, requested: { reasoning: true, reasoningEffort: "max" }, expected: { reasoning: true, reasoningEffort: "max" } },
-  { capabilities: { reasoning: false, thinkingToggle: false }, requested: { reasoning: true, reasoningEffort: "max" }, expected: {} },
+  {
+    capabilities: { reasoning: true, thinkingToggle: true },
+    requested: { reasoning: false },
+    expected: { reasoning: false },
+  },
+  {
+    capabilities: { reasoning: true, thinkingToggle: false, reasoningMandatory: true },
+    requested: { reasoning: false },
+    expected: { reasoning: true },
+  },
+  {
+    capabilities: {
+      reasoning: true,
+      thinkingToggle: true,
+      reasoningEfforts: ["high", "max"],
+      reasoningDefaultEffort: "high",
+    },
+    requested: { reasoning: true, reasoningEffort: "max" },
+    expected: { reasoning: true, reasoningEffort: "max" },
+  },
+  {
+    capabilities: { reasoning: false, thinkingToggle: false },
+    requested: { reasoning: true, reasoningEffort: "max" },
+    expected: {},
+  },
 ])("normalizes request options using model capabilities: $expected", async ({ capabilities, requested, expected }) => {
-  const resolution = { ok: true as const, model: { key: "fixture", definition: { api: "openai-completions" as const, provider: "deepseek", apiModel: "v4", contextWindow: 1000, thinkingDefault: true, capabilities: capabilities as ModelCapabilities }, providerRuntime: {} } };
-  const adapter = new DesktopLlmAdapter({ resolveMainModel: () => resolution, resolveImageInspectionModel: () => resolution, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); });
+  const resolution = {
+    ok: true as const,
+    model: {
+      key: "fixture",
+      definition: {
+        api: "openai-completions" as const,
+        provider: "deepseek",
+        apiModel: "v4",
+        contextWindow: 1000,
+        thinkingDefault: true,
+        capabilities: capabilities as ModelCapabilities,
+      },
+      providerRuntime: {},
+    },
+  };
+  const adapter = new DesktopLlmAdapter(
+    {
+      resolveMainModel: () => resolution,
+      resolveImageInspectionModel: () => resolution,
+      getToolEnvironment: () => ({ searchCredentials: {} }),
+    },
+    async () => {
+      throw Error("unused");
+    },
+  );
   try {
-    await adapter.dispatch({ request: { model: "fixture", options: requested }, credential: {}, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
+    await adapter.dispatch({
+      request: { model: "fixture", options: requested },
+      credential: {},
+      signal: new AbortController().signal,
+    } as unknown as LlmAdapterDispatchInput);
     expect((dispatch.mock.calls[0] as unknown as [LlmAdapterDispatchInput])[0].request.options).toMatchObject(expected);
-    if (!capabilities.reasoning) expect((dispatch.mock.calls[0] as unknown as [LlmAdapterDispatchInput])[0].request.options).not.toHaveProperty("reasoning");
-  } finally { await adapter.dispose(); }
+    if (!capabilities.reasoning)
+      expect((dispatch.mock.calls[0] as unknown as [LlmAdapterDispatchInput])[0].request.options).not.toHaveProperty(
+        "reasoning",
+      );
+  } finally {
+    await adapter.dispose();
+  }
 });
 
 it.each([
@@ -36,31 +129,113 @@ it.each([
   { requested: {}, expected: {} },
 ])("keeps request options JSON-safe when no effort applies: $requested", ({ requested, expected }) => {
   // The options become the request snapshot's defaults, which reject undefined values.
-  const resolution = { ok: true as const, model: { key: "fixture", definition: { api: "openai-completions" as const, provider: "deepseek", apiModel: "v4", contextWindow: 1000, capabilities: { reasoning: true, thinkingToggle: true, reasoningEfforts: ["high"] } as ModelCapabilities }, providerRuntime: {} } };
-  const adapter = new DesktopLlmAdapter({ resolveMainModel: () => resolution, resolveImageInspectionModel: () => resolution, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); });
-  const options = adapter.prepare({ request: { model: "fixture", options: requested }, credential: {} } as unknown as LlmAdapterPrepareInput).request.options;
+  const resolution = {
+    ok: true as const,
+    model: {
+      key: "fixture",
+      definition: {
+        api: "openai-completions" as const,
+        provider: "deepseek",
+        apiModel: "v4",
+        contextWindow: 1000,
+        capabilities: { reasoning: true, thinkingToggle: true, reasoningEfforts: ["high"] } as ModelCapabilities,
+      },
+      providerRuntime: {},
+    },
+  };
+  const adapter = new DesktopLlmAdapter(
+    {
+      resolveMainModel: () => resolution,
+      resolveImageInspectionModel: () => resolution,
+      getToolEnvironment: () => ({ searchCredentials: {} }),
+    },
+    async () => {
+      throw Error("unused");
+    },
+  );
+  const options = adapter.prepare({
+    request: { model: "fixture", options: requested },
+    credential: {},
+  } as unknown as LlmAdapterPrepareInput).request.options;
   expect(options).toStrictEqual(expected);
 });
 
 it("routes title requests to a text-only utility model with its own connection", async () => {
-  const utility = { ok: true as const, model: { key: "utility", definition: { api: "openai-completions" as const, provider: "kimi", apiModel: "title-model", contextWindow: 1000, capabilities: { toolUse: false, reasoning: false } as ModelCapabilities }, providerRuntime: { apiKey: "fixture-utility-key", baseUrl: "https://utility.example/v1" } } };
-  const resolveMainModel = vi.fn(() => { throw Error("must not validate utility model as chat"); });
+  const utility = {
+    ok: true as const,
+    model: {
+      key: "utility",
+      definition: {
+        api: "openai-completions" as const,
+        provider: "kimi",
+        apiModel: "title-model",
+        contextWindow: 1000,
+        capabilities: { toolUse: false, reasoning: false } as ModelCapabilities,
+      },
+      providerRuntime: { apiKey: "fixture-utility-key", baseUrl: "https://utility.example/v1" },
+    },
+  };
+  const resolveMainModel = vi.fn(() => {
+    throw Error("must not validate utility model as chat");
+  });
   const resolveUtilityTaskModel = vi.fn(() => utility);
-  const adapter = new DesktopLlmAdapter({ resolveMainModel, resolveUtilityTaskModel, resolveImageInspectionModel: () => utility, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); }, "utility");
+  const adapter = new DesktopLlmAdapter(
+    {
+      resolveMainModel,
+      resolveUtilityTaskModel,
+      resolveImageInspectionModel: () => utility,
+      getToolEnvironment: () => ({ searchCredentials: {} }),
+    },
+    async () => {
+      throw Error("unused");
+    },
+    "utility",
+  );
   try {
     expect(adapter.resolveModelFacts("chosen-main")).toEqual({ contextWindow: 1000 });
-    await adapter.dispatch({ request: { model: "chosen-main", options: {} }, credential: {}, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
+    await adapter.dispatch({
+      request: { model: "chosen-main", options: {} },
+      credential: {},
+      signal: new AbortController().signal,
+    } as unknown as LlmAdapterDispatchInput);
     expect(resolveUtilityTaskModel).toHaveBeenCalledWith("chosen-main");
     expect(resolveMainModel).not.toHaveBeenCalled();
-    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ request: expect.objectContaining({ model: "title-model" }), credential: expect.objectContaining({ apiKey: "fixture-utility-key", baseUrl: "https://utility.example/v1" }) }));
-  } finally { await adapter.dispose(); }
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: expect.objectContaining({ model: "title-model" }),
+        credential: expect.objectContaining({ apiKey: "fixture-utility-key", baseUrl: "https://utility.example/v1" }),
+      }),
+    );
+  } finally {
+    await adapter.dispose();
+  }
 });
 
 it("resolves a changed utility binding on the next prepared call", async () => {
   let key = "first-utility";
-  const resolveUtilityTaskModel = vi.fn(() => ({ ok: true as const, model: { key, definition: { api: "openai-completions" as const, provider: "kimi", apiModel: key, contextWindow: 1000 }, providerRuntime: {} } }));
-  const resolveMainModel = vi.fn(() => { throw Error("compaction must use utility"); });
-  const adapter = new DesktopLlmAdapter({ resolveMainModel, resolveUtilityTaskModel, resolveImageInspectionModel: resolveUtilityTaskModel, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); }, "utility");
+  const resolveUtilityTaskModel = vi.fn(() => ({
+    ok: true as const,
+    model: {
+      key,
+      definition: { api: "openai-completions" as const, provider: "kimi", apiModel: key, contextWindow: 1000 },
+      providerRuntime: {},
+    },
+  }));
+  const resolveMainModel = vi.fn(() => {
+    throw Error("compaction must use utility");
+  });
+  const adapter = new DesktopLlmAdapter(
+    {
+      resolveMainModel,
+      resolveUtilityTaskModel,
+      resolveImageInspectionModel: resolveUtilityTaskModel,
+      getToolEnvironment: () => ({ searchCredentials: {} }),
+    },
+    async () => {
+      throw Error("unused");
+    },
+    "utility",
+  );
   const input = { request: { model: "default", options: {} }, credential: {} } as unknown as LlmAdapterPrepareInput;
   try {
     expect(adapter.prepare(input).request.model).toBe("first-utility");
@@ -69,20 +244,47 @@ it("resolves a changed utility binding on the next prepared call", async () => {
     expect(resolveUtilityTaskModel).toHaveBeenNthCalledWith(1, undefined);
     expect(resolveUtilityTaskModel).toHaveBeenNthCalledWith(2, undefined);
     expect(resolveMainModel).not.toHaveBeenCalled();
-  } finally { await adapter.dispose(); }
+  } finally {
+    await adapter.dispose();
+  }
 });
 
 it("uses the auto-review binding with the current main model and fails closed when unavailable", async () => {
-  const resolution = { ok: true as const, model: { key: "review", definition: { api: "openai-completions" as const, provider: "kimi", apiModel: "review-api", contextWindow: 1000 }, providerRuntime: { baseUrl: "https://review.example/v1" } } };
+  const resolution = {
+    ok: true as const,
+    model: {
+      key: "review",
+      definition: { api: "openai-completions" as const, provider: "kimi", apiModel: "review-api", contextWindow: 1000 },
+      providerRuntime: { baseUrl: "https://review.example/v1" },
+    },
+  };
   const resolveMainModel = vi.fn(() => resolution);
-  const resolveAutoReviewModel = vi.fn((): import("../runtime-v2/model-port").DesktopRuntimeModelResolution => resolution);
-  const adapter = new DesktopLlmAdapter({ resolveMainModel, resolveAutoReviewModel, resolveImageInspectionModel: () => resolution, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); }, "auto-review");
+  const resolveAutoReviewModel = vi.fn(
+    (): import("../runtime-v2/model-port").DesktopRuntimeModelResolution => resolution,
+  );
+  const adapter = new DesktopLlmAdapter(
+    {
+      resolveMainModel,
+      resolveAutoReviewModel,
+      resolveImageInspectionModel: () => resolution,
+      getToolEnvironment: () => ({ searchCredentials: {} }),
+    },
+    async () => {
+      throw Error("unused");
+    },
+    "auto-review",
+  );
   try {
-    const input = { request: { model: "chosen-main", options: {} }, signal: new AbortController().signal } as unknown as LlmAdapterPrepareInput;
+    const input = {
+      request: { model: "chosen-main", options: {} },
+      signal: new AbortController().signal,
+    } as unknown as LlmAdapterPrepareInput;
     expect(adapter.prepare(input).request.model).toBe("review-api");
     expect(resolveAutoReviewModel).toHaveBeenCalledWith("chosen-main");
     resolveAutoReviewModel.mockReturnValue({ ok: false, message: "review unavailable" });
     expect(() => adapter.prepare(input)).toThrow("review unavailable");
     expect(resolveMainModel).not.toHaveBeenCalled();
-  } finally { await adapter.dispose(); }
+  } finally {
+    await adapter.dispose();
+  }
 });

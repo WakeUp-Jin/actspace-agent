@@ -6,18 +6,32 @@ export function extractPairCode(text: string): string {
   return /\b[a-f0-9]{32}\b/i.exec(text)?.[0] ?? text.replace(/\s+/g, "");
 }
 
-export function PairCodeInput({ value, onChange, onSubmit, invalid, describedBy }: { readonly value: string; readonly onChange: (value: string) => void; readonly onSubmit: () => void; readonly invalid?: boolean; readonly describedBy?: string }) {
+export function PairCodeInput({
+  value,
+  onChange,
+  onSubmit,
+  invalid,
+  describedBy,
+}: {
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly onSubmit: () => void;
+  readonly invalid?: boolean;
+  readonly describedBy?: string;
+}) {
   const id = useId();
   return (
     <input
       id={id}
       value={value}
-      onChange={event => onChange(extractPairCode(event.target.value))}
-      onPaste={event => {
+      onChange={(event) => onChange(extractPairCode(event.target.value))}
+      onPaste={(event) => {
         event.preventDefault();
         onChange(extractPairCode(event.clipboardData.getData("text")));
       }}
-      onKeyDown={event => { if (event.key === "Enter") onSubmit(); }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") onSubmit();
+      }}
       aria-label="配对码"
       aria-invalid={invalid || undefined}
       aria-describedby={describedBy}

@@ -7,15 +7,28 @@ export async function writeDurableJson(path: string, value: unknown): Promise<vo
   const temporary = `${path}.${randomUUID()}.tmp`;
   try {
     const file = await open(temporary, "wx", 0o600);
-    try { await file.writeFile(JSON.stringify(value)); await file.sync(); } finally { await file.close(); }
+    try {
+      await file.writeFile(JSON.stringify(value));
+      await file.sync();
+    } finally {
+      await file.close();
+    }
     await rename(temporary, path);
     const directory = await open(dirname(path), "r");
-    try { await directory.sync(); } finally { await directory.close(); }
-  } finally { await unlink(temporary).catch(() => undefined); }
+    try {
+      await directory.sync();
+    } finally {
+      await directory.close();
+    }
+  } finally {
+    await unlink(temporary).catch(() => undefined);
+  }
 }
 export class SerialGate {
   #tail: Promise<unknown> = Promise.resolve();
   run<T>(operation: () => Promise<T>): Promise<T> {
-    const next = this.#tail.then(operation); this.#tail = next.catch(() => undefined); return next;
+    const next = this.#tail.then(operation);
+    this.#tail = next.catch(() => undefined);
+    return next;
   }
 }

@@ -44,7 +44,7 @@ async function removeExpiredLogs(logDir) {
 async function replaceLatestLogLink(latestLog, logFile) {
   try {
     const existing = await lstat(latestLog);
-    if (existing.isSymbolicLink() && await readlink(latestLog) === basename(logFile)) return;
+    if (existing.isSymbolicLink() && (await readlink(latestLog)) === basename(logFile)) return;
     await unlink(latestLog);
   } catch (error) {
     if (error?.code !== "ENOENT") throw error;
@@ -114,18 +114,22 @@ async function main() {
     ["node", ["scripts/package-browser-components.mjs"], repoRoot],
     // Existing dist files are not proof that this invocation compiled successfully.
     ["pnpm", ["--filter", "@actspace/desktop", "run", "build:electron"], repoRoot],
-    ["pnpm", [
-      "exec",
-      "concurrently",
-      "-k",
-      "pnpm:dev:deps",
-      "pnpm:dev:client-bundle",
-      "pnpm:dev:host-bundles",
-      "pnpm:dev:prompts",
-      "pnpm:dev:renderer",
-      "pnpm:dev:electron:build",
-      "pnpm:dev:electron:run",
-    ], desktopRoot],
+    [
+      "pnpm",
+      [
+        "exec",
+        "concurrently",
+        "-k",
+        "pnpm:dev:deps",
+        "pnpm:dev:client-bundle",
+        "pnpm:dev:host-bundles",
+        "pnpm:dev:prompts",
+        "pnpm:dev:renderer",
+        "pnpm:dev:electron:build",
+        "pnpm:dev:electron:run",
+      ],
+      desktopRoot,
+    ],
   ];
 
   let exitCode = 0;
@@ -147,7 +151,7 @@ async function main() {
 }
 
 void main().catch(async (error) => {
-  writeOutput(process.stderr, `${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+  writeOutput(process.stderr, `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`);
   if (forceKillTimer) clearTimeout(forceKillTimer);
   await closeLog();
   process.exitCode = 1;

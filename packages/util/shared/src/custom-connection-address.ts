@@ -2,7 +2,9 @@ import type { ModelApi } from "./model-config";
 import { trimTrailing } from "./trim-trailing";
 
 // shared 只带 ES2022 lib；URL 在 Node 和浏览器里都是全局对象，这里只声明用到的字段。
-declare const URL: new (input: string) => {
+declare const URL: new (
+  input: string,
+) => {
   readonly protocol: string;
   readonly username: string;
   readonly password: string;
@@ -59,7 +61,13 @@ export function normalizeCustomConnectionAddress(raw: string, protocol: ModelApi
     strippedSuffixes.push("/v1");
   }
   const baseUrl = `${parsed.origin}${path}`;
-  return { ok: true, baseUrl, requestUrl: customConnectionRequestUrl(baseUrl, effectiveProtocol), strippedSuffixes, inferredProtocol };
+  return {
+    ok: true,
+    baseUrl,
+    requestUrl: customConnectionRequestUrl(baseUrl, effectiveProtocol),
+    strippedSuffixes,
+    inferredProtocol,
+  };
 }
 
 /** 连接测试和模型调用实际请求的接口地址。 */

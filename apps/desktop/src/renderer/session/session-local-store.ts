@@ -67,7 +67,9 @@ function releaseAttachmentPreviews(state: SessionLocalState | undefined): void {
 export function createSessionLocalStore(): SessionLocalStore {
   const states = new Map<string, SessionLocalState>();
   const listeners = new Set<() => void>();
-  const notify = () => { for (const listener of [...listeners]) listener(); };
+  const notify = () => {
+    for (const listener of [...listeners]) listener();
+  };
   const get = (sessionId: string) => states.get(sessionId) ?? DEFAULT_SESSION_LOCAL_STATE;
   return {
     get,
@@ -80,7 +82,9 @@ export function createSessionLocalStore(): SessionLocalStore {
     },
     subscribe(listener) {
       listeners.add(listener);
-      return () => { listeners.delete(listener); };
+      return () => {
+        listeners.delete(listener);
+      };
     },
     evict(sessionId) {
       releaseAttachmentPreviews(states.get(sessionId));
@@ -106,7 +110,11 @@ export const SessionLocalStoreContext = createContext<SessionLocalStore | null>(
  * 订阅一个会话的本地状态。selector 的结果按 `Object.is` 比较，不变就不重渲染，
  * 所以 selector 只能返回 state 里已有的引用或原始值，不要在里面新建对象。
  */
-export function useSessionLocalState<T>(store: SessionLocalStore, sessionId: string | null, selector: (state: SessionLocalState) => T): T {
+export function useSessionLocalState<T>(
+  store: SessionLocalStore,
+  sessionId: string | null,
+  selector: (state: SessionLocalState) => T,
+): T {
   const getSnapshot = useCallback(
     () => selector(sessionId === null ? DEFAULT_SESSION_LOCAL_STATE : store.get(sessionId)),
     [store, sessionId, selector],
@@ -119,7 +127,10 @@ const EMPTY_IDS: ReadonlySet<string> = new Set();
 /**
  * 跨会话的成员集合（例如「等待审批的会话」）。成员不变时返回同一个 Set，下游 memo 不会白算。
  */
-export function useSessionLocalIds(store: SessionLocalStore, predicate: (state: SessionLocalState) => boolean): ReadonlySet<string> {
+export function useSessionLocalIds(
+  store: SessionLocalStore,
+  predicate: (state: SessionLocalState) => boolean,
+): ReadonlySet<string> {
   const cache = useRef(EMPTY_IDS);
   const getSnapshot = useCallback(() => {
     const ids = store.ids().filter((id) => predicate(store.get(id)));

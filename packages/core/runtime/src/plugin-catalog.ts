@@ -42,7 +42,10 @@ import { manifest as sessionTranscriptManifest } from "@actspace/session-transcr
 import { manifest as subagentToolsManifest } from "@actspace/tool-subagent/manifest";
 import { manifest as subagentCodexManifest } from "@actspace/subagent-codex/manifest";
 import { manifest as subagentClaudeCodeManifest } from "@actspace/subagent-claude-code/manifest";
-import { manifest as todoToolsManifest, projectionManifest as todoProjectionManifest } from "@actspace/tool-todo/manifest";
+import {
+  manifest as todoToolsManifest,
+  projectionManifest as todoProjectionManifest,
+} from "@actspace/tool-todo/manifest";
 import { manifest as webManifest } from "@actspace/tool-web/manifest";
 import { agentFactoryManifest, agentRuntimeManifest, runtimeManifest, sessionRuntimeManifest } from "./manifests.js";
 
@@ -74,72 +77,381 @@ const harness = ["harness"] as const;
  * all derived from this list.
  */
 export const PLUGIN_CATALOG: readonly PluginCatalogEntry[] = Object.freeze([
-  { id: "actspace-runtime", manifest: runtimeManifest, module: "@actspace/runtime/cordis", loaders: host, directory: "core" },
-  { id: "session-journal", manifest: sessionJournalManifest, module: "@actspace/session-journal/plugin", loaders: host, codec: "@actspace/session-journal/codec", directory: "session" },
-  { id: "session-persistence", manifest: sessionPersistenceManifest, module: "@actspace/session-persistence/plugin", loaders: host, directory: "session" },
-  { id: "session-jsonl", manifest: sessionJsonlManifest, module: "@actspace/session-persistence-jsonl/plugin", loaders: host, directory: "session" },
-  { id: "session-projection", manifest: sessionProjectionManifest, module: "@actspace/session-projection/plugin", loaders: host, directory: "session" },
-  { id: "session-runtime", manifest: sessionRuntimeManifest, module: "@actspace/runtime/session", loaders: host, directory: "core" },
-  { id: "session-checkpoint-policy", manifest: checkpointPolicyManifest, module: "@actspace/session-checkpoint-policy/plugin", loaders: host, directory: "session" },
-  { id: "llm-service", manifest: llmServiceManifest, module: "@actspace/llm-service/plugin", loaders: ["host", "harness"], directory: "llm" },
-  { id: "todo-projection", manifest: todoProjectionManifest, module: "@actspace/tool-todo/projection", loaders: host, directory: "todo" },
+  {
+    id: "actspace-runtime",
+    manifest: runtimeManifest,
+    module: "@actspace/runtime/cordis",
+    loaders: host,
+    directory: "core",
+  },
+  {
+    id: "session-journal",
+    manifest: sessionJournalManifest,
+    module: "@actspace/session-journal/plugin",
+    loaders: host,
+    codec: "@actspace/session-journal/codec",
+    directory: "session",
+  },
+  {
+    id: "session-persistence",
+    manifest: sessionPersistenceManifest,
+    module: "@actspace/session-persistence/plugin",
+    loaders: host,
+    directory: "session",
+  },
+  {
+    id: "session-jsonl",
+    manifest: sessionJsonlManifest,
+    module: "@actspace/session-persistence-jsonl/plugin",
+    loaders: host,
+    directory: "session",
+  },
+  {
+    id: "session-projection",
+    manifest: sessionProjectionManifest,
+    module: "@actspace/session-projection/plugin",
+    loaders: host,
+    directory: "session",
+  },
+  {
+    id: "session-runtime",
+    manifest: sessionRuntimeManifest,
+    module: "@actspace/runtime/session",
+    loaders: host,
+    directory: "core",
+  },
+  {
+    id: "session-checkpoint-policy",
+    manifest: checkpointPolicyManifest,
+    module: "@actspace/session-checkpoint-policy/plugin",
+    loaders: host,
+    directory: "session",
+  },
+  {
+    id: "llm-service",
+    manifest: llmServiceManifest,
+    module: "@actspace/llm-service/plugin",
+    loaders: ["host", "harness"],
+    directory: "llm",
+  },
+  {
+    id: "todo-projection",
+    manifest: todoProjectionManifest,
+    module: "@actspace/tool-todo/projection",
+    loaders: host,
+    directory: "todo",
+  },
   { id: "core-agent", manifest: coreAgentManifest, module: "@actspace/agent/plugin", loaders: host, directory: "core" },
-  { id: "agent-runtime", manifest: agentRuntimeManifest, module: "@actspace/runtime/agent-runtime", loaders: host, directory: "core" },
-  { id: "headless-runner", manifest: headlessManifest, module: "@actspace/headless/plugin", loaders: host, directory: "host" },
-  { id: "agent-host", manifest: agentHostManifest, module: "@actspace/agent-host/plugin", loaders: host, directory: "host" },
-  { id: "desktop-app", manifest: desktopAppManifest, module: "@actspace/desktop-app/plugin", loaders: host, directory: "host" },
-  { id: "english-learning", manifest: englishLearningManifest, module: "@actspace/english-learning/plugin", loaders: host, directory: "english-learning" },
-  { id: "side-chat", manifest: sideChatManifest, module: "@actspace/side-chat/plugin", loaders: host, directory: "side-chat" },
-  { id: "session-transcript", manifest: sessionTranscriptManifest, module: "@actspace/session-transcript/plugin", loaders: host, directory: "session" },
+  {
+    id: "agent-runtime",
+    manifest: agentRuntimeManifest,
+    module: "@actspace/runtime/agent-runtime",
+    loaders: host,
+    directory: "core",
+  },
+  {
+    id: "headless-runner",
+    manifest: headlessManifest,
+    module: "@actspace/headless/plugin",
+    loaders: host,
+    directory: "host",
+  },
+  {
+    id: "agent-host",
+    manifest: agentHostManifest,
+    module: "@actspace/agent-host/plugin",
+    loaders: host,
+    directory: "host",
+  },
+  {
+    id: "desktop-app",
+    manifest: desktopAppManifest,
+    module: "@actspace/desktop-app/plugin",
+    loaders: host,
+    directory: "host",
+  },
+  {
+    id: "english-learning",
+    manifest: englishLearningManifest,
+    module: "@actspace/english-learning/plugin",
+    loaders: host,
+    directory: "english-learning",
+  },
+  {
+    id: "side-chat",
+    manifest: sideChatManifest,
+    module: "@actspace/side-chat/plugin",
+    loaders: host,
+    directory: "side-chat",
+  },
+  {
+    id: "session-transcript",
+    manifest: sessionTranscriptManifest,
+    module: "@actspace/session-transcript/plugin",
+    loaders: host,
+    directory: "session",
+  },
 
-  { id: "auto-review", manifest: autoReviewManifest, module: "@actspace/auto-review/plugin", loaders: harness, directory: "approval" },
-  { id: "tools-approval", manifest: approvalManifest, module: "@actspace/approval/plugin", loaders: harness, directory: "approval" },
-  { id: "sandbox", manifest: sandboxManifest, module: "@actspace/sandbox/plugin", loaders: harness, directory: "sandbox", admitOnHost: true },
-  { id: "sandbox-nono", manifest: sandboxNonoManifest, module: "@actspace/sandbox-nono/plugin", loaders: harness, directory: "sandbox", admitOnHost: true },
-  { id: "sandbox-seatbelt", manifest: sandboxSeatbeltManifest, module: "@actspace/sandbox-seatbelt/plugin", loaders: harness, directory: "sandbox", admitOnHost: true },
-  { id: "tools-runtime", manifest: toolRuntimeManifest, module: "@actspace/tool-runtime/plugin", loaders: harness, directory: "core" },
-  { id: "context-engine", manifest: contextEngineManifest, module: "@actspace/context-engine/plugin", loaders: harness, codec: "@actspace/context-engine/codec", directory: "context" },
-  { id: "prompt-runtime", manifest: promptManifest, module: "@actspace/prompt/plugin", loaders: harness, directory: "context" },
-  { id: "context-assembly", manifest: contextAssemblyManifest, module: "@actspace/context-assembly/plugin", loaders: harness, directory: "context" },
-  { id: "context-system", manifest: contextSystemManifest, module: "@actspace/context-system/plugin", loaders: harness, directory: "context" },
-  { id: "context-rules", manifest: contextRulesManifest, module: "@actspace/context-rules/plugin", loaders: harness, directory: "context" },
-  { id: "context-skills", manifest: contextSkillsManifest, module: "@actspace/context-skills/plugin", loaders: harness, directory: "context" },
-  { id: "context-runtime", manifest: contextRuntimeManifest, module: "@actspace/context-runtime/plugin", loaders: harness, directory: "context" },
-  { id: "context-conversation", manifest: contextConversationManifest, module: "@actspace/context-conversation/plugin", loaders: harness, directory: "context" },
-  { id: "context-tools", manifest: contextToolsManifest, module: "@actspace/context-tools/plugin", loaders: harness, directory: "context" },
-  { id: "context-background-tasks", manifest: contextBackgroundTasksManifest, module: "@actspace/context-background-tasks/plugin", loaders: harness, directory: "context" },
-  { id: "context-disclosure", manifest: contextDisclosureManifest, module: "@actspace/context-disclosure/plugin", loaders: harness, directory: "context" },
-  { id: "compaction-runtime", manifest: compactionManifest, module: "@actspace/context-compaction/plugin", loaders: harness, directory: "context" },
-  { id: "filesystem-read", manifest: fsReadManifest, module: "@actspace/tool-fs-read/plugin", loaders: harness, directory: "fs", admitOnHost: true },
-  { id: "filesystem-search", manifest: fsSearchManifest, module: "@actspace/tool-fs-search/plugin", loaders: harness, directory: "fs", admitOnHost: true },
-  { id: "filesystem-write", manifest: fsWriteManifest, module: "@actspace/tool-fs-write/plugin", loaders: harness, directory: "fs", admitOnHost: true },
-  { id: "web-tools", manifest: webManifest, module: "@actspace/tool-web/plugin", loaders: harness, directory: "web", admitOnHost: true },
-  { id: "image-generation", manifest: imageGenerationManifest, module: "@actspace/tool-image-generation/plugin", loaders: harness, directory: "image", admitOnHost: true },
-  { id: "shell-tools", manifest: shellManifest, module: "@actspace/tool-shell/plugin", loaders: harness, directory: "shell", admitOnHost: true },
-  { id: "image-inspection", manifest: imageInspectionManifest, module: "@actspace/tool-image-inspection/plugin", loaders: harness, directory: "image", admitOnHost: true },
-  { id: "todo-tools", manifest: todoToolsManifest, module: "@actspace/tool-todo/plugin", loaders: harness, codec: "@actspace/tool-todo/codec", directory: "todo", admitOnHost: true },
-  { id: "browser-tools", manifest: browserToolsManifest, module: "@actspace/tool-browser/plugin", loaders: harness, directory: "browser" },
-  { id: "background-tasks", manifest: backgroundTasksToolManifest, module: "@actspace/tool-background-tasks/plugin", loaders: harness, directory: "background-tasks" },
-  { id: "subagent-tools", manifest: subagentToolsManifest, module: "@actspace/tool-subagent/plugin", loaders: harness, directory: "subagent" },
-  { id: "subagent-codex", manifest: subagentCodexManifest, module: "@actspace/subagent-codex/plugin", loaders: harness, directory: "subagent" },
-  { id: "subagent-claude-code", manifest: subagentClaudeCodeManifest, module: "@actspace/subagent-claude-code/plugin", loaders: harness, directory: "subagent" },
-  { id: "plugin-manager", manifest: pluginManagerManifest, module: "@actspace/plugin-manager/plugin", loaders: harness, directory: "harness-evolution" },
-  { id: "agent-factory", manifest: agentFactoryManifest, module: "@actspace/runtime/agent-factory", loaders: harness, directory: "core" },
+  {
+    id: "auto-review",
+    manifest: autoReviewManifest,
+    module: "@actspace/auto-review/plugin",
+    loaders: harness,
+    directory: "approval",
+  },
+  {
+    id: "tools-approval",
+    manifest: approvalManifest,
+    module: "@actspace/approval/plugin",
+    loaders: harness,
+    directory: "approval",
+  },
+  {
+    id: "sandbox",
+    manifest: sandboxManifest,
+    module: "@actspace/sandbox/plugin",
+    loaders: harness,
+    directory: "sandbox",
+    admitOnHost: true,
+  },
+  {
+    id: "sandbox-nono",
+    manifest: sandboxNonoManifest,
+    module: "@actspace/sandbox-nono/plugin",
+    loaders: harness,
+    directory: "sandbox",
+    admitOnHost: true,
+  },
+  {
+    id: "sandbox-seatbelt",
+    manifest: sandboxSeatbeltManifest,
+    module: "@actspace/sandbox-seatbelt/plugin",
+    loaders: harness,
+    directory: "sandbox",
+    admitOnHost: true,
+  },
+  {
+    id: "tools-runtime",
+    manifest: toolRuntimeManifest,
+    module: "@actspace/tool-runtime/plugin",
+    loaders: harness,
+    directory: "core",
+  },
+  {
+    id: "context-engine",
+    manifest: contextEngineManifest,
+    module: "@actspace/context-engine/plugin",
+    loaders: harness,
+    codec: "@actspace/context-engine/codec",
+    directory: "context",
+  },
+  {
+    id: "prompt-runtime",
+    manifest: promptManifest,
+    module: "@actspace/prompt/plugin",
+    loaders: harness,
+    directory: "context",
+  },
+  {
+    id: "context-assembly",
+    manifest: contextAssemblyManifest,
+    module: "@actspace/context-assembly/plugin",
+    loaders: harness,
+    directory: "context",
+  },
+  {
+    id: "context-system",
+    manifest: contextSystemManifest,
+    module: "@actspace/context-system/plugin",
+    loaders: harness,
+    directory: "context",
+  },
+  {
+    id: "context-rules",
+    manifest: contextRulesManifest,
+    module: "@actspace/context-rules/plugin",
+    loaders: harness,
+    directory: "context",
+  },
+  {
+    id: "context-skills",
+    manifest: contextSkillsManifest,
+    module: "@actspace/context-skills/plugin",
+    loaders: harness,
+    directory: "context",
+  },
+  {
+    id: "context-runtime",
+    manifest: contextRuntimeManifest,
+    module: "@actspace/context-runtime/plugin",
+    loaders: harness,
+    directory: "context",
+  },
+  {
+    id: "context-conversation",
+    manifest: contextConversationManifest,
+    module: "@actspace/context-conversation/plugin",
+    loaders: harness,
+    directory: "context",
+  },
+  {
+    id: "context-tools",
+    manifest: contextToolsManifest,
+    module: "@actspace/context-tools/plugin",
+    loaders: harness,
+    directory: "context",
+  },
+  {
+    id: "context-background-tasks",
+    manifest: contextBackgroundTasksManifest,
+    module: "@actspace/context-background-tasks/plugin",
+    loaders: harness,
+    directory: "context",
+  },
+  {
+    id: "context-disclosure",
+    manifest: contextDisclosureManifest,
+    module: "@actspace/context-disclosure/plugin",
+    loaders: harness,
+    directory: "context",
+  },
+  {
+    id: "compaction-runtime",
+    manifest: compactionManifest,
+    module: "@actspace/context-compaction/plugin",
+    loaders: harness,
+    directory: "context",
+  },
+  {
+    id: "filesystem-read",
+    manifest: fsReadManifest,
+    module: "@actspace/tool-fs-read/plugin",
+    loaders: harness,
+    directory: "fs",
+    admitOnHost: true,
+  },
+  {
+    id: "filesystem-search",
+    manifest: fsSearchManifest,
+    module: "@actspace/tool-fs-search/plugin",
+    loaders: harness,
+    directory: "fs",
+    admitOnHost: true,
+  },
+  {
+    id: "filesystem-write",
+    manifest: fsWriteManifest,
+    module: "@actspace/tool-fs-write/plugin",
+    loaders: harness,
+    directory: "fs",
+    admitOnHost: true,
+  },
+  {
+    id: "web-tools",
+    manifest: webManifest,
+    module: "@actspace/tool-web/plugin",
+    loaders: harness,
+    directory: "web",
+    admitOnHost: true,
+  },
+  {
+    id: "image-generation",
+    manifest: imageGenerationManifest,
+    module: "@actspace/tool-image-generation/plugin",
+    loaders: harness,
+    directory: "image",
+    admitOnHost: true,
+  },
+  {
+    id: "shell-tools",
+    manifest: shellManifest,
+    module: "@actspace/tool-shell/plugin",
+    loaders: harness,
+    directory: "shell",
+    admitOnHost: true,
+  },
+  {
+    id: "image-inspection",
+    manifest: imageInspectionManifest,
+    module: "@actspace/tool-image-inspection/plugin",
+    loaders: harness,
+    directory: "image",
+    admitOnHost: true,
+  },
+  {
+    id: "todo-tools",
+    manifest: todoToolsManifest,
+    module: "@actspace/tool-todo/plugin",
+    loaders: harness,
+    codec: "@actspace/tool-todo/codec",
+    directory: "todo",
+    admitOnHost: true,
+  },
+  {
+    id: "browser-tools",
+    manifest: browserToolsManifest,
+    module: "@actspace/tool-browser/plugin",
+    loaders: harness,
+    directory: "browser",
+  },
+  {
+    id: "background-tasks",
+    manifest: backgroundTasksToolManifest,
+    module: "@actspace/tool-background-tasks/plugin",
+    loaders: harness,
+    directory: "background-tasks",
+  },
+  {
+    id: "subagent-tools",
+    manifest: subagentToolsManifest,
+    module: "@actspace/tool-subagent/plugin",
+    loaders: harness,
+    directory: "subagent",
+  },
+  {
+    id: "subagent-codex",
+    manifest: subagentCodexManifest,
+    module: "@actspace/subagent-codex/plugin",
+    loaders: harness,
+    directory: "subagent",
+  },
+  {
+    id: "subagent-claude-code",
+    manifest: subagentClaudeCodeManifest,
+    module: "@actspace/subagent-claude-code/plugin",
+    loaders: harness,
+    directory: "subagent",
+  },
+  {
+    id: "plugin-manager",
+    manifest: pluginManagerManifest,
+    module: "@actspace/plugin-manager/plugin",
+    loaders: harness,
+    directory: "harness-evolution",
+  },
+  {
+    id: "agent-factory",
+    manifest: agentFactoryManifest,
+    module: "@actspace/runtime/agent-factory",
+    loaders: harness,
+    directory: "core",
+  },
 ]);
 
 /** Packages that ship a `plugin.ts` but are intentionally not part of the default composition. */
-export const PLUGIN_PACKAGES_OUTSIDE_DEFAULT: readonly { readonly package: string; readonly reason: string }[] = Object.freeze([
-  { package: "@actspace/agent-loop", reason: "只在 CLI 装配（apps/cli/cordis.yml）里加载" },
-  { package: "@actspace/agent-service", reason: "Codec 由基础 Bundle 准入，行为由应用直接调用" },
-  { package: "@actspace/harness-control", reason: "Agent 运行时当库用，直接调用" },
-  { package: "@actspace/harness-hmr", reason: "Agent 运行时当库用，直接调用" },
-  { package: "@actspace/harness-evaluation", reason: "评估候选 Harness 时单独装配" },
-  { package: "@actspace/scope", reason: "只提供作用域类，由 Agent 注册表等包直接引用" },
-  { package: "@actspace/subagent", reason: "子智能体管理器与工具定义，由运行时创建、tool-subagent 注册" },
-  { package: "@actspace/llm-pi-ai", reason: "模型适配库，由桌面端和远程 Host 直接构造适配器，运行时只重新导出" },
-]);
+export const PLUGIN_PACKAGES_OUTSIDE_DEFAULT: readonly { readonly package: string; readonly reason: string }[] =
+  Object.freeze([
+    { package: "@actspace/agent-loop", reason: "只在 CLI 装配（apps/cli/cordis.yml）里加载" },
+    { package: "@actspace/agent-service", reason: "Codec 由基础 Bundle 准入，行为由应用直接调用" },
+    { package: "@actspace/harness-control", reason: "Agent 运行时当库用，直接调用" },
+    { package: "@actspace/harness-hmr", reason: "Agent 运行时当库用，直接调用" },
+    { package: "@actspace/harness-evaluation", reason: "评估候选 Harness 时单独装配" },
+    { package: "@actspace/scope", reason: "只提供作用域类，由 Agent 注册表等包直接引用" },
+    { package: "@actspace/subagent", reason: "子智能体管理器与工具定义，由运行时创建、tool-subagent 注册" },
+    { package: "@actspace/llm-pi-ai", reason: "模型适配库，由桌面端和远程 Host 直接构造适配器，运行时只重新导出" },
+  ]);
 
-const byId = new Map(PLUGIN_CATALOG.map(entry => [entry.id, entry]));
+const byId = new Map(PLUGIN_CATALOG.map((entry) => [entry.id, entry]));
 
 export function pluginCatalogEntry(id: string): PluginCatalogEntry | undefined {
   return byId.get(id);
@@ -151,7 +463,9 @@ export function pluginCatalogEntry(id: string): PluginCatalogEntry | undefined {
  * Harness entries (loop, context, tools runtime, sandbox, approval) form the shared kernel closure.
  */
 export function isHarnessToolPlugin(entry: PluginCatalogEntry | undefined): entry is PluginCatalogEntry {
-  return entry !== undefined && entry.loaders.includes("harness") && (entry.manifest.contributions.tools?.length ?? 0) > 0;
+  return (
+    entry !== undefined && entry.loaders.includes("harness") && (entry.manifest.contributions.tools?.length ?? 0) > 0
+  );
 }
 
 export function harnessToolPluginEntries(): readonly PluginCatalogEntry[] {
@@ -163,9 +477,12 @@ export function harnessToolPluginEntries(): readonly PluginCatalogEntry[] {
  * plugin switches (CLI, remote Host) leaves them off, e.g. the external subagents that run local CLIs.
  */
 export function harnessEntriesOffByDefault(): readonly string[] {
-  return PLUGIN_CATALOG
-    .filter(entry => entry.loaders.includes("harness") && entry.manifest.display?.canDisable === true && entry.manifest.display.defaultEnabled === false)
-    .map(entry => entry.id);
+  return PLUGIN_CATALOG.filter(
+    (entry) =>
+      entry.loaders.includes("harness") &&
+      entry.manifest.display?.canDisable === true &&
+      entry.manifest.display.defaultEnabled === false,
+  ).map((entry) => entry.id);
 }
 
 /**
@@ -174,7 +491,10 @@ export function harnessEntriesOffByDefault(): readonly string[] {
  * a missing capability there must fail loudly instead.
  */
 export function harnessEntriesMissingHostCapabilities(capabilityCeiling: readonly string[]): readonly string[] {
-  return PLUGIN_CATALOG
-    .filter(entry => entry.loaders.includes("harness") && entry.manifest.behaviors[0]?.required === false && entry.manifest.behaviors[0].host.required.some(capability => !capabilityCeiling.includes(capability)))
-    .map(entry => entry.id);
+  return PLUGIN_CATALOG.filter(
+    (entry) =>
+      entry.loaders.includes("harness") &&
+      entry.manifest.behaviors[0]?.required === false &&
+      entry.manifest.behaviors[0].host.required.some((capability) => !capabilityCeiling.includes(capability)),
+  ).map((entry) => entry.id);
 }

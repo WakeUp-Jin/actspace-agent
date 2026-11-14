@@ -16,7 +16,14 @@ import { Button } from "../../ui/Button";
 import { PermissionModeControl } from "../../workbench/PermissionModeControl";
 import { useRightPanel, type RightPanelTab } from "../RightPanelContext";
 import { useSideChatRuntime, type SideChatRuntimeValue } from "./side-chat-runtime";
-import { countInheritedTurns, hideInheritedMessages, sideChatBoundarySeq, sideChatDividerText, sideChatOwnTitle, sideChatTitleFromMessages } from "./side-chat-transcript";
+import {
+  countInheritedTurns,
+  hideInheritedMessages,
+  sideChatBoundarySeq,
+  sideChatDividerText,
+  sideChatOwnTitle,
+  sideChatTitleFromMessages,
+} from "./side-chat-transcript";
 
 type SideChatTab = Extract<RightPanelTab, { kind: "sideChat" }>;
 
@@ -58,7 +65,10 @@ function SideChatBody({ tab, runtime }: { tab: SideChatTab; runtime: SideChatRun
   const transcript = useSessionTranscript(runtime, sessionId, undefined);
   const { sessionRecord, live, isCompacting } = transcript;
   const boundarySeq = sideChatBoundarySeq(snapshot?.lineage);
-  const messages = useMemo(() => hideInheritedMessages(transcript.messages, boundarySeq), [transcript.messages, boundarySeq]);
+  const messages = useMemo(
+    () => hideInheritedMessages(transcript.messages, boundarySeq),
+    [transcript.messages, boundarySeq],
+  );
   const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
   const inputHistory = useMemo(() => userInputHistory(messages), [messages]);
   const inheritedTurnCount = tab.inheritedTurnCount ?? countInheritedTurns(cell?.window, boundarySeq);
@@ -72,7 +82,9 @@ function SideChatBody({ tab, runtime }: { tab: SideChatTab; runtime: SideChatRun
 
   // 面板里看得到就算读过：跑完一轮时不留未读点。
   const unread = useSessionLocalState(localStore, sessionId, selectUnread);
-  useEffect(() => { if (unread) markRead(sessionId); }, [unread, markRead, sessionId]);
+  useEffect(() => {
+    if (unread) markRead(sessionId);
+  }, [unread, markRead, sessionId]);
 
   // tab 标题：会话自己的标题优先，没有时用第一条问题。
   const parentTitle = useContext(ActiveSessionContext)?.title;
@@ -95,79 +107,131 @@ function SideChatBody({ tab, runtime }: { tab: SideChatTab; runtime: SideChatRun
   const storedModel = useSessionLocalState(localStore, sessionId, selectModel);
   const selectedSkills = useSessionLocalState(localStore, sessionId, selectSkills) ?? NO_SKILLS;
   const selectedModelId = storedModel ?? runtime.parentModelId;
-  const onSelectedModelChange = useCallback((modelId: ModelSelectionId) => {
-    localStore.update(sessionId, (state) => ({ ...state, selectedModelId: modelId }));
-  }, [localStore, sessionId]);
-  const onSelectedSkillsChange = useCallback((skills: string[]) => {
-    localStore.update(sessionId, (state) => ({ ...state, composer: { mode: state.composer?.mode ?? mode, selectedSkills: skills } }));
-  }, [localStore, sessionId, mode]);
-  const onSend = useCallback((text: string, options: ComposerSendOptions) => {
-    stick.scrollToBottom();
-    return send(sessionId, text, options);
-  }, [send, sessionId, stick.scrollToBottom]);
+  const onSelectedModelChange = useCallback(
+    (modelId: ModelSelectionId) => {
+      localStore.update(sessionId, (state) => ({ ...state, selectedModelId: modelId }));
+    },
+    [localStore, sessionId],
+  );
+  const onSelectedSkillsChange = useCallback(
+    (skills: string[]) => {
+      localStore.update(sessionId, (state) => ({
+        ...state,
+        composer: { mode: state.composer?.mode ?? mode, selectedSkills: skills },
+      }));
+    },
+    [localStore, sessionId, mode],
+  );
+  const onSend = useCallback(
+    (text: string, options: ComposerSendOptions) => {
+      stick.scrollToBottom();
+      return send(sessionId, text, options);
+    },
+    [send, sessionId, stick.scrollToBottom],
+  );
   const onAbort = useCallback(() => abort(sessionId), [abort, sessionId]);
   const onModeChange = useCallback((next: ComposerMode) => setMode(sessionId, next), [setMode, sessionId]);
   const { openTab } = useRightPanel();
-  const openAttachmentPreview = useCallback((attachment: ComposerAttachment) => {
-    if (attachment.previewUrl) openTab({ id: `composer-attachment:${attachment.id}`, kind: "image", title: attachment.name, src: attachment.previewUrl });
-  }, [openTab]);
+  const openAttachmentPreview = useCallback(
+    (attachment: ComposerAttachment) => {
+      if (attachment.previewUrl)
+        openTab({
+          id: `composer-attachment:${attachment.id}`,
+          kind: "image",
+          title: attachment.name,
+          src: attachment.previewUrl,
+        });
+    },
+    [openTab],
+  );
 
   // 侧边对话自己聊得很长时，窗口外还有分叉之后的消息：按需往前补页（分叉之前的不显示，也就不补）。
-  const hasEarlier = transcript.historyBefore !== null && boundarySeq !== null && transcript.historyBefore > boundarySeq + 1;
+  const hasEarlier =
+    transcript.historyBefore !== null && boundarySeq !== null && transcript.historyBefore > boundarySeq + 1;
   const requestEarlier = () => {
     if (earlierLoading) return;
     setEarlierLoading(true);
-    void loadEarlier(sessionStore, sessionId).catch(console.error).finally(() => setEarlierLoading(false));
+    void loadEarlier(sessionStore, sessionId)
+      .catch(console.error)
+      .finally(() => setEarlierLoading(false));
   };
-  const retry = () => { void projection?.bridge?.refreshRelated(sessionId); };
+  const retry = () => {
+    void projection?.bridge?.refreshRelated(sessionId);
+  };
 
-  const permissionControl = mode !== "chat" && snapshot ? (
-    <PermissionModeControl
-      sessionId={sessionId}
-      mode={snapshot.permissionMode ?? "default"}
-      disabled={false}
-      onChanged={async () => { await projection?.bridge?.refreshRelated(sessionId); }}
-    />
-  ) : null;
+  const permissionControl =
+    mode !== "chat" && snapshot ? (
+      <PermissionModeControl
+        sessionId={sessionId}
+        mode={snapshot.permissionMode ?? "default"}
+        disabled={false}
+        onChanged={async () => {
+          await projection?.bridge?.refreshRelated(sessionId);
+        }}
+      />
+    ) : null;
   const notice = runtime.notice?.sessionId === sessionId ? runtime.notice.text : null;
   const loading = !sessionRecord && cell?.status !== "error";
 
   return (
     <section className={SIDE_CHAT_CLASS} aria-label={`侧边对话：${tab.title}`}>
       <div className="relative min-h-0 flex-1">
-        <div ref={stick.scrollRef} className={SIDE_CHAT_SCROLL_CLASS} onScroll={stick.onScroll} aria-label="侧边对话消息">
+        <div
+          ref={stick.scrollRef}
+          className={SIDE_CHAT_SCROLL_CLASS}
+          onScroll={stick.onScroll}
+          aria-label="侧边对话消息"
+        >
           <div ref={stick.contentRef} className={SIDE_CHAT_STACK_CLASS}>
             {hasEarlier ? (
-              <Button variant="ghost" size="xs" className="self-center" busy={earlierLoading} disabled={earlierLoading} onClick={requestEarlier}>
+              <Button
+                variant="ghost"
+                size="xs"
+                className="self-center"
+                busy={earlierLoading}
+                disabled={earlierLoading}
+                onClick={requestEarlier}
+              >
                 {earlierLoading ? "正在加载…" : "加载更早的消息"}
               </Button>
             ) : null}
-            <p className={SIDE_CHAT_DIVIDER_CLASS} data-testid="side-chat-divider">{sideChatDividerText(inheritedTurnCount, tab.runningTurnExcluded)}</p>
+            <p className={SIDE_CHAT_DIVIDER_CLASS} data-testid="side-chat-divider">
+              {sideChatDividerText(inheritedTurnCount, tab.runningTurnExcluded)}
+            </p>
             {cell?.status === "error" ? (
               <p role="alert" className={SIDE_CHAT_NOTE_CLASS}>
-                侧边对话读取失败：{cell.error ?? "未知错误"} <Button variant="ghost" size="xs" onClick={retry}>重试</Button>
+                侧边对话读取失败：{cell.error ?? "未知错误"}{" "}
+                <Button variant="ghost" size="xs" onClick={retry}>
+                  重试
+                </Button>
               </p>
             ) : loading ? (
-              <p role="status" className={SIDE_CHAT_NOTE_CLASS}>正在加载侧边对话…</p>
+              <p role="status" className={SIDE_CHAT_NOTE_CLASS}>
+                正在加载侧边对话…
+              </p>
             ) : turns.length === 0 && !live.isStreaming ? (
               <div className={SIDE_CHAT_EMPTY_CLASS}>
                 <p className="m-0 text-act-sm font-medium text-text-main">在这里另起一条线问，不打断主会话</p>
                 <p className="m-0 text-act-xs leading-5 text-text-faint">
-                  {mode === "plan" ? "默认 Plan 模式，只用只读工具；需要改文件时在输入框里退出 Plan。" : "这里的对话不会回到主会话。"}
+                  {mode === "plan"
+                    ? "默认 Plan 模式，只用只读工具；需要改文件时在输入框里退出 Plan。"
+                    : "这里的对话不会回到主会话。"}
                 </p>
               </div>
-            ) : turns.map((turn, index) => (
-              <TurnView
-                key={turn.id}
-                turn={turn}
-                isActive={live.isStreaming && index === turns.length - 1}
-                isLatest={index === turns.length - 1}
-                sessionId={sessionId}
-                workspaceRoot={workspaceRoot}
-                setTurnElement={noop}
-                onOpenAttachmentPreview={openAttachmentPreview}
-              />
-            ))}
+            ) : (
+              turns.map((turn, index) => (
+                <TurnView
+                  key={turn.id}
+                  turn={turn}
+                  isActive={live.isStreaming && index === turns.length - 1}
+                  isLatest={index === turns.length - 1}
+                  sessionId={sessionId}
+                  workspaceRoot={workspaceRoot}
+                  setTurnElement={noop}
+                  onOpenAttachmentPreview={openAttachmentPreview}
+                />
+              ))
+            )}
           </div>
         </div>
         <PinnedTurnPrompt scrollRef={stick.scrollRef} turns={turns} className={SIDE_CHAT_COLUMN_CLASS} />

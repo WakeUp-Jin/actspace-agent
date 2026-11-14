@@ -1,12 +1,7 @@
 import type { DesktopBridge } from "@actspace/shared/desktop-bridge";
 import type { SessionListPage, SessionListPageInput, SettingsV4Tools } from "@actspace/shared";
 import type { TaskReceipt, TaskSnapshot } from "@actspace/shared/runtime-v2";
-import {
-  mockBrowserBridgeStatus,
-  mockEnglishLearningState,
-  mockLocalUpdateState,
-  mockUsableModels,
-} from "./fixtures";
+import { mockBrowserBridgeStatus, mockEnglishLearningState, mockLocalUpdateState, mockUsableModels } from "./fixtures";
 import {
   appendMockMessage,
   createMockSession,
@@ -35,14 +30,23 @@ const SYSTEM_PROMPT = "你是 ActSpace 的主 Agent。\n- 先理解需求，再�
 
 /** 分页视图建立在 `sessions.list` 之上：测试只覆盖 `sessions.list` 时，侧栏分页读到的是同一份数据。 */
 async function listPage(clock: MockClock, input: SessionListPageInput): Promise<SessionListPage> {
-  const items = (await clock.bridge.sessions.list({})).filter((item) => !item.isChildSession && !item.sideChatParentId &&
-    (!input.search || (!item.hostId && item.title.toLowerCase().includes(input.search.toLowerCase()))) &&
-    (input.hostId === undefined || item.hostId === input.hostId) &&
-    (input.workspaceRoot === undefined || item.workspaceRoot === input.workspaceRoot) &&
-    (input.pinned === undefined || Boolean(item.pinned) === input.pinned));
+  const items = (await clock.bridge.sessions.list({})).filter(
+    (item) =>
+      !item.isChildSession &&
+      !item.sideChatParentId &&
+      (!input.search || (!item.hostId && item.title.toLowerCase().includes(input.search.toLowerCase()))) &&
+      (input.hostId === undefined || item.hostId === input.hostId) &&
+      (input.workspaceRoot === undefined || item.workspaceRoot === input.workspaceRoot) &&
+      (input.pinned === undefined || Boolean(item.pinned) === input.pinned),
+  );
   const groups = new Map<string, SessionListPage["groups"][number]>();
   for (const item of items) {
-    const group = { hostId: item.hostId, workspaceRoot: item.workspaceRoot ?? "", pinned: Boolean(item.pinned), hasMore: false };
+    const group = {
+      hostId: item.hostId,
+      workspaceRoot: item.workspaceRoot ?? "",
+      pinned: Boolean(item.pinned),
+      hasMore: false,
+    };
     groups.set(JSON.stringify([group.hostId, group.workspaceRoot, group.pinned]), group);
   }
   return { items, groups: [...groups.values()], indexing: false, failed: 0 };
@@ -72,17 +76,31 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       submit: async (input) => {
         const session = requireSession(db, input.sessionId);
         if (session.hostId && db.hosts.find((host) => host.hostId === session.hostId)?.state !== "connected") {
-          return { status: "submission-failed", acknowledgement: "rejected", message: "远端 Host 未连接，草稿已保留。" };
+          return {
+            status: "submission-failed",
+            acknowledgement: "rejected",
+            message: "远端 Host 未连接，草稿已保留。",
+          };
         }
         const current = taskSnapshot(input.sessionId);
         const agentRunId = db.nextId("mock-run");
         const task: TaskReceipt["task"] = {
-          taskId: input.submissionId, submissionId: input.submissionId, content: { kind: "composer-task", original: input.userInput, prepared: input.userInput },
-          acceptedSeq: current.revision + 1, state: "claimed", targetRunId: null, runId: agentRunId, continuationOf: null,
+          taskId: input.submissionId,
+          submissionId: input.submissionId,
+          content: { kind: "composer-task", original: input.userInput, prepared: input.userInput },
+          acceptedSeq: current.revision + 1,
+          state: "claimed",
+          targetRunId: null,
+          runId: agentRunId,
+          continuationOf: null,
         };
         publishTasks({ ...current, tasks: [...current.tasks, task] });
         appendMockMessage(db, session, "user", input.userInput, agentRunId);
-        const playback = playReply(clock, { sessionId: input.sessionId, agentRunId, text: session.sideChat ? MOCK_SIDE_CHAT_REPLY : MOCK_REPLY });
+        const playback = playReply(clock, {
+          sessionId: input.sessionId,
+          agentRunId,
+          text: session.sideChat ? MOCK_SIDE_CHAT_REPLY : MOCK_REPLY,
+        });
         playbacks.set(input.sessionId, playback);
         return { task, revision: taskSnapshot(input.sessionId).revision, durableSeq: null };
       },
@@ -91,8 +109,12 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         return true;
       },
       listBackground: async () => [],
-      readBackgroundOutput: async ({ taskId }) => { throw new Error(`Background task ${taskId} was not found.`); },
-      stopBackground: async ({ taskId }) => { throw new Error(`Background task ${taskId} was not found.`); },
+      readBackgroundOutput: async ({ taskId }) => {
+        throw new Error(`Background task ${taskId} was not found.`);
+      },
+      stopBackground: async ({ taskId }) => {
+        throw new Error(`Background task ${taskId} was not found.`);
+      },
     },
     approvals: {
       listPending: async ({ sessionId } = {}) =>
@@ -101,12 +123,27 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         for (const [sessionId, pending] of db.pendingApprovals) {
           const request = pending.find((item) => item.requestId === requestId);
           if (!request?.recovery) continue;
-          db.pendingApprovals.set(sessionId, pending.filter((item) => item !== request));
+          db.pendingApprovals.set(
+            sessionId,
+            pending.filter((item) => item !== request),
+          );
           const { agentRunId, toolCallId } = request.recovery;
-          clock.emit("agentStream", { type: "tool_approval_resolved", sessionId, agentRunId, toolCallId, requestId, decision });
+          clock.emit("agentStream", {
+            type: "tool_approval_resolved",
+            sessionId,
+            agentRunId,
+            toolCallId,
+            requestId,
+            decision,
+          });
           const reply = decision === "deny" ? "已拒绝执行该命令。" : "命令已在 mock 中“执行”，没有真正运行。";
           const message = appendMockMessage(db, requireSession(db, sessionId), "assistant", reply, agentRunId);
-          clock.emit("agentStream", { type: "agent_run_finished", sessionId, agentRunId, resultEventIds: [message.id] });
+          clock.emit("agentStream", {
+            type: "agent_run_finished",
+            sessionId,
+            agentRunId,
+            resultEventIds: [message.id],
+          });
           return { ok: true };
         }
         return { ok: false, reason: "审批请求不存在或已处理。" };
@@ -116,7 +153,10 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       selectFiles: async () => ({ canceled: true, attachments: [] }),
       selectImages: async () => ({ canceled: true, attachments: [] }),
       selectWorkspaceDirectory: async () => ({ canceled: true }),
-      importComposerImage: async () => ({ ok: false, error: { code: "write_failed", message: "浏览器 mock 模式不保存图片。" } }),
+      importComposerImage: async () => ({
+        ok: false,
+        error: { code: "write_failed", message: "浏览器 mock 模式不保存图片。" },
+      }),
       getPathForFile: (file) => file.name,
     },
     workspaces: {
@@ -124,15 +164,36 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       setVisibility: async ({ workspaceId, hidden }) => {
         const workspace = db.workspaces.items.find((item) => item.id === workspaceId);
         if (!workspace) return { ok: false, error: "workspace_not_found" };
-        db.workspaces = { ...db.workspaces, items: db.workspaces.items.map((item) => (item === workspace ? { ...item, hidden } : item)) };
+        db.workspaces = {
+          ...db.workspaces,
+          items: db.workspaces.items.map((item) => (item === workspace ? { ...item, hidden } : item)),
+        };
         return { ok: true };
       },
-      getGitContext: async ({ workspaceRoot }) => ({ status: "not_repository", workspaceRoot: workspaceRoot ?? db.bootstrap.workspaceRoot, branches: [] }),
+      getGitContext: async ({ workspaceRoot }) => ({
+        status: "not_repository",
+        workspaceRoot: workspaceRoot ?? db.bootstrap.workspaceRoot,
+        branches: [],
+      }),
       createFolder: async ({ parentRoot, name }) => {
         const now = new Date().toISOString();
         const workspaceRoot = `${parentRoot.replace(/\/+$/, "")}/${name}`;
         const workspaceId = db.nextId("workspace");
-        db.workspaces = { ...db.workspaces, items: [...db.workspaces.items, { id: workspaceId, kind: "folder", label: name, path: workspaceRoot, order: db.workspaces.items.length, createdAt: now, updatedAt: now }] };
+        db.workspaces = {
+          ...db.workspaces,
+          items: [
+            ...db.workspaces.items,
+            {
+              id: workspaceId,
+              kind: "folder",
+              label: name,
+              path: workspaceRoot,
+              order: db.workspaces.items.length,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        };
         return { ok: true, workspaceId, workspaceRoot };
       },
       // 「文档」面板的数据来自内存里的示例目录（mock/docs-fixture.ts），预览、编辑、保存都能在浏览器里检查。
@@ -151,11 +212,20 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       openFile: async () => ({ ok: true }),
       listOpenTools: async () => ({ tools: [] }),
       openInIde: async () => ({ ok: false, error: "open_failed" }),
-      openInTool: async ({ workspaceRoot, toolId }) => ({ ok: false, workspaceRoot: workspaceRoot ?? db.bootstrap.workspaceRoot, toolId, error: "unsupported_platform" }),
+      openInTool: async ({ workspaceRoot, toolId }) => ({
+        ok: false,
+        workspaceRoot: workspaceRoot ?? db.bootstrap.workspaceRoot,
+        toolId,
+        error: "unsupported_platform",
+      }),
     },
     review: {
       getSnapshot: async () => ({ ok: false, code: "not_a_repository", message: "浏览器 mock 模式没有 Git 仓库。" }),
-      refreshSnapshot: async () => ({ ok: false, code: "not_a_repository", message: "浏览器 mock 模式没有 Git 仓库。" }),
+      refreshSnapshot: async () => ({
+        ok: false,
+        code: "not_a_repository",
+        message: "浏览器 mock 模式没有 Git 仓库。",
+      }),
     },
     sessions: {
       listPage: (input = {}) => listPage(clock, input),
@@ -177,10 +247,26 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         const { session, inheritedTurnCount, runningTurnExcluded } = openMockSideChat(db, parentSessionId);
         return { session: sessionProjection(session), inheritedTurnCount, runningTurnExcluded };
       },
-      listSideChats: async ({ parentSessionId }) => listMockSessions(db).filter((item) => item.sideChatParentId === parentSessionId).reverse(),
-      pin: async ({ sessionId, pinned }) => { touchSession(sessionId, (session) => { session.pinned = pinned; }); return { ok: true }; },
-      rename: async ({ sessionId, title }) => { touchSession(sessionId, (session) => { session.title = title; }); return { ok: true }; },
-      setWorkspace: async ({ sessionId, workspaceRoot }) => { requireSession(db, sessionId).workspaceRoot = workspaceRoot; return { ok: true }; },
+      listSideChats: async ({ parentSessionId }) =>
+        listMockSessions(db)
+          .filter((item) => item.sideChatParentId === parentSessionId)
+          .reverse(),
+      pin: async ({ sessionId, pinned }) => {
+        touchSession(sessionId, (session) => {
+          session.pinned = pinned;
+        });
+        return { ok: true };
+      },
+      rename: async ({ sessionId, title }) => {
+        touchSession(sessionId, (session) => {
+          session.title = title;
+        });
+        return { ok: true };
+      },
+      setWorkspace: async ({ sessionId, workspaceRoot }) => {
+        requireSession(db, sessionId).workspaceRoot = workspaceRoot;
+        return { ok: true };
+      },
       setPermissionMode: async ({ mode }) => ({ ok: true, mode }),
       setAgentMode: async ({ sessionId, mode }) => {
         const session = requireSession(db, sessionId);
@@ -188,43 +274,74 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         session.agentModeRevision += 1;
         return { ok: true, mode, revision: session.agentModeRevision };
       },
-      archive: async ({ sessionId, archived }) => { touchSession(sessionId, (session) => { session.archived = archived; }); return { ok: true }; },
+      archive: async ({ sessionId, archived }) => {
+        touchSession(sessionId, (session) => {
+          session.archived = archived;
+        });
+        return { ok: true };
+      },
       archiveMany: async ({ sessionIds }) => {
         for (const sessionId of sessionIds) requireSession(db, sessionId).archived = true;
         return { ok: true, archivedSessionIds: sessionIds, failedSessionIds: [] };
       },
       setObserved: () => undefined,
-      listContextPaths: async input => {
-        if (input.revision !== MOCK_CONTEXT_PATHS_REVISION) throw new Error("Context revision stale; reload the panel.");
+      listContextPaths: async (input) => {
+        if (input.revision !== MOCK_CONTEXT_PATHS_REVISION)
+          throw new Error("Context revision stale; reload the panel.");
         return mockContextPathsPage(MOCK_CONTEXT_PATHS, input);
       },
-      describeContextPanel: async ({ sessionId, release }) => release ? null : mockContextPanelView(sessionId, db.sessions.get(sessionId)),
+      describeContextPanel: async ({ sessionId, release }) =>
+        release ? null : mockContextPanelView(sessionId, db.sessions.get(sessionId)),
     },
-    usage: { getStatus: async () => null, cancel: async () => undefined, getActivity: async input => mockUsageActivity(input) },
-    harnessStats: { query: async input => mockHarnessStats(input), getStatus: async () => MOCK_HARNESS_STATS_SYNC, cancel: async () => undefined },
+    usage: {
+      getStatus: async () => null,
+      cancel: async () => undefined,
+      getActivity: async (input) => mockUsageActivity(input),
+    },
+    harnessStats: {
+      query: async (input) => mockHarnessStats(input),
+      getStatus: async () => MOCK_HARNESS_STATS_SYNC,
+      cancel: async () => undefined,
+    },
     // 浏览器里没有 pty：列表为空，其余操作在 UI 上不会出现（终端入口只在开发功能开启时显示）。
     settings: {
       get: async () => db.settings,
       update: async (patch) => {
-        db.settings = { ...db.settings, ...patch, agent: { ...db.settings.agent, ...patch.agent }, skills: { ...db.settings.skills, ...patch.skills } };
+        db.settings = {
+          ...db.settings,
+          ...patch,
+          agent: { ...db.settings.agent, ...patch.agent },
+          skills: { ...db.settings.skills, ...patch.skills },
+        };
         return db.settings;
       },
       getV4: async () => db.settingsV4,
       updateV4: async ({ namespace, patch, expectedRevision }) => {
         const latest = db.settingsV4;
-        if (expectedRevision !== latest.revision) return { ok: false, code: "revision_conflict", latest, message: "设置已在别处修改。" };
+        if (expectedRevision !== latest.revision)
+          return { ok: false, code: "revision_conflict", latest, message: "设置已在别处修改。" };
         const revision = `mock-${Number(latest.revision.replace("mock-", "")) + 1}`;
-        db.settingsV4 = { ...latest, revision, settings: { ...latest.settings, [namespace]: { ...latest.settings[namespace], ...patch } } };
+        db.settingsV4 = {
+          ...latest,
+          revision,
+          settings: { ...latest.settings, [namespace]: { ...latest.settings[namespace], ...patch } },
+        };
         if (namespace === "tools" && "plugins" in patch) {
           db.settingsV4.settings.tools.plugins = { ...latest.settings.tools.plugins, ...patch.plugins };
         }
         if (namespace === "tools" && "externalSubagents" in patch) {
           const stored = latest.settings.tools.externalSubagents;
           const next = (patch as { externalSubagents?: SettingsV4Tools["externalSubagents"] }).externalSubagents;
-          db.settingsV4.settings.tools.externalSubagents = { codex: { ...stored?.codex, ...next?.codex }, claudeCode: { ...stored?.claudeCode, ...next?.claudeCode } };
+          db.settingsV4.settings.tools.externalSubagents = {
+            codex: { ...stored?.codex, ...next?.codex },
+            claudeCode: { ...stored?.claudeCode, ...next?.claudeCode },
+          };
         }
         if (namespace === "tools" && "searchProviders" in patch) {
-          db.settingsV4.settings.tools.searchProviders = { ...latest.settings.tools.searchProviders, ...patch.searchProviders };
+          db.settingsV4.settings.tools.searchProviders = {
+            ...latest.settings.tools.searchProviders,
+            ...patch.searchProviders,
+          };
         }
         clock.emit("settingsChanged", { revision, changedNamespaces: [namespace] });
         return { ok: true, snapshot: db.settingsV4 };
@@ -234,17 +351,30 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
     },
     quickOpen: {
       consume: async () => null,
-      getShortcutStatus: async () => ({ registered: false, accelerator: db.settings.shortcuts?.quickOpen.accelerator ?? "" }),
+      getShortcutStatus: async () => ({
+        registered: false,
+        accelerator: db.settings.shortcuts?.quickOpen.accelerator ?? "",
+      }),
     },
     providers: {
       setKey: async ({ provider }) => {
-        if (provider in db.settings.providers) db.settings.providers[provider as keyof typeof db.settings.providers] = { ...db.settings.providers[provider as keyof typeof db.settings.providers], hasApiKey: true };
-        if (provider in db.settings.searchProviders) db.settings.searchProviders[provider as keyof typeof db.settings.searchProviders] = { hasApiKey: true };
+        if (provider in db.settings.providers)
+          db.settings.providers[provider as keyof typeof db.settings.providers] = {
+            ...db.settings.providers[provider as keyof typeof db.settings.providers],
+            hasApiKey: true,
+          };
+        if (provider in db.settings.searchProviders)
+          db.settings.searchProviders[provider as keyof typeof db.settings.searchProviders] = { hasApiKey: true };
         return { ok: true };
       },
       clearKey: async ({ provider }) => {
-        if (provider in db.settings.providers) db.settings.providers[provider as keyof typeof db.settings.providers] = { ...db.settings.providers[provider as keyof typeof db.settings.providers], hasApiKey: false };
-        if (provider in db.settings.searchProviders) db.settings.searchProviders[provider as keyof typeof db.settings.searchProviders] = { hasApiKey: false };
+        if (provider in db.settings.providers)
+          db.settings.providers[provider as keyof typeof db.settings.providers] = {
+            ...db.settings.providers[provider as keyof typeof db.settings.providers],
+            hasApiKey: false,
+          };
+        if (provider in db.settings.searchProviders)
+          db.settings.searchProviders[provider as keyof typeof db.settings.searchProviders] = { hasApiKey: false };
         return { ok: true };
       },
     },
@@ -257,7 +387,14 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
     plugins: { list: async () => mockPluginList(db.settingsV4.settings) },
     pythonRuntime: {
       getStatus: async () => mockPythonRuntimeStatus(),
-      installExtension: async () => ({ ...mockPythonRuntimeStatus(), extension: { ...mockPythonRuntimeStatus().extension, state: "installing" as const, progress: { completed: 3, total: 22 } } }),
+      installExtension: async () => ({
+        ...mockPythonRuntimeStatus(),
+        extension: {
+          ...mockPythonRuntimeStatus().extension,
+          state: "installing" as const,
+          progress: { completed: 3, total: 22 },
+        },
+      }),
     },
     skills: { list: async () => ({ items: [], warnings: [] }) },
     updates: { getState: async () => mockLocalUpdateState() },
@@ -269,7 +406,9 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       list: async () => db.hosts,
       activate: async () => undefined,
       reconnect: async (id) => {
-        db.hosts = db.hosts.map((host) => (host.id === id && host.state === "offline" ? { ...host, state: "connected", error: undefined } : host));
+        db.hosts = db.hosts.map((host) =>
+          host.id === id && host.state === "offline" ? { ...host, state: "connected", error: undefined } : host,
+        );
         clock.emit("hostsChanged", db.hosts);
       },
       remove: async (id) => {

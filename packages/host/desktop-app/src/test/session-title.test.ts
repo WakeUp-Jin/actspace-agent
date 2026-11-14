@@ -7,14 +7,25 @@ import { apply as mountTitles } from "../session-title.js";
 function fixture(initialTitle: string | null = null) {
   let title = initialTitle;
   const events: { type: string; data: { title?: string } }[] = [];
-  const append = vi.fn(async (event: typeof events[number]) => { events.push(event); if (event.type === "session/title-set") title = event.data.title ?? null; });
-  const session = { append, appendMany: async (items: typeof events) => { for (const item of items) await append(item); }, flush: vi.fn(async () => undefined) };
+  const append = vi.fn(async (event: (typeof events)[number]) => {
+    events.push(event);
+    if (event.type === "session/title-set") title = event.data.title ?? null;
+  });
+  const session = {
+    append,
+    appendMany: async (items: typeof events) => {
+      for (const item of items) await append(item);
+    },
+    flush: vi.fn(async () => undefined),
+  };
   const snapshot = () => ({ metadata: { title }, sessionId: "session" });
   const run = vi.fn(async () => ({ sessionId: "session", snapshot: snapshot() }));
   const services = new Map<string, unknown>([
     ["llm.auxiliary-requests", { start: async () => ({ finish: async () => {} }) }],
     ["session.runtime", { resume: async () => session, snapshot }],
-    ["agent.runtime", { runs: { service: { submit: run }, configuration: () => ({ model: "main-model" }) } }], ["compaction.runtime", {}], ["llm.service", {}],
+    ["agent.runtime", { runs: { service: { submit: run }, configuration: () => ({ model: "main-model" }) } }],
+    ["compaction.runtime", {}],
+    ["llm.service", {}],
   ]);
   const ctx = new CordisContextClass();
   for (const [id, value] of services) ctx.provide(id, value);
@@ -22,11 +33,17 @@ function fixture(initialTitle: string | null = null) {
   const app = new DesktopAppService(ctx as CordisContext);
   let resolve!: (result: { text: string }) => void;
   let reject!: (error: Error) => void;
-  const completion = new Promise<{ text: string }>((yes, no) => { resolve = yes; reject = no; });
-  const complete = vi.fn((_input: Parameters<typeof app.completeText>[0]) => completion as ReturnType<typeof app.completeText>);
+  const completion = new Promise<{ text: string }>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  const complete = vi.fn(
+    (_input: Parameters<typeof app.completeText>[0]) => completion as ReturnType<typeof app.completeText>,
+  );
   vi.spyOn(textUtility, "completeText").mockImplementation((_llm, input) => complete(input));
   let sequence = 0;
-  const submit = (input: { sessionId: string; content: import("@actspace/shared/runtime-v2").RuntimeJsonValue }) => app.submitTask(input.sessionId, `submission-${sequence++}`, input.content);
+  const submit = (input: { sessionId: string; content: import("@actspace/shared/runtime-v2").RuntimeJsonValue }) =>
+    app.submitTask(input.sessionId, `submission-${sequence++}`, input.content);
   return { submit, app, run, complete, resolve, reject, snapshot, session, events };
 }
 afterEach(() => vi.restoreAllMocks());
@@ -38,7 +55,14 @@ describe("first message session title", () => {
     await f.submit(input);
     expect(f.run).toHaveBeenCalledOnce();
     await vi.waitFor(() => expect(f.complete).toHaveBeenCalledOnce());
-    expect(f.complete).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "session", purpose: "utility", model: "main-model", auxiliary: { recorder: expect.any(Object), owner: { sessionId: "session", purpose: "session-title" } } }));
+    expect(f.complete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "session",
+        purpose: "utility",
+        model: "main-model",
+        auxiliary: { recorder: expect.any(Object), owner: { sessionId: "session", purpose: "session-title" } },
+      }),
+    );
     await f.submit({ ...input, content: "第二条" });
     expect(f.complete).toHaveBeenCalledOnce();
     f.resolve({ text: '"项目架构分析"' });
@@ -49,7 +73,7 @@ describe("first message session title", () => {
     await f.app.dispose();
   });
 
-  it.each(["手动标题", "New chat"])("preserves an explicitly assigned title: %s", async title => {
+  it.each(["手动标题", "New chat"])("preserves an explicitly assigned title: %s", async (title) => {
     const f = fixture(title);
     await f.submit(input);
     expect(f.complete).not.toHaveBeenCalled();
@@ -65,7 +89,7 @@ describe("first message session title", () => {
     f.resolve({ text: "模型标题" });
     await f.app.dispose();
     expect(f.snapshot().metadata.title).toBe("我的标题");
-    expect(f.events.filter(event => event.type === "session/title-set")).toHaveLength(1);
+    expect(f.events.filter((event) => event.type === "session/title-set")).toHaveLength(1);
   });
 
   it("does not replace a manual rename when the provider fails", async () => {
@@ -79,8 +103,16 @@ describe("first message session title", () => {
 
   it("extracts text from multimodal input without sending images to the title task", async () => {
     const f = fixture();
-    await f.submit({ ...input, content: [{ type: "text", text: "解释架构图" }, { type: "image", artifactId: "private-image" }] });
-    expect(f.complete).toHaveBeenCalledWith(expect.objectContaining({ messages: expect.arrayContaining([{ role: "user", content: "解释架构图" }]) }));
+    await f.submit({
+      ...input,
+      content: [
+        { type: "text", text: "解释架构图" },
+        { type: "image", artifactId: "private-image" },
+      ],
+    });
+    expect(f.complete).toHaveBeenCalledWith(
+      expect.objectContaining({ messages: expect.arrayContaining([{ role: "user", content: "解释架构图" }]) }),
+    );
     expect(JSON.stringify(f.complete.mock.calls)).not.toContain("private-image");
     f.resolve({ text: "架构图说明" });
     await vi.waitFor(() => expect(f.snapshot().metadata.title).toBe("架构图说明"));
@@ -101,18 +133,23 @@ describe("first message session title", () => {
   it("falls back when the utility request reaches its deadline", async () => {
     vi.useFakeTimers();
     const f = fixture();
-    f.complete.mockImplementation(({ signal }) => new Promise((_resolve, reject) => {
-      signal!.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
-    }));
+    f.complete.mockImplementation(
+      ({ signal }) =>
+        new Promise((_resolve, reject) => {
+          signal!.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        }),
+    );
     try {
       await f.submit(input);
       await vi.advanceTimersByTimeAsync(30_000);
       expect(f.snapshot().metadata.title).toBe(input.content);
       await f.app.dispose();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it.each(["failure", "empty"])("falls back to the first message on %s", async kind => {
+  it.each(["failure", "empty"])("falls back to the first message on %s", async (kind) => {
     const f = fixture();
     await f.submit(input);
     await vi.waitFor(() => expect(f.complete).toHaveBeenCalledOnce());

@@ -11,7 +11,9 @@ import { getDocument } from "../components/markdown-editor/core";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
 import { findEditorView, polyfillLayout, pressKey, typeInto, typeSynced } from "./markdown-editor-helpers";
 
-vi.mock("mermaid", () => ({ default: { initialize: vi.fn(), render: vi.fn(async () => ({ svg: "<svg></svg>", diagramType: "flowchart-v2" })) } }));
+vi.mock("mermaid", () => ({
+  default: { initialize: vi.fn(), render: vi.fn(async () => ({ svg: "<svg></svg>", diagramType: "flowchart-v2" })) },
+}));
 
 const README = "docs/design-docs/自进化的方案设计/README.md";
 
@@ -24,7 +26,15 @@ function OpenDocs({ select }: { select?: string }) {
   );
 }
 
-async function renderDocs({ workspaceRoot = "/ws", edited, select }: { workspaceRoot?: string | null; edited?: string[]; select?: string } = {}) {
+async function renderDocs({
+  workspaceRoot = "/ws",
+  edited,
+  select,
+}: {
+  workspaceRoot?: string | null;
+  edited?: string[];
+  select?: string;
+} = {}) {
   const view = render(
     <TooltipProvider delayDuration={0}>
       <RightPanelProvider initialOpen initialTabs={[{ id: "docs", kind: "docs", title: "MD 文档" }]}>
@@ -93,7 +103,9 @@ describe("文档面板", () => {
     expect(screen.queryByRole("tree")).toBeNull();
     unmount();
 
-    setupBridge({ "workspaces.listMarkdownFiles": async () => ({ ok: true, files: [], truncated: false, source: "git" }) });
+    setupBridge({
+      "workspaces.listMarkdownFiles": async () => ({ ok: true, files: [], truncated: false, source: "git" }),
+    });
     await renderDocs();
     expect(await screen.findByText("这个工作区还没有 Markdown 文档")).toBeInTheDocument();
   });
@@ -148,7 +160,11 @@ describe("文档面板", () => {
 
   it("编辑后切换工作区再切回：草稿和未保存圆点恢复，不写盘", async () => {
     const user = userEvent.setup();
-    const write = vi.fn(async (input: { content: string }) => ({ ok: true as const, mtimeMs: 2000, size: input.content.length }));
+    const write = vi.fn(async (input: { content: string }) => ({
+      ok: true as const,
+      mtimeMs: 2000,
+      size: input.content.length,
+    }));
     overrideBridge({ "workspaces.writeMarkdownFile": write });
     const view = await renderDocs();
     await user.click(await within(tree()).findByRole("treeitem", { name: /AGENTS\.md/ }));
@@ -181,7 +197,11 @@ describe("文档面板", () => {
 
   it("⌘S 保存调用 writeMarkdownFile，保存后圆点消失", async () => {
     const user = userEvent.setup();
-    const write = vi.fn(async (input: { content: string }) => ({ ok: true as const, mtimeMs: 2000, size: input.content.length }));
+    const write = vi.fn(async (input: { content: string }) => ({
+      ok: true as const,
+      mtimeMs: 2000,
+      size: input.content.length,
+    }));
     overrideBridge({ "workspaces.writeMarkdownFile": write });
     await renderDocs();
     await user.click(await within(tree()).findByRole("treeitem", { name: /AGENTS\.md/ }));
@@ -190,15 +210,27 @@ describe("文档面板", () => {
     await typeSynced(view, "X");
     await waitFor(() => expect(dirtyDot()).toBeInTheDocument());
     let event!: KeyboardEvent;
-    await act(async () => { event = pressKey(view, { key: "s", keyCode: 83, ctrlKey: true }); });
+    await act(async () => {
+      event = pressKey(view, { key: "s", keyCode: 83, ctrlKey: true });
+    });
     expect(event.defaultPrevented).toBe(true);
     await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
-    expect(write).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/ws", relativePath: "AGENTS.md", content: expect.stringContaining("X") }));
+    expect(write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceRoot: "/ws",
+        relativePath: "AGENTS.md",
+        content: expect.stringContaining("X"),
+      }),
+    );
     await waitFor(() => expect(dirtyDot()).toBeNull());
   });
 
   it("输入后立刻 ⌘S（草稿还没渲染出来）也保存最新内容", async () => {
-    const write = vi.fn(async (input: { content: string }) => ({ ok: true as const, mtimeMs: 2000, size: input.content.length }));
+    const write = vi.fn(async (input: { content: string }) => ({
+      ok: true as const,
+      mtimeMs: 2000,
+      size: input.content.length,
+    }));
     overrideBridge({ "workspaces.writeMarkdownFile": write });
     await renderDocs({ select: "AGENTS.md" });
     const view = await editorWith("AGENTS");
@@ -232,7 +264,11 @@ describe("文档面板", () => {
 
   it("保存并离开：先写盘再切换", async () => {
     const user = userEvent.setup();
-    const write = vi.fn(async (input: { content: string }) => ({ ok: true as const, mtimeMs: 2000, size: input.content.length }));
+    const write = vi.fn(async (input: { content: string }) => ({
+      ok: true as const,
+      mtimeMs: 2000,
+      size: input.content.length,
+    }));
     overrideBridge({ "workspaces.writeMarkdownFile": write });
     await renderDocs();
     await user.click(await within(tree()).findByRole("treeitem", { name: /AGENTS\.md/ }));
@@ -248,7 +284,12 @@ describe("文档面板", () => {
     const user = userEvent.setup();
     overrideBridge({
       "workspaces.readFile": async ({ relativePath }: { relativePath: string }) => ({
-        relativePath, renderKind: "markdown" as const, size: 9_000_000, mtimeMs: 1, content: "# 很大\n", truncated: true,
+        relativePath,
+        renderKind: "markdown" as const,
+        size: 9_000_000,
+        mtimeMs: 1,
+        content: "# 很大\n",
+        truncated: true,
       }),
     });
     await renderDocs();
@@ -293,7 +334,7 @@ describe("文档面板", () => {
 
   it("从交付卡打开 Markdown：选中并展开到该文件", async () => {
     await renderDocs({ select: README });
-    const item = await within(tree()).findByRole("treeitem", { name: /^README\.md/ , selected: true });
+    const item = await within(tree()).findByRole("treeitem", { name: /^README\.md/, selected: true });
     expect(item).toBeInTheDocument();
     await editorWith("Harness 自进化方案设计");
     expect(findEditorView().dom.querySelector(".md-h1")).toHaveTextContent("Harness 自进化方案设计");
@@ -316,7 +357,11 @@ describe("文档面板", () => {
 
     await user.click(screen.getByRole("button", { name: "大纲" }));
     const popover = await screen.findByLabelText("本页大纲");
-    expect(within(popover).getAllByRole("button").map((button) => button.textContent)).toEqual(["当前状态", "进化流程", "触发条件", "插件声明示例", "待办"]);
+    expect(
+      within(popover)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["当前状态", "进化流程", "触发条件", "插件声明示例", "待办"]);
     await user.click(within(popover).getByRole("button", { name: "触发条件" }));
     expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
     await waitFor(() => expect(screen.queryByLabelText("本页大纲")).toBeNull());
@@ -344,7 +389,11 @@ describe("文档面板", () => {
     const user = userEvent.setup();
     overrideBridge({
       "workspaces.readFile": async ({ relativePath }: { relativePath: string }) => ({
-        relativePath, renderKind: "markdown" as const, size: 5, mtimeMs: 1, content: "只有正文。",
+        relativePath,
+        renderKind: "markdown" as const,
+        size: 5,
+        mtimeMs: 1,
+        content: "只有正文。",
       }),
     });
     await renderDocs({ select: "AGENTS.md" });
@@ -362,12 +411,22 @@ describe("文档面板", () => {
     expect(screen.queryByRole("button", { name: "重新加载" })).toBeNull();
 
     overrideBridge({
-      "workspaces.statFile": async ({ relativePath }: { relativePath: string }) => ({ relativePath, size: 12, mtimeMs: 9_999_999_999_999 }),
+      "workspaces.statFile": async ({ relativePath }: { relativePath: string }) => ({
+        relativePath,
+        size: 12,
+        mtimeMs: 9_999_999_999_999,
+      }),
       "workspaces.readFile": async ({ relativePath }: { relativePath: string }) => ({
-        relativePath, renderKind: "markdown" as const, size: 12, mtimeMs: 9_999_999_999_999, content: "# 磁盘新内容",
+        relativePath,
+        renderKind: "markdown" as const,
+        size: 12,
+        mtimeMs: 9_999_999_999_999,
+        content: "# 磁盘新内容",
       }),
     });
-    act(() => { window.dispatchEvent(new Event("focus")); });
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
     await user.click(await screen.findByRole("button", { name: "重新加载" }));
     const after = await editorWith("磁盘新内容");
     expect(getDocument(after)).toBe("# 磁盘新内容");

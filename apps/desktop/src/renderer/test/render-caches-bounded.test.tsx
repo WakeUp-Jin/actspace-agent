@@ -1,14 +1,27 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { IMAGE_CACHE_MAX_BYTES, clearMarkdownImageCache, loadCached } from "../components/messages/markdown/MarkdownImage";
-import { FILE_APPLICATIONS_CACHE_MAX_ENTRIES, clearFileApplicationsCache, useFileApplications } from "../components/turn-tail/useFileApplications";
+import {
+  IMAGE_CACHE_MAX_BYTES,
+  clearMarkdownImageCache,
+  loadCached,
+} from "../components/messages/markdown/MarkdownImage";
+import {
+  FILE_APPLICATIONS_CACHE_MAX_ENTRIES,
+  clearFileApplicationsCache,
+  useFileApplications,
+} from "../components/turn-tail/useFileApplications";
 import { observeOverflow, observedOverflowCount } from "../components/messages/overflow-observer";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { LruCache } from "../lru-cache";
 import { setupBridge } from "./helpers/bridge";
 
-beforeEach(() => { clearMarkdownImageCache(); clearFileApplicationsCache(); });
-afterEach(() => { vi.unstubAllGlobals(); });
+beforeEach(() => {
+  clearMarkdownImageCache();
+  clearFileApplicationsCache();
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 it("LruCache evicts the least recently used entries by cost and skips oversize entries", () => {
   const cache = new LruCache<string>(10);
@@ -51,32 +64,52 @@ it("keeps markdown images by bytes: hits for a stable loader, evicts the oldest 
 });
 
 it("bounds the file application cache by entry count and keeps recent entries", async () => {
-  const list = vi.fn(async ({ relativePath }: { relativePath: string }) => ({ applications: [{ id: relativePath, name: relativePath, iconDataUrl: null }], error: undefined }));
+  const list = vi.fn(async ({ relativePath }: { relativePath: string }) => ({
+    applications: [{ id: relativePath, name: relativePath, iconDataUrl: null }],
+    error: undefined,
+  }));
   setupBridge({ "workspaces.listFileApplications": list as never });
-  function Probe({ path }: { path: string }) { useFileApplications("/w", path, true); return null; }
+  function Probe({ path }: { path: string }) {
+    useFileApplications("/w", path, true);
+    return null;
+  }
   const total = FILE_APPLICATIONS_CACHE_MAX_ENTRIES + 5;
   for (let index = 0; index < total; index++) {
     const view = render(<Probe path={`f${index}.md`} />);
-    await act(async () => { await Promise.resolve(); });
+    await act(async () => {
+      await Promise.resolve();
+    });
     view.unmount();
   }
   expect(list).toHaveBeenCalledTimes(total);
   // the most recent file is still cached; the very first one was evicted and is queried again
   const recent = render(<Probe path={`f${total - 1}.md`} />);
-  await act(async () => { await Promise.resolve(); });
+  await act(async () => {
+    await Promise.resolve();
+  });
   recent.unmount();
   expect(list).toHaveBeenCalledTimes(total);
   const first = render(<Probe path="f0.md" />);
-  await act(async () => { await Promise.resolve(); });
+  await act(async () => {
+    await Promise.resolve();
+  });
   first.unmount();
   expect(list).toHaveBeenCalledTimes(total + 1);
 });
 
 it("shares one ResizeObserver across tool lines and releases it with the last one", () => {
-  const instances: Array<{ observe: ReturnType<typeof vi.fn>; unobserve: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn> }> = [];
+  const instances: Array<{
+    observe: ReturnType<typeof vi.fn>;
+    unobserve: ReturnType<typeof vi.fn>;
+    disconnect: ReturnType<typeof vi.fn>;
+  }> = [];
   class FakeResizeObserver {
-    observe = vi.fn(); unobserve = vi.fn(); disconnect = vi.fn();
-    constructor(_callback: ResizeObserverCallback) { instances.push(this); }
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+    constructor(_callback: ResizeObserverCallback) {
+      instances.push(this);
+    }
   }
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
   const first = document.createElement("span");
@@ -94,7 +127,14 @@ it("shares one ResizeObserver across tool lines and releases it with the last on
 });
 
 it("a running tool line carries an empty shimmer layer, a finished one does not", () => {
-  const base = { kind: "grep" as const, id: "g", createdAt: "now", pattern: "x", scope: "*.ts", displayText: "Grep x in *.ts" };
+  const base = {
+    kind: "grep" as const,
+    id: "g",
+    createdAt: "now",
+    pattern: "x",
+    scope: "*.ts",
+    displayText: "Grep x in *.ts",
+  };
   const { container, rerender } = render(<ToolLogLine message={{ ...base, status: "running" }} />);
   const shimmer = container.querySelector(".tool-log-shimmer");
   expect(shimmer).not.toBeNull();

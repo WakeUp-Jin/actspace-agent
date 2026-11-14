@@ -14,10 +14,15 @@ export type ConnectionSecretChange = {
   readonly managementKey?: string | null;
 };
 
-const isDefaultConnection = (connectionId: string, providerId: LlmProviderId) => connectionId === `${providerId}:default`;
+const isDefaultConnection = (connectionId: string, providerId: LlmProviderId) =>
+  connectionId === `${providerId}:default`;
 
 export function hasConnectionKey(store: SettingsStore, connectionId: string, providerId: LlmProviderId): boolean {
-  return Boolean(isDefaultConnection(connectionId, providerId) ? store.getStoredKey(providerId) : store.secrets.providerCredentials[`connection:${connectionId}`]);
+  return Boolean(
+    isDefaultConnection(connectionId, providerId)
+      ? store.getStoredKey(providerId)
+      : store.secrets.providerCredentials[`connection:${connectionId}`],
+  );
 }
 
 export function hasManagementKey(store: SettingsStore): boolean {

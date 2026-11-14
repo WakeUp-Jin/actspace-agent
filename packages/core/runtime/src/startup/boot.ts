@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import type { RuntimeHostDescriptor, RuntimeBootManifest, RuntimeStateView, RuntimeDiagnosticsSnapshot, RuntimeShutdownResult } from "@actspace/shared/runtime-v2";
+import type {
+  RuntimeHostDescriptor,
+  RuntimeBootManifest,
+  RuntimeStateView,
+  RuntimeDiagnosticsSnapshot,
+  RuntimeShutdownResult,
+} from "@actspace/shared/runtime-v2";
 import type { AgentLoopLiveEvent } from "@actspace/agent-loop";
 import { PromptExtensionRegistry, emptyRuntimePromptSource, type RuntimePromptSource } from "@actspace/prompt";
 import { DiagnosticsCollector } from "../projection/diagnostics.js";
@@ -14,7 +20,14 @@ import type { EventCodec } from "@actspace/session-journal";
 import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
 import { LLM_SERVICE } from "@actspace/llm-service";
 import type { ResolvedComposition } from "@actspace/composition";
-import { discoverPluginCodecs, getService, provideService, type CodecModuleLoader, type CordisContext, type ServiceKey } from "@actspace/cordis-adapter";
+import {
+  discoverPluginCodecs,
+  getService,
+  provideService,
+  type CodecModuleLoader,
+  type CordisContext,
+  type ServiceKey,
+} from "@actspace/cordis-adapter";
 import { inspectCordisAdmission } from "@actspace/cordis-adapter";
 import type { CordisAdmissionReport, CordisRootHandle } from "@actspace/cordis-adapter";
 import { bootDshCordis, createDshBootCandidate } from "@actspace/boot";
@@ -51,7 +64,11 @@ export type BootRuntimeOptions = {
   readonly gracefulShutdownMs?: number;
   readonly finalShutdownMs?: number;
   readonly onLiveEvent?: (event: AgentLoopLiveEvent) => void;
-  readonly cordis?: { readonly admission: CordisAdmissionReport; readonly createRoot?: () => Promise<CordisRootHandle>; readonly configPath?: string };
+  readonly cordis?: {
+    readonly admission: CordisAdmissionReport;
+    readonly createRoot?: () => Promise<CordisRootHandle>;
+    readonly configPath?: string;
+  };
   readonly rendererAllowlist?: RendererAllowlist;
   /** Host-owned facts normalized before the Cordis config tree is mounted. */
   readonly hostServices?: RuntimeHostServices;
@@ -63,7 +80,9 @@ export type BootRuntimeOptions = {
    */
   readonly disabledPlugins?: readonly string[];
   /** Plugin settings by plugin Entry id, over the manifest's `config` defaults (e.g. the external subagents' permission settings). */
-  readonly pluginConfig?: Readonly<Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>>>;
+  readonly pluginConfig?: Readonly<
+    Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>>
+  >;
   /** Record Harness runtime stats under `<dataRoot>/harness-stats` (default true). Ephemeral runs pass false so they leave no stats behind. */
   readonly harnessStats?: boolean;
 };
@@ -104,12 +123,34 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
   const state = new RuntimeStateController();
   const composition = options.composition;
   if (composition === undefined) throw new Error("Runtime boot requires an explicit Profile composition.");
-  const hostServices = options.hostServices ?? createRuntimeHostServices({ descriptor: options.host, dataRoot: options.dataRoot, workspaceRoot: options.toolEnvironment.workspaceRoot, toolEnvironment: options.toolEnvironment });
-  const cordisAdmission = options.cordis?.admission ?? await inspectCordisAdmission();
-  const enabledPluginIds = new Set(composition.entries.filter(entry => entry.enabled && entry.state !== "skipped").map(entry => entry.pluginId));
-  const pluginCodecs: readonly EventCodec[] = await discoverPluginCodecs(composition.manifests.filter(manifest => enabledPluginIds.has(manifest.pluginId) || (manifest.source.kind === "builtin" && manifest.pluginId === "actspace.context")), (specifier, manifest) =>
-    manifest.source.kind === "builtin" ? loadBuiltinToolCodec(specifier, manifest) : (options.pluginCodecLoader ?? missingCodecLoader)(specifier, manifest));
-  const pluginVersions = new Map(composition.entries.filter((entry) => entry.enabled && entry.state !== "skipped").map((entry) => [entry.pluginId, entry.pluginVersion]));
+  const hostServices =
+    options.hostServices ??
+    createRuntimeHostServices({
+      descriptor: options.host,
+      dataRoot: options.dataRoot,
+      workspaceRoot: options.toolEnvironment.workspaceRoot,
+      toolEnvironment: options.toolEnvironment,
+    });
+  const cordisAdmission = options.cordis?.admission ?? (await inspectCordisAdmission());
+  const enabledPluginIds = new Set(
+    composition.entries.filter((entry) => entry.enabled && entry.state !== "skipped").map((entry) => entry.pluginId),
+  );
+  const pluginCodecs: readonly EventCodec[] = await discoverPluginCodecs(
+    composition.manifests.filter(
+      (manifest) =>
+        enabledPluginIds.has(manifest.pluginId) ||
+        (manifest.source.kind === "builtin" && manifest.pluginId === "actspace.context"),
+    ),
+    (specifier, manifest) =>
+      manifest.source.kind === "builtin"
+        ? loadBuiltinToolCodec(specifier, manifest)
+        : (options.pluginCodecLoader ?? missingCodecLoader)(specifier, manifest),
+  );
+  const pluginVersions = new Map(
+    composition.entries
+      .filter((entry) => entry.enabled && entry.state !== "skipped")
+      .map((entry) => [entry.pluginId, entry.pluginVersion]),
+  );
   const configRevision = createHash("sha256").update(JSON.stringify(composition.config)).digest("hex");
   const diagnostics = new DiagnosticsCollector({ runtimeInstanceId: state.runtimeInstanceId });
   const published = <T>(ctx: CordisContext, key: ServiceKey<T>): T => {
@@ -125,14 +166,26 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     plugins: [...pluginVersions].map(([id, version]) => ({ id, version })),
     rendererAllowlist: options.rendererAllowlist,
   } satisfies RuntimeSessionHostPort);
-  const originalPromptPort = hostServices.services["actspace.host.prompt"] ?? Object.freeze({
-    workspaceRoot: options.toolEnvironment.workspaceRoot,
-    resolveSource: async (workspaceRoot: string) => typeof options.promptSource === "function" ? options.promptSource(workspaceRoot) : options.promptSource ?? emptyRuntimePromptSource(),
+  const originalPromptPort =
+    hostServices.services["actspace.host.prompt"] ??
+    Object.freeze({
+      workspaceRoot: options.toolEnvironment.workspaceRoot,
+      resolveSource: async (workspaceRoot: string) =>
+        typeof options.promptSource === "function"
+          ? options.promptSource(workspaceRoot)
+          : (options.promptSource ?? emptyRuntimePromptSource()),
+    });
+  const promptPort = Object.freeze({
+    ...(originalPromptPort as import("@actspace/prompt").PromptHostPort),
+    extensions:
+      (originalPromptPort as import("@actspace/prompt").PromptHostPort).extensions ?? new PromptExtensionRegistry(),
   });
-  const promptPort = Object.freeze({ ...(originalPromptPort as import("@actspace/prompt").PromptHostPort), extensions: (originalPromptPort as import("@actspace/prompt").PromptHostPort).extensions ?? new PromptExtensionRegistry() });
   let runtimeContext: CordisContext | undefined;
   // Host-owned recorder: it outlives every Harness mount, so switching versions keeps its counts. ACTSPACE_HARNESS_STATS=0 creates nothing.
-  const harnessStats = options.harnessStats !== false && harnessStatsEnabled() ? new HarnessStats({ dataRoot: options.dataRoot }) : undefined;
+  const harnessStats =
+    options.harnessStats !== false && harnessStatsEnabled()
+      ? new HarnessStats({ dataRoot: options.dataRoot })
+      : undefined;
   const providedHostServices = Object.freeze({
     ...hostServices.services,
     "actspace.host.subagents": createSubagentHost(() => {
@@ -154,7 +207,13 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     // Hosts without a model list still publish the port, so subagent tools see an empty list rather than a missing service.
     [MODELS_HOST_PORT_ID]: hostServices.services[MODELS_HOST_PORT_ID] ?? EMPTY_MODELS_HOST_PORT,
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
-      disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...harnessEntriesMissingHostCapabilities(options.host.capabilityCeiling), ...(options.disabledPlugins ?? harnessEntriesOffByDefault())],
+      disabledHarnessEntries: [
+        ...toolTransportPatches(composition)
+          .filter((row) => row.disabled)
+          .map((row) => row.id),
+        ...harnessEntriesMissingHostCapabilities(options.host.capabilityCeiling),
+        ...(options.disabledPlugins ?? harnessEntriesOffByDefault()),
+      ],
       authorizeHarness: options.authorizeHarness,
       ...(options.pluginConfig ? { harnessEntryConfig: options.pluginConfig } : {}),
       ...(harnessStats ? { observeHarnessMount: harnessStats.observeMount } : {}),
@@ -165,24 +224,45 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
           if (!runtime?.evolution) throw new Error("Evolution service is not ready");
           return runtime.evolution.inspect(context);
         },
-        execute: (args: Readonly<Record<string, unknown>>, context: import("@actspace/tool-runtime").ToolExecutionContext) => {
+        execute: (
+          args: Readonly<Record<string, unknown>>,
+          context: import("@actspace/tool-runtime").ToolExecutionContext,
+        ) => {
           const runtime = getService(runtimeContext, AGENT_RUNTIME_SERVICE);
           if (!runtime?.evolution) throw new Error("Evolution service is not ready");
           return runtime.evolution.execute(args, context);
         },
       },
-      onHarnessDiagnostic: (error: unknown) => diagnostics.record({ severity: "error", source: "boot", code: "HARNESS_RECOVERY_BLOCKED", message: error instanceof Error ? error.message : String(error) }),
-      onSandboxStatus: (status: import("@actspace/sandbox").SandboxStatus | undefined) => diagnostics.record(sandboxStatusDiagnostic(status)),
+      onHarnessDiagnostic: (error: unknown) =>
+        diagnostics.record({
+          severity: "error",
+          source: "boot",
+          code: "HARNESS_RECOVERY_BLOCKED",
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      onSandboxStatus: (status: import("@actspace/sandbox").SandboxStatus | undefined) =>
+        diagnostics.record(sandboxStatusDiagnostic(status)),
       host: options.host,
       agentForm: MAIN_AGENT_FORM,
       toolEnvironment: options.toolEnvironment,
-      contextDisclosure: createContextHost(() => getService(runtimeContext, SESSION_RUNTIME_SERVICE), options.toolEnvironment),
+      contextDisclosure: createContextHost(
+        () => getService(runtimeContext, SESSION_RUNTIME_SERVICE),
+        options.toolEnvironment,
+      ),
       workspaceRoot: options.toolEnvironment.workspaceRoot,
       compositionDigest: composition.digest,
       hostCapabilityDigest: configRevision,
       plugins: runtimeHost.plugins,
-      ...((hostServices.services["actspace.host.chat-settings"] as { readonly compactionTriggerRatio?: () => number } | undefined)?.compactionTriggerRatio
-        ? { chatCompactionTriggerRatio: (hostServices.services["actspace.host.chat-settings"] as { readonly compactionTriggerRatio: () => number }).compactionTriggerRatio }
+      ...((
+        hostServices.services["actspace.host.chat-settings"] as
+          | { readonly compactionTriggerRatio?: () => number }
+          | undefined
+      )?.compactionTriggerRatio
+        ? {
+            chatCompactionTriggerRatio: (
+              hostServices.services["actspace.host.chat-settings"] as { readonly compactionTriggerRatio: () => number }
+            ).compactionTriggerRatio,
+          }
         : {}),
       onLiveEvent: options.onLiveEvent,
     } satisfies AgentRuntimeHostPort),
@@ -196,14 +276,27 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
       transportPatches: hostTransportPatches(composition),
       createRoot: options.cordis?.createRoot,
 
-      requiredServices: ["actspace.runtime", "session.journal", "session.runtime", "llm.service", "core.agent", "agent.registry", "agent.service", "agent.runtime"],
+      requiredServices: [
+        "actspace.runtime",
+        "session.journal",
+        "session.runtime",
+        "llm.service",
+        "core.agent",
+        "agent.registry",
+        "agent.service",
+        "agent.runtime",
+      ],
       prepare: (prepared) => {
         runtimeContext = prepared;
-        provideService(prepared, RUNTIME_CORDIS_HOST_PORT, Object.freeze({
-          hostKind: options.host.hostKind,
-          descriptor: hostServices.descriptor,
-          services: providedHostServices,
-        }));
+        provideService(
+          prepared,
+          RUNTIME_CORDIS_HOST_PORT,
+          Object.freeze({
+            hostKind: options.host.hostKind,
+            descriptor: hostServices.descriptor,
+            services: providedHostServices,
+          }),
+        );
       },
     });
     root = boot.root;
@@ -211,10 +304,34 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     published(context, SESSION_RUNTIME_SERVICE);
     published(context, LLM_SERVICE);
     const agentRuntime = published(context, AGENT_RUNTIME_SERVICE);
-    const candidate = await createDshBootCandidate({ host: options.host, composition, cordisAdmission, root, discoveredCodecs: pluginCodecs });
-    for (const item of candidate.diagnostics) diagnostics.record({ severity: item.severity, source: "boot", code: item.code, message: item.message, ...(item.provenance.pluginId === undefined ? {} : { pluginId: item.provenance.pluginId }), details: isRecord(item.details) ? item.details : { value: item.details } });
+    const candidate = await createDshBootCandidate({
+      host: options.host,
+      composition,
+      cordisAdmission,
+      root,
+      discoveredCodecs: pluginCodecs,
+    });
+    for (const item of candidate.diagnostics)
+      diagnostics.record({
+        severity: item.severity,
+        source: "boot",
+        code: item.code,
+        message: item.message,
+        ...(item.provenance.pluginId === undefined ? {} : { pluginId: item.provenance.pluginId }),
+        details: isRecord(item.details) ? item.details : { value: item.details },
+      });
     state.ready();
-    return createBootedProfile({ state, manifest: candidate.manifest, diagnostics, context, root, agentRuntime, candidate, options, harnessStats });
+    return createBootedProfile({
+      state,
+      manifest: candidate.manifest,
+      diagnostics,
+      context,
+      root,
+      agentRuntime,
+      candidate,
+      options,
+      harnessStats,
+    });
   } catch (error) {
     await harnessStats?.dispose().catch(() => undefined);
     await root?.dispose().catch(() => undefined);
@@ -225,7 +342,9 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
   }
 }
 
-async function missingCodecLoader(specifier: string): Promise<never> { throw new Error(`No trusted Codec loader is configured for ${specifier}.`); }
+async function missingCodecLoader(specifier: string): Promise<never> {
+  throw new Error(`No trusted Codec loader is configured for ${specifier}.`);
+}
 function createBootedProfile(input: {
   readonly state: RuntimeStateController;
   readonly manifest: RuntimeBootManifest;
@@ -255,10 +374,14 @@ function createBootedProfile(input: {
         // Last: every Harness has stopped, so the final counts are in.
         () => input.harnessStats?.dispose(),
       ]) {
-        try { await dispose(); } catch (error) { failures.push(error); }
+        try {
+          await dispose();
+        } catch (error) {
+          failures.push(error);
+        }
       }
       if (failures.length) throw new AggregateError(failures, "Runtime resource cleanup failed.");
-    })().catch(error => {
+    })().catch((error) => {
       if (cleanupPromise === attempt) cleanupPromise = undefined;
       throw error;
     });
@@ -281,18 +404,22 @@ function createBootedProfile(input: {
     getState: () => input.state.view(),
     getDiagnostics: () => input.diagnostics.snapshot(),
     recordDiagnostic: (diagnostic: DiagnosticInput) => input.diagnostics.record(diagnostic),
-    requestRestart: (reason: string, source: string, candidateDigest?: string) => input.state.requestRestart(reason, source, candidateDigest),
+    requestRestart: (reason: string, source: string, candidateDigest?: string) =>
+      input.state.requestRestart(reason, source, candidateDigest),
     shutdown,
   });
 }
 
-async function shutdownBootedProfile(input: {
-  readonly state: RuntimeStateController;
-  readonly diagnostics: DiagnosticsCollector;
-  readonly agentRuntime: AgentRuntimeService;
-  readonly candidate: Awaited<ReturnType<typeof createDshBootCandidate>>;
-  readonly options: BootRuntimeOptions;
-}, cleanupResources: () => Promise<void>): Promise<RuntimeShutdownResult> {
+async function shutdownBootedProfile(
+  input: {
+    readonly state: RuntimeStateController;
+    readonly diagnostics: DiagnosticsCollector;
+    readonly agentRuntime: AgentRuntimeService;
+    readonly candidate: Awaited<ReturnType<typeof createDshBootCandidate>>;
+    readonly options: BootRuntimeOptions;
+  },
+  cleanupResources: () => Promise<void>,
+): Promise<RuntimeShutdownResult> {
   input.state.quiesce();
   input.agentRuntime.runs.quiesce();
   // A timeout stops waiting, not disposal. Retries observe the same ongoing cleanup.
@@ -300,15 +427,28 @@ async function shutdownBootedProfile(input: {
   const graceful = await settleWithinDeadline(cleanup, input.options.gracefulShutdownMs ?? 30_000);
   let final = graceful;
   if (graceful.kind === "timeout") {
-    input.diagnostics.record({ severity: "warning", source: "host", code: "SHUTDOWN_GRACEFUL_TIMEOUT", message: `Graceful shutdown exceeded ${graceful.timeoutMs} ms; cooperative cancellation was repeated.` });
+    input.diagnostics.record({
+      severity: "warning",
+      source: "host",
+      code: "SHUTDOWN_GRACEFUL_TIMEOUT",
+      message: `Graceful shutdown exceeded ${graceful.timeoutMs} ms; cooperative cancellation was repeated.`,
+    });
     input.agentRuntime.runs.quiesce();
     final = await settleWithinDeadline(cleanup, input.options.finalShutdownMs ?? 5_000);
   }
   const blockers: string[] = [];
   if (final.kind === "failed") blockers.push(final.error instanceof Error ? final.error.message : String(final.error));
-  if (final.kind === "timeout") blockers.push(`Shutdown exceeded ${input.options.gracefulShutdownMs ?? 30_000} ms plus ${final.timeoutMs} ms final cancellation window.`);
+  if (final.kind === "timeout")
+    blockers.push(
+      `Shutdown exceeded ${input.options.gracefulShutdownMs ?? 30_000} ms plus ${final.timeoutMs} ms final cancellation window.`,
+    );
   if (blockers.length > 0) {
-    input.diagnostics.record({ severity: "fatal", source: "host", code: "SHUTDOWN_INCOMPLETE", message: blockers[0] ?? "Shutdown incomplete." });
+    input.diagnostics.record({
+      severity: "fatal",
+      source: "host",
+      code: "SHUTDOWN_INCOMPLETE",
+      message: blockers[0] ?? "Shutdown incomplete.",
+    });
     throw new RuntimeShutdownFailure(blockers);
   }
   input.state.disposed();
@@ -316,20 +456,24 @@ async function shutdownBootedProfile(input: {
   return Object.freeze({ disposed: true, blockers: Object.freeze([]), diagnostics: input.diagnostics.snapshot() });
 }
 
-export function resetRuntimeProcessGuardForTest(): void { runtimeClaimed = false; }
+export function resetRuntimeProcessGuardForTest(): void {
+  runtimeClaimed = false;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 /** The Harness-facing subagent port; calls reach the Host's SubagentManager once the runtime is up. */
-function createSubagentHost(manager: () => import("@actspace/subagent").SubagentHostPort): import("@actspace/subagent").SubagentHostPort {
+function createSubagentHost(
+  manager: () => import("@actspace/subagent").SubagentHostPort,
+): import("@actspace/subagent").SubagentHostPort {
   const port: import("@actspace/subagent").SubagentHostPort = {
-    spawn: input => manager().spawn(input),
-    spawnFork: input => manager().spawnFork(input),
+    spawn: (input) => manager().spawn(input),
+    spawnFork: (input) => manager().spawnFork(input),
     spawnExternal: (backend, input) => manager().spawnExternal(backend, input),
-    sendMessage: input => manager().sendMessage(input),
-    listModels: input => manager().listModels(input),
+    sendMessage: (input) => manager().sendMessage(input),
+    listModels: (input) => manager().listModels(input),
   };
   return Object.freeze(port);
 }

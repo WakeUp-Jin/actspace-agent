@@ -31,7 +31,34 @@ export type StreamTailOptions = {
 };
 
 /** 行内元素：尾巴放在它们后面，不放进去（不然尾巴会跟着加粗、变成链接）。 */
-const INLINE = new Set(["a", "abbr", "b", "bdi", "bdo", "cite", "code", "data", "del", "dfn", "em", "i", "ins", "kbd", "mark", "q", "s", "samp", "small", "span", "strong", "sub", "sup", "time", "u", "var"]);
+const INLINE = new Set([
+  "a",
+  "abbr",
+  "b",
+  "bdi",
+  "bdo",
+  "cite",
+  "code",
+  "data",
+  "del",
+  "dfn",
+  "em",
+  "i",
+  "ins",
+  "kbd",
+  "mark",
+  "q",
+  "s",
+  "samp",
+  "small",
+  "span",
+  "strong",
+  "sub",
+  "sup",
+  "time",
+  "u",
+  "var",
+]);
 /** 空元素不能有子节点。 */
 const VOID = new Set(["br", "hr", "img", "input", "wbr", "area", "col", "embed", "source", "track"]);
 
@@ -41,11 +68,18 @@ type Anchor = { parent: HastNode; index: number; inPre: boolean; split?: HastNod
 
 function isExcluded(node: HastNode): boolean {
   // 公式（KaTeX 输出）和显式排除批注的节点：内部不渐显，也不放尾巴。
-  return classNames(node).some((name) => name.startsWith("katex")) || node.properties?.dataAnnotationExclude !== undefined;
+  return (
+    classNames(node).some((name) => name.startsWith("katex")) || node.properties?.dataAnnotationExclude !== undefined
+  );
 }
 
 function isSkipped(node: HastNode, options: StreamTailOptions): boolean {
-  return Boolean(options.skipFootnoteSection) && node.type === "element" && node.tagName === "section" && node.properties?.dataFootnotes !== undefined;
+  return (
+    Boolean(options.skipFootnoteSection) &&
+    node.type === "element" &&
+    node.tagName === "section" &&
+    node.properties?.dataFootnotes !== undefined
+  );
 }
 
 function isBlank(node: HastNode): boolean {
@@ -95,21 +129,28 @@ function findAnchor(root: HastNode, options: StreamTailOptions): Anchor {
   for (;;) {
     const children = node.children ?? [];
     let index = children.length - 1;
-    while (index >= 0 && (isBlank(children[index]) || isSkipped(children[index], options) || isBackref(children[index]))) index -= 1;
+    while (
+      index >= 0 &&
+      (isBlank(children[index]) || isSkipped(children[index], options) || isBackref(children[index]))
+    )
+      index -= 1;
     const child = children[index] as HastNode | undefined;
-    const tag = child?.type === "element" ? child.tagName ?? "" : "";
+    const tag = child?.type === "element" ? (child.tagName ?? "") : "";
     if (child && tag === "pre") {
       const code = (child.children ?? []).find((item) => item.type === "element" && item.tagName === "code") ?? child;
       const text = lastText(code);
       if (!text) return { parent: code, index: (code.children ?? []).length, inPre: true };
       const at = text.parent.children!.indexOf(text.node);
-      return (text.node.value ?? "").endsWith("\n") ? { parent: text.parent, index: at, inPre: true, split: text.node } : { parent: text.parent, index: at + 1, inPre: true };
+      return (text.node.value ?? "").endsWith("\n")
+        ? { parent: text.parent, index: at, inPre: true, split: text.node }
+        : { parent: text.parent, index: at + 1, inPre: true };
     }
     if (child && child.type === "element" && !isExcluded(child) && !VOID.has(tag) && !INLINE.has(tag)) {
       node = child;
       continue;
     }
-    if (child?.type === "text" && node !== root && /\s$/.test(child.value ?? "")) return { parent: node, index, inPre: false, split: child };
+    if (child?.type === "text" && node !== root && /\s$/.test(child.value ?? ""))
+      return { parent: node, index, inPre: false, split: child };
     return { parent: node, index: index + 1, inPre: false };
   }
 }
@@ -122,7 +163,11 @@ export function rehypeStreamTail(options: StreamTailOptions = {}) {
 
     // 先插尾巴；拆出来的结尾空白（代码块里是补的换行）在尾巴后面，不参与渐显。
     // 代码区已有内容（拆开了末尾补的换行）时标 dataFilled：块源码以换行结尾的话，尾巴是新的一行，组件先补一个换行。
-    const properties = anchor.inPre ? { dataPre: "", ...(anchor.split ? { dataFilled: "" } : {}) } : anchor.parent === tree ? { dataRoot: "" } : {};
+    const properties = anchor.inPre
+      ? { dataPre: "", ...(anchor.split ? { dataFilled: "" } : {}) }
+      : anchor.parent === tree
+        ? { dataRoot: "" }
+        : {};
     const element: HastNode = { type: "element", tagName: STREAM_TAIL_TAG, properties, children: [] };
     const siblings = anchor.parent.children!;
     if (anchor.split) {
@@ -142,8 +187,14 @@ export function rehypeStreamTail(options: StreamTailOptions = {}) {
       const value = node.value ?? "";
       if (!value) continue;
       const take = Math.min(value.length, TAIL_FADE_LIMIT - consumed);
-      const fade: HastNode = { type: "element", tagName: STREAM_FADE_TAG, properties: { dataAfter: consumed }, children: [{ type: "text", value: value.slice(value.length - take) }] };
-      const pieces = take < value.length ? [{ type: "text", value: value.slice(0, value.length - take) }, fade] : [fade];
+      const fade: HastNode = {
+        type: "element",
+        tagName: STREAM_FADE_TAG,
+        properties: { dataAfter: consumed },
+        children: [{ type: "text", value: value.slice(value.length - take) }],
+      };
+      const pieces =
+        take < value.length ? [{ type: "text", value: value.slice(0, value.length - take) }, fade] : [fade];
       parent.children!.splice(parent.children!.indexOf(node), 1, ...pieces);
       consumed += take;
     }

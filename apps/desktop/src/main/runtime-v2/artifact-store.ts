@@ -17,7 +17,11 @@ export class DesktopArtifactStore {
     this.root = join(dataRoot, "artifacts-v2");
   }
 
-  async create(input: { readonly bytes: Uint8Array; readonly mediaType: string; readonly owner: ToolArtifactOwner }): Promise<ToolArtifactRef> {
+  async create(input: {
+    readonly bytes: Uint8Array;
+    readonly mediaType: string;
+    readonly owner: ToolArtifactOwner;
+  }): Promise<ToolArtifactRef> {
     await mkdir(this.root, { recursive: true });
     const artifactId = randomUUID();
     const path = join(this.root, artifactId);
@@ -28,14 +32,32 @@ export class DesktopArtifactStore {
       size: input.bytes.byteLength,
       sha256: createHash("sha256").update(input.bytes).digest("hex"),
     });
-    const metadata: ArtifactMetadata = Object.freeze({ schemaVersion: 1, ...ref, owner: Object.freeze({ ...input.owner }) });
+    const metadata: ArtifactMetadata = Object.freeze({
+      schemaVersion: 1,
+      ...ref,
+      owner: Object.freeze({ ...input.owner }),
+    });
     try {
       const file = await open(path, "wx", 0o600);
-      try { await file.writeFile(input.bytes); await file.sync(); } finally { await file.close(); }
+      try {
+        await file.writeFile(input.bytes);
+        await file.sync();
+      } finally {
+        await file.close();
+      }
       const meta = await open(metadataPath, "wx", 0o600);
-      try { await meta.writeFile(`${JSON.stringify(metadata)}\n`); await meta.sync(); } finally { await meta.close(); }
+      try {
+        await meta.writeFile(`${JSON.stringify(metadata)}\n`);
+        await meta.sync();
+      } finally {
+        await meta.close();
+      }
       const directory = await open(this.root, "r");
-      try { await directory.sync(); } finally { await directory.close(); }
+      try {
+        await directory.sync();
+      } finally {
+        await directory.close();
+      }
       return ref;
     } catch (error) {
       await Promise.allSettled([rm(path, { force: true }), rm(metadataPath, { force: true })]);
@@ -50,17 +72,28 @@ export class DesktopArtifactStore {
 
   async copyForSession(parentSessionId: string, childSessionId: string, artifactId: string): Promise<ToolArtifactRef> {
     const verified = await this.#readVerified(artifactId);
-    if (verified.metadata.owner.sessionId !== parentSessionId) throw new Error("Artifact does not belong to this Session.");
-    return this.create({ bytes: verified.bytes, mediaType: verified.metadata.mediaType, owner: { ...verified.metadata.owner, sessionId: childSessionId } });
+    if (verified.metadata.owner.sessionId !== parentSessionId)
+      throw new Error("Artifact does not belong to this Session.");
+    return this.create({
+      bytes: verified.bytes,
+      mediaType: verified.metadata.mediaType,
+      owner: { ...verified.metadata.owner, sessionId: childSessionId },
+    });
   }
 
-  async readForSession(sessionId: string, artifactId: string): Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }> {
+  async readForSession(
+    sessionId: string,
+    artifactId: string,
+  ): Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }> {
     const verified = await this.#readVerified(artifactId);
     if (verified.metadata.owner.sessionId !== sessionId) throw new Error("Artifact does not belong to this Session.");
     return Object.freeze({ bytes: verified.bytes, mediaType: verified.metadata.mediaType });
   }
 
-  async resolveForSession(sessionId: string, artifactId: string): Promise<{ readonly path: string; readonly bytes: Uint8Array; readonly mediaType: string }> {
+  async resolveForSession(
+    sessionId: string,
+    artifactId: string,
+  ): Promise<{ readonly path: string; readonly bytes: Uint8Array; readonly mediaType: string }> {
     const verified = await this.#readVerified(artifactId);
     if (verified.metadata.owner.sessionId !== sessionId) throw new Error("Artifact does not belong to this Session.");
     return Object.freeze({ path: verified.path, bytes: verified.bytes, mediaType: verified.metadata.mediaType });
@@ -69,21 +102,26 @@ export class DesktopArtifactStore {
   async deleteForSession(sessionId: string, artifactId: string): Promise<void> {
     const verified = await this.#readVerified(artifactId);
     if (verified.metadata.owner.sessionId !== sessionId) throw new Error("Artifact does not belong to this Session.");
-    await Promise.all([
-      rm(verified.path),
-      rm(`${verified.path}.json`),
-    ]);
+    await Promise.all([rm(verified.path), rm(`${verified.path}.json`)]);
   }
 
-  async #readVerified(artifactId: string): Promise<{ readonly path: string; readonly bytes: Buffer; readonly metadata: ArtifactMetadata }> {
+  async #readVerified(
+    artifactId: string,
+  ): Promise<{ readonly path: string; readonly bytes: Buffer; readonly metadata: ArtifactMetadata }> {
     if (!/^[0-9a-f-]{36}$/i.test(artifactId)) throw new Error("Invalid artifact id.");
     const path = join(this.root, artifactId);
-    const [realRoot, realPath, realMetadataPath] = await Promise.all([realpath(this.root), realpath(path), realpath(`${path}.json`)]);
-    if (!isInside(realRoot, realPath) || !isInside(realRoot, realMetadataPath)) throw new Error("Artifact escapes the store root.");
+    const [realRoot, realPath, realMetadataPath] = await Promise.all([
+      realpath(this.root),
+      realpath(path),
+      realpath(`${path}.json`),
+    ]);
+    if (!isInside(realRoot, realPath) || !isInside(realRoot, realMetadataPath))
+      throw new Error("Artifact escapes the store root.");
     const [rawMetadata, bytes] = await Promise.all([readFile(realMetadataPath, "utf8"), readFile(realPath)]);
     const metadata = parseMetadata(rawMetadata, artifactId);
     const digest = createHash("sha256").update(bytes).digest("hex");
-    if (bytes.byteLength !== metadata.size || digest !== metadata.sha256) throw new Error("Artifact integrity check failed.");
+    if (bytes.byteLength !== metadata.size || digest !== metadata.sha256)
+      throw new Error("Artifact integrity check failed.");
     return { path: realPath, bytes, metadata };
   }
 }
@@ -94,11 +132,30 @@ function isInside(root: string, target: string): boolean {
 
 function parseMetadata(raw: string, artifactId: string): ArtifactMetadata {
   const value: unknown = JSON.parse(raw);
-  if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error("Artifact metadata is invalid.");
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    throw new Error("Artifact metadata is invalid.");
   const record = value as Record<string, unknown>;
   const owner = record.owner;
-  if (record.schemaVersion !== 1 || record.artifactId !== artifactId || typeof record.mediaType !== "string" || typeof record.size !== "number" || !Number.isSafeInteger(record.size) || record.size < 0 || typeof record.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(record.sha256) || owner === null || typeof owner !== "object" || Array.isArray(owner)) throw new Error("Artifact metadata is invalid.");
+  if (
+    record.schemaVersion !== 1 ||
+    record.artifactId !== artifactId ||
+    typeof record.mediaType !== "string" ||
+    typeof record.size !== "number" ||
+    !Number.isSafeInteger(record.size) ||
+    record.size < 0 ||
+    typeof record.sha256 !== "string" ||
+    !/^[0-9a-f]{64}$/.test(record.sha256) ||
+    owner === null ||
+    typeof owner !== "object" ||
+    Array.isArray(owner)
+  )
+    throw new Error("Artifact metadata is invalid.");
   const fields = owner as Record<string, unknown>;
-  if ([fields.sessionId, fields.callId, fields.pluginId, fields.name].some((field) => typeof field !== "string" || field.length === 0)) throw new Error("Artifact owner metadata is invalid.");
+  if (
+    [fields.sessionId, fields.callId, fields.pluginId, fields.name].some(
+      (field) => typeof field !== "string" || field.length === 0,
+    )
+  )
+    throw new Error("Artifact owner metadata is invalid.");
   return value as ArtifactMetadata;
 }

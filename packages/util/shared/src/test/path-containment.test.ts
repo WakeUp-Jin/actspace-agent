@@ -64,7 +64,10 @@ describe("relativePathInside", () => {
 
 describe("isLexicallyInside", () => {
   it("counts the root itself only when includeRoot is true", () => {
-    for (const [rules, root, child, sibling] of [[posix, "/w", "/w/a", "/wx"], [win32, "C:\\w", "C:\\w\\a", "C:\\wx"]] as const) {
+    for (const [rules, root, child, sibling] of [
+      [posix, "/w", "/w/a", "/wx"],
+      [win32, "C:\\w", "C:\\w\\a", "C:\\wx"],
+    ] as const) {
       expect(isLexicallyInside(rules, root, root, { includeRoot: true })).toBe(true);
       expect(isLexicallyInside(rules, root, root, { includeRoot: false })).toBe(false);
       for (const includeRoot of [true, false]) {
@@ -106,7 +109,11 @@ describe("exhaustive comparison with a segment-by-segment check", () => {
     return folded;
   }
 
-  function segmentsInside(root: readonly string[], candidate: readonly string[], sameName: (left: string, right: string) => boolean): string[] | null {
+  function segmentsInside(
+    root: readonly string[],
+    candidate: readonly string[],
+    sameName: (left: string, right: string) => boolean,
+  ): string[] | null {
     const foldedRoot = fold(root);
     const foldedCandidate = fold(candidate);
     if (foldedCandidate.length < foldedRoot.length) return null;
@@ -114,13 +121,26 @@ describe("exhaustive comparison with a segment-by-segment check", () => {
     return foldedCandidate.slice(foldedRoot.length);
   }
 
-  function compare(rules: PathRules, root: string, candidate: string, expected: string | null, seen: Record<"same" | "inside" | "outside", number>, mismatches: string[]): void {
+  function compare(
+    rules: PathRules,
+    root: string,
+    candidate: string,
+    expected: string | null,
+    seen: Record<"same" | "inside" | "outside", number>,
+    mismatches: string[],
+  ): void {
     seen[expected === null ? "outside" : expected === "" ? "same" : "inside"] += 1;
     const actual = relativePathInside(rules, root, candidate);
     const withRoot = isLexicallyInside(rules, root, candidate, { includeRoot: true });
     const withoutRoot = isLexicallyInside(rules, root, candidate, { includeRoot: false });
-    if (actual !== expected || withRoot !== (expected !== null) || withoutRoot !== (expected !== null && expected !== "")) {
-      mismatches.push(`${JSON.stringify(root)} / ${JSON.stringify(candidate)}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    if (
+      actual !== expected ||
+      withRoot !== (expected !== null) ||
+      withoutRoot !== (expected !== null && expected !== "")
+    ) {
+      mismatches.push(
+        `${JSON.stringify(root)} / ${JSON.stringify(candidate)}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+      );
     }
   }
 
@@ -131,7 +151,14 @@ describe("exhaustive comparison with a segment-by-segment check", () => {
     for (const root of sequences(alphabet, 2)) {
       for (const candidate of sequences(alphabet, 3)) {
         const expected = segmentsInside(root, candidate, (left, right) => left === right);
-        compare(posix, `/${root.join("/")}`, `/${candidate.join("/")}`, expected === null ? null : expected.join("/"), seen, mismatches);
+        compare(
+          posix,
+          `/${root.join("/")}`,
+          `/${candidate.join("/")}`,
+          expected === null ? null : expected.join("/"),
+          seen,
+          mismatches,
+        );
       }
     }
     expect(mismatches).toEqual([]);
@@ -149,7 +176,14 @@ describe("exhaustive comparison with a segment-by-segment check", () => {
         for (const drive of ["C:", "c:", "D:"]) {
           for (const separator of ["\\", "/"]) {
             const inside = sameName(drive, "C:") ? segmentsInside(root, candidate, sameName) : null;
-            compare(win32, `C:\\${root.join("\\")}`, `${drive}${separator}${candidate.join(separator)}`, inside === null ? null : inside.join("\\"), seen, mismatches);
+            compare(
+              win32,
+              `C:\\${root.join("\\")}`,
+              `${drive}${separator}${candidate.join(separator)}`,
+              inside === null ? null : inside.join("\\"),
+              seen,
+              mismatches,
+            );
           }
         }
       }

@@ -24,20 +24,25 @@ export function getQuickOpenSettings(settings: AppSettings): QuickOpenShortcutSe
   return settings.shortcuts?.quickOpen ?? FALLBACK_QUICK_OPEN_SETTINGS;
 }
 
-export function acceleratorFromKeyboardEvent(event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey">): string | null {
+export function acceleratorFromKeyboardEvent(
+  event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey">,
+): string | null {
   if (["Meta", "Control", "Alt", "Shift"].includes(event.key)) return null;
   const modifiers: string[] = [];
   if (event.metaKey || event.ctrlKey) modifiers.push("CommandOrControl");
   if (event.altKey) modifiers.push("Alt");
   if (event.shiftKey) modifiers.push("Shift");
   if (modifiers.length === 0) return null;
-  const key = ({
-    " ": "Space",
-    ArrowUp: "Up",
-    ArrowDown: "Down",
-    ArrowLeft: "Left",
-    ArrowRight: "Right",
-  } as Record<string, string>)[event.key] ?? (event.key.length === 1 ? event.key.toUpperCase() : event.key);
+  const key =
+    (
+      {
+        " ": "Space",
+        ArrowUp: "Up",
+        ArrowDown: "Down",
+        ArrowLeft: "Left",
+        ArrowRight: "Right",
+      } as Record<string, string>
+    )[event.key] ?? (event.key.length === 1 ? event.key.toUpperCase() : event.key);
   return [...modifiers, key].join("+");
 }
 
@@ -73,16 +78,15 @@ export function ShortcutSettings({
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([
-      quickOpenApi.getShortcutStatus(),
-      workspacesApi.list(),
-    ]).then(([nextStatus, registry]) => {
-      if (cancelled) return;
-      setStatus(nextStatus);
-      setWorkspaces(registry?.items.filter((workspace) => !workspace.hidden) ?? []);
-    }).catch((error: unknown) => {
-      if (!cancelled) console.error("Failed to load shortcut settings context", error);
-    });
+    void Promise.all([quickOpenApi.getShortcutStatus(), workspacesApi.list()])
+      .then(([nextStatus, registry]) => {
+        if (cancelled) return;
+        setStatus(nextStatus);
+        setWorkspaces(registry?.items.filter((workspace) => !workspace.hidden) ?? []);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) console.error("Failed to load shortcut settings context", error);
+      });
     return () => {
       cancelled = true;
     };
@@ -106,10 +110,11 @@ export function ShortcutSettings({
   };
 
   const projectOptions = useMemo(
-    () => workspaces.map((workspace) => ({
-      value: workspace.id,
-      label: workspace.label,
-    })),
+    () =>
+      workspaces.map((workspace) => ({
+        value: workspace.id,
+        label: workspace.label,
+      })),
     [workspaces],
   );
   const targetKind = quickOpen.target.kind;
@@ -124,108 +129,127 @@ export function ShortcutSettings({
   const dependentDisabled = !quickOpen.enabled;
 
   return (
-      <SettingGroup title="快捷键" headingLevel={3}>
-        <SettingRow
-          title="快速唤起"
-          control={<Toggle checked={quickOpen.enabled} disabled={saving} ariaLabel="启用快速唤起" onChange={(enabled) => void update({ enabled })} />}
-        />
-        <SettingRow
-          disabled={dependentDisabled}
-          title="快捷键"
-          description={status?.error ? <span className="text-on-danger">{status.error}</span> : undefined}
-          control={
-            <>
-              <button
-                ref={recorderRef}
-                type="button"
-                disabled={dependentDisabled || saving}
-                aria-label="录制快速唤起快捷键"
-                onClick={() => setIsRecording(true)}
-                onBlur={() => setIsRecording(false)}
-                onKeyDown={(event) => {
-                  if (!isRecording) return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  if (event.key === "Escape") {
-                    setIsRecording(false);
-                    return;
-                  }
-                  const accelerator = acceleratorFromKeyboardEvent(event.nativeEvent);
-                  if (!accelerator) return;
+    <SettingGroup title="快捷键" headingLevel={3}>
+      <SettingRow
+        title="快速唤起"
+        control={
+          <Toggle
+            checked={quickOpen.enabled}
+            disabled={saving}
+            ariaLabel="启用快速唤起"
+            onChange={(enabled) => void update({ enabled })}
+          />
+        }
+      />
+      <SettingRow
+        disabled={dependentDisabled}
+        title="快捷键"
+        description={status?.error ? <span className="text-on-danger">{status.error}</span> : undefined}
+        control={
+          <>
+            <button
+              ref={recorderRef}
+              type="button"
+              disabled={dependentDisabled || saving}
+              aria-label="录制快速唤起快捷键"
+              onClick={() => setIsRecording(true)}
+              onBlur={() => setIsRecording(false)}
+              onKeyDown={(event) => {
+                if (!isRecording) return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (event.key === "Escape") {
                   setIsRecording(false);
-                  void update({ accelerator });
-                }}
-                className="inline-flex h-[30px] items-center gap-1 rounded-act-sm px-1 outline-none transition-colors hover:bg-hover-overlay focus-visible:ring-[3px] focus-visible:ring-focus-ring/15 disabled:cursor-not-allowed"
-              >
-                {isRecording ? (
-                  <span className="px-1.5 text-act-xs text-text-muted">请按下组合键…</span>
-                ) : (
-                  keys.map((key, index) => (
-                    <span key={`${key}-${index}`} className="inline-flex items-center gap-1">
-                      {key.separator ? <span className="text-act-xxs text-text-subtle">+</span> : null}
-                      <Kbd>{key.label}</Kbd>
-                    </span>
-                  ))
-                )}
-              </button>
-              <IconButton
-                label="恢复默认快捷键"
-                disabled={dependentDisabled || saving || quickOpen.accelerator === DEFAULT_QUICK_OPEN_ACCELERATOR}
-                onClick={() => void update({ accelerator: DEFAULT_QUICK_OPEN_ACCELERATOR })}
-              >
-                <RotateCcw size={13} aria-hidden="true" />
-              </IconButton>
-            </>
-          }
-        />
+                  return;
+                }
+                const accelerator = acceleratorFromKeyboardEvent(event.nativeEvent);
+                if (!accelerator) return;
+                setIsRecording(false);
+                void update({ accelerator });
+              }}
+              className="inline-flex h-[30px] items-center gap-1 rounded-act-sm px-1 outline-none transition-colors hover:bg-hover-overlay focus-visible:ring-[3px] focus-visible:ring-focus-ring/15 disabled:cursor-not-allowed"
+            >
+              {isRecording ? (
+                <span className="px-1.5 text-act-xs text-text-muted">请按下组合键…</span>
+              ) : (
+                keys.map((key, index) => (
+                  <span key={`${key}-${index}`} className="inline-flex items-center gap-1">
+                    {key.separator ? <span className="text-act-xxs text-text-subtle">+</span> : null}
+                    <Kbd>{key.label}</Kbd>
+                  </span>
+                ))
+              )}
+            </button>
+            <IconButton
+              label="恢复默认快捷键"
+              disabled={dependentDisabled || saving || quickOpen.accelerator === DEFAULT_QUICK_OPEN_ACCELERATOR}
+              onClick={() => void update({ accelerator: DEFAULT_QUICK_OPEN_ACCELERATOR })}
+            >
+              <RotateCcw size={13} aria-hidden="true" />
+            </IconButton>
+          </>
+        }
+      />
+      <SettingRow
+        disabled={dependentDisabled}
+        title="打开目标"
+        control={
+          <SettingsSelect
+            value={choosingSession ? "session" : targetKind}
+            options={targetOptions}
+            disabled={dependentDisabled || saving}
+            ariaLabel="快速唤起打开目标"
+            onChange={(kind) => {
+              if (kind !== "session") setChoosingSession(false);
+              if (kind === "workspace" && projectOptions[0])
+                void update({ target: { kind, workspaceId: projectOptions[0].value } });
+              else if (kind === "session") setChoosingSession(true);
+              else void update({ target: { kind: "automatic" } });
+            }}
+          />
+        }
+      />
+      {targetKind === "workspace" && !choosingSession ? (
         <SettingRow
           disabled={dependentDisabled}
-          title="打开目标"
+          title="默认工作区"
           control={
             <SettingsSelect
-              value={choosingSession ? "session" : targetKind}
-              options={targetOptions}
+              value={selectedWorkspaceId}
+              options={
+                projectOptions.some((option) => option.value === selectedWorkspaceId)
+                  ? projectOptions
+                  : [{ value: selectedWorkspaceId, label: "已移除的工作区（将自动降级）" }, ...projectOptions]
+              }
+              disabled={dependentDisabled || saving || projectOptions.length === 0}
+              ariaLabel="快速唤起默认工作区"
+              onChange={(workspaceId) => void update({ target: { kind: "workspace", workspaceId } })}
+            />
+          }
+        />
+      ) : null}
+      {targetKind === "session" || choosingSession ? (
+        <SettingRow
+          disabled={dependentDisabled}
+          title="默认会话"
+          description={chosenTitle ?? undefined}
+          control={
+            <SessionSearch
+              buttonLabel="选择快速唤起会话"
               disabled={dependentDisabled || saving}
-              ariaLabel="快速唤起打开目标"
-              onChange={(kind) => {
-                if (kind !== "session") setChoosingSession(false);
-                if (kind === "workspace" && projectOptions[0]) void update({ target: { kind, workspaceId: projectOptions[0].value } });
-                else if (kind === "session") setChoosingSession(true);
-                else void update({ target: { kind: "automatic" } });
+              onSelect={(sessionId, title) => {
+                void update({ target: { kind: "session", sessionId } }).then((saved) => {
+                  if (saved) {
+                    setChosenTitle(title ?? null);
+                    setChoosingSession(false);
+                  }
+                });
               }}
             />
           }
         />
-        {targetKind === "workspace" && !choosingSession ? (
-          <SettingRow
-            disabled={dependentDisabled}
-            title="默认工作区"
-            control={
-              <SettingsSelect
-                value={selectedWorkspaceId}
-                options={projectOptions.some((option) => option.value === selectedWorkspaceId)
-                  ? projectOptions
-                  : [{ value: selectedWorkspaceId, label: "已移除的工作区（将自动降级）" }, ...projectOptions]}
-                disabled={dependentDisabled || saving || projectOptions.length === 0}
-                ariaLabel="快速唤起默认工作区"
-                onChange={(workspaceId) => void update({ target: { kind: "workspace", workspaceId } })}
-              />
-            }
-          />
-        ) : null}
-        {targetKind === "session" || choosingSession ? (
-          <SettingRow
-            disabled={dependentDisabled}
-            title="默认会话"
-            description={chosenTitle ?? undefined}
-            control={<SessionSearch buttonLabel="选择快速唤起会话" disabled={dependentDisabled || saving} onSelect={(sessionId, title) => {
-              void update({ target: { kind: "session", sessionId } }).then(saved => {
-                if (saved) { setChosenTitle(title ?? null); setChoosingSession(false); }
-              });
-            }} />}
-          />
-        ) : null}
-      </SettingGroup>
+      ) : null}
+    </SettingGroup>
   );
 }
 

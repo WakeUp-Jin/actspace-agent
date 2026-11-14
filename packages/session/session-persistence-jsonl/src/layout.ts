@@ -14,5 +14,11 @@ export function sessionFileLayout(dataRoot: string, sessionId: string): SessionF
   }
   const root = join(dataRoot, "sessions-v2");
   const sessionDir = join(root, sessionId);
-  return Object.freeze({ root, sessionDir, journalPath: join(sessionDir, "journal.jsonl"), artifactsDir: join(sessionDir, "artifacts"), recoveryDir: join(sessionDir, "recovery") });
+  return Object.freeze({
+    root,
+    sessionDir,
+    journalPath: join(sessionDir, "journal.jsonl"),
+    artifactsDir: join(sessionDir, "artifacts"),
+    recoveryDir: join(sessionDir, "recovery"),
+  });
 }

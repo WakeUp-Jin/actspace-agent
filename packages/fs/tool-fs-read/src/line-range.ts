@@ -13,20 +13,20 @@ export type NumberedRange =
   | { readonly kind: "binary" }
   | { readonly kind: "empty" }
   | {
-    readonly kind: "lines";
-    /** 带行号的文本；范围里一行都没有时是空串。 */
-    readonly text: string;
-    /** 最后一个输出的行号；一行都没有时是 0。 */
-    readonly lastLine: number;
-    /** 文件总行数（换行符个数 + 1）；文件太大、没扫到结尾时是 null。 */
-    readonly totalLines: number | null;
-    /** 输出的最后一行之后还有没有行。 */
-    readonly more: boolean;
-    /** 是输出预算而不是 limit 让它停下的。 */
-    readonly budgetExhausted: boolean;
-    /** 被截短的行数。 */
-    readonly cutLines: number;
-  };
+      readonly kind: "lines";
+      /** 带行号的文本；范围里一行都没有时是空串。 */
+      readonly text: string;
+      /** 最后一个输出的行号；一行都没有时是 0。 */
+      readonly lastLine: number;
+      /** 文件总行数（换行符个数 + 1）；文件太大、没扫到结尾时是 null。 */
+      readonly totalLines: number | null;
+      /** 输出的最后一行之后还有没有行。 */
+      readonly more: boolean;
+      /** 是输出预算而不是 limit 让它停下的。 */
+      readonly budgetExhausted: boolean;
+      /** 被截短的行数。 */
+      readonly cutLines: number;
+    };
 
 export type NumberedLines = Extract<NumberedRange, { kind: "lines" }>;
 
@@ -35,7 +35,13 @@ export type NumberedLines = Extract<NumberedRange, { kind: "lines" }>;
  * 输出受两个上限约束：一行最多 TOOL_OUTPUT_LINE_CHARS，合计最多 TOOL_OUTPUT_TEXT_CHARS（按整行停）。
  * 行的算法和 `text.split("\n")` 一致：最后一个换行符后面的空串也算一行。
  */
-export async function readNumberedRange(handle: FileHandle, size: number, offset: number, limit: number, signal: AbortSignal): Promise<NumberedRange> {
+export async function readNumberedRange(
+  handle: FileHandle,
+  size: number,
+  offset: number,
+  limit: number,
+  signal: AbortSignal,
+): Promise<NumberedRange> {
   const buffer = Buffer.allocUnsafe(CHUNK_BYTES);
   const countTotal = size <= COUNT_LINES_MAX_BYTES;
   const endExclusive = offset + limit;
@@ -96,11 +102,28 @@ export async function readNumberedRange(handle: FileHandle, size: number, offset
       finishLine();
       cursor = newline + 1;
       // 大文件：要的范围已经输出完，换行符后面还有一行，不再往下扫。
-      if (rangeDone && !countTotal) return { kind: "lines", text: out.join("\n"), lastLine, totalLines: null, more: true, budgetExhausted, cutLines };
+      if (rangeDone && !countTotal)
+        return {
+          kind: "lines",
+          text: out.join("\n"),
+          lastLine,
+          totalLines: null,
+          more: true,
+          budgetExhausted,
+          cutLines,
+        };
     }
   }
   if (position === 0) return { kind: "empty" };
   finishLine();
   const totalLines = line - 1;
-  return { kind: "lines", text: out.join("\n"), lastLine, totalLines, more: lastLine > 0 && lastLine < totalLines, budgetExhausted, cutLines };
+  return {
+    kind: "lines",
+    text: out.join("\n"),
+    lastLine,
+    totalLines,
+    more: lastLine > 0 && lastLine < totalLines,
+    budgetExhausted,
+    cutLines,
+  };
 }

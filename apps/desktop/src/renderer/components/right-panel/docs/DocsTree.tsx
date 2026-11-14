@@ -65,7 +65,8 @@ export function DocsTree({
   /** 当前会话里 Agent 写过 / 改过的 Markdown（相对路径）。 */
   editedPaths: ReadonlySet<string>;
 }) {
-  const { docsSelectedPath, selectDocsPath, expandedDirs, toggleDir, docsFilter, setDocsFilter, refreshDocs } = useRightPanel();
+  const { docsSelectedPath, selectDocsPath, expandedDirs, toggleDir, docsFilter, setDocsFilter, refreshDocs } =
+    useRightPanel();
   const [query, setQuery] = useState("");
 
   const tree = useMemo(() => buildDocsTree(files ?? []), [files]);
@@ -78,7 +79,8 @@ export function DocsTree({
     const walk = (nodes: readonly DocsNode[], depth: number) => {
       for (const node of nodes) {
         out.push({ node, depth });
-        if (node.kind === "dir" && (expandedDirs.has(node.path) || visible.autoExpand.has(node.path))) walk(node.children, depth + 1);
+        if (node.kind === "dir" && (expandedDirs.has(node.path) || visible.autoExpand.has(node.path)))
+          walk(node.children, depth + 1);
       }
     };
     walk(visible.nodes, 0);
@@ -94,10 +96,24 @@ export function DocsTree({
       <div className="flex shrink-0 flex-col gap-2 px-2.5 pb-1.5 pt-2.5">
         <div className="flex items-center gap-1.5 px-1 text-act-sm font-semibold text-text-main">
           <Folder size={14} className="shrink-0 text-text-faint" aria-hidden="true" />
-          <span className="min-w-0 truncate" title={workspaceLabel}>{workspaceLabel}</span>
-          <span className="ml-auto shrink-0 text-act-xs font-normal text-text-faint">{files ? `${total}${truncated ? "+" : ""} 篇` : ""}</span>
-          <IconButton label="刷新文档列表" tooltip="刷新" size="xs" onClick={refreshDocs} disabled={status === "loading"}>
-            {status === "loading" ? <LoaderCircle size={13} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={13} aria-hidden="true" />}
+          <span className="min-w-0 truncate" title={workspaceLabel}>
+            {workspaceLabel}
+          </span>
+          <span className="ml-auto shrink-0 text-act-xs font-normal text-text-faint">
+            {files ? `${total}${truncated ? "+" : ""} 篇` : ""}
+          </span>
+          <IconButton
+            label="刷新文档列表"
+            tooltip="刷新"
+            size="xs"
+            onClick={refreshDocs}
+            disabled={status === "loading"}
+          >
+            {status === "loading" ? (
+              <LoaderCircle size={13} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <RefreshCw size={13} aria-hidden="true" />
+            )}
           </IconButton>
         </div>
         <label className={SEARCH_CLASS}>
@@ -113,21 +129,43 @@ export function DocsTree({
           />
         </label>
         <div className="flex gap-1" role="group" aria-label="筛选">
-          <Button size="xs" shape="pill" variant={docsFilter === "all" ? "primary" : "secondary"} aria-pressed={docsFilter === "all"} onClick={() => setDocsFilter("all")}>
+          <Button
+            size="xs"
+            shape="pill"
+            variant={docsFilter === "all" ? "primary" : "secondary"}
+            aria-pressed={docsFilter === "all"}
+            onClick={() => setDocsFilter("all")}
+          >
             全部
           </Button>
-          <Button size="xs" shape="pill" variant={docsFilter === "session" ? "primary" : "secondary"} aria-pressed={docsFilter === "session"} onClick={() => setDocsFilter("session")}>
+          <Button
+            size="xs"
+            shape="pill"
+            variant={docsFilter === "session" ? "primary" : "secondary"}
+            aria-pressed={docsFilter === "session"}
+            onClick={() => setDocsFilter("session")}
+          >
             本会话改过
           </Button>
         </div>
       </div>
 
       <div className={BODY_CLASS} role="tree" aria-label="Markdown 文档">
-        {loading ? <div className={STATE_CLASS}><LoaderCircle size={13} className="animate-spin" aria-label="正在读取文档列表" /></div> : null}
-        {status === "error" && files === null ? <div className={STATE_CLASS} role="alert">{error ?? "无法读取文档列表。"}</div> : null}
+        {loading ? (
+          <div className={STATE_CLASS}>
+            <LoaderCircle size={13} className="animate-spin" aria-label="正在读取文档列表" />
+          </div>
+        ) : null}
+        {status === "error" && files === null ? (
+          <div className={STATE_CLASS} role="alert">
+            {error ?? "无法读取文档列表。"}
+          </div>
+        ) : null}
         {empty && total === 0 ? <div className={STATE_CLASS}>没有 Markdown 文档</div> : null}
         {empty && total > 0 ? (
-          <div className={STATE_CLASS}>{docsFilter === "session" && !query.trim() ? "本会话还没有改过 Markdown" : "没有匹配的文档"}</div>
+          <div className={STATE_CLASS}>
+            {docsFilter === "session" && !query.trim() ? "本会话还没有改过 Markdown" : "没有匹配的文档"}
+          </div>
         ) : null}
         {rows.map(({ node, depth }) => {
           if (node.kind === "dir") {
@@ -143,9 +181,19 @@ export function DocsTree({
                 style={indent(depth)}
                 onClick={() => toggleDir(node.path)}
               >
-                <ChevronRight size={13} className={`shrink-0 text-text-faint transition-transform ${expanded ? "rotate-90" : ""}`} aria-hidden="true" />
-                {expanded ? <FolderOpen size={14} className="shrink-0 text-text-faint" aria-hidden="true" /> : <Folder size={14} className="shrink-0 text-text-faint" aria-hidden="true" />}
-                <span className="min-w-0 flex-1 truncate text-text-muted" title={node.path}><HighlightedName name={node.name} query={query} /></span>
+                <ChevronRight
+                  size={13}
+                  className={`shrink-0 text-text-faint transition-transform ${expanded ? "rotate-90" : ""}`}
+                  aria-hidden="true"
+                />
+                {expanded ? (
+                  <FolderOpen size={14} className="shrink-0 text-text-faint" aria-hidden="true" />
+                ) : (
+                  <Folder size={14} className="shrink-0 text-text-faint" aria-hidden="true" />
+                )}
+                <span className="min-w-0 flex-1 truncate text-text-muted" title={node.path}>
+                  <HighlightedName name={node.name} query={query} />
+                </span>
                 <span className="shrink-0 text-act-xxs text-text-faint">{node.count}</span>
               </button>
             );
@@ -165,8 +213,12 @@ export function DocsTree({
               onClick={() => selectDocsPath(node.path)}
             >
               <FileText size={14} className="shrink-0 text-text-faint" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate"><HighlightedName name={node.name} query={query} /></span>
-              {edited ? <span className="size-1.5 shrink-0 rounded-full bg-operational" role="img" aria-label="本会话改过" /> : null}
+              <span className="min-w-0 flex-1 truncate">
+                <HighlightedName name={node.name} query={query} />
+              </span>
+              {edited ? (
+                <span className="size-1.5 shrink-0 rounded-full bg-operational" role="img" aria-label="本会话改过" />
+              ) : null}
             </button>
           );
         })}
@@ -184,12 +236,20 @@ export function DocsTree({
 function TruncatedNotice({ dirs, onLoadMore }: { dirs: readonly string[]; onLoadMore?: () => void }) {
   const names = dirs.map((dir) => (dir === "." ? "根目录" : dir));
   const shown = names.slice(0, 3).join("、");
-  const label = names.length === 0 ? "工作区太大，部分目录没有列出。" : `工作区太大，${shown}${names.length > 3 ? ` 等 ${names.length} 个目录` : ""}没有列全。`;
+  const label =
+    names.length === 0
+      ? "工作区太大，部分目录没有列出。"
+      : `工作区太大，${shown}${names.length > 3 ? ` 等 ${names.length} 个目录` : ""}没有列全。`;
   return (
-    <div role="status" className="flex shrink-0 flex-col gap-1.5 border-t border-line bg-warning-soft px-3 py-2 text-act-xs text-warning">
+    <div
+      role="status"
+      className="flex shrink-0 flex-col gap-1.5 border-t border-line bg-warning-soft px-3 py-2 text-act-xs text-warning"
+    >
       <span title={names.join("、") || undefined}>{label}</span>
       {onLoadMore ? (
-        <Button size="xs" variant="secondary" className="self-start" onClick={onLoadMore}>继续加载</Button>
+        <Button size="xs" variant="secondary" className="self-start" onClick={onLoadMore}>
+          继续加载
+        </Button>
       ) : (
         <span className="text-act-xxs">已到加载上限，可以把这些目录单独加成工作区。</span>
       )}

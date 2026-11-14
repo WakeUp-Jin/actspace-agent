@@ -59,11 +59,17 @@ test("ignores other dot prefixes, segment comparisons and comment lines", () => 
 });
 
 test("reports each hand-written check in a file that is not on the list", () => {
-  const errors = auditPathContainment([
-    { path: "packages/a/src/policy.ts", text: 'const a = 1;\nreturn !relative(root, target).startsWith("..");' },
-    { path: "apps/b/src/open.ts", text: 'return rel === ".." || rel.startsWith("../") || rel.startsWith("..\\\\");' },
-    { path: "packages/a/src/clean.ts", text: "return isLexicallyInside(nodePath, root, target, { includeRoot: true });" },
-  ], []);
+  const errors = auditPathContainment(
+    [
+      { path: "packages/a/src/policy.ts", text: 'const a = 1;\nreturn !relative(root, target).startsWith("..");' },
+      { path: "apps/b/src/open.ts", text: 'return rel === ".." || rel.startsWith("../") || rel.startsWith("..\\\\");' },
+      {
+        path: "packages/a/src/clean.ts",
+        text: "return isLexicallyInside(nodePath, root, target, { includeRoot: true });",
+      },
+    ],
+    [],
+  );
   assert.deepEqual(errors, [
     "apps/b/src/open.ts:1 对「..」开头做了前缀判断",
     "apps/b/src/open.ts:1 对「..」开头做了前缀判断",

@@ -10,11 +10,20 @@ export type TrajectoryRevealTarget =
   | { readonly compactionId: string }
   | { readonly latest: "user" | "assistant" | "tool-call" | "tool-result" | null };
 
-export function findRevealRecord(records: readonly TrajectoryRecord[], target: TrajectoryRevealTarget): TrajectoryRecord | null {
+export function findRevealRecord(
+  records: readonly TrajectoryRecord[],
+  target: TrajectoryRevealTarget,
+): TrajectoryRecord | null {
   const visible = records.filter((record) => record.visible !== false && !record.requestOnly);
-  if ("callId" in target) return visible.find((record) => record.kind === "tool" && record.callId === target.callId) ?? null;
+  if ("callId" in target)
+    return visible.find((record) => record.kind === "tool" && record.callId === target.callId) ?? null;
   if ("messageId" in target) return visible.find((record) => record.messageId === target.messageId) ?? null;
-  if ("compactionId" in target) return visible.find((record) => record.kind === "compaction" && record.compaction?.compactionId === target.compactionId) ?? null;
+  if ("compactionId" in target)
+    return (
+      visible.find(
+        (record) => record.kind === "compaction" && record.compaction?.compactionId === target.compactionId,
+      ) ?? null
+    );
   const kind = target.latest === "tool-call" || target.latest === "tool-result" ? "tool" : target.latest;
   for (let index = visible.length - 1; index >= 0; index -= 1) {
     const record = visible[index];

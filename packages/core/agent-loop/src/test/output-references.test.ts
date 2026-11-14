@@ -7,7 +7,15 @@ it("replays a large text tool artifact as a file reference, never an image", asy
   const artifact = { artifactId: "full-output", mediaType: "text/plain", size: 40871, sha256: "fixture" };
   const run = await runToolStreamFixture({
     resolveArtifact: async () => ({ path: "/managed/full-output", mediaType: "text/plain" }),
-    execute: async () => ({ status: "completed", summary: "Bash completed", modelOutput: [{ type: "text", text: "bounded head" }, { type: "artifact", artifact, label: "Full Bash output" }], artifacts: [artifact] }),
+    execute: async () => ({
+      status: "completed",
+      summary: "Bash completed",
+      modelOutput: [
+        { type: "text", text: "bounded head" },
+        { type: "artifact", artifact, label: "Full Bash output" },
+      ],
+      artifacts: [artifact],
+    }),
     onMessages: (messages) => requests.push(messages),
   });
   const tool = requests[1].find((message) => message.role === "tool")!;
@@ -22,7 +30,17 @@ it("replays a large text tool artifact as a file reference, never an image", asy
 it("persists the sanitized terminal failure and publishes it live", async () => {
   let journal: readonly any[] = [];
   const live: any[] = [];
-  await expect(runToolStreamFixture({ beforeFinalText: async () => { throw new Error("Provider rejected request token-abcdefgh"); }, onJournal: (events) => { journal = events; }, onLiveEvent: (event) => live.push(event) })).rejects.toThrow();
+  await expect(
+    runToolStreamFixture({
+      beforeFinalText: async () => {
+        throw new Error("Provider rejected request token-abcdefgh");
+      },
+      onJournal: (events) => {
+        journal = events;
+      },
+      onLiveEvent: (event) => live.push(event),
+    }),
+  ).rejects.toThrow();
   const terminal = journal.find((event) => event.type === "turn/end");
   expect(terminal?.data.failure?.message).toContain("Provider rejected request");
   expect(JSON.stringify(terminal)).not.toContain("token-abcdefgh");
@@ -32,8 +50,20 @@ it("persists the sanitized terminal failure and publishes it live", async () => 
 it("keeps a missing historical output reference explicit without failing the next request", async () => {
   const requests: (readonly LlmMessage[])[] = [];
   const run = await runToolStreamFixture({
-    resolveArtifact: async () => { throw new Error("file missing"); },
-    execute: async () => ({ status: "completed", summary: "Bash completed", modelOutput: [{ type: "text", text: "saved head" }, { type: "artifact", artifact: { artifactId: "old-output", mediaType: "text/plain", size: 40000, sha256: "fixture" } }] }),
+    resolveArtifact: async () => {
+      throw new Error("file missing");
+    },
+    execute: async () => ({
+      status: "completed",
+      summary: "Bash completed",
+      modelOutput: [
+        { type: "text", text: "saved head" },
+        {
+          type: "artifact",
+          artifact: { artifactId: "old-output", mediaType: "text/plain", size: 40000, sha256: "fixture" },
+        },
+      ],
+    }),
     onMessages: (messages) => requests.push(messages),
   });
   expect(run.result.reason).toBe("completed");

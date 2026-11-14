@@ -13,11 +13,12 @@ parentPort.on("message", (request) => {
   if (request.args[0] === "crash") {
     process.exit(2);
   }
-  const respond = () => parentPort.postMessage({
-    id: request.id,
-    ok: true,
-    value: { stdout: request.args.join(" "), stderr: "", exitCode: 0, timedOut: false, truncated: false },
-  });
+  const respond = () =>
+    parentPort.postMessage({
+      id: request.id,
+      ok: true,
+      value: { stdout: request.args.join(" "), stderr: "", exitCode: 0, timedOut: false, truncated: false },
+    });
   if (request.args[0] === "delay") timers.set(request.id, setTimeout(respond, 1_000));
   else respond();
 });

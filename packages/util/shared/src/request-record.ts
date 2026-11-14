@@ -7,8 +7,19 @@
 
 export type RequestRecordEvent = { readonly seq: number; readonly type: string; readonly data: unknown };
 
-export type RequestSystemPromptSection = { readonly id: string; readonly owner: string; readonly order: number; readonly content: unknown; readonly provenance?: unknown };
-export type RequestModelFact = { readonly owner: string; readonly id: string; readonly order: number; readonly content: unknown };
+export type RequestSystemPromptSection = {
+  readonly id: string;
+  readonly owner: string;
+  readonly order: number;
+  readonly content: unknown;
+  readonly provenance?: unknown;
+};
+export type RequestModelFact = {
+  readonly owner: string;
+  readonly id: string;
+  readonly order: number;
+  readonly content: unknown;
+};
 
 export type RequestSystemPromptData = {
   readonly requestId: string;
@@ -41,14 +52,19 @@ export function isRequestRecordEvent(type: string): boolean {
 }
 
 /** 不晚于 `atSeq` 的最近一条提示词与工具。`atSeq` 省略时取最新。 */
-export function effectiveRequestRecord(events: readonly RequestRecordEvent[], atSeq = Number.POSITIVE_INFINITY): EffectiveRequestRecord {
+export function effectiveRequestRecord(
+  events: readonly RequestRecordEvent[],
+  atSeq = Number.POSITIVE_INFINITY,
+): EffectiveRequestRecord {
   let systemPrompt: EffectiveRequestRecord["systemPrompt"];
   let tools: EffectiveRequestRecord["tools"];
   for (let index = events.length - 1; index >= 0 && (systemPrompt === undefined || tools === undefined); index--) {
     const event = events[index];
     if (event.seq > atSeq) continue;
-    if (systemPrompt === undefined && event.type === REQUEST_SYSTEM_PROMPT_EVENT) systemPrompt = { seq: event.seq, data: event.data as RequestSystemPromptData };
-    else if (tools === undefined && event.type === REQUEST_TOOLS_EVENT) tools = { seq: event.seq, data: event.data as RequestToolsData };
+    if (systemPrompt === undefined && event.type === REQUEST_SYSTEM_PROMPT_EVENT)
+      systemPrompt = { seq: event.seq, data: event.data as RequestSystemPromptData };
+    else if (tools === undefined && event.type === REQUEST_TOOLS_EVENT)
+      tools = { seq: event.seq, data: event.data as RequestToolsData };
   }
   return { ...(systemPrompt ? { systemPrompt } : {}), ...(tools ? { tools } : {}) };
 }
@@ -58,18 +74,24 @@ export function effectiveRequestRecord(events: readonly RequestRecordEvent[], at
  * `events` 需按 seq 升序。
  */
 export function indexRequestRecords(events: readonly RequestRecordEvent[]): (atSeq?: number) => EffectiveRequestRecord {
-  const prompts = events.filter(event => event.type === REQUEST_SYSTEM_PROMPT_EVENT);
-  const tools = events.filter(event => event.type === REQUEST_TOOLS_EVENT);
+  const prompts = events.filter((event) => event.type === REQUEST_SYSTEM_PROMPT_EVENT);
+  const tools = events.filter((event) => event.type === REQUEST_TOOLS_EVENT);
   const latest = (list: readonly RequestRecordEvent[], atSeq: number) => {
-    let low = 0, high = list.length - 1, found: RequestRecordEvent | undefined;
+    let low = 0,
+      high = list.length - 1,
+      found: RequestRecordEvent | undefined;
     while (low <= high) {
       const mid = (low + high) >> 1;
-      if (list[mid].seq <= atSeq) { found = list[mid]; low = mid + 1; } else high = mid - 1;
+      if (list[mid].seq <= atSeq) {
+        found = list[mid];
+        low = mid + 1;
+      } else high = mid - 1;
     }
     return found;
   };
   return (atSeq = Number.POSITIVE_INFINITY) => {
-    const prompt = latest(prompts, atSeq); const tool = latest(tools, atSeq);
+    const prompt = latest(prompts, atSeq);
+    const tool = latest(tools, atSeq);
     return {
       ...(prompt ? { systemPrompt: { seq: prompt.seq, data: prompt.data as RequestSystemPromptData } } : {}),
       ...(tool ? { tools: { seq: tool.seq, data: tool.data as RequestToolsData } } : {}),

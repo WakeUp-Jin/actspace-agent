@@ -51,7 +51,13 @@ export function cpuChartMax(values: readonly number[]): number {
 }
 
 /** SVG 折线与填充路径；横轴固定 `capacity` 个点，不足时从右边开始画。 */
-export function sparkPaths(values: readonly number[], max: number, capacity: number, width: number, height: number): { line: string; area: string } {
+export function sparkPaths(
+  values: readonly number[],
+  max: number,
+  capacity: number,
+  width: number,
+  height: number,
+): { line: string; area: string } {
   if (values.length === 0 || max <= 0) return { line: "", area: "" };
   const offset = capacity - values.length;
   const step = capacity > 1 ? width / (capacity - 1) : 0;

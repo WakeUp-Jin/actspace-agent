@@ -22,19 +22,24 @@ export function useResourceWatch(): ResourceWatch {
     let generation = 0;
     const apply = (active: boolean) => {
       const id = ++generation;
-      resourceMonitorApi.watch(active).then((initial) => {
-        if (!alive || id !== generation || !active) return;
-        setState({ history: initial.history, latest: initial.latest, error: null });
-      }, (error: unknown) => {
-        if (alive && id === generation) setState(current => ({ ...current, error: error instanceof Error ? error.message : "无法读取资源占用" }));
-      });
+      resourceMonitorApi.watch(active).then(
+        (initial) => {
+          if (!alive || id !== generation || !active) return;
+          setState({ history: initial.history, latest: initial.latest, error: null });
+        },
+        (error: unknown) => {
+          if (alive && id === generation)
+            setState((current) => ({ ...current, error: error instanceof Error ? error.message : "无法读取资源占用" }));
+        },
+      );
     };
     const removeSample = eventsApi.resourceSample(({ sample, point }) => {
       if (!alive) return;
       setState((current) => {
-        const history = current.history.length >= RESOURCE_HISTORY_LENGTH
-          ? [...current.history.slice(current.history.length - RESOURCE_HISTORY_LENGTH + 1), point]
-          : [...current.history, point];
+        const history =
+          current.history.length >= RESOURCE_HISTORY_LENGTH
+            ? [...current.history.slice(current.history.length - RESOURCE_HISTORY_LENGTH + 1), point]
+            : [...current.history, point];
         return { history, latest: sample, error: null };
       });
     });

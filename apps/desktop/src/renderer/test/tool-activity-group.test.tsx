@@ -101,7 +101,12 @@ function renderConversation(messages: MessageBlock[], isStreaming = false) {
   return render(
     <TooltipProvider delayDuration={0}>
       <RightPanelProvider>
-        <TestConversationView messages={messages} contextSnapshot={null} sessionId="session-1" isStreaming={isStreaming} />
+        <TestConversationView
+          messages={messages}
+          contextSnapshot={null}
+          sessionId="session-1"
+          isStreaming={isStreaming}
+        />
       </RightPanelProvider>
     </TooltipProvider>,
   );
@@ -157,13 +162,26 @@ describe("ToolActivityGroup in ConversationView", () => {
       { ...toolTurn[3], collapsedByDefault: false } as MessageBlock,
       { ...toolTurn[2], resultPreview: ["read detail"] } as MessageBlock,
       { ...toolTurn[4], resultPreview: ["grep detail"] } as MessageBlock,
-      { kind: "web_search", mode: "query", id: "web", createdAt: toolTurn[0].createdAt, displayText: "Searched web", query: "example", status: "completed", contentPreview: "web detail" },
+      {
+        kind: "web_search",
+        mode: "query",
+        id: "web",
+        createdAt: toolTurn[0].createdAt,
+        displayText: "Searched web",
+        query: "example",
+        status: "completed",
+        contentPreview: "web detail",
+      },
       { ...thinkingBeforeBashTurn[2], status: "failed", stdout: "bash detail" } as MessageBlock,
       toolTurn[5],
     ];
-    const view = (active: boolean) => <TooltipProvider><RightPanelProvider>
-      <TestConversationView messages={messages} contextSnapshot={null} sessionId="session-1" isStreaming={active} />
-    </RightPanelProvider></TooltipProvider>;
+    const view = (active: boolean) => (
+      <TooltipProvider>
+        <RightPanelProvider>
+          <TestConversationView messages={messages} contextSnapshot={null} sessionId="session-1" isStreaming={active} />
+        </RightPanelProvider>
+      </TooltipProvider>
+    );
     const { rerender } = render(view(true));
     for (const name of ["Show result for Read package.json", "Grep ToolActivityGroup", "Searched web"]) {
       await user.click(screen.getByRole("button", { name }));
@@ -176,7 +194,9 @@ describe("ToolActivityGroup in ConversationView", () => {
     const worked = screen.getByRole("button", { name: /Worked for/ });
     expect(worked).toHaveAttribute("aria-expanded", "false");
     await user.click(worked);
-    for (const button of screen.getAllByRole("button").filter((button) => button !== worked && button.hasAttribute("aria-expanded"))) {
+    for (const button of screen
+      .getAllByRole("button")
+      .filter((button) => button !== worked && button.hasAttribute("aria-expanded"))) {
       expect(button).toHaveAttribute("aria-expanded", "false");
     }
     for (const detail of ["read detail", "grep detail", "web detail", "bash detail", "需要继续搜索组件引用。"]) {
@@ -200,13 +220,23 @@ describe("ToolActivityGroup in ConversationView", () => {
   });
 
   it("shows a run failure as an error line outside the collapsed process", () => {
-    const failure: MessageBlock = { kind: "error", id: "failure-1", title: "LLM_ERROR", content: "Request snapshot contains a non-JSON value.", createdAt: "2026-06-02T00:00:09.000Z", recoverable: false };
+    const failure: MessageBlock = {
+      kind: "error",
+      id: "failure-1",
+      title: "LLM_ERROR",
+      content: "Request snapshot contains a non-JSON value.",
+      createdAt: "2026-06-02T00:00:09.000Z",
+      recoverable: false,
+    };
     renderConversation([...toolTurn.slice(0, 5), failure]);
     expect(screen.getByRole("button", { name: /Worked for/ })).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Grep ToolActivityGroup")).not.toBeInTheDocument();
     expect(screen.getByText("Request snapshot contains a non-JSON value.")).toHaveClass("turn-status-line", "is-error");
     // A failure before any request leaves only the user message and the error.
-    renderConversation([{ ...plainTurn[0], id: "user-failed" }, { ...failure, id: "failure-2" }]);
+    renderConversation([
+      { ...plainTurn[0], id: "user-failed" },
+      { ...failure, id: "failure-2" },
+    ]);
     expect(screen.getAllByText("Request snapshot contains a non-JSON value.")).toHaveLength(2);
   });
 

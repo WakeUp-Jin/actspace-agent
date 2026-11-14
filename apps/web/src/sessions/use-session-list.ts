@@ -1,4 +1,14 @@
-import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { isRecord } from "@actspace/shared/host-protocol";
 import type { ApprovalRequest, RuntimeSessionListItem } from "@actspace/shared/runtime-v2";
 import { useConnectionStore, useHostConnection } from "../connection/use-connection";
@@ -38,7 +48,7 @@ export function SessionListProvider({ children }: { readonly children: ReactNode
     const current = connectionRef.current;
     if (!current) return;
     try {
-      const list = await current.client.call("sessions.list") as RuntimeSessionListItem[];
+      const list = (await current.client.call("sessions.list")) as RuntimeSessionListItem[];
       if (connectionRef.current !== current) return;
       setSessions(list);
       setError(null);
@@ -55,32 +65,49 @@ export function SessionListProvider({ children }: { readonly children: ReactNode
     setRunning(new Set(connection.hostSnapshot.running));
     void refresh();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const stop = connection.events.on(connection.hostSubscriptionId, value => {
+    const stop = connection.events.on(connection.hostSubscriptionId, (value) => {
       if (!isRecord(value)) return;
       if (value.kind === "sessions-changed") {
         // 流式输出时每个片段都会触发，不能每次重置计时（否则一直不刷新）：窗口内只刷新一次。
-        timer ??= setTimeout(() => { timer = undefined; void refresh(); }, SESSION_LIST_DEBOUNCE_MS);
+        timer ??= setTimeout(() => {
+          timer = undefined;
+          void refresh();
+        }, SESSION_LIST_DEBOUNCE_MS);
       } else if (value.kind === "approvals" && typeof value.sessionId === "string" && Array.isArray(value.requests)) {
-        const sessionId = value.sessionId, requests = value.requests as ApprovalRequest[];
-        setApprovals(previous => {
+        const sessionId = value.sessionId,
+          requests = value.requests as ApprovalRequest[];
+        setApprovals((previous) => {
           const next = new Map(previous);
-          if (requests.length) next.set(sessionId, requests); else next.delete(sessionId);
+          if (requests.length) next.set(sessionId, requests);
+          else next.delete(sessionId);
           return next;
         });
-      } else if (value.kind === "activity" && typeof value.sessionId === "string" && typeof value.running === "boolean") {
-        const sessionId = value.sessionId, active = value.running;
-        setRunning(previous => {
+      } else if (
+        value.kind === "activity" &&
+        typeof value.sessionId === "string" &&
+        typeof value.running === "boolean"
+      ) {
+        const sessionId = value.sessionId,
+          active = value.running;
+        setRunning((previous) => {
           if (previous.has(sessionId) === active) return previous;
           const next = new Set(previous);
-          if (active) next.add(sessionId); else next.delete(sessionId);
+          if (active) next.add(sessionId);
+          else next.delete(sessionId);
           return next;
         });
       }
     });
-    return () => { stop(); clearTimeout(timer); };
+    return () => {
+      stop();
+      clearTimeout(timer);
+    };
   }, [connection, refresh]);
 
-  const value = useMemo<SessionListState>(() => ({ sessions, approvals, running, error, refresh }), [sessions, approvals, running, error, refresh]);
+  const value = useMemo<SessionListState>(
+    () => ({ sessions, approvals, running, error, refresh }),
+    [sessions, approvals, running, error, refresh],
+  );
   return createElement(SessionListContext.Provider, { value }, children);
 }
 

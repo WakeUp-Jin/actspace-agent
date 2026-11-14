@@ -10,20 +10,64 @@ import type { RuntimePermissionMode } from "./types";
 /** The CLI runs from `apps/cli/dist/runtime-v2`; a repo checkout keeps the fetched nono under `<repo>/dist/sandbox-components`. */
 export const CLI_REPO_ROOT = join(__dirname, "../../../..");
 
-
-export async function bootCli(options: { readonly onForceCleanup?: (cleanup: () => void) => void; readonly kind: "cli-run"; readonly workspace: string; readonly dataRoot: string; readonly persistentArtifacts?: boolean; readonly permissionMode: RuntimePermissionMode; readonly permissionModeExplicit?: boolean; readonly sandboxInherited?: boolean; readonly pinnedHarness?: import("@actspace/runtime").PinnedHarness; readonly mock: boolean; readonly model?: string; readonly headlessInput?: string; readonly headlessSessionId?: string; readonly env?: NodeJS.ProcessEnv; readonly onLiveEvent?: (event: Omit<RuntimeLiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq" | "throughJournalSeq">) => void; readonly onHeadlessSession?: (sessionId: string, abort: () => boolean) => void }) {
-  const runtime = await loadRuntimeModule(); const provider = resolveEnvModelProvider(options.env ?? process.env);
-  const host = { hostKind: options.kind, capabilityCeiling: ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const, runtimeContract: "actspace.runtime.v2" as const, invocationId: randomUUID(), workspaceRef: options.workspace };
+export async function bootCli(options: {
+  readonly onForceCleanup?: (cleanup: () => void) => void;
+  readonly kind: "cli-run";
+  readonly workspace: string;
+  readonly dataRoot: string;
+  readonly persistentArtifacts?: boolean;
+  readonly permissionMode: RuntimePermissionMode;
+  readonly permissionModeExplicit?: boolean;
+  readonly sandboxInherited?: boolean;
+  readonly pinnedHarness?: import("@actspace/runtime").PinnedHarness;
+  readonly mock: boolean;
+  readonly model?: string;
+  readonly headlessInput?: string;
+  readonly headlessSessionId?: string;
+  readonly env?: NodeJS.ProcessEnv;
+  readonly onLiveEvent?: (
+    event: Omit<RuntimeLiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq" | "throughJournalSeq">,
+  ) => void;
+  readonly onHeadlessSession?: (sessionId: string, abort: () => boolean) => void;
+}) {
+  const runtime = await loadRuntimeModule();
+  const provider = resolveEnvModelProvider(options.env ?? process.env);
+  const host = {
+    hostKind: options.kind,
+    capabilityCeiling: ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const,
+    runtimeContract: "actspace.runtime.v2" as const,
+    invocationId: randomUUID(),
+    workspaceRef: options.workspace,
+  };
   // The trusted CLI assembly is now a checked-in cordis.yml tree. External
   // plugin admission remains an explicit future surface; the default run does
   // not silently read the retired runtime-v2/plugins.json file.
   const composition = runtime.createProfileComposition(runtime.RUNTIME_PROFILE_IDS.headless, host);
   const toolModule = await import("@actspace/agent-host/node-ports");
-  const artifacts = options.persistentArtifacts === false ? await NodeArtifactStore.ephemeral() : new NodeArtifactStore(options.dataRoot);
-  const llmAdapter = new NodeLlmAdapter({ mock: options.mock, model: options.model, provider, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId) });
-  const credentials = { resolve: async () => ({ apiKey: provider.apiKey, baseUrl: provider.baseUrl, ...(provider.proxyUrl === undefined ? {} : { proxyUrl: provider.proxyUrl }) }) };
-  const disposeResources = onceAsync(async () => { await artifacts.dispose(); });
-  const sandbox = { nonoPath: toolModule.resolveNodeHostNonoPath(process.env, CLI_REPO_ROOT), sandboxInherited: options.sandboxInherited === true };
+  const artifacts =
+    options.persistentArtifacts === false
+      ? await NodeArtifactStore.ephemeral()
+      : new NodeArtifactStore(options.dataRoot);
+  const llmAdapter = new NodeLlmAdapter({
+    mock: options.mock,
+    model: options.model,
+    provider,
+    readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId),
+  });
+  const credentials = {
+    resolve: async () => ({
+      apiKey: provider.apiKey,
+      baseUrl: provider.baseUrl,
+      ...(provider.proxyUrl === undefined ? {} : { proxyUrl: provider.proxyUrl }),
+    }),
+  };
+  const disposeResources = onceAsync(async () => {
+    await artifacts.dispose();
+  });
+  const sandbox = {
+    nonoPath: toolModule.resolveNodeHostNonoPath(process.env, CLI_REPO_ROOT),
+    sandboxInherited: options.sandboxInherited === true,
+  };
   try {
     const approval = new CliApprovalBroker();
     const capabilities = host.capabilityCeiling;
@@ -43,23 +87,73 @@ export async function bootCli(options: { readonly onForceCleanup?: (cleanup: () 
         "host.approval": approval,
         "host.artifacts": artifacts,
         [MODELS_HOST_PORT_ID]: currentModelHostPort(options.model),
-        [runtime.LLM_HOST_PORT_ID]: Object.freeze({ credentials, routes: Object.freeze([{ routeId: "default", providerId: provider.providerId, modelPattern: "*", adapter: llmAdapter, credentialRef: "cli-env", defaults: {} }]) }),
-        ...(options.mock ? { ...toolModule.createUnavailableToolHostServices(), ...toolModule.createNodeSandboxHostServices(sandbox) } : toolModule.createNodeToolHostServices({ ...sandbox, python: toolModule.resolveNodeHostPython(process.env, CLI_REPO_ROOT, options.dataRoot), onShellProcesses: (control) => options.onForceCleanup?.(control.forceTerminate), workspaceRoot: options.workspace, tmpRoot: `${options.dataRoot}/runtime/tmp`, model: options.model ?? "default", readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) })),
-        [runtime.PROMPT_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspace, resolveUserSource: async () => runtime.prepareUserPromptSource(options.dataRoot), resolveSource: async (workspaceRoot: string) => runtime.prepareRuntimePromptSource({ dataRoot: options.dataRoot, workspaceRoot }) }),
-        [runtime.HEADLESS_HOST_PORT_ID]: options.headlessInput === undefined
-          ? Object.freeze({ enabled: false })
-          : Object.freeze({ enabled: true, content: options.headlessInput, persistent: options.persistentArtifacts !== false, workspaceRoot: options.workspace, sessionId: options.headlessSessionId, title: titleFromInput(options.headlessInput), model: options.model, onSessionCreated: options.onHeadlessSession, appExit: (_code: number) => undefined }),
+        [runtime.LLM_HOST_PORT_ID]: Object.freeze({
+          credentials,
+          routes: Object.freeze([
+            {
+              routeId: "default",
+              providerId: provider.providerId,
+              modelPattern: "*",
+              adapter: llmAdapter,
+              credentialRef: "cli-env",
+              defaults: {},
+            },
+          ]),
+        }),
+        ...(options.mock
+          ? { ...toolModule.createUnavailableToolHostServices(), ...toolModule.createNodeSandboxHostServices(sandbox) }
+          : toolModule.createNodeToolHostServices({
+              ...sandbox,
+              python: toolModule.resolveNodeHostPython(process.env, CLI_REPO_ROOT, options.dataRoot),
+              onShellProcesses: (control) => options.onForceCleanup?.(control.forceTerminate),
+              workspaceRoot: options.workspace,
+              tmpRoot: `${options.dataRoot}/runtime/tmp`,
+              model: options.model ?? "default",
+              readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId),
+              resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId),
+            })),
+        [runtime.PROMPT_HOST_PORT_ID]: Object.freeze({
+          workspaceRoot: options.workspace,
+          resolveUserSource: async () => runtime.prepareUserPromptSource(options.dataRoot),
+          resolveSource: async (workspaceRoot: string) =>
+            runtime.prepareRuntimePromptSource({ dataRoot: options.dataRoot, workspaceRoot }),
+        }),
+        [runtime.HEADLESS_HOST_PORT_ID]:
+          options.headlessInput === undefined
+            ? Object.freeze({ enabled: false })
+            : Object.freeze({
+                enabled: true,
+                content: options.headlessInput,
+                persistent: options.persistentArtifacts !== false,
+                workspaceRoot: options.workspace,
+                sessionId: options.headlessSessionId,
+                title: titleFromInput(options.headlessInput),
+                model: options.model,
+                onSessionCreated: options.onHeadlessSession,
+                appExit: (_code: number) => undefined,
+              }),
       }),
     });
     const profile = await runtime.bootProfileRuntime({
-      host, dataRoot: options.dataRoot,
+      host,
+      dataRoot: options.dataRoot,
       hostServices,
       harnessStats: options.persistentArtifacts !== false,
-      toolEnvironment: { workspaceRoot: options.workspace, permissionMode: options.permissionMode, permissionModeExplicit: options.permissionModeExplicit, hostCapabilities: new Set(capabilities), capabilitySet, approvalBroker: approval, createArtifact: (input) => artifacts.create(input), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) },
+      toolEnvironment: {
+        workspaceRoot: options.workspace,
+        permissionMode: options.permissionMode,
+        permissionModeExplicit: options.permissionModeExplicit,
+        hostCapabilities: new Set(capabilities),
+        capabilitySet,
+        approvalBroker: approval,
+        createArtifact: (input) => artifacts.create(input),
+        resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId),
+      },
       composition,
       ...(options.pinnedHarness ? { pinnedHarness: options.pinnedHarness } : {}),
       onLiveEvent: (event) => {
-        if (event.kind === "assistant-delta" || event.kind === "reasoning-delta" || event.kind === "run-state") options.onLiveEvent?.({ ...event });
+        if (event.kind === "assistant-delta" || event.kind === "reasoning-delta" || event.kind === "run-state")
+          options.onLiveEvent?.({ ...event });
       },
       cordis: { configPath: runtime.runtimeCordisConfigPath(), admission: await runtime.inspectCordisAdmission() },
       disposePlugins: disposeResources,

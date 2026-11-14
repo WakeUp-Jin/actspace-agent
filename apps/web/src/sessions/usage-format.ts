@@ -4,7 +4,8 @@ import type { TurnUsageSummary } from "@actspace/shared";
 
 /** 紧凑 token 数：517 / 12.2K / 517K / 1.2M。 */
 export function formatTokens(value: number): string {
-  const scaled = (candidate: number) => candidate >= 100 ? String(Math.round(candidate)) : String(Math.round(candidate * 10) / 10);
+  const scaled = (candidate: number) =>
+    candidate >= 100 ? String(Math.round(candidate)) : String(Math.round(candidate * 10) / 10);
   if (value < 1_000) return String(value);
   if (value < 1_000_000) return `${scaled(value / 1_000)}K`;
   return `${scaled(value / 1_000_000)}M`;
@@ -20,8 +21,15 @@ export function cacheHitPercent(cacheRead: number, prompt: number): string | nul
   return String(value);
 }
 
-const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", minimumFractionDigits: 2, maximumFractionDigits: 6 });
-export const formatUsd = (value: number): string => Number.isFinite(value) ? value > 0 && value < 0.000001 ? "<$0.000001" : USD.format(value) : "—";
+const USD = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  currencyDisplay: "narrowSymbol",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 6,
+});
+export const formatUsd = (value: number): string =>
+  Number.isFinite(value) ? (value > 0 && value < 0.000001 ? "<$0.000001" : USD.format(value)) : "—";
 
 export type TurnUsageView = {
   /** 胶囊上的紧凑总数，例如「用量 88K tok」。 */
@@ -39,7 +47,11 @@ export function turnUsageView(usage: TurnUsageSummary | undefined): TurnUsageVie
   const rows: { label: string; value: string; note?: string }[] = [];
   if (usage.routes.length) rows.push({ label: "提供方 / 模型", value: usage.routes.join(", ") });
   if (hit !== null) rows.push({ label: "缓存命中", value: `${hit}%` });
-  rows.push({ label: "未缓存输入", value: tok(usage.inputTokens) }, { label: "缓存读取", value: tok(usage.cacheReadTokens) }, { label: "缓存写入", value: tok(usage.cacheWriteTokens) });
+  rows.push(
+    { label: "未缓存输入", value: tok(usage.inputTokens) },
+    { label: "缓存读取", value: tok(usage.cacheReadTokens) },
+    { label: "缓存写入", value: tok(usage.cacheWriteTokens) },
+  );
   rows.push({ label: "输出", value: tok(usage.outputTokens) });
   if (usage.unpricedRequestCount > 0) rows.push({ label: "花费", value: usage.costUsd > 0 ? "部分未知" : "未知" });
   else rows.push({ label: "花费", value: formatUsd(usage.costUsd), ...(usage.costEstimated ? { note: "预估" } : {}) });

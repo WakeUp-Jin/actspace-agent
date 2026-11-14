@@ -1,5 +1,5 @@
 import type { Context, Plugin } from "@deepseek-ai/cordis";
-import type { JsonObject} from "./plugin-contract.js";
+import type { JsonObject } from "./plugin-contract.js";
 
 /** DSH-native Behavior ABI. The wrapper below intentionally presents an arrow
  * `apply` callback to Cordis so a Behavior's returned disposer is collected as
@@ -21,11 +21,12 @@ export function toCordisBehavior(module: unknown, entryId = "behavior"): Plugin 
   const record = asRecord(module);
   const candidate = record?.default ?? module;
   const candidateRecord = asRecord(candidate);
-  const apply = typeof candidate === "function"
-    ? candidate
-    : candidateRecord !== undefined && typeof candidateRecord.apply === "function"
-      ? candidateRecord.apply
-      : undefined;
+  const apply =
+    typeof candidate === "function"
+      ? candidate
+      : candidateRecord !== undefined && typeof candidateRecord.apply === "function"
+        ? candidateRecord.apply
+        : undefined;
   if (apply === undefined) {
     if (candidateRecord !== undefined && typeof candidateRecord.activate === "function") {
       throw new Error(`Behavior ${entryId} uses retired activate(); export apply(ctx, config) instead.`);
@@ -50,5 +51,5 @@ export async function loadCordisBehavior(
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value !== null && typeof value === "object" ? value as Record<string, unknown> : undefined;
+  return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
 }

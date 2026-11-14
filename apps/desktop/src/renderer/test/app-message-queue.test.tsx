@@ -3,13 +3,7 @@ import type { TaskSnapshot, TaskCommand, SubmitTaskInput, TaskContentEnvelope } 
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type {
-  AgentRunResult,
-  BootstrapState,
-  RuntimeStreamEvent,
-  SessionEvent,
-  SessionRecord,
-} from "@actspace/shared";
+import type { AgentRunResult, BootstrapState, RuntimeStreamEvent, SessionEvent, SessionRecord } from "@actspace/shared";
 import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -50,8 +44,14 @@ function setupQueueFixture() {
   let seq = 0;
   const states = new Map<string, TaskSnapshot>();
   const live = new Set<(event: any) => void>();
-  const state = (id: string) => { if (!states.has(id)) states.set(id, { sessionId: id, revision: 0, paused: false, tasks: [], queue: [], runs: [] }); return states.get(id)!; };
-  const publish = (id: string, next: TaskSnapshot) => { states.set(id, { ...next, revision: state(id).revision + 1 }); for (const fn of live) fn({ event: { kind: "journal-update", message: "task-queue-updated", sessionId: id } }); };
+  const state = (id: string) => {
+    if (!states.has(id)) states.set(id, { sessionId: id, revision: 0, paused: false, tasks: [], queue: [], runs: [] });
+    return states.get(id)!;
+  };
+  const publish = (id: string, next: TaskSnapshot) => {
+    states.set(id, { ...next, revision: state(id).revision + 1 });
+    for (const fn of live) fn({ event: { kind: "journal-update", message: "task-queue-updated", sessionId: id } });
+  };
   // Host 用客户端申请的 run id 开始任务（空闲发送的乐观 run，§5.5）；`hold` 时先不开始，留在 pending。
   const requested = new Map<string, string>();
   const rewinds: NonNullable<SubmitTaskInput["rewind"]>[] = [];
@@ -59,25 +59,47 @@ function setupQueueFixture() {
   const schedule = (id: string) => {
     const current = state(id);
     if (hold || pending.has(id) || current.paused || !current.queue.length) return;
-    const task = current.tasks.find(task => task.taskId === current.queue[0])!;
+    const task = current.tasks.find((task) => task.taskId === current.queue[0])!;
     const original = (task.content as TaskContentEnvelope).original as { userInput: string };
-    if (original.userInput === "/compact") { void executeCompaction({ sessionId: id, agentRunId: "compact" }); publish(id, { ...current, queue: current.queue.slice(1), tasks: current.tasks.map(item => item === task ? { ...item, state: "completed" } : item) }); return; }
+    if (original.userInput === "/compact") {
+      void executeCompaction({ sessionId: id, agentRunId: "compact" });
+      publish(id, {
+        ...current,
+        queue: current.queue.slice(1),
+        tasks: current.tasks.map((item) => (item === task ? { ...item, state: "completed" } : item)),
+      });
+      return;
+    }
     const agentRunId = requested.get(task.taskId) ?? `host-${task.taskId}`;
-    publish(id, { ...current, queue: current.queue.slice(1), tasks: current.tasks.map(item => item === task ? { ...item, state: "claimed", runId: agentRunId } : item) });
+    publish(id, {
+      ...current,
+      queue: current.queue.slice(1),
+      tasks: current.tasks.map((item) => (item === task ? { ...item, state: "claimed", runId: agentRunId } : item)),
+    });
     void startExecution({ sessionId: id, agentRunId, userInput: original.userInput });
   };
   const submitTask = vi.fn(async (input: SubmitTaskInput) => {
-    const current = state(input.sessionId); const taskId = input.submissionId;
+    const current = state(input.sessionId);
+    const taskId = input.submissionId;
     if (input.agentRunId) requested.set(taskId, input.agentRunId);
     if (input.rewind) {
       // Host 侧回退：日志截到被编辑轮之前（agent-edit-resend-rewind.md §3）。
       const record = records.get(input.sessionId)!;
-      const cut = record.events.findIndex(event => event.agentRunId === input.rewind!.runId);
+      const cut = record.events.findIndex((event) => event.agentRunId === input.rewind!.runId);
       const events = record.events.slice(0, cut);
       records.set(input.sessionId, { ...record, events, messageBlocks: createMessageBlocks(events) });
       rewinds.push(input.rewind);
     }
-    const task = { taskId, submissionId: taskId, content: { kind: "composer-task", original: { userInput: input.userInput }, prepared: input.userInput }, acceptedSeq: ++seq, state: "pending" as const, targetRunId: null, runId: null, continuationOf: null };
+    const task = {
+      taskId,
+      submissionId: taskId,
+      content: { kind: "composer-task", original: { userInput: input.userInput }, prepared: input.userInput },
+      acceptedSeq: ++seq,
+      state: "pending" as const,
+      targetRunId: null,
+      runId: null,
+      continuationOf: null,
+    };
     publish(input.sessionId, { ...current, tasks: [...current.tasks, task], queue: [...current.queue, taskId] });
     schedule(input.sessionId);
     return { task, revision: state(input.sessionId).revision, durableSeq: seq };
@@ -89,38 +111,87 @@ function setupQueueFixture() {
         const result = await designateSupplement(input);
         if (!result) return { snapshot: current, error: "RUN_NOT_ACTIVE" };
       } else await clearDesignation(input);
-      publish(input.sessionId, { ...current, tasks: current.tasks.map(item => item.taskId === input.taskId ? { ...item, targetRunId: input.runId } : item) });
+      publish(input.sessionId, {
+        ...current,
+        tasks: current.tasks.map((item) =>
+          item.taskId === input.taskId ? { ...item, targetRunId: input.runId } : item,
+        ),
+      });
     }
-    if (input.op === "cancel") publish(input.sessionId, { ...current, queue: current.queue.filter(id => id !== input.taskId), tasks: current.tasks.map(item => item.taskId === input.taskId ? { ...item, state: "cancelled" } : item) });
-    if (input.op === "resume") { publish(input.sessionId, { ...current, paused: false }); schedule(input.sessionId); }
+    if (input.op === "cancel")
+      publish(input.sessionId, {
+        ...current,
+        queue: current.queue.filter((id) => id !== input.taskId),
+        tasks: current.tasks.map((item) => (item.taskId === input.taskId ? { ...item, state: "cancelled" } : item)),
+      });
+    if (input.op === "resume") {
+      publish(input.sessionId, { ...current, paused: false });
+      schedule(input.sessionId);
+    }
     return { snapshot: state(input.sessionId) };
   });
   const pending = new Map<string, PendingRun>();
-  const startExecution = vi.fn((input: FixtureRunInput) => new Promise<AgentRunResult>((resolve) => {
-    pending.set(input.sessionId, { input, resolve });
-    const current = state(input.sessionId);
-    publish(input.sessionId, { ...current, runs: [...current.runs, { runId: input.agentRunId, taskId: "initial", configuration: {}, harness: { harnessId: "main", generationId: "fixture", revision: 1 }, state: "running", result: null }] });
-    emit({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-  }));
+  const startExecution = vi.fn(
+    (input: FixtureRunInput) =>
+      new Promise<AgentRunResult>((resolve) => {
+        pending.set(input.sessionId, { input, resolve });
+        const current = state(input.sessionId);
+        publish(input.sessionId, {
+          ...current,
+          runs: [
+            ...current.runs,
+            {
+              runId: input.agentRunId,
+              taskId: "initial",
+              configuration: {},
+              harness: { harnessId: "main", generationId: "fixture", revision: 1 },
+              state: "running",
+              result: null,
+            },
+          ],
+        });
+        emit({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+      }),
+  );
   const executeCompaction = vi.fn(async (input: FixtureCompactionInput) => ({
-    sessionId: input.sessionId, agentRunId: input.agentRunId, status: "skipped" as const,
-    events: [], contextSnapshot: emptySnapshot, contextState: null,
+    sessionId: input.sessionId,
+    agentRunId: input.agentRunId,
+    status: "skipped" as const,
+    events: [],
+    contextSnapshot: emptySnapshot,
+    contextState: null,
   }));
   const designateSupplement = vi.fn(async (_input: Extract<TaskCommand, { op: "designate" }>) => true);
   const clearDesignation = vi.fn(async (_input: Extract<TaskCommand, { op: "designate" }>) => {});
   const abort = vi.fn(async () => true);
 
   setupBridge({
-    "tasks.command": taskCommand, "tasks.submit": submitTask,
-    "events.sessionLive": (callback: any) => { live.add(callback); return () => live.delete(callback); },
+    "tasks.command": taskCommand,
+    "tasks.submit": submitTask,
+    "events.sessionLive": (callback: any) => {
+      live.add(callback);
+      return () => live.delete(callback);
+    },
     "app.getBootstrapState": async () => bootstrapState,
-    "settings.get": async () => ({ version: 1, defaultModelId: null, providers: {}, searchProviders: {}, agent: {}, skills: { disabled: [] } }),
-    "sessions.list": async () => [...records.values()].map((record) => ({
-      id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: record.meta.agentRunCount,
-      workspaceRoot: "/tmp/workspace",
-    })),
+    "settings.get": async () => ({
+      version: 1,
+      defaultModelId: null,
+      providers: {},
+      searchProviders: {},
+      agent: {},
+      skills: { disabled: [] },
+    }),
+    "sessions.list": async () =>
+      [...records.values()].map((record) => ({
+        id: record.meta.id,
+        title: record.meta.title,
+        updatedAt: record.meta.updatedAt,
+        agentRunCount: record.meta.agentRunCount,
+        workspaceRoot: "/tmp/workspace",
+      })),
     "sessions.get": projectRecord(async ({ sessionId }: { sessionId: string }) => records.get(sessionId) ?? null),
-    "sessions.getPage": async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
+    "sessions.getPage": async ({ sessionId }: { sessionId: string }) =>
+      recordProjectionFixture(records.get(sessionId)!),
     "sessions.create": projectRecord(async () => records.get("queue-a")),
     "tasks.abort": abort,
     "approvals.listPending": async () => [],
@@ -128,12 +199,24 @@ function setupQueueFixture() {
     "appearance.setUiZoom": () => {},
     "appearance.setNativeTheme": () => {},
     "events.shuttingDown": () => () => {},
-    "events.agentStream": (callback: typeof emit) => { emit = callback; return () => {}; },
+    "events.agentStream": (callback: typeof emit) => {
+      emit = callback;
+      return () => {};
+    },
   });
 
   const event = (sessionId: string, value: Record<string, unknown>) => {
     if (value.type === "user_message_steered") {
-      const current = state(sessionId); publish(sessionId, { ...current, queue: current.queue.filter(id => id !== value.messageId), tasks: current.tasks.map(task => task.taskId === value.messageId ? { ...task, state: "claimed", targetRunId: null, runId: pending.get(sessionId)!.input.agentRunId } : task) });
+      const current = state(sessionId);
+      publish(sessionId, {
+        ...current,
+        queue: current.queue.filter((id) => id !== value.messageId),
+        tasks: current.tasks.map((task) =>
+          task.taskId === value.messageId
+            ? { ...task, state: "claimed", targetRunId: null, runId: pending.get(sessionId)!.input.agentRunId }
+            : task,
+        ),
+      });
     }
     emit({ sessionId, agentRunId: pending.get(sessionId)!.input.agentRunId, ...value } as RuntimeStreamEvent);
   };
@@ -143,30 +226,114 @@ function setupQueueFixture() {
     const timestamp = new Date().toISOString();
     const events: SessionEvent[] = [
       ...record.events,
-      { id: `v2-${++seq}`, sessionId, agentRunId: input.agentRunId, type: "user_message", timestamp, schemaVersion: 2, payload: { content: input.userInput } },
+      {
+        id: `v2-${++seq}`,
+        sessionId,
+        agentRunId: input.agentRunId,
+        type: "user_message",
+        timestamp,
+        schemaVersion: 2,
+        payload: { content: input.userInput },
+      },
       ...extra,
-      { id: `v2-${++seq}`, sessionId, agentRunId: input.agentRunId, type: "assistant_message", timestamp, schemaVersion: 2, payload: { content: `reply to ${input.userInput}` } },
+      {
+        id: `v2-${++seq}`,
+        sessionId,
+        agentRunId: input.agentRunId,
+        type: "assistant_message",
+        timestamp,
+        schemaVersion: 2,
+        payload: { content: `reply to ${input.userInput}` },
+      },
     ];
-    records.set(sessionId, { ...record, meta: { ...record.meta, agentRunCount: record.meta.agentRunCount + 1 }, events, messageBlocks: createMessageBlocks(events) });
-    event(sessionId, { type: status === "completed" ? "agent_run_finished" : status === "aborted" ? "agent_run_aborted" : "agent_run_failed" });
+    records.set(sessionId, {
+      ...record,
+      meta: { ...record.meta, agentRunCount: record.meta.agentRunCount + 1 },
+      events,
+      messageBlocks: createMessageBlocks(events),
+    });
+    event(sessionId, {
+      type:
+        status === "completed" ? "agent_run_finished" : status === "aborted" ? "agent_run_aborted" : "agent_run_failed",
+    });
     pending.delete(sessionId);
-    const current = state(sessionId); publish(sessionId, { ...current, paused: status !== "completed", runs: current.runs.map(run => run.runId === input.agentRunId ? { ...run, state: status === "aborted" ? "cancelled" : status } : run), tasks: current.tasks.map(task => ({ ...task, targetRunId: null, state: task.runId === input.agentRunId ? status === "aborted" ? "cancelled" : status : task.state })) });
+    const current = state(sessionId);
+    publish(sessionId, {
+      ...current,
+      paused: status !== "completed",
+      runs: current.runs.map((run) =>
+        run.runId === input.agentRunId ? { ...run, state: status === "aborted" ? "cancelled" : status } : run,
+      ),
+      tasks: current.tasks.map((task) => ({
+        ...task,
+        targetRunId: null,
+        state: task.runId === input.agentRunId ? (status === "aborted" ? "cancelled" : status) : task.state,
+      })),
+    });
     resolve({ sessionId, agentRunId: input.agentRunId, status, events, contextSnapshot: emptySnapshot });
     schedule(sessionId);
   };
   const sentTexts = () => startExecution.mock.calls.map(([input]) => input.userInput);
-  const seedTasks = (id: string, tasks: TaskSnapshot["tasks"]) => { states.set(id, { ...state(id), tasks }); };
-  const holdStart = (value: boolean, sessionId = "queue-a") => { hold = value; if (!value) schedule(sessionId); };
-  const seedTurns = (sessionId: string, turns: readonly [runId: string, prompt: string][]) => {
-    const record = records.get(sessionId)!; const timestamp = new Date().toISOString();
-    const events: SessionEvent[] = turns.flatMap(([runId, prompt]) => [
-      { id: `v2-${++seq}`, sessionId, agentRunId: runId, type: "user_message" as const, timestamp, schemaVersion: 2 as const, payload: { content: prompt } },
-      { id: `v2-${++seq}`, sessionId, agentRunId: runId, type: "assistant_message" as const, timestamp, schemaVersion: 2 as const, payload: { content: `reply to ${prompt}` } },
-    ]);
-    records.set(sessionId, { ...record, meta: { ...record.meta, agentRunCount: turns.length }, events, messageBlocks: createMessageBlocks(events) });
+  const seedTasks = (id: string, tasks: TaskSnapshot["tasks"]) => {
+    states.set(id, { ...state(id), tasks });
   };
-  const liveEvent = (event: unknown) => { for (const fn of live) fn({ event }); };
-  return { holdStart, rewinds, seedTurns, liveEvent, records, pending, startExecution, submitTask, taskCommand, seedTasks, executeCompaction, designateSupplement, clearDesignation, abort, event, finish, sentTexts, nextSeq: () => ++seq };
+  const holdStart = (value: boolean, sessionId = "queue-a") => {
+    hold = value;
+    if (!value) schedule(sessionId);
+  };
+  const seedTurns = (sessionId: string, turns: readonly [runId: string, prompt: string][]) => {
+    const record = records.get(sessionId)!;
+    const timestamp = new Date().toISOString();
+    const events: SessionEvent[] = turns.flatMap(([runId, prompt]) => [
+      {
+        id: `v2-${++seq}`,
+        sessionId,
+        agentRunId: runId,
+        type: "user_message" as const,
+        timestamp,
+        schemaVersion: 2 as const,
+        payload: { content: prompt },
+      },
+      {
+        id: `v2-${++seq}`,
+        sessionId,
+        agentRunId: runId,
+        type: "assistant_message" as const,
+        timestamp,
+        schemaVersion: 2 as const,
+        payload: { content: `reply to ${prompt}` },
+      },
+    ]);
+    records.set(sessionId, {
+      ...record,
+      meta: { ...record.meta, agentRunCount: turns.length },
+      events,
+      messageBlocks: createMessageBlocks(events),
+    });
+  };
+  const liveEvent = (event: unknown) => {
+    for (const fn of live) fn({ event });
+  };
+  return {
+    holdStart,
+    rewinds,
+    seedTurns,
+    liveEvent,
+    records,
+    pending,
+    startExecution,
+    submitTask,
+    taskCommand,
+    seedTasks,
+    executeCompaction,
+    designateSupplement,
+    clearDesignation,
+    abort,
+    event,
+    finish,
+    sentTexts,
+    nextSeq: () => ++seq,
+  };
 }
 
 function renderApp() {
@@ -206,13 +373,45 @@ describe("App message queue", () => {
     const fixture = setupQueueFixture();
     const record = fixture.records.get("queue-a")!;
     const text = "reload active task input";
-    record.events = [{ id: "durable-user", sessionId: "queue-a", agentRunId: "recovered-run", type: "user_message", timestamp: new Date().toISOString(), schemaVersion: 2, payload: { content: text } }];
+    record.events = [
+      {
+        id: "durable-user",
+        sessionId: "queue-a",
+        agentRunId: "recovered-run",
+        type: "user_message",
+        timestamp: new Date().toISOString(),
+        schemaVersion: 2,
+        payload: { content: text },
+      },
+    ];
     record.messageBlocks = createMessageBlocks(record.events);
     const snapshot: TaskSnapshot = {
-      sessionId: "queue-a", revision: 4, paused: false, queue: [],
-      tasks: [{ taskId: "accepted-task", submissionId: "accepted-task", acceptedSeq: 1, state: "claimed", targetRunId: null, runId: "recovered-run", continuationOf: null,
-        content: { kind: "composer-task", original: { userInput: text }, prepared: text } }],
-      runs: [{ runId: "recovered-run", taskId: "accepted-task", state: "running", result: null, configuration: {}, harness: { harnessId: "main", generationId: "fixture", revision: 1 } }],
+      sessionId: "queue-a",
+      revision: 4,
+      paused: false,
+      queue: [],
+      tasks: [
+        {
+          taskId: "accepted-task",
+          submissionId: "accepted-task",
+          acceptedSeq: 1,
+          state: "claimed",
+          targetRunId: null,
+          runId: "recovered-run",
+          continuationOf: null,
+          content: { kind: "composer-task", original: { userInput: text }, prepared: text },
+        },
+      ],
+      runs: [
+        {
+          runId: "recovered-run",
+          taskId: "accepted-task",
+          state: "running",
+          result: null,
+          configuration: {},
+          harness: { harnessId: "main", generationId: "fixture", revision: 1 },
+        },
+      ],
     };
     overrideBridge({ "tasks.command": vi.fn(async () => ({ snapshot })) });
     renderApp();
@@ -265,7 +464,10 @@ describe("App message queue", () => {
   // agent-edit-resend-rewind.md §5.2、§5.4：从第一轮编辑重发，后面的轮次消失，新提问接着运行。
   it("resends an edited prompt from that turn: later turns disappear and the new prompt runs in their place", async () => {
     const fixture = setupQueueFixture();
-    fixture.seedTurns("queue-a", [["run-1", "first prompt"], ["run-2", "second prompt"]]);
+    fixture.seedTurns("queue-a", [
+      ["run-1", "first prompt"],
+      ["run-2", "second prompt"],
+    ]);
     renderApp();
     await selectSession("queue-a", "Queue A");
     await userEvent.click(await screen.findByText("first prompt"));
@@ -289,15 +491,27 @@ describe("App message queue", () => {
 
   it("keeps the conversation and reopens the editor when the Host refuses the rewind", async () => {
     const fixture = setupQueueFixture();
-    fixture.seedTurns("queue-a", [["run-1", "first prompt"], ["run-2", "second prompt"]]);
-    const refused = vi.fn(async (_input: SubmitTaskInput) => ({ status: "submission-failed", acknowledgement: "rejected", message: "这段对话有了新内容，看过最新内容后再编辑。" }));
+    fixture.seedTurns("queue-a", [
+      ["run-1", "first prompt"],
+      ["run-2", "second prompt"],
+    ]);
+    const refused = vi.fn(async (_input: SubmitTaskInput) => ({
+      status: "submission-failed",
+      acknowledgement: "rejected",
+      message: "这段对话有了新内容，看过最新内容后再编辑。",
+    }));
     overrideBridge({ "tasks.submit": refused });
     renderApp();
     await selectSession("queue-a", "Queue A");
     await userEvent.click(await screen.findByText("second prompt"));
     await userEvent.type(await screen.findByRole("textbox", { name: "编辑提问内容" }), " again{Enter}");
     expect(await screen.findByText("这段对话有了新内容，看过最新内容后再编辑。")).toBeInTheDocument();
-    expect(refused).toHaveBeenCalledWith(expect.objectContaining({ userInput: "second prompt again", rewind: expect.objectContaining({ runId: "run-2" }) }));
+    expect(refused).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userInput: "second prompt again",
+        rewind: expect.objectContaining({ runId: "run-2" }),
+      }),
+    );
     expect(await screen.findByRole("textbox", { name: "编辑提问内容" })).toHaveValue("second prompt again");
     expect(screen.getByText("first prompt")).toBeInTheDocument();
     expect(screen.getByText("reply to second prompt")).toBeInTheDocument();
@@ -306,7 +520,10 @@ describe("App message queue", () => {
 
   it("reloads the Session when another window rewound it", async () => {
     const fixture = setupQueueFixture();
-    fixture.seedTurns("queue-a", [["run-1", "first prompt"], ["run-2", "second prompt"]]);
+    fixture.seedTurns("queue-a", [
+      ["run-1", "first prompt"],
+      ["run-2", "second prompt"],
+    ]);
     renderApp();
     await selectSession("queue-a", "Queue A");
     await screen.findByText("second prompt");
@@ -314,10 +531,35 @@ describe("App message queue", () => {
     const record = fixture.records.get("queue-a")!;
     const events = record.events.slice(0, 2);
     fixture.records.set("queue-a", { ...record, events, messageBlocks: createMessageBlocks(events) });
-    act(() => fixture.liveEvent({ kind: "journal-update", sessionId: "queue-a", update: { sessionId: "queue-a", throughJournalSeq: 2, event: { recordKind: "event", seq: 2, type: "session/rewound", eventVersion: 1, criticality: "ignorable", time: new Date().toISOString(), source: { ownerPluginId: "@actspace/core" }, data: {}, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } } } }));
+    act(() =>
+      fixture.liveEvent({
+        kind: "journal-update",
+        sessionId: "queue-a",
+        update: {
+          sessionId: "queue-a",
+          throughJournalSeq: 2,
+          event: {
+            recordKind: "event",
+            seq: 2,
+            type: "session/rewound",
+            eventVersion: 1,
+            criticality: "ignorable",
+            time: new Date().toISOString(),
+            source: { ownerPluginId: "@actspace/core" },
+            data: {},
+            surface: null,
+            provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
+          },
+        },
+      }),
+    );
     await waitFor(() => expect(screen.queryByText("second prompt")).toBeNull());
     expect(screen.getByText("first prompt")).toBeInTheDocument();
-    await waitFor(() => expect(fixture.taskCommand).toHaveBeenCalledWith(expect.objectContaining({ op: "snapshot", sessionId: "queue-a" })));
+    await waitFor(() =>
+      expect(fixture.taskCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ op: "snapshot", sessionId: "queue-a" }),
+      ),
+    );
   });
 
   it("queues messages while running and sends them one turn at a time after completion", async () => {
@@ -369,8 +611,13 @@ describe("App message queue", () => {
 
   it("preserves a definitively rejected draft without retrying or retaining a pending submission", async () => {
     const fixture = setupQueueFixture();
-    renderApp(); await startFirstRun(fixture);
-    fixture.submitTask.mockResolvedValueOnce({ status: "submission-failed", acknowledgement: "rejected", message: "单个文件不能超过 20 MiB。" } as never);
+    renderApp();
+    await startFirstRun(fixture);
+    fixture.submitTask.mockResolvedValueOnce({
+      status: "submission-failed",
+      acknowledgement: "rejected",
+      message: "单个文件不能超过 20 MiB。",
+    } as never);
     await queueText("oversized draft");
     await screen.findByText("单个文件不能超过 20 MiB。");
     expect(fixture.submitTask).toHaveBeenCalledTimes(2);
@@ -382,13 +629,21 @@ describe("App message queue", () => {
   describe("pending submission recovery (14 T20)", () => {
     const KEY = "actspace:pending-submission:queue-a";
     const unknown = { status: "submission-failed", acknowledgement: "unknown" } as never;
-    const seedRecord = (id: string, text: string) => localStorage.setItem(KEY, JSON.stringify({
-      content: JSON.stringify({ sessionId: "queue-a", userInput: text }), id, createdAt: new Date().toISOString(), draft: { sessionId: "queue-a", text },
-    }));
+    const seedRecord = (id: string, text: string) =>
+      localStorage.setItem(
+        KEY,
+        JSON.stringify({
+          content: JSON.stringify({ sessionId: "queue-a", userInput: text }),
+          id,
+          createdAt: new Date().toISOString(),
+          draft: { sessionId: "queue-a", text },
+        }),
+      );
 
     it("restores an unconfirmed local submission as a draft after remount without resending it", async () => {
       const fixture = setupQueueFixture();
-      const view = renderApp(); await startFirstRun(fixture);
+      const view = renderApp();
+      await startFirstRun(fixture);
       fixture.submitTask.mockResolvedValueOnce(unknown).mockResolvedValueOnce(unknown);
       await queueText("maybe sent");
       await screen.findByText("提交尚未确认，再次发送将核对同一次提交。");
@@ -397,19 +652,34 @@ describe("App message queue", () => {
       view.unmount();
       fixture.submitTask.mockClear();
 
-      renderApp(); await selectSession("queue-a", "Queue A");
+      renderApp();
+      await selectSession("queue-a", "Queue A");
       await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("maybe sent"));
       expect(screen.getByText("上次提交尚未确认，再次发送将核对同一次提交。")).toBeInTheDocument();
-      expect(fixture.taskCommand).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "queue-a", op: "snapshot" }));
+      expect(fixture.taskCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: "queue-a", op: "snapshot" }),
+      );
       expect(fixture.submitTask).not.toHaveBeenCalled();
       expect(localStorage.getItem(KEY)).not.toBeNull();
     });
 
     it("only clears the record when the task snapshot already holds the same submission", async () => {
       const fixture = setupQueueFixture();
-      fixture.seedTasks("queue-a", [{ taskId: "sub-1", submissionId: "sub-1", content: { kind: "composer-task", original: { userInput: "landed" }, prepared: "landed" }, acceptedSeq: 1, state: "completed", targetRunId: null, runId: null, continuationOf: null }] as TaskSnapshot["tasks"]);
+      fixture.seedTasks("queue-a", [
+        {
+          taskId: "sub-1",
+          submissionId: "sub-1",
+          content: { kind: "composer-task", original: { userInput: "landed" }, prepared: "landed" },
+          acceptedSeq: 1,
+          state: "completed",
+          targetRunId: null,
+          runId: null,
+          continuationOf: null,
+        },
+      ] as TaskSnapshot["tasks"]);
       seedRecord("sub-1", "landed");
-      renderApp(); await selectSession("queue-a", "Queue A");
+      renderApp();
+      await selectSession("queue-a", "Queue A");
       await waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
       expect(screen.getByLabelText("消息输入框")).toHaveValue("");
       expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
@@ -421,7 +691,8 @@ describe("App message queue", () => {
       seedRecord("sub-2", "offline draft");
       const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
       fixture.taskCommand.mockRejectedValue(new Error("IPC 断开"));
-      renderApp(); await selectSession("queue-a", "Queue A");
+      renderApp();
+      await selectSession("queue-a", "Queue A");
       await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("offline draft"));
       expect(error).toHaveBeenCalledWith("Failed to check pending submission", expect.any(Error));
       expect(fixture.submitTask).not.toHaveBeenCalled();
@@ -433,12 +704,18 @@ describe("App message queue", () => {
     const holdSnapshots = (fixture: ReturnType<typeof setupQueueFixture>) => {
       const original = fixture.taskCommand.getMockImplementation()!;
       let release!: () => void;
-      const gate = new Promise<void>((resolve) => { release = resolve; });
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
       fixture.taskCommand.mockImplementation(async (input: TaskCommand) => {
         if (input.op === "snapshot") await gate;
         return original(input);
       });
-      return () => act(async () => { release(); await Promise.resolve(); });
+      return () =>
+        act(async () => {
+          release();
+          await Promise.resolve();
+        });
     };
 
     it("does not restore the record while the same content is being sent", async () => {
@@ -447,17 +724,28 @@ describe("App message queue", () => {
       const releaseSnapshots = holdSnapshots(fixture);
       const submit = fixture.submitTask.getMockImplementation()!;
       let releaseSubmit!: () => void;
-      const submitGate = new Promise<void>((resolve) => { releaseSubmit = resolve; });
-      fixture.submitTask.mockImplementationOnce(async (input: SubmitTaskInput) => { await submitGate; return submit(input); });
-      renderApp(); await selectSession("queue-a", "Queue A");
+      const submitGate = new Promise<void>((resolve) => {
+        releaseSubmit = resolve;
+      });
+      fixture.submitTask.mockImplementationOnce(async (input: SubmitTaskInput) => {
+        await submitGate;
+        return submit(input);
+      });
+      renderApp();
+      await selectSession("queue-a", "Queue A");
       await userEvent.type(screen.getByLabelText("消息输入框"), "in flight");
       await userEvent.click(screen.getByLabelText("发送消息"));
       await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledTimes(1));
       expect(fixture.submitTask.mock.calls[0][0].submissionId).toBe("sub-4");
       await releaseSnapshots();
-      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
       expect(screen.getByLabelText("消息输入框")).toHaveValue("");
-      await act(async () => { releaseSubmit(); await Promise.resolve(); });
+      await act(async () => {
+        releaseSubmit();
+        await Promise.resolve();
+      });
       await waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
       expect(screen.getByLabelText("消息输入框")).toHaveValue("");
       expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
@@ -467,10 +755,13 @@ describe("App message queue", () => {
       const fixture = setupQueueFixture();
       seedRecord("sub-5", "old draft");
       const releaseSnapshots = holdSnapshots(fixture);
-      renderApp(); await selectSession("queue-a", "Queue A");
+      renderApp();
+      await selectSession("queue-a", "Queue A");
       await userEvent.type(screen.getByLabelText("消息输入框"), "my own words");
       await releaseSnapshots();
-      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
       expect(screen.getByLabelText("消息输入框")).toHaveValue("my own words");
       expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
       expect(localStorage.getItem(KEY)).not.toBeNull();
@@ -482,13 +773,16 @@ describe("App message queue", () => {
       overrideBridge({ "dialogs.getPathForFile": (file: File) => `/Users/test/${file.name}` });
       seedRecord("sub-6", "old draft");
       const releaseSnapshots = holdSnapshots(fixture);
-      renderApp(); await selectSession("queue-a", "Queue A");
+      renderApp();
+      await selectSession("queue-a", "Queue A");
       fireEvent.drop(screen.getByLabelText("消息输入面板"), {
         dataTransfer: { files: [new File(["report"], "report.pdf", { type: "application/pdf" })], types: ["Files"] },
       });
       expect(screen.getByLabelText("已附加的文件 report.pdf")).toBeInTheDocument();
       await releaseSnapshots();
-      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
       expect(screen.getByLabelText("消息输入框")).toHaveValue("");
       expect(screen.getByLabelText("已附加的文件 report.pdf")).toBeInTheDocument();
       expect(screen.queryByText("上次提交尚未确认，再次发送将核对同一次提交。")).not.toBeInTheDocument();
@@ -498,7 +792,8 @@ describe("App message queue", () => {
     it("reuses the recorded submissionId when the restored draft is sent unchanged", async () => {
       const fixture = setupQueueFixture();
       seedRecord("sub-3", "send again");
-      renderApp(); await selectSession("queue-a", "Queue A");
+      renderApp();
+      await selectSession("queue-a", "Queue A");
       await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("send again"));
       await userEvent.click(screen.getByLabelText("发送消息"));
       await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledTimes(1));
@@ -516,11 +811,17 @@ describe("App message queue", () => {
 
     await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 引导" }));
     const steerInput = fixture.designateSupplement.mock.calls[0][0];
-    expect(steerInput).toMatchObject({ sessionId: "queue-a", op: "designate", runId: fixture.pending.get("queue-a")!.input.agentRunId });
+    expect(steerInput).toMatchObject({
+      sessionId: "queue-a",
+      op: "designate",
+      runId: fixture.pending.get("queue-a")!.input.agentRunId,
+    });
     expect(await within(tray()!).findByText("下一步读取")).toBeInTheDocument();
     expect(within(tray()!).getByRole("img", { name: /1 条已引导/ })).toBeInTheDocument();
 
-    await act(async () => fixture.event("queue-a", { type: "user_message_steered", turnId: "turn-1", messageId: steerInput.taskId }));
+    await act(async () =>
+      fixture.event("queue-a", { type: "user_message_steered", turnId: "turn-1", messageId: steerInput.taskId }),
+    );
     expect(tray()).toBeNull();
     const log = screen.getByText("working on it").closest("[role='log'], main") ?? document.body;
     expect(within(log as HTMLElement).getByText("also check tests")).toBeInTheDocument();
@@ -545,7 +846,10 @@ describe("App message queue", () => {
     expect(fixture.clearDesignation).not.toHaveBeenCalled(); // Host clears unread designation at terminal commit.
     await waitFor(() => expect(within(tray()!).getByText("已暂停")).toBeInTheDocument());
     const rows = within(tray()!).getAllByRole("listitem");
-    expect(rows.map((row) => row.textContent)).toEqual([expect.stringContaining("steer me"), expect.stringContaining("later")]);
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("steer me"),
+      expect.stringContaining("later"),
+    ]);
     expect(fixture.startExecution).toHaveBeenCalledTimes(1);
   });
 
@@ -578,9 +882,15 @@ describe("App message queue", () => {
     renderApp();
     await startFirstRun(fixture);
     await queueText("wait for approval");
-    await act(async () => fixture.event("queue-a", {
-      type: "tool_approval_required", toolCallId: "tool-1", toolName: "bash", requestId: "approval-1", reason: "run command",
-    }));
+    await act(async () =>
+      fixture.event("queue-a", {
+        type: "tool_approval_required",
+        toolCallId: "tool-1",
+        toolName: "bash",
+        requestId: "approval-1",
+        reason: "run command",
+      }),
+    );
 
     await waitFor(() => expect(within(tray()!).getByRole("button", { name: "↳ 引导" })).toBeDisabled());
   });
@@ -609,7 +919,9 @@ describe("App message queue", () => {
     expect(within(tray()!).queryByRole("button", { name: "↳ 引导" })).not.toBeInTheDocument();
 
     await act(async () => fixture.finish("queue-a", "completed"));
-    await waitFor(() => expect(fixture.executeCompaction).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "queue-a" })));
+    await waitFor(() =>
+      expect(fixture.executeCompaction).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "queue-a" })),
+    );
   });
 
   it("edits a queued message back into the empty input", async () => {

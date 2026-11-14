@@ -37,7 +37,17 @@ export { HEADLESS_HOST_PORT_ID } from "@actspace/headless";
 export type { HeadlessHostPort, HeadlessRunResult, HeadlessRunner } from "@actspace/headless";
 export { prepareRuntimePromptSource, prepareUserPromptSource } from "@actspace/prompt";
 export type { RuntimePromptSource, RuntimeInstructionSource } from "@actspace/prompt";
-export type { LlmAdapter, LlmAdapterDispatchInput, LlmContentBlock, LlmMessage, LlmStreamEvent, LlmStreamSource, LlmToolDefinition, CredentialResolver, LlmCredential } from "@actspace/llm-service";
+export type {
+  LlmAdapter,
+  LlmAdapterDispatchInput,
+  LlmContentBlock,
+  LlmMessage,
+  LlmStreamEvent,
+  LlmStreamSource,
+  LlmToolDefinition,
+  CredentialResolver,
+  LlmCredential,
+} from "@actspace/llm-service";
 export { LLM_HOST_PORT_ID } from "@actspace/llm-service";
 export type { LlmHostPort } from "@actspace/llm-service";
 export type { PiAiWireRoute, PiAiConnectionOptions, PiAiAdapterOptions } from "@actspace/llm-pi-ai";
@@ -45,14 +55,25 @@ export type { ApprovalBroker, ApprovalDecision, ApprovalRequest } from "@actspac
 export { PROMPT_HOST_PORT_ID } from "@actspace/prompt";
 export type { PromptHostPort, PromptRuntimeService } from "@actspace/prompt";
 export { SESSION_CODEC_HOST_PORT_ID } from "@actspace/session-journal";
-export type { ToolArtifactOwner, ToolArtifactRef, ToolBodyResult, ToolCapabilitySet, ToolExecutionContext } from "@actspace/tool-runtime";
+export type {
+  ToolArtifactOwner,
+  ToolArtifactRef,
+  ToolBodyResult,
+  ToolCapabilitySet,
+  ToolExecutionContext,
+} from "@actspace/tool-runtime";
 export type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 export { loadConfiguredPlugins, emptyPluginSet } from "@actspace/cordis-adapter";
 export { inspectCordisAdmission } from "@actspace/cordis-adapter";
-export type { ExplicitPluginConfig, LoadedPluginSet, PluginManifest, PluginBehaviorDescriptor, PluginCodecDescriptor } from "@actspace/cordis-adapter";
+export type {
+  ExplicitPluginConfig,
+  LoadedPluginSet,
+  PluginManifest,
+  PluginBehaviorDescriptor,
+  PluginCodecDescriptor,
+} from "@actspace/cordis-adapter";
 export type { Bundle, Profile, Patch, PatchOperation, PatchOperationResult } from "@actspace/bundle";
 export type { ResolvedComposition } from "@actspace/composition";
 export type { BootDiagnostic } from "@actspace/diagnostics";
 
 export type { AgentLoopLiveEvent } from "@actspace/agent-loop";
-

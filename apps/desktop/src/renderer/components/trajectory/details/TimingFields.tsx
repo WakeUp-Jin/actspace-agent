@@ -1,8 +1,16 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from "react";
 import {
-  STATUS_LABEL, T, formatDurationMs, formatStartedAt, formatThroughput, formatUnixSeconds,
-  type TrajectoryAssistantMetrics, type TrajectoryCell, type TrajectoryLayout, type TrajectoryRequestView,
-} from '../../../trajectory';
+  STATUS_LABEL,
+  T,
+  formatDurationMs,
+  formatStartedAt,
+  formatThroughput,
+  formatUnixSeconds,
+  type TrajectoryAssistantMetrics,
+  type TrajectoryCell,
+  type TrajectoryLayout,
+  type TrajectoryRequestView,
+} from "../../../trajectory";
 
 /** 点击在本地时间和 Unix 时间戳之间切换；正在选中文字时不切换。 */
 export function StartedAtValue({ timestamp }: { timestamp: number | null | undefined }) {
@@ -16,8 +24,14 @@ export function StartedAtValue({ timestamp }: { timestamp: number | null | undef
         title={showUnix ? T.showLocalTime : T.showUnixTimestamp}
         onClick={(event) => {
           const selection = window.getSelection();
-          if (selection && !selection.isCollapsed && selection.rangeCount > 0 && selection.getRangeAt(0).intersectsNode(event.currentTarget)) return;
-          setShowUnix(current => !current);
+          if (
+            selection &&
+            !selection.isCollapsed &&
+            selection.rangeCount > 0 &&
+            selection.getRangeAt(0).intersectsNode(event.currentTarget)
+          )
+            return;
+          setShowUnix((current) => !current);
         }}
       >
         {showUnix ? formatUnixSeconds(timestamp) : formatStartedAt(timestamp)}
@@ -26,7 +40,12 @@ export function StartedAtValue({ timestamp }: { timestamp: number | null | undef
   );
 }
 
-const Row = ({ label, children }: { label: string; children: ReactNode }) => <div><dt>{label}</dt><dd>{children}</dd></div>;
+const Row = ({ label, children }: { label: string; children: ReactNode }) => (
+  <div>
+    <dt>{label}</dt>
+    <dd>{children}</dd>
+  </div>
+);
 
 function totalTime(m: TrajectoryAssistantMetrics): string {
   if (!m.timingRecorded) return T.notRecorded;
@@ -60,7 +79,10 @@ function throughput(m: TrajectoryAssistantMetrics): string {
 function AssistantTimingPanel({ metrics }: { metrics: TrajectoryAssistantMetrics }) {
   return (
     <dl className="tj-overview">
-      <div><dt>{T.started}</dt><StartedAtValue timestamp={metrics.stepStartTime} /></div>
+      <div>
+        <dt>{T.started}</dt>
+        <StartedAtValue timestamp={metrics.stepStartTime} />
+      </div>
       <Row label={T.totalDuration}>{totalTime(metrics)}</Row>
       <Row label={T.ttft}>{ttft(metrics)}</Row>
       <Row label={T.generation}>{generationTime(metrics)}</Row>
@@ -72,30 +94,54 @@ function AssistantTimingPanel({ metrics }: { metrics: TrajectoryAssistantMetrics
 /** 记录计时：助手有首 token 指标时用助手面板，其余是开始时间、时长、来源。 */
 export function RecordTiming({ cell, preview = false }: { cell: TrajectoryCell; preview?: boolean }) {
   const metrics = cell.record.assistantMetrics;
-  if (cell.kind === 'message' && metrics) return <AssistantTimingPanel metrics={metrics} />;
+  if (cell.kind === "message" && metrics) return <AssistantTimingPanel metrics={metrics} />;
   return (
     <dl className="tj-overview">
-      <div><dt>{T.started}</dt><StartedAtValue timestamp={cell.startedAt} /></div>
+      <div>
+        <dt>{T.started}</dt>
+        <StartedAtValue timestamp={cell.startedAt} />
+      </div>
       <Row label={T.duration}>{formatDurationMs(cell.durationMs)}</Row>
-      {!preview && <Row label={T.timingSource}>{cell.durationMs === null ? T.notAvailable : cell.record.timingSource ?? T.sessionTimestamps}</Row>}
+      {!preview && (
+        <Row label={T.timingSource}>
+          {cell.durationMs === null ? T.notAvailable : (cell.record.timingSource ?? T.sessionTimestamps)}
+        </Row>
+      )}
     </dl>
   );
 }
 
 /** 请求计时：有结果助手时沿用它的计时，否则用请求自己的开始和完成时间。 */
-export function RequestTiming({ layout, request, preview = false }: { layout: TrajectoryLayout; request: TrajectoryRequestView; preview?: boolean }) {
-  const assistant = request.purpose === 'assistant' && request.resultRecordId !== null
-    ? layout.cells.find(cell => cell.recordId === request.resultRecordId && cell.kind === 'message')
-    : undefined;
+export function RequestTiming({
+  layout,
+  request,
+  preview = false,
+}: {
+  layout: TrajectoryLayout;
+  request: TrajectoryRequestView;
+  preview?: boolean;
+}) {
+  const assistant =
+    request.purpose === "assistant" && request.resultRecordId !== null
+      ? layout.cells.find((cell) => cell.recordId === request.resultRecordId && cell.kind === "message")
+      : undefined;
   if (assistant) return <RecordTiming cell={assistant} preview={preview} />;
-  const anchor = layout.cells.find(cell => cell.requestKey === request.key);
+  const anchor = layout.cells.find((cell) => cell.requestKey === request.key);
   const startedAt = request.startedAt ?? anchor?.startedAt ?? null;
-  const duration = request.startedAt === null || request.completedAt === null ? null : Math.max(0, request.completedAt - request.startedAt);
+  const duration =
+    request.startedAt === null || request.completedAt === null
+      ? null
+      : Math.max(0, request.completedAt - request.startedAt);
   return (
     <dl className="tj-overview">
-      <div><dt>{T.started}</dt><StartedAtValue timestamp={startedAt} /></div>
+      <div>
+        <dt>{T.started}</dt>
+        <StartedAtValue timestamp={startedAt} />
+      </div>
       <Row label={T.duration}>{formatDurationMs(duration)}</Row>
-      {!preview && request.startedAt !== null && <Row label={T.timingSource}>{duration === null ? T.sessionTimestampsRunning : T.sessionTimestamps}</Row>}
+      {!preview && request.startedAt !== null && (
+        <Row label={T.timingSource}>{duration === null ? T.sessionTimestampsRunning : T.sessionTimestamps}</Row>
+      )}
     </dl>
   );
 }

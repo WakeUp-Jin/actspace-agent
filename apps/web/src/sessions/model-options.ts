@@ -2,13 +2,21 @@ import { resolveCustomModelReasoning, type ModelReasoningEffort } from "@actspac
 import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
 import type { HostModel } from "../connection/connection-store";
 
-const EFFORT_LABELS: Record<ModelReasoningEffort, string> = { minimal: "Minimal", low: "Low", medium: "Medium", high: "High", xhigh: "Extra High", max: "Max", ultra: "Ultra" };
+const EFFORT_LABELS: Record<ModelReasoningEffort, string> = {
+  minimal: "Minimal",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra High",
+  max: "Max",
+  ultra: "Ultra",
+};
 export const effortLabel = (effort: string): string => EFFORT_LABELS[effort as ModelReasoningEffort] ?? effort;
 
 /** Host 的模型 id 是 `<provider>/<model>`；目录按 model 部分（apiModel）查。不在目录或不支持推理时返回 []。 */
 export function effortOptionsFor(modelId: string): ModelReasoningEffort[] {
   const apiModel = modelId.slice(modelId.indexOf("/") + 1);
-  const entry = BUILTIN_MODEL_CATALOG.entries.find(item => item.apiModel === apiModel);
+  const entry = BUILTIN_MODEL_CATALOG.entries.find((item) => item.apiModel === apiModel);
   if (!entry?.reasoning) return [];
   return resolveCustomModelReasoning(apiModel).efforts;
 }
@@ -22,5 +30,5 @@ export function groupModels(models: readonly HostModel[]): ModelGroup[] {
 }
 
 export function modelShortName(modelId: string, models: readonly HostModel[]): string {
-  return models.find(model => model.id === modelId)?.name ?? modelId.slice(modelId.indexOf("/") + 1);
+  return models.find((model) => model.id === modelId)?.name ?? modelId.slice(modelId.indexOf("/") + 1);
 }

@@ -30,7 +30,12 @@ export function relativePathInside(rules: PathRules, root: string, candidate: st
  *
  * 和 `relativePathInside` 一样只比较字面，不解析符号链接。
  */
-export function isLexicallyInside(rules: PathRules, root: string, candidate: string, options: { readonly includeRoot: boolean }): boolean {
+export function isLexicallyInside(
+  rules: PathRules,
+  root: string,
+  candidate: string,
+  options: { readonly includeRoot: boolean },
+): boolean {
   const nested = relativePathInside(rules, root, candidate);
   return nested !== null && (nested !== "" || options.includeRoot);
 }

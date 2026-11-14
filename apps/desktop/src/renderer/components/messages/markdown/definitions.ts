@@ -58,7 +58,11 @@ function scanRefs(block: MarkdownBlock): BlockRefs {
 export function footnoteKeyFromHref(href: string | undefined, prefix: string): string | null {
   const marker = `#${prefix}fn-`;
   if (!href?.startsWith(marker)) return null;
-  try { return decodeURIComponent(href.slice(marker.length)).toLowerCase(); } catch { return null; }
+  try {
+    return decodeURIComponent(href.slice(marker.length)).toLowerCase();
+  } catch {
+    return null;
+  }
 }
 
 export function collectDefinitions(blocks: readonly MarkdownBlock[]): DefinitionIndex {

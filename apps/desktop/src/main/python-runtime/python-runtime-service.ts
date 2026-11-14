@@ -22,10 +22,17 @@ import type { PythonRuntimeStatus } from "@actspace/shared";
  * `pnpm python-runtime:prepare` put under `dist/`. Undefined means no bundled Python (the prompt then falls back
  * to the system interpreter), never a lookup on PATH.
  */
-export function resolveDesktopPythonRuntime(input: { readonly packaged: boolean; readonly resourcesPath: string; readonly repoRoot: string; readonly env: NodeJS.ProcessEnv }): PythonRuntime | undefined {
-  return findBundledPythonRuntime(input.packaged
-    ? [join(input.resourcesPath, "app", "runtime", "python")]
-    : [input.env.ACTSPACE_PYTHON_RUNTIME, repoPythonRuntimePath(input.repoRoot)]);
+export function resolveDesktopPythonRuntime(input: {
+  readonly packaged: boolean;
+  readonly resourcesPath: string;
+  readonly repoRoot: string;
+  readonly env: NodeJS.ProcessEnv;
+}): PythonRuntime | undefined {
+  return findBundledPythonRuntime(
+    input.packaged
+      ? [join(input.resourcesPath, "app", "runtime", "python")]
+      : [input.env.ACTSPACE_PYTHON_RUNTIME, repoPythonRuntimePath(input.repoRoot)],
+  );
 }
 
 type ExtensionState = PythonRuntimeStatus["extension"];
@@ -40,12 +47,20 @@ export class PythonRuntimeService {
   #progress: ExtensionState["progress"];
   #error: string | undefined;
 
-  constructor(options: { readonly runtime: PythonRuntime | undefined; readonly dataRoot: string; readonly log?: (message: string, details?: Record<string, unknown>) => void; readonly fetch?: typeof fetch }) {
+  constructor(options: {
+    readonly runtime: PythonRuntime | undefined;
+    readonly dataRoot: string;
+    readonly log?: (message: string, details?: Record<string, unknown>) => void;
+    readonly fetch?: typeof fetch;
+  }) {
     this.#runtime = options.runtime;
     this.#dataRoot = options.dataRoot;
     this.#log = options.log ?? (() => undefined);
     this.#fetch = options.fetch;
-    this.#sitePackages = options.runtime === undefined ? undefined : installedExtensionSitePackages(options.dataRoot, options.runtime.manifest);
+    this.#sitePackages =
+      options.runtime === undefined
+        ? undefined
+        : installedExtensionSitePackages(options.dataRoot, options.runtime.manifest);
   }
 
   /** What the bash tool gets; undefined when this build ships no runtime. */
@@ -56,10 +71,24 @@ export class PythonRuntimeService {
   getStatus(): PythonRuntimeStatus {
     const runtime = this.#runtime;
     return {
-      runtime: runtime === undefined ? null : { version: runtime.manifest.python.version, root: runtime.root, corePackages: runtime.manifest.core.map((pin) => pin.name) },
+      runtime:
+        runtime === undefined
+          ? null
+          : {
+              version: runtime.manifest.python.version,
+              root: runtime.root,
+              corePackages: runtime.manifest.core.map((pin) => pin.name),
+            },
       extension: {
         packages: runtime === undefined ? [] : [...runtime.manifest.extension.packages],
-        state: this.#install !== undefined ? "installing" : this.#sitePackages !== undefined ? "ready" : this.#error !== undefined ? "failed" : "missing",
+        state:
+          this.#install !== undefined
+            ? "installing"
+            : this.#sitePackages !== undefined
+              ? "ready"
+              : this.#error !== undefined
+                ? "failed"
+                : "missing",
         ...(this.#install !== undefined && this.#progress !== undefined ? { progress: this.#progress } : {}),
         ...(this.#install === undefined && this.#error !== undefined ? { error: this.#error } : {}),
         localWheelsDirectory: join(extensionLayerRoot(this.#dataRoot), EXTENSION_LAYER_LOCAL_WHEELS),
@@ -77,14 +106,24 @@ export class PythonRuntimeService {
         manifest: runtime.manifest,
         dataRoot: this.#dataRoot,
         ...(this.#fetch === undefined ? {} : { fetch: this.#fetch }),
-        onProgress: (progress) => { this.#progress = { completed: progress.completed, total: progress.total }; },
-      }).then((sitePackages) => {
-        this.#sitePackages = sitePackages;
-        this.#log("python extension installed", { sitePackages });
-      }, (error: unknown) => {
-        this.#error = error instanceof Error ? error.message : String(error);
-        this.#log("python extension install failed", { error: this.#error });
-      }).finally(() => { this.#install = undefined; this.#progress = undefined; });
+        onProgress: (progress) => {
+          this.#progress = { completed: progress.completed, total: progress.total };
+        },
+      })
+        .then(
+          (sitePackages) => {
+            this.#sitePackages = sitePackages;
+            this.#log("python extension installed", { sitePackages });
+          },
+          (error: unknown) => {
+            this.#error = error instanceof Error ? error.message : String(error);
+            this.#log("python extension install failed", { error: this.#error });
+          },
+        )
+        .finally(() => {
+          this.#install = undefined;
+          this.#progress = undefined;
+        });
     }
     return this.getStatus();
   }

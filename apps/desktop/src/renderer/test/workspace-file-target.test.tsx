@@ -6,7 +6,13 @@ import { tabFromFile } from "../components/right-panel/workspaceFileTab";
 import { useReloadFileTab } from "../components/right-panel/useFileFreshness";
 import { setupBridge } from "./helpers/bridge";
 
-const file = { relativePath: "canary.png", renderKind: "image" as const, size: 1, mtimeMs: 1, dataUrl: "data:image/png;base64,A" };
+const file = {
+  relativePath: "canary.png",
+  renderKind: "image" as const,
+  size: 1,
+  mtimeMs: 1,
+  dataUrl: "data:image/png;base64,A",
+};
 const wrapper = ({ children }: { children: ReactNode }) => <RightPanelProvider>{children}</RightPanelProvider>;
 
 describe("workspace file target ownership", () => {
@@ -16,7 +22,10 @@ describe("workspace file target ownership", () => {
     const remote = tabFromFile(file, { workspaceRoot: "/tree-a", hostId: "remote" });
     expect(new Set([a.id, b.id, remote.id]).size).toBe(3);
     const { result } = renderHook(() => useRightPanel(), { wrapper });
-    act(() => { result.current.openTab(a); result.current.openTab(b); });
+    act(() => {
+      result.current.openTab(a);
+      result.current.openTab(b);
+    });
     expect(result.current.tabs).toHaveLength(2);
     expect(result.current.tabs[0]).toMatchObject({ workspaceRoot: "/tree-a", src: "data:image/png;base64,A" });
   });
@@ -30,6 +39,10 @@ describe("workspace file target ownership", () => {
     act(() => result.current.panel.openTab(tab));
     await act(() => result.current.reload(file.relativePath, "canary.png", bound));
     expect(read).toHaveBeenCalledWith({ workspaceRoot: "/tree-a", relativePath: file.relativePath });
-    expect(result.current.panel.tabs[0]).toMatchObject({ id: tab.id, workspaceRoot: "/tree-a", src: "data:image/png;base64,UPDATED" });
+    expect(result.current.panel.tabs[0]).toMatchObject({
+      id: tab.id,
+      workspaceRoot: "/tree-a",
+      src: "data:image/png;base64,UPDATED",
+    });
   });
 });

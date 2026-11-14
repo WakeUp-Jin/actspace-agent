@@ -7,13 +7,25 @@ import { createRef, useState, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDocument } from "../components/markdown-editor/core";
 import { MarkdownEditor as LazyMarkdownEditor } from "../components/markdown-editor";
-import { MarkdownEditor, type MarkdownEditorHandle, type MarkdownEditorProps } from "../components/markdown-editor/MarkdownEditor";
+import {
+  MarkdownEditor,
+  type MarkdownEditorHandle,
+  type MarkdownEditorProps,
+} from "../components/markdown-editor/MarkdownEditor";
 import { useMarkdownEditorHost } from "../components/markdown-editor/use-markdown-editor-host";
 import { RightPanelProvider, useRightPanel } from "../components/right-panel/RightPanelContext";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
 import { findEditorView, polyfillLayout, typeInto, typeSynced } from "./markdown-editor-helpers";
 
-vi.mock("mermaid", () => ({ default: { initialize: vi.fn(), render: vi.fn(async (id: string) => ({ svg: `<svg id="${id}" viewBox="0 0 10 10" width="10" height="10"></svg>`, diagramType: "flowchart-v2" })) } }));
+vi.mock("mermaid", () => ({
+  default: {
+    initialize: vi.fn(),
+    render: vi.fn(async (id: string) => ({
+      svg: `<svg id="${id}" viewBox="0 0 10 10" width="10" height="10"></svg>`,
+      diagramType: "flowchart-v2",
+    })),
+  },
+}));
 
 const PNG = "data:image/png;base64,AA==";
 
@@ -25,7 +37,15 @@ function mount(props: Props = {}) {
   const onChange = vi.fn();
   const onSave = vi.fn();
   const handle = createRef<MarkdownEditorHandle>();
-  const base: MarkdownEditorProps = { value: "# 标题\n\n正文", docPath: "docs/note.md", workspaceRoot: "/ws", mode: "preview", onChange, onSave, ...props };
+  const base: MarkdownEditorProps = {
+    value: "# 标题\n\n正文",
+    docPath: "docs/note.md",
+    workspaceRoot: "/ws",
+    mode: "preview",
+    onChange,
+    onSave,
+    ...props,
+  };
   const view = render(<MarkdownEditor ref={handle} {...base} />, { wrapper });
   const rerender = (next: Props) => view.rerender(<MarkdownEditor ref={handle} {...base} {...next} />);
   return { ...view, rerender, onChange, onSave, handle, editor: () => findEditorView() };
@@ -40,7 +60,10 @@ function Controlled({ initial, onDraft }: { initial: string; onDraft: (draft: st
       docPath="docs/note.md"
       mode="preview"
       replaceKey="a"
-      onChange={(doc) => { setDraft(doc); onDraft(doc); }}
+      onChange={(doc) => {
+        setDraft(doc);
+        onDraft(doc);
+      }}
       onSave={() => undefined}
     />
   );
@@ -90,7 +113,9 @@ describe("MarkdownEditor 外壳：同步", () => {
     expect(editor()).toBe(view);
     expect(getDocument(view)).toBe("# 另一篇\n");
     expect(undoDepth(view.state)).toBe(0);
-    await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -102,7 +127,13 @@ describe("MarkdownEditor 外壳：同步", () => {
   });
 
   it("重新加载读到同一份内容：不改文档，但图片重新读取（用户可能改过图）", async () => {
-    const reads = vi.fn(async ({ relativePath }: { relativePath: string }) => ({ relativePath, renderKind: "image" as const, size: 1, mtimeMs: 1, dataUrl: PNG }));
+    const reads = vi.fn(async ({ relativePath }: { relativePath: string }) => ({
+      relativePath,
+      renderKind: "image" as const,
+      size: 1,
+      mtimeMs: 1,
+      dataUrl: PNG,
+    }));
     overrideBridge({ "workspaces.readFile": reads });
     const doc = "![图](a.png)\n\n末尾";
     const { editor, rerender, container } = mount({ value: doc, replaceKey: "a" });
@@ -121,7 +152,9 @@ describe("MarkdownEditor 外壳：同步", () => {
     const view = editor();
     await act(async () => {
       typeInto(view, "x");
-      view.contentDOM.dispatchEvent(new KeyboardEvent("keydown", { key: "s", keyCode: 83, ctrlKey: true, bubbles: true, cancelable: true }));
+      view.contentDOM.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "s", keyCode: 83, ctrlKey: true, bubbles: true, cancelable: true }),
+      );
     });
     expect(onChange).toHaveBeenCalledWith("# 标题\n\n正文x");
     expect(onSave).toHaveBeenCalledTimes(1);
@@ -133,12 +166,16 @@ describe("MarkdownEditor 外壳：生命周期", () => {
   it("卸载时补发最后一帧的输入（不丢字），之后不再回调", async () => {
     const { editor, unmount, onChange, onSave } = mount();
     const view = editor();
-    await act(async () => { typeInto(view, "最后一笔"); });
+    await act(async () => {
+      typeInto(view, "最后一笔");
+    });
     expect(onChange).not.toHaveBeenCalled();
     unmount();
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith("# 标题\n\n正文最后一笔");
-    await act(async () => { await new Promise<void>((resolve) => setTimeout(resolve, 50)); });
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    });
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onSave).not.toHaveBeenCalled();
     expect(document.querySelector(".cm-editor")).toBeNull();
@@ -179,11 +216,17 @@ describe("MarkdownEditor 外壳：生命周期", () => {
   it("不静态引用编辑器：DocsReader 只经懒加载入口使用它", () => {
     // 按语句认 import，不按行：名字多了格式化工具会把一条 import 折成几行，按行找会漏掉。
     const staticImports = (source: string) =>
-      [...source.matchAll(/^import\s+(?!type\b)(?:[^;"']*\sfrom\s+)?["'][^"']*markdown-editor[^"']*["'];?/gm)].map((match) => match[0].replace(/\s+/g, " "));
-    expect(staticImports('import {\n  parseOutline,\n  renderPreview,\n} from "../../markdown-editor/core";\nimport type {\n  OutlineItem,\n} from "../../markdown-editor";\n')).toEqual([
-      'import { parseOutline, renderPreview, } from "../../markdown-editor/core";',
+      [...source.matchAll(/^import\s+(?!type\b)(?:[^;"']*\sfrom\s+)?["'][^"']*markdown-editor[^"']*["'];?/gm)].map(
+        (match) => match[0].replace(/\s+/g, " "),
+      );
+    expect(
+      staticImports(
+        'import {\n  parseOutline,\n  renderPreview,\n} from "../../markdown-editor/core";\nimport type {\n  OutlineItem,\n} from "../../markdown-editor";\n',
+      ),
+    ).toEqual(['import { parseOutline, renderPreview, } from "../../markdown-editor/core";']);
+    expect(staticImports(readerSource)).toEqual([
+      'import { MarkdownEditor, type MarkdownEditorHandle } from "../../markdown-editor";',
     ]);
-    expect(staticImports(readerSource)).toEqual(['import { MarkdownEditor, type MarkdownEditorHandle } from "../../markdown-editor";']);
     expect(staticImports(outlineSource)).toEqual([]);
     // 入口那一句折成几行也认：只看「lazy 里动态 import 编辑器」。
     const lazyImport = /lazy\(\s*\(\)\s*=>\s*import\(\s*"\.\/MarkdownEditor"\s*\)/;
@@ -238,23 +281,50 @@ describe("MarkdownEditor 外壳：大纲句柄", () => {
 describe("useMarkdownEditorHost（宿主实现）", () => {
   function Probe() {
     const { docsSelectedPath, docsPendingLine, activeTab } = useRightPanel();
-    return <output data-testid="probe">{JSON.stringify({ path: docsSelectedPath, line: docsPendingLine?.line ?? null, tab: activeTab?.kind ?? null })}</output>;
+    return (
+      <output data-testid="probe">
+        {JSON.stringify({ path: docsSelectedPath, line: docsPendingLine?.line ?? null, tab: activeTab?.kind ?? null })}
+      </output>
+    );
   }
 
   function mountHost(props: { docPath?: string; workspaceRoot?: string } = {}) {
-    return renderHook(
-      () => useMarkdownEditorHost({ docPath: "docs/note.md", workspaceRoot: "/ws", ...props }),
-      { wrapper: ({ children }) => <RightPanelProvider>{children}<Probe /></RightPanelProvider> },
-    );
+    return renderHook(() => useMarkdownEditorHost({ docPath: "docs/note.md", workspaceRoot: "/ws", ...props }), {
+      wrapper: ({ children }) => (
+        <RightPanelProvider>
+          {children}
+          <Probe />
+        </RightPanelProvider>
+      ),
+    });
   }
 
   it("openPath：Markdown 在文档面板里打开并带行号；越界 / 不存在时开一个说明失败的标签", async () => {
     const { result } = mountHost();
-    overrideBridge({ "workspaces.statFile": async ({ relativePath }: { relativePath: string }) => ({ relativePath, size: 1, mtimeMs: 1 }) });
+    overrideBridge({
+      "workspaces.statFile": async ({ relativePath }: { relativePath: string }) => ({
+        relativePath,
+        size: 1,
+        mtimeMs: 1,
+      }),
+    });
     act(() => result.current.host.openPath("docs/b.md", 5));
-    await waitFor(() => expect(JSON.parse(screen.getByTestId("probe").textContent)).toMatchObject({ path: "docs/b.md", line: 5, tab: "docs" }));
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId("probe").textContent)).toMatchObject({
+        path: "docs/b.md",
+        line: 5,
+        tab: "docs",
+      }),
+    );
 
-    overrideBridge({ "workspaces.statFile": async ({ relativePath }: { relativePath: string }) => ({ relativePath, size: 0, mtimeMs: 0, error: "not_found" as const }) });
+    overrideBridge({
+      "workspaces.statFile": async ({ relativePath }: { relativePath: string }) => ({
+        relativePath,
+        size: 0,
+        mtimeMs: 0,
+        error: "not_found" as const,
+      }),
+    });
     act(() => result.current.host.openPath("docs/gone.md"));
     await waitFor(() => expect(JSON.parse(screen.getByTestId("probe").textContent).tab).toBe("text"));
   });
@@ -279,13 +349,41 @@ describe("useMarkdownEditorHost（宿主实现）", () => {
 
   it("loadImage：取 readFile 的 dataUrl；不是图片、读取失败都返回 null", async () => {
     const { result } = mountHost();
-    overrideBridge({ "workspaces.readFile": async ({ relativePath }: { relativePath: string }) => ({ relativePath, renderKind: "image" as const, size: 1, mtimeMs: 1, dataUrl: PNG }) });
+    overrideBridge({
+      "workspaces.readFile": async ({ relativePath }: { relativePath: string }) => ({
+        relativePath,
+        renderKind: "image" as const,
+        size: 1,
+        mtimeMs: 1,
+        dataUrl: PNG,
+      }),
+    });
     expect(await result.current.host.loadImage("docs/a.png")).toBe(PNG);
-    overrideBridge({ "workspaces.readFile": async ({ relativePath }: { relativePath: string }) => ({ relativePath, renderKind: "markdown" as const, size: 1, mtimeMs: 1, content: "x" }) });
+    overrideBridge({
+      "workspaces.readFile": async ({ relativePath }: { relativePath: string }) => ({
+        relativePath,
+        renderKind: "markdown" as const,
+        size: 1,
+        mtimeMs: 1,
+        content: "x",
+      }),
+    });
     expect(await result.current.host.loadImage("docs/a.md")).toBeNull();
-    overrideBridge({ "workspaces.readFile": async ({ relativePath }: { relativePath: string }) => ({ relativePath, renderKind: "image" as const, size: 0, mtimeMs: 0, error: "not_found" as const }) });
+    overrideBridge({
+      "workspaces.readFile": async ({ relativePath }: { relativePath: string }) => ({
+        relativePath,
+        renderKind: "image" as const,
+        size: 0,
+        mtimeMs: 0,
+        error: "not_found" as const,
+      }),
+    });
     expect(await result.current.host.loadImage("docs/none.png")).toBeNull();
-    overrideBridge({ "workspaces.readFile": async () => { throw new Error("ipc"); } });
+    overrideBridge({
+      "workspaces.readFile": async () => {
+        throw new Error("ipc");
+      },
+    });
     expect(await result.current.host.loadImage("docs/boom.png")).toBeNull();
   });
 

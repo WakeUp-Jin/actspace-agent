@@ -3,57 +3,95 @@ import { randomUUID } from "node:crypto";
 import { SessionError, snapshotSessionJson, type SessionEventCandidateV1 } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
 import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
-import { TaskError, type TaskSnapshot, type TaskRecord, type TaskReceipt, type HarnessIdentity, type RunOutcome } from "./contracts.js";
+import {
+  TaskError,
+  type TaskSnapshot,
+  type TaskRecord,
+  type TaskReceipt,
+  type HarnessIdentity,
+  type RunOutcome,
+} from "./contracts.js";
 import { TASK_EVENT, RUN_EVENT, QUEUE_EVENT, QUEUE_RETURN_EVENT, eventCandidate } from "./task-events.js";
 import { projectTasks } from "./task-projection.js";
 
 /** One ledger per owned Session writer. All scheduling mutations share its serial lane. */
 export class TaskLedger {
   readonly #listeners = new Set<(snapshot: TaskSnapshot) => void>();
-  subscribe(listener: (snapshot: TaskSnapshot) => void): () => void { this.#listeners.add(listener); return () => { this.#listeners.delete(listener); }; }
+  subscribe(listener: (snapshot: TaskSnapshot) => void): () => void {
+    this.#listeners.add(listener);
+    return () => {
+      this.#listeners.delete(listener);
+    };
+  }
   #tail: Promise<unknown> = Promise.resolve();
   #failure: unknown;
   #blocked = false;
   #snapshot: TaskSnapshot;
-  private constructor(readonly session: SessionHandle) { this.#snapshot = projectTasks(session.header.sessionId, session.journal.readEvents()); }
+  private constructor(readonly session: SessionHandle) {
+    this.#snapshot = projectTasks(session.header.sessionId, session.journal.readEvents());
+  }
 
   /** Only call once when taking ownership, never when refreshing a client view. */
   static async open(session: SessionHandle): Promise<TaskLedger> {
     const ledger = new TaskLedger(session);
     // Finish prior acceptance before acknowledging even a duplicate request.
     await session.flush();
-    if (ledger.#snapshot.queue.length || ledger.#snapshot.tasks.some(task => task.state === "claimed")) {
+    if (ledger.#snapshot.queue.length || ledger.#snapshot.tasks.some((task) => task.state === "claimed")) {
       await ledger.#commit([
-        ...ledger.#snapshot.runs.filter(run => run.state === "running").flatMap(run => ledger.#returnEvents(run.runId)),
+        ...ledger.#snapshot.runs
+          .filter((run) => run.state === "running")
+          .flatMap((run) => ledger.#returnEvents(run.runId)),
         eventCandidate(QUEUE_EVENT, { sessionId: session.header.sessionId, op: "recover" }),
       ]);
     }
     return ledger;
   }
-  snapshot(): TaskSnapshot { return this.#snapshot; }
-  get blocked(): boolean { return this.#blocked; }
+  snapshot(): TaskSnapshot {
+    return this.#snapshot;
+  }
+  get blocked(): boolean {
+    return this.#blocked;
+  }
 
   /**
    * `resumeWhenIdle`: a stop/failure leaves the queue paused, so a fresh message would sit behind a
    * pause nobody asked it to honour. When nothing is running and nothing else waits, accept and resume
    * in one commit. Older queued messages keep the whole queue paused until the user resumes it.
    */
-  submit(submissionId: string, content: RuntimeJsonValue, continuationOf: string | null = null, options: { readonly resumeWhenIdle?: boolean } = {}): Promise<TaskReceipt> {
+  submit(
+    submissionId: string,
+    content: RuntimeJsonValue,
+    continuationOf: string | null = null,
+    options: { readonly resumeWhenIdle?: boolean } = {},
+  ): Promise<TaskReceipt> {
     // Capture before waiting: caller mutation must not change a queued submission.
     const captured = snapshotSessionJson(content);
     return this.#serialize(async () => {
-      const previous = this.#snapshot.tasks.find(task => task.submissionId === submissionId);
+      const previous = this.#snapshot.tasks.find((task) => task.submissionId === submissionId);
       if (previous) {
-        if (canonical(previous.content) !== canonical(captured) || previous.continuationOf !== continuationOf) this.#error("SUBMISSION_CONFLICT");
+        if (canonical(previous.content) !== canonical(captured) || previous.continuationOf !== continuationOf)
+          this.#error("SUBMISSION_CONFLICT");
         return this.#receipt(previous.taskId);
       }
-      if (continuationOf !== null && !["failed", "cancelled", "interrupted"].includes(this.#task(continuationOf).state)) this.#error("TASK_NOT_PENDING");
+      if (continuationOf !== null && !["failed", "cancelled", "interrupted"].includes(this.#task(continuationOf).state))
+        this.#error("TASK_NOT_PENDING");
       const taskId = randomUUID();
       const snapshot = this.#snapshot;
-      const resume = options.resumeWhenIdle === true && snapshot.paused && snapshot.queue.length === 0
-        && !snapshot.runs.some(run => run.state === "running") && !snapshot.tasks.some(task => task.state === "claimed");
+      const resume =
+        options.resumeWhenIdle === true &&
+        snapshot.paused &&
+        snapshot.queue.length === 0 &&
+        !snapshot.runs.some((run) => run.state === "running") &&
+        !snapshot.tasks.some((task) => task.state === "claimed");
       await this.#commit([
-        eventCandidate(TASK_EVENT, { op: "accept", sessionId: this.session.header.sessionId, taskId, submissionId, content: captured, continuationOf }),
+        eventCandidate(TASK_EVENT, {
+          op: "accept",
+          sessionId: this.session.header.sessionId,
+          taskId,
+          submissionId,
+          content: captured,
+          continuationOf,
+        }),
         ...(resume ? [eventCandidate(QUEUE_EVENT, { op: "resume", sessionId: this.session.header.sessionId })] : []),
       ]);
       return this.#receipt(taskId);
@@ -62,43 +100,60 @@ export class TaskLedger {
 
   designate(taskId: string, runId: string | null, expectedRevision: number): Promise<TaskSnapshot> {
     return this.#serialize(async () => {
-      this.#revision(expectedRevision); const task = this.#pending(taskId);
+      this.#revision(expectedRevision);
+      const task = this.#pending(taskId);
       if (runId !== null) {
         this.#active(runId);
         if (taskOperation(this.#task(taskId).content)) this.#error("QUEUE_ORDER");
       }
-      await this.#commit(runId === null && task.targetRunId !== null
-        ? this.#returnEvents(task.targetRunId, taskId)
-        : [eventCandidate(TASK_EVENT, { op: "designate", sessionId: this.session.header.sessionId, taskId, runId })]);
+      await this.#commit(
+        runId === null && task.targetRunId !== null
+          ? this.#returnEvents(task.targetRunId, taskId)
+          : [eventCandidate(TASK_EVENT, { op: "designate", sessionId: this.session.header.sessionId, taskId, runId })],
+      );
       return this.#snapshot;
     });
   }
   cancel(taskId: string, expectedRevision: number): Promise<TaskSnapshot> {
     return this.#serialize(async () => {
-      this.#revision(expectedRevision); this.#pending(taskId);
-      await this.#commit([eventCandidate(TASK_EVENT, { op: "cancel", sessionId: this.session.header.sessionId, taskId })]);
+      this.#revision(expectedRevision);
+      this.#pending(taskId);
+      await this.#commit([
+        eventCandidate(TASK_EVENT, { op: "cancel", sessionId: this.session.header.sessionId, taskId }),
+      ]);
       return this.#snapshot;
     });
   }
   move(taskId: string, beforeTaskId: string, expectedRevision: number): Promise<TaskSnapshot> {
     return this.#serialize(async () => {
       this.#revision(expectedRevision);
-      if (taskId === beforeTaskId || this.#pending(taskId).targetRunId !== null || this.#pending(beforeTaskId).targetRunId !== null) this.#error("QUEUE_ORDER");
-      await this.#commit([eventCandidate(QUEUE_EVENT, { op: "move", sessionId: this.session.header.sessionId, taskId, beforeTaskId })]);
+      if (
+        taskId === beforeTaskId ||
+        this.#pending(taskId).targetRunId !== null ||
+        this.#pending(beforeTaskId).targetRunId !== null
+      )
+        this.#error("QUEUE_ORDER");
+      await this.#commit([
+        eventCandidate(QUEUE_EVENT, { op: "move", sessionId: this.session.header.sessionId, taskId, beforeTaskId }),
+      ]);
       return this.#snapshot;
     });
   }
   setPaused(paused: boolean, expectedRevision: number): Promise<TaskSnapshot> {
     return this.#serialize(async () => {
       this.#revision(expectedRevision);
-      await this.#commit([eventCandidate(QUEUE_EVENT, { op: paused ? "pause" : "resume", sessionId: this.session.header.sessionId })]);
+      await this.#commit([
+        eventCandidate(QUEUE_EVENT, { op: paused ? "pause" : "resume", sessionId: this.session.header.sessionId }),
+      ]);
       return this.#snapshot;
     });
   }
 
   /** Runtime-owned stop/close path, ordered with mutations without a stale client revision. */
   pause(): Promise<void> {
-    return this.#serialize(() => this.#commit([eventCandidate(QUEUE_EVENT, { op: "pause", sessionId: this.session.header.sessionId })]));
+    return this.#serialize(() =>
+      this.#commit([eventCandidate(QUEUE_EVENT, { op: "pause", sessionId: this.session.header.sessionId })]),
+    );
   }
 
   /** Persist run identity and its initial input atomically before calling the factory. */
@@ -106,11 +161,22 @@ export class TaskLedger {
     const captured = snapshotSessionJson({ harness, configuration });
     return this.#serialize(async () => {
       if (this.#snapshot.paused) this.#error("QUEUE_PAUSED");
-      if (this.#snapshot.runs.some(run => run.state === "running" || run.runId === runId)) this.#error("SESSION_BUSY");
+      if (this.#snapshot.runs.some((run) => run.state === "running" || run.runId === runId))
+        this.#error("SESSION_BUSY");
       const task = this.#pending(taskId);
-      if (task.targetRunId !== null || this.#snapshot.queue.find(id => this.#task(id).targetRunId === null) !== taskId) this.#error("QUEUE_ORDER");
+      if (
+        task.targetRunId !== null ||
+        this.#snapshot.queue.find((id) => this.#task(id).targetRunId === null) !== taskId
+      )
+        this.#error("QUEUE_ORDER");
       await this.#commit([
-        eventCandidate(RUN_EVENT, { op: "start", sessionId: this.session.header.sessionId, taskId, runId, ...captured }),
+        eventCandidate(RUN_EVENT, {
+          op: "start",
+          sessionId: this.session.header.sessionId,
+          taskId,
+          runId,
+          ...captured,
+        }),
         ...this.#claimEvents(task, runId),
       ]);
       return this.#task(taskId);
@@ -120,21 +186,34 @@ export class TaskLedger {
   claimSupplement(runId: string): Promise<readonly TaskRecord[]> {
     return this.#serialize(async () => {
       this.#active(runId);
-      const tasks = this.#snapshot.queue.map(id => this.#task(id)).filter(task => task.targetRunId === runId);
-      if (tasks.length) await this.#commit(tasks.flatMap(task => this.#claimEvents(task, runId)));
-      return Object.freeze(tasks.map(task => this.#task(task.taskId)));
+      const tasks = this.#snapshot.queue.map((id) => this.#task(id)).filter((task) => task.targetRunId === runId);
+      if (tasks.length) await this.#commit(tasks.flatMap((task) => this.#claimEvents(task, runId)));
+      return Object.freeze(tasks.map((task) => this.#task(task.taskId)));
     });
   }
   startOperation(taskId: string): Promise<void> {
     return this.#serialize(async () => {
       if (this.#snapshot.paused) this.#error("QUEUE_PAUSED");
       this.#pending(taskId);
-      if (this.#snapshot.queue[0] !== taskId || this.#snapshot.tasks.some(task => task.state === "claimed")) this.#error("SESSION_BUSY");
-      await this.#commit([eventCandidate(TASK_EVENT, { op: "operation-start", sessionId: this.session.header.sessionId, taskId })]);
+      if (this.#snapshot.queue[0] !== taskId || this.#snapshot.tasks.some((task) => task.state === "claimed"))
+        this.#error("SESSION_BUSY");
+      await this.#commit([
+        eventCandidate(TASK_EVENT, { op: "operation-start", sessionId: this.session.header.sessionId, taskId }),
+      ]);
     });
   }
   finishOperation(taskId: string, outcome: RunOutcome, result: RuntimeJsonValue = null): Promise<void> {
-    return this.#serialize(() => this.#commit([eventCandidate(TASK_EVENT, { op: "operation-finish", sessionId: this.session.header.sessionId, taskId, outcome, result })]));
+    return this.#serialize(() =>
+      this.#commit([
+        eventCandidate(TASK_EVENT, {
+          op: "operation-finish",
+          sessionId: this.session.header.sessionId,
+          taskId,
+          outcome,
+          result,
+        }),
+      ]),
+    );
   }
   finish(runId: string, outcome: RunOutcome, result: RuntimeJsonValue = null): Promise<TaskSnapshot> {
     return this.#serialize(async () => {
@@ -148,20 +227,57 @@ export class TaskLedger {
   }
 
   #returnEvents(runId: string, onlyTaskId?: string): readonly SessionEventCandidateV1[] {
-    const taskIds = this.#snapshot.queue.filter(id => this.#task(id).targetRunId === runId && (onlyTaskId === undefined || id === onlyTaskId));
-    return taskIds.length ? [eventCandidate(QUEUE_RETURN_EVENT, {
-      op: "return-steering", sessionId: this.session.header.sessionId, runId, taskIds, placement: "front",
-    })] : [];
+    const taskIds = this.#snapshot.queue.filter(
+      (id) => this.#task(id).targetRunId === runId && (onlyTaskId === undefined || id === onlyTaskId),
+    );
+    return taskIds.length
+      ? [
+          eventCandidate(QUEUE_RETURN_EVENT, {
+            op: "return-steering",
+            sessionId: this.session.header.sessionId,
+            runId,
+            taskIds,
+            placement: "front",
+          }),
+        ]
+      : [];
   }
   #claimEvents(task: TaskRecord, runId: string): readonly SessionEventCandidateV1[] {
-    const claim = eventCandidate(TASK_EVENT, { op: "claim", sessionId: this.session.header.sessionId, taskId: task.taskId, runId });
+    const claim = eventCandidate(TASK_EVENT, {
+      op: "claim",
+      sessionId: this.session.header.sessionId,
+      taskId: task.taskId,
+      runId,
+    });
     // A wake task has no user input; the Run opens with the claimed Inbox notifications.
     if (isBackgroundWake(task.content)) return [claim];
     // 模型看到的内容只存在 data.content，节点由 surfaceNode 推出（agent-spec-surface-derived.md §4.2）。
-    return [claim, coreEvent("user/message", { messageId: task.taskId, agentRunId: runId, content: task.content && typeof task.content === "object" && !Array.isArray(task.content) && "kind" in task.content && task.content.kind === "composer-task" ? task.content.prepared : task.content }, {
-      surface: { kind: "append" },
-      provenance: { sourceEventSeqs: [task.acceptedSeq], contributorIds: [TASK_OWNER_ID], runtimeSelectionSeq: null },
-    })];
+    return [
+      claim,
+      coreEvent(
+        "user/message",
+        {
+          messageId: task.taskId,
+          agentRunId: runId,
+          content:
+            task.content &&
+            typeof task.content === "object" &&
+            !Array.isArray(task.content) &&
+            "kind" in task.content &&
+            task.content.kind === "composer-task"
+              ? task.content.prepared
+              : task.content,
+        },
+        {
+          surface: { kind: "append" },
+          provenance: {
+            sourceEventSeqs: [task.acceptedSeq],
+            contributorIds: [TASK_OWNER_ID],
+            runtimeSelectionSeq: null,
+          },
+        },
+      ),
+    ];
   }
   async #commit(events: readonly SessionEventCandidateV1[]): Promise<void> {
     const previousSeq = this.session.lastSeq;
@@ -169,17 +285,34 @@ export class TaskLedger {
     try {
       const accepted = await this.session.appendMany(events);
       appended = true;
-      const next = projectTasks(this.session.header.sessionId, this.session.journal.eventsAfter(this.#snapshot.revision), this.#snapshot);
+      const next = projectTasks(
+        this.session.header.sessionId,
+        this.session.journal.eventsAfter(this.#snapshot.revision),
+        this.#snapshot,
+      );
       await this.session.flush(accepted.at(-1)!.seq);
       this.#snapshot = next;
-      for (const listener of this.#listeners) { try { listener(next); } catch { /* observation cannot invalidate a durable commit */ } }
+      for (const listener of this.#listeners) {
+        try {
+          listener(next);
+        } catch {
+          /* observation cannot invalidate a durable commit */
+        }
+      }
     } catch (cause) {
       // Journal validation rolls the whole batch back. Rejected input is not a
       // durability failure; retain the conservative block for every other error.
-      if (!appended && this.session.lastSeq === previousSeq && cause instanceof SessionError && cause.code === "INVALID_EVENT") throw cause;
+      if (
+        !appended &&
+        this.session.lastSeq === previousSeq &&
+        cause instanceof SessionError &&
+        cause.code === "INVALID_EVENT"
+      )
+        throw cause;
       // The in-memory Journal may already contain accepted but undurable events.
       // Do not retry against it or report them through snapshots as committed.
-      this.#failure = cause; this.#blocked = true;
+      this.#failure = cause;
+      this.#blocked = true;
       throw new TaskError("DURABILITY_BLOCKED", this.#snapshot, { cause });
     }
   }
@@ -191,17 +324,40 @@ export class TaskLedger {
     this.#tail = result.catch(() => undefined);
     return result;
   }
-  #receipt(taskId: string): TaskReceipt { return Object.freeze({ task: this.#task(taskId), revision: this.#snapshot.revision, durableSeq: this.session.durableSeq }); }
-  #revision(expected: number): void { if (expected !== this.#snapshot.revision) this.#error("REVISION_CONFLICT"); }
-  #task(id: string): TaskRecord { const task = this.#snapshot.tasks.find(item => item.taskId === id); if (!task) this.#error("TASK_NOT_FOUND"); return task; }
-  #pending(id: string): TaskRecord { const task = this.#task(id); if (task.state !== "pending") this.#error("TASK_NOT_PENDING"); return task; }
-  #active(id: string): void { if (!this.#snapshot.runs.some(run => run.runId === id && run.state === "running")) this.#error("RUN_NOT_ACTIVE"); }
-  #error(code: ConstructorParameters<typeof TaskError>[0]): never { throw new TaskError(code, this.#snapshot); }
+  #receipt(taskId: string): TaskReceipt {
+    return Object.freeze({
+      task: this.#task(taskId),
+      revision: this.#snapshot.revision,
+      durableSeq: this.session.durableSeq,
+    });
+  }
+  #revision(expected: number): void {
+    if (expected !== this.#snapshot.revision) this.#error("REVISION_CONFLICT");
+  }
+  #task(id: string): TaskRecord {
+    const task = this.#snapshot.tasks.find((item) => item.taskId === id);
+    if (!task) this.#error("TASK_NOT_FOUND");
+    return task;
+  }
+  #pending(id: string): TaskRecord {
+    const task = this.#task(id);
+    if (task.state !== "pending") this.#error("TASK_NOT_PENDING");
+    return task;
+  }
+  #active(id: string): void {
+    if (!this.#snapshot.runs.some((run) => run.runId === id && run.state === "running")) this.#error("RUN_NOT_ACTIVE");
+  }
+  #error(code: ConstructorParameters<typeof TaskError>[0]): never {
+    throw new TaskError(code, this.#snapshot);
+  }
 }
 const TASK_OWNER_ID = "actspace.agent-service";
 function canonical(value: RuntimeJsonValue): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   const object = value as Readonly<Record<string, RuntimeJsonValue>>;
-  return `{${Object.keys(object).sort().map(key => `${JSON.stringify(key)}:${canonical(object[key])}`).join(",")}}`;
+  return `{${Object.keys(object)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonical(object[key])}`)
+    .join(",")}}`;
 }

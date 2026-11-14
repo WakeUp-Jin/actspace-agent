@@ -8,81 +8,184 @@ import type { PiAiWireRoute } from "../pi-ai-stream.js";
 const routes: readonly PiAiWireRoute[] = ["openai-completions", "openai-responses", "anthropic-messages"];
 
 describe("LegacyProxyWireEngine", () => {
-  it.each(["json", "object", "malformed"])("preserves safe OpenRouter provider details through the SDK (%s)", async (format) => {
-    const providerMessage = "tools.1.custom.input_schema: unsupported allOf; sk-fixture12345678 http://user:password@proxy.invalid";
-    const detail = { error: { type: "invalid_request_error", message: providerMessage }, request_id: "private-request-id", headers: { authorization: "private-header" } };
-    const raw = format === "json" ? JSON.stringify(detail) : format === "object" ? detail : "unparseable private-provider-body";
-    const pool = new ProviderProxyPool(async () => ({
-      ProxyAgent: class { async close(): Promise<void> {} },
-      fetch: async () => new Response(JSON.stringify({ error: { code: 400, message: "Provider returned error", metadata: { raw } } }), { status: 400, headers: { "content-type": "application/json" } }),
-    }));
-    const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "openrouter", baseUrl: "https://openrouter.ai/api/v1", proxies: pool });
-    try {
-      const events: LlmStreamEvent[] = [];
-      for await (const event of await engine.stream(input("openai-completions"))) events.push(event);
-      expect(events.at(-1)).toMatchObject({ type: "error", failure: { kind: "invalid-request", httpStatus: 400, retryable: false } });
-      const output = JSON.stringify(events);
-      if (format !== "malformed") {
-        expect(events.at(-1)).toMatchObject({ failure: { providerCode: "invalid_request_error", providerMessage: "tools.1.custom.input_schema: unsupported allOf; [REDACTED] http://[REDACTED]@proxy.invalid", message: expect.stringContaining("unsupported allOf") } });
-        expect(output).not.toContain("sk-fixture12345678");
-        expect(output).not.toContain("user:password");
-      } else expect(events.at(-1)).toMatchObject({ failure: { message: "400 Provider returned error" } });
-      expect(output).not.toContain("private-request-id");
-      expect(output).not.toContain("private-header");
-      expect(output).not.toContain("private-provider-body");
-    } finally { await pool.dispose(); }
-  });
-
-  it.each(["short", "long", "none"] as const)("applies Anthropic cache markers through the proxy (%s)", async (cacheRetention) => {
-    const observed: { params?: unknown; options?: unknown } = {};
-    const pool = proxyPool();
-    const engine = new LegacyProxyWireEngine({ route: "anthropic-messages", providerId: "custom", baseUrl: "https://relay.example", proxies: pool, cacheRetention, loadSdk: loaderFor("anthropic-messages", observed) });
-    for await (const _event of await engine.stream(input("anthropic-messages"))) { /* drain */ }
-    const serialized = JSON.stringify(observed.params);
-    if (cacheRetention !== "none") {
-      expect((serialized.match(/cache_control/g) ?? [])).toHaveLength(3);
-      expect(serialized).toContain('"type":"ephemeral"');
-      expect(serialized).toContain(`"ttl":"${cacheRetention === "long" ? "1h" : "5m"}"`);
-    } else {
-      expect(serialized).not.toContain("cache_control");
-    }
-    await pool.dispose();
-  });
-
-  it.each(["short", "long", "none"] as const)("enables OpenRouter Claude caching on direct and proxy requests (%s)", async (cacheRetention) => {
-    for (const proxy of [false, true]) {
-      for (const modelId of ["anthropic/claude-opus-5.5", "openai/gpt-fixture"]) {
-        const observed: { params?: unknown } = {};
-        const pool = proxyPool();
-        try {
-          const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "openrouter", modelId, baseUrl: "https://openrouter.ai/api/v1", proxies: pool, cacheRetention, loadSdk: loaderFor("openai-completions", observed) });
-          const original = input("openai-completions");
-          for await (const _event of await engine.stream({ ...original, credential: proxy ? original.credential : { apiKey: "fixture" } })) { /* drain */ }
-          expect(observed.params).toMatchObject({ model: modelId, stream: true });
-          if (modelId.startsWith("anthropic/") && cacheRetention !== "none") {
-            expect(observed.params).toMatchObject({ cache_control: { type: "ephemeral", ttl: cacheRetention === "long" ? "1h" : "5m" } });
-          } else expect(observed.params).not.toHaveProperty("cache_control");
-        } finally { await pool.dispose(); }
+  it.each(["json", "object", "malformed"])(
+    "preserves safe OpenRouter provider details through the SDK (%s)",
+    async (format) => {
+      const providerMessage =
+        "tools.1.custom.input_schema: unsupported allOf; sk-fixture12345678 http://user:password@proxy.invalid";
+      const detail = {
+        error: { type: "invalid_request_error", message: providerMessage },
+        request_id: "private-request-id",
+        headers: { authorization: "private-header" },
+      };
+      const raw =
+        format === "json" ? JSON.stringify(detail) : format === "object" ? detail : "unparseable private-provider-body";
+      const pool = new ProviderProxyPool(async () => ({
+        ProxyAgent: class {
+          async close(): Promise<void> {}
+        },
+        fetch: async () =>
+          new Response(
+            JSON.stringify({ error: { code: 400, message: "Provider returned error", metadata: { raw } } }),
+            { status: 400, headers: { "content-type": "application/json" } },
+          ),
+      }));
+      const engine = new LegacyProxyWireEngine({
+        route: "openai-completions",
+        providerId: "openrouter",
+        baseUrl: "https://openrouter.ai/api/v1",
+        proxies: pool,
+      });
+      try {
+        const events: LlmStreamEvent[] = [];
+        for await (const event of await engine.stream(input("openai-completions"))) events.push(event);
+        expect(events.at(-1)).toMatchObject({
+          type: "error",
+          failure: { kind: "invalid-request", httpStatus: 400, retryable: false },
+        });
+        const output = JSON.stringify(events);
+        if (format !== "malformed") {
+          expect(events.at(-1)).toMatchObject({
+            failure: {
+              providerCode: "invalid_request_error",
+              providerMessage:
+                "tools.1.custom.input_schema: unsupported allOf; [REDACTED] http://[REDACTED]@proxy.invalid",
+              message: expect.stringContaining("unsupported allOf"),
+            },
+          });
+          expect(output).not.toContain("sk-fixture12345678");
+          expect(output).not.toContain("user:password");
+        } else expect(events.at(-1)).toMatchObject({ failure: { message: "400 Provider returned error" } });
+        expect(output).not.toContain("private-request-id");
+        expect(output).not.toContain("private-header");
+        expect(output).not.toContain("private-provider-body");
+      } finally {
+        await pool.dispose();
       }
-    }
-  });
+    },
+  );
+
+  it.each(["short", "long", "none"] as const)(
+    "applies Anthropic cache markers through the proxy (%s)",
+    async (cacheRetention) => {
+      const observed: { params?: unknown; options?: unknown } = {};
+      const pool = proxyPool();
+      const engine = new LegacyProxyWireEngine({
+        route: "anthropic-messages",
+        providerId: "custom",
+        baseUrl: "https://relay.example",
+        proxies: pool,
+        cacheRetention,
+        loadSdk: loaderFor("anthropic-messages", observed),
+      });
+      for await (const _event of await engine.stream(input("anthropic-messages"))) {
+        /* drain */
+      }
+      const serialized = JSON.stringify(observed.params);
+      if (cacheRetention !== "none") {
+        expect(serialized.match(/cache_control/g) ?? []).toHaveLength(3);
+        expect(serialized).toContain('"type":"ephemeral"');
+        expect(serialized).toContain(`"ttl":"${cacheRetention === "long" ? "1h" : "5m"}"`);
+      } else {
+        expect(serialized).not.toContain("cache_control");
+      }
+      await pool.dispose();
+    },
+  );
+
+  it.each(["short", "long", "none"] as const)(
+    "enables OpenRouter Claude caching on direct and proxy requests (%s)",
+    async (cacheRetention) => {
+      for (const proxy of [false, true]) {
+        for (const modelId of ["anthropic/claude-opus-5.5", "openai/gpt-fixture"]) {
+          const observed: { params?: unknown } = {};
+          const pool = proxyPool();
+          try {
+            const engine = new LegacyProxyWireEngine({
+              route: "openai-completions",
+              providerId: "openrouter",
+              modelId,
+              baseUrl: "https://openrouter.ai/api/v1",
+              proxies: pool,
+              cacheRetention,
+              loadSdk: loaderFor("openai-completions", observed),
+            });
+            const original = input("openai-completions");
+            for await (const _event of await engine.stream({
+              ...original,
+              credential: proxy ? original.credential : { apiKey: "fixture" },
+            })) {
+              /* drain */
+            }
+            expect(observed.params).toMatchObject({ model: modelId, stream: true });
+            if (modelId.startsWith("anthropic/") && cacheRetention !== "none") {
+              expect(observed.params).toMatchObject({
+                cache_control: { type: "ephemeral", ttl: cacheRetention === "long" ? "1h" : "5m" },
+              });
+            } else expect(observed.params).not.toHaveProperty("cache_control");
+          } finally {
+            await pool.dispose();
+          }
+        }
+      }
+    },
+  );
 
   it.each([0, 0.123])("preserves raw OpenRouter billed cost %s on direct requests", async (cost) => {
-    const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "openrouter", baseUrl: "https://openrouter.ai/api/v1",
-      loadSdk: loaderFor("openai-completions", {}, (async function* () {
-        yield { choices: [{ delta: {}, finish_reason: null }], usage: null };
-        yield { choices: [{ delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 100, completion_tokens: 5, cost, prompt_tokens_details: { cached_tokens: 50, cache_write_tokens: 20 } } };
-      })()),
+    const engine = new LegacyProxyWireEngine({
+      route: "openai-completions",
+      providerId: "openrouter",
+      baseUrl: "https://openrouter.ai/api/v1",
+      loadSdk: loaderFor(
+        "openai-completions",
+        {},
+        (async function* () {
+          yield { choices: [{ delta: {}, finish_reason: null }], usage: null };
+          yield {
+            choices: [{ delta: {}, finish_reason: "stop" }],
+            usage: {
+              prompt_tokens: 100,
+              completion_tokens: 5,
+              cost,
+              prompt_tokens_details: { cached_tokens: 50, cache_write_tokens: 20 },
+            },
+          };
+        })(),
+      ),
     });
     const original = input("openai-completions");
     const events: LlmStreamEvent[] = [];
-    for await (const event of await engine.stream({ ...original, credential: { apiKey: "fixture" } })) events.push(event);
-    expect(events.at(-1)).toMatchObject({ type: "done", usage: { cost, costCurrency: "USD", inputTokens: 30, cacheReadTokens: 50, cacheWriteTokens: 20, costProvenance: { basis: "provider-reported" } } });
+    for await (const event of await engine.stream({ ...original, credential: { apiKey: "fixture" } }))
+      events.push(event);
+    expect(events.at(-1)).toMatchObject({
+      type: "done",
+      usage: {
+        cost,
+        costCurrency: "USD",
+        inputTokens: 30,
+        cacheReadTokens: 50,
+        cacheWriteTokens: 20,
+        costProvenance: { basis: "provider-reported" },
+      },
+    });
   });
   it("does not trust an unrelated endpoint's cost as OpenRouter billing", async () => {
     const pool = proxyPool();
-    const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "openrouter", baseUrl: "https://proxy.example/v1", proxies: pool,
-      loadSdk: loaderFor("openai-completions", {}, (async function* () { yield { choices: [{ delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 100, completion_tokens: 5, cost: 0.1 } }; })()),
+    const engine = new LegacyProxyWireEngine({
+      route: "openai-completions",
+      providerId: "openrouter",
+      baseUrl: "https://proxy.example/v1",
+      proxies: pool,
+      loadSdk: loaderFor(
+        "openai-completions",
+        {},
+        (async function* () {
+          yield {
+            choices: [{ delta: {}, finish_reason: "stop" }],
+            usage: { prompt_tokens: 100, completion_tokens: 5, cost: 0.1 },
+          };
+        })(),
+      ),
     });
     const events: LlmStreamEvent[] = [];
     for await (const event of await engine.stream(input("openai-completions"))) events.push(event);
@@ -91,9 +194,40 @@ describe("LegacyProxyWireEngine", () => {
   });
   it("prices cached input once and preserves the estimate on truncated streams", async () => {
     const pool = proxyPool();
-    const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "fixture", baseUrl: "https://provider.example/v1", proxies: pool,
-      pricing: { providerId: "fixture", connectionId: null, apiModel: "m", modelKey: "fixture:m", currency: "USD", rates: { input: 2, output: 8, cacheRead: 0.2, cacheWrite: null }, multiplier: 1, source: "configured", contentHash: "fixture", capturedAt: "2026-09-07T00:00:00Z", fetchedAt: "2026-09-07T00:00:00Z", unsupportedBilling: false },
-      loadSdk: loaderFor("openai-completions", {}, (async function* () { yield { choices: [], usage: { prompt_tokens: 3000, completion_tokens: 500, prompt_tokens_details: { cached_tokens: 2000 }, completion_tokens_details: { reasoning_tokens: 400 } } }; })()),
+    const engine = new LegacyProxyWireEngine({
+      route: "openai-completions",
+      providerId: "fixture",
+      baseUrl: "https://provider.example/v1",
+      proxies: pool,
+      pricing: {
+        providerId: "fixture",
+        connectionId: null,
+        apiModel: "m",
+        modelKey: "fixture:m",
+        currency: "USD",
+        rates: { input: 2, output: 8, cacheRead: 0.2, cacheWrite: null },
+        multiplier: 1,
+        source: "configured",
+        contentHash: "fixture",
+        capturedAt: "2026-09-07T00:00:00Z",
+        fetchedAt: "2026-09-07T00:00:00Z",
+        unsupportedBilling: false,
+      },
+      loadSdk: loaderFor(
+        "openai-completions",
+        {},
+        (async function* () {
+          yield {
+            choices: [],
+            usage: {
+              prompt_tokens: 3000,
+              completion_tokens: 500,
+              prompt_tokens_details: { cached_tokens: 2000 },
+              completion_tokens_details: { reasoning_tokens: 400 },
+            },
+          };
+        })(),
+      ),
     });
     const events: LlmStreamEvent[] = [];
     for await (const event of await engine.stream(input("openai-completions"))) events.push(event);
@@ -108,9 +242,20 @@ describe("LegacyProxyWireEngine", () => {
   it.each([true, false])("sends DeepSeek thinking settings through the proxy (enabled=%s)", async (enabled) => {
     const observed: { params?: unknown; options?: unknown } = {};
     const pool = proxyPool();
-    const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "deepseek", baseUrl: "https://provider.example/v1", proxies: pool, loadSdk: loaderFor("openai-completions", observed) });
+    const engine = new LegacyProxyWireEngine({
+      route: "openai-completions",
+      providerId: "deepseek",
+      baseUrl: "https://provider.example/v1",
+      proxies: pool,
+      loadSdk: loaderFor("openai-completions", observed),
+    });
     const original = input("openai-completions");
-    for await (const _event of await engine.stream({ ...original, request: { ...original.request, options: { reasoning: enabled, reasoningEffort: "max" } } })) { /* drain */ }
+    for await (const _event of await engine.stream({
+      ...original,
+      request: { ...original.request, options: { reasoning: enabled, reasoningEffort: "max" } },
+    })) {
+      /* drain */
+    }
     expect(observed.params).toMatchObject({ thinking: { type: enabled ? "enabled" : "disabled" } });
     if (enabled) expect(observed.params).toMatchObject({ reasoning_effort: "max" });
     else expect(observed.params).not.toHaveProperty("reasoning_effort");
@@ -120,7 +265,9 @@ describe("LegacyProxyWireEngine", () => {
   it.each(routes)("maps the scoped proxy stream for %s", async (route) => {
     const observed: { params?: unknown; options?: unknown } = {};
     const pool = new ProviderProxyPool(async () => ({
-      ProxyAgent: class { async close(): Promise<void> {} },
+      ProxyAgent: class {
+        async close(): Promise<void> {}
+      },
       fetch: async () => new Response("ok"),
     }));
     const engine = new LegacyProxyWireEngine({
@@ -169,22 +316,46 @@ describe("LegacyProxyWireEngine", () => {
   });
 
   it.each([
-    ["Bearer", { headers: { Authorization: "Bearer relay-secret" } }, "authorization", "Bearer relay-secret", "x-api-key"],
+    [
+      "Bearer",
+      { headers: { Authorization: "Bearer relay-secret" } },
+      "authorization",
+      "Bearer relay-secret",
+      "x-api-key",
+    ],
     ["x-api-key", { apiKey: "relay-secret" }, "x-api-key", "relay-secret", "authorization"],
-  ] as const)("sends only the %s auth header through the real Anthropic SDK", async (_label, auth, present, value, absent) => {
-    const seen: Headers[] = [];
-    const pool = new ProviderProxyPool(async () => ({
-      ProxyAgent: class { async close(): Promise<void> {} },
-      fetch: async (_url: string | URL | Request, init?: RequestInit) => { seen.push(new Headers(init?.headers)); return new Response("{}", { status: 400 }); },
-    }));
-    const engine = new LegacyProxyWireEngine({ route: "anthropic-messages", providerId: "custom", baseUrl: "https://relay.example", proxies: pool });
-    const original = input("anthropic-messages");
-    for await (const _event of await engine.stream({ ...original, credential: { ...auth, proxyUrl: "http://proxy.example:8080" } })) { /* drain */ }
-    expect(seen).toHaveLength(1);
-    expect(seen[0].get(present)).toBe(value);
-    expect(seen[0].has(absent)).toBe(false);
-    await pool.dispose();
-  });
+  ] as const)(
+    "sends only the %s auth header through the real Anthropic SDK",
+    async (_label, auth, present, value, absent) => {
+      const seen: Headers[] = [];
+      const pool = new ProviderProxyPool(async () => ({
+        ProxyAgent: class {
+          async close(): Promise<void> {}
+        },
+        fetch: async (_url: string | URL | Request, init?: RequestInit) => {
+          seen.push(new Headers(init?.headers));
+          return new Response("{}", { status: 400 });
+        },
+      }));
+      const engine = new LegacyProxyWireEngine({
+        route: "anthropic-messages",
+        providerId: "custom",
+        baseUrl: "https://relay.example",
+        proxies: pool,
+      });
+      const original = input("anthropic-messages");
+      for await (const _event of await engine.stream({
+        ...original,
+        credential: { ...auth, proxyUrl: "http://proxy.example:8080" },
+      })) {
+        /* drain */
+      }
+      expect(seen).toHaveLength(1);
+      expect(seen[0].get(present)).toBe(value);
+      expect(seen[0].has(absent)).toBe(false);
+      await pool.dispose();
+    },
+  );
 
   it("classifies a request-scoped proxy disconnect without leaking its cause", async () => {
     const pool = proxyPool();
@@ -214,25 +385,68 @@ describe("LegacyProxyWireEngine", () => {
   });
 
   it.each([
-    { name: "SDK 'Request timed out.'", error: () => new Error("Request timed out."), kind: "timeout", text: "请求 relay.example 超时" },
-    { name: "undici connect timeout behind a generic SDK error", error: () => new Error("Connection error.", { cause: Object.assign(new Error("Connect Timeout Error"), { code: "UND_ERR_CONNECT_TIMEOUT" }) }), kind: "timeout", text: "连接 relay.example 超时（10 秒内未建立连接）", causeCode: "UND_ERR_CONNECT_TIMEOUT" },
-    { name: "refused connection behind a generic SDK error", error: () => new Error("Connection error.", { cause: Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }) }), kind: "network", text: "无法连接 relay.example", causeCode: "ECONNREFUSED" },
+    {
+      name: "SDK 'Request timed out.'",
+      error: () => new Error("Request timed out."),
+      kind: "timeout",
+      text: "请求 relay.example 超时",
+    },
+    {
+      name: "undici connect timeout behind a generic SDK error",
+      error: () =>
+        new Error("Connection error.", {
+          cause: Object.assign(new Error("Connect Timeout Error"), { code: "UND_ERR_CONNECT_TIMEOUT" }),
+        }),
+      kind: "timeout",
+      text: "连接 relay.example 超时（10 秒内未建立连接）",
+      causeCode: "UND_ERR_CONNECT_TIMEOUT",
+    },
+    {
+      name: "refused connection behind a generic SDK error",
+      error: () =>
+        new Error("Connection error.", {
+          cause: Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }),
+        }),
+      kind: "network",
+      text: "无法连接 relay.example",
+      causeCode: "ECONNREFUSED",
+    },
   ])("names the network problem for $name", async ({ error, kind, text, causeCode }) => {
     const pool = proxyPool();
     const engine = new LegacyProxyWireEngine({
-      route: "openai-completions", providerId: "fixture-provider", modelId: "fixture-model", baseUrl: "https://relay.example/v1", proxies: pool,
-      loadSdk: loaderFor("openai-completions", {}, (async function* (): AsyncIterable<Record<string, unknown>> { throw error(); })()),
+      route: "openai-completions",
+      providerId: "fixture-provider",
+      modelId: "fixture-model",
+      baseUrl: "https://relay.example/v1",
+      proxies: pool,
+      loadSdk: loaderFor(
+        "openai-completions",
+        {},
+        (async function* (): AsyncIterable<Record<string, unknown>> {
+          throw error();
+        })(),
+      ),
     });
     const events: LlmStreamEvent[] = [];
     for await (const event of await engine.stream(input("openai-completions"))) events.push(event);
-    expect(events.at(-1)).toMatchObject({ type: "error", failure: { kind, retryable: true, message: expect.stringContaining(text), ...(causeCode === undefined ? {} : { causeCode }) } });
+    expect(events.at(-1)).toMatchObject({
+      type: "error",
+      failure: {
+        kind,
+        retryable: true,
+        message: expect.stringContaining(text),
+        ...(causeCode === undefined ? {} : { causeCode }),
+      },
+    });
     await pool.dispose();
   });
 });
 
 function proxyPool(): ProviderProxyPool {
   return new ProviderProxyPool(async () => ({
-    ProxyAgent: class { async close(): Promise<void> {} },
+    ProxyAgent: class {
+      async close(): Promise<void> {}
+    },
     fetch: async () => new Response("ok"),
   }));
 }
@@ -250,7 +464,15 @@ function input(route: PiAiWireRoute): LlmAdapterDispatchInput {
         { role: "assistant", content: [{ type: "tool-call", callId: "call-1", name: "read_file", arguments: "{}" }] },
         { role: "tool", callId: "call-1", content: "result" },
       ],
-      tools: [{ name: "read_file", definitionVersion: 1, definitionDigest: "digest", description: "Read", inputSchema: { type: "object" } }],
+      tools: [
+        {
+          name: "read_file",
+          definitionVersion: 1,
+          definitionDigest: "digest",
+          description: "Read",
+          inputSchema: { type: "object" },
+        },
+      ],
       options: { maxTokens: 128 },
       credentialRef: "credential",
     },
@@ -304,7 +526,8 @@ function loaderFor(
 
 function truncatedEvents(route: PiAiWireRoute): AsyncIterable<Record<string, unknown>> {
   if (route === "openai-responses") return oneEvent({ type: "response.output_text.delta", delta: "partial" });
-  if (route === "anthropic-messages") return oneEvent({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "partial" } });
+  if (route === "anthropic-messages")
+    return oneEvent({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "partial" } });
   return oneEvent({ choices: [{ delta: { content: "partial" }, finish_reason: null }] });
 }
 
@@ -318,7 +541,10 @@ async function* proxyDisconnectEvents(): AsyncIterable<Record<string, unknown>> 
 }
 
 async function* completionsEvents(): AsyncIterable<Record<string, unknown>> {
-  yield { choices: [{ delta: { content: "answer" }, finish_reason: "stop" }], usage: { prompt_tokens: 2, completion_tokens: 3 } };
+  yield {
+    choices: [{ delta: { content: "answer" }, finish_reason: "stop" }],
+    usage: { prompt_tokens: 2, completion_tokens: 3 },
+  };
 }
 
 async function* responsesEvents(): AsyncIterable<Record<string, unknown>> {
@@ -333,15 +559,34 @@ async function* anthropicEvents(): AsyncIterable<Record<string, unknown>> {
 
 it.each(routes)("uses the same custom reasoning format behind a proxy: %s", async (route) => {
   for (const effort of [undefined, "high"] as const) {
-    const pool = proxyPool(); const observed: { params?: unknown } = {};
-    const engine = new LegacyProxyWireEngine({ route, providerId: "custom", baseUrl: "https://relay.example/v1", proxies: pool, loadSdk: loaderFor(route, observed) });
+    const pool = proxyPool();
+    const observed: { params?: unknown } = {};
+    const engine = new LegacyProxyWireEngine({
+      route,
+      providerId: "custom",
+      baseUrl: "https://relay.example/v1",
+      proxies: pool,
+      loadSdk: loaderFor(route, observed),
+    });
     try {
       const original = input(route);
-      for await (const _event of await engine.stream({ ...original, request: { ...original.request, options: effort ? { reasoning: true, reasoningEffort: effort } : {} } })) { /* drain */ }
-      if (!effort) { expect(observed.params).not.toHaveProperty("reasoning_effort"); expect(observed.params).not.toHaveProperty("reasoning"); expect(observed.params).not.toHaveProperty("thinking"); }
-      else if (route === "openai-completions") { expect(observed.params).toHaveProperty("reasoning_effort", "high"); expect(observed.params).not.toHaveProperty("reasoning"); }
-      else if (route === "openai-responses") expect(observed.params).toHaveProperty("reasoning.effort", "high");
+      for await (const _event of await engine.stream({
+        ...original,
+        request: { ...original.request, options: effort ? { reasoning: true, reasoningEffort: effort } : {} },
+      })) {
+        /* drain */
+      }
+      if (!effort) {
+        expect(observed.params).not.toHaveProperty("reasoning_effort");
+        expect(observed.params).not.toHaveProperty("reasoning");
+        expect(observed.params).not.toHaveProperty("thinking");
+      } else if (route === "openai-completions") {
+        expect(observed.params).toHaveProperty("reasoning_effort", "high");
+        expect(observed.params).not.toHaveProperty("reasoning");
+      } else if (route === "openai-responses") expect(observed.params).toHaveProperty("reasoning.effort", "high");
       else expect(observed.params).toMatchObject({ thinking: { type: "adaptive" }, output_config: { effort: "high" } });
-    } finally { await pool.dispose(); }
+    } finally {
+      await pool.dispose();
+    }
   }
 });

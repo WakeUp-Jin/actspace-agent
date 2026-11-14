@@ -16,8 +16,13 @@ function load(): Seen {
   if (cache) return cache;
   try {
     const value = JSON.parse(localStorage.getItem(KEY) ?? "{}") as unknown;
-    cache = value && typeof value === "object" && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).filter(([, v]) => typeof v === "string")) as Seen : {};
-  } catch { cache = {}; }
+    cache =
+      value && typeof value === "object" && !Array.isArray(value)
+        ? (Object.fromEntries(Object.entries(value).filter(([, v]) => typeof v === "string")) as Seen)
+        : {};
+  } catch {
+    cache = {};
+  }
   return cache;
 }
 
@@ -32,22 +37,35 @@ export function markSeen(sessionId: string, updatedAt: string): void {
   const seen = load();
   if ((seen[sessionId] ?? "") >= updatedAt) return;
   cache = { ...seen, [sessionId]: updatedAt };
-  try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* 只在本次页面内有效 */ }
+  try {
+    localStorage.setItem(KEY, JSON.stringify(cache));
+  } catch {
+    /* 只在本次页面内有效 */
+  }
   for (const listener of [...listeners]) listener();
 }
 
 /** 给没有记录过的会话记下当前 updatedAt 作为基线，之后的更新才能显示未读。 */
 export function seedSeen(items: readonly { readonly sessionId: string; readonly updatedAt: string }[]): void {
   const seen = load();
-  const missing = items.filter(item => seen[item.sessionId] === undefined);
+  const missing = items.filter((item) => seen[item.sessionId] === undefined);
   if (missing.length === 0) return;
-  cache = { ...seen, ...Object.fromEntries(missing.map(item => [item.sessionId, item.updatedAt])) };
-  try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* 只在本次页面内有效 */ }
+  cache = { ...seen, ...Object.fromEntries(missing.map((item) => [item.sessionId, item.updatedAt])) };
+  try {
+    localStorage.setItem(KEY, JSON.stringify(cache));
+  } catch {
+    /* 只在本次页面内有效 */
+  }
   for (const listener of [...listeners]) listener();
 }
 
 /** 没有记录过的会话视为已读（首次连接时不把历史会话都标成未读）。 */
-export function isUnread(sessionId: string, updatedAt: string, openSessionId: string | null, seen: Seen = load()): boolean {
+export function isUnread(
+  sessionId: string,
+  updatedAt: string,
+  openSessionId: string | null,
+  seen: Seen = load(),
+): boolean {
   if (sessionId === openSessionId) return false;
   const last = seen[sessionId];
   return last !== undefined && updatedAt > last;
@@ -55,7 +73,9 @@ export function isUnread(sessionId: string, updatedAt: string, openSessionId: st
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 /** 订阅已读表；列表页用它重新计算未读。 */

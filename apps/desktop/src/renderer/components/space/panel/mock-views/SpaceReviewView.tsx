@@ -37,13 +37,18 @@ export function SpaceReviewView({ scope }: { scope: PanelScope }) {
     <div>
       <div className="flex items-center gap-2 px-1.5 pb-2.5 pt-0.5 text-act-xs text-text-faint">
         <BranchIcon size={12} aria-hidden="true" />
-        <span>{scope.branch} · {files.length} 个文件</span>
-        <span className="ml-auto"><DiffCount add={add} del={del} /></span>
+        <span>
+          {scope.branch} · {files.length} 个文件
+        </span>
+        <span className="ml-auto">
+          <DiffCount add={add} del={del} />
+        </span>
       </div>
       {files.map((f) => (
         // 保留原生 <button>：三列网格的文件行，ui/Button 套不上。
         <button
-          key={f.name} type="button"
+          key={f.name}
+          type="button"
           className="grid w-full grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2 rounded-act-sm border-0 bg-transparent px-2 py-[7px] text-left text-act-xs transition-colors duration-(--motion-fast) hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]"
           onClick={() => openFile(`${scope.dir}/${f.name}`)}
         >

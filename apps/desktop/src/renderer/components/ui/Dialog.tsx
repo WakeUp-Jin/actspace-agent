@@ -53,58 +53,84 @@ type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.
   withDescription?: boolean;
 };
 
-const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Content>, DialogContentProps>(({
-  size = "md", surface = "float", backdrop = "scrim", overlayClassName, initialFocus, returnFocus,
-  closeOnOutsideClick = true, withDescription = false, className, onOpenAutoFocus, onCloseAutoFocus,
-  onInteractOutside, onKeyDown, children, ...props
-}, ref) => {
-  const descriptionProps = withDescription ? {} : { "aria-describedby": undefined };
-  // Radix 的模态 Dialog 关闭时只把焦点还给 DialogTrigger。项目里多数对话框是条件渲染、没有 Trigger 的，
-  // 所以由 OpenerCapture 在内容第一次渲染时（React 处理 autoFocus 之前）记下当时的焦点，作为兜底。
-  const opener = React.useRef<HTMLElement | null>(null);
-  const full = size === "full";
-  return (
-    <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className={cn("fixed inset-0 z-(--act-z-modal)", BACKDROP_CLASS[backdrop], NO_DRAG, overlayClassName)} />
-      {/* 定位层只负责居中，不接收指针事件，点到空白处落在遮罩上。full 自己定位。 */}
-      <div className={cn("pointer-events-none fixed inset-0 z-(--act-z-modal)", full ? undefined : "grid place-items-center px-5", NO_DRAG)}>
-        <DialogPrimitive.Content
-          ref={ref}
-          {...descriptionProps}
-          className={cn("pointer-events-auto outline-none", SIZE_CLASS[size], SURFACE_CLASS[surface], className)}
-          onOpenAutoFocus={(event) => {
-            onOpenAutoFocus?.(event);
-            if (event.defaultPrevented || !initialFocus?.current) return;
-            event.preventDefault();
-            initialFocus.current.focus();
-          }}
-          onCloseAutoFocus={(event) => {
-            onCloseAutoFocus?.(event);
-            const target = (returnFocus instanceof HTMLElement ? returnFocus : returnFocus?.current) ?? opener.current;
-            if (event.defaultPrevented || !target?.isConnected) return;
-            event.preventDefault();
-            target.focus();
-          }}
-          // 点外面和焦点移到外面都走 onInteractOutside。
-          onInteractOutside={(event) => {
-            onInteractOutside?.(event);
-            if (!closeOnOutsideClick) event.preventDefault();
-          }}
-          onKeyDown={(event) => {
-            onKeyDown?.(event);
-            // Radix 在 document 捕获阶段处理 Esc。React 事件会穿过 portal 冒泡到外层组件，
-            // 外层自己的 Esc 处理（返回上一步、关右侧面板）不能再响应同一次按键。
-            if (event.key === "Escape") event.stopPropagation();
-          }}
-          {...props}
+const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Content>, DialogContentProps>(
+  (
+    {
+      size = "md",
+      surface = "float",
+      backdrop = "scrim",
+      overlayClassName,
+      initialFocus,
+      returnFocus,
+      closeOnOutsideClick = true,
+      withDescription = false,
+      className,
+      onOpenAutoFocus,
+      onCloseAutoFocus,
+      onInteractOutside,
+      onKeyDown,
+      children,
+      ...props
+    },
+    ref,
+  ) => {
+    const descriptionProps = withDescription ? {} : { "aria-describedby": undefined };
+    // Radix 的模态 Dialog 关闭时只把焦点还给 DialogTrigger。项目里多数对话框是条件渲染、没有 Trigger 的，
+    // 所以由 OpenerCapture 在内容第一次渲染时（React 处理 autoFocus 之前）记下当时的焦点，作为兜底。
+    const opener = React.useRef<HTMLElement | null>(null);
+    const full = size === "full";
+    return (
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay
+          className={cn("fixed inset-0 z-(--act-z-modal)", BACKDROP_CLASS[backdrop], NO_DRAG, overlayClassName)}
+        />
+        {/* 定位层只负责居中，不接收指针事件，点到空白处落在遮罩上。full 自己定位。 */}
+        <div
+          className={cn(
+            "pointer-events-none fixed inset-0 z-(--act-z-modal)",
+            full ? undefined : "grid place-items-center px-5",
+            NO_DRAG,
+          )}
         >
-          <OpenerCapture target={opener} />
-          {children}
-        </DialogPrimitive.Content>
-      </div>
-    </DialogPrimitive.Portal>
-  );
-});
+          <DialogPrimitive.Content
+            ref={ref}
+            {...descriptionProps}
+            className={cn("pointer-events-auto outline-none", SIZE_CLASS[size], SURFACE_CLASS[surface], className)}
+            onOpenAutoFocus={(event) => {
+              onOpenAutoFocus?.(event);
+              if (event.defaultPrevented || !initialFocus?.current) return;
+              event.preventDefault();
+              initialFocus.current.focus();
+            }}
+            onCloseAutoFocus={(event) => {
+              onCloseAutoFocus?.(event);
+              const target =
+                (returnFocus instanceof HTMLElement ? returnFocus : returnFocus?.current) ?? opener.current;
+              if (event.defaultPrevented || !target?.isConnected) return;
+              event.preventDefault();
+              target.focus();
+            }}
+            // 点外面和焦点移到外面都走 onInteractOutside。
+            onInteractOutside={(event) => {
+              onInteractOutside?.(event);
+              if (!closeOnOutsideClick) event.preventDefault();
+            }}
+            onKeyDown={(event) => {
+              onKeyDown?.(event);
+              // Radix 在 document 捕获阶段处理 Esc。React 事件会穿过 portal 冒泡到外层组件，
+              // 外层自己的 Esc 处理（返回上一步、关右侧面板）不能再响应同一次按键。
+              if (event.key === "Escape") event.stopPropagation();
+            }}
+            {...props}
+          >
+            <OpenerCapture target={opener} />
+            {children}
+          </DialogPrimitive.Content>
+        </div>
+      </DialogPrimitive.Portal>
+    );
+  },
+);
 DialogContent.displayName = "DialogContent";
 
 const DialogTitle = DialogPrimitive.Title;
@@ -122,4 +148,14 @@ function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
   return <div className={cn("flex justify-end gap-2", className)} {...props} />;
 }
 
-export { Dialog, DialogTrigger, DialogClose, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogBody, DialogFooter };
+export {
+  Dialog,
+  DialogTrigger,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogHeader,
+  DialogBody,
+  DialogFooter,
+};

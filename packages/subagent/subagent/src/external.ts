@@ -4,7 +4,11 @@ import type { SubagentCaller } from "./types.js";
 export type ExternalSubagentKind = "codex" | "claude-code";
 
 /** How one external run ended. `text` is the CLI's final reply; `error` the first line of what went wrong. */
-export type ExternalRunResult = { readonly status: "completed" | "failed" | "interrupted"; readonly text: string; readonly error?: string };
+export type ExternalRunResult = {
+  readonly status: "completed" | "failed" | "interrupted";
+  readonly text: string;
+  readonly error?: string;
+};
 
 /** One started CLI process: a single Turn that cannot be continued. */
 export type ExternalRun = {
@@ -16,7 +20,12 @@ export type ExternalRun = {
   interrupt(): Promise<void>;
 };
 
-export type ExternalStartInput = { readonly prompt: string; readonly cwd: string; readonly model?: string; readonly signal: AbortSignal };
+export type ExternalStartInput = {
+  readonly prompt: string;
+  readonly cwd: string;
+  readonly model?: string;
+  readonly signal: AbortSignal;
+};
 
 /** A local CLI that runs one task as a subagent (Codex, Claude Code). The Host manager schedules it like any subagent. */
 export interface ExternalSubagentBackend {
@@ -25,7 +34,9 @@ export interface ExternalSubagentBackend {
   readonly label: string;
   /** The tool that starts it: `agent_codex` / `agent_claude_code`. */
   readonly toolName: string;
-  available(): Promise<{ readonly ok: true; readonly command: string } | { readonly ok: false; readonly reason: string }>;
+  available(): Promise<
+    { readonly ok: true; readonly command: string } | { readonly ok: false; readonly reason: string }
+  >;
   /** Start the process; rejects when it cannot start at all (no record path exists then). */
   start(input: ExternalStartInput): Promise<ExternalRun>;
 }
@@ -41,5 +52,10 @@ export type SpawnExternalInput = SubagentCaller & {
 /** The first non-empty line of a CLI error, for the `failed` summary (design 04 §3.3). */
 export function firstErrorLine(value: unknown): string {
   const text = value instanceof Error ? value.message : typeof value === "string" ? value : String(value);
-  return text.split("\n").map(line => line.trim()).find(Boolean) ?? "unknown error";
+  return (
+    text
+      .split("\n")
+      .map((line) => line.trim())
+      .find(Boolean) ?? "unknown error"
+  );
 }

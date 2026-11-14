@@ -3,9 +3,31 @@ import { useConnectionStore, useHostConnection } from "../../../connection/use-c
 import { formatElapsed } from "../../../sessions/composer-state";
 import { ToolLine } from "./ToolLine";
 
-type BashLike = { readonly status: string; readonly command: string; readonly title: string; readonly intent?: string; readonly cwd?: string; readonly sandboxed?: boolean; readonly notExecuted?: boolean; readonly stdout?: string; readonly stderr?: string; readonly exitCode?: number | null; readonly durationMs?: number; readonly reason?: string; readonly createdAt: string; readonly runId?: string };
+type BashLike = {
+  readonly status: string;
+  readonly command: string;
+  readonly title: string;
+  readonly intent?: string;
+  readonly cwd?: string;
+  readonly sandboxed?: boolean;
+  readonly notExecuted?: boolean;
+  readonly stdout?: string;
+  readonly stderr?: string;
+  readonly exitCode?: number | null;
+  readonly durationMs?: number;
+  readonly reason?: string;
+  readonly createdAt: string;
+  readonly runId?: string;
+};
 
-const VERBS: Readonly<Record<string, string>> = { pending: "Running", running: "Running", failed: "Failed", denied: "Denied", expired: "Expired", cancelled: "Cancelled" };
+const VERBS: Readonly<Record<string, string>> = {
+  pending: "Running",
+  running: "Running",
+  failed: "Failed",
+  denied: "Denied",
+  expired: "Expired",
+  cancelled: "Cancelled",
+};
 
 function useElapsed(active: boolean, since: string): string {
   const [now, setNow] = useState(() => Date.now());
@@ -45,13 +67,21 @@ export function BashRow({ block, sessionId }: { readonly block: BashLike; readon
     const next = !open;
     setOpen(next);
     if (!next || inline || output !== null || !connection || !block.runId) return;
-    void connection.client.call("sessions.output", { sessionId, runId: block.runId, afterRevision: 0 }).then(result => {
-      const chunks = (result as { chunks?: { text: string }[] }).chunks ?? [];
-      setOutput(chunks.map(chunk => chunk.text).join(""));
-    }).catch(error => { store.reportError(error); setOutput("无法加载输出"); });
+    void connection.client
+      .call("sessions.output", { sessionId, runId: block.runId, afterRevision: 0 })
+      .then((result) => {
+        const chunks = (result as { chunks?: { text: string }[] }).chunks ?? [];
+        setOutput(chunks.map((chunk) => chunk.text).join(""));
+      })
+      .catch((error) => {
+        store.reportError(error);
+        setOutput("无法加载输出");
+      });
   };
 
-  const where = [block.cwd, env?.text, block.durationMs ? formatElapsed(block.durationMs) : ""].filter(Boolean).join(" · ");
+  const where = [block.cwd, env?.text, block.durationMs ? formatElapsed(block.durationMs) : ""]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <ToolLine
       verb={verb}
@@ -60,16 +90,39 @@ export function BashRow({ block, sessionId }: { readonly block: BashLike; readon
       grow
       running={running}
       error={failed && block.status !== "denied"}
-      extra={<>{block.status === "running" ? <span className="tl-meta">{elapsed}</span> : null}{showEnv && env ? <span className="tool-badge" data-tone={env.warn ? "warn" : undefined}>{env.text}</span> : null}</>}
+      extra={
+        <>
+          {block.status === "running" ? <span className="tl-meta">{elapsed}</span> : null}
+          {showEnv && env ? (
+            <span className="tool-badge" data-tone={env.warn ? "warn" : undefined}>
+              {env.text}
+            </span>
+          ) : null}
+        </>
+      }
       open={open}
       onToggle={toggle}
     >
       <div className="tool-out">
         <pre>
-          {block.intent ? <span className="tool-out-note"># {block.intent}{"\n"}</span> : null}
-          <span>$ {block.command}{"\n"}</span>
-          {where ? <span className="tool-out-note"># {where}{"\n"}</span> : null}
-          {"\n"}{inline || output || block.reason || (running ? "" : "无输出")}
+          {block.intent ? (
+            <span className="tool-out-note">
+              # {block.intent}
+              {"\n"}
+            </span>
+          ) : null}
+          <span>
+            $ {block.command}
+            {"\n"}
+          </span>
+          {where ? (
+            <span className="tool-out-note">
+              # {where}
+              {"\n"}
+            </span>
+          ) : null}
+          {"\n"}
+          {inline || output || block.reason || (running ? "" : "无输出")}
         </pre>
       </div>
     </ToolLine>

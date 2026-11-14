@@ -1,7 +1,7 @@
-import { createContext, useContext } from 'react';
-import type { SessionListPage, SessionListPageInput } from '@actspace/shared';
+import { createContext, useContext } from "react";
+import type { SessionListPage, SessionListPageInput } from "@actspace/shared";
 export type SessionBrowseState = {
-  groups: SessionListPage['groups'];
+  groups: SessionListPage["groups"];
   listLoading: boolean;
   listError: string | null;
   retryList: () => void;

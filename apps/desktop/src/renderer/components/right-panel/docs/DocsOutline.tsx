@@ -44,7 +44,12 @@ export function DocsOutline({
           <ListTree size={15} aria-hidden="true" />
         </IconButton>
       </PopoverTrigger>
-      <PopoverContent align="end" radius="lg" className="max-h-[360px] w-[240px] overflow-auto p-1.5" aria-label="本页大纲">
+      <PopoverContent
+        align="end"
+        radius="lg"
+        className="max-h-[360px] w-[240px] overflow-auto p-1.5"
+        aria-label="本页大纲"
+      >
         {items.length === 0 ? (
           <p className="m-0 px-2.5 py-1.5 text-act-xs text-text-faint">没有标题</p>
         ) : (

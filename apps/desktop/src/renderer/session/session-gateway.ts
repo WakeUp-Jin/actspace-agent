@@ -1,6 +1,12 @@
 import { formatChatAttachmentIssue, formatComposerReferenceIssue } from "@actspace/shared";
 import type { ComposerAttachment, MainAgentForm } from "@actspace/shared";
-import type { SubmitTaskInput, TaskConfiguration, TaskRewind, TaskSubmissionFailure, TaskSubmissionResult } from "@actspace/shared/runtime-v2";
+import type {
+  SubmitTaskInput,
+  TaskConfiguration,
+  TaskRewind,
+  TaskSubmissionFailure,
+  TaskSubmissionResult,
+} from "@actspace/shared/runtime-v2";
 import type { ComposerDraftRestore, ComposerSendOptions } from "../components/Composer";
 import type { NewSessionInput } from "./session-actions-context";
 import type { RunTargetReadiness } from "../target/readiness";
@@ -21,7 +27,9 @@ export type SendTarget = {
 };
 
 export type SessionGatewayDeps = {
-  createSession(input: NewSessionInput): Promise<{ readonly meta: { readonly id: string; readonly agentModeRevision?: number } } | null>;
+  createSession(
+    input: NewSessionInput,
+  ): Promise<{ readonly meta: { readonly id: string; readonly agentModeRevision?: number } } | null>;
   setPlanMode(sessionId: string, expectedRevision: number): Promise<unknown>;
   /** 远端会话创建后记下工作区和模型（Host 不返回 workspaceId，03-1；15 T8）。 */
   recordRemoteSession(sessionId: string, prefs: { readonly workspaceId?: string; readonly modelId?: string }): void;
@@ -50,7 +58,13 @@ export type SessionGateway = {
    * `agentRunId`：乐观显示用的 run id，Host 用它开始这条任务。`rewind`：从某一轮重来（编辑提问重发）；
    * 这种提交失败时内容回到原地编辑器，不写 pending 记录、不放回下方输入框。
    */
-  submit(sessionId: string, text: string, options: ComposerSendOptions, model: string | undefined, extra?: SubmitExtra): Promise<TaskSubmissionResult>;
+  submit(
+    sessionId: string,
+    text: string,
+    options: ComposerSendOptions,
+    model: string | undefined,
+    extra?: SubmitExtra,
+  ): Promise<TaskSubmissionResult>;
 };
 
 export type SubmitExtra = { readonly agentRunId?: string; readonly rewind?: TaskRewind };
@@ -63,23 +77,35 @@ function withoutPreview({ previewUrl: _previewUrl, ...attachment }: ComposerAtta
   return attachment;
 }
 
-const agentForm = (options: ComposerSendOptions): MainAgentForm => options.mode === "chat" ? "chat" : "agent";
+const agentForm = (options: ComposerSendOptions): MainAgentForm => (options.mode === "chat" ? "chat" : "agent");
 
 /**
  * 15 T12：App `handleSend` 中「选目标、提交、pending 记录」的部分（03 §2.6）。pending 规则沿用 14 T20：
  * 提交前写入；确认收到或明确被拒绝后清除；结果未知时保留，下次激活会话时恢复为草稿。
  */
 export function createSessionGateway(deps: SessionGatewayDeps): SessionGateway {
-  const failed = (result: TaskSubmissionResult): result is TaskSubmissionFailure => "status" in result && result.status === "submission-failed";
+  const failed = (result: TaskSubmissionResult): result is TaskSubmissionFailure =>
+    "status" in result && result.status === "submission-failed";
   return {
     async ensureSession(sessionId, send, options) {
       const { target } = send;
       if (target.kind === "remote" && send.readiness.state !== "ready") throw new Error(NOT_READY);
       if (sessionId) return sessionId;
       const remote = target.kind === "remote";
-      const created = await deps.createSession(remote
-        ? { hostId: target.hostId, ...(send.remoteWorkspaceId ? { workspaceId: send.remoteWorkspaceId } : {}), agentForm: agentForm(options) }
-        : { ...(send.localWorkspaceRoot ? { workspaceRoot: send.localWorkspaceRoot } : {}), ...(send.runLocation ? { runLocation: send.runLocation } : {}), ...(send.branch ? { branch: send.branch } : {}), agentForm: agentForm(options) });
+      const created = await deps.createSession(
+        remote
+          ? {
+              hostId: target.hostId,
+              ...(send.remoteWorkspaceId ? { workspaceId: send.remoteWorkspaceId } : {}),
+              agentForm: agentForm(options),
+            }
+          : {
+              ...(send.localWorkspaceRoot ? { workspaceRoot: send.localWorkspaceRoot } : {}),
+              ...(send.runLocation ? { runLocation: send.runLocation } : {}),
+              ...(send.branch ? { branch: send.branch } : {}),
+              agentForm: agentForm(options),
+            },
+      );
       if (!created) throw new Error(remote ? "Unable to create remote Session" : "Unable to create Session");
       if (remote) {
         deps.recordRemoteSession(created.meta.id, {
@@ -92,20 +118,51 @@ export function createSessionGateway(deps: SessionGatewayDeps): SessionGateway {
     },
 
     async submit(sessionId, text, options, model, extra = {}) {
-      const submitted = { sessionId, userInput: text, attachments: options.attachments?.map(withoutPreview), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations };
+      const submitted = {
+        sessionId,
+        userInput: text,
+        attachments: options.attachments?.map(withoutPreview),
+        fileReferences: options.fileReferences,
+        responseAnnotations: options.responseAnnotations,
+      };
       const serialized = JSON.stringify(submitted);
       const rewinding = extra.rewind !== undefined;
       const saved = rewinding ? null : deps.pending.read(sessionId);
       // 同样的内容再次发送时复用 submissionId，让 Runtime 去重。
       const submissionId = saved?.content === serialized ? saved.id : deps.newSubmissionId();
       deps.rememberOptions(sessionId, submissionId, options, extra.agentRunId);
-      if (!rewinding) deps.pending.write(sessionId, { content: serialized, id: submissionId, draft: { sessionId, text, attachments: options.attachments?.map(withoutPreview), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } });
+      if (!rewinding)
+        deps.pending.write(sessionId, {
+          content: serialized,
+          id: submissionId,
+          draft: {
+            sessionId,
+            text,
+            attachments: options.attachments?.map(withoutPreview),
+            fileReferences: options.fileReferences,
+            responseAnnotations: options.responseAnnotations,
+          },
+        });
       const restore = (error: string, issues?: Pick<TaskSubmissionFailure, "attachmentIssue" | "referenceIssue">) => {
         if (rewinding) return;
-        deps.restoreDraft(sessionId, { id: deps.now(), sessionId, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error, ...issues });
+        deps.restoreDraft(sessionId, {
+          id: deps.now(),
+          sessionId,
+          text,
+          attachments: options.attachments,
+          fileReferences: options.fileReferences,
+          responseAnnotations: options.responseAnnotations,
+          error,
+          ...issues,
+        });
       };
       try {
-        const configured = await deps.configure(sessionId, { model, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, selectedSkillIds: options.selectedSkills });
+        const configured = await deps.configure(sessionId, {
+          model,
+          thinkingEnabled: options.thinkingEnabled,
+          reasoningEffort: options.reasoningEffort,
+          selectedSkillIds: options.selectedSkills,
+        });
         if (!configured) throw new Error(CONFIGURE_FAILED);
       } catch (error) {
         if (!rewinding) deps.pending.clear(sessionId);
@@ -115,8 +172,16 @@ export function createSessionGateway(deps: SessionGatewayDeps): SessionGateway {
         throw new Error(message);
       }
       const attempt = async (): Promise<TaskSubmissionResult> => {
-        try { return await deps.submit({ ...submitted, submissionId, ...(extra.agentRunId ? { agentRunId: extra.agentRunId } : {}), ...(extra.rewind ? { rewind: extra.rewind } : {}) }); }
-        catch { return { status: "submission-failed", acknowledgement: "unknown", message: UNKNOWN }; }
+        try {
+          return await deps.submit({
+            ...submitted,
+            submissionId,
+            ...(extra.agentRunId ? { agentRunId: extra.agentRunId } : {}),
+            ...(extra.rewind ? { rewind: extra.rewind } : {}),
+          });
+        } catch {
+          return { status: "submission-failed", acknowledgement: "unknown", message: UNKNOWN };
+        }
       };
       let result = await attempt();
       if (failed(result) && result.acknowledgement === "unknown") {
@@ -129,8 +194,18 @@ export function createSessionGateway(deps: SessionGatewayDeps): SessionGateway {
           deps.forgetOptions(submissionId);
         }
         const message = result.acknowledgement === "unknown" ? UNKNOWN : result.message;
-        const issues = { ...(result.attachmentIssue ? { attachmentIssue: result.attachmentIssue } : {}), ...(result.referenceIssue ? { referenceIssue: result.referenceIssue } : {}) };
-        restore(result.attachmentIssue ? formatChatAttachmentIssue(result.attachmentIssue) : result.referenceIssue ? formatComposerReferenceIssue(result.referenceIssue) : message, issues);
+        const issues = {
+          ...(result.attachmentIssue ? { attachmentIssue: result.attachmentIssue } : {}),
+          ...(result.referenceIssue ? { referenceIssue: result.referenceIssue } : {}),
+        };
+        restore(
+          result.attachmentIssue
+            ? formatChatAttachmentIssue(result.attachmentIssue)
+            : result.referenceIssue
+              ? formatComposerReferenceIssue(result.referenceIssue)
+              : message,
+          issues,
+        );
         throw new Error(message);
       }
       if (!rewinding) deps.pending.clear(sessionId);

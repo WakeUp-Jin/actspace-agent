@@ -51,9 +51,18 @@ describe("custom connection address", () => {
   });
 
   it("tolerates repeated trailing slashes", () => {
-    expect(normalizeCustomConnectionAddress("  https://a.com/v1///  ", "anthropic-messages")).toMatchObject({ ok: true, baseUrl: "https://a.com" });
-    expect(normalizeCustomConnectionAddress("https://a.com/v1/messages//", "anthropic-messages")).toMatchObject({ ok: true, baseUrl: "https://a.com" });
-    expect(normalizeCustomConnectionAddress("https://a.com/", "openai-completions")).toMatchObject({ ok: true, baseUrl: "https://a.com" });
+    expect(normalizeCustomConnectionAddress("  https://a.com/v1///  ", "anthropic-messages")).toMatchObject({
+      ok: true,
+      baseUrl: "https://a.com",
+    });
+    expect(normalizeCustomConnectionAddress("https://a.com/v1/messages//", "anthropic-messages")).toMatchObject({
+      ok: true,
+      baseUrl: "https://a.com",
+    });
+    expect(normalizeCustomConnectionAddress("https://a.com/", "openai-completions")).toMatchObject({
+      ok: true,
+      baseUrl: "https://a.com",
+    });
   });
 
   it.each([

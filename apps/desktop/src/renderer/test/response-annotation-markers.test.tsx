@@ -41,7 +41,13 @@ function Harness({ initial, onClose }: { initial: HarnessState; onClose?: () => 
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(initial.editingAnnotationId ?? null);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(initial.activeAnnotationId ?? null);
   const [replyVisible, setReplyVisible] = useState(!initial.deferReply);
-  current = { drafts, activeAnnotationId, setActive: setActiveAnnotationId, setDrafts, showReply: () => setReplyVisible(true) };
+  current = {
+    drafts,
+    activeAnnotationId,
+    setActive: setActiveAnnotationId,
+    setDrafts,
+    showReply: () => setReplyVisible(true),
+  };
   const messagesRef = useRef<HTMLElement | null>(null);
   // 评论框不给消息区：jsdom 里容器没有尺寸，会被当成原文滚出视口而隐藏。
   const popoverScrollRef = useRef<HTMLElement | null>(null);
@@ -90,7 +96,14 @@ describe("draft annotation marks", () => {
           drafts: [
             makeAnnotation({ annotationId: "a" }),
             makeAnnotation({ annotationId: "gone", selectedText: "不存在", prefixContext: "", suffixContext: "" }),
-            makeAnnotation({ annotationId: "c", selectedText: "正文", startOffset: 10, endOffset: 12, prefixContext: "第二段的", suffixContext: "" }),
+            makeAnnotation({
+              annotationId: "c",
+              selectedText: "正文",
+              startOffset: 10,
+              endOffset: 12,
+              prefixContext: "第二段的",
+              suffixContext: "",
+            }),
           ],
         }}
       />,
@@ -119,7 +132,12 @@ describe("draft annotation marks", () => {
 describe("comment popover", () => {
   it("saves the trimmed comment with Enter and hands focus back", async () => {
     const onClose = vi.fn();
-    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={onClose} />);
+    render(
+      <Harness
+        initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }}
+        onClose={onClose}
+      />,
+    );
     const popover = screen.getByRole("dialog", { name: "第 1 条批注的评论" });
     expect(popover).toHaveAttribute("data-anchored", "true");
     expect(screen.getByRole("textbox", { name: "第 1 条批注的评论" })).toHaveFocus();
@@ -143,7 +161,12 @@ describe("comment popover", () => {
     const onClose = vi.fn();
     const outerKeyDown = vi.fn();
     document.addEventListener("keydown", outerKeyDown);
-    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a", comment: "原评论" })], editingAnnotationId: "a" }} onClose={onClose} />);
+    render(
+      <Harness
+        initial={{ drafts: [makeAnnotation({ annotationId: "a", comment: "原评论" })], editingAnnotationId: "a" }}
+        onClose={onClose}
+      />,
+    );
     const input = screen.getByRole("textbox", { name: "第 1 条批注的评论" });
     fireEvent.change(input, { target: { value: "改了一半" } });
     fireEvent.keyDown(input, { key: "Escape" });
@@ -159,18 +182,32 @@ describe("comment popover", () => {
     const composer = document.createElement("textarea");
     document.body.append(before, composer);
     before.focus();
-    const { unmount } = render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={() => composer.focus()} />);
+    const { unmount } = render(
+      <Harness
+        initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }}
+        onClose={() => composer.focus()}
+      />,
+    );
     fireEvent.keyDown(screen.getByRole("textbox", { name: "第 1 条批注的评论" }), { key: "Escape" });
     // Radix 在 setTimeout(0) 里处理关闭后的焦点。
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(composer).toHaveFocus();
 
     // 点外部的非焦点元素：焦点随评论框一起丢失，也不回到打开前的元素。
     unmount();
     before.focus();
-    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={() => composer.focus()} />);
+    render(
+      <Harness
+        initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }}
+        onClose={() => composer.focus()}
+      />,
+    );
     fireEvent.pointerDown(document.body);
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(before).not.toHaveFocus();
     before.remove();
@@ -179,7 +216,12 @@ describe("comment popover", () => {
 
   it("saves typed text on an outside click without stealing focus", () => {
     const onClose = vi.fn();
-    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }} onClose={onClose} />);
+    render(
+      <Harness
+        initial={{ drafts: [makeAnnotation({ annotationId: "a" })], editingAnnotationId: "a" }}
+        onClose={onClose}
+      />,
+    );
     fireEvent.change(screen.getByRole("textbox", { name: "第 1 条批注的评论" }), { target: { value: "外部保存" } });
     fireEvent.pointerDown(screen.getByRole("button", { name: "回复外部" }));
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -188,8 +230,14 @@ describe("comment popover", () => {
   });
 
   it("blocks over-long comments and keeps the original on an outside click", () => {
-    render(<Harness initial={{ drafts: [makeAnnotation({ annotationId: "a", comment: "原评论" })], editingAnnotationId: "a" }} />);
-    fireEvent.change(screen.getByRole("textbox", { name: "第 1 条批注的评论" }), { target: { value: "长".repeat(2001) } });
+    render(
+      <Harness
+        initial={{ drafts: [makeAnnotation({ annotationId: "a", comment: "原评论" })], editingAnnotationId: "a" }}
+      />,
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "第 1 条批注的评论" }), {
+      target: { value: "长".repeat(2001) },
+    });
     expect(screen.getByRole("alert")).toHaveTextContent("评论超过 2,000 个字符");
     expect(screen.getByRole("button", { name: "保存评论" })).toBeDisabled();
     fireEvent.pointerDown(screen.getByRole("button", { name: "回复外部" }));
@@ -224,12 +272,37 @@ describe("annotation highlights", () => {
   });
 
   it("registers drafts normally, moves the active one to the active highlight and cleans up", () => {
-    const sent = makeAnnotation({ annotationId: "sent", selectedText: "正文", startOffset: 10, endOffset: 12, prefixContext: "第二段的", suffixContext: "" });
+    const sent = makeAnnotation({
+      annotationId: "sent",
+      selectedText: "正文",
+      startOffset: 10,
+      endOffset: 12,
+      prefixContext: "第二段的",
+      suffixContext: "",
+    });
     const { unmount } = render(
       <Harness
         initial={{
-          drafts: [makeAnnotation({ annotationId: "a" }), makeAnnotation({ annotationId: "b", selectedText: "第一段", startOffset: 0, endOffset: 3, prefixContext: "", suffixContext: "内容\n" })],
-          messages: [{ kind: "user", id: "v2-2", content: "", createdAt: "2026-09-28T00:00:01.000Z", responseAnnotations: [sent] }],
+          drafts: [
+            makeAnnotation({ annotationId: "a" }),
+            makeAnnotation({
+              annotationId: "b",
+              selectedText: "第一段",
+              startOffset: 0,
+              endOffset: 3,
+              prefixContext: "",
+              suffixContext: "内容\n",
+            }),
+          ],
+          messages: [
+            {
+              kind: "user",
+              id: "v2-2",
+              content: "",
+              createdAt: "2026-09-28T00:00:01.000Z",
+              responseAnnotations: [sent],
+            },
+          ],
         }}
       />,
     );
@@ -264,7 +337,15 @@ describe("annotation highlights for late replies", () => {
   beforeEach(() => {
     registry = new Map();
     vi.stubGlobal("CSS", { highlights: registry });
-    vi.stubGlobal("Highlight", class { ranges: Range[]; constructor(...ranges: Range[]) { this.ranges = ranges; } });
+    vi.stubGlobal(
+      "Highlight",
+      class {
+        ranges: Range[];
+        constructor(...ranges: Range[]) {
+          this.ranges = ranges;
+        }
+      },
+    );
   });
   afterEach(() => {
     vi.unstubAllGlobals();

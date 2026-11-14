@@ -17,21 +17,75 @@ function liveCase(count: number) {
   const registry = createCoreCodecRegistry();
   // 不压缩：每一屏的事件数只由轮数决定，两种规模的读取量可以逐条相等地比。
   const { journal, history, events } = syntheticJournal(count, { retainedEvents: RETAINED, compactEvery: 0 });
-  const header = createSessionHeader({ sessionId: "scale", createdAt: "2026-11-07T00:00:00.000Z", cwd: "/fixture", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } });
-  const session = { header, journal, get acceptedSeq() { return journal.lastSeq; }, get durableSeq() { return journal.lastSeq; } } as unknown as SessionHandle;
+  const header = createSessionHeader({
+    sessionId: "scale",
+    createdAt: "2026-11-07T00:00:00.000Z",
+    cwd: "/fixture",
+    lineage: null,
+    createdWith: {
+      profileId: "test",
+      runtimeContractVersion: "1",
+      manifestDigest: "test",
+      plugins: [],
+      codecSetDigest: registry.digest,
+    },
+  });
+  const session = {
+    header,
+    journal,
+    get acceptedSeq() {
+      return journal.lastSeq;
+    },
+    get durableSeq() {
+      return journal.lastSeq;
+    },
+  } as unknown as SessionHandle;
   // 打开中的会话只读内存里的日志和它的归档历史；碰到存储就是走错了路。
-  const storage = new Proxy({ identity: Symbol("scale") }, { get: (target, key) => key === "identity" ? target.identity : () => { throw new Error(`storage.${String(key)} must not be used for a live Session`); } }) as unknown as SessionStorage;
-  const controller = new RuntimeSessionController({ dataRoot: "/fixture", runtimeId: "test", registry, profileId: "test", manifestDigest: "test", plugins: [] }, new SessionStore({ registry }, storage));
+  const storage = new Proxy(
+    { identity: Symbol("scale") },
+    {
+      get: (target, key) =>
+        key === "identity"
+          ? target.identity
+          : () => {
+              throw new Error(`storage.${String(key)} must not be used for a live Session`);
+            },
+    },
+  ) as unknown as SessionStorage;
+  const controller = new RuntimeSessionController(
+    { dataRoot: "/fixture", runtimeId: "test", registry, profileId: "test", manifestDigest: "test", plugins: [] },
+    new SessionStore({ registry }, storage),
+  );
   controller.registerExternal(session);
-  const reading = async <T>(action: () => Promise<T>) => { const before = history.eventsRead; const result = await action(); return { result, read: history.eventsRead - before }; };
+  const reading = async <T>(action: () => Promise<T>) => {
+    const before = history.eventsRead;
+    const result = await action();
+    return { result, read: history.eventsRead - before };
+  };
   const appendTurn = (turnId: string) => {
-    const append = (type: string, data: Record<string, unknown>, surface: "append" | null = null) => journal.append({ type, eventVersion: 1, source: SOURCE, data: data as never, surface: surface ? { kind: surface } : null });
+    const append = (type: string, data: Record<string, unknown>, surface: "append" | null = null) =>
+      journal.append({
+        type,
+        eventVersion: 1,
+        source: SOURCE,
+        data: data as never,
+        surface: surface ? { kind: surface } : null,
+      });
     const stepId = `step-${turnId}`;
     append("turn/start", { turnId });
     append("step/start", { turnId, stepId });
     append("user/message", { messageId: `user-${turnId}`, content: "next" }, "append");
     append("tool/call", { callId: `call-${turnId}`, name: "read_file", turnId, stepId, args: { path: "next.ts" } });
-    append("tool/result", { callId: `call-${turnId}`, name: "read_file", status: "completed", modelOutput: [{ type: "text", text: "next" }] }, "append");
+    append(
+      "tool/result",
+      {
+        callId: `call-${turnId}`,
+        name: "read_file",
+        status: "completed",
+        modelOutput: [{ type: "text", text: "next" }],
+      },
+      "append",
+    );
     append("step/end", { turnId, stepId, status: "completed" });
     append("turn/end", { turnId, status: "completed" });
   };
@@ -57,8 +111,12 @@ it("reads the same number of archived events per page and per tool detail for 1k
   expect(largeAgain.result.window).toEqual(largeFirst.result.window);
 
   // 往前翻一页：只读那 20 轮。
-  const smallOlder = await small.reading(() => small.controller.readProjection({ sessionId: "scale", beforeSeq: smallAgain.result.window.beforeSeq! }));
-  const largeOlder = await large.reading(() => large.controller.readProjection({ sessionId: "scale", beforeSeq: largeAgain.result.window.beforeSeq! }));
+  const smallOlder = await small.reading(() =>
+    small.controller.readProjection({ sessionId: "scale", beforeSeq: smallAgain.result.window.beforeSeq! }),
+  );
+  const largeOlder = await large.reading(() =>
+    large.controller.readProjection({ sessionId: "scale", beforeSeq: largeAgain.result.window.beforeSeq! }),
+  );
   expect(largeOlder.read).toBe(smallOlder.read);
   expect(smallOlder.read).toBe(smallOlder.result.window.events.length);
   expect(largeOlder.result.window.turnOffset).toBe(largeAgain.result.window.turnOffset - 20);
@@ -69,11 +127,14 @@ it("reads the same number of archived events per page and per tool detail for 1k
   const largeDetail = await large.reading(() => large.controller.browseToolDetail("scale", "call-3-1"));
   expect(largeDetail.read).toBe(smallDetail.read);
   expect(smallDetail.read).toBe(2);
-  expect(largeDetail.result.journal).toEqual(large.events.filter(event => (event.data as { callId?: string }).callId === "call-3-1"));
-  expect(largeDetail.result.journal.map(event => event.type)).toEqual(["tool/call", "tool/result"]);
+  expect(largeDetail.result.journal).toEqual(
+    large.events.filter((event) => (event.data as { callId?: string }).callId === "call-3-1"),
+  );
+  expect(largeDetail.result.journal.map((event) => event.type)).toEqual(["tool/call", "tool/result"]);
 
   // 新写入一轮之后再读：索引只补新事件，窗口往后挪一轮，从归档读的不会比之前多。
-  small.appendTurn("turn-next"); large.appendTurn("turn-next");
+  small.appendTurn("turn-next");
+  large.appendTurn("turn-next");
   const smallNext = await small.reading(() => small.controller.readProjection(tail));
   const largeNext = await large.reading(() => large.controller.readProjection(tail));
   expect(largeNext.read).toBe(smallNext.read);
@@ -86,5 +147,5 @@ it("reads the same number of archived events per page and per tool detail for 1k
   const largeNew = await large.reading(() => large.controller.browseToolDetail("scale", "call-turn-next"));
   expect(smallNew.read).toBe(0);
   expect(largeNew.read).toBe(0);
-  expect(largeNew.result.journal.map(event => event.type)).toEqual(["tool/call", "tool/result"]);
+  expect(largeNew.result.journal.map((event) => event.type)).toEqual(["tool/call", "tool/result"]);
 }, 60_000);

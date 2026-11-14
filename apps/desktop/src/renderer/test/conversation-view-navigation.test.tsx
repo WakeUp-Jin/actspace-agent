@@ -11,8 +11,18 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 
 function turnMessages(count: number): MessageBlock[] {
   return Array.from({ length: count }, (_, index) => [
-    { kind: "user" as const, id: `user-${index + 1}`, content: `第 ${index + 1} 轮提问`, createdAt: `2026-06-02T00:00:0${index * 2}.000Z` },
-    { kind: "assistant" as const, id: `assistant-${index + 1}`, content: `第 ${index + 1} 轮回复`, createdAt: `2026-06-02T00:00:0${index * 2 + 1}.000Z` },
+    {
+      kind: "user" as const,
+      id: `user-${index + 1}`,
+      content: `第 ${index + 1} 轮提问`,
+      createdAt: `2026-06-02T00:00:0${index * 2}.000Z`,
+    },
+    {
+      kind: "assistant" as const,
+      id: `assistant-${index + 1}`,
+      content: `第 ${index + 1} 轮回复`,
+      createdAt: `2026-06-02T00:00:0${index * 2 + 1}.000Z`,
+    },
   ]).flat();
 }
 
@@ -68,7 +78,11 @@ describe("ConversationView composer slots", () => {
 
   it("shows the review summary in the followup composer and opens Review from it", async () => {
     const onOpenReview = vi.fn();
-    renderConversation({ messages: turnMessages(1), reviewSummary: { status: "changes", additions: 3, deletions: 1 }, onOpenReview });
+    renderConversation({
+      messages: turnMessages(1),
+      reviewSummary: { status: "changes", additions: 3, deletions: 1 },
+      onOpenReview,
+    });
     await userEvent.setup().click(screen.getByRole("button", { name: "审查待处理变更 +3 -1" }));
     expect(onOpenReview).toHaveBeenCalledOnce();
   });

@@ -112,19 +112,36 @@ function Preview() {
     { kind: "user", id: "user", createdAt, content: "画几张图解释聊天里的 Mermaid 渲染链路。" },
     { kind: "assistant", id: "reply", createdAt, content: reply(streaming) },
   ];
-  return <TooltipProvider><RightPanelProvider>
-    <div className="flex h-screen flex-col bg-app-bg text-text-main">
-      <div className="flex shrink-0 items-center gap-4 border-b border-line p-3 text-act-sm">
-        <span>Mermaid 图表验收样例</span>
-        <button type="button" onClick={() => setStreaming(true)}>流式中（fence 未闭合）</button>
-        <button type="button" onClick={() => setStreaming(false)}>回复完成</button>
-        <a href="?theme=light">浅色</a><a href="?theme=dark">深色</a>
-      </div>
-      <TestConversationView messages={messages} contextSnapshot={null}
-        sessionId="mermaid-fixture" isStreaming={streaming} composerPhase="active"
-        executionContext={{ runLocation: "this_mac", gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] } }} />
-    </div>
-  </RightPanelProvider></TooltipProvider>;
+  return (
+    <TooltipProvider>
+      <RightPanelProvider>
+        <div className="flex h-screen flex-col bg-app-bg text-text-main">
+          <div className="flex shrink-0 items-center gap-4 border-b border-line p-3 text-act-sm">
+            <span>Mermaid 图表验收样例</span>
+            <button type="button" onClick={() => setStreaming(true)}>
+              流式中（fence 未闭合）
+            </button>
+            <button type="button" onClick={() => setStreaming(false)}>
+              回复完成
+            </button>
+            <a href="?theme=light">浅色</a>
+            <a href="?theme=dark">深色</a>
+          </div>
+          <TestConversationView
+            messages={messages}
+            contextSnapshot={null}
+            sessionId="mermaid-fixture"
+            isStreaming={streaming}
+            composerPhase="active"
+            executionContext={{
+              runLocation: "this_mac",
+              gitContext: { status: "not_repository", workspaceRoot: "/work/notes", branches: [] },
+            }}
+          />
+        </div>
+      </RightPanelProvider>
+    </TooltipProvider>
+  );
 }
 
 createRoot(document.getElementById("root")!).render(<Preview />);
@@ -138,11 +155,15 @@ if (Number.isInteger(pngIndex)) {
     .then((blob) => {
       const image = document.createElement("img");
       image.src = URL.createObjectURL(blob);
-      image.style.cssText = "position:fixed;inset:0;z-index:9999;max-width:100vw;max-height:100vh;outline:4px solid red";
+      image.style.cssText =
+        "position:fixed;inset:0;z-index:9999;max-width:100vw;max-height:100vh;outline:4px solid red";
       document.body.append(image);
     })
     .catch((error: unknown) => {
-      document.body.insertAdjacentHTML("afterbegin", `<pre style="position:fixed;z-index:9999;color:red">PNG export failed: ${String(error)}</pre>`);
+      document.body.insertAdjacentHTML(
+        "afterbegin",
+        `<pre style="position:fixed;z-index:9999;color:red">PNG export failed: ${String(error)}</pre>`,
+      );
     });
 }
 

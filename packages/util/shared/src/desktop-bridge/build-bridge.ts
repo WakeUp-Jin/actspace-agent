@@ -14,7 +14,11 @@ export type LocalImplementations = Readonly<Record<string, (...args: never[]) =>
  * 按契约生成 bridge：invoke 补默认入参后转发，event 补默认 payload 后回调，send 直接发送，
  * local 取调用方（preload 或 mock）提供的实现。缺少 local 实现时直接抛错，避免暴露一个调用即崩的成员。
  */
-export function buildBridge<C extends BridgeContract>(contract: C, transport: BridgeTransport, locals: LocalImplementations): BridgeOf<C> {
+export function buildBridge<C extends BridgeContract>(
+  contract: C,
+  transport: BridgeTransport,
+  locals: LocalImplementations,
+): BridgeOf<C> {
   const bridge: Record<string, Record<string, unknown>> = {};
   for (const [domain, members] of Object.entries(contract)) {
     const target: Record<string, unknown> = {};
@@ -22,15 +26,19 @@ export function buildBridge<C extends BridgeContract>(contract: C, transport: Br
       switch (spec.kind) {
         case "invoke": {
           const { channel, defaultInput } = spec;
-          target[member] = defaultInput === undefined
-            ? (input?: unknown) => transport.invoke(channel, input)
-            : (input?: unknown) => transport.invoke(channel, input ?? defaultInput);
+          target[member] =
+            defaultInput === undefined
+              ? (input?: unknown) => transport.invoke(channel, input)
+              : (input?: unknown) => transport.invoke(channel, input ?? defaultInput);
           break;
         }
         case "event": {
           const { channel, defaultPayload } = spec;
           target[member] = (listener: (payload: unknown) => void) =>
-            transport.on(channel, defaultPayload === undefined ? listener : (payload) => listener(payload ?? defaultPayload));
+            transport.on(
+              channel,
+              defaultPayload === undefined ? listener : (payload) => listener(payload ?? defaultPayload),
+            );
           break;
         }
         case "send": {

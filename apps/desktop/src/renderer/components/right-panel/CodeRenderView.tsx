@@ -55,21 +55,29 @@ export function CodeRenderView({ content, language }: { content: string; languag
     [hiddenLineCount, plainLines, content],
   );
   const isLarge = plainLines.length > VIRTUAL_LINE_THRESHOLD || renderedContent.length > VIRTUAL_CHAR_THRESHOLD;
-  const highlightedLines = useMemo(() => isLarge ? [] : highlightToLines(renderedContent, language), [renderedContent, language, isLarge]);
-  const footer = hiddenLineCount > 0 ? (
-    <div className={FOOTER_CLASS} role="status">
-      {`仅渲染前 ${MAX_RENDERED_LINES.toLocaleString()} 行，另有 ${hiddenLineCount.toLocaleString()} 行未显示`}
-    </div>
-  ) : null;
-
-  if (isLarge) return (
-    <div className={ROOT_CLASS}>
-      <VirtualCodeView lines={plainLines} language={language}
-        renderLine={(index, html) => <LineRow lineNumber={index + 1} html={html} />}>
-        {footer}
-      </VirtualCodeView>
-    </div>
+  const highlightedLines = useMemo(
+    () => (isLarge ? [] : highlightToLines(renderedContent, language)),
+    [renderedContent, language, isLarge],
   );
+  const footer =
+    hiddenLineCount > 0 ? (
+      <div className={FOOTER_CLASS} role="status">
+        {`仅渲染前 ${MAX_RENDERED_LINES.toLocaleString()} 行，另有 ${hiddenLineCount.toLocaleString()} 行未显示`}
+      </div>
+    ) : null;
+
+  if (isLarge)
+    return (
+      <div className={ROOT_CLASS}>
+        <VirtualCodeView
+          lines={plainLines}
+          language={language}
+          renderLine={(index, html) => <LineRow lineNumber={index + 1} html={html} />}
+        >
+          {footer}
+        </VirtualCodeView>
+      </div>
+    );
 
   return (
     <div className={ROOT_CLASS}>
@@ -100,4 +108,3 @@ const LineRow = memo(function LineRow({ lineNumber, html }: { lineNumber: number
     </>
   );
 });
-

@@ -30,23 +30,45 @@ const userTabs = [
   { id: 8, windowId: 1, title: "Eight", url: "https://other.test/", active: false, status: "complete" },
 ];
 let nextTabId = 9;
-const calls = { attach: 0, detach: 0, cdp: 0, cdpCalls: [], close: 0, groups: [], groupUpdates: [], nativeMessages: [] };
+const calls = {
+  attach: 0,
+  detach: 0,
+  cdp: 0,
+  cdpCalls: [],
+  close: 0,
+  groups: [],
+  groupUpdates: [],
+  nativeMessages: [],
+};
 const event = () => {
   const listeners = [];
   return {
-    addListener(listener) { listeners.push(listener); },
-    emit(...args) { for (const listener of listeners) listener(...args); },
+    addListener(listener) {
+      listeners.push(listener);
+    },
+    emit(...args) {
+      for (const listener of listeners) listener(...args);
+    },
   };
 };
 const nativePort = {
   onDisconnect: event(),
   onMessage: event(),
-  postMessage(message) { calls.nativeMessages.push(message); },
+  postMessage(message) {
+    calls.nativeMessages.push(message);
+  },
 };
 const chrome = {
   action: { onClicked: event() },
   alarms: { create() {}, onAlarm: event() },
-  storage: { local: { async get() { return {}; }, async set() {} } },
+  storage: {
+    local: {
+      async get() {
+        return {};
+      },
+      async set() {},
+    },
+  },
   runtime: {
     lastError: null,
     connectNative: () => nativePort,
@@ -79,14 +101,22 @@ const chrome = {
     onRemoved: event(),
   },
   tabGroups: {
-    update: async (groupId, properties) => { calls.groupUpdates.push({ groupId, properties }); },
+    update: async (groupId, properties) => {
+      calls.groupUpdates.push({ groupId, properties });
+    },
     onRemoved: event(),
   },
   history: { search: (_query, done) => done([]) },
   downloads: { onCreated: event(), onChanged: event() },
   debugger: {
-    attach: (_target, _version, done) => { calls.attach += 1; done(); },
-    detach: (_target, done) => { calls.detach += 1; done(); },
+    attach: (_target, _version, done) => {
+      calls.attach += 1;
+      done();
+    },
+    detach: (_target, done) => {
+      calls.detach += 1;
+      done();
+    },
     sendCommand: (target, method, params, done) => {
       calls.cdp += 1;
       calls.cdpCalls.push({ target, method, params });
@@ -113,12 +143,13 @@ const context = vm.createContext({
 vm.runInContext(source, context, { filename: "background.js" });
 assert.equal(typeof context.handleNativeRequest, "function");
 
-const request = (method, params = {}) => context.handleNativeRequest({
-  protocolVersion: "0.2.0",
-  id: `${method}-${Math.random()}`,
-  method,
-  params,
-});
+const request = (method, params = {}) =>
+  context.handleNativeRequest({
+    protocolVersion: "0.2.0",
+    id: `${method}-${Math.random()}`,
+    method,
+    params,
+  });
 
 const info = await request("agent_browser_bridge.info");
 assert.equal(info.result.version, manifest.version);
@@ -151,7 +182,10 @@ assert.equal(calls.groups.length, 1);
 assert.equal(calls.groups[0].tabIds, 7);
 assert.equal(calls.groupUpdates.at(-1).properties.title, "ActSpace");
 const sessionTabs = await request("agent_browser_bridge.backend.tabs.list");
-assert.deepEqual(Array.from(sessionTabs.result, (tab) => tab.id), [7]);
+assert.deepEqual(
+  Array.from(sessionTabs.result, (tab) => tab.id),
+  [7],
+);
 
 const named = await request("agent_browser_bridge.backend.session.name", { name: "Plan 5 Acceptance" });
 assert.equal(named.ok, true);
@@ -176,7 +210,10 @@ assert.deepEqual(Array.from(finalized.result.kept), [7, 9]);
 assert.equal(calls.close, 0);
 assert.equal(calls.groupUpdates.at(-1).properties.title, "✅ actspace");
 const afterFinalize = await request("agent_browser_bridge.backend.tabs.list");
-assert.deepEqual(Array.from(afterFinalize.result, (tab) => tab.id), [7]);
+assert.deepEqual(
+  Array.from(afterFinalize.result, (tab) => tab.id),
+  [7],
+);
 
 const attached = await request("agent_browser_bridge.backend.attach", { tabId: 7 });
 assert.equal(attached.ok, true);
@@ -201,13 +238,16 @@ const agentCdp = await request("agent_browser_bridge.backend.execute_cdp", {
   commandParams: { expression: "document.title" },
 });
 assert.equal(agentCdp.ok, true);
-assert.equal(calls.cdpCalls.at(-1).target.sessionId, undefined, "Agent identity must not become a Chrome Debugger session ID");
-
-chrome.debugger.onEvent.emit(
-  { tabId: 7 },
-  "Target.attachedToTarget",
-  { sessionId: "child-session", targetInfo: { targetId: "child-target", type: "iframe" } },
+assert.equal(
+  calls.cdpCalls.at(-1).target.sessionId,
+  undefined,
+  "Agent identity must not become a Chrome Debugger session ID",
 );
+
+chrome.debugger.onEvent.emit({ tabId: 7 }, "Target.attachedToTarget", {
+  sessionId: "child-session",
+  targetInfo: { targetId: "child-target", type: "iframe" },
+});
 await new Promise((resolve) => setTimeout(resolve, 0));
 const childCdp = await request("agent_browser_bridge.backend.execute_cdp", {
   tabId: 7,
@@ -236,10 +276,10 @@ assert.equal(source.includes("window.__actspaceCursor?.version === 2"), true);
 assert.equal(source.includes("awaitPromise: true"), true);
 assert.equal(cursorSource.includes("async moveTo(x, y)"), true);
 assert.equal(cursorSource.includes("requestAnimationFrame(frame)"), true);
-assert.equal(cursorSource.includes("viewBox=\"0 0 20 24\""), true);
+assert.equal(cursorSource.includes('viewBox="0 0 20 24"'), true);
 assert.equal(cursorSource.includes('fill="#05070a" stroke="#f8fafc"'), true);
 assert.equal(cursorSource.includes('stroke-opacity=".78" stroke-width="1.15"'), true);
-assert.equal(cursorSource.includes('M2.2 2.1c-.3-.2-.6.1-.5.5'), true);
+assert.equal(cursorSource.includes("M2.2 2.1c-.3-.2-.6.1-.5.5"), true);
 
 const sessionACreated = await request("agent_browser_bridge.backend.tabs.create", {
   sessionId: "session-a",
@@ -259,14 +299,23 @@ const sessionAFinalized = await request("agent_browser_bridge.backend.session.fi
 assert.equal(sessionAFinalized.ok, true);
 assert.deepEqual(Array.from(sessionAFinalized.result.closed), [sessionACreated.result.id]);
 const sessionBTabs = await request("agent_browser_bridge.backend.tabs.list", { sessionId: "session-b" });
-assert.deepEqual(Array.from(sessionBTabs.result, (tab) => tab.id), [sessionBCreated.result.id]);
+assert.deepEqual(
+  Array.from(sessionBTabs.result, (tab) => tab.id),
+  [sessionBCreated.result.id],
+);
 assert.equal(calls.close, 1);
 
 const identity = { sessionId: "session-b", turnId: "next-turn" };
-const nextTurn = await request("agent_browser_bridge.backend.user_tabs.claim", { ...identity, tabId: sessionBCreated.result.id });
+const nextTurn = await request("agent_browser_bridge.backend.user_tabs.claim", {
+  ...identity,
+  tabId: sessionBCreated.result.id,
+});
 assert.equal(nextTurn.ok, false, "another Turn cannot steal existing ownership");
 await request("agent_browser_bridge.session.end", { sessionId: "session-b" });
-const released = await request("agent_browser_bridge.backend.user_tabs.claim", { ...identity, tabId: sessionBCreated.result.id });
+const released = await request("agent_browser_bridge.backend.user_tabs.claim", {
+  ...identity,
+  tabId: sessionBCreated.result.id,
+});
 assert.equal(released.ok, true, "session.end releases ownership");
 await request("agent_browser_bridge.session.end", identity);
 const afterEnd = await request("agent_browser_bridge.backend.tabs.list", identity);

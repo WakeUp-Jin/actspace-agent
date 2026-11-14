@@ -25,27 +25,33 @@ export function useToolToggle({
   const disabled = settingsV4?.settings.tools.disabledTools ?? settings.agent.disabledTools;
   const v4Writable = settingsV4Writable(settingsV4);
 
-  const writeDisabled = useCallback((nextDisabledTools: string[]) => {
-    if (v4Writable) {
-      void onUpdateNamespace({ namespace: "tools", patch: { disabledTools: nextDisabledTools } })
-        .then(() => notifySaved())
-        .catch((error: unknown) => {
-          console.error("Failed to update tool settings", error);
-        });
-    } else {
-      onUpdate({ agent: { disabledTools: nextDisabledTools } });
-      notifySaved();
-    }
-  }, [notifySaved, onUpdate, onUpdateNamespace, v4Writable]);
+  const writeDisabled = useCallback(
+    (nextDisabledTools: string[]) => {
+      if (v4Writable) {
+        void onUpdateNamespace({ namespace: "tools", patch: { disabledTools: nextDisabledTools } })
+          .then(() => notifySaved())
+          .catch((error: unknown) => {
+            console.error("Failed to update tool settings", error);
+          });
+      } else {
+        onUpdate({ agent: { disabledTools: nextDisabledTools } });
+        notifySaved();
+      }
+    },
+    [notifySaved, onUpdate, onUpdateNamespace, v4Writable],
+  );
 
-  const setToolEnabled = useCallback((names: string | string[], enabled: boolean) => {
-    const set = new Set(disabled);
-    for (const name of Array.isArray(names) ? names : [names]) {
-      if (enabled) set.delete(name);
-      else set.add(name);
-    }
-    writeDisabled([...set]);
-  }, [disabled, writeDisabled]);
+  const setToolEnabled = useCallback(
+    (names: string | string[], enabled: boolean) => {
+      const set = new Set(disabled);
+      for (const name of Array.isArray(names) ? names : [names]) {
+        if (enabled) set.delete(name);
+        else set.add(name);
+      }
+      writeDisabled([...set]);
+    },
+    [disabled, writeDisabled],
+  );
 
   const isEnabled = useCallback((name: string) => !disabled.includes(name), [disabled]);
 

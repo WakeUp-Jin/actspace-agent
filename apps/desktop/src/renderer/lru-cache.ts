@@ -11,8 +11,12 @@ export class LruCache<V> {
     if (!(maxCost > 0)) throw new RangeError("LruCache maxCost must be positive.");
   }
 
-  get size(): number { return this.#entries.size; }
-  get totalCost(): number { return this.#total; }
+  get size(): number {
+    return this.#entries.size;
+  }
+  get totalCost(): number {
+    return this.#total;
+  }
 
   /** Read and mark as most recently used. */
   get(key: string): V | undefined {

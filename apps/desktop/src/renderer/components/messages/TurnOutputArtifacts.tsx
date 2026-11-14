@@ -33,14 +33,25 @@ function displayArtifactPath(path: string): string {
 
 function fileName(path: string): string {
   const normalized = path.replace(/[\\/]+$/, "");
-  return normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized;
+  return (
+    normalized
+      .split(/[\\/]+/)
+      .filter(Boolean)
+      .pop() ?? normalized
+  );
 }
 
 export function collectTurnOutputArtifacts(messages: MessageBlock[]): TurnOutputImage[] {
   const outputs = new Map<string, TurnOutputImage>();
 
   for (const message of messages) {
-    if (!((message.kind === "image_generation" && (message.status === "completed" || message.status === "partial")) || (message.kind === "tool" && message.artifacts?.length))) continue;
+    if (
+      !(
+        (message.kind === "image_generation" && (message.status === "completed" || message.status === "partial")) ||
+        (message.kind === "tool" && message.artifacts?.length)
+      )
+    )
+      continue;
     const images = message.kind === "image_generation" ? message.images : message.artifacts;
     for (const image of images ?? []) {
       if (image.type !== "image" || !image.path) continue;
@@ -49,7 +60,8 @@ export function collectTurnOutputArtifacts(messages: MessageBlock[]): TurnOutput
       outputs.set(key, {
         id: key,
         name: image.name || fileName(image.path),
-        displayPath: message.kind === "tool" ? image.name || displayArtifactPath(image.path) : displayArtifactPath(image.path),
+        displayPath:
+          message.kind === "tool" ? image.name || displayArtifactPath(image.path) : displayArtifactPath(image.path),
         sourcePath: image.path,
       });
     }
@@ -65,13 +77,7 @@ function artifactReadError(error: string | undefined): string {
   return "图片读取失败。";
 }
 
-export function TurnOutputArtifacts({
-  messages,
-  sessionId,
-}: {
-  messages: MessageBlock[];
-  sessionId: string | null;
-}) {
+export function TurnOutputArtifacts({ messages, sessionId }: { messages: MessageBlock[]; sessionId: string | null }) {
   const outputs = useMemo(() => collectTurnOutputArtifacts(messages), [messages]);
   const { openTab } = useRightPanel();
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -115,14 +121,21 @@ export function TurnOutputArtifacts({
     setError(null);
     if (!sessionId) return;
     try {
-      const result = await dialogsApi.showArtifactContextMenu({ kind: "session_image", sessionId, artifactPath: artifact.sourcePath });
+      const result = await dialogsApi.showArtifactContextMenu({
+        kind: "session_image",
+        sessionId,
+        artifactPath: artifact.sourcePath,
+      });
       if (!result.shown) setError("无法打开 Artifact 菜单。");
     } catch {
       setError("无法打开 Artifact 菜单。");
     }
   }
 
-  const hasGeneratedImage = messages.some((message) => message.kind === "image_generation" && (message.status === "completed" || message.status === "partial"));
+  const hasGeneratedImage = messages.some(
+    (message) =>
+      message.kind === "image_generation" && (message.status === "completed" || message.status === "partial"),
+  );
   const summaryLabel = `${hasGeneratedImage ? "Generated " : ""}${outputs.length} ${outputs.length === 1 ? "image" : "images"}`;
 
   return (
@@ -146,11 +159,13 @@ export function TurnOutputArtifacts({
                 aria-label={`Open ${artifact.name}`}
               >
                 <span className="grid h-5 w-5 shrink-0 place-items-center text-text-faint" aria-hidden="true">
-                  {loadingId === artifact.id ? <LoaderCircle size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+                  {loadingId === artifact.id ? (
+                    <LoaderCircle size={14} className="animate-spin" />
+                  ) : (
+                    <ImageIcon size={14} />
+                  )}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-act-xs text-text-muted">
-                  {artifact.displayPath}
-                </span>
+                <span className="min-w-0 flex-1 truncate text-act-xs text-text-muted">{artifact.displayPath}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" align="start" className="max-w-[420px] break-all font-normal">

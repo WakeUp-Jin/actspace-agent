@@ -4,7 +4,9 @@
 
 export type FrameScheduler = (flush: () => void) => void;
 
-export function createFrameScheduler(requestFrame: (callback: () => void) => void = defaultRequestFrame): FrameScheduler {
+export function createFrameScheduler(
+  requestFrame: (callback: () => void) => void = defaultRequestFrame,
+): FrameScheduler {
   const queue = new Set<() => void>();
   let pending = false;
   return (flush) => {
@@ -16,7 +18,11 @@ export function createFrameScheduler(requestFrame: (callback: () => void) => voi
       const due = [...queue];
       queue.clear();
       for (const callback of due) {
-        try { callback(); } catch (error) { console.error("Frame batch callback failed", error); }
+        try {
+          callback();
+        } catch (error) {
+          console.error("Frame batch callback failed", error);
+        }
       }
     });
   };

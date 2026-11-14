@@ -25,7 +25,7 @@ const MODEL_MENU_ORIGIN_CLASS = {
   top: { start: "origin-bottom-left", end: "origin-bottom-right" },
   bottom: { start: "origin-top-left", end: "origin-top-right" },
 } as const;
-const MODEL_MENU_SCROLL_CLASS ="max-h-[290px] overflow-y-auto rounded-act-lg p-1";
+const MODEL_MENU_SCROLL_CLASS = "max-h-[290px] overflow-y-auto rounded-act-lg p-1";
 const MODEL_SEARCH_WRAP_CLASS =
   "sticky top-0 z-10 flex h-9 items-center gap-2 rounded-act-md bg-surface-raised px-2 text-text-faint";
 const MODEL_SEARCH_INPUT_CLASS =
@@ -126,8 +126,10 @@ function filterModelGroups(catalog: ModelCatalog, query: string): ModelCatalogGr
       ...group,
       models: normalizedQuery
         ? group.models.filter((model) =>
-            [model.label, model.id, model.detail ?? "", group.label]
-              .some((text) => text.toLocaleLowerCase().includes(normalizedQuery)))
+            [model.label, model.id, model.detail ?? "", group.label].some((text) =>
+              text.toLocaleLowerCase().includes(normalizedQuery),
+            ),
+          )
         : group.models,
     }))
     .filter((group) => group.models.length > 0);
@@ -141,7 +143,10 @@ function modelListEmptyText(catalog: ModelCatalog): string {
 
 /** 同一分组里有同名模型时，第二行显示详情区分。 */
 function showModelDetail(group: ModelCatalogGroup, spec: CatalogModel): boolean {
-  return Boolean(spec.detail) && group.models.filter((model) => normalizeLabel(model.label) === normalizeLabel(spec.label)).length > 1;
+  return (
+    Boolean(spec.detail) &&
+    group.models.filter((model) => normalizeLabel(model.label) === normalizeLabel(spec.label)).length > 1
+  );
 }
 
 /**
@@ -153,7 +158,9 @@ export function ModelPicker({ open, onOpenChange, triggerLabel, triggerTitle, di
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <button className={MODEL_BUTTON_CLASS} type="button" disabled={disabled}>
-          <span className={MODEL_BUTTON_TEXT_CLASS} title={triggerTitle}>{triggerLabel}</span>
+          <span className={MODEL_BUTTON_TEXT_CLASS} title={triggerTitle}>
+            {triggerLabel}
+          </span>
           <ChevronDown size={14} aria-hidden="true" />
         </button>
       </PopoverTrigger>
@@ -165,7 +172,15 @@ export function ModelPicker({ open, onOpenChange, triggerLabel, triggerTitle, di
 // 只在打开时挂载：搜索词、正在编辑的模型这些状态随浮层关闭一起丢掉。
 // 设置页的模型下拉也复用这个菜单，外面自己包 Popover 和触发器。
 export function ModelPickerMenu({
-  catalog, selectedModelId, onSelect, options, optionsPanel, side = "top", align = "start", ariaLabel = "模型", pinned = [],
+  catalog,
+  selectedModelId,
+  onSelect,
+  options,
+  optionsPanel,
+  side = "top",
+  align = "start",
+  ariaLabel = "模型",
+  pinned = [],
 }: ModelPickerMenuProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [hoveredModelId, setHoveredModelId] = useState<string | null>(null);
@@ -245,7 +260,10 @@ export function ModelPickerMenu({
         {pinnedRows.map((spec) => {
           const selected = spec.id === selectedModelId;
           return (
-            <div className={`${MODEL_MENU_ROW_CLASS} ${selected ? MODEL_MENU_ROW_SELECTED_CLASS : ""}`} key={`pinned:${spec.id}`}>
+            <div
+              className={`${MODEL_MENU_ROW_CLASS} ${selected ? MODEL_MENU_ROW_SELECTED_CLASS : ""}`}
+              key={`pinned:${spec.id}`}
+            >
               <Button
                 variant="ghost"
                 className={`model-select-button min-w-0 flex-1 justify-start text-left ${selected ? "pr-[58px]" : "pr-[46px]"}`}
@@ -260,12 +278,7 @@ export function ModelPickerMenu({
           );
         })}
         {filteredGroups.map((group) => (
-          <div
-            className={MODEL_PROVIDER_GROUP_CLASS}
-            key={group.key}
-            role="group"
-            aria-label={group.label}
-          >
+          <div className={MODEL_PROVIDER_GROUP_CLASS} key={group.key} role="group" aria-label={group.label}>
             <div className={MODEL_PROVIDER_LABEL_CLASS}>{group.label}</div>
             {group.models.map((spec) => {
               const selected = spec.id === selectedModelId;
@@ -323,7 +336,9 @@ export function ModelPickerMenu({
                             setOptionsOffset(Math.min(rowOffset, maxOffset));
                             // 右边放不下 Options 时放到左边。
                             const roomOnRight = window.innerWidth - menu.getBoundingClientRect().right;
-                            setOptionsSide(roomOnRight < MODEL_OPTIONS_WIDTH_PX + MODEL_OPTIONS_GAP_PX * 2 ? "left" : "right");
+                            setOptionsSide(
+                              roomOnRight < MODEL_OPTIONS_WIDTH_PX + MODEL_OPTIONS_GAP_PX * 2 ? "left" : "right",
+                            );
                           }
                           setEditingModelId(spec.id);
                         }}
@@ -394,9 +409,7 @@ function ModelOptionsBody({ spec, options }: { spec: ComposerModelOption; option
       ) : null}
       {efforts.length > 0 ? (
         <>
-          {(spec.supportsThinkingToggle || spec.reasoningMandatory) ? (
-            <div className={OPTION_SEPARATOR_CLASS} />
-          ) : null}
+          {spec.supportsThinkingToggle || spec.reasoningMandatory ? <div className={OPTION_SEPARATOR_CLASS} /> : null}
           <div className={DROPDOWN_LABEL_CLASS}>Effort</div>
           {spec.provider !== "deepseek" ? (
             <button

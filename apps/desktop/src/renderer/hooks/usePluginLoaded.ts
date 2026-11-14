@@ -9,10 +9,17 @@ export function usePluginLoaded(id: string): boolean | undefined {
   const [loaded, setLoaded] = useState<boolean | undefined>(undefined);
   useEffect(() => {
     let canceled = false;
-    void pluginsApi.list()
-      .then((items) => { if (!canceled) setLoaded(items.find((item) => item.id === id)?.loaded === true); })
-      .catch(() => { if (!canceled) setLoaded(false); });
-    return () => { canceled = true; };
+    void pluginsApi
+      .list()
+      .then((items) => {
+        if (!canceled) setLoaded(items.find((item) => item.id === id)?.loaded === true);
+      })
+      .catch(() => {
+        if (!canceled) setLoaded(false);
+      });
+    return () => {
+      canceled = true;
+    };
   }, [id]);
   return loaded;
 }

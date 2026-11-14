@@ -12,30 +12,72 @@ import { RuntimeSessionController } from "../session/session-controller.js";
 
 it("owns a Chat fork before first send, publishes changes and releases its writer on shutdown", async () => {
   const root = await mkdtemp(join(tmpdir(), "desktop-fork-"));
-  const sessions = new RuntimeSessionController({ dataRoot: root, runtimeId: "fork-test", registry: createCoreCodecRegistry(), profileId: "test", manifestDigest: "test", plugins: [] }, new SessionStore({ registry: createCoreCodecRegistry() }, new JsonlSessionStorage({ dataRoot: root, runtimeId: "fork-test", registry: createCoreCodecRegistry() })));
+  const sessions = new RuntimeSessionController(
+    {
+      dataRoot: root,
+      runtimeId: "fork-test",
+      registry: createCoreCodecRegistry(),
+      profileId: "test",
+      manifestDigest: "test",
+      plugins: [],
+    },
+    new SessionStore(
+      { registry: createCoreCodecRegistry() },
+      new JsonlSessionStorage({ dataRoot: root, runtimeId: "fork-test", registry: createCoreCodecRegistry() }),
+    ),
+  );
   const attached = new Map<string, SessionHandle>();
   const runs = {
-    inspectCapability: (_key: { readonly id: string }, inspect: (service: { hasRunningBackgroundTask: (sessionId: string) => boolean }) => unknown) => inspect({ hasRunningBackgroundTask: sessionId => sessionId === "parent" && backgroundRunning }),
+    inspectCapability: (
+      _key: { readonly id: string },
+      inspect: (service: { hasRunningBackgroundTask: (sessionId: string) => boolean }) => unknown,
+    ) => inspect({ hasRunningBackgroundTask: (sessionId) => sessionId === "parent" && backgroundRunning }),
     configuration: () => ({}),
-    service: { exclusive: async (_id: string, operation: () => Promise<unknown>) => operation(), submit: async (sessionId: string) => {
-      const session = attached.get(sessionId)!;
-      expect(await sessions.resume(sessionId)).toBe(session);
-      await session.append({ type: "session/title-set", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { title: "fork replied" }, surface: null });
-      await session.flush();
-      return { task: { taskId: "fork-task" } };
-    } },
+    service: {
+      exclusive: async (_id: string, operation: () => Promise<unknown>) => operation(),
+      submit: async (sessionId: string) => {
+        const session = attached.get(sessionId)!;
+        expect(await sessions.resume(sessionId)).toBe(session);
+        await session.append({
+          type: "session/title-set",
+          eventVersion: 1,
+          source: { ownerPluginId: "@actspace/core" },
+          data: { title: "fork replied" },
+          surface: null,
+        });
+        await session.flush();
+        return { task: { taskId: "fork-task" } };
+      },
+    },
     isActive: () => false,
-    initialize: async (sessionId: string) => { attached.set(sessionId, await sessions.resume(sessionId)); },
-
+    initialize: async (sessionId: string) => {
+      attached.set(sessionId, await sessions.resume(sessionId));
+    },
   };
   let backgroundRunning = false;
-  const services = new Map<string, unknown>([["session.runtime", sessions], ["agent.runtime", { runs, backgroundTasks: { hasRunning: (sessionId?: string) => sessionId === "parent" && backgroundRunning } }], ["compaction.runtime", {}], ["llm.service", {}], ["tools.shell-tools", { hasRunningBackgroundTask: (sessionId: string) => sessionId === "parent" && backgroundRunning }]]);
+  const services = new Map<string, unknown>([
+    ["session.runtime", sessions],
+    [
+      "agent.runtime",
+      { runs, backgroundTasks: { hasRunning: (sessionId?: string) => sessionId === "parent" && backgroundRunning } },
+    ],
+    ["compaction.runtime", {}],
+    ["llm.service", {}],
+    [
+      "tools.shell-tools",
+      { hasRunningBackgroundTask: (sessionId: string) => sessionId === "parent" && backgroundRunning },
+    ],
+  ]);
   const app = new DesktopAppService({ get: (id: string) => services.get(id) } as CordisContext);
   try {
     const parent = await sessions.create("parent", "/workspace", "chat");
     const unboundChat = await sessions.create("unbound-chat", undefined, "chat");
     await expect(app.updateSessionAgentMode("unbound-chat", "plan", 0)).rejects.toThrow("WORKSPACE_REQUIRED");
-    expect(sessions.snapshot(unboundChat)).toMatchObject({ workspaceRoot: null, agentMode: "chat", agentModeRevision: 0 });
+    expect(sessions.snapshot(unboundChat)).toMatchObject({
+      workspaceRoot: null,
+      agentMode: "chat",
+      agentModeRevision: 0,
+    });
     await app.updateSessionMetadata("parent", { title: "parent" });
     const beforeModeSwitch = parent.journal.events.length - 1;
     backgroundRunning = true;
@@ -52,11 +94,16 @@ it("owns a Chat fork before first send, publishes changes and releases its write
     await app.submitTask("child", "fork-run", "hello");
     expect(await app.inspectSession("child")).toMatchObject({ metadata: { title: "fork replied" } });
     expect(sessions.getOpen("child")).toBe(attached.get("child"));
-    expect((await sessions.browseSessions()).items.find(item => item.sessionId === "child")?.metadata.title).toBe("fork replied");
+    expect((await sessions.browseSessions()).items.find((item) => item.sessionId === "child")?.metadata.title).toBe(
+      "fork replied",
+    );
     await sessions.closeAll();
     expect(await sessions.inspect("parent")).toMatchObject({ agentMode: "plan", agentModeRevision: 1 });
     expect(await sessions.inspect("child")).toMatchObject({ agentMode: "chat", agentModeRevision: 0 });
-    expect((await sessions.browseSessions()).items.find(item => item.sessionId === "parent")).toMatchObject({ agentMode: "plan", agentModeRevision: 1 });
+    expect((await sessions.browseSessions()).items.find((item) => item.sessionId === "parent")).toMatchObject({
+      agentMode: "plan",
+      agentModeRevision: 1,
+    });
     const reopened = await sessions.store.open("child");
     await reopened.close();
   } finally {

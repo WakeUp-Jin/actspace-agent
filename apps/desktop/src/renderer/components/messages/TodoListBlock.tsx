@@ -56,7 +56,9 @@ export function TodoListBlock({
       </button>
       {expanded && message.todos.length > 0 ? (
         <ol className={attached ? ATTACHED_LIST_CLASS : LIST_CLASS}>
-          {message.todos.map((todo) => <TodoRow key={todo.id} todo={todo} />)}
+          {message.todos.map((todo) => (
+            <TodoRow key={todo.id} todo={todo} />
+          ))}
         </ol>
       ) : null}
     </section>
@@ -67,9 +69,7 @@ function TodoRow({ todo }: { todo: TodoItem }) {
   const completed = todo.status === "completed";
   const inProgress = todo.status === "in_progress";
   const Icon = completed ? CircleCheck : inProgress ? LoaderCircle : Circle;
-  const iconClass = completed
-    ? "text-text-faint"
-    : inProgress ? "text-operational" : "text-text-faint";
+  const iconClass = completed ? "text-text-faint" : inProgress ? "text-operational" : "text-text-faint";
   const contentClass = completed
     ? "break-words leading-5 text-text-faint line-through"
     : "break-words leading-5 text-text-main";

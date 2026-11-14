@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { CODEX_APPROVAL_POLICY_VALUES, CODEX_SANDBOX_VALUES, DEFAULT_EXTERNAL_SUBAGENT_SETTINGS } from "@actspace/shared";
+import {
+  CODEX_APPROVAL_POLICY_VALUES,
+  CODEX_SANDBOX_VALUES,
+  DEFAULT_EXTERNAL_SUBAGENT_SETTINGS,
+} from "@actspace/shared";
 import { CODEX_APPROVAL_POLICIES, CODEX_SANDBOX_MODES, DEFAULT_CODEX_CONFIG } from "../backend.js";
 
 // 桌面设置页（renderer 不能 import 后端包）用 shared 里的取值表；这里钉住它和插件包一致。

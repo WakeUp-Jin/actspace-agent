@@ -13,20 +13,113 @@ export type PathRef = {
 
 /** 不含 `/` 时，只认这些扩展名：避免把 `config.yaml` 以外的 `obj.method`、`console.log` 认成文件。 */
 const COMMON_EXT = new Set([
-  "md", "markdown", "mdx", "txt", "rst",
-  "ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs", "json", "jsonc", "json5",
-  "css", "scss", "sass", "less", "html", "htm", "vue", "svelte", "astro",
-  "py", "pyi", "ipynb", "rs", "go", "java", "kt", "kts", "swift", "rb", "php", "lua", "dart", "scala", "ex", "exs", "erl", "hs", "clj",
-  "c", "h", "cc", "cpp", "cxx", "hpp", "hh", "m", "mm", "cs", "fs", "zig", "nim", "sol",
-  "sh", "bash", "zsh", "fish", "ps1", "bat", "cmd",
-  "yml", "yaml", "toml", "ini", "cfg", "conf", "env", "xml", "plist", "properties", "gradle", "lock",
-  "sql", "graphql", "gql", "proto", "prisma", "csv", "tsv",
-  "svg", "png", "jpg", "jpeg", "gif", "webp", "ico", "bmp", "avif", "pdf",
-  "dockerfile", "makefile", "mk", "cmake", "tf", "nix", "patch", "diff",
+  "md",
+  "markdown",
+  "mdx",
+  "txt",
+  "rst",
+  "ts",
+  "tsx",
+  "mts",
+  "cts",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+  "json",
+  "jsonc",
+  "json5",
+  "css",
+  "scss",
+  "sass",
+  "less",
+  "html",
+  "htm",
+  "vue",
+  "svelte",
+  "astro",
+  "py",
+  "pyi",
+  "ipynb",
+  "rs",
+  "go",
+  "java",
+  "kt",
+  "kts",
+  "swift",
+  "rb",
+  "php",
+  "lua",
+  "dart",
+  "scala",
+  "ex",
+  "exs",
+  "erl",
+  "hs",
+  "clj",
+  "c",
+  "h",
+  "cc",
+  "cpp",
+  "cxx",
+  "hpp",
+  "hh",
+  "m",
+  "mm",
+  "cs",
+  "fs",
+  "zig",
+  "nim",
+  "sol",
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "ps1",
+  "bat",
+  "cmd",
+  "yml",
+  "yaml",
+  "toml",
+  "ini",
+  "cfg",
+  "conf",
+  "env",
+  "xml",
+  "plist",
+  "properties",
+  "gradle",
+  "lock",
+  "sql",
+  "graphql",
+  "gql",
+  "proto",
+  "prisma",
+  "csv",
+  "tsv",
+  "svg",
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "ico",
+  "bmp",
+  "avif",
+  "pdf",
+  "dockerfile",
+  "makefile",
+  "mk",
+  "cmake",
+  "tf",
+  "nix",
+  "patch",
+  "diff",
 ]);
 
 /** 一段路径：可选 `./`、`../` 前缀，若干目录，文件名必须带扩展名，可带 `:行号` 或 `:行号-行号`。 */
-const PATH_RE = /^((?:\.{1,2}\/)*(?:[\w@\u4e00-\u9fa5.+-]+\/)*[\w@\u4e00-\u9fa5+-][\w@\u4e00-\u9fa5.+-]*\.([A-Za-z][\w]{0,9}))(?::(\d+)(?:-(\d+))?)?$/;
+const PATH_RE =
+  /^((?:\.{1,2}\/)*(?:[\w@\u4e00-\u9fa5.+-]+\/)*[\w@\u4e00-\u9fa5+-][\w@\u4e00-\u9fa5.+-]*\.([A-Za-z][\w]{0,9}))(?::(\d+)(?:-(\d+))?)?$/;
 
 /**
  * 行内代码的整段文字是不是一个文件路径（D12）。
@@ -38,9 +131,10 @@ const PATH_RE = /^((?:\.{1,2}\/)*(?:[\w@\u4e00-\u9fa5.+-]+\/)*[\w@\u4e00-\u9fa5+
  */
 export function parseInlinePath(text: string, { absolute = false }: { absolute?: boolean } = {}): PathRef | null {
   if (!text || text.length > 400 || /\s/.test(text)) return null;
-  const root = absolute ? /^(?:[A-Za-z]:[\\/]|\/)(?!\/)/.exec(text)?.[0] ?? "" : "";
+  const root = absolute ? (/^(?:[A-Za-z]:[\\/]|\/)(?!\/)/.exec(text)?.[0] ?? "") : "";
   const rest = root ? text.slice(root.length).replace(/\\/g, "/") : text;
-  if (/^[a-z][a-z0-9+.-]*:/i.test(rest) || rest.startsWith("/") || rest.startsWith("~") || /^[A-Za-z]:[\\/]/.test(rest)) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(rest) || rest.startsWith("/") || rest.startsWith("~") || /^[A-Za-z]:[\\/]/.test(rest))
+    return null;
   const m = PATH_RE.exec(rest);
   if (!m) return null;
   const [, relative, ext, line, lineEnd] = m;
@@ -101,7 +195,10 @@ export type ResolveOptions = {
 /**
  * 解析成工作区相对路径；越出工作区、工作区外的绝对路径、`~` 开头的，返回 null（不可点）。
  */
-export function resolveWorkspacePath(raw: string, { baseDir = "", workspaceRoot, plainRelativeToBase = false }: ResolveOptions = {}): string | null {
+export function resolveWorkspacePath(
+  raw: string,
+  { baseDir = "", workspaceRoot, plainRelativeToBase = false }: ResolveOptions = {},
+): string | null {
   let path = raw.trim().replace(/\\/g, "/");
   if (!path || path.startsWith("~")) return null;
   if (path.startsWith("/") || /^[A-Za-z]:\//.test(path)) {
@@ -142,5 +239,9 @@ export function isAbsolutePath(path: string): boolean {
 }
 
 function safeDecode(value: string): string {
-  try { return decodeURI(value); } catch { return value; }
+  try {
+    return decodeURI(value);
+  } catch {
+    return value;
+  }
 }

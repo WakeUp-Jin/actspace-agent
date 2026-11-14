@@ -7,21 +7,41 @@ import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { BLOCK_COMPONENTS } from "../components/messages/markdown/components-map";
 import { BlockStateContext } from "../components/messages/markdown/contexts";
 import type { HastNode } from "../components/messages/markdown/hast-types";
-import { rehypeStreamTail, TAIL_LEVELS, type StreamTailOptions } from "../components/messages/markdown/rehype-stream-tail";
+import {
+  rehypeStreamTail,
+  TAIL_LEVELS,
+  type StreamTailOptions,
+} from "../components/messages/markdown/rehype-stream-tail";
 import { NO_TAIL, StreamTailContext, type StreamTail } from "../components/messages/markdown/StreamTail";
 import { nextCut, snapCut, useSmoothText } from "../components/messages/markdown/smooth-text";
 
 /** 流式效果：末尾渐显、光标、平滑输出（规范 §7，T19）。 */
 
 const text = (value: string): HastNode => ({ type: "text", value });
-const el = (tagName: string, children: HastNode[], className?: string[]): HastNode => ({ type: "element", tagName, properties: className ? { className } : {}, children });
+const el = (tagName: string, children: HastNode[], className?: string[]): HastNode => ({
+  type: "element",
+  tagName,
+  properties: className ? { className } : {},
+  children,
+});
 
 /** 插件只放占位元素，渐显和光标由组件按尾巴生成：跑插件，再用和聊天区一样的组件映射渲染成 DOM。 */
-function renderTail(children: HastNode[], tail: StreamTail = NO_TAIL, options?: StreamTailOptions, source = ""): HTMLElement {
+function renderTail(
+  children: HastNode[],
+  tail: StreamTail = NO_TAIL,
+  options?: StreamTailOptions,
+  source = "",
+): HTMLElement {
   const tree = el("root", children);
   tree.type = "root";
   rehypeStreamTail(options)(tree);
-  const output = toJsxRuntime(tree as never, { Fragment, jsx, jsxs, components: BLOCK_COMPONENTS as never, passNode: true });
+  const output = toJsxRuntime(tree as never, {
+    Fragment,
+    jsx,
+    jsxs,
+    components: BLOCK_COMPONENTS as never,
+    passNode: true,
+  });
   const { container } = render(
     <BlockStateContext.Provider value={{ source, fenceOpen: false }}>
       <StreamTailContext.Provider value={tail}>{output}</StreamTailContext.Provider>
@@ -29,7 +49,10 @@ function renderTail(children: HastNode[], tail: StreamTail = NO_TAIL, options?: 
   );
   return container;
 }
-const levelText = (root: Element, level: number) => Array.from(root.querySelectorAll(`.md-tail-${level}`)).map((node) => node.textContent).join("");
+const levelText = (root: Element, level: number) =>
+  Array.from(root.querySelectorAll(`.md-tail-${level}`))
+    .map((node) => node.textContent)
+    .join("");
 
 describe("rehypeStreamTail + 尾巴组件", () => {
   it("光标放在结尾空白之前，不落在结尾换行后面", () => {
@@ -66,7 +89,12 @@ describe("rehypeStreamTail + 尾巴组件", () => {
   });
 
   it("标了批注排除的节点内部也不参与", () => {
-    const excluded: HastNode = { type: "element", tagName: "span", properties: { dataAnnotationExclude: "" }, children: [text("隐藏")] };
+    const excluded: HastNode = {
+      type: "element",
+      tagName: "span",
+      properties: { dataAnnotationExclude: "" },
+      children: [text("隐藏")],
+    };
     const root = renderTail([el("p", [text("可见"), excluded])]);
     expect(root.querySelector("[data-annotation-exclude]")!.querySelector(".md-tail")).toBeNull();
   });
@@ -120,7 +148,9 @@ describe("rehypeStreamTail + 尾巴组件", () => {
   });
 
   it("没闭合的代码块：尾巴接在代码最后一行的行尾，不高亮、不放光标；源码以换行结尾时另起一行", () => {
-    const code = () => [el("pre", [el("code", [el("span", [text("const")], ["hljs-keyword"]), text(" a = 1;\n")], ["language-ts"])])];
+    const code = () => [
+      el("pre", [el("code", [el("span", [text("const")], ["hljs-keyword"]), text(" a = 1;\n")], ["language-ts"])]),
+    ];
     const sameLine = renderTail(code(), { text: "0", lead: "" }, undefined, "```ts\nconst a = 1;");
     expect(sameLine.querySelector("code")!.textContent).toBe("const a = 1;0\n");
     expect(sameLine.querySelector(".md-caret")).toBeNull();
@@ -133,8 +163,17 @@ describe("rehypeStreamTail + 尾巴组件", () => {
   });
 
   it("隐藏的脚注区不接尾巴、不渐显：落在它前面的正文上", () => {
-    const section: HastNode = { type: "element", tagName: "section", properties: { dataFootnotes: true }, children: [el("ol", [el("li", [el("p", [text("注释")])])])] };
-    const root = renderTail([el("p", [text("正文")]), text("\n"), section], { text: "续", lead: "" }, { skipFootnoteSection: true });
+    const section: HastNode = {
+      type: "element",
+      tagName: "section",
+      properties: { dataFootnotes: true },
+      children: [el("ol", [el("li", [el("p", [text("注释")])])])],
+    };
+    const root = renderTail(
+      [el("p", [text("正文")]), text("\n"), section],
+      { text: "续", lead: "" },
+      { skipFootnoteSection: true },
+    );
     expect(root.querySelector("section")).toBeNull();
     expect(root.querySelector("p")!.textContent).toBe("正文续");
   });
@@ -229,13 +268,25 @@ describe("useSmoothText", () => {
   let frames: Array<() => void>;
   beforeEach(() => {
     frames = [];
-    vi.stubGlobal("requestAnimationFrame", (callback: () => void) => { frames.push(callback); return frames.length; });
+    vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
+      frames.push(callback);
+      return frames.length;
+    });
     vi.stubGlobal("cancelAnimationFrame", () => {});
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  const tick = () => act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); });
-  const settle = () => { for (let i = 0; i < 200 && frames.length > 0; i += 1) tick(); };
+  const tick = () =>
+    act(() => {
+      const batch = frames;
+      frames = [];
+      batch.forEach((callback) => {
+        callback();
+      });
+    });
+  const settle = () => {
+    for (let i = 0; i < 200 && frames.length > 0; i += 1) tick();
+  };
 
   it("首次挂载已有的内容整段直接显示", () => {
     const { result } = renderHook(() => useSmoothText("已经有的一大段内容", true));
@@ -243,7 +294,9 @@ describe("useSmoothText", () => {
   });
 
   it("流式中追加的内容按帧放出，放完后没有积压", () => {
-    const { result, rerender } = renderHook(({ target }) => useSmoothText(target, true), { initialProps: { target: "开头" } });
+    const { result, rerender } = renderHook(({ target }) => useSmoothText(target, true), {
+      initialProps: { target: "开头" },
+    });
     const next = "开头" + "追加".repeat(30);
     rerender({ target: next });
     expect(result.current.text).toBe("开头");
@@ -257,7 +310,9 @@ describe("useSmoothText", () => {
   });
 
   it("每帧放出的字数 = ceil(积压/12)", () => {
-    const { result, rerender } = renderHook(({ target }) => useSmoothText(target, true), { initialProps: { target: "" } });
+    const { result, rerender } = renderHook(({ target }) => useSmoothText(target, true), {
+      initialProps: { target: "" },
+    });
     rerender({ target: "x".repeat(120) });
     tick();
     expect(result.current.text.length).toBe(10);
@@ -266,7 +321,9 @@ describe("useSmoothText", () => {
   });
 
   it("流式结束后，剩下的积压继续放完", () => {
-    const { result, rerender } = renderHook(({ target, streaming }) => useSmoothText(target, streaming), { initialProps: { target: "a", streaming: true } });
+    const { result, rerender } = renderHook(({ target, streaming }) => useSmoothText(target, streaming), {
+      initialProps: { target: "a", streaming: true },
+    });
     const next = "a" + "b".repeat(60);
     rerender({ target: next, streaming: true });
     tick();
@@ -278,7 +335,9 @@ describe("useSmoothText", () => {
 
   it("收尾围栏没写完时停在行首，下一批到达或流式结束后再放", () => {
     const head = "```ts\nconst a = 1;\n";
-    const { result, rerender } = renderHook(({ target, streaming }) => useSmoothText(target, streaming), { initialProps: { target: "", streaming: true } });
+    const { result, rerender } = renderHook(({ target, streaming }) => useSmoothText(target, streaming), {
+      initialProps: { target: "", streaming: true },
+    });
     rerender({ target: `${head}\`\``, streaming: true });
     settle();
     expect(result.current).toEqual({ text: head, backlog: true });
@@ -296,20 +355,26 @@ describe("useSmoothText", () => {
   });
 
   it("内容变短（重新生成）时直接显示全部", () => {
-    const { result, rerender } = renderHook(({ target }) => useSmoothText(target, true), { initialProps: { target: "很长很长的旧回复" } });
+    const { result, rerender } = renderHook(({ target }) => useSmoothText(target, true), {
+      initialProps: { target: "很长很长的旧回复" },
+    });
     rerender({ target: "新" });
     expect(result.current).toEqual({ text: "新", backlog: false });
   });
 
   it("不是在末尾追加（被改写）时直接显示全部", () => {
-    const { result, rerender } = renderHook(({ target }) => useSmoothText(target, true), { initialProps: { target: "旧回复内容" } });
+    const { result, rerender } = renderHook(({ target }) => useSmoothText(target, true), {
+      initialProps: { target: "旧回复内容" },
+    });
     rerender({ target: "完全不同的另一条回复，比较长一些" });
     expect(result.current.backlog).toBe(false);
     expect(result.current.text).toBe("完全不同的另一条回复，比较长一些");
   });
 
   it("不在流式中时，追加的内容直接显示全部", () => {
-    const { result, rerender } = renderHook(({ target }) => useSmoothText(target, false), { initialProps: { target: "a" } });
+    const { result, rerender } = renderHook(({ target }) => useSmoothText(target, false), {
+      initialProps: { target: "a" },
+    });
     rerender({ target: "a" + "b".repeat(50) });
     expect(result.current.backlog).toBe(false);
     expect(result.current.text).toHaveLength(51);
@@ -320,11 +385,21 @@ describe("MarkdownProse 流式效果", () => {
   let frames: Array<() => void>;
   beforeEach(() => {
     frames = [];
-    vi.stubGlobal("requestAnimationFrame", (callback: () => void) => { frames.push(callback); return frames.length; });
+    vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
+      frames.push(callback);
+      return frames.length;
+    });
     vi.stubGlobal("cancelAnimationFrame", () => {});
   });
   afterEach(() => vi.unstubAllGlobals());
-  const tick = () => act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); });
+  const tick = () =>
+    act(() => {
+      const batch = frames;
+      frames = [];
+      batch.forEach((callback) => {
+        callback();
+      });
+    });
 
   function stream(content: string, streaming: boolean) {
     return (

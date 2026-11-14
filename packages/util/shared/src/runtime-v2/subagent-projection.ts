@@ -1,7 +1,15 @@
 import type { RuntimeJsonValue } from "./host-dto";
 import {
-  SUBAGENT_ACTIVATION_STATUSES, SUBAGENT_DELIVERIES, SUBAGENT_KINDS, SUBAGENT_PRESETS,
-  type SubagentActivationStatus, type SubagentActivationTrigger, type SubagentDelivery, type SubagentKind, type SubagentPreset, type SubagentStatus,
+  SUBAGENT_ACTIVATION_STATUSES,
+  SUBAGENT_DELIVERIES,
+  SUBAGENT_KINDS,
+  SUBAGENT_PRESETS,
+  type SubagentActivationStatus,
+  type SubagentActivationTrigger,
+  type SubagentDelivery,
+  type SubagentKind,
+  type SubagentPreset,
+  type SubagentStatus,
 } from "./subagents";
 
 /**
@@ -48,7 +56,10 @@ export type SubagentView = {
   readonly activations: readonly SubagentActivationView[];
 };
 
-export type SubagentTree = { readonly order: readonly string[]; readonly agents: Readonly<Record<string, SubagentView>> };
+export type SubagentTree = {
+  readonly order: readonly string[];
+  readonly agents: Readonly<Record<string, SubagentView>>;
+};
 
 export const EMPTY_SUBAGENT_TREE: SubagentTree = Object.freeze({ order: Object.freeze([]), agents: Object.freeze({}) });
 
@@ -57,11 +68,16 @@ type FoldableEvent = { readonly type: string; readonly time?: string; readonly d
 export function reduceSubagentTree(state: SubagentTree, event: FoldableEvent): SubagentTree {
   const data = record(event.data);
   switch (event.type) {
-    case "subagent/spawned": return spawned(state, data);
-    case "subagent/activation": return activation(state, data);
-    case "delegation/requested": return legacyRequested(state, data, event.time ?? "");
-    case "delegation/completed": return legacyCompleted(state, data, event.time ?? "");
-    default: return state;
+    case "subagent/spawned":
+      return spawned(state, data);
+    case "subagent/activation":
+      return activation(state, data);
+    case "delegation/requested":
+      return legacyRequested(state, data, event.time ?? "");
+    case "delegation/completed":
+      return legacyCompleted(state, data, event.time ?? "");
+    default:
+      return state;
   }
 }
 
@@ -73,7 +89,7 @@ export function foldSubagentTree(events: Iterable<FoldableEvent>): SubagentTree 
 
 /** Subagents the model may see and message: everything except old `delegation/*` records. */
 export function listedSubagents(tree: SubagentTree): readonly SubagentView[] {
-  return tree.order.map(id => tree.agents[id]).filter(agent => !agent.legacy);
+  return tree.order.map((id) => tree.agents[id]).filter((agent) => !agent.legacy);
 }
 
 export function runningActivation(agent: SubagentView): SubagentActivationView | undefined {
@@ -83,7 +99,7 @@ export function runningActivation(agent: SubagentView): SubagentActivationView |
 
 /** Running activations across every kind; the per-Session limit counts these. */
 export function runningSubagentCount(tree: SubagentTree): number {
-  return listedSubagents(tree).filter(agent => runningActivation(agent) !== undefined).length;
+  return listedSubagents(tree).filter((agent) => runningActivation(agent) !== undefined).length;
 }
 
 /** The model the subagent ran with most recently, if any activation recorded one. */
@@ -96,13 +112,27 @@ export function lastActivationModel(agent: SubagentView): string | undefined {
 }
 
 function spawned(state: SubagentTree, data: Readonly<Record<string, RuntimeJsonValue>>): SubagentTree {
-  const agentId = text(data.agentId), callId = text(data.callId), description = typeof data.description === "string" ? data.description : null;
-  const transcriptPath = text(data.transcriptPath), createdAt = text(data.createdAt);
-  if (!agentId || !callId || description === null || !transcriptPath || !createdAt || !oneOf(data.kind, SUBAGENT_KINDS)) return state;
+  const agentId = text(data.agentId),
+    callId = text(data.callId),
+    description = typeof data.description === "string" ? data.description : null;
+  const transcriptPath = text(data.transcriptPath),
+    createdAt = text(data.createdAt);
+  if (!agentId || !callId || description === null || !transcriptPath || !createdAt || !oneOf(data.kind, SUBAGENT_KINDS))
+    return state;
   if (state.agents[agentId]) return state;
-  const toolNames = Array.isArray(data.toolNames) ? data.toolNames.filter((name): name is string => typeof name === "string") : undefined;
+  const toolNames = Array.isArray(data.toolNames)
+    ? data.toolNames.filter((name): name is string => typeof name === "string")
+    : undefined;
   const view: SubagentView = {
-    agentId, kind: data.kind, description, transcriptPath, callId, createdAt, legacy: false, status: "closed", activations: [],
+    agentId,
+    kind: data.kind,
+    description,
+    transcriptPath,
+    callId,
+    createdAt,
+    legacy: false,
+    status: "closed",
+    activations: [],
     ...(oneOf(data.preset, SUBAGENT_PRESETS) ? { preset: data.preset } : {}),
     ...(typeof data.inheritedThroughSeq === "number" ? { inheritedThroughSeq: data.inheritedThroughSeq } : {}),
     ...(toolNames ? { toolNames } : {}),
@@ -111,60 +141,119 @@ function spawned(state: SubagentTree, data: Readonly<Record<string, RuntimeJsonV
 }
 
 function activation(state: SubagentTree, data: Readonly<Record<string, RuntimeJsonValue>>): SubagentTree {
-  const agentId = text(data.agentId), activationId = text(data.activationId);
+  const agentId = text(data.agentId),
+    activationId = text(data.activationId);
   const current = agentId ? state.agents[agentId] : undefined;
   if (!current || !activationId) return state;
   if (data.op === "start") {
-    const callId = text(data.callId), startedAt = text(data.startedAt);
-    if (!callId || !startedAt || (data.trigger !== "spawn" && data.trigger !== "message") || current.activations.some(item => item.activationId === activationId)) return state;
-    const senderId = text(data.senderId), model = text(data.model), reasoningEffort = text(data.reasoningEffort);
+    const callId = text(data.callId),
+      startedAt = text(data.startedAt);
+    if (
+      !callId ||
+      !startedAt ||
+      (data.trigger !== "spawn" && data.trigger !== "message") ||
+      current.activations.some((item) => item.activationId === activationId)
+    )
+      return state;
+    const senderId = text(data.senderId),
+      model = text(data.model),
+      reasoningEffort = text(data.reasoningEffort);
     const started: SubagentActivationView = {
-      activationId, trigger: data.trigger, callId, background: data.background === true, startedAt,
-      ...(senderId ? { senderId } : {}), ...(model ? { model } : {}), ...(reasoningEffort ? { reasoningEffort } : {}),
+      activationId,
+      trigger: data.trigger,
+      callId,
+      background: data.background === true,
+      startedAt,
+      ...(senderId ? { senderId } : {}),
+      ...(model ? { model } : {}),
+      ...(reasoningEffort ? { reasoningEffort } : {}),
     };
     return replace(state, { ...current, activations: [...current.activations, started], status: "running" });
   }
   if (data.op === "settle") {
-    const index = current.activations.findIndex(item => item.activationId === activationId);
+    const index = current.activations.findIndex((item) => item.activationId === activationId);
     const endedAt = text(data.endedAt);
-    if (index < 0 || current.activations[index].settle || !endedAt || !oneOf(data.status, SUBAGENT_ACTIVATION_STATUSES) || !oneOf(data.delivery, SUBAGENT_DELIVERIES)) return state;
+    if (
+      index < 0 ||
+      current.activations[index].settle ||
+      !endedAt ||
+      !oneOf(data.status, SUBAGENT_ACTIVATION_STATUSES) ||
+      !oneOf(data.delivery, SUBAGENT_DELIVERIES)
+    )
+      return state;
     const settle: SubagentActivationSettle = {
-      status: data.status, summary: typeof data.summary === "string" ? data.summary : "", delivery: data.delivery, endedAt,
+      status: data.status,
+      summary: typeof data.summary === "string" ? data.summary : "",
+      delivery: data.delivery,
+      endedAt,
       ...(typeof data.result === "string" ? { result: data.result } : {}),
       ...(typeof data.resultTruncated === "boolean" ? { resultTruncated: data.resultTruncated } : {}),
     };
-    const activations = current.activations.map((item, position) => position === index ? { ...item, settle } : item);
+    const activations = current.activations.map((item, position) => (position === index ? { ...item, settle } : item));
     return replace(state, { ...current, activations, status: statusOf(activations) });
   }
   return state;
 }
 
-function legacyRequested(state: SubagentTree, data: Readonly<Record<string, RuntimeJsonValue>>, time: string): SubagentTree {
-  const agentId = text(data.childSessionId), activationId = text(data.invocationId), callId = text(data.parentCallId);
+function legacyRequested(
+  state: SubagentTree,
+  data: Readonly<Record<string, RuntimeJsonValue>>,
+  time: string,
+): SubagentTree {
+  const agentId = text(data.childSessionId),
+    activationId = text(data.invocationId),
+    callId = text(data.parentCallId);
   if (!agentId || !activationId || !callId || state.agents[agentId]) return state;
   const view: SubagentView = {
-    agentId, kind: "local", preset: data.presetId === "actspace.explore" ? "explore" : "general", description: "", transcriptPath: "", callId, createdAt: time,
-    legacy: true, status: "running", activations: [{ activationId, trigger: "spawn", callId, background: false, startedAt: time }],
+    agentId,
+    kind: "local",
+    preset: data.presetId === "actspace.explore" ? "explore" : "general",
+    description: "",
+    transcriptPath: "",
+    callId,
+    createdAt: time,
+    legacy: true,
+    status: "running",
+    activations: [{ activationId, trigger: "spawn", callId, background: false, startedAt: time }],
   };
   return { order: [...state.order, agentId], agents: { ...state.agents, [agentId]: view } };
 }
 
-function legacyCompleted(state: SubagentTree, data: Readonly<Record<string, RuntimeJsonValue>>, time: string): SubagentTree {
+function legacyCompleted(
+  state: SubagentTree,
+  data: Readonly<Record<string, RuntimeJsonValue>>,
+  time: string,
+): SubagentTree {
   const agentId = text(data.childSessionId);
   const current = agentId ? state.agents[agentId] : undefined;
   if (!current?.legacy || current.activations[0]?.settle) return state;
-  const status: SubagentActivationStatus = data.status === "completed" ? "completed" : data.status === "aborted" ? "interrupted" : "failed";
+  const status: SubagentActivationStatus =
+    data.status === "completed" ? "completed" : data.status === "aborted" ? "interrupted" : "failed";
   const model = text(data.model);
-  const first = { ...current.activations[0], ...(model ? { model } : {}), settle: { status, summary: "", delivery: "returned" as const, endedAt: time } };
+  const first = {
+    ...current.activations[0],
+    ...(model ? { model } : {}),
+    settle: { status, summary: "", delivery: "returned" as const, endedAt: time },
+  };
   return replace(state, { ...current, status: "closed", activations: [first] });
 }
 
 /** Running while an activation is open; closed once it settled. */
 function statusOf(activations: readonly SubagentActivationView[]): SubagentStatus {
-  return activations.some(item => !item.settle) ? "running" : "closed";
+  return activations.some((item) => !item.settle) ? "running" : "closed";
 }
 
-function replace(state: SubagentTree, view: SubagentView): SubagentTree { return { order: state.order, agents: { ...state.agents, [view.agentId]: view } }; }
-function record(value: RuntimeJsonValue | undefined): Readonly<Record<string, RuntimeJsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : {}; }
-function text(value: RuntimeJsonValue | undefined): string | null { return typeof value === "string" && value.length > 0 ? value : null; }
-function oneOf<T extends string>(value: RuntimeJsonValue | undefined, values: readonly T[]): value is T { return typeof value === "string" && (values as readonly string[]).includes(value); }
+function replace(state: SubagentTree, view: SubagentView): SubagentTree {
+  return { order: state.order, agents: { ...state.agents, [view.agentId]: view } };
+}
+function record(value: RuntimeJsonValue | undefined): Readonly<Record<string, RuntimeJsonValue>> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Readonly<Record<string, RuntimeJsonValue>>)
+    : {};
+}
+function text(value: RuntimeJsonValue | undefined): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+function oneOf<T extends string>(value: RuntimeJsonValue | undefined, values: readonly T[]): value is T {
+  return typeof value === "string" && (values as readonly string[]).includes(value);
+}

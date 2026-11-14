@@ -2,11 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { RightPanel } from "../components/RightPanel";
-import {
-  RightPanelProvider,
-  useRightPanel,
-  workspaceFileTabId,
-} from "../components/right-panel/RightPanelContext";
+import { RightPanelProvider, useRightPanel, workspaceFileTabId } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
 /** 测试用入口：像打开交付卡里的图片那样打开一个本机图片文件 Tab。 */

@@ -39,7 +39,8 @@ export function aggregate(profiles, filter) {
       const size = sizes.get(node.id) ?? 0;
       total += size;
       if (size) self.set(name, (self.get(name) ?? 0) + size);
-      const counts = !active.has(name) && (!filter || filter.test(`${node.callFrame.url} ${node.callFrame.functionName}`));
+      const counts =
+        !active.has(name) && (!filter || filter.test(`${node.callFrame.url} ${node.callFrame.functionName}`));
       const next = counts ? new Set(active).add(name) : active;
       if (size) for (const key of next) inclusive.set(key, (inclusive.get(key) ?? 0) + size);
       for (const child of node.children ?? []) stack.push({ node: child, active: next });
@@ -53,7 +54,11 @@ export function callers(profiles, fnPattern, depth = 4) {
   const totals = new Map();
   for (const profile of profiles) {
     const sizes = selfSizes(profile);
-    const subtotal = (node) => { let sum = sizes.get(node.id) ?? 0; for (const child of node.children ?? []) sum += subtotal(child); return sum; };
+    const subtotal = (node) => {
+      let sum = sizes.get(node.id) ?? 0;
+      for (const child of node.children ?? []) sum += subtotal(child);
+      return sum;
+    };
     const walk = (node, chain) => {
       if (fnPattern.test(node.callFrame.functionName)) {
         const key = [frameName(node.callFrame), ...chain.slice(-depth).reverse()].join(" ← ");
@@ -75,7 +80,16 @@ export function summarizeSamples(rows) {
   const buckets = new Map();
   for (const row of valid) {
     const index = Math.floor((row.t - start) / 30_000);
-    const bucket = buckets.get(index) ?? { at: index * 30, heapMax: 0, rssMax: 0, lagMax: 0, mainCpu: 0, rendererCpu: 0, rendererWorkingSetMax: 0, count: 0 };
+    const bucket = buckets.get(index) ?? {
+      at: index * 30,
+      heapMax: 0,
+      rssMax: 0,
+      lagMax: 0,
+      mainCpu: 0,
+      rendererCpu: 0,
+      rendererWorkingSetMax: 0,
+      count: 0,
+    };
     const browser = row.processes?.find((process) => process.type === "Browser");
     const tabs = row.processes?.filter((process) => process.type === "Tab") ?? [];
     bucket.heapMax = Math.max(bucket.heapMax, row.main.heapUsed);
@@ -83,15 +97,27 @@ export function summarizeSamples(rows) {
     bucket.lagMax = Math.max(bucket.lagMax, row.mainLagMs ?? 0);
     bucket.mainCpu += browser?.cpu ?? 0;
     bucket.rendererCpu += tabs.reduce((sum, process) => sum + process.cpu, 0);
-    bucket.rendererWorkingSetMax = Math.max(bucket.rendererWorkingSetMax, tabs.reduce((sum, process) => sum + process.workingSetKB * 1024, 0));
+    bucket.rendererWorkingSetMax = Math.max(
+      bucket.rendererWorkingSetMax,
+      tabs.reduce((sum, process) => sum + process.workingSetKB * 1024, 0),
+    );
     bucket.count += 1;
     buckets.set(index, bucket);
   }
-  return { seconds: (valid.at(-1).t - start) / 1000, buckets: [...buckets.values()].map((bucket) => ({ ...bucket, mainCpu: bucket.mainCpu / bucket.count, rendererCpu: bucket.rendererCpu / bucket.count })) };
+  return {
+    seconds: (valid.at(-1).t - start) / 1000,
+    buckets: [...buckets.values()].map((bucket) => ({
+      ...bucket,
+      mainCpu: bucket.mainCpu / bucket.count,
+      rendererCpu: bucket.rendererCpu / bucket.count,
+    })),
+  };
 }
 
 function loadProfiles(dir, prefix) {
-  const files = readdirSync(dir).filter((file) => file.startsWith(`${prefix}-`) && file.endsWith(".heapprofile")).sort();
+  const files = readdirSync(dir)
+    .filter((file) => file.startsWith(`${prefix}-`) && file.endsWith(".heapprofile"))
+    .sort();
   if (files.length === 0) throw new Error(`${dir} 里没有 ${prefix}-*.heapprofile`);
   return files.map((file) => JSON.parse(readFileSync(join(dir, file), "utf8")));
 }
@@ -116,11 +142,17 @@ function main(argv) {
   const filter = filterSource ? new RegExp(filterSource) : undefined;
   if (command === "summary") {
     for (const dir of positional) {
-      const rows = readFileSync(join(dir, "samples.jsonl"), "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+      const rows = readFileSync(join(dir, "samples.jsonl"), "utf8")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
       const { seconds, buckets } = summarizeSamples(rows);
       console.log(`== ${dir}  ${rows.length} 个采样点，${seconds.toFixed(0)} 秒`);
       for (const bucket of buckets) {
-        console.log(`${String(bucket.at).padStart(5)}s  主进程堆 ${(bucket.heapMax / 1e6).toFixed(0).padStart(4)}MB  RSS ${(bucket.rssMax / 1e6).toFixed(0).padStart(4)}MB  主线程延迟 ${String(bucket.lagMax).padStart(5)}ms  主进程CPU ${bucket.mainCpu.toFixed(0).padStart(3)}%  渲染CPU ${bucket.rendererCpu.toFixed(0).padStart(3)}%  渲染内存 ${(bucket.rendererWorkingSetMax / 1048576).toFixed(0)}MB`);
+        console.log(
+          `${String(bucket.at).padStart(5)}s  主进程堆 ${(bucket.heapMax / 1e6).toFixed(0).padStart(4)}MB  RSS ${(bucket.rssMax / 1e6).toFixed(0).padStart(4)}MB  主线程延迟 ${String(bucket.lagMax).padStart(5)}ms  主进程CPU ${bucket.mainCpu.toFixed(0).padStart(3)}%  渲染CPU ${bucket.rendererCpu.toFixed(0).padStart(3)}%  渲染内存 ${(bucket.rendererWorkingSetMax / 1048576).toFixed(0)}MB`,
+        );
       }
     }
     return;
@@ -132,7 +164,8 @@ function main(argv) {
     console.log("--- 自身分配");
     for (const [name, bytes] of sorted(result.self, top)) console.log(MB(bytes), name);
     console.log("--- 包含分配（应用代码）");
-    for (const [name, bytes] of sorted(new Map([...result.inclusive].filter(([name]) => APP_FRAME(name))), top)) console.log(MB(bytes), name);
+    for (const [name, bytes] of sorted(new Map([...result.inclusive].filter(([name]) => APP_FRAME(name))), top))
+      console.log(MB(bytes), name);
     return;
   }
   if (command === "callers") {
@@ -146,7 +179,9 @@ function main(argv) {
     const left = aggregate(loadProfiles(before, prefix), filter);
     const right = aggregate(loadProfiles(after, prefix), filter);
     console.log(`合计分配 ${MB(left.total)} MB → ${MB(right.total)} MB`);
-    const names = new Set([...sorted(left.inclusive, top * 2), ...sorted(right.inclusive, top * 2)].map(([name]) => name).filter(APP_FRAME));
+    const names = new Set(
+      [...sorted(left.inclusive, top * 2), ...sorted(right.inclusive, top * 2)].map(([name]) => name).filter(APP_FRAME),
+    );
     const rows = [...names].map((name) => [name, left.inclusive.get(name) ?? 0, right.inclusive.get(name) ?? 0]);
     rows.sort((a, b) => Math.max(b[1], b[2]) - Math.max(a[1], a[2]));
     console.log("     之前 MB     之后 MB  函数（包含分配）");

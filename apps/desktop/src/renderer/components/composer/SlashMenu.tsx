@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useState, type RefObject } from "react";
-import { Asterisk, BookOpen, Bot, ChartPie, Check, GitBranch, GitFork, ListTodo, LoaderCircle, type LucideIcon } from "lucide-react";
+import {
+  Asterisk,
+  BookOpen,
+  Bot,
+  ChartPie,
+  Check,
+  GitBranch,
+  GitFork,
+  ListTodo,
+  LoaderCircle,
+  type LucideIcon,
+} from "lucide-react";
 import type { ComposerMode, SkillCatalogItem } from "@actspace/shared";
 import {
   composerSlashFunctionOptionId,
@@ -25,7 +36,8 @@ const SLASH_SKILL_OPTION_CLASS = SLASH_FUNCTION_OPTION_CLASS;
 const SLASH_OPTION_ACTIVE_CLASS = "bg-selected";
 const SLASH_FUNCTION_ICON_CLASS = "shrink-0 text-text-muted";
 const SLASH_FUNCTION_COMMAND_CLASS = "shrink-0 font-mono text-act-xs font-medium leading-5 text-text-main";
-const SLASH_FUNCTION_DESCRIPTION_CLASS = "ml-auto min-w-0 flex-1 truncate text-right text-act-xs font-normal leading-5 text-text-faint";
+const SLASH_FUNCTION_DESCRIPTION_CLASS =
+  "ml-auto min-w-0 flex-1 truncate text-right text-act-xs font-normal leading-5 text-text-faint";
 const SLASH_SKILL_NAME_CLASS = "max-w-[42%] shrink-0 truncate text-act-xs font-medium leading-5 text-text-main";
 const SLASH_SKILL_DESCRIPTION_CLASS = SLASH_FUNCTION_DESCRIPTION_CLASS;
 const SLASH_STATUS_CLASS = "px-2 py-4 text-act-sm text-text-faint";
@@ -45,7 +57,9 @@ export type ComposerSlashResult =
   | { kind: "skill"; item: SkillCatalogItem };
 
 function slashOptionId(result: ComposerSlashResult): string {
-  return result.kind === "function" ? composerSlashFunctionOptionId(result.item.id) : composerSlashSkillOptionId(result.item.name);
+  return result.kind === "function"
+    ? composerSlashFunctionOptionId(result.item.id)
+    : composerSlashSkillOptionId(result.item.name);
 }
 
 export type SlashFunctionHandlers = {
@@ -107,7 +121,18 @@ export type SlashMenuOptions = {
  * 09 T28：斜杠菜单的状态。输入框内容是 `/xxx` 就打开，Esc、点外面、打开别的浮层时收起（`dismiss`），
  * 内容一改又允许打开（`reset`）。高亮项随结果变化回到第一项，并滚进可见区。
  */
-export function useSlashMenu({ message, inputLocked, isChatForm, isStreaming, allowSideChat, skills, composerRef, inputRef, setDraftText, onDraftReplaced }: SlashMenuOptions) {
+export function useSlashMenu({
+  message,
+  inputLocked,
+  isChatForm,
+  isStreaming,
+  allowSideChat,
+  skills,
+  composerRef,
+  inputRef,
+  setDraftText,
+  onDraftReplaced,
+}: SlashMenuOptions) {
   // 主会话和侧边对话各有一个 Composer，菜单 id 按实例生成。
   const menuId = `composer-slash-menu-${useId().replace(/:/g, "")}`;
   const [dismissed, setDismissed] = useState(false);
@@ -116,17 +141,22 @@ export function useSlashMenu({ message, inputLocked, isChatForm, isStreaming, al
 
   const query = inputLocked ? null : parseComposerSlashQuery(message);
   const open = query !== null && !dismissed;
-  const functions = query === null ? [] : filterComposerSlashFunctions(query)
-    .filter((item) => !isChatForm || ["compact", "status"].includes(item.id))
-    .filter((item) => !isStreaming || (item.id !== "plan" && item.id !== "agent"))
-    .filter((item) => allowSideChat || item.id !== "side");
+  const functions =
+    query === null
+      ? []
+      : filterComposerSlashFunctions(query)
+          .filter((item) => !isChatForm || ["compact", "status"].includes(item.id))
+          .filter((item) => !isStreaming || (item.id !== "plan" && item.id !== "agent"))
+          .filter((item) => allowSideChat || item.id !== "side");
   const matchedSkills = query === null || isChatForm ? [] : filterComposerSlashSkills([...skills], query);
   const results: ComposerSlashResult[] = [
     ...functions.map((item): ComposerSlashResult => ({ kind: "function", item })),
     ...matchedSkills.map((item): ComposerSlashResult => ({ kind: "skill", item })),
   ];
   const resultKey = results
-    .map((result) => result.kind === "function" ? `function:${result.item.id}` : `skill:${result.item.scope}:${result.item.name}`)
+    .map((result) =>
+      result.kind === "function" ? `function:${result.item.id}` : `skill:${result.item.scope}:${result.item.name}`,
+    )
     .join("|");
   const active = results[Math.min(activeIndex, Math.max(0, results.length - 1))];
   const activeOptionId = active ? slashOptionId(active) : undefined;
@@ -156,7 +186,10 @@ export function useSlashMenu({ message, inputLocked, isChatForm, isStreaming, al
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
       // 浮层挂在 body 上，点浮层内部也算点在 Composer 里。
-      if (composerRef.current?.contains(event.target as Node) || (event.target as Element | null)?.closest?.("[data-composer-floating]")) {
+      if (
+        composerRef.current?.contains(event.target as Node) ||
+        (event.target as Element | null)?.closest?.("[data-composer-floating]")
+      ) {
         return;
       }
       setDismissed(true);
@@ -226,7 +259,17 @@ export type SlashMenuProps = {
   onRetrySkills: () => void;
 };
 
-export function SlashMenu({ surface, slash, mode, selectedSkills, skillsLoading, skillsError, skillCount, onSelect, onRetrySkills }: SlashMenuProps) {
+export function SlashMenu({
+  surface,
+  slash,
+  mode,
+  selectedSkills,
+  skillsLoading,
+  skillsError,
+  skillCount,
+  onSelect,
+  onRetrySkills,
+}: SlashMenuProps) {
   if (!slash.open || slash.query === null) return null;
   const functionsLabelId = `${slash.menuId}-functions`;
   const skillsLabelId = `${slash.menuId}-skills`;
@@ -234,16 +277,9 @@ export function SlashMenu({ surface, slash, mode, selectedSkills, skillsLoading,
     ? "translate-y-0 scale-100 opacity-100"
     : `pointer-events-none ${surface === "initial" ? "-translate-y-1" : "translate-y-1"} scale-[0.985] opacity-0`;
   const showSkillsGroup =
-    skillsLoading ||
-    Boolean(skillsError) ||
-    slash.skills.length > 0 ||
-    (slash.query === "" && skillCount === 0);
+    skillsLoading || Boolean(skillsError) || slash.skills.length > 0 || (slash.query === "" && skillCount === 0);
   const showTotalEmpty =
-    slash.query !== "" &&
-    slash.functions.length === 0 &&
-    slash.skills.length === 0 &&
-    !skillsLoading &&
-    !skillsError;
+    slash.query !== "" && slash.functions.length === 0 && slash.skills.length === 0 && !skillsLoading && !skillsError;
 
   return (
     <div
@@ -254,7 +290,9 @@ export function SlashMenu({ surface, slash, mode, selectedSkills, skillsLoading,
     >
       {slash.functions.length > 0 ? (
         <div role="group" aria-labelledby={functionsLabelId}>
-          <div className={SLASH_GROUP_LABEL_CLASS} id={functionsLabelId}>功能</div>
+          <div className={SLASH_GROUP_LABEL_CLASS} id={functionsLabelId}>
+            功能
+          </div>
           {slash.functions.map((item) => {
             const Icon = SLASH_FUNCTION_ICONS[item.id];
             const commandDisplayName = getSlashCommandDisplayName(item.command);
@@ -288,7 +326,9 @@ export function SlashMenu({ surface, slash, mode, selectedSkills, skillsLoading,
 
       {showSkillsGroup ? (
         <div role="group" aria-labelledby={skillsLabelId}>
-          <div className={SLASH_GROUP_LABEL_CLASS} id={skillsLabelId}>Skills</div>
+          <div className={SLASH_GROUP_LABEL_CLASS} id={skillsLabelId}>
+            Skills
+          </div>
           {skillsLoading ? (
             <div className={`${SLASH_STATUS_CLASS} flex items-center gap-2`}>
               <LoaderCircle className="animate-spin" size={15} aria-hidden="true" /> 正在加载 Skills…
@@ -306,40 +346,40 @@ export function SlashMenu({ surface, slash, mode, selectedSkills, skillsLoading,
                 重试
               </button>
             </div>
-          ) : slash.skills.length > 0 ? slash.skills.map((skill) => {
-            const optionId = composerSlashSkillOptionId(skill.name);
-            const isActive = slash.activeOptionId === optionId;
-            const isSelected = selectedSkills.includes(skill.id ?? skill.name);
-            const result: ComposerSlashResult = { kind: "skill", item: skill };
-            return (
-              // 原生 button（从 Composer 搬来）：同上，listbox 的 option。
-              <button
-                className={`${SLASH_SKILL_OPTION_CLASS}${isActive ? ` ${SLASH_OPTION_ACTIVE_CLASS}` : ""}`}
-                id={optionId}
-                type="button"
-                role="option"
-                aria-label={`${skill.name}: ${skill.description || "暂无说明"}. ${isSelected ? "已选择" : "未选择"}`}
-                aria-selected={isSelected}
-                key={`${skill.scope}:${skill.name}`}
-                onPointerDown={(event) => event.preventDefault()}
-                onMouseEnter={() => slash.highlight(result)}
-                onClick={() => onSelect(result)}
-              >
-                <BookOpen className={SLASH_FUNCTION_ICON_CLASS} size={14} aria-hidden="true" />
-                <span className={SLASH_SKILL_NAME_CLASS}>{skill.name}</span>
-                {isSelected ? <Check className="shrink-0 text-text-muted" size={13} aria-hidden="true" /> : null}
-                <span className={SLASH_SKILL_DESCRIPTION_CLASS}>{skill.description || "暂无说明"}</span>
-              </button>
-            );
-          }) : (
+          ) : slash.skills.length > 0 ? (
+            slash.skills.map((skill) => {
+              const optionId = composerSlashSkillOptionId(skill.name);
+              const isActive = slash.activeOptionId === optionId;
+              const isSelected = selectedSkills.includes(skill.id ?? skill.name);
+              const result: ComposerSlashResult = { kind: "skill", item: skill };
+              return (
+                // 原生 button（从 Composer 搬来）：同上，listbox 的 option。
+                <button
+                  className={`${SLASH_SKILL_OPTION_CLASS}${isActive ? ` ${SLASH_OPTION_ACTIVE_CLASS}` : ""}`}
+                  id={optionId}
+                  type="button"
+                  role="option"
+                  aria-label={`${skill.name}: ${skill.description || "暂无说明"}. ${isSelected ? "已选择" : "未选择"}`}
+                  aria-selected={isSelected}
+                  key={`${skill.scope}:${skill.name}`}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => slash.highlight(result)}
+                  onClick={() => onSelect(result)}
+                >
+                  <BookOpen className={SLASH_FUNCTION_ICON_CLASS} size={14} aria-hidden="true" />
+                  <span className={SLASH_SKILL_NAME_CLASS}>{skill.name}</span>
+                  {isSelected ? <Check className="shrink-0 text-text-muted" size={13} aria-hidden="true" /> : null}
+                  <span className={SLASH_SKILL_DESCRIPTION_CLASS}>{skill.description || "暂无说明"}</span>
+                </button>
+              );
+            })
+          ) : (
             <div className={SLASH_STATUS_CLASS}>暂无已启用的 Skills</div>
           )}
         </div>
       ) : null}
 
-      {showTotalEmpty ? (
-        <div className={SLASH_EMPTY_CLASS}>没有匹配的功能或 Skills</div>
-      ) : null}
+      {showTotalEmpty ? <div className={SLASH_EMPTY_CLASS}>没有匹配的功能或 Skills</div> : null}
     </div>
   );
 }

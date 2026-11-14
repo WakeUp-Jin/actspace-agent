@@ -9,8 +9,12 @@ export class ScopeDisposer {
   #workWaiters: Array<() => void> = [];
   readonly #disposers: AsyncDisposer[] = [];
 
-  get state(): ScopeDisposerState { return this.#state; }
-  get disposed(): boolean { return this.#state !== "active"; }
+  get state(): ScopeDisposerState {
+    return this.#state;
+  }
+  get disposed(): boolean {
+    return this.#state !== "active";
+  }
 
   /** Acquire a lease for work that must settle before scope disposal completes. */
   acquire(): () => void {
@@ -36,7 +40,9 @@ export class ScopeDisposer {
       active = false;
       await disposer();
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }
 
   async dispose(): Promise<void> {
@@ -47,7 +53,11 @@ export class ScopeDisposer {
     this.#disposePromise = (async () => {
       let failure: unknown;
       for (const disposer of disposers) {
-        try { await disposer(); } catch (error) { failure ??= error; }
+        try {
+          await disposer();
+        } catch (error) {
+          failure ??= error;
+        }
       }
       if (this.#activeWork > 0) await new Promise<void>((resolve) => this.#workWaiters.push(resolve));
       this.#state = "disposed";

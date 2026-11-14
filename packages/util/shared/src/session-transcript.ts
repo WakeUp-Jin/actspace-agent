@@ -1,9 +1,7 @@
 import type { MessageBlock } from "./session";
 
 function formatAttachments(message: Extract<MessageBlock, { kind: "user" }>): string | null {
-  const names = message.attachments
-    ?.map((attachment) => attachment.name.trim())
-    .filter(Boolean);
+  const names = message.attachments?.map((attachment) => attachment.name.trim()).filter(Boolean);
   if (!names?.length) return null;
 
   return ["Attachments:", ...names.map((name) => `- ${name}`)].join("\n");

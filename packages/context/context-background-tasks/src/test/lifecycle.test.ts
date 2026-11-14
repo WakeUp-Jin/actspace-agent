@@ -6,9 +6,9 @@ import { apply } from "../plugin.js";
 describe("context background tasks plugin lifecycle", () => {
   it("registers with context.assembly, publishes and disposes its source factory", async () => {
     const ctx = new CordisContextClass();
-    await ctx.plugin({ apply: inner => applyAssembly(inner as never) });
+    await ctx.plugin({ apply: (inner) => applyAssembly(inner as never) });
     const assembly = ctx.get("context.assembly") as ContextAssemblyService;
-    await ctx.plugin({ apply: inner => apply(inner as never) });
+    await ctx.plugin({ apply: (inner) => apply(inner as never) });
     expect(ctx.get("context.source.background-tasks")).toHaveProperty("create");
     expect(assembly.kinds("main")).toContain("background-tasks");
     expect(assembly.kinds("subagent")).not.toContain("background-tasks");
@@ -19,6 +19,6 @@ describe("context background tasks plugin lifecycle", () => {
 
   it("rejects a tree without context.assembly", async () => {
     const ctx = new CordisContextClass();
-    await expect(ctx.plugin({ apply: inner => apply(inner as never) })).rejects.toThrow("requires context.assembly");
+    await expect(ctx.plugin({ apply: (inner) => apply(inner as never) })).rejects.toThrow("requires context.assembly");
   });
 });

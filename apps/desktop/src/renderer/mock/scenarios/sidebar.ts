@@ -38,12 +38,25 @@ export function sidebarScenario({ db }: MockClock): MockHandlers | void {
     ...db.workspaces,
     items: [
       ...db.workspaces.items,
-      { id: "ws_harness", kind: "folder", label: "agent-harness-dev", path: HARNESS_ROOT, order: 1, createdAt: now, updatedAt: now },
+      {
+        id: "ws_harness",
+        kind: "folder",
+        label: "agent-harness-dev",
+        path: HARNESS_ROOT,
+        order: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
       { id: "ws_notes", kind: "folder", label: "notes", path: NOTES_ROOT, order: 2, createdAt: now, updatedAt: now },
     ],
   };
   for (const seed of SEEDS) {
-    const session = seedSession(db, { title: seed.title, minutesAgo: 0, pinned: seed.pinned, turns: [[seed.title, "好的，已经整理好了。"]] });
+    const session = seedSession(db, {
+      title: seed.title,
+      minutesAgo: 0,
+      pinned: seed.pinned,
+      turns: [[seed.title, "好的，已经整理好了。"]],
+    });
     session.workspaceRoot = seed.root ?? MOCK_WORKSPACE_ROOT;
     session.updatedAt = new Date(Date.now() - seed.minutesAgo * 60_000).toISOString();
     session.archived = seed.archived ?? false;

@@ -6,7 +6,12 @@ import { codeFor } from "../../model/panel-fixtures";
 /** file 标签：路径面包屑 + 带行号的代码（复用 CodeRenderView 的纯展示部分）。 */
 
 const LANGUAGE_BY_EXT: Record<string, string> = {
-  ts: "typescript", tsx: "typescript", js: "javascript", json: "json", sql: "sql", md: "markdown",
+  ts: "typescript",
+  tsx: "typescript",
+  js: "javascript",
+  json: "json",
+  sql: "sql",
+  md: "markdown",
 };
 
 export function SpaceFileView({ path }: { path: string }) {

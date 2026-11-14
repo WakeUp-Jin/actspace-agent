@@ -11,9 +11,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const hoisted = vi.hoisted(() => ({ calls: 0 }));
 vi.mock("../components/messages/markdown/processor", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../components/messages/markdown/processor")>();
-  return { ...actual, renderMarkdown: (...args: Parameters<typeof actual.renderMarkdown>) => { hoisted.calls += 1; return actual.renderMarkdown(...args); } };
+  return {
+    ...actual,
+    renderMarkdown: (...args: Parameters<typeof actual.renderMarkdown>) => {
+      hoisted.calls += 1;
+      return actual.renderMarkdown(...args);
+    },
+  };
 });
-vi.mock("mermaid", () => ({ default: { initialize: vi.fn(), render: vi.fn(async () => ({ svg: "<svg></svg>", diagramType: "flowchart-v2" })) } }));
+vi.mock("mermaid", () => ({
+  default: { initialize: vi.fn(), render: vi.fn(async () => ({ svg: "<svg></svg>", diagramType: "flowchart-v2" })) },
+}));
 
 import { MarkdownProse } from "../components/messages/MarkdownProse";
 import { ReplyStreamingContext } from "../components/messages/reply-streaming-context";
@@ -31,7 +39,10 @@ beforeEach(() => {
   frames = [];
   hoisted.calls = 0;
   vi.spyOn(performance, "now").mockImplementation(() => clock);
-  vi.stubGlobal("requestAnimationFrame", (callback: () => void) => { frames.push(callback); return frames.length; });
+  vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
+    frames.push(callback);
+    return frames.length;
+  });
   vi.stubGlobal("cancelAnimationFrame", () => {});
 });
 afterEach(() => {
@@ -78,7 +89,13 @@ function replay(text: string, options: { frameStep?: number; onFrame?: FrameChec
     }
     if (frames.length > 0) {
       const before = prose(rendered.container).textContent;
-      act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); });
+      act(() => {
+        const batch = frames;
+        frames = [];
+        batch.forEach((callback) => {
+          callback();
+        });
+      });
       if (prose(rendered.container).textContent !== before) textFrames += 1;
       options.onFrame?.(prose(rendered.container));
     }
@@ -98,21 +115,31 @@ async function preloadChunks() {
 }
 
 describe("等价：逐帧回放结束后的 DOM 与一次性渲染相同", () => {
-  for (const [name, text] of [["Markdown 全元素回复", MARKDOWN_SHOWCASE_REPLY], ["run7 最长回复", REAL_REPLY]] as const) {
+  for (const [name, text] of [
+    ["Markdown 全元素回复", MARKDOWN_SHOWCASE_REPLY],
+    ["run7 最长回复", REAL_REPLY],
+  ] as const) {
     it(name, async () => {
       await preloadChunks();
       const streamed = replay(text);
       // 一次性渲染放在回放之后：流式写过的代码块不折叠（CodeBlock 记住了它们），两边才可比。
       const direct = render(view(text, false));
-      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
-      expect(prose(streamed.container).querySelector(".md-tail-raw, .md-caret, .md-tail, act-fade, act-stream-tail")).toBeNull();
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(
+        prose(streamed.container).querySelector(".md-tail-raw, .md-caret, .md-tail, act-fade, act-stream-tail"),
+      ).toBeNull();
       expect(normalize(prose(streamed.container).innerHTML)).toBe(normalize(prose(direct.container).innerHTML));
     }, 30_000);
   }
 });
 
 describe("降频：解析次数", () => {
-  for (const [name, text] of [["Markdown 全元素回复", MARKDOWN_SHOWCASE_REPLY], ["run7 最长回复", REAL_REPLY]] as const) {
+  for (const [name, text] of [
+    ["Markdown 全元素回复", MARKDOWN_SHOWCASE_REPLY],
+    ["run7 最长回复", REAL_REPLY],
+  ] as const) {
     it(`${name}：块的解析渲染次数不超过每帧解析的 1/4`, async () => {
       await preloadChunks();
       hoisted.calls = 0;
@@ -180,7 +207,14 @@ describe("原样尾巴", () => {
   it("写完时立即完整解析：没有尾巴、渐显和光标", () => {
     const text = "第一段\n\n第二段 **加粗** 和 `code` 结尾";
     const rendered = replay(text);
-    for (let i = 0; i < 100 && frames.length > 0; i += 1) act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); });
+    for (let i = 0; i < 100 && frames.length > 0; i += 1)
+      act(() => {
+        const batch = frames;
+        frames = [];
+        batch.forEach((callback) => {
+          callback();
+        });
+      });
     const root = prose(rendered.container);
     expect(root.querySelector(".md-tail-raw, .md-caret, .md-tail")).toBeNull();
     expect(root.querySelector("strong")?.textContent).toBe("加粗");
@@ -190,7 +224,9 @@ describe("原样尾巴", () => {
 
 describe("代码块", () => {
   it("没闭合时尾巴接在代码区里，不放光标；代码行数只增不减", () => {
-    const code = Array.from({ length: 12 }, (_, i) => `const value${i} = compute(${i}) + another(${i * 2});`).join("\n");
+    const code = Array.from({ length: 12 }, (_, i) => `const value${i} = compute(${i}) + another(${i * 2});`).join(
+      "\n",
+    );
     const text = `看代码：\n\n\`\`\`ts\n${code}\n\`\`\`\n\n结束。`;
     let lines = 0;
     let tailInCode = 0;

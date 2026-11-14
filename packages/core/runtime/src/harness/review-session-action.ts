@@ -10,15 +10,37 @@ const REVIEW_CONTEXT = Symbol("auto-review-context");
 export async function reviewSessionAction(session: SessionHandle, reviewer: AutoReviewer, input: AutoReviewInput) {
   const context = session.journal.project(REVIEW_CONTEXT, createReviewContext, reduceReviewContext);
   const data = context.toolCalls.get(input.callId);
-  if (!data || ["agentRunId", "turnId", "stepId"].some(key => typeof data[key] !== "string" || !data[key])) throw new Error("Review requires its owning tool call");
+  if (!data || ["agentRunId", "turnId", "stepId"].some((key) => typeof data[key] !== "string" || !data[key]))
+    throw new Error("Review requires its owning tool call");
   const revision = session.journal.lastSeq;
   const logicalRequestId = randomUUID();
-  const decision = await reviewer.review({ sessionId: session.header.sessionId, agentRunId: data.agentRunId as string, turnId: data.turnId as string, stepId: data.stepId as string, callId: input.callId, logicalRequestId, model: input.model ?? "default", signal: input.signal,
-    snapshot: { conversation: reviewSnapshot(context), action: input.action, workspaceRoot: input.workspaceRoot, execution: "Existing executor; sandbox isolation is not guaranteed" },
+  const decision = await reviewer.review({
+    sessionId: session.header.sessionId,
+    agentRunId: data.agentRunId as string,
+    turnId: data.turnId as string,
+    stepId: data.stepId as string,
+    callId: input.callId,
+    logicalRequestId,
+    model: input.model ?? "default",
+    signal: input.signal,
+    snapshot: {
+      conversation: reviewSnapshot(context),
+      action: input.action,
+      workspaceRoot: input.workspaceRoot,
+      execution: "Existing executor; sandbox isolation is not guaranteed",
+    },
   });
   for (const event of session.journal.eventsAfter(revision)) {
     const fact = event.data as Record<string, unknown>;
-    if ((event.type !== "llm/auxiliary-start" && event.type !== "llm/auxiliary-end") || fact.purpose !== "auto-review" || fact.logicalRequestId !== logicalRequestId || fact.sessionId !== session.header.sessionId || fact.callId !== input.callId || ["agentRunId", "turnId", "stepId"].some(key => fact[key] !== data[key])) throw new Error("Review context changed");
+    if (
+      (event.type !== "llm/auxiliary-start" && event.type !== "llm/auxiliary-end") ||
+      fact.purpose !== "auto-review" ||
+      fact.logicalRequestId !== logicalRequestId ||
+      fact.sessionId !== session.header.sessionId ||
+      fact.callId !== input.callId ||
+      ["agentRunId", "turnId", "stepId"].some((key) => fact[key] !== data[key])
+    )
+      throw new Error("Review context changed");
   }
   return decision;
 }

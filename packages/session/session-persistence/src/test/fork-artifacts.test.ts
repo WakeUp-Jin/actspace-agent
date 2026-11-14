@@ -8,27 +8,55 @@ import { SessionStore } from "../session-store.js";
 import { JsonlSessionStorage } from "@actspace/session-persistence-jsonl";
 
 const roots: string[] = [];
-afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
 
 async function fixture() {
-  const dataRoot = await mkdtemp(join(tmpdir(), "fork-artifacts-")); roots.push(dataRoot);
+  const dataRoot = await mkdtemp(join(tmpdir(), "fork-artifacts-"));
+  roots.push(dataRoot);
   const registry = createCoreCodecRegistry();
   const copies = new Map<string, string>();
   const artifacts = {
     copyForSession: vi.fn(async (parent: string, child: string, id: string) => {
       if (id === "missing") throw new Error("missing artifact");
-      const next = `${child}-${id}`; copies.set(next, child); return { artifactId: next };
+      const next = `${child}-${id}`;
+      copies.set(next, child);
+      return { artifactId: next };
     }),
-    deleteForSession: vi.fn(async (_session: string, id: string) => { copies.delete(id); }),
+    deleteForSession: vi.fn(async (_session: string, id: string) => {
+      copies.delete(id);
+    }),
   };
   const options = { dataRoot, registry, runtimeId: "test", forkArtifacts: artifacts };
   const persistence = new JsonlSessionStorage(options);
   const store = new SessionStore(options, persistence);
-  const createdWith = { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest };
-  const parent = await store.create({ sessionId: "parent", lineage: null, createdAt: new Date().toISOString(), createdWith });
+  const createdWith = {
+    profileId: "test",
+    runtimeContractVersion: "1",
+    manifestDigest: "test",
+    plugins: [],
+    codecSetDigest: registry.digest,
+  };
+  const parent = await store.create({
+    sessionId: "parent",
+    lineage: null,
+    createdAt: new Date().toISOString(),
+    createdWith,
+  });
   async function message(id: string) {
-    const content = [{ type: "image", artifactId: id, mimeType: "image/png" }, { type: "artifact", artifact: { artifactId: id, mediaType: "image/png" } }, { type: "text", text: `keep ${id}` }];
-    await parent.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: id, content }, surface: { kind: "append" } });
+    const content = [
+      { type: "image", artifactId: id, mimeType: "image/png" },
+      { type: "artifact", artifact: { artifactId: id, mediaType: "image/png" } },
+      { type: "text", text: `keep ${id}` },
+    ];
+    await parent.append({
+      type: "user/message",
+      eventVersion: 1,
+      source: { ownerPluginId: "@actspace/core" },
+      data: { messageId: id, content },
+      surface: { kind: "append" },
+    });
     await parent.flush();
   }
   async function fork(parentSessionId = "parent", newSessionId = "child", boundarySeq = 0) {
@@ -39,11 +67,15 @@ async function fixture() {
 
 it("copies referenced artifacts once, rewrites data and surface, preserves parent and supports another fork", async () => {
   const f = await fixture();
-  await f.message("image"); await f.message("later"); await f.parent.close();
+  await f.message("image");
+  await f.message("later");
+  await f.parent.close();
   const child = await f.fork();
   expect(f.artifacts.copyForSession.mock.calls).toEqual([["parent", "child", "image"]]);
   const event = child.journal.events[0];
-  expect(event.data).toMatchObject({ content: [{ artifactId: "child-image" }, { artifact: { artifactId: "child-image" } }, { text: "keep image" }] });
+  expect(event.data).toMatchObject({
+    content: [{ artifactId: "child-image" }, { artifact: { artifactId: "child-image" } }, { text: "keep image" }],
+  });
   // surface 只是标记，节点从改写后的 data 推出（agent-spec-surface-derived.md §4.2）。
   expect(event.surface).toEqual({ kind: "append" });
   expect(surfaceNode(event)?.content).toEqual((event.data as { content: unknown }).content);
@@ -53,31 +85,39 @@ it("copies referenced artifacts once, rewrites data and surface, preserves paren
   expect(f.artifacts.copyForSession).toHaveBeenLastCalledWith("child", "grandchild", "child-image");
   await grandchild.close();
   const reopened = await f.store.open("child");
-  expect(reopened.journal.events[0]).toEqual(event); await reopened.close();
+  expect(reopened.journal.events[0]).toEqual(event);
+  await reopened.close();
 });
 
 it("rolls back copied files and child directory when a later artifact cannot be copied", async () => {
   const f = await fixture();
-  await f.message("image"); await f.message("missing"); await f.parent.close();
+  await f.message("image");
+  await f.message("missing");
+  await f.parent.close();
   await expect(f.fork("parent", "child", 1)).rejects.toThrow("missing artifact");
   expect(f.copies.size).toBe(0);
   expect(await readdir(join(f.dataRoot, "sessions-v2"))).toEqual(["parent"]);
 });
 
 it("does not overwrite an existing child or copy artifacts for an invalid boundary", async () => {
-  const f = await fixture(); await f.message("image"); await f.parent.close();
+  const f = await fixture();
+  await f.message("image");
+  await f.parent.close();
   await expect(f.fork("parent", "bad", 99)).rejects.toThrow();
   expect(f.artifacts.copyForSession).not.toHaveBeenCalled();
-  const child = await f.fork(); await child.close();
+  const child = await f.fork();
+  await child.close();
   await expect(f.fork()).rejects.toThrow();
   expect(f.artifacts.copyForSession).toHaveBeenCalledTimes(1);
   expect((await f.store.inspect("child")).header?.sessionId).toBe("child");
 });
 
 it("rolls back artifacts when publishing the child Journal fails", async () => {
-  const f = await fixture(); await f.message("image"); await f.parent.close();
+  const f = await fixture();
+  await f.message("image");
+  await f.parent.close();
   const create = f.persistence.create.bind(f.persistence);
-  vi.spyOn(f.persistence, "create").mockImplementationOnce(async header => {
+  vi.spyOn(f.persistence, "create").mockImplementationOnce(async (header) => {
     const handle = await create(header);
     vi.spyOn(handle, "append").mockRejectedValueOnce(new Error("disk full"));
     return handle;

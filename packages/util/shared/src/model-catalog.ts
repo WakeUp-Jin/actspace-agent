@@ -1,6 +1,11 @@
 /** Public catalogue facts. Prices are per million tokens; null never means free. */
 export type CatalogSource = "models.dev" | "openrouter";
-export type CatalogRates = { input: number | null; output: number | null; cacheRead: number | null; cacheWrite: number | null };
+export type CatalogRates = {
+  input: number | null;
+  output: number | null;
+  cacheRead: number | null;
+  cacheWrite: number | null;
+};
 export type ModelCatalogEntry = {
   source: CatalogSource;
   fetchedAt?: string;

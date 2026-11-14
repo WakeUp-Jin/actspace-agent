@@ -5,17 +5,29 @@ import { openRemoteFile } from "../hooks/remoteArtifact";
 import { setupBridge } from "./helpers/bridge";
 const key = encodeSessionLocator({ hostId: "host", sessionId: "session" });
 it("previews remote text without invoking local file APIs or enabling HTML", async () => {
-  const call = vi.fn(async () => ({ id: "artifact" })), preview = vi.fn(async () => ({ name: "result.html", size: 8, text: "<script>unsafe()</script>" })), localRead = vi.fn(), open = vi.fn();
+  const call = vi.fn(async () => ({ id: "artifact" })),
+    preview = vi.fn(async () => ({ name: "result.html", size: 8, text: "<script>unsafe()</script>" })),
+    localRead = vi.fn(),
+    open = vi.fn();
   setupBridge({ "hosts.call": call, "hosts.preview": preview, "workspaces.readFile": localRead });
   expect(await openRemoteFile(key, "result.html", open)).toBe(true);
-  expect(call).toHaveBeenCalledWith({ hostId: "host", method: "files.reference", params: { sessionId: "session", path: "result.html" } });
+  expect(call).toHaveBeenCalledWith({
+    hostId: "host",
+    method: "files.reference",
+    params: { sessionId: "session", path: "result.html" },
+  });
   expect(open).toHaveBeenCalledWith(expect.objectContaining({ kind: "text", content: "<script>unsafe()</script>" }));
   expect(open.mock.calls[0][0]).not.toHaveProperty("relativePath");
   expect(localRead).not.toHaveBeenCalled();
 });
 it("downloads remote binary through its authenticated Session identity", async () => {
-  const download = vi.fn(), open = vi.fn();
-  setupBridge({ "hosts.call": async () => ({ id: "binary" }), "hosts.preview": async () => ({ name: "result.bin", size: 9 }), "hosts.download": download });
+  const download = vi.fn(),
+    open = vi.fn();
+  setupBridge({
+    "hosts.call": async () => ({ id: "binary" }),
+    "hosts.preview": async () => ({ name: "result.bin", size: 9 }),
+    "hosts.download": download,
+  });
   await openRemoteFile(key, "result.bin", open);
   expect(download).toHaveBeenCalledWith({ hostId: "host", sessionId: "session", artifactId: "binary" });
   expect(open).not.toHaveBeenCalled();

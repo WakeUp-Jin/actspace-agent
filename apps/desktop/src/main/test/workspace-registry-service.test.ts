@@ -47,7 +47,12 @@ describe("workspace registry service", () => {
     const defaultWorkspaceRoot = join(dataRoot, "default-workspace");
     const fallbackWorkspaceRoot = join(dataRoot, "actspace-agent");
 
-    const registry = await readWorkspaceRegistry({ dataRoot, defaultWorkspaceRoot, fallbackWorkspaceRoot, sessions: [] });
+    const registry = await readWorkspaceRegistry({
+      dataRoot,
+      defaultWorkspaceRoot,
+      fallbackWorkspaceRoot,
+      sessions: [],
+    });
 
     expect(registry.items).toEqual([
       expect.objectContaining({ kind: "folder", label: "actspace-agent", path: resolve(fallbackWorkspaceRoot) }),
@@ -74,7 +79,12 @@ describe("workspace registry service", () => {
     const defaultWorkspaceRoot = join(blocker, "default-workspace");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-    const registry = await readWorkspaceRegistry({ dataRoot, defaultWorkspaceRoot, fallbackWorkspaceRoot: defaultWorkspaceRoot, sessions: [] });
+    const registry = await readWorkspaceRegistry({
+      dataRoot,
+      defaultWorkspaceRoot,
+      fallbackWorkspaceRoot: defaultWorkspaceRoot,
+      sessions: [],
+    });
 
     expect(registry.items).toEqual([]);
     expect(warn).toHaveBeenCalled();
@@ -106,16 +116,30 @@ describe("workspace registry service", () => {
         version: 1,
         defaultWorkspaceId: "default",
         items: [
-          { id: "default", kind: "default", label: "Default workspace", path: legacyDownloads, order: 0, ...timestamps },
+          {
+            id: "default",
+            kind: "default",
+            label: "Default workspace",
+            path: legacyDownloads,
+            order: 0,
+            ...timestamps,
+          },
           { id: "ws_project", kind: "folder", label: "project", path: projectRoot, order: 1, ...timestamps },
         ],
       }),
       "utf8",
     );
 
-    const registry = await readWorkspaceRegistry({ dataRoot, defaultWorkspaceRoot, fallbackWorkspaceRoot: defaultWorkspaceRoot, sessions: [] });
+    const registry = await readWorkspaceRegistry({
+      dataRoot,
+      defaultWorkspaceRoot,
+      fallbackWorkspaceRoot: defaultWorkspaceRoot,
+      sessions: [],
+    });
 
-    expect(registry.items).toEqual([expect.objectContaining({ id: "ws_project", kind: "folder", path: resolve(projectRoot) })]);
+    expect(registry.items).toEqual([
+      expect.objectContaining({ id: "ws_project", kind: "folder", path: resolve(projectRoot) }),
+    ]);
     const persisted = await readFile(workspaceRegistryPath(dataRoot), "utf8");
     expect(persisted).not.toContain("defaultWorkspaceId");
     expect(persisted).not.toContain(legacyDownloads);
@@ -136,12 +160,15 @@ describe("workspace registry service", () => {
     expect(folder).toBeDefined();
 
     await expect(
-      resolveWorkspaceSelection({
-        dataRoot,
-        defaultWorkspaceRoot,
-        fallbackWorkspaceRoot,
-        sessions: [],
-      }, { workspaceId: folder?.id }),
+      resolveWorkspaceSelection(
+        {
+          dataRoot,
+          defaultWorkspaceRoot,
+          fallbackWorkspaceRoot,
+          sessions: [],
+        },
+        { workspaceId: folder?.id },
+      ),
     ).resolves.toEqual({
       ok: true,
       workspaceId: folder?.id,
@@ -149,12 +176,15 @@ describe("workspace registry service", () => {
     });
 
     await expect(
-      resolveWorkspaceSelection({
-        dataRoot,
-        defaultWorkspaceRoot,
-        fallbackWorkspaceRoot,
-        sessions: [],
-      }, { workspaceId: "missing-workspace" }),
+      resolveWorkspaceSelection(
+        {
+          dataRoot,
+          defaultWorkspaceRoot,
+          fallbackWorkspaceRoot,
+          sessions: [],
+        },
+        { workspaceId: "missing-workspace" },
+      ),
     ).resolves.toEqual({
       ok: false,
       error: "workspaceId not found: missing-workspace",
@@ -179,17 +209,22 @@ describe("workspace registry service", () => {
       error: "workspace is required",
     });
 
-    const created = await resolveWorkspaceSelection({
-      dataRoot,
-      defaultWorkspaceRoot,
-      fallbackWorkspaceRoot,
-      sessions: [],
-    }, { workspaceRoot: newWorkspaceRoot });
+    const created = await resolveWorkspaceSelection(
+      {
+        dataRoot,
+        defaultWorkspaceRoot,
+        fallbackWorkspaceRoot,
+        sessions: [],
+      },
+      { workspaceRoot: newWorkspaceRoot },
+    );
 
-    expect(created).toEqual(expect.objectContaining({
-      ok: true,
-      workspaceRoot: resolve(newWorkspaceRoot),
-    }));
+    expect(created).toEqual(
+      expect.objectContaining({
+        ok: true,
+        workspaceRoot: resolve(newWorkspaceRoot),
+      }),
+    );
     const registry = await readWorkspaceRegistry({
       dataRoot,
       defaultWorkspaceRoot,
@@ -207,14 +242,16 @@ describe("workspace registry service", () => {
       dataRoot,
       defaultWorkspaceRoot,
       fallbackWorkspaceRoot: defaultWorkspaceRoot,
-      sessions: [{
-        id: "session-1",
-        title: "Hidden project session",
-        createdAt: "2026-07-29T00:00:00.000Z",
-        updatedAt: "2026-07-29T00:00:00.000Z",
-        agentRunCount: 1,
-        workspaceRoot,
-      }],
+      sessions: [
+        {
+          id: "session-1",
+          title: "Hidden project session",
+          createdAt: "2026-07-29T00:00:00.000Z",
+          updatedAt: "2026-07-29T00:00:00.000Z",
+          agentRunCount: 1,
+          workspaceRoot,
+        },
+      ],
     };
     const initial = await readWorkspaceRegistry(options);
     const workspace = initial.items.find((item) => item.path === resolve(workspaceRoot));
@@ -238,25 +275,37 @@ describe("workspace registry service", () => {
     const defaultWorkspaceRoot = join(dataRoot, "Downloads");
     const fallbackWorkspaceRoot = join(dataRoot, "actspace-agent");
 
-    await expect(resolveRegisteredWorkspaceSelection({
-      dataRoot,
-      defaultWorkspaceRoot,
-      fallbackWorkspaceRoot,
-      sessions: [],
-    }, { workspaceRoot: join(dataRoot, "unregistered") })).resolves.toEqual({
+    await expect(
+      resolveRegisteredWorkspaceSelection(
+        {
+          dataRoot,
+          defaultWorkspaceRoot,
+          fallbackWorkspaceRoot,
+          sessions: [],
+        },
+        { workspaceRoot: join(dataRoot, "unregistered") },
+      ),
+    ).resolves.toEqual({
       ok: false,
       error: "workspaceRoot is not registered",
     });
 
-    await expect(resolveRegisteredWorkspaceSelection({
-      dataRoot,
-      defaultWorkspaceRoot,
-      fallbackWorkspaceRoot,
-      sessions: [],
-    }, { workspaceRoot: fallbackWorkspaceRoot })).resolves.toEqual(expect.objectContaining({
-      ok: true,
-      workspaceRoot: resolve(fallbackWorkspaceRoot),
-    }));
+    await expect(
+      resolveRegisteredWorkspaceSelection(
+        {
+          dataRoot,
+          defaultWorkspaceRoot,
+          fallbackWorkspaceRoot,
+          sessions: [],
+        },
+        { workspaceRoot: fallbackWorkspaceRoot },
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        ok: true,
+        workspaceRoot: resolve(fallbackWorkspaceRoot),
+      }),
+    );
   });
 
   it("serializes concurrent registry repairs and preserves concurrent path registrations", async () => {
@@ -271,10 +320,14 @@ describe("workspace registry service", () => {
     await expect(Promise.all(Array.from({ length: 8 }, () => readWorkspaceRegistry(options)))).resolves.toHaveLength(8);
 
     const roots = Array.from({ length: 6 }, (_, index) => join(dataRoot, `project-${index}`));
-    await expect(Promise.all(roots.map((workspaceRoot) => resolveWorkspaceSelection(options, { workspaceRoot })))).resolves.toHaveLength(6);
+    await expect(
+      Promise.all(roots.map((workspaceRoot) => resolveWorkspaceSelection(options, { workspaceRoot }))),
+    ).resolves.toHaveLength(6);
 
     const registry = await readWorkspaceRegistry(options);
-    expect(roots.every((workspaceRoot) => registry.items.some((item) => item.path === resolve(workspaceRoot)))).toBe(true);
+    expect(roots.every((workspaceRoot) => registry.items.some((item) => item.path === resolve(workspaceRoot)))).toBe(
+      true,
+    );
     await expect(readFile(workspaceRegistryPath(dataRoot), "utf8")).resolves.toContain("project-5");
     await expect(readdir(dataRoot)).resolves.not.toEqual(expect.arrayContaining([expect.stringMatching(/\.tmp$/)]));
   });

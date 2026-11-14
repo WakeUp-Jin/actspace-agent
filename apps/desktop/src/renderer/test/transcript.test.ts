@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { createMessageBlocks, type MessageBlock, type SessionEvent, type SessionRecord } from "@actspace/shared";
 import { projectChatWindow } from "@actspace/client";
-import { mergeTranscript, type DurableTranscript, type LiveTranscript, type LocalTranscript } from "../session/transcript";
-import { createCompactionBlock, createEmptyStreamingState, streamingStateToBlocks, type StreamingState } from "@actspace/client/live";
+import {
+  mergeTranscript,
+  type DurableTranscript,
+  type LiveTranscript,
+  type LocalTranscript,
+} from "../session/transcript";
+import {
+  createCompactionBlock,
+  createEmptyStreamingState,
+  streamingStateToBlocks,
+  type StreamingState,
+} from "@actspace/client/live";
 import { recordProjectionFixture } from "./projection-fixture";
 
 // 14 T14：mergeTranscript 按 runId 归属，旧实现按 renderKey 前缀 / `:tool:` 子串归属；两者必须深度相等。
@@ -12,16 +22,34 @@ const SESSION = "s-transcript";
 const TIME = "2026-10-06T00:00:00.000Z";
 const NO_LOCAL: LocalTranscript = { compactionFailure: undefined, isStreaming: false };
 
-function event(id: string, agentRunId: string, type: SessionEvent["type"], payload: Record<string, unknown>): SessionEvent {
+function event(
+  id: string,
+  agentRunId: string,
+  type: SessionEvent["type"],
+  payload: Record<string, unknown>,
+): SessionEvent {
   return { id, sessionId: SESSION, agentRunId, type, timestamp: TIME, schemaVersion: 2, payload } as SessionEvent;
 }
 
-function turnEvents(runId: string, prefix: string, user: string, reply: string, tools: Array<{ callId: string; preview: Record<string, unknown> }> = []): SessionEvent[] {
+function turnEvents(
+  runId: string,
+  prefix: string,
+  user: string,
+  reply: string,
+  tools: Array<{ callId: string; preview: Record<string, unknown> }> = [],
+): SessionEvent[] {
   return [
     event(`${prefix}-user`, runId, "user_message", { content: user }),
     ...tools.flatMap(({ callId, preview }) => [
       event(`${prefix}-call-${callId}`, runId, "tool_call", { id: callId, name: "read_file", arguments: {} }),
-      event(`${prefix}-result-${callId}`, runId, "tool_result", { toolCallId: callId, toolName: "read_file", ok: true, status: "completed", summary: "ok", uiPreview: preview }),
+      event(`${prefix}-result-${callId}`, runId, "tool_result", {
+        toolCallId: callId,
+        toolName: "read_file",
+        ok: true,
+        status: "completed",
+        summary: "ok",
+        uiPreview: preview,
+      }),
     ]),
     event(`${prefix}-assistant`, runId, "assistant_message", { content: reply, stopReason: "stop" }),
   ];
@@ -30,36 +58,61 @@ function turnEvents(runId: string, prefix: string, user: string, reply: string, 
 function durableOf(events: SessionEvent[]): DurableTranscript {
   const record: SessionRecord = {
     meta: { schemaVersion: 2, id: SESSION, title: "Transcript", createdAt: TIME, updatedAt: TIME, agentRunCount: 0 },
-    events, messageBlocks: createMessageBlocks(events), contextSnapshot: null,
+    events,
+    messageBlocks: createMessageBlocks(events),
+    contextSnapshot: null,
   } as SessionRecord;
   const projected = projectChatWindow(recordProjectionFixture(record), "/tmp/workspace");
   return { blocks: projected.messageBlocks, events: projected.events };
 }
 
 /** 与 App 的 refreshStreamingBlocks 一致：任务快照的 user 块在前，其余由 streamingStateToBlocks 产出。 */
-function liveOf(runId: string | null, state: StreamingState, options: { userBlock?: MessageBlock; recovered?: boolean; blockRunId?: string } = {}): LiveTranscript {
+function liveOf(
+  runId: string | null,
+  state: StreamingState,
+  options: { userBlock?: MessageBlock; recovered?: boolean; blockRunId?: string } = {},
+): LiveTranscript {
   const blocks = streamingStateToBlocks(state, options.blockRunId ?? runId ?? undefined);
-  return { blocks: options.userBlock ? [options.userBlock, ...blocks] : blocks, runId, recovered: options.recovered === true };
+  return {
+    blocks: options.userBlock ? [options.userBlock, ...blocks] : blocks,
+    runId,
+    recovered: options.recovered === true,
+  };
 }
 
 function userBlock(runId: string, content: string): MessageBlock {
   return { kind: "user", id: `turn:${runId}:user:0`, runId, content, createdAt: TIME };
 }
 
-function streaming(text: string, tools: Array<{ callId: string; preview: Record<string, unknown>; finished?: boolean }> = []): StreamingState {
+function streaming(
+  text: string,
+  tools: Array<{ callId: string; preview: Record<string, unknown>; finished?: boolean }> = [],
+): StreamingState {
   const state = createEmptyStreamingState();
   for (const tool of tools) {
     state.segments.push({ type: "tool", toolCallId: tool.callId });
-    state.activeTools.set(tool.callId, { toolName: "read_file", preview: tool.preview as never, finished: tool.finished ?? true });
+    state.activeTools.set(tool.callId, {
+      toolName: "read_file",
+      preview: tool.preview as never,
+      finished: tool.finished ?? true,
+    });
   }
   if (text) state.segments.push({ type: "text", text });
   return state;
 }
 
 const readPreview = (file: string) => ({ kind: "read", filePath: file, displayText: `Read ${file}` });
-const todoPreview = (revision: number) => ({ kind: "todo", todos: [{ id: "t1", content: "plan", status: "in_progress" }], totalCount: 1, completedCount: 0, revision, displayText: "1 todo" });
+const todoPreview = (revision: number) => ({
+  kind: "todo",
+  todos: [{ id: "t1", content: "plan", status: "in_progress" }],
+  totalCount: 1,
+  completedCount: 0,
+  revision,
+  displayText: "1 todo",
+});
 
-const compare = (durable: DurableTranscript, live: LiveTranscript, local: LocalTranscript = NO_LOCAL): MessageBlock[] => mergeTranscript(durable, live, local);
+const compare = (durable: DurableTranscript, live: LiveTranscript, local: LocalTranscript = NO_LOCAL): MessageBlock[] =>
+  mergeTranscript(durable, live, local);
 
 const keys = (blocks: MessageBlock[]) => blocks.map((block) => `${block.kind}:${block.renderKey ?? block.id}`);
 
@@ -70,17 +123,26 @@ describe("mergeTranscript", () => {
     const live = liveOf(runId, streaming("handoff reply"), { userBlock: userBlock(runId, "handoff prompt") });
 
     // 流式中：durable 尚无该 run → 只显示 live。
-    expect(keys(compare(durableOf([]), live))).toEqual([`user:turn:${runId}:user:0`, `assistant:turn:${runId}:assistant:0`]);
+    expect(keys(compare(durableOf([]), live))).toEqual([
+      `user:turn:${runId}:user:0`,
+      `assistant:turn:${runId}:assistant:0`,
+    ]);
     // durable 已写入、live 仍在：durable 中同一 run 的块隐藏，live 不重复。
     expect(keys(compare(finished, live))).toEqual([`user:turn:${runId}:user:0`, `assistant:turn:${runId}:assistant:0`]);
     // run 完成后 live 清空：同一 renderKey 由 durable 接手。
-    expect(keys(compare(finished, liveOf(null, createEmptyStreamingState())))).toEqual([`user:turn:${runId}:user:0`, `assistant:turn:${runId}:assistant:0`]);
+    expect(keys(compare(finished, liveOf(null, createEmptyStreamingState())))).toEqual([
+      `user:turn:${runId}:user:0`,
+      `assistant:turn:${runId}:assistant:0`,
+    ]);
   });
 
   it("hydrates a recovered task without duplicating its persisted user (app-message-queue)", () => {
     const runId = "recovered-run";
     const durable = durableOf([event("durable-user", runId, "user_message", { content: "reload active task input" })]);
-    const live = liveOf(runId, createEmptyStreamingState(), { userBlock: userBlock(runId, "reload active task input"), recovered: true });
+    const live = liveOf(runId, createEmptyStreamingState(), {
+      userBlock: userBlock(runId, "reload active task input"),
+      recovered: true,
+    });
     const merged = compare(durable, live);
     expect(merged.filter((block) => block.kind === "user")).toHaveLength(1);
     expect(merged[0]).toMatchObject({ kind: "user", id: expect.not.stringMatching(/^turn:/) });
@@ -89,27 +151,47 @@ describe("mergeTranscript", () => {
   it("keeps background runs of other sessions apart (session-background-runs fixture)", () => {
     // 前一个 run 已完成并写入 durable；新 run 在流式中，进度和工具块只来自 live。
     const done = turnEvents("run-a1", "v2-a1", "第一轮", "A 后台任务已完成，共 2 次进度更新。");
-    const live = liveOf("run-a2", streaming("后台进度 2。", [{ callId: "read-1", preview: readPreview("file-1.md") }, { callId: "read-2", preview: readPreview("file-2.md") }]),
-      { userBlock: userBlock("run-a2", "第二轮") });
+    const live = liveOf(
+      "run-a2",
+      streaming("后台进度 2。", [
+        { callId: "read-1", preview: readPreview("file-1.md") },
+        { callId: "read-2", preview: readPreview("file-2.md") },
+      ]),
+      { userBlock: userBlock("run-a2", "第二轮") },
+    );
     const merged = compare(durableOf(done), live);
     expect(merged.map((block) => block.runId)).toEqual(["run-a1", "run-a1", "run-a2", "run-a2", "run-a2", "run-a2"]);
     // 第二轮 durable 已到但 live 未清：第二轮的 durable 块全部隐藏。
-    const both = durableOf([...done, ...turnEvents("run-a2", "v2-a2", "第二轮", "A 后台任务已完成，共 2 次进度更新。", [{ callId: "read-1", preview: readPreview("file-1.md") }])]);
+    const both = durableOf([
+      ...done,
+      ...turnEvents("run-a2", "v2-a2", "第二轮", "A 后台任务已完成，共 2 次进度更新。", [
+        { callId: "read-1", preview: readPreview("file-1.md") },
+      ]),
+    ]);
     expect(compare(both, live).filter((block) => block.runId === "run-a2")).toEqual(live.blocks);
   });
 
   it("keeps durable content of a recovered run and hides only tool blocks live already has", () => {
     const runId = "run-recover";
-    const durable = durableOf(turnEvents(runId, "evt-r", "question", "partial answer", [
-      { callId: "c1", preview: readPreview("a.md") },
-      { callId: "c2", preview: readPreview("b.md") },
-    ]));
-    const live = liveOf(runId, streaming("continued answer", [{ callId: "c2", preview: readPreview("b.md"), finished: false }]), { recovered: true });
+    const durable = durableOf(
+      turnEvents(runId, "evt-r", "question", "partial answer", [
+        { callId: "c1", preview: readPreview("a.md") },
+        { callId: "c2", preview: readPreview("b.md") },
+      ]),
+    );
+    const live = liveOf(
+      runId,
+      streaming("continued answer", [{ callId: "c2", preview: readPreview("b.md"), finished: false }]),
+      { recovered: true },
+    );
     // 实时底稿起的 live 正文序号从 0 重新数，与 durable 同一 run 的 renderKey 撞上时换成 `:live`。
     const merged = mergeTranscript(durable, live, NO_LOCAL);
     expect(keys(merged)).toEqual([
-      `user:turn:${runId}:user:0`, `read:turn:${runId}:tool:c1`, `assistant:turn:${runId}:assistant:0`,
-      `read:turn:${runId}:tool:c2`, `assistant:turn:${runId}:assistant:0:live`,
+      `user:turn:${runId}:user:0`,
+      `read:turn:${runId}:tool:c1`,
+      `assistant:turn:${runId}:assistant:0`,
+      `read:turn:${runId}:tool:c2`,
+      `assistant:turn:${runId}:assistant:0:live`,
     ]);
     expect(new Set(keys(merged)).size).toBe(merged.length);
   });
@@ -126,15 +208,24 @@ describe("mergeTranscript", () => {
   });
 
   it("falls back to events when the record has no blocks, excluding the streaming run", () => {
-    const events = [...turnEvents("run-old", "e-old", "old", "old reply"), ...turnEvents("run-new", "e-new", "new", "new reply")];
+    const events = [
+      ...turnEvents("run-old", "e-old", "old", "old reply"),
+      ...turnEvents("run-new", "e-new", "new", "new reply"),
+    ];
     const live = liveOf("run-new", streaming("new reply"));
     const merged = compare({ blocks: [], events: durableOf(events).events }, live);
     expect(merged.map((block) => block.runId)).toEqual(["run-old", "run-old", "run-new"]);
     compare({ blocks: undefined, events: durableOf(events).events }, liveOf(null, createEmptyStreamingState()));
     // 恢复的 run 不按流式处理：events 里该 run 的内容保留；live 里同样内容的正文已定稿，不再重复显示。
-    const recovered = mergeTranscript({ blocks: [], events: durableOf(events).events }, liveOf("run-new", streaming("new reply"), { recovered: true }), NO_LOCAL);
+    const recovered = mergeTranscript(
+      { blocks: [], events: durableOf(events).events },
+      liveOf("run-new", streaming("new reply"), { recovered: true }),
+      NO_LOCAL,
+    );
     expect(recovered.map((block) => block.runId)).toEqual(["run-old", "run-old", "run-new", "run-new"]);
-    expect(recovered.filter((block) => block.kind === "assistant").map((block) => (block as { content: string }).content)).toEqual(["old reply", "new reply"]);
+    expect(
+      recovered.filter((block) => block.kind === "assistant").map((block) => (block as { content: string }).content),
+    ).toEqual(["old reply", "new reply"]);
   });
 
   it("drops a live user block whose identity durable already has, keeping the durable one", () => {
@@ -152,20 +243,43 @@ describe("mergeTranscript", () => {
     state.segments.push(
       { type: "workspace_preparation", agentRunId: runId },
       { type: "text", text: "before steer" },
-      { type: "user_message", block: { kind: "user", id: `turn:${runId}:steer:m-1`, runId, content: "steer now", createdAt: TIME } },
+      {
+        type: "user_message",
+        block: { kind: "user", id: `turn:${runId}:steer:m-1`, runId, content: "steer now", createdAt: TIME },
+      },
       { type: "compaction", agentRunId: runId },
       { type: "text", text: "after steer" },
     );
-    state.activeWorkspacePreparations.set(runId, { kind: "workspace_preparation", id: `turn:${runId}:workspace-preparation:0`, runId, status: "completed", sourceWorkspaceRoot: "/w", baseBranch: "main", createdAt: TIME });
+    state.activeWorkspacePreparations.set(runId, {
+      kind: "workspace_preparation",
+      id: `turn:${runId}:workspace-preparation:0`,
+      runId,
+      status: "completed",
+      sourceWorkspaceRoot: "/w",
+      baseBranch: "main",
+      createdAt: TIME,
+    });
     state.activeCompactions.set(runId, createCompactionBlock({ agentRunId: runId, status: "completed" }));
-    const durable = durableOf([...turnEvents("run-prev", "p", "prev", "prev reply"), ...turnEvents(runId, "s", "start", "after steer")]);
+    const durable = durableOf([
+      ...turnEvents("run-prev", "p", "prev", "prev reply"),
+      ...turnEvents(runId, "s", "start", "after steer"),
+    ]);
 
     // run 进行中 / 刚完成但 live 尚未清空（runId 已置空）/ 恢复后。
     compare(durable, liveOf(runId, state, { userBlock: userBlock(runId, "start") }));
-    const lingering = compare(durable, liveOf(null, state, { userBlock: userBlock(runId, "start"), blockRunId: runId }));
+    const lingering = compare(
+      durable,
+      liveOf(null, state, { userBlock: userBlock(runId, "start"), blockRunId: runId }),
+    );
     expect(lingering.filter((block) => block.kind === "user")).toHaveLength(3);
-    const recovered = mergeTranscript(durable, liveOf(runId, state, { userBlock: userBlock(runId, "start"), recovered: true }), NO_LOCAL);
-    const replies = recovered.filter((block) => block.kind === "assistant" && block.runId === runId).map((block) => (block as { content: string }).content);
+    const recovered = mergeTranscript(
+      durable,
+      liveOf(runId, state, { userBlock: userBlock(runId, "start"), recovered: true }),
+      NO_LOCAL,
+    );
+    const replies = recovered
+      .filter((block) => block.kind === "assistant" && block.runId === runId)
+      .map((block) => (block as { content: string }).content);
     // 夹具里两段 live 正文都还在；durable 已定稿的「after steer」只显示一次。
     expect(replies.filter((content) => content === "after steer")).toHaveLength(1);
     expect(replies).toContain("before steer");
@@ -176,7 +290,10 @@ describe("mergeTranscript", () => {
   it("appends a compaction failure only when idle", () => {
     const failure = createCompactionBlock({ agentRunId: "compact-task", status: "failed" });
     const durable = durableOf(turnEvents("run-b", "b", "go", "started"));
-    const idle = compare(durable, liveOf(null, createEmptyStreamingState()), { compactionFailure: failure, isStreaming: false });
+    const idle = compare(durable, liveOf(null, createEmptyStreamingState()), {
+      compactionFailure: failure,
+      isStreaming: false,
+    });
     expect(idle.at(-1)).toBe(failure);
     const busy = compare(durable, liveOf("run-c", streaming("x")), { compactionFailure: failure, isStreaming: true });
     expect(busy).not.toContain(failure);

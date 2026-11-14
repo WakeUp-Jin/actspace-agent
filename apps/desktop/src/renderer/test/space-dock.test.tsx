@@ -9,7 +9,11 @@ const actions = spaceDemoStore.actions;
 const state = () => spaceDemoStore.getSnapshot();
 
 function renderDock() {
-  return render(<TooltipProvider delayDuration={0}><SpaceDock /></TooltipProvider>);
+  return render(
+    <TooltipProvider delayDuration={0}>
+      <SpaceDock />
+    </TooltipProvider>,
+  );
 }
 
 beforeEach(() => {

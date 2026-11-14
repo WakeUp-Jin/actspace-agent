@@ -11,16 +11,22 @@ const ASSISTANT_CONTENT_CLASS =
 const NO_MARKS: readonly DraftAnnotationMark[] = [];
 
 /** 流式期间只有正在写的那条回复换了 message 对象，其余回复靠 memo 跳过。 */
-export const AssistantReply = memo(function AssistantReply({ message, onOpenWorkspaceFile }: { message: Extract<MessageBlock, { kind: "assistant" }>; onOpenWorkspaceFile?: (path: string, line?: number) => void }) {
+export const AssistantReply = memo(function AssistantReply({
+  message,
+  onOpenWorkspaceFile,
+}: {
+  message: Extract<MessageBlock, { kind: "assistant" }>;
+  onOpenWorkspaceFile?: (path: string, line?: number) => void;
+}) {
   const drafts = useResponseAnnotations()?.drafts;
   const rootRef = useRef<HTMLDivElement | null>(null);
   const writingId = useContext(WritingReplyContext);
   const writing = writingId === undefined ? undefined : writingId === message.id;
   // 序号沿用 Composer 卡片里的全局顺序；没有属于本回复的草稿时复用同一个空数组，不触发重新测量。
   const marks = useMemo(() => {
-    const own = (drafts ?? []).flatMap((annotation, index) => (
-      annotation.assistantMessageId === message.id ? [{ annotation, label: index + 1 }] : []
-    ));
+    const own = (drafts ?? []).flatMap((annotation, index) =>
+      annotation.assistantMessageId === message.id ? [{ annotation, label: index + 1 }] : [],
+    );
     return own.length > 0 ? own : NO_MARKS;
   }, [drafts, message.id]);
   return (

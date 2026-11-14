@@ -5,7 +5,14 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("electron", () => ({ shell: { openExternal: vi.fn() } }));
 
-import { attachNavigationGuards, blockWebviewAttachment, buildContentSecurityPolicy, createAppUrlMatcher, createMainWindowOptions, installContentSecurityPolicy } from "../window-security";
+import {
+  attachNavigationGuards,
+  blockWebviewAttachment,
+  buildContentSecurityPolicy,
+  createAppUrlMatcher,
+  createMainWindowOptions,
+  installContentSecurityPolicy,
+} from "../window-security";
 
 function fakeWindow() {
   const contents = Object.assign(new EventEmitter(), {
@@ -89,7 +96,9 @@ describe("navigation guards", () => {
 
   it("swallows opener failures", async () => {
     const win = fakeWindow();
-    const openExternal = vi.fn(async () => { throw new Error("no handler"); });
+    const openExternal = vi.fn(async () => {
+      throw new Error("no handler");
+    });
     const onRejection = vi.fn();
     process.on("unhandledRejection", onRejection);
     try {
@@ -129,10 +138,12 @@ describe("webview blocking", () => {
 
 describe("content security policy", () => {
   function directives(policy: string): Record<string, string> {
-    return Object.fromEntries(policy.split("; ").map((directive) => {
-      const [name, ...values] = directive.split(" ");
-      return [name, values.join(" ")];
-    }));
+    return Object.fromEntries(
+      policy.split("; ").map((directive) => {
+        const [name, ...values] = directive.split(" ");
+        return [name, values.join(" ")];
+      }),
+    );
   }
 
   it("locks scripts to the bundle and blocks frames, plugins, workers and form targets in production", () => {
@@ -162,12 +173,34 @@ describe("content security policy", () => {
   });
 
   it("sets the header on document responses only and replaces any existing policy", () => {
-    let listener: ((details: { resourceType: string; responseHeaders?: Record<string, string[]> }, callback: (response: { responseHeaders?: Record<string, string[]> }) => void) => void) | undefined;
-    installContentSecurityPolicy({ webRequest: { onHeadersReceived: (fn) => { listener = fn; } } }, "default-src 'self'");
+    let listener:
+      | ((
+          details: { resourceType: string; responseHeaders?: Record<string, string[]> },
+          callback: (response: { responseHeaders?: Record<string, string[]> }) => void,
+        ) => void)
+      | undefined;
+    installContentSecurityPolicy(
+      {
+        webRequest: {
+          onHeadersReceived: (fn) => {
+            listener = fn;
+          },
+        },
+      },
+      "default-src 'self'",
+    );
     const responses: Array<{ responseHeaders?: Record<string, string[]> }> = [];
-    listener!({ resourceType: "mainFrame", responseHeaders: { "content-security-policy": ["default-src *"], "Content-Type": ["text/html"] } }, (response) => responses.push(response));
+    listener!(
+      {
+        resourceType: "mainFrame",
+        responseHeaders: { "content-security-policy": ["default-src *"], "Content-Type": ["text/html"] },
+      },
+      (response) => responses.push(response),
+    );
     listener!({ resourceType: "subFrame", responseHeaders: {} }, (response) => responses.push(response));
-    listener!({ resourceType: "script", responseHeaders: { "Content-Type": ["text/javascript"] } }, (response) => responses.push(response));
+    listener!({ resourceType: "script", responseHeaders: { "Content-Type": ["text/javascript"] } }, (response) =>
+      responses.push(response),
+    );
     listener!({ resourceType: "mainFrame" }, (response) => responses.push(response));
     expect(responses).toEqual([
       { responseHeaders: { "Content-Type": ["text/html"], "Content-Security-Policy": ["default-src 'self'"] } },

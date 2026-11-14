@@ -65,26 +65,74 @@ export const currentTruthFiles = [
 const BUILD_ARTIFACTS = new Set([]);
 
 const forbiddenCurrentClaims = [
-  { pattern: /\b(?:bootProfile\b\s*\(|BootedProfile\b|RunAgentInput\b)|context:compact|engine\/streaming-preview-extractors\.ts/g, message: "仍把退役的启动或任务 API 当作当前契约", allowHistoricalLine: true },
+  {
+    pattern:
+      /\b(?:bootProfile\b\s*\(|BootedProfile\b|RunAgentInput\b)|context:compact|engine\/streaming-preview-extractors\.ts/g,
+    message: "仍把退役的启动或任务 API 当作当前契约",
+    allowHistoricalLine: true,
+  },
   { pattern: /(?:docs\/)?design-docs\/v1-legacy(?:\/|\b)/g, message: "仍引用已搬移的 v1 归档路径" },
   { pattern: /(?:actspace-agent|actspace|dist\/cli\.js)\s+chat\b/g, message: "仍提供已退役的 CLI chat 命令示例" },
   { pattern: /`run`\s*\/\s*`chat`/g, message: "仍把 run/chat 并列为当前业务命令" },
-  { pattern: /(?:Promise<RuntimeHandle>|RuntimeHandle\.(?:runTurn|run|abort)\s*\()/g, message: "仍提供已删除的 RuntimeHandle API 示例" },
-  { pattern: /packages\/agent-runtime(?:\/|\b)/g, message: "仍把单一 packages/agent-runtime 当作当前实现", allowHistoricalLine: true },
+  {
+    pattern: /(?:Promise<RuntimeHandle>|RuntimeHandle\.(?:runTurn|run|abort)\s*\()/g,
+    message: "仍提供已删除的 RuntimeHandle API 示例",
+  },
+  {
+    pattern: /packages\/agent-runtime(?:\/|\b)/g,
+    message: "仍把单一 packages/agent-runtime 当作当前实现",
+    allowHistoricalLine: true,
+  },
   { pattern: /docs\/design-docs\/agent-runtime\/agent-testing\.md/g, message: "仍链接已失效的测试规范路径" },
-  { pattern: /docs\/design-docs\/execution-safety\/agent-(?:bash-policy-allowlist-design|tool-approval-pause-resume|bash工具设计文档)\.md/g, message: "仍把 v1 execution-safety 文档当作当前入口" },
-  { pattern: /docs\/design-docs\/model-context\/agent-cache-loss-audit\.md/g, message: "仍把 v1 cache audit 当作当前入口" },
-  { pattern: /docs\/exec-plans\/active\/(?:20260711-agent-team|Bash工具和工具权限调度开发计划)/g, message: "仍把已丢弃的 v1 计划登记为 active" },
+  {
+    pattern:
+      /docs\/design-docs\/execution-safety\/agent-(?:bash-policy-allowlist-design|tool-approval-pause-resume|bash工具设计文档)\.md/g,
+    message: "仍把 v1 execution-safety 文档当作当前入口",
+  },
+  {
+    pattern: /docs\/design-docs\/model-context\/agent-cache-loss-audit\.md/g,
+    message: "仍把 v1 cache audit 当作当前入口",
+  },
+  {
+    pattern: /docs\/exec-plans\/active\/(?:20260711-agent-team|Bash工具和工具权限调度开发计划)/g,
+    message: "仍把已丢弃的 v1 计划登记为 active",
+  },
   { pattern: /<userData>\/sessions\/<sessionId>/g, message: "仍描述 v1 Session 目录" },
-  { pattern: /apps\/desktop\/src\/main\/(?:agent-run|desktop-agent-runtime)\.ts/g, message: "仍链接已删除的 Desktop v1 Runtime" },
+  {
+    pattern: /apps\/desktop\/src\/main\/(?:agent-run|desktop-agent-runtime)\.ts/g,
+    message: "仍链接已删除的 Desktop v1 Runtime",
+  },
   { pattern: /apps\/cli\/src\/runtime-adapter\.ts/g, message: "仍链接已删除的 CLI v1 adapter" },
-  { pattern: /@actspace\/(?:tools-|core-agent|core-scope|session-jsonl)/g, message: "仍使用插件结构调整前的旧包名", allowHistoricalLine: true, skipMigrationSubjectDocs: true },
-  { pattern: /packages\/(?:tools-[a-z-]+|core-(?:agent|scope)[a-z-]*|session-jsonl)(?:\/|\b)/g, message: "仍使用插件结构调整前的一级包路径", allowHistoricalLine: true, skipMigrationSubjectDocs: true },
-  { pattern: /`(?:request\/snapshot|llm\/usage|llm\/ended)`/g, message: "仍把旧 v2 草案的事件名当作当前事件词汇", allowHistoricalLine: true },
-  { pattern: /schema\s*(?:=\s*)?9\b|user_version\s*=\s*9\b/g, message: "仍把 SQLite 读模型写成 schema 9（以 usage-read-model-schema.ts 的 user_version 为准）", allowHistoricalLine: true },
+  {
+    pattern: /@actspace\/(?:tools-|core-agent|core-scope|session-jsonl)/g,
+    message: "仍使用插件结构调整前的旧包名",
+    allowHistoricalLine: true,
+    skipMigrationSubjectDocs: true,
+  },
+  {
+    pattern: /packages\/(?:tools-[a-z-]+|core-(?:agent|scope)[a-z-]*|session-jsonl)(?:\/|\b)/g,
+    message: "仍使用插件结构调整前的一级包路径",
+    allowHistoricalLine: true,
+    skipMigrationSubjectDocs: true,
+  },
+  {
+    pattern: /`(?:request\/snapshot|llm\/usage|llm\/ended)`/g,
+    message: "仍把旧 v2 草案的事件名当作当前事件词汇",
+    allowHistoricalLine: true,
+  },
+  {
+    pattern: /schema\s*(?:=\s*)?9\b|user_version\s*=\s*9\b/g,
+    message: "仍把 SQLite 读模型写成 schema 9（以 usage-read-model-schema.ts 的 user_version 为准）",
+    allowHistoricalLine: true,
+  },
   { pattern: /`billingMode`/g, message: "仍描述已删除的连接级 billingMode", allowHistoricalLine: true },
   { pattern: /\/Users\/[A-Za-z0-9_.-]+\//g, message: "仍包含个人机器的绝对路径" },
-  { pattern: TRANSITIONAL_NAME, message: "仍使用改名前的标识符（哪些名字见 scripts/check-transitional-names.mjs）；node scripts/check-transitional-names.mjs --write <这份文档> 可以直接改", allowHistoricalLine: true },
+  {
+    pattern: TRANSITIONAL_NAME,
+    message:
+      "仍使用改名前的标识符（哪些名字见 scripts/check-transitional-names.mjs）；node scripts/check-transitional-names.mjs --write <这份文档> 可以直接改",
+    allowHistoricalLine: true,
+  },
 ];
 
 /** Design docs outside the truth list still must not restate retired facts; links are checked separately. */
@@ -95,7 +143,8 @@ const claimOnlyDirectories = ["docs/design-docs"];
  * described, so the old-name claims and the code-path existence check do not apply to them.
  */
 const migrationSubjectDocs = new Set(["docs/design-docs/架构优化/02-插件结构设计.md"]);
-const historicalLinePattern = /历史|追溯|已删除|已退役|已废弃|删掉|旧|不是当前|不再|不提供|无 `|退役|historical|retired/iu;
+const historicalLinePattern =
+  /历史|追溯|已删除|已退役|已废弃|删掉|旧|不是当前|不再|不提供|无 `|退役|historical|retired/iu;
 
 /** Replace fenced and inline code with same-length blanks, keeping offsets and line numbers. */
 export function maskCode(source) {
@@ -111,9 +160,7 @@ function lineNumber(source, index) {
 
 function normalizeLinkTarget(rawTarget) {
   const target = rawTarget.trim();
-  const withoutTitle = target.startsWith("<")
-    ? target.slice(1, target.indexOf(">"))
-    : target.split(/\s+["']/u, 1)[0];
+  const withoutTitle = target.startsWith("<") ? target.slice(1, target.indexOf(">")) : target.split(/\s+["']/u, 1)[0];
   return withoutTitle.split("#", 1)[0].split("?", 1)[0];
 }
 
@@ -140,7 +187,9 @@ export async function checkMarkdownFiles(repoRoot, files, { checkClaims = true, 
     }
 
     const isMigrationSubject = migrationSubjectDocs.has(relativePath);
-    for (const { pattern, message, allowHistoricalLine, skipMigrationSubjectDocs } of checkClaims ? forbiddenCurrentClaims : []) {
+    for (const { pattern, message, allowHistoricalLine, skipMigrationSubjectDocs } of checkClaims
+      ? forbiddenCurrentClaims
+      : []) {
       if (skipMigrationSubjectDocs && isMigrationSubject) continue;
       pattern.lastIndex = 0;
       for (const match of source.matchAll(pattern)) {
@@ -159,7 +208,8 @@ export async function checkMarkdownFiles(repoRoot, files, { checkClaims = true, 
           const path = match[1].replace(/[:#].*$/u, "").replace(/\/$/u, "");
           // Globs, alternations (`a|b`), elisions (`1..9`, `...`) and date placeholders (`YYYY-MM`) are shorthand, not paths.
           if (/[*{}<>…|]|\.\.|YYYY/u.test(path)) continue;
-          if (!(await exists(resolve(repoRoot, path)))) failures.push(`${relativePath}:${index + 1}: code path does not exist: ${path}`);
+          if (!(await exists(resolve(repoRoot, path))))
+            failures.push(`${relativePath}:${index + 1}: code path does not exist: ${path}`);
         }
       }
     }
@@ -182,10 +232,15 @@ export async function checkMarkdownFiles(repoRoot, files, { checkClaims = true, 
       const resolvedTarget = resolve(dirname(absolutePath), decodedTarget);
       if (!(await exists(resolvedTarget))) {
         failures.push(`${relativePath}:${lineNumber(source, match.index)}: broken Markdown link: ${target}`);
-      } else if (checkClaims && relative(repoRoot, resolvedTarget).replaceAll("\\", "/").startsWith("docs/archive/v1/")) {
+      } else if (
+        checkClaims &&
+        relative(repoRoot, resolvedTarget).replaceAll("\\", "/").startsWith("docs/archive/v1/")
+      ) {
         const line = source.split("\n")[lineNumber(source, match.index) - 1].replace(/\]\([^)]*\)/gu, "]");
         if (!/历史|归档|追溯|旧|v1|legacy|archive/iu.test(line)) {
-          failures.push(`${relativePath}:${lineNumber(source, match.index)}: current navigation must label v1 archive links as historical: ${target}`);
+          failures.push(
+            `${relativePath}:${lineNumber(source, match.index)}: current navigation must label v1 archive links as historical: ${target}`,
+          );
         }
       }
     }
@@ -199,7 +254,7 @@ async function collectDocumentationFiles(repoRoot, directory) {
   const files = [];
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     const path = `${directory}/${entry.name}`;
-    if (entry.isDirectory()) files.push(...await collectDocumentationFiles(repoRoot, path));
+    if (entry.isDirectory()) files.push(...(await collectDocumentationFiles(repoRoot, path)));
     else if (entry.isFile() && /\.(?:md|html)$/u.test(entry.name)) files.push(path);
   }
   return files;
@@ -209,12 +264,13 @@ export async function checkDocumentationLinks(repoRoot, directories) {
   const failures = [];
   for (const directory of directories) {
     for (const path of await collectDocumentationFiles(repoRoot, directory)) {
-      if (path.endsWith(".md")) failures.push(...await checkMarkdownFiles(repoRoot, [path], { checkClaims: false }));
+      if (path.endsWith(".md")) failures.push(...(await checkMarkdownFiles(repoRoot, [path], { checkClaims: false })));
       // Markdown may embed raw HTML assets; HTML prototypes may reference docs.
       const source = await readFile(resolve(repoRoot, path), "utf8");
       for (const match of source.matchAll(/\b(?:src|href)=["']([^"']+)["']/gu)) {
         const target = normalizeLinkTarget(match[1]);
-        if (!target || target.startsWith("/") || /^[a-z][a-z0-9+.-]*:/iu.test(target) || /[{}<>]/u.test(target)) continue;
+        if (!target || target.startsWith("/") || /^[a-z][a-z0-9+.-]*:/iu.test(target) || /[{}<>]/u.test(target))
+          continue;
         try {
           const resolvedAsset = resolve(dirname(resolve(repoRoot, path)), decodeURIComponent(target));
           if (BUILD_ARTIFACTS.has(relative(repoRoot, resolvedAsset).replaceAll("\\", "/"))) continue;
@@ -300,11 +356,22 @@ export async function checkCurrentDocs(repoRoot) {
     ...(await collectTopLevelMarkdown(repoRoot, "docs/exec-plans")),
   ];
   // Learnings keep old symbols only with a「历史：…」label (see docs/learnings/WRITING_GUIDE.md), so their code paths must exist too.
-  const learningsDocs = (await collectDocumentationFiles(repoRoot, "docs/learnings")).filter((path) => path.endsWith(".md"));
+  const learningsDocs = (await collectDocumentationFiles(repoRoot, "docs/learnings")).filter((path) =>
+    path.endsWith(".md"),
+  );
   const [claims, designClaims, links, otherLinks, learningsPaths, learningsIndex] = await Promise.all([
     checkMarkdownFiles(repoRoot, currentTruthFiles),
-    checkMarkdownFiles(repoRoot, designDocs.filter((path) => !currentTruthFiles.includes(path))),
-    checkDocumentationLinks(repoRoot, ["docs/design-docs", "docs/exec-plans", "docs/exec-runs", "docs/learnings", "docs/coding-standards"]),
+    checkMarkdownFiles(
+      repoRoot,
+      designDocs.filter((path) => !currentTruthFiles.includes(path)),
+    ),
+    checkDocumentationLinks(repoRoot, [
+      "docs/design-docs",
+      "docs/exec-plans",
+      "docs/exec-runs",
+      "docs/learnings",
+      "docs/coding-standards",
+    ]),
     checkMarkdownFiles(repoRoot, otherCurrentDocs, { checkClaims: false }),
     checkMarkdownFiles(repoRoot, learningsDocs, { checkClaims: false, checkCodePaths: true }),
     checkLearningsIndex(repoRoot),
@@ -324,6 +391,8 @@ if (isMain) {
     process.stderr.write(`current docs check failed (${failures.length}):\n${failures.join("\n")}\n`);
     process.exitCode = 1;
   } else {
-    process.stdout.write(`current docs check passed (${currentTruthFiles.length} truth files; design-docs claims; docs/plans/runs/learnings/coding-standards links; learnings code paths and index)\n`);
+    process.stdout.write(
+      `current docs check passed (${currentTruthFiles.length} truth files; design-docs claims; docs/plans/runs/learnings/coding-standards links; learnings code paths and index)\n`,
+    );
   }
 }

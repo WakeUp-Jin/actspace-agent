@@ -11,6 +11,13 @@ it("returns [] for unknown models and models without reasoning support", () => {
 });
 
 it("groups models by provider in host order", () => {
-  const groups = groupModels([{ id: "a/x", provider: "a", name: "x" }, { id: "b/y", provider: "b", name: "y" }, { id: "a/z", provider: "a", name: "z" }]);
-  expect(groups.map(group => [group.provider, group.models.map(model => model.name)])).toEqual([["a", ["x", "z"]], ["b", ["y"]]]);
+  const groups = groupModels([
+    { id: "a/x", provider: "a", name: "x" },
+    { id: "b/y", provider: "b", name: "y" },
+    { id: "a/z", provider: "a", name: "z" },
+  ]);
+  expect(groups.map((group) => [group.provider, group.models.map((model) => model.name)])).toEqual([
+    ["a", ["x", "z"]],
+    ["b", ["y"]],
+  ]);
 });

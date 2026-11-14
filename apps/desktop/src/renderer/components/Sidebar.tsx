@@ -22,7 +22,8 @@ const SIDEBAR_PRIMARY_ACTION_CLASS =
 const SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS = "bg-selected font-semibold text-text-main";
 const SIDEBAR_PRIMARY_ACTION_LABEL_CLASS = "min-w-0 flex-1 text-left";
 const SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS = "text-act-xs leading-4 font-medium tracking-[0.02em] text-text-faint";
-const SESSION_NAV_CLASS = "sidebar-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-x-hidden overflow-y-auto pt-1";
+const SESSION_NAV_CLASS =
+  "sidebar-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-x-hidden overflow-y-auto pt-1";
 const SETTINGS_ENTRY_CLASS =
   "flex min-h-[34px] min-w-0 items-center gap-[9px] rounded-act-md border-0 bg-transparent px-2.5 py-0 text-left text-act-sm font-medium text-text-muted transition-[background,color] duration-(--motion-fast) ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 
@@ -84,11 +85,17 @@ export const Sidebar = memo(function Sidebar({
           >
             <SquarePen size={14} />
             <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>新建会话</span>
-            <span className={SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS} aria-hidden="true">⌘N</span>
+            <span className={SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS} aria-hidden="true">
+              ⌘N
+            </span>
           </button>
         </div>
         {newSpace ? (
-          <NewSpaceAction className={SIDEBAR_PRIMARY_ACTION_CLASS} labelClassName={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS} onNewSpace={newSpace} />
+          <NewSpaceAction
+            className={SIDEBAR_PRIMARY_ACTION_CLASS}
+            labelClassName={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}
+            onNewSpace={newSpace}
+          />
         ) : null}
         <button
           className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "extensions" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
@@ -110,9 +117,22 @@ export const Sidebar = memo(function Sidebar({
       </div>
 
       <nav className={SESSION_NAV_CLASS} aria-label="会话">
-        {browse?.listLoading && <p role="status" className="px-2 text-act-xs leading-4 text-text-muted">正在加载会话…</p>}
-        {browse?.listError && <p role="alert" className="px-2 text-act-xs leading-4 text-text-muted">{browse.listError} <button type="button" onClick={browse.retryList}>重试</button></p>}
-        {newSpace ? <SpaceSidebarSection inSpace={view === "space"} onEnter={enterSpace} onNewSpace={newSpace} /> : null}
+        {browse?.listLoading && (
+          <p role="status" className="px-2 text-act-xs leading-4 text-text-muted">
+            正在加载会话…
+          </p>
+        )}
+        {browse?.listError && (
+          <p role="alert" className="px-2 text-act-xs leading-4 text-text-muted">
+            {browse.listError}{" "}
+            <button type="button" onClick={browse.retryList}>
+              重试
+            </button>
+          </p>
+        )}
+        {newSpace ? (
+          <SpaceSidebarSection inSpace={view === "space"} onEnter={enterSpace} onNewSpace={newSpace} />
+        ) : null}
         <SidebarSessions
           sessions={sessions}
           workspaces={workspaces}

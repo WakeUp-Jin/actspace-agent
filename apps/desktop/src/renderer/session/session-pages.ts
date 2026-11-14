@@ -14,7 +14,11 @@ const pending = new WeakMap<ClientSessionStore, Map<string, Promise<boolean>>>()
  * cell 已被 evict / 窗口已被替换（页不再与窗口相邻），返回 false 并丢弃该页。
  * 同一会话同时只有一个请求，重复调用拿到同一个 Promise。读取失败时抛出，由调用方显示错误。
  */
-export function loadEarlier(store: ClientSessionStore, sessionId: string, getPage: GetPage = sessionsApi.getPage): Promise<boolean> {
+export function loadEarlier(
+  store: ClientSessionStore,
+  sessionId: string,
+  getPage: GetPage = sessionsApi.getPage,
+): Promise<boolean> {
   const loads = pending.get(store) ?? new Map<string, Promise<boolean>>();
   pending.set(store, loads);
   const inFlight = loads.get(sessionId);
@@ -30,4 +34,3 @@ export function loadEarlier(store: ClientSessionStore, sessionId: string, getPag
   loads.set(sessionId, job);
   return job;
 }
-

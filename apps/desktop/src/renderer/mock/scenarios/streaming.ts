@@ -17,7 +17,11 @@ const STREAM_TEXT = [
 /** 流式中：打开会话后开始逐段输出，停在运行态，便于截图「生成中」的界面。 */
 export function streamingScenario(clock: MockClock): MockHandlers | void {
   const { db } = clock;
-  seedSession(db, { title: "梳理 preload 接口", minutesAgo: 40, turns: [["preload 现在有多少行？", "改造后约 30 行，只做 IPC 转发。"]] });
+  seedSession(db, {
+    title: "梳理 preload 接口",
+    minutesAgo: 40,
+    turns: [["preload 现在有多少行？", "改造后约 30 行，只做 IPC 转发。"]],
+  });
   const session = seedSession(db, {
     title: "检查 bridge 调用方",
     minutesAgo: 1,
@@ -29,7 +33,17 @@ export function streamingScenario(clock: MockClock): MockHandlers | void {
       getPage: async ({ sessionId }) => {
         if (sessionId === session.id && !started) {
           started = true;
-          clock.schedule(() => playReply(clock, { sessionId, agentRunId: lastRunId(session), text: STREAM_TEXT, chunkMs: 90, finish: false }), 300);
+          clock.schedule(
+            () =>
+              playReply(clock, {
+                sessionId,
+                agentRunId: lastRunId(session),
+                text: STREAM_TEXT,
+                chunkMs: 90,
+                finish: false,
+              }),
+            300,
+          );
         }
         return sessionProjection(requireSession(db, sessionId));
       },

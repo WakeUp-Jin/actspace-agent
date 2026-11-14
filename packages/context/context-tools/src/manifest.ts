@@ -1,2 +1,18 @@
 import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
-export const manifest = defineBuiltinPluginManifest({ display: { title: "工具说明", description: "告诉 Agent 每个工具怎么用", scope: "session", defaultEnabled: true, canDisable: false }, pluginId: "actspace.context-tools", version: "0.1.0", name: "ActSpace Context tools", entry: { entryId: "context.tools", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: ["context.assembly"], contributions: { services: ["context.source.tools"], tools: [], prompts: [], events: [] } });
+export const manifest = defineBuiltinPluginManifest({
+  display: {
+    title: "工具说明",
+    description: "告诉 Agent 每个工具怎么用",
+    scope: "session",
+    defaultEnabled: true,
+    canDisable: false,
+  },
+  pluginId: "actspace.context-tools",
+  version: "0.1.0",
+  name: "ActSpace Context tools",
+  entry: { entryId: "context.tools", behavior: "./plugin.js" },
+  host: { required: [], optional: [] },
+  frontend: null,
+  injects: ["context.assembly"],
+  contributions: { services: ["context.source.tools"], tools: [], prompts: [], events: [] },
+});

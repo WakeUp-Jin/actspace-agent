@@ -16,7 +16,13 @@ export const FS: Record<string, FsNode[]> = {
     { n: "README.md" },
   ],
   "checkout-web": [
-    { n: "src", c: [{ n: "hooks", c: [{ n: "useQuote.ts" }, { n: "useQuote.test.ts" }] }, { n: "pages", c: [{ n: "Checkout.tsx" }] }] },
+    {
+      n: "src",
+      c: [
+        { n: "hooks", c: [{ n: "useQuote.ts" }, { n: "useQuote.test.ts" }] },
+        { n: "pages", c: [{ n: "Checkout.tsx" }] },
+      ],
+    },
     { n: "package.json" },
   ],
 };
@@ -111,7 +117,10 @@ export function fileRows(roots: string[], open: readonly string[], query: string
   const walk = (nodes: FsNode[], base: string, depth: number) => {
     for (const nd of nodes) {
       const path = `${base}/${nd.n}`;
-      if (!nd.c) { rows.push({ path, name: nd.n, depth, dir: false }); continue; }
+      if (!nd.c) {
+        rows.push({ path, name: nd.n, depth, dir: false });
+        continue;
+      }
       rows.push({ path, name: nd.n, depth, dir: true });
       if (isOpen(path)) walk(nd.c, path, depth + 1);
     }
@@ -119,7 +128,8 @@ export function fileRows(roots: string[], open: readonly string[], query: string
   const q = query.trim().toLowerCase();
   for (const root of roots) {
     if (q) {
-      for (const p of flatten(FS[root] ?? [], root)) if (p.toLowerCase().includes(q)) rows.push({ path: p, name: p, depth: 0, dir: false });
+      for (const p of flatten(FS[root] ?? [], root))
+        if (p.toLowerCase().includes(q)) rows.push({ path: p, name: p, depth: 0, dir: false });
       continue;
     }
     rows.push({ path: root, name: root, depth: 0, dir: true, root: true });
@@ -191,7 +201,11 @@ export function contextUsage(input: {
 }): ContextUsage {
   const parts: UsagePart[] = [
     { name: "系统提示", value: input.coord ? 4.8 : 6.2, tone: "neutral" },
-    { name: input.inSpace ? "Space 指令与记忆" : "自己的记忆", value: input.inSpace ? 1.6 + input.memoryCount * 0.4 : 2.4, tone: "info" },
+    {
+      name: input.inSpace ? "Space 指令与记忆" : "自己的记忆",
+      value: input.inSpace ? 1.6 + input.memoryCount * 0.4 : 2.4,
+      tone: "info",
+    },
     { name: "对话", value: 2 + input.messageCount * 2.4, tone: "operational" },
     { name: "工具结果", value: input.isMember ? input.toolLines * 3.1 : input.coord ? 3.2 : 0, tone: "warning" },
   ];

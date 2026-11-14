@@ -6,11 +6,17 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@actspace/shared/model-catalog-data": resolve(__dirname, "../../packages/util/shared/src/generated/model-catalog.generated.ts"),
+      "@actspace/shared/model-catalog-data": resolve(
+        __dirname,
+        "../../packages/util/shared/src/generated/model-catalog.generated.ts",
+      ),
       "@actspace/shared/desktop-bridge": resolve(__dirname, "../../packages/util/shared/src/desktop-bridge/index.ts"),
       "@actspace/shared/host-protocol": resolve(__dirname, "../../packages/util/shared/src/host-protocol/index.ts"),
       "@actspace/shared/runtime-v2": resolve(__dirname, "../../packages/util/shared/src/runtime-v2/index.ts"),
-      "@actspace/shared/composer-reference-validation": resolve(__dirname, "../../packages/util/shared/src/composer-reference-validation.ts"),
+      "@actspace/shared/composer-reference-validation": resolve(
+        __dirname,
+        "../../packages/util/shared/src/composer-reference-validation.ts",
+      ),
       "@actspace/shared/session-list-page": resolve(__dirname, "../../packages/util/shared/src/session-list-page.ts"),
       "@actspace/shared/session-locator": resolve(__dirname, "../../packages/util/shared/src/session-locator.ts"),
       "@actspace/shared": resolve(__dirname, "../../packages/util/shared/src/index.ts"),

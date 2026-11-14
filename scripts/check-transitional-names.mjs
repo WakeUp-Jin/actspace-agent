@@ -125,7 +125,8 @@ export function auditTransitionalNames(sources, allowed) {
   for (const { file, name, count } of allowed) {
     const actual = counts.get(key(file, name)) ?? 0;
     if (actual > count) errors.push(`${file}：${name} 有 ${actual} 处，清单只允许 ${count} 处`);
-    else if (actual < count) errors.push(`${file}：清单记了 ${count} 处 ${name}，现在只有 ${actual} 处，请同步修改 ALLOWED`);
+    else if (actual < count)
+      errors.push(`${file}：清单记了 ${count} 处 ${name}，现在只有 ${actual} 处，请同步修改 ALLOWED`);
   }
   return errors;
 }
@@ -147,7 +148,10 @@ function walk(root, dir, accept, out) {
   for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
     if (entry.name.startsWith(".")) continue;
     const next = path.join(dir, entry.name);
-    if (entry.isDirectory()) { if (!SKIP_DIRS.has(entry.name)) walk(root, next, accept, out); continue; }
+    if (entry.isDirectory()) {
+      if (!SKIP_DIRS.has(entry.name)) walk(root, next, accept, out);
+      continue;
+    }
     if (entry.isFile()) addFile(next, accept, out);
   }
 }
@@ -163,7 +167,8 @@ export function isOutsideRoot(relative, rules = path) {
 /** `targets` 为空时列出四个根目录下的源码；否则列出这些文件和目录里的源码和 Markdown，路径相对 `root`。 */
 function listFiles(root, targets) {
   const out = [];
-  for (const base of targets.length === 0 ? ROOTS : []) if (fs.existsSync(path.join(root, base))) walk(root, base, isSourceFile, out);
+  for (const base of targets.length === 0 ? ROOTS : [])
+    if (fs.existsSync(path.join(root, base))) walk(root, base, isSourceFile, out);
   for (const target of targets) {
     const start = path.relative(root, path.resolve(root, target));
     if (start === "") throw new Error("不能整个仓库一起改：历史记录里的旧名字要保留。请给出具体的文件或目录");
@@ -177,7 +182,10 @@ function listFiles(root, targets) {
 }
 
 export function runCheck(root = repoRoot, allowed = ALLOWED) {
-  const sources = listFiles(root, []).map((file) => ({ path: file, text: fs.readFileSync(path.join(root, file), "utf8") }));
+  const sources = listFiles(root, []).map((file) => ({
+    path: file,
+    text: fs.readFileSync(path.join(root, file), "utf8"),
+  }));
   return { files: sources.length, errors: auditTransitionalNames(sources, allowed) };
 }
 
@@ -198,7 +206,11 @@ export function runWrite(root = repoRoot, allowed = ALLOWED, targets = []) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args[0] === "--write") {
-    const changed = runWrite(repoRoot, ALLOWED, args.slice(1).map((target) => path.resolve(target)));
+    const changed = runWrite(
+      repoRoot,
+      ALLOWED,
+      args.slice(1).map((target) => path.resolve(target)),
+    );
     for (const file of changed) console.log(file);
     console.log(`过渡期命名：改了 ${changed.length} 个文件。接着跑 pnpm typecheck。`);
   } else {
@@ -206,7 +218,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (errors.length > 0) {
       console.error(`过渡期命名检查失败（${errors.length} 处）：`);
       for (const error of errors) console.error(`  - ${error}`);
-      console.error("这些名字已经改掉。运行 node scripts/check-transitional-names.mjs --write 按同一张表改名，再跑 pnpm typecheck。");
+      console.error(
+        "这些名字已经改掉。运行 node scripts/check-transitional-names.mjs --write 按同一张表改名，再跑 pnpm typecheck。",
+      );
       console.error("确实要保留的，记进 scripts/check-transitional-names.mjs 的 ALLOWED，写明理由。");
       process.exit(1);
     }

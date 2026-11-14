@@ -3,7 +3,13 @@ import type { PromptExtensionRegistry } from "./extensions.js";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { createCoreContributors } from "./core-contributors.js";
 import { emptyRuntimePromptSource, type RuntimePromptSource } from "./host-context.js";
-import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType, requireService, Service, serviceKey } from "@actspace/cordis-adapter";
+import {
+  ACTSPACE_SERVICE_DEFINITIONS,
+  bindServiceType,
+  requireService,
+  Service,
+  serviceKey,
+} from "@actspace/cordis-adapter";
 import type { CordisServiceContext } from "@actspace/cordis-adapter";
 
 export const PROMPT_HOST_PORT_ID = "actspace.host.prompt" as const;
@@ -40,12 +46,15 @@ export class SystemPromptService extends Service implements PromptRuntimeService
     super(ctx, PROMPT_RUNTIME_SERVICE.id);
     this.source = source;
     this.selectSystem = host.selectSystem;
-    this.resolveSource = async workspaceRoot => await host.resolveSource?.(workspaceRoot) ?? emptyRuntimePromptSource();
+    this.resolveSource = async (workspaceRoot) =>
+      (await host.resolveSource?.(workspaceRoot)) ?? emptyRuntimePromptSource();
     this.resolveForTurn = (workspaceRoot, turnId, chat) => {
       const key = `${workspaceRoot}\0${turnId}\0${chat}`;
       let pending = this.cache.get(key);
       if (!pending) {
-        pending = Promise.resolve(chat ? host.resolveUserSource?.() ?? emptyRuntimePromptSource() : this.resolveSource(workspaceRoot)).then(source => {
+        pending = Promise.resolve(
+          chat ? (host.resolveUserSource?.() ?? emptyRuntimePromptSource()) : this.resolveSource(workspaceRoot),
+        ).then((source) => {
           if (source.warnings.length) throw new Error(`Context rules source failed: ${source.warnings.join("; ")}`);
           return source;
         });
@@ -60,6 +69,6 @@ export class SystemPromptService extends Service implements PromptRuntimeService
 
 export async function apply(ctx: CordisContext): Promise<void> {
   const host = requireService(ctx, PROMPT_HOST_PORT, "Prompt plugin");
-  const source = await host.resolveUserSource?.() ?? emptyRuntimePromptSource();
+  const source = (await host.resolveUserSource?.()) ?? emptyRuntimePromptSource();
   new SystemPromptService(ctx as never, source, host);
 }

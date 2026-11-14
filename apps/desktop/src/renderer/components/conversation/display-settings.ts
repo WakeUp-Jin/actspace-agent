@@ -20,10 +20,16 @@ async function refresh(): Promise<void> {
     const snapshot = await settingsApi.getV4();
     if (current !== revision) return;
     const general = snapshot.settings.general;
-    const next = { showTurnCodeChanges: general.showTurnCodeChanges !== false, simplifyThinking: general.simplifyThinking !== false };
-    if (next.showTurnCodeChanges === value.showTurnCodeChanges && next.simplifyThinking === value.simplifyThinking) return;
+    const next = {
+      showTurnCodeChanges: general.showTurnCodeChanges !== false,
+      simplifyThinking: general.simplifyThinking !== false,
+    };
+    if (next.showTurnCodeChanges === value.showTurnCodeChanges && next.simplifyThinking === value.simplifyThinking)
+      return;
     value = next;
-    listeners.forEach((listener) => { listener(); });
+    listeners.forEach((listener) => {
+      listener();
+    });
   } catch {
     // 保持现值。
   }
@@ -32,7 +38,9 @@ async function refresh(): Promise<void> {
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   if (!removeListener) {
-    removeListener = eventsApi.settingsChanged(() => { void refresh(); });
+    removeListener = eventsApi.settingsChanged(() => {
+      void refresh();
+    });
     void refresh();
   }
   return () => {
@@ -45,10 +53,18 @@ function subscribe(listener: () => void): () => void {
 
 /** 轮尾是否显示「本轮代码改动」卡。 */
 export function useShowTurnCodeChanges(): boolean {
-  return useSyncExternalStore(subscribe, () => value.showTurnCodeChanges, () => DEFAULTS.showTurnCodeChanges);
+  return useSyncExternalStore(
+    subscribe,
+    () => value.showTurnCodeChanges,
+    () => DEFAULTS.showTurnCodeChanges,
+  );
 }
 
 /** 思考进行时是否只显示一行标题（见中间消息区规范「简化思考过程」）。 */
 export function useSimplifyThinking(): boolean {
-  return useSyncExternalStore(subscribe, () => value.simplifyThinking, () => DEFAULTS.simplifyThinking);
+  return useSyncExternalStore(
+    subscribe,
+    () => value.simplifyThinking,
+    () => DEFAULTS.simplifyThinking,
+  );
 }

@@ -15,8 +15,23 @@ export async function apply(ctx: CordisContext, config: Readonly<Record<string, 
   const backend = createCodexBackend({ config: codexConfig(config) });
   const availability = await backend.available();
   const registration = availability.ok
-    ? registerExternalSubagentTool(tools, port, backend, CODEX_SUBAGENT_PLUGIN_ID, sessionId => registry.list().find(agent => agent.session.header.sessionId === sessionId && agent.session.header.lineage?.origin !== "delegation")?.scope)
+    ? registerExternalSubagentTool(
+        tools,
+        port,
+        backend,
+        CODEX_SUBAGENT_PLUGIN_ID,
+        (sessionId) =>
+          registry
+            .list()
+            .find(
+              (agent) =>
+                agent.session.header.sessionId === sessionId && agent.session.header.lineage?.origin !== "delegation",
+            )?.scope,
+      )
     : undefined;
   ctx.provide?.("tools.subagent-codex", Object.freeze({ availability }));
-  ctx.effect?.(() => async () => { await registration?.dispose(); clearCommandCache("codex"); });
+  ctx.effect?.(() => async () => {
+    await registration?.dispose();
+    clearCommandCache("codex");
+  });
 }

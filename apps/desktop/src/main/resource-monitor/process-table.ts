@@ -18,7 +18,7 @@ export interface PsRow {
 export function parsePsTime(value: string): number | null {
   const [days, clock] = value.includes("-") ? value.split("-", 2) : ["0", value];
   const parts = clock!.split(":").map(Number);
-  if (parts.length < 2 || parts.length > 3 || parts.some(part => !Number.isFinite(part))) return null;
+  if (parts.length < 2 || parts.length > 3 || parts.some((part) => !Number.isFinite(part))) return null;
   const [seconds, minutes, hours = 0] = parts.reverse() as [number, number, number?];
   const dayCount = Number(days);
   if (!Number.isFinite(dayCount)) return null;
@@ -39,7 +39,13 @@ export function parsePsOutput(stdout: string): PsRow[] {
     if (!match) continue;
     const cpuSeconds = parsePsTime(match[4]!);
     if (cpuSeconds === null) continue;
-    rows.push({ pid: Number(match[1]), ppid: Number(match[2]), rssKiB: Number(match[3]), cpuSeconds, name: basename(match[5]!) || match[5]! });
+    rows.push({
+      pid: Number(match[1]),
+      ppid: Number(match[2]),
+      rssKiB: Number(match[3]),
+      cpuSeconds,
+      name: basename(match[5]!) || match[5]!,
+    });
   }
   return rows;
 }
@@ -106,7 +112,10 @@ export interface ElectronProcessReading {
 
 const ELECTRON_LABELS: Record<string, string> = { Browser: "主进程", GPU: "GPU", Tab: "界面" };
 
-export function electronGroupOf(reading: Pick<ElectronProcessReading, "pid" | "type">, monitorPids: ReadonlySet<number>): ResourceGroupId {
+export function electronGroupOf(
+  reading: Pick<ElectronProcessReading, "pid" | "type">,
+  monitorPids: ReadonlySet<number>,
+): ResourceGroupId {
   if (monitorPids.has(reading.pid)) return "monitor";
   if (reading.type === "Browser") return "main";
   if (reading.type === "Tab") return "renderer";
@@ -136,7 +145,14 @@ export function mergeByName(rows: readonly ResourceProcessRow[]): ResourceProces
       entry.rssKiB += row.rssKiB;
     } else merged.set(row.label, { pid: row.pid, count: row.count, cpu: [row.cpuPercent], rssKiB: row.rssKiB });
   }
-  return [...merged].map(([label, entry]) => ({ pid: entry.pid, label, count: entry.count, cpuPercent: sumCpu(entry.cpu), rssKiB: entry.rssKiB }))
+  return [...merged]
+    .map(([label, entry]) => ({
+      pid: entry.pid,
+      label,
+      count: entry.count,
+      cpuPercent: sumCpu(entry.cpu),
+      rssKiB: entry.rssKiB,
+    }))
     .sort((a, b) => b.rssKiB - a.rssKiB);
 }
 
@@ -151,16 +167,29 @@ export interface GroupInput {
 
 /** 按固定顺序产出六组；空组也保留（界面上写 0）。 */
 export function buildGroups(input: GroupInput): ResourceGroup[] {
-  const rows: Record<ResourceGroupId, ResourceProcessRow[]> = { main: [], renderer: [], gpu: [], utility: [], agent: [], monitor: [] };
+  const rows: Record<ResourceGroupId, ResourceProcessRow[]> = {
+    main: [],
+    renderer: [],
+    gpu: [],
+    utility: [],
+    agent: [],
+    monitor: [],
+  };
   for (const reading of input.electron) {
     const group = electronGroupOf(reading, input.monitorPids);
-    rows[group].push({ pid: reading.pid, label: electronLabel(reading, group), count: 1, cpuPercent: reading.cpuPercent, rssKiB: reading.rssKiB });
+    rows[group].push({
+      pid: reading.pid,
+      label: electronLabel(reading, group),
+      count: 1,
+      cpuPercent: reading.cpuPercent,
+      rssKiB: reading.rssKiB,
+    });
   }
   rows.agent.push(...mergeByName(input.agent));
   rows.monitor.push(...input.monitorChildren);
-  return (Object.keys(rows) as ResourceGroupId[]).map(id => ({
+  return (Object.keys(rows) as ResourceGroupId[]).map((id) => ({
     id,
-    cpuPercent: sumCpu(rows[id].map(row => row.cpuPercent)) ?? 0,
+    cpuPercent: sumCpu(rows[id].map((row) => row.cpuPercent)) ?? 0,
     rssKiB: rows[id].reduce((total, row) => total + row.rssKiB, 0),
     processes: rows[id],
   }));

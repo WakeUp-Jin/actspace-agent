@@ -12,14 +12,26 @@ import { ReplyStreamingContext } from "../components/messages/reply-streaming-co
 let frames: Array<() => void> = [];
 beforeEach(() => {
   frames = [];
-  vi.stubGlobal("requestAnimationFrame", (callback: () => void) => { frames.push(callback); return frames.length; });
+  vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
+    frames.push(callback);
+    return frames.length;
+  });
   vi.stubGlobal("cancelAnimationFrame", () => {});
 });
 afterEach(() => {
   vi.unstubAllGlobals();
   Reflect.deleteProperty(navigator, "clipboard");
 });
-const flush = () => { for (let i = 0; i < 300 && frames.length > 0; i += 1) act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); }); };
+const flush = () => {
+  for (let i = 0; i < 300 && frames.length > 0; i += 1)
+    act(() => {
+      const batch = frames;
+      frames = [];
+      batch.forEach((callback) => {
+        callback();
+      });
+    });
+};
 
 const lines = (count: number) => Array.from({ length: count }, (_, i) => `const line${i + 1} = ${i + 1};`).join("\n");
 const fence = (body: string, info = "ts") => `\`\`\`${info}\n${body}\n\`\`\``;
@@ -89,7 +101,11 @@ describe("CodeBlock", () => {
   });
 
   it("流式中围栏没闭合：头部显示「写入中 · N 行」，没有换行和复制按钮；闭合后换成按钮", () => {
-    const stream = (content: string) => <ReplyStreamingContext.Provider value={true}><MarkdownProse content={content} /></ReplyStreamingContext.Provider>;
+    const stream = (content: string) => (
+      <ReplyStreamingContext.Provider value={true}>
+        <MarkdownProse content={content} />
+      </ReplyStreamingContext.Provider>
+    );
     const view = render(stream("```ts\nconst a = 1;\nconst b = 2;\n"));
     expect(screen.getByRole("status")).toHaveTextContent("写入中 · 2 行");
     expect(screen.queryByRole("button", { name: "复制代码" })).toBeNull();
@@ -105,7 +121,9 @@ describe("CodeBlock", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     render(<MarkdownProse content={"```ts\nconst answer = 42;\n```"} />);
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "复制代码" })); });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "复制代码" }));
+    });
     expect(writeText).toHaveBeenCalledWith("const answer = 42;\n");
     expect(writeText.mock.calls[0][0]).not.toContain("```");
     await waitFor(() => expect(screen.getByText("已复制")).toBeInTheDocument());
@@ -121,8 +139,14 @@ describe("CodeBlock", () => {
   });
 
   it("语言显示名：标了语言用显示名，没标写「文本」；未收录的语言原样显示", () => {
-    const { container } = render(<MarkdownProse content={`${fence("a", "bash")}\n\n${fence("b", "")}\n\n${fence("c", "zig")}`} />);
-    expect(Array.from(container.querySelectorAll(".md-code-lang")).map((n) => n.textContent)).toEqual(["Shell", "文本", "zig"]);
+    const { container } = render(
+      <MarkdownProse content={`${fence("a", "bash")}\n\n${fence("b", "")}\n\n${fence("c", "zig")}`} />,
+    );
+    expect(Array.from(container.querySelectorAll(".md-code-lang")).map((n) => n.textContent)).toEqual([
+      "Shell",
+      "文本",
+      "zig",
+    ]);
   });
 
   it("title= 显示成文件名；是工作区路径且有宿主时可点，带行号用行号打开", async () => {
@@ -147,7 +171,9 @@ describe("CodeBlock", () => {
 describe("InlineCode 路径", () => {
   it("有宿主时，行内路径是可点的文件：单击打开", async () => {
     const openPath = vi.fn();
-    const { container } = render(<MarkdownProse content={"改了 `src/app.ts` 这个文件"} onOpenWorkspaceFile={openPath} />);
+    const { container } = render(
+      <MarkdownProse content={"改了 `src/app.ts` 这个文件"} onOpenWorkspaceFile={openPath} />,
+    );
     const chip = container.querySelector("code.md-path")!;
     expect(chip).toHaveAttribute("role", "button");
     expect(chip.textContent).toBe("src/app.ts");
@@ -187,14 +213,21 @@ describe("InlineCode 路径", () => {
 
   it("不是工作区路径的行内代码（命令、越界路径、绝对路径）保持普通代码", async () => {
     const openPath = vi.fn();
-    const { container } = render(<MarkdownProse content={"`npm run build` `../secret.txt` `~/.zshrc` `foo()`"} onOpenWorkspaceFile={openPath} />);
+    const { container } = render(
+      <MarkdownProse content={"`npm run build` `../secret.txt` `~/.zshrc` `foo()`"} onOpenWorkspaceFile={openPath} />,
+    );
     expect(container.querySelector("code.md-path")).toBeNull();
     for (const code of Array.from(container.querySelectorAll("code"))) await userEvent.click(code);
     expect(openPath).not.toHaveBeenCalled();
   });
 
   it("代码块里的路径和链接文字里的路径不识别", () => {
-    const { container } = render(<MarkdownProse content={"```\nsrc/app.ts\n```\n\n[`src/app.ts`](https://example.com)"} onOpenWorkspaceFile={() => {}} />);
+    const { container } = render(
+      <MarkdownProse
+        content={"```\nsrc/app.ts\n```\n\n[`src/app.ts`](https://example.com)"}
+        onOpenWorkspaceFile={() => {}}
+      />,
+    );
     expect(container.querySelector("code.md-path")).toBeNull();
   });
 
@@ -208,7 +241,11 @@ describe("InlineCode 路径", () => {
 
 describe("MarkdownLink", () => {
   it("网页链接新窗口打开，只放行 http/https/mailto", () => {
-    render(<MarkdownProse content={"[甲](https://example.com) [乙](mailto:a@b.co) [丙](javascript:alert(1)) [丁](ftp://x.test)"} />);
+    render(
+      <MarkdownProse
+        content={"[甲](https://example.com) [乙](mailto:a@b.co) [丙](javascript:alert(1)) [丁](ftp://x.test)"}
+      />,
+    );
     const link = screen.getByRole("link", { name: "甲" });
     expect(link).toHaveAttribute("target", "_blank");
     expect(link.getAttribute("rel")).toMatch(/noopener/);
@@ -220,7 +257,9 @@ describe("MarkdownLink", () => {
 
   it("本地链接：有宿主时前面有文件图标、单击打开；没有宿主时是普通文字", async () => {
     const openPath = vi.fn();
-    const view = render(<MarkdownProse content={"看 [入口](src/main.ts) 和 [带行号](src/main.ts:7)"} onOpenWorkspaceFile={openPath} />);
+    const view = render(
+      <MarkdownProse content={"看 [入口](src/main.ts) 和 [带行号](src/main.ts:7)"} onOpenWorkspaceFile={openPath} />,
+    );
     const link = view.container.querySelector<HTMLAnchorElement>("a.md-link-file")!;
     expect(link.textContent).toBe("入口");
     // 图标和第一个字符在同一个不换行的 span 里，窄的时候图标不会单独留在上一行末尾
@@ -253,7 +292,9 @@ describe("MarkdownImage（T22）", () => {
 
   it("本地图片经宿主 loadImage 读取：先显示读取中，读到后显示图片，同一路径只读一次", async () => {
     const loadImage = vi.fn().mockResolvedValue("data:image/png;base64,AAAA");
-    const { container } = render(withHost({ loadImage }, <MarkdownProse content={"![图一](docs/a.png)\n\n![图一又来](docs/a.png)"} />));
+    const { container } = render(
+      withHost({ loadImage }, <MarkdownProse content={"![图一](docs/a.png)\n\n![图一又来](docs/a.png)"} />),
+    );
     expect(screen.getAllByText(/读取中/).length).toBeGreaterThan(0);
     await waitFor(() => expect(container.querySelectorAll("img")).toHaveLength(2));
     expect(container.querySelector("img")).toHaveAttribute("src", "data:image/png;base64,AAAA");
@@ -299,7 +340,11 @@ describe("表格", () => {
     expect(view.container.querySelector("td[align='right'], td[style*='right']")).not.toBeNull();
     expect(view.container.querySelector(".markdown-prose")).not.toHaveAttribute("data-streaming");
     view.unmount();
-    const live = render(<ReplyStreamingContext.Provider value={true}><MarkdownProse content={content} /></ReplyStreamingContext.Provider>);
+    const live = render(
+      <ReplyStreamingContext.Provider value={true}>
+        <MarkdownProse content={content} />
+      </ReplyStreamingContext.Provider>,
+    );
     expect(live.container.querySelector(".markdown-prose")).toHaveAttribute("data-streaming", "true");
   });
 });

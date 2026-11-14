@@ -1,6 +1,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { MessageBlock } from "@actspace/shared";
-import { CompactCommandBlock, CompactionRetryContext, formatCompactionDuration } from "../components/messages/CompactCommandBlock";
+import {
+  CompactCommandBlock,
+  CompactionRetryContext,
+  formatCompactionDuration,
+} from "../components/messages/CompactCommandBlock";
 import { TrajectoryNavigationProvider, useTrajectoryNavigation } from "../components/trajectory/TrajectoryNavigation";
 
 function makeBlock(
@@ -23,7 +27,9 @@ describe("CompactCommandBlock", () => {
   it("renders running state as a divider with an elapsed timer", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-02T00:00:08.000Z"));
-    const { container } = render(<CompactCommandBlock message={makeBlock({ status: "running", startedAt: "2026-06-02T00:00:00.000Z" })} />);
+    const { container } = render(
+      <CompactCommandBlock message={makeBlock({ status: "running", startedAt: "2026-06-02T00:00:00.000Z" })} />,
+    );
 
     expect(screen.getByRole("status")).toHaveTextContent("正在压缩上下文");
     expect(screen.getByText("8s")).toBeInTheDocument();
@@ -38,19 +44,43 @@ describe("CompactCommandBlock", () => {
 
   it("renders completed state with counts, tokens and duration", () => {
     const { container } = render(
-      <CompactCommandBlock message={makeBlock({ status: "completed", removedCount: 48, durationMs: 23_000, compactionId: "c1", beforeTokens: 182_400, afterTokens: 9_100 })} />,
+      <CompactCommandBlock
+        message={makeBlock({
+          status: "completed",
+          removedCount: 48,
+          durationMs: 23_000,
+          compactionId: "c1",
+          beforeTokens: 182_400,
+          afterTokens: 9_100,
+        })}
+      />,
     );
 
-    expect(screen.getByRole("separator", { name: "以上 48 条消息已压缩 · 182.4K → 约 9.1K tokens · 23s" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("separator", { name: "以上 48 条消息已压缩 · 182.4K → 约 9.1K tokens · 23s" }),
+    ).toBeInTheDocument();
     expect(container.querySelector(".compact-command-block")).toHaveClass("w-full");
     // 没有轨迹导航（单独渲染）时不提供跳转。
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("marks the before count approximate when it includes estimates", () => {
-    render(<CompactCommandBlock message={makeBlock({ status: "completed", removedCount: 12, durationMs: 9_000, beforeTokens: 5_157, afterTokens: 126, beforeEstimated: true })} />);
+    render(
+      <CompactCommandBlock
+        message={makeBlock({
+          status: "completed",
+          removedCount: 12,
+          durationMs: 9_000,
+          beforeTokens: 5_157,
+          afterTokens: 126,
+          beforeEstimated: true,
+        })}
+      />,
+    );
 
-    expect(screen.getByRole("separator", { name: "以上 12 条消息已压缩 · 约 5.2K → 约 126 tokens · 9s" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("separator", { name: "以上 12 条消息已压缩 · 约 5.2K → 约 126 tokens · 9s" }),
+    ).toBeInTheDocument();
   });
 
   it("shows only count and duration for compactions recorded before token counts", () => {

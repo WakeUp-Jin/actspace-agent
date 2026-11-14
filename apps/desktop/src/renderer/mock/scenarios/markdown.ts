@@ -23,7 +23,11 @@ export function markdownScenario(clock: MockClock): MockHandlers | void {
         if (sessionId === session.id && !started) {
           started = true;
           const batches = networkBatches(MARKDOWN_SHOWCASE_REPLY);
-          clock.schedule(() => playReply(clock, { sessionId, agentRunId: lastRunId(session), text: MARKDOWN_SHOWCASE_REPLY, batches }), 500);
+          clock.schedule(
+            () =>
+              playReply(clock, { sessionId, agentRunId: lastRunId(session), text: MARKDOWN_SHOWCASE_REPLY, batches }),
+            500,
+          );
         }
         return sessionProjection(requireSession(db, sessionId));
       },

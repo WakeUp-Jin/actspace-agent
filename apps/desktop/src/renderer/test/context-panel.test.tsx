@@ -19,9 +19,15 @@ function PendingProbe() {
 function renderPanel(options: { navigation?: boolean; contextState?: ContextState } = {}) {
   const onShowTrajectory = vi.fn();
   const panel = <ContextPanel sessionId={SESSION} contextRevision={1} contextState={options.contextState} />;
-  const wrap = (children: ReactNode) => options.navigation
-    ? <TrajectoryNavigationProvider onShowTrajectory={onShowTrajectory}>{children}<PendingProbe /></TrajectoryNavigationProvider>
-    : children;
+  const wrap = (children: ReactNode) =>
+    options.navigation ? (
+      <TrajectoryNavigationProvider onShowTrajectory={onShowTrajectory}>
+        {children}
+        <PendingProbe />
+      </TrajectoryNavigationProvider>
+    ) : (
+      children
+    );
   render(<TooltipProvider delayDuration={0}>{wrap(panel)}</TooltipProvider>);
   return { onShowTrajectory };
 }
@@ -55,7 +61,10 @@ describe("ContextPanel", () => {
       totalEstimatedTokens: 1_500,
       maxTokens: 200_000,
       percentUsed: 1,
-      buckets: [{ key: "rules", tokens: 500 }, { key: "conversation", tokens: 1_000 }],
+      buckets: [
+        { key: "rules", tokens: 500 },
+        { key: "conversation", tokens: 1_000 },
+      ],
       entries: [
         { id: "rule-1", kind: "rules", title: "AGENTS.md", estimatedTokens: 500, included: true, preview: "# rules" },
         { id: "managed-3-message-0", kind: "conversation", title: "你好", estimatedTokens: 1_000, included: true },
@@ -121,7 +130,9 @@ describe("ContextPanel", () => {
   it("reveals a conversation row in the trajectory with its call id", async () => {
     setupBridge();
     renderPanel({ navigation: true });
-    const expected = mockContextPanelView(SESSION).current.entries.find((entry) => entry.title === "write_file · 已写入")!.trajectoryRef;
+    const expected = mockContextPanelView(SESSION).current.entries.find(
+      (entry) => entry.title === "write_file · 已写入",
+    )!.trajectoryRef;
 
     await userEvent.click(await screen.findByTitle("在轨迹中查看：write_file · 已写入"));
     expect(screen.getByTestId("pending")).toHaveTextContent(JSON.stringify({ callId: expected!.callId }));
@@ -145,8 +156,20 @@ describe("ContextPanel", () => {
     renderPanel();
     const events = await screen.findByRole("region", { name: "上下文事件" });
     const rows = Array.from(events.querySelectorAll<HTMLElement>("[data-context-event]"));
-    expect(rows.map(row => row.dataset.contextEvent)).toEqual(["files", "runtime", "files", "subagents", "background", "tools-changed", "compact", "model-switch", "inject"]);
-    expect(rows[0]).toHaveTextContent("文件活跃文件清单更新新增 context-history-projection.ts 等 2 个，共 14 个+410第 9 轮 · 步 3");
+    expect(rows.map((row) => row.dataset.contextEvent)).toEqual([
+      "files",
+      "runtime",
+      "files",
+      "subagents",
+      "background",
+      "tools-changed",
+      "compact",
+      "model-switch",
+      "inject",
+    ]);
+    expect(rows[0]).toHaveTextContent(
+      "文件活跃文件清单更新新增 context-history-projection.ts 等 2 个，共 14 个+410第 9 轮 · 步 3",
+    );
     // 合并行：标题带 ×N，位置只写轮。
     expect(rows[2]).toHaveTextContent("活跃文件清单更新 ×6");
     expect(rows[2]).toHaveTextContent(/第 8 轮$/);
@@ -159,15 +182,45 @@ describe("ContextPanel", () => {
 
   it("has no separate load-more button; 再显示 fetches the next page when the local rows run out", async () => {
     const view = mockContextPanelView(SESSION);
-    const conversation = view.current.entries.filter(entry => entry.bucket === "conversation");
-    const older = Array.from({ length: 30 }, (_, i) => ({ key: `older-${i}`, bucket: "conversation" as const, kind: "tool-call" as const, title: `更早 ${i}`, estimatedTokens: 1 }));
-    const counts = { ...Object.fromEntries(Object.entries(Object.groupBy(view.current.entries, entry => entry.bucket)).map(([key, list]) => [key, list.length])), conversation: conversation.length + older.length };
+    const conversation = view.current.entries.filter((entry) => entry.bucket === "conversation");
+    const older = Array.from({ length: 30 }, (_, i) => ({
+      key: `older-${i}`,
+      bucket: "conversation" as const,
+      kind: "tool-call" as const,
+      title: `更早 ${i}`,
+      estimatedTokens: 1,
+    }));
+    const counts = {
+      ...Object.fromEntries(
+        Object.entries(Object.groupBy(view.current.entries, (entry) => entry.bucket)).map(([key, list]) => [
+          key,
+          list.length,
+        ]),
+      ),
+      conversation: conversation.length + older.length,
+    };
     const listContextEntries = vi.fn(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
-      return { revision: "rev", total: view.current.entries.length + older.length, bucketCounts: counts, entries: older, previous: [] };
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return {
+        revision: "rev",
+        total: view.current.entries.length + older.length,
+        bucketCounts: counts,
+        entries: older,
+        previous: [],
+      };
     });
     setupBridge({
-      "sessions.describeContextPanel": async () => ({ ...view, previous: null, entriesPage: { revision: "rev", total: view.current.entries.length + older.length, truncated: true, nextCursor: "c1", bucketCounts: counts } }),
+      "sessions.describeContextPanel": async () => ({
+        ...view,
+        previous: null,
+        entriesPage: {
+          revision: "rev",
+          total: view.current.entries.length + older.length,
+          truncated: true,
+          nextCursor: "c1",
+          bucketCounts: counts,
+        },
+      }),
       "sessions.listContextEntries": listContextEntries,
     });
     renderPanel();
@@ -176,14 +229,17 @@ describe("ContextPanel", () => {
     const section = browser.querySelector<HTMLElement>('[data-category="conversation"]')!;
     expect(section.querySelector("button")).toHaveTextContent(`${conversation.length + older.length} 项`);
     const more = () => within(section).getByRole("button", { name: /再显示|正在读取/ });
-    while (more().textContent?.startsWith("再显示") && listContextEntries.mock.calls.length === 0) await userEvent.click(more());
+    while (more().textContent?.startsWith("再显示") && listContextEntries.mock.calls.length === 0)
+      await userEvent.click(more());
     expect(listContextEntries).toHaveBeenCalledWith(expect.objectContaining({ revision: "rev", cursor: "c1" }));
     expect(await within(section).findByText("更早 29")).toBeInTheDocument();
   });
 
   it("hides the cost cell when costUsd is null", async () => {
     const view = mockContextPanelView(SESSION);
-    setupBridge({ "sessions.describeContextPanel": async () => ({ ...view, stats: { ...view.stats, costUsd: null } }) });
+    setupBridge({
+      "sessions.describeContextPanel": async () => ({ ...view, stats: { ...view.stats, costUsd: null } }),
+    });
     renderPanel();
 
     const stats = await screen.findByRole("region", { name: "会话统计" });

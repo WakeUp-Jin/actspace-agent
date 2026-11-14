@@ -32,10 +32,29 @@ type ConversationComposerSlotProps = Pick<
 export const ConversationComposerSlot = memo(function ConversationComposerSlot(props: ConversationComposerSlotProps) {
   const { sessionId, isStreaming, isAborting, isCompacting, onSend, onAbort } = useActiveSession();
   const {
-    messageQueue, composerNotice, defaultModelId, selectedModelId, onSelectedModelChange, composerMode, onComposerModeChange,
-    selectedSkills, onSelectedSkillsChange, models, draftRestore, draftKey, readDraft, writeDraft, readAttachmentDraft, writeAttachmentDraft,
+    messageQueue,
+    composerNotice,
+    defaultModelId,
+    selectedModelId,
+    onSelectedModelChange,
+    composerMode,
+    onComposerModeChange,
+    selectedSkills,
+    onSelectedSkillsChange,
+    models,
+    draftRestore,
+    draftKey,
+    readDraft,
+    writeDraft,
+    readAttachmentDraft,
+    writeAttachmentDraft,
   } = useComposerContext();
-  const { workspaceOptions, selectedWorkspaceRoot, onSelectWorkspace, execution: executionContext } = useRunTargetContext();
+  const {
+    workspaceOptions,
+    selectedWorkspaceRoot,
+    onSelectWorkspace,
+    execution: executionContext,
+  } = useRunTargetContext();
   const sideChat = useOpenSideChat(sessionId);
   return (
     <Composer

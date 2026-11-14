@@ -1,17 +1,34 @@
-import { fixedSystemText } from '../../../trajectory/context-sections';
-import { ChevronRight } from 'lucide-react';
-import { T, TAB_LABEL, promptDiffLines, namedParametersJson, type TrajectoryCell, type TrajectoryPromptDetail } from '../../../trajectory';
-import { JsonTree } from '../../ui/JsonTree';
-import { ToolCallGlyph } from '../kind-icons';
-import { MarkdownFragment, NoPayload } from './shared';
+import { fixedSystemText } from "../../../trajectory/context-sections";
+import { ChevronRight } from "lucide-react";
+import {
+  T,
+  TAB_LABEL,
+  promptDiffLines,
+  namedParametersJson,
+  type TrajectoryCell,
+  type TrajectoryPromptDetail,
+} from "../../../trajectory";
+import { JsonTree } from "../../ui/JsonTree";
+import { ToolCallGlyph } from "../kind-icons";
+import { MarkdownFragment, NoPayload } from "./shared";
 
-const promptText = (prompt: TrajectoryPromptDetail | null | undefined) => prompt ? fixedSystemText(prompt) : '';
+const promptText = (prompt: TrajectoryPromptDetail | null | undefined) => (prompt ? fixedSystemText(prompt) : "");
 const toolsJson = (prompt: TrajectoryPromptDetail | null | undefined) => JSON.stringify(prompt?.tools ?? [], null, 2);
 
 export function SystemPromptView({ cell }: { cell: TrajectoryCell }) {
   const text = promptText(cell.record.promptDetail);
-  if (text === '' && !cell.record.promptDetail?.contextSections) return <NoPayload>{T.systemPromptMissing}</NoPayload>;
-  return <><MarkdownFragment text={text} className="tj-systemPrompt" />{cell.record.promptDetail?.contextSections && <details className="tj-toolCatalogItem"><summary>实际发送的完整 system 消息（包含规则与技能）</summary><MarkdownFragment text={cell.record.promptDetail.systemPrompt ?? text} className="tj-systemPrompt" /></details>}</>;
+  if (text === "" && !cell.record.promptDetail?.contextSections) return <NoPayload>{T.systemPromptMissing}</NoPayload>;
+  return (
+    <>
+      <MarkdownFragment text={text} className="tj-systemPrompt" />
+      {cell.record.promptDetail?.contextSections && (
+        <details className="tj-toolCatalogItem">
+          <summary>实际发送的完整 system 消息（包含规则与技能）</summary>
+          <MarkdownFragment text={cell.record.promptDetail.systemPrompt ?? text} className="tj-systemPrompt" />
+        </details>
+      )}
+    </>
+  );
 }
 
 type CatalogTool = { readonly name: string; readonly description: string; readonly parameters: unknown };
@@ -20,10 +37,10 @@ function catalogTools(prompt: TrajectoryPromptDetail | null | undefined): readon
   const tools = prompt?.tools;
   if (!Array.isArray(tools)) return [];
   return tools.map((tool, index) => {
-    const data = tool !== null && typeof tool === 'object' && !Array.isArray(tool) ? tool : {};
+    const data = tool !== null && typeof tool === "object" && !Array.isArray(tool) ? tool : {};
     return {
-      name: typeof data.name === 'string' ? data.name : `${T.toolCall} ${index + 1}`,
-      description: typeof data.description === 'string' ? data.description : '',
+      name: typeof data.name === "string" ? data.name : `${T.toolCall} ${index + 1}`,
+      description: typeof data.description === "string" ? data.description : "",
       parameters: data.parameters ?? data.inputSchema ?? data.input_schema ?? {},
     };
   });
@@ -44,7 +61,7 @@ export function ToolCatalog({ cell }: { cell: TrajectoryCell }) {
             <span className="tj-toolCatalogDescription">{tool.description}</span>
           </summary>
           <div className="tj-toolCatalogDefinition">
-            {tool.description !== '' && <p className="tj-toolCatalogFullDescription">{tool.description}</p>}
+            {tool.description !== "" && <p className="tj-toolCatalogFullDescription">{tool.description}</p>}
             <JsonTree data={tool.parameters} label={namedParametersJson(tool.name)} className="tj-toolCatalogTree" />
           </div>
         </details>
@@ -60,7 +77,12 @@ function DiffSection({ title, before, after }: { title: string; before: string; 
     <section className="tj-promptDiffSection">
       <h3 className="tj-promptDiffTitle">{title}</h3>
       <pre className="tj-promptDiff">
-        {lines.map((line, index) => <span className={`tj-promptDiffLine${line.kind}`} key={index}>{line.text || ' '}{'\n'}</span>)}
+        {lines.map((line, index) => (
+          <span className={`tj-promptDiffLine${line.kind}`} key={index}>
+            {line.text || " "}
+            {"\n"}
+          </span>
+        ))}
       </pre>
     </section>
   );

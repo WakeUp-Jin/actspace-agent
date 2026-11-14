@@ -40,6 +40,12 @@ export const cssLayerBridge = EditorView.theme({
   "& .cm-panels": { background: REVERT, color: REVERT },
   "& .cm-panels-top": { borderBottomColor: REVERT },
   "& .cm-textfield": { background: REVERT, color: REVERT, fontSize: REVERT, border: REVERT },
-  "& .cm-button, & .cm-button:active": { background: REVERT, color: REVERT, fontSize: REVERT, border: REVERT, borderRadius: REVERT },
+  "& .cm-button, & .cm-button:active": {
+    background: REVERT,
+    color: REVERT,
+    fontSize: REVERT,
+    border: REVERT,
+    borderRadius: REVERT,
+  },
   "& .cm-searchMatch, & .cm-searchMatch-selected": { background: REVERT },
 });

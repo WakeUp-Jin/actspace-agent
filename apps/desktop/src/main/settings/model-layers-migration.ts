@@ -43,7 +43,11 @@ const NO_HINTS: LegacyModelHints = { visionModel: null, billingModes: {} };
 export function legacyModelHints(raw: string | undefined): LegacyModelHints {
   if (!raw) return NO_HINTS;
   let parsed: unknown;
-  try { parsed = JSON.parse(raw); } catch { return NO_HINTS; }
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return NO_HINTS;
+  }
   const root = asRecord(parsed);
   const inspection = asRecord(asRecord(root.media).imageInspection ?? root.imageInspection);
   const billingModes: Record<string, LegacyBillingMode> = {};
@@ -55,10 +59,14 @@ export function legacyModelHints(raw: string | undefined): LegacyModelHints {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-export function migrateModelLayers(input: SettingsV4, catalog: Pick<ModelCatalogSnapshot, "entries">, hints: LegacyModelHints = NO_HINTS): SettingsV4 | null {
+export function migrateModelLayers(
+  input: SettingsV4,
+  catalog: Pick<ModelCatalogSnapshot, "entries">,
+  hints: LegacyModelHints = NO_HINTS,
+): SettingsV4 | null {
   const version = input.models.layersVersion ?? 0;
   if (version >= MODEL_LAYERS_VERSION) return null;
   const settings = cloneJson(input);
@@ -79,7 +87,11 @@ function dropExploreBinding(settings: SettingsV4): void {
 
 function dropDisabledModels(settings: SettingsV4): void {
   const models = settings.models;
-  const disabled = new Set(Object.entries(models.installed).filter(([, installed]) => installed && !installed.enabled).map(([key]) => key));
+  const disabled = new Set(
+    Object.entries(models.installed)
+      .filter(([, installed]) => installed && !installed.enabled)
+      .map(([key]) => key),
+  );
   if (disabled.size === 0) return;
   for (const key of disabled) {
     const typed = key as ModelKey;
@@ -94,7 +106,11 @@ function dropDisabledModels(settings: SettingsV4): void {
   }
 }
 
-function migrateToLayers(settings: SettingsV4, catalog: Pick<ModelCatalogSnapshot, "entries">, hints: LegacyModelHints): void {
+function migrateToLayers(
+  settings: SettingsV4,
+  catalog: Pick<ModelCatalogSnapshot, "entries">,
+  hints: LegacyModelHints,
+): void {
   const models = settings.models;
   const overrides: Partial<Record<ModelKey, ModelOverrides>> = { ...(models.overrides ?? {}) };
   const modes = new Map<string, "reference" | "token" | "manual">();
@@ -117,7 +133,7 @@ function migrateToLayers(settings: SettingsV4, catalog: Pick<ModelCatalogSnapsho
       catalog,
       protocol: connection?.protocol ?? definition.api,
       catalogProvider: connection ? templateForConnection(connection).catalogProvider : undefined,
-      mode: connection ? modes.get(connection.connectionId) ?? "manual" : "manual",
+      mode: connection ? (modes.get(connection.connectionId) ?? "manual") : "manual",
       multiplier: connection?.defaultPricingMultiplier ?? 1,
     });
     if (!isEmptyFacts(patch)) overrides[key] = { ...patch, ...overrides[key] };
@@ -139,22 +155,33 @@ function migrateToLayers(settings: SettingsV4, catalog: Pick<ModelCatalogSnapsho
   models.overrides = overrides;
 }
 
-function customModelOverrides(definition: ModelDefinition, context: {
-  catalog: Pick<ModelCatalogSnapshot, "entries">;
-  protocol: ModelDefinition["api"];
-  catalogProvider?: string;
-  mode: "reference" | "token" | "manual";
-  multiplier: number;
-}): ModelOverrides {
-  const baseline = resolveEffectiveModel({ apiModel: definition.apiModel, protocol: context.protocol, catalog: context.catalog, catalogProvider: context.catalogProvider });
+function customModelOverrides(
+  definition: ModelDefinition,
+  context: {
+    catalog: Pick<ModelCatalogSnapshot, "entries">;
+    protocol: ModelDefinition["api"];
+    catalogProvider?: string;
+    mode: "reference" | "token" | "manual";
+    multiplier: number;
+  },
+): ModelOverrides {
+  const baseline = resolveEffectiveModel({
+    apiModel: definition.apiModel,
+    protocol: context.protocol,
+    catalog: context.catalog,
+    catalogProvider: context.catalogProvider,
+  });
   const patch: ModelOverrides = {};
-  if (definition.label && definition.label !== definition.apiModel && definition.label !== baseline.label) patch.label = definition.label;
-  if (definition.contextWindow && definition.contextWindow !== baseline.contextWindow) patch.contextWindow = definition.contextWindow;
+  if (definition.label && definition.label !== definition.apiModel && definition.label !== baseline.label)
+    patch.label = definition.label;
+  if (definition.contextWindow && definition.contextWindow !== baseline.contextWindow)
+    patch.contextWindow = definition.contextWindow;
   if (definition.maxTokens && definition.maxTokens !== baseline.maxOutput) patch.maxOutput = definition.maxTokens;
   const image = definition.capabilities.input.includes("image");
   if (image !== baseline.input.includes("image")) patch.input = image ? ["text", "image"] : ["text"];
   // 自动推理配置本来就是「跟目录走」，新的档位表接手；只有手动配置算用户修改。
-  if (definition.reasoningConfig?.mode === "manual") patch.thinking = capabilitiesToThinking(definition.capabilities, definition.thinkingDefault);
+  if (definition.reasoningConfig?.mode === "manual")
+    patch.thinking = capabilitiesToThinking(definition.capabilities, definition.thinkingDefault);
   if (definition.pricing && context.mode !== "token") {
     const rates = pricingToRates(definition.pricing);
     const scaled = context.mode === "manual" ? scaleRates(rates, context.multiplier) : rates;
@@ -165,9 +192,20 @@ function customModelOverrides(definition: ModelDefinition, context: {
 
 function scaleRates(rates: ModelRates, factor: number): ModelRates {
   const scale = (value: number) => Number((value * factor).toFixed(8));
-  return { input: scale(rates.input), output: scale(rates.output), cacheRead: rates.cacheRead === null ? null : scale(rates.cacheRead), cacheWrite: rates.cacheWrite === null ? null : scale(rates.cacheWrite) };
+  return {
+    input: scale(rates.input),
+    output: scale(rates.output),
+    cacheRead: rates.cacheRead === null ? null : scale(rates.cacheRead),
+    cacheWrite: rates.cacheWrite === null ? null : scale(rates.cacheWrite),
+  };
 }
 
 function sameRates(left: ModelRates, right: ModelRates | null): boolean {
-  return Boolean(right) && left.input === right!.input && left.output === right!.output && left.cacheRead === right!.cacheRead && left.cacheWrite === right!.cacheWrite;
+  return (
+    Boolean(right) &&
+    left.input === right!.input &&
+    left.output === right!.output &&
+    left.cacheRead === right!.cacheRead &&
+    left.cacheWrite === right!.cacheWrite
+  );
 }

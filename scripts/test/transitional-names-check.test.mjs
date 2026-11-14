@@ -48,11 +48,34 @@ test("names on the list are renamed as a whole, before the general rule", () => 
 
 test("format versions, legacy data names and unrelated names are not transitional", () => {
   for (const name of [
-    "SettingsV4", "AppSettingsV2", "PersistedSettingsV3", "SessionEventEnvelopeV1", "getV4", "updateV2", "RV2",
-    "Runtime", "runtime", "RUNTIME", "RuntimeState", "RuntimeV1Thing", "runtimeV3", "RUNTIME_V1", "RUNTIME_V", "RuntimeV",
-    "legacyCallArgs", "migrateLegacyRemoteModels", "runCommand", "runV2", "V2Command", "CliV2",
-    "LegacyProxyWireEngine", "legacyProxy", "DesktopLegacyLlmAdapterOptions", "LegacyLlmAdapter",
-  ]) assert.equal(replacementFor(name), null, name);
+    "SettingsV4",
+    "AppSettingsV2",
+    "PersistedSettingsV3",
+    "SessionEventEnvelopeV1",
+    "getV4",
+    "updateV2",
+    "RV2",
+    "Runtime",
+    "runtime",
+    "RUNTIME",
+    "RuntimeState",
+    "RuntimeV1Thing",
+    "runtimeV3",
+    "RUNTIME_V1",
+    "RUNTIME_V",
+    "RuntimeV",
+    "legacyCallArgs",
+    "migrateLegacyRemoteModels",
+    "runCommand",
+    "runV2",
+    "V2Command",
+    "CliV2",
+    "LegacyProxyWireEngine",
+    "legacyProxy",
+    "DesktopLegacyLlmAdapterOptions",
+    "LegacyLlmAdapter",
+  ])
+    assert.equal(replacementFor(name), null, name);
 });
 
 test("finds old names in code, comments and strings, one entry per occurrence", () => {
@@ -96,10 +119,13 @@ test("ignores paths, channel names, contract ids and names that only contain a l
 });
 
 test("an old name is matched as a whole identifier, including $ and digits around it", () => {
-  assert.deepEqual(findTransitionalNames("x.$RuntimeV2Json$1 = _RUNTIME_V2_9;").map((entry) => [entry.name, entry.replacement]), [
-    ["$RuntimeV2Json$1", "$RuntimeJson$1"],
-    ["_RUNTIME_V2_9", "_RUNTIME_9"],
-  ]);
+  assert.deepEqual(
+    findTransitionalNames("x.$RuntimeV2Json$1 = _RUNTIME_V2_9;").map((entry) => [entry.name, entry.replacement]),
+    [
+      ["$RuntimeV2Json$1", "$RuntimeJson$1"],
+      ["_RUNTIME_V2_9", "_RUNTIME_9"],
+    ],
+  );
 });
 
 test("renaming changes only the old names and can be repeated", () => {
@@ -131,11 +157,14 @@ test("renaming keeps the names it is told to keep", () => {
 });
 
 test("reports every old name in files that are not on the list, in path order", () => {
-  const errors = auditTransitionalNames([
-    { path: "packages/b/src/b.ts", text: "const a = 1;\nexport type X = RuntimeV2JsonValue | RuntimeV2JsonValue[];" },
-    { path: "apps/a/src/a.ts", text: "bootCliV2();" },
-    { path: "packages/b/src/clean.ts", text: "export type X = RuntimeJsonValue;" },
-  ], []);
+  const errors = auditTransitionalNames(
+    [
+      { path: "packages/b/src/b.ts", text: "const a = 1;\nexport type X = RuntimeV2JsonValue | RuntimeV2JsonValue[];" },
+      { path: "apps/a/src/a.ts", text: "bootCliV2();" },
+      { path: "packages/b/src/clean.ts", text: "export type X = RuntimeJsonValue;" },
+    ],
+    [],
+  );
   assert.deepEqual(errors, [
     "apps/a/src/a.ts:1 bootCliV2 是过渡期的名字，改成 bootCli",
     "packages/b/src/b.ts:2 RuntimeV2JsonValue 是过渡期的名字，改成 RuntimeJsonValue",
@@ -147,22 +176,34 @@ test("a listed name must appear exactly the recorded number of times, and exempt
   const allowed = [{ file: "fixtures/smoke.cjs", name: "APPROVED_BY_RUNTIME_V2", count: 2, reason: "测试文本" }];
   const twice = 'fill("APPROVED_BY_RUNTIME_V2");\nexpect("APPROVED_BY_RUNTIME_V2");';
   assert.deepEqual(auditTransitionalNames([{ path: "fixtures/smoke.cjs", text: twice }], allowed), []);
-  assert.deepEqual(auditTransitionalNames([{ path: "fixtures/smoke.cjs", text: `${twice}\nlog("APPROVED_BY_RUNTIME_V2");` }], allowed), [
-    "fixtures/smoke.cjs：APPROVED_BY_RUNTIME_V2 有 3 处，清单只允许 2 处",
-  ]);
-  assert.deepEqual(auditTransitionalNames([{ path: "fixtures/smoke.cjs", text: 'fill("APPROVED_BY_RUNTIME_V2");' }], allowed), [
-    "fixtures/smoke.cjs：清单记了 2 处 APPROVED_BY_RUNTIME_V2，现在只有 1 处，请同步修改 ALLOWED",
-  ]);
+  assert.deepEqual(
+    auditTransitionalNames([{ path: "fixtures/smoke.cjs", text: `${twice}\nlog("APPROVED_BY_RUNTIME_V2");` }], allowed),
+    ["fixtures/smoke.cjs：APPROVED_BY_RUNTIME_V2 有 3 处，清单只允许 2 处"],
+  );
+  assert.deepEqual(
+    auditTransitionalNames([{ path: "fixtures/smoke.cjs", text: 'fill("APPROVED_BY_RUNTIME_V2");' }], allowed),
+    ["fixtures/smoke.cjs：清单记了 2 处 APPROVED_BY_RUNTIME_V2，现在只有 1 处，请同步修改 ALLOWED"],
+  );
   assert.deepEqual(auditTransitionalNames([], allowed), [
     "fixtures/smoke.cjs：清单记了 2 处 APPROVED_BY_RUNTIME_V2，现在只有 0 处，请同步修改 ALLOWED",
   ]);
-  assert.deepEqual(auditTransitionalNames([{ path: "fixtures/smoke.cjs", text: `${twice}\nloadRuntimeV2();` }], allowed), [
-    "fixtures/smoke.cjs:3 loadRuntimeV2 是过渡期的名字，改成 loadRuntimeModule",
-  ]);
-  assert.deepEqual(auditTransitionalNames([{ path: "fixtures/smoke.cjs", text: twice }, { path: "fixtures/other.cjs", text: twice }], allowed), [
-    "fixtures/other.cjs:1 APPROVED_BY_RUNTIME_V2 是过渡期的名字，改成 APPROVED_BY_RUNTIME",
-    "fixtures/other.cjs:2 APPROVED_BY_RUNTIME_V2 是过渡期的名字，改成 APPROVED_BY_RUNTIME",
-  ]);
+  assert.deepEqual(
+    auditTransitionalNames([{ path: "fixtures/smoke.cjs", text: `${twice}\nloadRuntimeV2();` }], allowed),
+    ["fixtures/smoke.cjs:3 loadRuntimeV2 是过渡期的名字，改成 loadRuntimeModule"],
+  );
+  assert.deepEqual(
+    auditTransitionalNames(
+      [
+        { path: "fixtures/smoke.cjs", text: twice },
+        { path: "fixtures/other.cjs", text: twice },
+      ],
+      allowed,
+    ),
+    [
+      "fixtures/other.cjs:1 APPROVED_BY_RUNTIME_V2 是过渡期的名字，改成 APPROVED_BY_RUNTIME",
+      "fixtures/other.cjs:2 APPROVED_BY_RUNTIME_V2 是过渡期的名字，改成 APPROVED_BY_RUNTIME",
+    ],
+  );
 });
 
 const BAD = "export type Json = RuntimeV2JsonValue;\n";
@@ -230,8 +271,11 @@ test("--write renames exactly the files the check scans, then the check passes",
   const root = tempRepo(t, SCOPE_FILES);
   assert.deepEqual(runWrite(root, []), SCANNED);
   assert.deepEqual(runCheck(root, []), { files: SCANNED.length + 1, errors: [] });
-  for (const file of SCANNED) assert.equal(fs.readFileSync(path.join(root, file), "utf8"), "export type Json = RuntimeJsonValue;\n", file);
-  for (const file of Object.keys(SCOPE_FILES).filter((name) => !SCANNED.includes(name) && name !== "packages/a/src/clean.ts")) {
+  for (const file of SCANNED)
+    assert.equal(fs.readFileSync(path.join(root, file), "utf8"), "export type Json = RuntimeJsonValue;\n", file);
+  for (const file of Object.keys(SCOPE_FILES).filter(
+    (name) => !SCANNED.includes(name) && name !== "packages/a/src/clean.ts",
+  )) {
     assert.equal(fs.readFileSync(path.join(root, file), "utf8"), BAD, file);
   }
   assert.deepEqual(runWrite(root, []), []);
@@ -247,12 +291,14 @@ test("--write with paths renames only those, Markdown included, and still skips 
     "packages/a/src/value.ts": BAD,
     "packages/a/src/other.ts": BAD,
   });
-  assert.deepEqual(runWrite(root, [], ["docs/design-docs", path.join(root, "packages/a/src/value.ts"), "docs/design-docs/a.md"]), [
-    "docs/design-docs/a.md",
-    "docs/design-docs/nested/b.md",
-    "packages/a/src/value.ts",
-  ]);
-  assert.equal(fs.readFileSync(path.join(root, "docs/design-docs/a.md"), "utf8"), "`RuntimeJsonValue` 和 `RuntimeStateView`\n");
+  assert.deepEqual(
+    runWrite(root, [], ["docs/design-docs", path.join(root, "packages/a/src/value.ts"), "docs/design-docs/a.md"]),
+    ["docs/design-docs/a.md", "docs/design-docs/nested/b.md", "packages/a/src/value.ts"],
+  );
+  assert.equal(
+    fs.readFileSync(path.join(root, "docs/design-docs/a.md"), "utf8"),
+    "`RuntimeJsonValue` 和 `RuntimeStateView`\n",
+  );
   assert.equal(fs.readFileSync(path.join(root, "docs/design-docs/nested/b.md"), "utf8"), "`runCommand`\n");
   assert.equal(fs.readFileSync(path.join(root, "docs/design-docs/nested/data.json"), "utf8"), '"RuntimeV2JsonValue"\n');
   assert.equal(fs.readFileSync(path.join(root, "docs/design-docs/dist/c.md"), "utf8"), "`RuntimeV2JsonValue`\n");
@@ -261,8 +307,16 @@ test("--write with paths renames only those, Markdown included, and still skips 
 });
 
 test("--write accepts a path inside the repository whose name starts with two dots", (t) => {
-  const root = tempRepo(t, { "..notes.md": "`RuntimeV2JsonValue`\n", "..drafts/a.md": "`runV2Command`\n", "docs/..b.md": "`RunV2Io`\n" });
-  assert.deepEqual(runWrite(root, [], ["..notes.md", "..drafts", path.join(root, "docs/..b.md")]), ["..drafts/a.md", "..notes.md", "docs/..b.md"]);
+  const root = tempRepo(t, {
+    "..notes.md": "`RuntimeV2JsonValue`\n",
+    "..drafts/a.md": "`runV2Command`\n",
+    "docs/..b.md": "`RunV2Io`\n",
+  });
+  assert.deepEqual(runWrite(root, [], ["..notes.md", "..drafts", path.join(root, "docs/..b.md")]), [
+    "..drafts/a.md",
+    "..notes.md",
+    "docs/..b.md",
+  ]);
   assert.equal(fs.readFileSync(path.join(root, "..notes.md"), "utf8"), "`RuntimeJsonValue`\n");
   assert.equal(fs.readFileSync(path.join(root, "..drafts/a.md"), "utf8"), "`runCommand`\n");
   assert.equal(fs.readFileSync(path.join(root, "docs/..b.md"), "utf8"), "`RunIo`\n");
@@ -284,7 +338,8 @@ test("a target is outside the repository when it climbs out of it or sits on ano
     [path.win32, "C:\\repo", "C:\\elsewhere\\a.md", true],
     [path.win32, "C:\\repo", "D:\\repo\\docs\\a.md", true],
     [path.win32, "C:\\repo", "\\\\server\\share\\a.md", true],
-  ]) assert.equal(isOutsideRoot(rules.relative(root, target), rules), outside, `${root} → ${target}`);
+  ])
+    assert.equal(isOutsideRoot(rules.relative(root, target), rules), outside, `${root} → ${target}`);
 });
 
 test("--write refuses a missing path, a path outside the repository and the repository as a whole, and writes nothing", (t) => {
@@ -295,10 +350,18 @@ test("--write refuses a missing path, a path outside the repository and the repo
   const sandbox = tempRepo(t, Object.fromEntries(files.map((file) => [file, OLD])));
   const root = path.join(sandbox, "repo");
   assert.throws(() => runWrite(root, [], ["docs/design-docs", "docs/missing"]), /找不到 docs\/missing/);
-  for (const outside of ["..", "../elsewhere", "../notes.md", "docs/../../notes.md", sandbox, path.join(sandbox, "elsewhere")]) {
+  for (const outside of [
+    "..",
+    "../elsewhere",
+    "../notes.md",
+    "docs/../../notes.md",
+    sandbox,
+    path.join(sandbox, "elsewhere"),
+  ]) {
     assert.throws(() => runWrite(root, [], ["docs/design-docs", outside]), /不在仓库里/, outside);
   }
-  for (const whole of [".", root, "docs/.."]) assert.throws(() => runWrite(root, [], [whole]), /不能整个仓库一起改/, whole);
+  for (const whole of [".", root, "docs/.."])
+    assert.throws(() => runWrite(root, [], [whole]), /不能整个仓库一起改/, whole);
   for (const file of files) assert.equal(fs.readFileSync(path.join(sandbox, file), "utf8"), OLD, file);
 });
 
@@ -309,7 +372,10 @@ test("--write leaves listed names in their file and the check agrees with the re
     "browser-bridge/other.cjs": 'fill("APPROVED_BY_RUNTIME_V2");\n',
   });
   assert.deepEqual(runWrite(root, allowed), ["browser-bridge/other.cjs", "browser-bridge/smoke.cjs"]);
-  assert.equal(fs.readFileSync(path.join(root, "browser-bridge/smoke.cjs"), "utf8"), 'const { loadRuntimeModule } = require("./client.cjs");\nfill("APPROVED_BY_RUNTIME_V2");\n');
+  assert.equal(
+    fs.readFileSync(path.join(root, "browser-bridge/smoke.cjs"), "utf8"),
+    'const { loadRuntimeModule } = require("./client.cjs");\nfill("APPROVED_BY_RUNTIME_V2");\n',
+  );
   assert.equal(fs.readFileSync(path.join(root, "browser-bridge/other.cjs"), "utf8"), 'fill("APPROVED_BY_RUNTIME");\n');
   assert.deepEqual(runCheck(root, allowed), { files: 2, errors: [] });
 });

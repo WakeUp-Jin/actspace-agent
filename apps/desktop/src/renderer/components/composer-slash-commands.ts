@@ -1,12 +1,6 @@
 import type { SkillCatalogItem } from "@actspace/shared";
 
-export type ComposerSlashFunctionId =
-  | "plan"
-  | "agent"
-  | "compact"
-  | "status"
-  | "review"
-  | "side";
+export type ComposerSlashFunctionId = "plan" | "agent" | "compact" | "status" | "review" | "side";
 
 export type ComposerSlashFunction = {
   id: ComposerSlashFunctionId;
@@ -77,17 +71,16 @@ export function filterComposerSlashFunctions(query: string): ComposerSlashFuncti
   const normalizedQuery = normalizeSlashSearch(query);
   if (!normalizedQuery) return [...COMPOSER_SLASH_FUNCTIONS];
 
-  return COMPOSER_SLASH_FUNCTIONS
-    .map((item, index) => ({
-      item,
-      index,
-      commandPrefix: item.command.slice(1).toLocaleLowerCase().startsWith(normalizedQuery),
-      matches:
-        item.command.slice(1).toLocaleLowerCase().includes(normalizedQuery) ||
-        item.label.toLocaleLowerCase().includes(normalizedQuery) ||
-        item.description.toLocaleLowerCase().includes(normalizedQuery) ||
-        item.searchAliases.toLocaleLowerCase().includes(normalizedQuery),
-    }))
+  return COMPOSER_SLASH_FUNCTIONS.map((item, index) => ({
+    item,
+    index,
+    commandPrefix: item.command.slice(1).toLocaleLowerCase().startsWith(normalizedQuery),
+    matches:
+      item.command.slice(1).toLocaleLowerCase().includes(normalizedQuery) ||
+      item.label.toLocaleLowerCase().includes(normalizedQuery) ||
+      item.description.toLocaleLowerCase().includes(normalizedQuery) ||
+      item.searchAliases.toLocaleLowerCase().includes(normalizedQuery),
+  }))
     .filter((entry) => entry.matches)
     .sort((left, right) => Number(right.commandPrefix) - Number(left.commandPrefix) || left.index - right.index)
     .map((entry) => entry.item);
@@ -96,10 +89,12 @@ export function filterComposerSlashFunctions(query: string): ComposerSlashFuncti
 export function filterComposerSlashSkills(skills: SkillCatalogItem[], query: string): SkillCatalogItem[] {
   const normalizedQuery = normalizeSlashSearch(query);
   return skills
-    .filter((skill) =>
-      !normalizedQuery ||
-      skill.name.toLocaleLowerCase().includes(normalizedQuery) ||
-      skill.description.toLocaleLowerCase().includes(normalizedQuery))
+    .filter(
+      (skill) =>
+        !normalizedQuery ||
+        skill.name.toLocaleLowerCase().includes(normalizedQuery) ||
+        skill.description.toLocaleLowerCase().includes(normalizedQuery),
+    )
     .sort((left, right) => {
       if (left.scope !== right.scope) return left.scope === "project" ? -1 : 1;
       return left.name.localeCompare(right.name);

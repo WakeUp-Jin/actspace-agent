@@ -5,12 +5,33 @@ const capabilities = { input: ["text" as const], toolUse: "declared" as const, r
 
 describe("models host port", () => {
   it("summarizes a usable model with its efforts, default effort and connection", () => {
-    expect(usableModelSummary({ key: "openrouter:openai/gpt-5.5", label: "GPT-5.5", connectionLabel: "Work relay", thinkingDefault: true, capabilities: { ...capabilities, reasoningEfforts: ["low", "high"], reasoningDefaultEffort: "high" } }))
-      .toEqual({ key: "openrouter:openai/gpt-5.5", label: "GPT-5.5", connectionLabel: "Work relay", reasoningEfforts: ["low", "high"], defaultEffort: "high", thinkingDefault: true });
+    expect(
+      usableModelSummary({
+        key: "openrouter:openai/gpt-5.5",
+        label: "GPT-5.5",
+        connectionLabel: "Work relay",
+        thinkingDefault: true,
+        capabilities: { ...capabilities, reasoningEfforts: ["low", "high"], reasoningDefaultEffort: "high" },
+      }),
+    ).toEqual({
+      key: "openrouter:openai/gpt-5.5",
+      label: "GPT-5.5",
+      connectionLabel: "Work relay",
+      reasoningEfforts: ["low", "high"],
+      defaultEffort: "high",
+      thinkingDefault: true,
+    });
   });
 
   it("expands an open effort list and leaves models without effort control empty", () => {
-    expect(usableModelSummary({ key: "deepseek:a", label: "A", thinkingDefault: false, capabilities: { ...capabilities, reasoningEfforts: null } }).reasoningEfforts).toEqual([...MODEL_REASONING_EFFORTS]);
+    expect(
+      usableModelSummary({
+        key: "deepseek:a",
+        label: "A",
+        thinkingDefault: false,
+        capabilities: { ...capabilities, reasoningEfforts: null },
+      }).reasoningEfforts,
+    ).toEqual([...MODEL_REASONING_EFFORTS]);
     const none = usableModelSummary({ key: "deepseek:b", label: "B", thinkingDefault: false, capabilities });
     expect(none.reasoningEfforts).toEqual([]);
     expect(none).not.toHaveProperty("defaultEffort");
@@ -24,7 +45,9 @@ describe("models host port", () => {
 
   it("gives CLI hosts a list of just the configured model", () => {
     const port = currentModelHostPort("deepseek/deepseek-chat");
-    expect(port.listUsableModels()).toEqual([{ key: "deepseek/deepseek-chat", label: "deepseek/deepseek-chat", reasoningEfforts: [], thinkingDefault: false }]);
+    expect(port.listUsableModels()).toEqual([
+      { key: "deepseek/deepseek-chat", label: "deepseek/deepseek-chat", reasoningEfforts: [], thinkingDefault: false },
+    ]);
     expect(port.subagentDefaultModel()).toBeNull();
     expect(currentModelHostPort(undefined).listUsableModels()).toEqual([]);
   });

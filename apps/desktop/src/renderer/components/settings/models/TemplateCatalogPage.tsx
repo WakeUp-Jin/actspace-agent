@@ -33,7 +33,7 @@ export function TemplateCatalogPage() {
       templateId: template.id,
       apiKey: "",
       protocol: template.protocol ?? "openai-completions",
-      baseUrl: isRelayTemplate(template) ? "" : template.defaultBaseUrl ?? "",
+      baseUrl: isRelayTemplate(template) ? "" : (template.defaultBaseUrl ?? ""),
       proxyUrl: "",
     });
     go({ name: "setup" });
@@ -52,12 +52,16 @@ export function TemplateCatalogPage() {
         />
       </label>
       {GROUPS.map((group) => {
-        const templates = PROVIDER_TEMPLATES.filter((template) => template.group === group && !template.hidden && (!q || template.label.toLowerCase().includes(q)));
+        const templates = PROVIDER_TEMPLATES.filter(
+          (template) =>
+            template.group === group && !template.hidden && (!q || template.label.toLowerCase().includes(q)),
+        );
         if (templates.length === 0) return null;
         return (
           <SettingGroup key={group} title={PROVIDER_TEMPLATE_GROUP_LABELS[group]} headingLevel={3}>
             {templates.map((template) => {
-              const added = !isRelayTemplate(template) && connections.some((connection) => connection.templateId === template.id);
+              const added =
+                !isRelayTemplate(template) && connections.some((connection) => connection.templateId === template.id);
               return (
                 <SettingLinkRow
                   key={template.id}

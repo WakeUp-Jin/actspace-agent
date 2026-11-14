@@ -80,11 +80,7 @@ export async function getWorkspaceGitContext(
   }
 
   const headCommit = head.stdout.trim();
-  const refs = await runGit(
-    runner,
-    ["for-each-ref", "--format=%(refname:short)", "refs/heads"],
-    repositoryRoot,
-  );
+  const refs = await runGit(runner, ["for-each-ref", "--format=%(refname:short)", "refs/heads"], repositoryRoot);
   if (!isGitRunSuccess(refs)) {
     return contextFailure("failed", resolvedRoot, sanitizeGitError(refs), repositoryRoot);
   }
@@ -364,7 +360,13 @@ function contextFailure(
   error?: string,
   repositoryRoot?: string,
 ): WorkspaceGitContext {
-  return { status, workspaceRoot, ...(repositoryRoot ? { repositoryRoot } : {}), branches: [], ...(error ? { error } : {}) };
+  return {
+    status,
+    workspaceRoot,
+    ...(repositoryRoot ? { repositoryRoot } : {}),
+    branches: [],
+    ...(error ? { error } : {}),
+  };
 }
 
 function gitContextToPreparationFailure(
@@ -391,8 +393,18 @@ function failed(
   return { ok: false, code, message };
 }
 
-async function runGit(runner: GitRunner, args: string[], cwd: string, env?: Record<string, string>): Promise<GitRunResult> {
-  return runner(args, { cwd, timeoutMs: GIT_TIMEOUT_MS, maxOutputChars: GIT_MAX_OUTPUT_CHARS, ...(env ? { env } : {}) });
+async function runGit(
+  runner: GitRunner,
+  args: string[],
+  cwd: string,
+  env?: Record<string, string>,
+): Promise<GitRunResult> {
+  return runner(args, {
+    cwd,
+    timeoutMs: GIT_TIMEOUT_MS,
+    maxOutputChars: GIT_MAX_OUTPUT_CHARS,
+    ...(env ? { env } : {}),
+  });
 }
 
 function isGitMissing(result: GitRunResult): boolean {

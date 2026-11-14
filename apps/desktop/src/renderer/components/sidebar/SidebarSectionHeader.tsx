@@ -4,7 +4,8 @@ import { ChevronDown, Search, X } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
 import { NAV_SECTION_LABEL_BASE_CLASS, NAV_SECTION_ACTIONS_CLASS } from "./styles";
 
-const SECTION_HEADER_CLASS = "nav-section-title group/nav-title relative flex min-w-0 items-center justify-between gap-2 px-2";
+const SECTION_HEADER_CLASS =
+  "nav-section-title group/nav-title relative flex min-w-0 items-center justify-between gap-2 px-2";
 const SECTION_LABEL_CLASS = `nav-section-label ${NAV_SECTION_LABEL_BASE_CLASS} h-full gap-1 text-act-xs`;
 // 收起时箭头转到朝右并常亮；展开时隐藏，悬停标题时出现（Cursor）。
 const SECTION_CHEVRON_CLASS =
@@ -14,7 +15,8 @@ const SECTION_HIDDEN_CLASS = "pointer-events-none opacity-0";
 // 搜索框从图标位置向左展开到整行（DSH）。
 const SEARCH_BOX_CLASS =
   "sidebar-search absolute inset-y-0.5 right-0.5 z-10 flex items-center gap-1.5 overflow-hidden rounded-act-md border border-line bg-surface-raised pl-2 pr-0.5 transition-[width] duration-(--motion-base) ease-in-out";
-const SEARCH_INPUT_CLASS = "min-w-0 flex-1 border-0 bg-transparent p-0 text-act-sm text-text-main outline-none placeholder:text-text-faint";
+const SEARCH_INPUT_CLASS =
+  "min-w-0 flex-1 border-0 bg-transparent p-0 text-act-sm text-text-main outline-none placeholder:text-text-faint";
 
 type SidebarSectionHeaderProps = {
   label: ReactNode;
@@ -30,15 +32,34 @@ type SidebarSectionHeaderProps = {
 };
 
 /** 侧栏分区标题，也用作按时间分组的时间段标题：点文字折叠，悬停露出折叠箭头。 */
-export function SidebarSectionHeader({ label, collapsed, onToggle, actions, overlay, compact = false, className = "" }: SidebarSectionHeaderProps) {
+export function SidebarSectionHeader({
+  label,
+  collapsed,
+  onToggle,
+  actions,
+  overlay,
+  compact = false,
+  className = "",
+}: SidebarSectionHeaderProps) {
   const hidden = overlay ? SECTION_HIDDEN_CLASS : "";
   return (
     <div className={`${SECTION_HEADER_CLASS} ${compact ? "h-6" : "h-[30px]"} ${className}`}>
-      <button className={`${SECTION_LABEL_CLASS} ${hidden}`} type="button" onClick={onToggle} aria-expanded={!collapsed}>
+      <button
+        className={`${SECTION_LABEL_CLASS} ${hidden}`}
+        type="button"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+      >
         {label}
-        <ChevronDown size={12} className={`${SECTION_CHEVRON_CLASS} ${collapsed ? "-rotate-90 opacity-100" : "opacity-0"}`} aria-hidden="true" />
+        <ChevronDown
+          size={12}
+          className={`${SECTION_CHEVRON_CLASS} ${collapsed ? "-rotate-90 opacity-100" : "opacity-0"}`}
+          aria-hidden="true"
+        />
       </button>
-      {actions ? <div className={`nav-section-actions ${NAV_SECTION_ACTIONS_CLASS} gap-px ${hidden}`}>{actions}</div> : null}
+      {actions ? (
+        <div className={`nav-section-actions ${NAV_SECTION_ACTIONS_CLASS} gap-px ${hidden}`}>{actions}</div>
+      ) : null}
       {overlay}
     </div>
   );
@@ -71,10 +92,15 @@ export function SidebarSearchBox({ query, onQueryChange, onClose }: SidebarSearc
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onClose(true); }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            onClose(true);
+          }
         }}
         onBlur={(event) => {
-          if (!query.trim() && !event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) onClose(false);
+          if (!query.trim() && !event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null))
+            onClose(false);
         }}
       />
       <IconButton size="xs" label="关闭搜索" tooltip={false} onClick={() => onClose(true)}>
@@ -87,7 +113,14 @@ export function SidebarSearchBox({ query, onQueryChange, onClose }: SidebarSearc
 /** 标题行里的搜索图标按钮。 */
 export function SidebarSearchButton({ onOpen, buttonRef }: { onOpen: () => void; buttonRef?: Ref<HTMLButtonElement> }) {
   return (
-    <IconButton ref={buttonRef} className="sidebar-search-button" size="xs" label="搜索会话" tooltip="搜索会话" onClick={onOpen}>
+    <IconButton
+      ref={buttonRef}
+      className="sidebar-search-button"
+      size="xs"
+      label="搜索会话"
+      tooltip="搜索会话"
+      onClick={onOpen}
+    >
       <Search size={13} aria-hidden="true" />
     </IconButton>
   );

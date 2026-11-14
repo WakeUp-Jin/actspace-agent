@@ -36,15 +36,17 @@ export function useTimelineViewport(
   useEffect(() => {
     if (model === null) return;
     setAnimate(false);
-    setViewport(current => current !== null && (current.end < model.start || current.start > model.end) ? null : current);
+    setViewport((current) =>
+      current !== null && (current.end < model.start || current.start > model.end) ? null : current,
+    );
   }, [model]);
 
   useEffect(() => {
     if (model === null || selectedId === null) return;
-    const selected = model.spans.find(span => span.recordId === selectedId);
+    const selected = model.spans.find((span) => span.recordId === selectedId);
     if (selected === undefined) return;
     setAnimate(true);
-    setViewport(current => {
+    setViewport((current) => {
       if (current === null) return current;
       if (selected.end > current.start && selected.start < current.end) return current;
       const duration = Math.max(1, current.end - current.start);
@@ -56,11 +58,12 @@ export function useTimelineViewport(
 
   const fullDuration = Math.max(1, (model?.end ?? 0) - (model?.start ?? 0));
   const viewportDuration = Math.min(fullDuration, Math.max(1, (viewport?.end ?? 0) - (viewport?.start ?? 0)));
-  const viewportStart = model === null || viewport === null
-    ? model?.start ?? 0
-    : Math.min(Math.max(viewport.start, model.start), model.end - viewportDuration);
+  const viewportStart =
+    model === null || viewport === null
+      ? (model?.start ?? 0)
+      : Math.min(Math.max(viewport.start, model.start), model.end - viewportDuration);
   const domainDuration = viewport === null ? fullDuration : viewportDuration;
-  const domainStart = viewport === null ? model?.start ?? 0 : viewportStart;
+  const domainStart = viewport === null ? (model?.start ?? 0) : viewportStart;
 
   useEffect(() => {
     const root = rootRef.current;
@@ -79,7 +82,10 @@ export function useTimelineViewport(
         return;
       }
       const anchorTime = domainStart + anchorFraction * domainDuration;
-      const start = Math.min(Math.max(anchorTime - anchorFraction * nextDuration, model.start), model.end - nextDuration);
+      const start = Math.min(
+        Math.max(anchorTime - anchorFraction * nextDuration, model.start),
+        model.end - nextDuration,
+      );
       setViewport({ start, end: start + nextDuration });
     };
     root.addEventListener("wheel", onWheel, { passive: false });

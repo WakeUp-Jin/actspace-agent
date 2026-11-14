@@ -6,13 +6,15 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 
 const WORKSPACE_ROOT = "/Users/me/projects/actspace-agent";
 
-const SESSIONS: SessionListItem[] = ["s-idle", "s-running", "s-busy", "s-waiting", "s-failed", "s-unknown"].map((id) => ({
-  id,
-  title: id,
-  workspaceRoot: WORKSPACE_ROOT,
-  updatedAt: "2026-07-29T00:00:00.000Z",
-  agentRunCount: 1,
-}));
+const SESSIONS: SessionListItem[] = ["s-idle", "s-running", "s-busy", "s-waiting", "s-failed", "s-unknown"].map(
+  (id) => ({
+    id,
+    title: id,
+    workspaceRoot: WORKSPACE_ROOT,
+    updatedAt: "2026-07-29T00:00:00.000Z",
+    agentRunCount: 1,
+  }),
+);
 
 function renderSidebar() {
   return render(
@@ -34,7 +36,12 @@ function renderSidebar() {
         mode="expanded"
         view="chat"
         busySessionIds={new Set(["s-busy"])}
-        sessionStatuses={{ "s-running": "running", "s-waiting": "waiting_approval", "s-failed": "failed", "s-unknown": "archived" }}
+        sessionStatuses={{
+          "s-running": "running",
+          "s-waiting": "waiting_approval",
+          "s-failed": "failed",
+          "s-unknown": "archived",
+        }}
       />
     </TooltipProvider>,
   );
@@ -56,7 +63,8 @@ describe("Sidebar semantics", () => {
 
   it("exposes the resolved session status on the status dot", () => {
     const { container } = renderSidebar();
-    const dotState = (sessionId: string) => row(container, sessionId).querySelector(".session-status-button [data-state]")?.getAttribute("data-state");
+    const dotState = (sessionId: string) =>
+      row(container, sessionId).querySelector(".session-status-button [data-state]")?.getAttribute("data-state");
 
     expect(dotState("s-idle")).toBe("idle");
     expect(dotState("s-running")).toBe("running");

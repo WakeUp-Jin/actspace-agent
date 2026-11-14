@@ -43,7 +43,9 @@ export function PurposePicker({
   const [open, setOpen] = useState(false);
 
   const summary = purposeSummary(connections, binding);
-  const followLabel = purpose.follow ? purpose.followLabel ?? `跟随${PURPOSES.find((item) => item.id === purpose.follow)!.label}` : "未设置";
+  const followLabel = purpose.follow
+    ? (purpose.followLabel ?? `跟随${PURPOSES.find((item) => item.id === purpose.follow)!.label}`)
+    : "未设置";
   const catalog: ModelCatalog = {
     source: "local-providers",
     groups: pickerGroups(connections, purpose, "").map((group) => ({
@@ -62,7 +64,10 @@ export function PurposePicker({
     const model = findModel(connections, key);
     if (!model || binding.model === model.key) return;
     const levels = model.effective.thinking?.levels ?? [];
-    onChange({ model: model.key, thinking: binding.thinking && levels.includes(binding.thinking) ? binding.thinking : null });
+    onChange({
+      model: model.key,
+      thinking: binding.thinking && levels.includes(binding.thinking) ? binding.thinking : null,
+    });
   };
 
   const panel: ModelOptionsPanel = {
@@ -73,13 +78,16 @@ export function PurposePicker({
     render: (key) => {
       const model = findModel(connections, key);
       if (!model) return null;
-      const level = binding.model === key ? binding.thinking ?? model.effective.thinking?.default ?? null : null;
+      const level = binding.model === key ? (binding.thinking ?? model.effective.thinking?.default ?? null) : null;
       return (
         <ThinkingOptions
           model={model}
           level={level}
           onLevel={(next) => onChange({ model: model.key, thinking: next })}
-          onGoToModel={() => { setOpen(false); onGoToModel(key); }}
+          onGoToModel={() => {
+            setOpen(false);
+            onGoToModel(key);
+          }}
         />
       );
     },
@@ -101,7 +109,9 @@ export function PurposePicker({
               <span className="min-w-0 truncate">{summary.label}</span>
               {summary.level && !purpose.noThinking ? <span className="text-text-muted">· {summary.level}</span> : null}
             </>
-          ) : <span className="text-text-faint">{followLabel}</span>}
+          ) : (
+            <span className="text-text-faint">{followLabel}</span>
+          )}
           <ChevronDown size={13} aria-hidden="true" className="shrink-0 text-text-subtle" />
         </button>
       </PopoverTrigger>
@@ -121,7 +131,17 @@ export function PurposePicker({
   );
 }
 
-function ThinkingOptions({ model, level, onLevel, onGoToModel }: { model: ConnectionModelView; level: ThinkingLevel | null; onLevel: (level: ThinkingLevel) => void; onGoToModel: () => void }) {
+function ThinkingOptions({
+  model,
+  level,
+  onLevel,
+  onGoToModel,
+}: {
+  model: ConnectionModelView;
+  level: ThinkingLevel | null;
+  onLevel: (level: ThinkingLevel) => void;
+  onGoToModel: () => void;
+}) {
   const thinking = model.effective.thinking;
   return (
     <>
@@ -139,14 +159,18 @@ function ThinkingOptions({ model, level, onLevel, onGoToModel }: { model: Connec
             >
               <span className={OPTION_CHOICE_LABEL_CLASS}>{levelName(thinking.levels, item)}</span>
               {thinking.default === item ? <span className="mr-2 text-act-xxs text-text-faint">默认</span> : null}
-              <span className="grid w-3.5 place-items-center">{level === item ? <Check size={14} aria-hidden="true" /> : null}</span>
+              <span className="grid w-3.5 place-items-center">
+                {level === item ? <Check size={14} aria-hidden="true" /> : null}
+              </span>
             </button>
           ))}
         </div>
       ) : (
         <div className="px-2 pb-1.5">
           <p className="text-act-xs leading-relaxed text-text-muted">还没有这个模型的思考信息。</p>
-          <Button variant="secondary" size="xs" className="mt-2" onClick={onGoToModel}>去补充</Button>
+          <Button variant="secondary" size="xs" className="mt-2" onClick={onGoToModel}>
+            去补充
+          </Button>
         </div>
       )}
     </>

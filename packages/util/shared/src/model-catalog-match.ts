@@ -28,7 +28,8 @@ export function matchCatalogModel(
   const index = indexOf(catalog.entries);
   const rank = (entry: ModelCatalogEntry) =>
     entry.sourceProviderId === catalogProvider ? 0 : entry.sourceProviderId !== "openrouter" ? 1 : 2;
-  const best = (rows: readonly ModelCatalogEntry[] | undefined) => rows?.length ? [...rows].sort((a, b) => rank(a) - rank(b))[0] : undefined;
+  const best = (rows: readonly ModelCatalogEntry[] | undefined) =>
+    rows?.length ? [...rows].sort((a, b) => rank(a) - rank(b))[0] : undefined;
   const exact = best(index.exact.get(id));
   if (exact) return { entry: exact, exact: true };
   const key = loose(id);
@@ -48,7 +49,8 @@ function indexOf(entries: readonly ModelCatalogEntry[]): CatalogIndex {
   const index: CatalogIndex = { exact: new Map(), loose: new Map() };
   const push = (map: Map<string, ModelCatalogEntry[]>, key: string, entry: ModelCatalogEntry) => {
     const rows = map.get(key);
-    if (rows) rows.push(entry); else map.set(key, [entry]);
+    if (rows) rows.push(entry);
+    else map.set(key, [entry]);
   };
   for (const entry of entries) {
     push(index.exact, entry.apiModel, entry);

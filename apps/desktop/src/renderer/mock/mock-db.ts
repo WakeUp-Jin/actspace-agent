@@ -40,7 +40,11 @@ export type MockMessage = {
   readonly events?: readonly MockRawEvent[];
 };
 
-export type MockRawEvent = { readonly type: string; readonly data: Readonly<Record<string, RuntimeJsonValue>>; readonly surface?: SessionEventEnvelopeV1["surface"] };
+export type MockRawEvent = {
+  readonly type: string;
+  readonly data: Readonly<Record<string, RuntimeJsonValue>>;
+  readonly surface?: SessionEventEnvelopeV1["surface"];
+};
 
 export type MockToolCall = {
   readonly name: string;
@@ -100,7 +104,17 @@ export function createMockDb(): MockDb {
     bootstrap: mockBootstrapState,
     workspaces: {
       version: 1,
-      items: [{ id: "ws_actspace_demo", kind: "folder", label: "actspace-demo", path: MOCK_WORKSPACE_ROOT, order: 0, createdAt: now, updatedAt: now }],
+      items: [
+        {
+          id: "ws_actspace_demo",
+          kind: "folder",
+          label: "actspace-demo",
+          path: MOCK_WORKSPACE_ROOT,
+          order: 0,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
     },
     sessions: new Map(),
     hosts: [],
@@ -113,11 +127,16 @@ export function createMockDb(): MockDb {
 }
 
 /** 原 App 里 `createLocalEmptySession` 的 mock 版本：新会话写进内存表。 */
-export function createMockSession(db: MockDb, input: SessionCreateInput & { id?: string; updatedAt?: string } = {}): MockSession {
+export function createMockSession(
+  db: MockDb,
+  input: SessionCreateInput & { id?: string; updatedAt?: string } = {},
+): MockSession {
   const createdAt = input.updatedAt ?? new Date().toISOString();
   const host = input.hostId ? db.hosts.find((item) => item.hostId === input.hostId) : undefined;
   const session: MockSession = {
-    id: input.hostId ? remoteSessionId(input.hostId, input.id ?? db.nextId("session")) : input.id ?? db.nextId("mock-session"),
+    id: input.hostId
+      ? remoteSessionId(input.hostId, input.id ?? db.nextId("session"))
+      : (input.id ?? db.nextId("mock-session")),
     title: input.title ?? "New chat",
     createdAt,
     updatedAt: createdAt,
@@ -156,7 +175,10 @@ export function forkMockSession(db: MockDb, sourceId: string): MockSession {
  * 侧边对话：复制主会话到最后一个已完成轮（以助手回复结尾）为止的消息，默认 Plan，与真实 fork 一样带 lineage。
  * 之后还没有回复的那一轮算进行中，不复制。
  */
-export function openMockSideChat(db: MockDb, parentId: string): { session: MockSession; inheritedTurnCount: number; runningTurnExcluded: boolean } {
+export function openMockSideChat(
+  db: MockDb,
+  parentId: string,
+): { session: MockSession; inheritedTurnCount: number; runningTurnExcluded: boolean } {
   const parent = requireSession(db, parentId);
   const lastAnswer = parent.messages.findLastIndex((message) => message.role === "assistant");
   const inherited = parent.messages.slice(0, lastAnswer + 1);
@@ -185,7 +207,13 @@ export function requireSession(db: MockDb, sessionId: string): MockSession {
   return session;
 }
 
-export function appendMockMessage(db: MockDb, session: MockSession, role: MockMessage["role"], content: string, agentRunId: string): MockMessage {
+export function appendMockMessage(
+  db: MockDb,
+  session: MockSession,
+  role: MockMessage["role"],
+  content: string,
+  agentRunId: string,
+): MockMessage {
   const message: MockMessage = { id: db.nextId(role), role, content, createdAt: new Date().toISOString(), agentRunId };
   session.messages.push(message);
   session.updatedAt = message.createdAt;
@@ -202,14 +230,18 @@ export function sessionListItem(session: MockSession, db: MockDb): SessionListIt
     agentForm: session.agentForm,
     agentMode: session.agentMode,
     agentModeRevision: session.agentModeRevision,
-    workspaceId: session.hostId ? undefined : db.workspaces.items.find((item) => item.path === session.workspaceRoot)?.id,
+    workspaceId: session.hostId
+      ? undefined
+      : db.workspaces.items.find((item) => item.path === session.workspaceRoot)?.id,
     workspaceRoot: session.workspaceRoot,
     pinned: session.pinned,
     archived: session.archived,
     ...(session.parentSessionId ? { isChildSession: true } : {}),
     ...(session.sideChat ? { sideChatParentId: session.sideChat.parentId } : {}),
     ...(sideChatCount(db, session.id) ? { sideChatCount: sideChatCount(db, session.id) } : {}),
-    ...(session.hostId ? { hostId: session.hostId, hostName: session.hostName ?? host?.name, connectionState: host?.state ?? "offline" } : {}),
+    ...(session.hostId
+      ? { hostId: session.hostId, hostName: session.hostName ?? host?.name, connectionState: host?.state ?? "offline" }
+      : {}),
   };
 }
 
@@ -242,14 +274,46 @@ export function journal(session: MockSession): SessionEventEnvelopeV1[] {
     // 每个 agentRun 开头一条 turn/start，和真实 Journal 一样能数出轮数。
     if (message.agentRunId !== currentRun) {
       currentRun = message.agentRunId;
-      events.push({ ...base(message), seq: events.length, type: "turn/start", data: { agentRunId: message.agentRunId }, surface: null });
+      events.push({
+        ...base(message),
+        seq: events.length,
+        type: "turn/start",
+        data: { agentRunId: message.agentRunId },
+        surface: null,
+      });
     }
-    for (const raw of message.events ?? []) events.push({ ...base(message), seq: events.length, type: raw.type, data: { agentRunId: message.agentRunId, ...raw.data }, surface: raw.surface ?? null });
+    for (const raw of message.events ?? [])
+      events.push({
+        ...base(message),
+        seq: events.length,
+        type: raw.type,
+        data: { agentRunId: message.agentRunId, ...raw.data },
+        surface: raw.surface ?? null,
+      });
     if (message.role === "tool" && message.tool) {
       const callId = message.id;
-      events.push({ ...base(message), seq: events.length, type: "tool/call", data: { agentRunId: message.agentRunId, callId, name: message.tool.name, args: message.tool.args }, surface: null });
-      for (const raw of message.tool.during?.(callId) ?? []) events.push({ ...base(message), seq: events.length, type: raw.type, data: raw.data, surface: raw.surface ?? null });
-      events.push({ ...base(message), seq: events.length, type: "tool/result", data: { agentRunId: message.agentRunId, callId, ...message.tool.result }, surface: null });
+      events.push({
+        ...base(message),
+        seq: events.length,
+        type: "tool/call",
+        data: { agentRunId: message.agentRunId, callId, name: message.tool.name, args: message.tool.args },
+        surface: null,
+      });
+      for (const raw of message.tool.during?.(callId) ?? [])
+        events.push({
+          ...base(message),
+          seq: events.length,
+          type: raw.type,
+          data: raw.data,
+          surface: raw.surface ?? null,
+        });
+      events.push({
+        ...base(message),
+        seq: events.length,
+        type: "tool/result",
+        data: { agentRunId: message.agentRunId, callId, ...message.tool.result },
+        surface: null,
+      });
       continue;
     }
     if (message.role === "tool") continue;
@@ -261,7 +325,13 @@ export function journal(session: MockSession): SessionEventEnvelopeV1[] {
       surface: { kind: "append" },
     });
     if (message.usage) {
-      events.push({ ...base(message), seq: events.length, type: "step/end", data: { agentRunId: message.agentRunId, reason: "completed", usage: message.usage }, surface: null });
+      events.push({
+        ...base(message),
+        seq: events.length,
+        type: "step/end",
+        data: { agentRunId: message.agentRunId, reason: "completed", usage: message.usage },
+        surface: null,
+      });
     }
   }
   return events;
@@ -286,28 +356,56 @@ export function snapshot(session: MockSession, throughJournalSeq: number): Runti
     metadata: { title: session.title, pinned: session.pinned, archived: session.archived },
     messages: session.messages.flatMap((message) => [
       // 原始事件里的 surface append（如唤醒回合领取的任务通知）也是可见消息。
-      ...(message.events ?? []).flatMap((raw) => { const node = raw.surface?.kind === "append" ? surfaceNode({ type: raw.type, data: raw.data, surface: raw.surface }) : null; return node?.kind === "user" ? [{ kind: "user" as const, messageId: node.messageId, content: node.content }] : []; }),
-      ...(message.role === "tool" && !message.tool ? [] : [message.role === "tool"
-        ? { kind: "tool-result" as const, messageId: message.id, content: message.content, callId: message.id }
-        : { kind: message.role, messageId: message.id, content: message.content }]),
+      ...(message.events ?? []).flatMap((raw) => {
+        const node =
+          raw.surface?.kind === "append" ? surfaceNode({ type: raw.type, data: raw.data, surface: raw.surface }) : null;
+        return node?.kind === "user"
+          ? [{ kind: "user" as const, messageId: node.messageId, content: node.content }]
+          : [];
+      }),
+      ...(message.role === "tool" && !message.tool
+        ? []
+        : [
+            message.role === "tool"
+              ? { kind: "tool-result" as const, messageId: message.id, content: message.content, callId: message.id }
+              : { kind: message.role, messageId: message.id, content: message.content },
+          ]),
     ]),
     tools: [],
     pendingInbox: [],
     todos: [],
     delegations: [],
-    lineage: session.forkInheritedMessages !== undefined && session.parentSessionId ? {
-      parentSessionId: session.parentSessionId,
-      origin: "delegation",
-      delegationDepth: 1,
-      inheritedThroughSeq: journal({ ...session, messages: session.messages.slice(0, session.forkInheritedMessages) }).length - 1,
-    } : session.sideChat ? {
-      parentSessionId: session.sideChat.parentId,
-      parentBoundarySeq: journal({ ...session, messages: session.messages.slice(0, session.sideChat.inheritedMessages) }).length - 1,
-      origin: "side-chat",
-      delegationDepth: 0,
-    } : null,
+    lineage:
+      session.forkInheritedMessages !== undefined && session.parentSessionId
+        ? {
+            parentSessionId: session.parentSessionId,
+            origin: "delegation",
+            delegationDepth: 1,
+            inheritedThroughSeq:
+              journal({ ...session, messages: session.messages.slice(0, session.forkInheritedMessages) }).length - 1,
+          }
+        : session.sideChat
+          ? {
+              parentSessionId: session.sideChat.parentId,
+              parentBoundarySeq:
+                journal({ ...session, messages: session.messages.slice(0, session.sideChat.inheritedMessages) })
+                  .length - 1,
+              origin: "side-chat",
+              delegationDepth: 0,
+            }
+          : null,
     usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
-    activity: { turnCount: runs, completedTurnCount: runs, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } },
+    activity: {
+      turnCount: runs,
+      completedTurnCount: runs,
+      stepCount: 0,
+      activeTurnId: null,
+      activeStepId: null,
+      compactionCount: 0,
+      activeCompactionId: null,
+      lastCompactionSummary: null,
+      timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 },
+    },
   };
 }
 
@@ -341,12 +439,24 @@ export function sessionObservation(session: MockSession): RuntimeSessionObservat
     kind: "session-observation",
     schemaVersion: 1,
     sessionId: session.id,
-    projection: { kind: "session-projection", schemaVersion: 1, sessionId: session.id, throughJournalSeq: seq, values: projection.values },
+    projection: {
+      kind: "session-projection",
+      schemaVersion: 1,
+      sessionId: session.id,
+      throughJournalSeq: seq,
+      values: projection.values,
+    },
     snapshot: projection.snapshot,
     window: projection.window,
     activeMessageIds: projection.activeMessageIds,
     deferredToolCalls: [],
-    watermarks: { acceptedThroughSeq: seq, durableThroughSeq: seq, projectionThroughSeq: seq, windowThroughSeq: seq, indexGeneration: null },
+    watermarks: {
+      acceptedThroughSeq: seq,
+      durableThroughSeq: seq,
+      projectionThroughSeq: seq,
+      windowThroughSeq: seq,
+      indexGeneration: null,
+    },
   };
 }
 

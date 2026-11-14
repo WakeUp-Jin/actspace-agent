@@ -6,16 +6,30 @@ import { CODE_FILE_TYPES } from "../components/files/code-file-types";
 
 describe("file type icon", () => {
   it.each([
-    ["report.docx", "word"], ["sheet.xlsx", "excel"], ["data.csv", "excel"], ["deck.pptx", "ppt"], ["paper.pdf", "pdf"],
-    ["README.md", "markdown"], ["logo.svg", "image"], ["clip.mp4", "video"], ["index.html", "html"], ["notes.bin", "other"],
-    ["src/app.ts", "typescript"], ["package.json", "node"], ["Dockerfile", "docker"], ["feature.component.ts", "angular"], [".env.production", "env"],
+    ["report.docx", "word"],
+    ["sheet.xlsx", "excel"],
+    ["data.csv", "excel"],
+    ["deck.pptx", "ppt"],
+    ["paper.pdf", "pdf"],
+    ["README.md", "markdown"],
+    ["logo.svg", "image"],
+    ["clip.mp4", "video"],
+    ["index.html", "html"],
+    ["notes.bin", "other"],
+    ["src/app.ts", "typescript"],
+    ["package.json", "node"],
+    ["Dockerfile", "docker"],
+    ["feature.component.ts", "angular"],
+    [".env.production", "env"],
   ])("classifies %s as %s", (path, type) => {
     expect(classifyFileType(path)).toBe(type);
   });
 
   it("selects Flutter only when the project snapshot identifies it", () => {
     expect(classifyFileType("lib/main.dart")).toBe("dart");
-    expect(classifyFileType("lib/main.dart", { files: { "pubspec.yaml": "dependencies:\n  flutter: sdk" } })).toBe("flutter");
+    expect(classifyFileType("lib/main.dart", { files: { "pubspec.yaml": "dependencies:\n  flutter: sdk" } })).toBe(
+      "flutter",
+    );
   });
 
   it("keeps the embedded code artwork closed and free of unsafe markup", () => {
@@ -30,7 +44,13 @@ describe("file type icon", () => {
   });
 
   it("renders category colors for traditional files and per-instance ids for code artwork", () => {
-    const { container } = render(<><FileTypeIcon path="a.docx" size={20} /><FileTypeIcon path="a.ts" /><FileTypeIcon path="b.ts" /></>);
+    const { container } = render(
+      <>
+        <FileTypeIcon path="a.docx" size={20} />
+        <FileTypeIcon path="a.ts" />
+        <FileTypeIcon path="b.ts" />
+      </>,
+    );
     const [word, first, second] = Array.from(container.querySelectorAll("svg"));
     expect(word.getAttribute("class")).toContain("--act-file-type-blue-light");
     expect(word.getAttribute("width")).toBe("20");

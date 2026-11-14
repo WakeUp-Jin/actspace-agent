@@ -22,11 +22,16 @@ export type GrantSelector = FileGrantSelector | CommandPrefixGrantSelector;
 export function isCommandPrefixSelector(value: unknown): value is CommandPrefixGrantSelector {
   if (!value || typeof value !== "object") return false;
   const selector = value as Partial<CommandPrefixGrantSelector>;
-  return selector.kind === "command_prefix"
-    && Array.isArray(selector.prefix) && selector.prefix.length >= 1 && selector.prefix.length <= 2
-    && selector.prefix.every(token => typeof token === "string" && /^[A-Za-z0-9._@+-]{1,64}$/.test(token))
-    && typeof selector.cwdRoot === "string" && /^(?:\/|[A-Za-z]:[\\/])/.test(selector.cwdRoot)
-    && !/[*?\[\]{}]/.test(selector.cwdRoot);
+  return (
+    selector.kind === "command_prefix" &&
+    Array.isArray(selector.prefix) &&
+    selector.prefix.length >= 1 &&
+    selector.prefix.length <= 2 &&
+    selector.prefix.every((token) => typeof token === "string" && /^[A-Za-z0-9._@+-]{1,64}$/.test(token)) &&
+    typeof selector.cwdRoot === "string" &&
+    /^(?:\/|[A-Za-z]:[\\/])/.test(selector.cwdRoot) &&
+    !/[*?\[\]{}]/.test(selector.cwdRoot)
+  );
 }
 
 export type GrantAudience = {

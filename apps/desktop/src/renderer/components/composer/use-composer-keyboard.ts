@@ -33,7 +33,14 @@ export type ComposerKeyboardOptions<Result> = {
  * 输入法组字时（中文 / 日文选候选词）按键都交给输入法：Enter 是上屏、↑↓ 是翻候选、Esc 是取消组字。
  */
 export function useComposerKeyboard<Result>({
-  inputRef, message, setDraftText, inputHistory, modeShortcut, onModeShortcut, slash, onSend,
+  inputRef,
+  message,
+  setDraftText,
+  inputHistory,
+  modeShortcut,
+  onModeShortcut,
+  slash,
+  onSend,
 }: ComposerKeyboardOptions<Result>) {
   const historyIndexRef = useRef<number | null>(null);
 
@@ -90,7 +97,10 @@ export function useComposerKeyboard<Result>({
       slash.move(event.key === "ArrowDown" ? 1 : -1);
       return;
     }
-    if ((event.key === "ArrowUp" || event.key === "ArrowDown") && navigateInputHistory(event.key === "ArrowUp" ? -1 : 1)) {
+    if (
+      (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+      navigateInputHistory(event.key === "ArrowUp" ? -1 : 1)
+    ) {
       event.preventDefault();
       return;
     }

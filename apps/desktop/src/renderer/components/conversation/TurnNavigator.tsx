@@ -14,27 +14,34 @@ export function useTurnNavigator(items: readonly ConversationTurnNavigationItem[
   const [railVisible, setRailVisible] = useState(false);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(items[0]?.id ?? null);
 
-  const sync = useCallback((viewport: HTMLElement, scrollable: boolean, atBottom: boolean) => {
-    setRailVisible(
-      scrollable &&
-      viewport.clientWidth >= TURN_RAIL_MIN_VIEWPORT_WIDTH_PX &&
-      items.length >= TURN_RAIL_MIN_TURNS,
-    );
+  const sync = useCallback(
+    (viewport: HTMLElement, scrollable: boolean, atBottom: boolean) => {
+      setRailVisible(
+        scrollable && viewport.clientWidth >= TURN_RAIL_MIN_VIEWPORT_WIDTH_PX && items.length >= TURN_RAIL_MIN_TURNS,
+      );
 
-    if (items.length === 0) {
-      setActiveTurnId(null);
-      return;
-    }
+      if (items.length === 0) {
+        setActiveTurnId(null);
+        return;
+      }
 
-    if (atBottom) {
-      setActiveTurnId(items[items.length - 1].id);
-      return;
-    }
+      if (atBottom) {
+        setActiveTurnId(items[items.length - 1].id);
+        return;
+      }
 
-    const viewportRect = viewport.getBoundingClientRect();
-    const readingLine = viewportRect.top + Math.min(viewport.clientHeight * 0.32, 180);
-    setActiveTurnId(pickActiveTurnId(items, (turnId) => turnElementsRef.current.get(turnId)?.getBoundingClientRect().top, readingLine));
-  }, [items]);
+      const viewportRect = viewport.getBoundingClientRect();
+      const readingLine = viewportRect.top + Math.min(viewport.clientHeight * 0.32, 180);
+      setActiveTurnId(
+        pickActiveTurnId(
+          items,
+          (turnId) => turnElementsRef.current.get(turnId)?.getBoundingClientRect().top,
+          readingLine,
+        ),
+      );
+    },
+    [items],
+  );
 
   const setTurnElement = useCallback((turnId: string, element: HTMLElement | null) => {
     if (element) {

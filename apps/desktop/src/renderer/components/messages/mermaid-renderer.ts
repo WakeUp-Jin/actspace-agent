@@ -20,7 +20,10 @@ const CACHE_LIMIT = 32;
 export type MermaidErrorKind = "empty" | "too-large" | "syntax" | "timeout" | "invalid-output";
 
 export class MermaidRenderError extends Error {
-  constructor(readonly kind: MermaidErrorKind, message: string) {
+  constructor(
+    readonly kind: MermaidErrorKind,
+    message: string,
+  ) {
     super(message);
     this.name = "MermaidRenderError";
   }
@@ -142,7 +145,12 @@ export const MERMAID_THEMES: Record<MermaidThemeId, MermaidThemePreset> = {
       specialStateColor: CODEX.line,
       errorBkgColor: "#fbe4dc",
       errorTextColor: "#8e2d1c",
-      ...Object.fromEntries(CODEX_SERIES.flatMap((color, index) => [[`pie${index + 1}`, color], [`cScale${index}`, color]])),
+      ...Object.fromEntries(
+        CODEX_SERIES.flatMap((color, index) => [
+          [`pie${index + 1}`, color],
+          [`cScale${index}`, color],
+        ]),
+      ),
       pieStrokeColor: CODEX.surface,
       pieOuterStrokeColor: CODEX.border,
       pieTitleTextColor: CODEX.text,
@@ -271,13 +279,20 @@ export async function sanitizeMermaidSvg(svg: string): Promise<string> {
 
 /** Read the intrinsic diagram size from the SVG viewBox (falls back to width/height). */
 export function svgIntrinsicSize(svg: string): { width: number; height: number } {
-  const viewBox = svg.match(/viewBox\s*=\s*"([^"]+)"/i)?.[1]?.trim().split(/[\s,]+/).map(Number);
+  const viewBox = svg
+    .match(/viewBox\s*=\s*"([^"]+)"/i)?.[1]
+    ?.trim()
+    .split(/[\s,]+/)
+    .map(Number);
   if (viewBox && viewBox.length === 4 && viewBox.every(Number.isFinite) && viewBox[2] > 0 && viewBox[3] > 0) {
     return { width: viewBox[2], height: viewBox[3] };
   }
   const width = Number.parseFloat(svg.match(/<svg[^>]*\swidth\s*=\s*"([\d.]+)/i)?.[1] ?? "");
   const height = Number.parseFloat(svg.match(/<svg[^>]*\sheight\s*=\s*"([\d.]+)/i)?.[1] ?? "");
-  return { width: Number.isFinite(width) && width > 0 ? width : 0, height: Number.isFinite(height) && height > 0 ? height : 0 };
+  return {
+    width: Number.isFinite(width) && width > 0 ? width : 0,
+    height: Number.isFinite(height) && height > 0 ? height : 0,
+  };
 }
 
 type MermaidModule = typeof import("mermaid").default;
@@ -338,8 +353,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new MermaidRenderError("timeout", "图表渲染超时")), ms);
     promise.then(
-      (value) => { clearTimeout(timer); resolve(value); },
-      (error: unknown) => { clearTimeout(timer); reject(error); },
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
     );
   });
 }
@@ -376,8 +397,15 @@ export function renderMermaid(source: string, themeId: MermaidThemeId): Promise<
   const pending = inflight.get(cacheKey);
   if (pending) return pending;
   const task = renderUncached(source, theme).then(
-    (result) => { inflight.delete(cacheKey); remember(cacheKey, result); return result; },
-    (error: unknown) => { inflight.delete(cacheKey); throw error; },
+    (result) => {
+      inflight.delete(cacheKey);
+      remember(cacheKey, result);
+      return result;
+    },
+    (error: unknown) => {
+      inflight.delete(cacheKey);
+      throw error;
+    },
   );
   inflight.set(cacheKey, task);
   return task;

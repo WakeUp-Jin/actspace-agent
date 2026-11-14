@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  BUILTIN_MODEL_REGISTRY,
-  type ModelDefinition,
-  type ModelKey,
-} from "../model-config";
+import { BUILTIN_MODEL_REGISTRY, type ModelDefinition, type ModelKey } from "../model-config";
 import {
   capabilityMatchesPurpose,
   listUsableModels,
@@ -68,11 +64,7 @@ function install(snapshot: ModelSnapshot, definition: ModelDefinition): void {
 describe("model resolver", () => {
   it("lists builtin chat models in stable provider order", () => {
     const keys = listUsableModels(makeSnapshot(), "chat").map((model) => model.key);
-    expect(keys).toEqual([
-      "deepseek:deepseek-flash",
-      "kimi:kimi-k2.6",
-      "kimi:kimi-k2.7-code",
-    ]);
+    expect(keys).toEqual(["deepseek:deepseek-flash", "kimi:kimi-k2.6", "kimi:kimi-k2.7-code"]);
   });
 
   it("keeps configured providers usable before the optional connection test", () => {
@@ -121,17 +113,36 @@ describe("model resolver", () => {
   });
 
   it.each([
-    ["provider_disabled", (snapshot: ModelSnapshot) => { snapshot.providers.deepseek.enabled = false; }],
-    ["provider_disconnected", (snapshot: ModelSnapshot) => { snapshot.providers.deepseek.hasApiKey = false; }],
-    ["connection_unavailable", (snapshot: ModelSnapshot) => {
-      snapshot.providers.deepseek.lastConnection = { status: "unavailable", checkedAt: now };
-    }],
-    ["model_not_installed", (snapshot: ModelSnapshot) => {
-      delete snapshot.installedModels["deepseek:deepseek-flash"];
-    }],
-    ["model_disabled", (snapshot: ModelSnapshot) => {
-      snapshot.installedModels["deepseek:deepseek-flash"] = { enabled: false, addedAt: now };
-    }],
+    [
+      "provider_disabled",
+      (snapshot: ModelSnapshot) => {
+        snapshot.providers.deepseek.enabled = false;
+      },
+    ],
+    [
+      "provider_disconnected",
+      (snapshot: ModelSnapshot) => {
+        snapshot.providers.deepseek.hasApiKey = false;
+      },
+    ],
+    [
+      "connection_unavailable",
+      (snapshot: ModelSnapshot) => {
+        snapshot.providers.deepseek.lastConnection = { status: "unavailable", checkedAt: now };
+      },
+    ],
+    [
+      "model_not_installed",
+      (snapshot: ModelSnapshot) => {
+        delete snapshot.installedModels["deepseek:deepseek-flash"];
+      },
+    ],
+    [
+      "model_disabled",
+      (snapshot: ModelSnapshot) => {
+        snapshot.installedModels["deepseek:deepseek-flash"] = { enabled: false, addedAt: now };
+      },
+    ],
   ] as const)("returns %s with the configured model preserved", (reason, mutate) => {
     const snapshot = makeSnapshot();
     mutate(snapshot);

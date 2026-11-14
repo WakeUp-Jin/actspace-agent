@@ -15,7 +15,10 @@ export class SubagentActivityBoard {
 
   accept(event: AgentLiveEvent): void {
     if (!event.parentSessionId) return;
-    if (event.kind === "run-state" && TERMINAL.has(event.message)) { this.#entries.delete(event.sessionId); return; }
+    if (event.kind === "run-state" && TERMINAL.has(event.message)) {
+      this.#entries.delete(event.sessionId);
+      return;
+    }
     let entry = this.#entries.get(event.sessionId);
     if (!entry) {
       if (this.#entries.size >= LIMIT) this.#entries.delete(this.#entries.keys().next().value!);

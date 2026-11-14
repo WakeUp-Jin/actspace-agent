@@ -89,9 +89,16 @@ function messageBlockFromToolPreview(
   timestamp: string,
   preview: ToolUiPreview,
   isError?: boolean,
-  terminalStatus?: unknown
+  terminalStatus?: unknown,
 ): MessageBlock {
-  const status = terminalStatus === "running" ? "running" : terminalStatus === "denied" || terminalStatus === "aborted" || terminalStatus === "outcome-unknown" ? terminalStatus : isError ? "failed" : "completed";
+  const status =
+    terminalStatus === "running"
+      ? "running"
+      : terminalStatus === "denied" || terminalStatus === "aborted" || terminalStatus === "outcome-unknown"
+        ? terminalStatus
+        : isError
+          ? "failed"
+          : "completed";
   switch (preview.kind) {
     case "read":
       return {
@@ -102,7 +109,7 @@ function messageBlockFromToolPreview(
         displayText: preview.displayText,
         resultPreview: preview.resultPreview,
         status,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
       };
     case "search":
       return {
@@ -114,7 +121,7 @@ function messageBlockFromToolPreview(
         displayText: preview.displayText,
         resultPreview: preview.resultPreview,
         status,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
       };
     case "grep":
       return {
@@ -126,7 +133,7 @@ function messageBlockFromToolPreview(
         displayText: preview.displayText,
         resultPreview: preview.resultPreview,
         status,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
       };
     case "glob":
       return {
@@ -138,7 +145,7 @@ function messageBlockFromToolPreview(
         displayText: preview.displayText,
         resultPreview: preview.resultPreview,
         status,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
       };
     case "web_search":
       return {
@@ -162,7 +169,7 @@ function messageBlockFromToolPreview(
         displayText: preview.displayText,
         status,
         createdAt: getDisplayTime(timestamp),
-        isError
+        isError,
       };
     case "image_generation":
       return {
@@ -189,7 +196,7 @@ function messageBlockFromToolPreview(
         displayText: preview.displayText,
         resultPreview: preview.resultPreview,
         status,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
       };
     case "edit_diff":
       return {
@@ -202,11 +209,11 @@ function messageBlockFromToolPreview(
         deletions: preview.deletions,
         diff: preview.diff,
         collapsedLines: preview.collapsedLines,
-      generationProgress: preview.generationProgress,
+        generationProgress: preview.generationProgress,
         status: preview.status ?? (isError ? "failed" : undefined),
         approvalRequestId: preview.approvalRequestId,
         errorMessage: preview.errorMessage,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
       };
     case "write":
       return {
@@ -219,12 +226,12 @@ function messageBlockFromToolPreview(
         deletions: preview.deletions,
         diff: preview.diff,
         collapsedLines: preview.collapsedLines,
-      generationProgress: preview.generationProgress,
+        generationProgress: preview.generationProgress,
         status: preview.status ?? (isError ? "failed" : undefined),
         approvalRequestId: preview.approvalRequestId,
         errorMessage: preview.errorMessage,
         streamingContent: preview.streamingContent,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
       };
     case "present":
       return {
@@ -234,7 +241,7 @@ function messageBlockFromToolPreview(
         displayText: preview.displayText,
         status: preview.status ?? (isError ? "failed" : "completed"),
         isError,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
       };
     case "delete": {
       const status = preview.status ?? (isError ? "failed" : "completed");
@@ -248,7 +255,7 @@ function messageBlockFromToolPreview(
         status,
         isError,
         approvalRequestId: preview.approvalRequestId,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
       };
     }
     case "bash":
@@ -273,7 +280,7 @@ function messageBlockFromToolPreview(
         outputFilePath: preview.outputFilePath,
         sandboxed: preview.sandboxed,
         notExecuted: preview.notExecuted,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
       };
     case "agent":
       return {
@@ -296,7 +303,7 @@ function messageBlockFromToolPreview(
         stats: preview.stats,
         error: preview.error,
         display: preview.display,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
       };
     case "todo":
       return {
@@ -320,13 +327,13 @@ function messageBlockFromToolPreview(
         artifacts: preview.artifacts,
         ...(preview.subagentLink ? { subagentLink: preview.subagentLink } : {}),
         createdAt: getDisplayTime(timestamp),
-        isError
+        isError,
       };
   }
 }
 
 function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
-  const payload = isRecord(event.payload) ? event.payload as ContextCompactionPayload : null;
+  const payload = isRecord(event.payload) ? (event.payload as ContextCompactionPayload) : null;
   if (
     !payload ||
     typeof payload.triggerTokens !== "number" ||
@@ -340,13 +347,15 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
   const status = payload.status ?? "compacted";
   if (status === "skipped") return [];
   if (status === "failed") {
-    return [{
-      kind: "context_compaction",
-      id: event.id,
-      status: "failed",
-      ...(payload.reason ? { errorMessage: payload.reason } : {}),
-      createdAt: getDisplayTime(event.timestamp),
-    }];
+    return [
+      {
+        kind: "context_compaction",
+        id: event.id,
+        status: "failed",
+        ...(payload.reason ? { errorMessage: payload.reason } : {}),
+        createdAt: getDisplayTime(event.timestamp),
+      },
+    ];
   }
 
   return [
@@ -362,12 +371,12 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
       ...(typeof payload.afterTokens === "number" ? { afterTokens: payload.afterTokens } : {}),
       ...(payload.beforeEstimated === true ? { beforeEstimated: true as const } : {}),
       createdAt: getDisplayTime(event.timestamp),
-    }
+    },
   ];
 }
 
 function workspacePreparationBlock(event: SessionEvent): MessageBlock[] {
-  const payload = isRecord(event.payload) ? event.payload as WorkspacePreparationPayload : null;
+  const payload = isRecord(event.payload) ? (event.payload as WorkspacePreparationPayload) : null;
   if (
     payload?.kind !== "worktree" ||
     payload.status !== "completed" ||
@@ -380,23 +389,36 @@ function workspacePreparationBlock(event: SessionEvent): MessageBlock[] {
     return [];
   }
 
-  return [{
-    kind: "workspace_preparation",
-    id: event.id,
-    status: "completed",
-    sourceWorkspaceRoot: payload.sourceWorkspaceRoot,
-    workspaceRoot: payload.workspaceRoot,
-    baseBranch: payload.baseBranch,
-    branch: payload.branch,
-    baseCommit: payload.baseCommit,
-    durationMs: payload.durationMs,
-    environmentSetup: payload.environmentSetup,
-    createdAt: getDisplayTime(event.timestamp),
-  }];
+  return [
+    {
+      kind: "workspace_preparation",
+      id: event.id,
+      status: "completed",
+      sourceWorkspaceRoot: payload.sourceWorkspaceRoot,
+      workspaceRoot: payload.workspaceRoot,
+      baseBranch: payload.baseBranch,
+      branch: payload.branch,
+      baseCommit: payload.baseCommit,
+      durationMs: payload.durationMs,
+      environmentSetup: payload.environmentSetup,
+      createdAt: getDisplayTime(event.timestamp),
+    },
+  ];
 }
 
 function emptyTurnUsage(): TurnUsageSummary {
-  return { totalTokens: 0, inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, reasoningTokens: 0, routes: [], costUsd: 0, unpricedRequestCount: 0, costEstimated: false };
+  return {
+    totalTokens: 0,
+    inputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    routes: [],
+    costUsd: 0,
+    unpricedRequestCount: 0,
+    costEstimated: false,
+  };
 }
 
 function tokenCount(value: unknown): number {
@@ -405,7 +427,7 @@ function tokenCount(value: unknown): number {
 
 /** 「提供方/模型」；投影拿不到时是 "default"，不展示。 */
 function usageRoute(provider: unknown, model: unknown): string | null {
-  const known = (value: unknown) => typeof value === "string" && value !== "" && value !== "default" ? value : null;
+  const known = (value: unknown) => (typeof value === "string" && value !== "" && value !== "default" ? value : null);
   const modelName = known(model);
   if (!modelName) return null;
   const providerName = known(provider);
@@ -479,7 +501,18 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
         // 收件箱通知（后台 Bash、子智能体完成、子智能体来信）渲染成一行分隔行：开启空闲唤醒那一轮的放在轮首，轮内读到的留在原位。
         if (payload.source && (INBOX_WAKE_SOURCES as readonly string[]).includes(payload.source)) {
           const notice = payload.backgroundNotice;
-          return notice ? [{ kind: "background_notice", id: event.id, renderKey: nextRenderKey(event, "background-notice"), content: payload.content, createdAt: getDisplayTime(event.timestamp), ...notice }] : [];
+          return notice
+            ? [
+                {
+                  kind: "background_notice",
+                  id: event.id,
+                  renderKey: nextRenderKey(event, "background-notice"),
+                  content: payload.content,
+                  createdAt: getDisplayTime(event.timestamp),
+                  ...notice,
+                },
+              ]
+            : [];
         }
         return [
           {
@@ -490,16 +523,15 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
             createdAt: getDisplayTime(event.timestamp),
             attachments: payload.attachments,
             ...(payload.fileReferences?.length ? { fileReferences: payload.fileReferences } : {}),
-            ...(payload.responseAnnotations?.length ? { responseAnnotations: payload.responseAnnotations } : {})
-          }
+            ...(payload.responseAnnotations?.length ? { responseAnnotations: payload.responseAnnotations } : {}),
+          },
         ];
       }
       case "assistant_message":
       case "assistant_reply": {
         const payload = event.payload as AssistantMessagePayload;
-        const usage = lastAssistantEventIdByTurn.get(event.agentRunId) === event.id
-          ? usageByTurn.get(event.agentRunId)
-          : undefined;
+        const usage =
+          lastAssistantEventIdByTurn.get(event.agentRunId) === event.id ? usageByTurn.get(event.agentRunId) : undefined;
         return [
           {
             kind: "assistant",
@@ -510,7 +542,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
             model: payload.model,
             provider: payload.provider,
             ...(usage ? { usage } : {}),
-          }
+          },
         ];
       }
       case "thinking": {
@@ -525,8 +557,8 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
             title: payload.title ?? "Thinking",
             content: payload.content,
             createdAt: getDisplayTime(event.timestamp),
-            collapsedByDefault: payload.collapsedByDefault ?? true
-          }
+            collapsedByDefault: payload.collapsedByDefault ?? true,
+          },
         ];
       }
       case "tool_result": {
@@ -539,22 +571,27 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
         if (preview.kind === "todo" && latestTodoEventIdByRun.get(event.agentRunId) !== event.id) {
           return [];
         }
-        const renderKey = preview.kind === "todo"
-          ? `turn:${event.agentRunId}:todo`
-          : nextRenderKey(event, "tool", getOptionalString(payload, "toolCallId"));
+        const renderKey =
+          preview.kind === "todo"
+            ? `turn:${event.agentRunId}:todo`
+            : nextRenderKey(event, "tool", getOptionalString(payload, "toolCallId"));
 
-        return [withRenderKey(
-          messageBlockFromToolPreview(event.id, event.timestamp, preview, payload.ok === false, payload.status),
-          renderKey,
-        )];
+        return [
+          withRenderKey(
+            messageBlockFromToolPreview(event.id, event.timestamp, preview, payload.ok === false, payload.status),
+            renderKey,
+          ),
+        ];
       }
       case "diff_preview": {
         const preview = event.payload;
         if (!isToolUiPreview(preview)) return [];
-        return [withRenderKey(
-          messageBlockFromToolPreview(event.id, event.timestamp, preview),
-          nextRenderKey(event, "tool-preview"),
-        )];
+        return [
+          withRenderKey(
+            messageBlockFromToolPreview(event.id, event.timestamp, preview),
+            nextRenderKey(event, "tool-preview"),
+          ),
+        ];
       }
       case "error": {
         const payload = event.payload as ErrorPayload;
@@ -566,8 +603,8 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
             title: payload.code,
             content: payload.message,
             createdAt: getDisplayTime(event.timestamp),
-            recoverable: payload.recoverable
-          }
+            recoverable: payload.recoverable,
+          },
         ];
       }
       case "agent_run_aborted":
@@ -609,7 +646,12 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
 }
 
 function withIdentity(block: MessageBlock, event: SessionEvent): MessageBlock {
-  return { ...block, runId: event.agentRunId, ...(event.turnId === undefined ? {} : { turnId: event.turnId }), ...(event.sourceSeq === undefined ? {} : { sourceSeq: event.sourceSeq }) };
+  return {
+    ...block,
+    runId: event.agentRunId,
+    ...(event.turnId === undefined ? {} : { turnId: event.turnId }),
+    ...(event.sourceSeq === undefined ? {} : { sourceSeq: event.sourceSeq }),
+  };
 }
 
 export function getLatestContextSnapshot(events: SessionEvent[]): ContextUsageSnapshot | null {
@@ -632,9 +674,7 @@ export function createSessionDiffSummary(sessionId: SessionId, events: SessionEv
     }
 
     const preview: unknown =
-      event.type === "tool_result"
-        ? (event.payload as { uiPreview?: unknown }).uiPreview
-        : event.payload;
+      event.type === "tool_result" ? (event.payload as { uiPreview?: unknown }).uiPreview : event.payload;
 
     if (!isToolUiPreview(preview) || (preview.kind !== "edit_diff" && preview.kind !== "write")) {
       continue;
@@ -659,7 +699,7 @@ export function createSessionDiffSummary(sessionId: SessionId, events: SessionEv
       additions: preview.additions,
       deletions: preview.deletions,
       diff: preview.diff,
-      sourceEventIds: [event.id]
+      sourceEventIds: [event.id],
     });
   }
 
@@ -669,6 +709,6 @@ export function createSessionDiffSummary(sessionId: SessionId, events: SessionEv
     sessionId,
     files: fileList,
     totalAdditions: fileList.reduce((total, file) => total + file.additions, 0),
-    totalDeletions: fileList.reduce((total, file) => total + file.deletions, 0)
+    totalDeletions: fileList.reduce((total, file) => total + file.deletions, 0),
   };
 }

@@ -31,19 +31,27 @@ function toSnapshot(usage: ContextUsage): ContextUsageSnapshot {
 function CoordStatusRow({ dirs, snapshot }: { dirs: string[]; snapshot: ContextUsageSnapshot | null }) {
   const display = contextUsageDisplay(snapshot);
   return (
-    <div className={`flex min-h-5 items-center justify-between gap-3 px-3 text-act-sm leading-5 text-text-faint`} aria-label="协调 Agent 的范围">
+    <div
+      className={`flex min-h-5 items-center justify-between gap-3 px-3 text-act-sm leading-5 text-text-faint`}
+      aria-label="协调 Agent 的范围"
+    >
       <div className="flex min-w-0 items-center gap-1.5">
         <span className="inline-flex min-w-0 items-center gap-1.5" title={dirs.join(", ")}>
           <Folder className="shrink-0 text-text-subtle" size={14} aria-hidden="true" />
           <span className="truncate">{dirs.join(", ")}</span>
         </span>
-        <span className="shrink-0 opacity-60" aria-hidden="true">·</span>
+        <span className="shrink-0 opacity-60" aria-hidden="true">
+          ·
+        </span>
         <span className="inline-flex shrink-0 items-center gap-1.5">
           <Eye className="shrink-0 text-text-subtle" size={14} aria-hidden="true" />
           <span>只读，交事给 Actor</span>
         </span>
       </div>
-      <span className="inline-flex shrink-0 items-center gap-1.5 text-text-muted" title={`上下文已用 ${display.percentLabel}`}>
+      <span
+        className="inline-flex shrink-0 items-center gap-1.5 text-text-muted"
+        title={`上下文已用 ${display.percentLabel}`}
+      >
         <span
           className="h-[15px] w-[15px] shrink-0 rounded-full"
           aria-hidden="true"
@@ -79,13 +87,14 @@ export function SpaceComposer() {
     placeholder = `对${nameOf(state.actors, actorId)}说…`;
   }
 
-  const executionContext: ComposerExecutionContext | undefined = scope && !scope.coord
-    ? {
-        gitContext: { status: "ready", workspaceRoot: scope.dir, currentBranch: scope.branch, branches: [] },
-        selectedBranch: scope.branch,
-        runLocation: scope.tree ? "worktree" : "this_mac",
-      }
-    : undefined;
+  const executionContext: ComposerExecutionContext | undefined =
+    scope && !scope.coord
+      ? {
+          gitContext: { status: "ready", workspaceRoot: scope.dir, currentBranch: scope.branch, branches: [] },
+          selectedBranch: scope.branch,
+          runLocation: scope.tree ? "worktree" : "this_mac",
+        }
+      : undefined;
 
   const snapshot = usage ? toSnapshot(usage) : null;
   return (
@@ -100,12 +109,14 @@ export function SpaceComposer() {
       writeDraft={writeDraft}
       executionContext={executionContext}
       onExpandContext={coord ? undefined : () => actions.openPanelTab("context")}
-      permissionControl={coord ? undefined : (
-        <span className="inline-flex items-center gap-1.5 text-text-muted" title="权限：自动">
-          <ShieldCheck className="shrink-0 text-text-subtle" size={14} aria-hidden="true" />
-          <span>自动</span>
-        </span>
-      )}
+      permissionControl={
+        coord ? undefined : (
+          <span className="inline-flex items-center gap-1.5 text-text-muted" title="权限：自动">
+            <ShieldCheck className="shrink-0 text-text-subtle" size={14} aria-hidden="true" />
+            <span>自动</span>
+          </span>
+        )
+      }
     />
   );
 }

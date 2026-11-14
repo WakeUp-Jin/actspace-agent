@@ -15,7 +15,10 @@ export type MdastNode = {
   value?: string;
   children?: MdastNode[];
   data?: object;
-  position?: { start: { line: number; column: number; offset?: number }; end: { line: number; column: number; offset?: number } };
+  position?: {
+    start: { line: number; column: number; offset?: number };
+    end: { line: number; column: number; offset?: number };
+  };
 };
 
 /** 元素的 className（数组或字符串都见过）统一成字符串数组。 */

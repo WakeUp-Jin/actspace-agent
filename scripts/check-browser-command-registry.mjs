@@ -9,14 +9,8 @@ import path from "node:path";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cliDir = path.join(repoRoot, "browser-bridge/apps/cli");
-const generatedPath = path.join(
-  repoRoot,
-  "packages/browser/tool-browser/src/generated-actions.ts",
-);
-const commandSurfacePath = path.join(
-  repoRoot,
-  "docs/design-docs/browser/agent-browser-use-command-surface.md",
-);
+const generatedPath = path.join(repoRoot, "packages/browser/tool-browser/src/generated-actions.ts");
+const commandSurfacePath = path.join(repoRoot, "docs/design-docs/browser/agent-browser-use-command-surface.md");
 
 const raw = execFileSync("go", ["run", ".", "commands", "--json"], {
   cwd: cliDir,
@@ -108,9 +102,7 @@ const generatedMetadata = report.commands.map((command) => ({
 const actionsByCategory = Object.fromEntries(
   Object.keys(expectedCounts).map((category) => [
     category,
-    generatedMetadata
-      .filter((command) => command.category === category)
-      .map((command) => command.action),
+    generatedMetadata.filter((command) => command.category === category).map((command) => command.action),
   ]),
 );
 const legacyAliases = Object.fromEntries(

@@ -28,7 +28,9 @@ const processors = new WeakMap<BlockPipeline, FrozenProcessor>();
 let created = 0;
 
 /** 测试用：一共建过几个处理器。 */
-export function processorCreations(): number { return created; }
+export function processorCreations(): number {
+  return created;
+}
 
 function processorFor(pipeline: BlockPipeline): FrozenProcessor {
   let processor = processors.get(pipeline);
@@ -55,7 +57,15 @@ export function renderMarkdown(source: string, pipeline: BlockPipeline, componen
   const tree = processor.runSync(processor.parse(file), file);
   visit(tree, transform as never);
   // react-markdown 的 Components 与 hast-util-to-jsx-runtime 的同形，只是写法不同（它内部也这样直接传过去）。
-  return toJsxRuntime(tree, { Fragment, components: components as Partial<JsxComponents>, ignoreInvalidStyle: true, jsx, jsxs, passKeys: true, passNode: true }) as ReactElement;
+  return toJsxRuntime(tree, {
+    Fragment,
+    components: components as Partial<JsxComponents>,
+    ignoreInvalidStyle: true,
+    jsx,
+    jsxs,
+    passKeys: true,
+    passNode: true,
+  }) as ReactElement;
 }
 
 function transform(node: HastNode, index: number | undefined, parent: HastNode | undefined): number | undefined {
@@ -68,7 +78,8 @@ function transform(node: HastNode, index: number | undefined, parent: HastNode |
     for (const key in urlAttributes) {
       if (Object.hasOwn(urlAttributes, key) && Object.hasOwn(properties, key)) {
         const test = urlAttributes[key];
-        if (test === null || test.includes(node.tagName!)) properties[key] = defaultUrlTransform(String(properties[key] || ""));
+        if (test === null || test.includes(node.tagName!))
+          properties[key] = defaultUrlTransform(String(properties[key] || ""));
       }
     }
   }

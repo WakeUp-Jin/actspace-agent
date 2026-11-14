@@ -10,20 +10,32 @@ const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const CACHE_DIR = join(root, ".cache", "sandbox", "nono");
 
 /** `<process.platform>-<process.arch>`, the key used in nono-version.json and dist/sandbox-components. */
-export function nonoTarget(platform = process.platform, arch = process.arch) { return `${platform}-${arch}`; }
+export function nonoTarget(platform = process.platform, arch = process.arch) {
+  return `${platform}-${arch}`;
+}
 
 /** The pinned release is imported as a module, so the download URL never derives from a file read at runtime. */
 export async function readNonoVersion(config = pinned) {
-  if (typeof config.version !== "string" || typeof config.releaseUrl !== "string" || !config.assets || typeof config.assets !== "object") {
+  if (
+    typeof config.version !== "string" ||
+    typeof config.releaseUrl !== "string" ||
+    !config.assets ||
+    typeof config.assets !== "object"
+  ) {
     throw new Error("nono-version.json is invalid.");
   }
   for (const [target, asset] of Object.entries(config.assets)) {
-    if (typeof asset?.file !== "string" || asset.file.includes("/") || !/^[a-f0-9]{64}$/.test(asset?.sha256 ?? "")) throw new Error(`nono-version.json has an invalid asset for ${target}.`);
+    if (typeof asset?.file !== "string" || asset.file.includes("/") || !/^[a-f0-9]{64}$/.test(asset?.sha256 ?? ""))
+      throw new Error(`nono-version.json has an invalid asset for ${target}.`);
   }
   return config;
 }
 
-export async function sha256(file) { return createHash("sha256").update(await readFile(file)).digest("hex"); }
+export async function sha256(file) {
+  return createHash("sha256")
+    .update(await readFile(file))
+    .digest("hex");
+}
 
 /**
  * Installs the pinned nono for `target` at `out`. The archive is cached by file name and re-verified on every use;
@@ -33,7 +45,7 @@ export async function fetchNono({ target, out, config, cacheDir = CACHE_DIR, dow
   const asset = config.assets[target];
   if (!asset) throw new Error(`No pinned nono build for ${target}.`);
   const archive = join(cacheDir, asset.file);
-  if (await sha256(archive).catch(() => null) !== asset.sha256) {
+  if ((await sha256(archive).catch(() => null)) !== asset.sha256) {
     await rm(archive, { force: true });
     await mkdir(cacheDir, { recursive: true });
     const partial = `${archive}.partial`;
@@ -52,12 +64,16 @@ export async function fetchNono({ target, out, config, cacheDir = CACHE_DIR, dow
     await mkdir(dirname(out), { recursive: true });
     await copyFile(join(work, "nono"), out);
     await chmod(out, 0o755);
-  } finally { await rm(work, { recursive: true, force: true }); }
+  } finally {
+    await rm(work, { recursive: true, force: true });
+  }
   return { target, out, version: config.version };
 }
 
 /** curl honours https_proxy, which Node's fetch does not. */
-function curlDownload(url, file) { execFileSync("curl", ["-fsSL", "--retry", "3", "-o", file, url], { stdio: "inherit" }); }
+function curlDownload(url, file) {
+  execFileSync("curl", ["-fsSL", "--retry", "3", "-o", file, url], { stdio: "inherit" });
+}
 
 export function parseArgs(argv) {
   const options = { all: false, target: undefined, out: undefined };
@@ -70,7 +86,8 @@ export function parseArgs(argv) {
       options[arg.slice(2)] = value;
     } else throw new Error(`Unknown argument: ${arg}`);
   }
-  if (options.all && (options.target || options.out)) throw new Error("--all cannot be combined with --target or --out.");
+  if (options.all && (options.target || options.out))
+    throw new Error("--all cannot be combined with --target or --out.");
   return options;
 }
 

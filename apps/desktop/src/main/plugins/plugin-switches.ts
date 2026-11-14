@@ -4,18 +4,37 @@
  * after a restart.
  */
 import type { PluginCatalogEntry } from "@actspace/runtime";
-import { DEFAULT_EXTERNAL_SUBAGENT_SETTINGS, sanitizeExternalSubagentSettings, type ExternalSubagentSettings } from "@actspace/shared";
+import {
+  DEFAULT_EXTERNAL_SUBAGENT_SETTINGS,
+  sanitizeExternalSubagentSettings,
+  type ExternalSubagentSettings,
+} from "@actspace/shared";
 
-export type PluginSwitchCatalogEntry = Pick<PluginCatalogEntry, "id" | "loaders"> & { readonly manifest: { readonly display?: Pick<NonNullable<PluginCatalogEntry["manifest"]["display"]>, "defaultEnabled" | "canDisable"> } };
-export type PluginSwitchSettings = { readonly tools: { readonly plugins?: Readonly<Record<string, boolean>>; readonly externalSubagents?: ExternalSubagentSettings } };
+export type PluginSwitchCatalogEntry = Pick<PluginCatalogEntry, "id" | "loaders"> & {
+  readonly manifest: {
+    readonly display?: Pick<NonNullable<PluginCatalogEntry["manifest"]["display"]>, "defaultEnabled" | "canDisable">;
+  };
+};
+export type PluginSwitchSettings = {
+  readonly tools: {
+    readonly plugins?: Readonly<Record<string, boolean>>;
+    readonly externalSubagents?: ExternalSubagentSettings;
+  };
+};
 
 /** Plugin Entry id -> on/off. Plugins that cannot be disabled are always on and ignore the setting. */
-export function resolvePluginSwitches(settings: PluginSwitchSettings, catalog: readonly PluginSwitchCatalogEntry[]): ReadonlyMap<string, boolean> {
+export function resolvePluginSwitches(
+  settings: PluginSwitchSettings,
+  catalog: readonly PluginSwitchCatalogEntry[],
+): ReadonlyMap<string, boolean> {
   const switches = new Map<string, boolean>();
   for (const entry of catalog) {
     if (switches.has(entry.id)) continue;
     const display = entry.manifest.display;
-    switches.set(entry.id, display?.canDisable === true ? settings.tools.plugins?.[entry.id] ?? display.defaultEnabled : true);
+    switches.set(
+      entry.id,
+      display?.canDisable === true ? (settings.tools.plugins?.[entry.id] ?? display.defaultEnabled) : true,
+    );
   }
   return switches;
 }
@@ -45,7 +64,8 @@ export function resolvePluginSettings(settings: PluginSwitchSettings): PluginSet
       sandbox: stored?.codex?.sandbox ?? DEFAULT_EXTERNAL_SUBAGENT_SETTINGS.codex.sandbox,
     }),
     [CLAUDE_CODE_PLUGIN_ID]: Object.freeze({
-      permissionMode: stored?.claudeCode?.permissionMode ?? DEFAULT_EXTERNAL_SUBAGENT_SETTINGS.claudeCode.permissionMode,
+      permissionMode:
+        stored?.claudeCode?.permissionMode ?? DEFAULT_EXTERNAL_SUBAGENT_SETTINGS.claudeCode.permissionMode,
     }),
   });
 }

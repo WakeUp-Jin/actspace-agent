@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, LocalUpdateState, SessionListItem, SettingsV4Snapshot, SettingsV4UpdateInput } from "@actspace/shared";
+import type {
+  AppSettings,
+  LocalUpdateState,
+  SessionListItem,
+  SettingsV4Snapshot,
+  SettingsV4UpdateInput,
+} from "@actspace/shared";
 import { SettingsPage } from "../components/settings/SettingsPage";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/Dialog";
@@ -35,7 +41,6 @@ function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
     agent: over.agent ? { ...base.agent, ...over.agent } : base.agent,
   };
 }
-
 
 function makeLocalUpdateState(over: Partial<LocalUpdateState> = {}): LocalUpdateState {
   return {
@@ -78,20 +83,47 @@ function stubToolsV4(tools: Partial<SettingsV4Snapshot["settings"]["tools"]> = {
         personalization: { displayName: "", responseStyle: "" },
         agentInstructions: { systemPromptPath: "/tmp/main-agent.md" },
         taskDefaults: { temperature: null, maxOutputTokens: null, chatCompactionTriggerRatio: 0.8 },
-        shortcuts: { quickOpen: { enabled: true, accelerator: "CommandOrControl+Shift+Space", target: { kind: "automatic" as const } } },
+        shortcuts: {
+          quickOpen: {
+            enabled: true,
+            accelerator: "CommandOrControl+Shift+Space",
+            target: { kind: "automatic" as const },
+          },
+        },
       },
-      models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, subagentDefaultModel: null } },
+      models: {
+        connections: {},
+        definitions: {},
+        installed: {},
+        taskBindings: { defaultChat: null, utility: null, subagentDefaultModel: null },
+      },
       tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {}, ...tools },
-      media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" }, imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" as const } },
+      media: {
+        imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" },
+        imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" as const },
+      },
       skills: { disabled: [] },
       subagents: { routes: {} },
-      activity: { usage: { range: "30d" as const, activeTab: "requests" as const, tokenView: "type" as const, timeView: "phase" as const, trendMetric: "tokens" as const, heatMetric: "sessions" as const } },
+      activity: {
+        usage: {
+          range: "30d" as const,
+          activeTab: "requests" as const,
+          tokenView: "type" as const,
+          timeView: "phase" as const,
+          trendMetric: "tokens" as const,
+          heatMetric: "sessions" as const,
+        },
+      },
     },
   } as SettingsV4Snapshot;
   let current = snapshot;
   const updateSettingsV4 = vi.fn(async (input?: SettingsV4UpdateInput) => {
     const patch = input?.namespace === "tools" ? input.patch : {};
-    current = { ...current, revision: `${current.revision}+`, settings: { ...current.settings, tools: { ...current.settings.tools, ...patch } } };
+    current = {
+      ...current,
+      revision: `${current.revision}+`,
+      settings: { ...current.settings, tools: { ...current.settings.tools, ...patch } },
+    };
     return { ok: true as const, snapshot: current };
   });
   overrideBridge({ "settings.getV4": vi.fn(async () => current), "settings.updateV4": updateSettingsV4 });
@@ -164,7 +196,10 @@ describe("SettingsPage", () => {
   const listUsableModels = vi.fn(async () => ({ models: [] }));
   const updateImageGeneration = vi.fn(async () => ({ ok: true as const }));
   const getLocalUpdateState = vi.fn(async () => makeLocalUpdateState());
-  const selectLocalUpdateSource = vi.fn(async () => ({ canceled: false, state: makeLocalUpdateState({ sourceRoot: "/repo/new" }) }));
+  const selectLocalUpdateSource = vi.fn(async () => ({
+    canceled: false,
+    state: makeLocalUpdateState({ sourceRoot: "/repo/new" }),
+  }));
   const startLocalUpdate = vi.fn(async () => ({
     ok: true,
     state: makeLocalUpdateState({
@@ -259,7 +294,11 @@ describe("SettingsPage", () => {
       "appearance.setUiZoom": setUiZoom,
       "appearance.setNativeTheme": setNativeTheme,
       // 浏览器工具组与语音设置跟随插件是否已加载。
-      "plugins.list": async () => extensionPlugins({ "browser-tools": { loaded: true, enabled: true }, "english-learning": { loaded: true, enabled: true } }),
+      "plugins.list": async () =>
+        extensionPlugins({
+          "browser-tools": { loaded: true, enabled: true },
+          "english-learning": { loaded: true, enabled: true },
+        }),
     });
   });
 
@@ -289,7 +328,9 @@ describe("SettingsPage", () => {
     await userEvent.click(await screen.findByRole("button", { name: "通用" }));
     const toggle = await screen.findByRole("switch", { name: "启用快速唤起" });
     expect(toggle).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByRole("button", { name: "录制快速唤起快捷键" })).toHaveTextContent("CommandOrControl+Shift+Space");
+    expect(screen.getByRole("button", { name: "录制快速唤起快捷键" })).toHaveTextContent(
+      "CommandOrControl+Shift+Space",
+    );
 
     await userEvent.click(toggle);
 
@@ -314,16 +355,33 @@ describe("SettingsPage", () => {
             },
           },
         },
-        models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, subagentDefaultModel: null } },
+        models: {
+          connections: {},
+          definitions: {},
+          installed: {},
+          taskBindings: { defaultChat: null, utility: null, subagentDefaultModel: null },
+        },
         tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {} },
         media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" } },
         skills: { disabled: [] },
         subagents: { routes: {} },
-        activity: { usage: { range: "30d", activeTab: "requests", tokenView: "type", timeView: "phase", trendMetric: "tokens", heatMetric: "sessions" } },
+        activity: {
+          usage: {
+            range: "30d",
+            activeTab: "requests",
+            tokenView: "type",
+            timeView: "phase",
+            trendMetric: "tokens",
+            heatMetric: "sessions",
+          },
+        },
       },
     };
     const getSettingsV4 = vi.fn(async () => snapshot);
-    const updateSettingsV4 = vi.fn(async () => ({ ok: true as const, snapshot: { ...snapshot, revision: "revision-2" } }));
+    const updateSettingsV4 = vi.fn(async () => ({
+      ok: true as const,
+      snapshot: { ...snapshot, revision: "revision-2" },
+    }));
     overrideBridge({ "settings.getV4": getSettingsV4 });
     overrideBridge({ "settings.updateV4": updateSettingsV4 });
 
@@ -353,17 +411,43 @@ describe("SettingsPage", () => {
           personalization: { displayName: "", responseStyle: "" },
           agentInstructions: { systemPromptPath: "/tmp/main-agent.md" },
           taskDefaults: { temperature: null, maxOutputTokens: null, chatCompactionTriggerRatio: 0.8 },
-          shortcuts: { quickOpen: { enabled: true, accelerator: "CommandOrControl+Shift+Space", target: { kind: "automatic" as const } } },
+          shortcuts: {
+            quickOpen: {
+              enabled: true,
+              accelerator: "CommandOrControl+Shift+Space",
+              target: { kind: "automatic" as const },
+            },
+          },
         },
-        models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, subagentDefaultModel: null } },
+        models: {
+          connections: {},
+          definitions: {},
+          installed: {},
+          taskBindings: { defaultChat: null, utility: null, subagentDefaultModel: null },
+        },
         tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {} },
-        media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" }, imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" as const } },
+        media: {
+          imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" },
+          imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" as const },
+        },
         skills: { disabled: [] },
         subagents: { routes: {} },
-        activity: { usage: { range: "30d" as const, activeTab: "requests" as const, tokenView: "type" as const, timeView: "phase" as const, trendMetric: "tokens" as const, heatMetric: "sessions" as const } },
+        activity: {
+          usage: {
+            range: "30d" as const,
+            activeTab: "requests" as const,
+            tokenView: "type" as const,
+            timeView: "phase" as const,
+            trendMetric: "tokens" as const,
+            heatMetric: "sessions" as const,
+          },
+        },
       },
     } as SettingsV4Snapshot;
-    const updateSettingsV4 = vi.fn(async () => ({ ok: true as const, snapshot: { ...snapshot, revision: "revision-2" } }));
+    const updateSettingsV4 = vi.fn(async () => ({
+      ok: true as const,
+      snapshot: { ...snapshot, revision: "revision-2" },
+    }));
     overrideBridge({ "settings.getV4": vi.fn(async () => snapshot) });
     overrideBridge({ "settings.updateV4": updateSettingsV4 });
 
@@ -404,7 +488,9 @@ describe("SettingsPage", () => {
     const toggle = await screen.findByRole("switch", { name: "执行前确认" });
     await userEvent.click(toggle);
     await waitFor(() => {
-      expect(updateSettingsV4).toHaveBeenCalledWith(expect.objectContaining({ namespace: "tools", patch: { bash: { alwaysAsk: true } } }));
+      expect(updateSettingsV4).toHaveBeenCalledWith(
+        expect.objectContaining({ namespace: "tools", patch: { bash: { alwaysAsk: true } } }),
+      );
     });
   });
 
@@ -417,9 +503,8 @@ describe("SettingsPage", () => {
   });
 
   it("本地更新分区可选择源码目录并启动更新", async () => {
-    getLocalUpdateState
-      .mockResolvedValueOnce(makeLocalUpdateState())
-      .mockResolvedValue(makeLocalUpdateState({
+    getLocalUpdateState.mockResolvedValueOnce(makeLocalUpdateState()).mockResolvedValue(
+      makeLocalUpdateState({
         running: true,
         canUpdate: false,
         progress: {
@@ -428,7 +513,8 @@ describe("SettingsPage", () => {
           startedAt: "2026-06-04T15:00:00.000Z",
           updatedAt: "2026-06-04T15:00:01.000Z",
         },
-      }));
+      }),
+    );
 
     renderSettingsPage();
     await screen.findByRole("heading", { name: "通用", level: 2 });
@@ -474,9 +560,8 @@ describe("SettingsPage", () => {
         },
       }),
     });
-    getLocalUpdateState
-      .mockResolvedValueOnce(makeLocalUpdateState())
-      .mockResolvedValueOnce(makeLocalUpdateState({
+    getLocalUpdateState.mockResolvedValueOnce(makeLocalUpdateState()).mockResolvedValueOnce(
+      makeLocalUpdateState({
         running: false,
         canUpdate: true,
         progress: {
@@ -486,7 +571,8 @@ describe("SettingsPage", () => {
           updatedAt: "2026-06-04T15:00:02.000Z",
           finishedAt: "2026-06-04T15:00:02.000Z",
         },
-      }));
+      }),
+    );
 
     renderSettingsPage();
     await screen.findByRole("heading", { name: "通用", level: 2 });
@@ -499,13 +585,15 @@ describe("SettingsPage", () => {
   });
 
   it("图片生成服务用摘要卡片打开配置弹窗，并把兼容地址收进高级设置", async () => {
-    getSettings.mockResolvedValueOnce(makeSettings({
-      imageGeneration: {
-        hasApiKey: false,
-        baseUrl: "https://www.duckcoding.ai/v1",
-        model: "gpt-image-2",
-      },
-    }));
+    getSettings.mockResolvedValueOnce(
+      makeSettings({
+        imageGeneration: {
+          hasApiKey: false,
+          baseUrl: "https://www.duckcoding.ai/v1",
+          model: "gpt-image-2",
+        },
+      }),
+    );
     renderSettingsPage();
     await screen.findByRole("heading", { name: "通用", level: 2 });
 
@@ -537,13 +625,15 @@ describe("SettingsPage", () => {
   });
 
   it("已配置的图片服务不回显 Key，并可从弹窗更换或断开", async () => {
-    getSettings.mockResolvedValueOnce(makeSettings({
-      imageGeneration: {
-        hasApiKey: true,
-        baseUrl: "https://www.duckcoding.ai/v1",
-        model: "gpt-image-2",
-      },
-    }));
+    getSettings.mockResolvedValueOnce(
+      makeSettings({
+        imageGeneration: {
+          hasApiKey: true,
+          baseUrl: "https://www.duckcoding.ai/v1",
+          model: "gpt-image-2",
+        },
+      }),
+    );
     renderSettingsPage();
     await screen.findByRole("heading", { name: "通用", level: 2 });
 
@@ -556,7 +646,10 @@ describe("SettingsPage", () => {
     expect(screen.queryByLabelText("图片生成服务 API Key")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "更换 Key" }));
-    expect(screen.getByLabelText("图片生成服务 API Key")).toHaveAttribute("placeholder", "输入新 Key；留空保持现有 Key");
+    expect(screen.getByLabelText("图片生成服务 API Key")).toHaveAttribute(
+      "placeholder",
+      "输入新 Key；留空保持现有 Key",
+    );
 
     await userEvent.click(screen.getByRole("button", { name: "断开服务" }));
     await waitFor(() => {
@@ -575,7 +668,9 @@ describe("SettingsPage", () => {
 
     await userEvent.click(readToggle);
     await waitFor(() => {
-      expect(updateSettingsV4).toHaveBeenCalledWith(expect.objectContaining({ namespace: "tools", patch: { disabledTools: ["read_file"] } }));
+      expect(updateSettingsV4).toHaveBeenCalledWith(
+        expect.objectContaining({ namespace: "tools", patch: { disabledTools: ["read_file"] } }),
+      );
     });
   });
 
@@ -594,7 +689,9 @@ describe("SettingsPage", () => {
 
     await userEvent.click(screen.getByRole("switch", { name: "浏览器" }));
     await waitFor(() => {
-      expect(updateSettingsV4).toHaveBeenCalledWith(expect.objectContaining({ namespace: "tools", patch: { disabledTools: ["browser"] } }));
+      expect(updateSettingsV4).toHaveBeenCalledWith(
+        expect.objectContaining({ namespace: "tools", patch: { disabledTools: ["browser"] } }),
+      );
     });
     expect(screen.getByRole("switch", { name: "截图与鼠标键盘操作" })).toBeDisabled();
   });
@@ -647,7 +744,12 @@ describe("SettingsPage", () => {
     await screen.findByRole("heading", { name: "通用", level: 2 });
     const main = screen.getByRole("main", { name: "设置内容" });
 
-    const assertHeadingContract = async (section: string, pageTitle: string, groupTitles: string[], level: 3 | 4 = 3) => {
+    const assertHeadingContract = async (
+      section: string,
+      pageTitle: string,
+      groupTitles: string[],
+      level: 3 | 4 = 3,
+    ) => {
       await userEvent.click(screen.getByRole("button", { name: section }));
       expect(main.querySelectorAll("h2")).toHaveLength(1);
       expect(main.querySelector("h2")).toHaveTextContent(pageTitle);

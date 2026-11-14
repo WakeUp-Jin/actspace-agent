@@ -19,7 +19,10 @@ function unclosedDepth(source: string): number {
  * previous 是上一次的合并结果：内容没变的合并块沿用旧对象，渲染层的 memo 才能跳过它。
  * 没有 `<details>` 时原样返回输入块（同一批对象）。
  */
-export function mergeHtmlBlocks(blocks: readonly MarkdownBlock[], previous: readonly MarkdownBlock[] = []): readonly MarkdownBlock[] {
+export function mergeHtmlBlocks(
+  blocks: readonly MarkdownBlock[],
+  previous: readonly MarkdownBlock[] = [],
+): readonly MarkdownBlock[] {
   const merged: MarkdownBlock[] = [];
   let changed = false;
   for (let i = 0; i < blocks.length; i += 1) {
@@ -36,7 +39,9 @@ export function mergeHtmlBlocks(blocks: readonly MarkdownBlock[], previous: read
       frozen = frozen && blocks[i].frozen;
     }
     const candidate: MarkdownBlock = { start: block.start, source, frozen };
-    const prior = previous.find((item) => item.start === candidate.start && item.source === source && item.frozen === frozen);
+    const prior = previous.find(
+      (item) => item.start === candidate.start && item.source === source && item.frozen === frozen,
+    );
     merged.push(prior ?? candidate);
     changed = true;
   }

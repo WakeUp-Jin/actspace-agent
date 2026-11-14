@@ -53,7 +53,9 @@ export type HarnessEvaluationOutcome = {
   readonly error?: string;
   readonly cleanup: "ok" | { readonly failed: string };
 };
-export type HarnessEvaluationResult = { readonly status: "unavailable"; readonly reasons: readonly string[] } | HarnessEvaluationOutcome;
+export type HarnessEvaluationResult =
+  | { readonly status: "unavailable"; readonly reasons: readonly string[] }
+  | HarnessEvaluationOutcome;
 export interface HarnessEvaluationService {
   status(): Promise<{ readonly available: boolean; readonly reasons: readonly string[] }>;
   run(request: HarnessEvaluationRequest, signal?: AbortSignal): Promise<HarnessEvaluationResult>;

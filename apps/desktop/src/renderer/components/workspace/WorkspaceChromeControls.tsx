@@ -62,12 +62,14 @@ type SourceItem = {
 };
 
 function slugifyBranchPart(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48) || "new-work";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "new-work"
+  );
 }
 
 function sourceIcon(kind: SourceItem["kind"]) {
@@ -125,7 +127,10 @@ export function WorkspaceChromeControls({
   const [dialog, setDialog] = useState<GitDialogState>(null);
   const environmentToggleRef = useRef<HTMLButtonElement>(null);
   // 附件来源从消息序列派生；只订阅这个小列表，流式输出时不随每帧重渲染。
-  const sources = useTranscriptSelect<SourceItem[]>(useCallback((messages: MessageBlock[]) => collectSources(workspaceRoot, messages), [workspaceRoot]), jsonEqual);
+  const sources = useTranscriptSelect<SourceItem[]>(
+    useCallback((messages: MessageBlock[]) => collectSources(workspaceRoot, messages), [workspaceRoot]),
+    jsonEqual,
+  );
 
   const loadEnvironment = async () => {
     const api = workspacesApi.getEnvironment;
@@ -155,15 +160,16 @@ export function WorkspaceChromeControls({
       return false;
     }
     if (result.ok) {
-      const message = result.action === "create_branch"
-        ? `已创建并切换到 ${result.branch}。`
-        : result.action === "switch_branch"
-          ? `已切换到 ${result.branch}。`
-        : result.action === "commit"
-          ? `已提交 ${result.commitHash ?? "工作区变更"}。`
-          : result.action === "commit_and_push"
-            ? `已提交 ${result.commitHash ?? "变更"}并推送。`
-            : `已推送 ${result.branch ?? "分支"}。`;
+      const message =
+        result.action === "create_branch"
+          ? `已创建并切换到 ${result.branch}。`
+          : result.action === "switch_branch"
+            ? `已切换到 ${result.branch}。`
+            : result.action === "commit"
+              ? `已提交 ${result.commitHash ?? "工作区变更"}。`
+              : result.action === "commit_and_push"
+                ? `已提交 ${result.commitHash ?? "变更"}并推送。`
+                : `已推送 ${result.branch ?? "分支"}。`;
       setEnvironmentOpen(true);
       setBranchMenuOpen(false);
       setFeedback({ tone: "success", message });
@@ -240,21 +246,40 @@ export function WorkspaceChromeControls({
           </TooltipTrigger>
           <TooltipContent>工作区环境</TooltipContent>
         </Tooltip>
-        <PopoverContent aria-label="工作区环境" align="end" sideOffset={8} radius="lg" className="w-[304px] overflow-hidden">
+        <PopoverContent
+          aria-label="工作区环境"
+          align="end"
+          sideOffset={8}
+          radius="lg"
+          className="w-[304px] overflow-hidden"
+        >
           <section className="p-2">
             <div className="flex items-center justify-between px-0.5 pb-1 text-act-xs font-medium text-text-faint">
               <span>工作区环境</span>
-              {loadingEnvironment ? <LoaderCircle size={13} className="animate-spin" aria-label="正在加载工作区环境" /> : null}
+              {loadingEnvironment ? (
+                <LoaderCircle size={13} className="animate-spin" aria-label="正在加载工作区环境" />
+              ) : null}
             </div>
-            <button type="button" className={ROW_CLASS} onClick={() => { onOpenReview(); setEnvironmentOpen(false); }}>
+            <button
+              type="button"
+              className={ROW_CLASS}
+              onClick={() => {
+                onOpenReview();
+                setEnvironmentOpen(false);
+              }}
+            >
               <GitCommitHorizontal size={15} aria-hidden="true" />
               <span className="min-w-0 flex-1">变更</span>
-              {reviewSummary?.status === "loading" ? <LoaderCircle size={13} className="animate-spin text-text-faint" aria-hidden="true" /> : hasChanges ? (
+              {reviewSummary?.status === "loading" ? (
+                <LoaderCircle size={13} className="animate-spin text-text-faint" aria-hidden="true" />
+              ) : hasChanges ? (
                 <span className="flex items-center gap-1 font-medium">
                   <span className="text-success">+{reviewSummary?.additions ?? 0}</span>
                   <span className="text-danger">-{reviewSummary?.deletions ?? 0}</span>
                 </span>
-              ) : <span className="text-act-xs text-text-faint">无变更</span>}
+              ) : (
+                <span className="text-act-xs text-text-faint">无变更</span>
+              )}
             </button>
             <div className={ROW_CLASS} title={environment?.workspaceRoot ?? workspaceRoot}>
               <Laptop size={15} aria-hidden="true" />
@@ -334,7 +359,9 @@ export function WorkspaceChromeControls({
             ) : null}
           </section>
           {feedback ? (
-            <div className={`border-t border-line px-3 py-2 text-act-xs leading-relaxed ${feedback.tone === "success" ? "text-success" : feedback.tone === "danger" ? "text-danger" : "text-text-muted"}`}>
+            <div
+              className={`border-t border-line px-3 py-2 text-act-xs leading-relaxed ${feedback.tone === "success" ? "text-success" : feedback.tone === "danger" ? "text-danger" : "text-text-muted"}`}
+            >
               {feedback.message}
             </div>
           ) : null}
@@ -370,7 +397,12 @@ export function WorkspaceChromeControls({
             setBusy(true);
             try {
               const result = await api({ workspaceRoot, ...input });
-              if (!result.ok && result.error === "remote_required" && result.remotes?.length && action === "commit_and_push") {
+              if (
+                !result.ok &&
+                result.error === "remote_required" &&
+                result.remotes?.length &&
+                action === "commit_and_push"
+              ) {
                 setDialog({ kind: "remote", action: "commit_and_push", input, remotes: result.remotes });
               } else {
                 await handleMutationResult(result);
@@ -382,9 +414,10 @@ export function WorkspaceChromeControls({
           onSelectRemote={async (remote, action, input) => {
             setBusy(true);
             try {
-              const result = action === "push"
-                ? await workspacesApi.push({ workspaceRoot, remote })
-                : await workspacesApi.commitAndPush({ workspaceRoot, ...(input ?? {}), remote });
+              const result =
+                action === "push"
+                  ? await workspacesApi.push({ workspaceRoot, remote })
+                  : await workspacesApi.commitAndPush({ workspaceRoot, ...(input ?? {}), remote });
               await handleMutationResult(result);
             } finally {
               setBusy(false);
@@ -416,7 +449,14 @@ function BranchMenu({
   }, [branches, query]);
 
   return (
-    <PopoverContent role="menu" aria-label="分支" side="left" align="start" radius="lg" className="flex w-[288px] flex-col overflow-hidden">
+    <PopoverContent
+      role="menu"
+      aria-label="分支"
+      side="left"
+      align="start"
+      radius="lg"
+      className="flex w-[288px] flex-col overflow-hidden"
+    >
       <div className="p-2">
         <label className="flex h-8 items-center gap-2 rounded-act-md border border-line bg-surface-subtle px-2.5 text-text-faint focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring/20">
           <Search size={13} aria-hidden="true" />
@@ -432,26 +472,28 @@ function BranchMenu({
       </div>
       <div className="px-2 pb-1 text-act-xs font-medium text-text-faint">分支</div>
       <div className="max-h-[240px] overflow-y-auto px-1.5 pb-1.5">
-        {filteredBranches.length ? filteredBranches.map((branch) => {
-          const occupied = Boolean(branch.checkedOutPath && !branch.current);
-          return (
-            <button
-              key={branch.name}
-              type="button"
-              role="menuitemradio"
-              aria-checked={branch.current}
-              className={MENU_ITEM_CLASS}
-              disabled={busy || occupied}
-              title={occupied ? `已检出到 ${branch.checkedOutPath}` : branch.name}
-              onClick={() => onSelect(branch.name)}
-            >
-              <GitBranch size={14} aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate">{branch.name}</span>
-              {occupied ? <span className="shrink-0 text-act-xxs text-text-faint">位于工作树</span> : null}
-              {branch.current ? <Check size={13} className="shrink-0 text-text-main" aria-hidden="true" /> : null}
-            </button>
-          );
-        }) : (
+        {filteredBranches.length ? (
+          filteredBranches.map((branch) => {
+            const occupied = Boolean(branch.checkedOutPath && !branch.current);
+            return (
+              <button
+                key={branch.name}
+                type="button"
+                role="menuitemradio"
+                aria-checked={branch.current}
+                className={MENU_ITEM_CLASS}
+                disabled={busy || occupied}
+                title={occupied ? `已检出到 ${branch.checkedOutPath}` : branch.name}
+                onClick={() => onSelect(branch.name)}
+              >
+                <GitBranch size={14} aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">{branch.name}</span>
+                {occupied ? <span className="shrink-0 text-act-xxs text-text-faint">位于工作树</span> : null}
+                {branch.current ? <Check size={13} className="shrink-0 text-text-main" aria-hidden="true" /> : null}
+              </button>
+            );
+          })
+        ) : (
           <div className="px-2.5 py-4 text-center text-act-xs text-text-faint">暂无分支</div>
         )}
       </div>
@@ -510,7 +552,12 @@ function GitActionDialog({
 
   return (
     // Git 操作进行中不能用 Esc 或点遮罩关闭，只能等它结束。
-    <Dialog open onOpenChange={(open) => { if (!open && !busy) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) onClose();
+      }}
+    >
       <DialogContent
         size="sm"
         className="overflow-hidden"
@@ -524,10 +571,21 @@ function GitActionDialog({
         }}
       >
         {state.kind === "branch" ? (
-          <form onSubmit={(event) => { event.preventDefault(); if (!busy && branchName.trim()) void onCreateBranch(branchName); }}>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!busy && branchName.trim()) void onCreateBranch(branchName);
+            }}
+          >
             <div className="flex items-center justify-between gap-4 px-5 pb-3 pt-5">
               <DialogTitle className="m-0 text-act-xl font-semibold text-text-main">创建并切换分支</DialogTitle>
-              <button type="button" className="grid h-8 w-8 shrink-0 place-items-center rounded-act-md text-text-faint hover:bg-hover-overlay hover:text-text-main" aria-label="关闭 Git 操作" disabled={busy} onClick={onClose}>
+              <button
+                type="button"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-act-md text-text-faint hover:bg-hover-overlay hover:text-text-main"
+                aria-label="关闭 Git 操作"
+                disabled={busy}
+                onClick={onClose}
+              >
                 <X size={15} aria-hidden="true" />
               </button>
             </div>
@@ -535,9 +593,21 @@ function GitActionDialog({
               <div className="grid gap-1.5 text-act-xs font-medium text-text-muted">
                 <div className="flex items-center justify-between">
                   分支名称
-                  <button type="button" className="border-0 bg-transparent text-act-xs text-text-faint hover:text-text-main" onClick={() => setShowPrefix((value) => !value)}>设置前缀</button>
+                  <button
+                    type="button"
+                    className="border-0 bg-transparent text-act-xs text-text-faint hover:text-text-main"
+                    onClick={() => setShowPrefix((value) => !value)}
+                  >
+                    设置前缀
+                  </button>
                 </div>
-                <input autoFocus aria-label="分支名称" className={INPUT_CLASS} value={branchName} onChange={(event) => setBranchName(event.target.value)} />
+                <input
+                  autoFocus
+                  aria-label="分支名称"
+                  className={INPUT_CLASS}
+                  value={branchName}
+                  onChange={(event) => setBranchName(event.target.value)}
+                />
               </div>
               {showPrefix ? (
                 <label className="grid gap-1.5 text-act-xs font-medium text-text-muted">
@@ -555,7 +625,9 @@ function GitActionDialog({
               ) : null}
             </div>
             <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
-              <Button variant="secondary" size="md" disabled={busy} onClick={onClose}>关闭</Button>
+              <Button variant="secondary" size="md" disabled={busy} onClick={onClose}>
+                关闭
+              </Button>
               <Button type="submit" variant="primary" size="md" disabled={busy || !branchName.trim()}>
                 {busy ? <LoaderCircle size={14} className="mr-2 animate-spin" aria-hidden="true" /> : null} 创建并切换
               </Button>
@@ -580,13 +652,33 @@ function GitActionDialog({
                   <ChevronDown size={13} aria-hidden="true" />
                 </button>
                 {branchMenuOpen ? (
-                  <div className="absolute left-0 top-[calc(100%+4px)] z-10 min-w-[190px] rounded-act-lg border border-line bg-surface-raised p-1.5 shadow-act-popover" role="menu" aria-label="提交到分支">
+                  <div
+                    className="absolute left-0 top-[calc(100%+4px)] z-10 min-w-[190px] rounded-act-lg border border-line bg-surface-raised p-1.5 shadow-act-popover"
+                    role="menu"
+                    aria-label="提交到分支"
+                  >
                     {currentBranch ? (
-                      <button type="button" role="menuitem" className={MENU_ITEM_CLASS} onClick={() => { setUseNewBranch(false); setBranchMenuOpen(false); }}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={MENU_ITEM_CLASS}
+                        onClick={() => {
+                          setUseNewBranch(false);
+                          setBranchMenuOpen(false);
+                        }}
+                      >
                         <GitBranch size={14} aria-hidden="true" /> {currentBranch}
                       </button>
                     ) : null}
-                    <button type="button" role="menuitem" className={MENU_ITEM_CLASS} onClick={() => { setUseNewBranch(true); setBranchMenuOpen(false); }}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={MENU_ITEM_CLASS}
+                      onClick={() => {
+                        setUseNewBranch(true);
+                        setBranchMenuOpen(false);
+                      }}
+                    >
                       <Plus size={14} aria-hidden="true" /> 新分支
                     </button>
                   </div>
@@ -600,7 +692,13 @@ function GitActionDialog({
 
             <div className="grid gap-3 px-4 py-3">
               {useNewBranch ? (
-                <input autoFocus aria-label="分支名称" className={INPUT_CLASS} value={branchName} onChange={(event) => setBranchName(event.target.value)} />
+                <input
+                  autoFocus
+                  aria-label="分支名称"
+                  className={INPUT_CLASS}
+                  value={branchName}
+                  onChange={(event) => setBranchName(event.target.value)}
+                />
               ) : null}
               <input
                 autoFocus={!useNewBranch}
@@ -622,15 +720,36 @@ function GitActionDialog({
             </div>
 
             <div className="border-t border-line p-1.5">
-              <button type="button" aria-label="提交" className="flex min-h-9 w-full items-center gap-2 rounded-act-md border-0 bg-hover-overlay px-2.5 text-left text-act-sm text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:text-text-faint" disabled={!canCommit} onClick={() => void onGitAction("commit", commitInput)}>
+              <button
+                type="button"
+                aria-label="提交"
+                className="flex min-h-9 w-full items-center gap-2 rounded-act-md border-0 bg-hover-overlay px-2.5 text-left text-act-sm text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:text-text-faint"
+                disabled={!canCommit}
+                onClick={() => void onGitAction("commit", commitInput)}
+              >
                 <GitCommitHorizontal size={15} aria-hidden="true" />
                 <span className="flex-1">提交</span>
-                <kbd aria-hidden="true" className="rounded bg-surface-subtle px-1.5 py-0.5 text-act-xxs text-text-faint">⌘↵</kbd>
+                <kbd
+                  aria-hidden="true"
+                  className="rounded bg-surface-subtle px-1.5 py-0.5 text-act-xxs text-text-faint"
+                >
+                  ⌘↵
+                </kbd>
               </button>
-              <button type="button" className={MENU_ITEM_CLASS} disabled={!canCommit} onClick={() => void onGitAction("commit_and_push", commitInput)}>
+              <button
+                type="button"
+                className={MENU_ITEM_CLASS}
+                disabled={!canCommit}
+                onClick={() => void onGitAction("commit_and_push", commitInput)}
+              >
                 <MonitorUp size={15} aria-hidden="true" /> 提交并推送
               </button>
-              <button type="button" className={MENU_ITEM_CLASS} disabled={!canPush} onClick={() => void onGitAction("push", commitInput)}>
+              <button
+                type="button"
+                className={MENU_ITEM_CLASS}
+                disabled={!canPush}
+                onClick={() => void onGitAction("push", commitInput)}
+              >
                 <MonitorUp size={15} aria-hidden="true" /> 推送
               </button>
             </div>
@@ -642,15 +761,28 @@ function GitActionDialog({
             <div className="flex items-center justify-between gap-4">
               <div>
                 <DialogTitle className="m-0 text-act-lg font-semibold text-text-main">选择远程仓库</DialogTitle>
-                <DialogDescription className="mb-0 mt-1 text-act-sm text-text-muted">此仓库有多个推送目标。</DialogDescription>
+                <DialogDescription className="mb-0 mt-1 text-act-sm text-text-muted">
+                  此仓库有多个推送目标。
+                </DialogDescription>
               </div>
-              <button type="button" className="grid h-8 w-8 place-items-center rounded-act-md text-text-faint hover:bg-hover-overlay hover:text-text-main" aria-label="关闭 Git 操作" onClick={onClose}>
+              <button
+                type="button"
+                className="grid h-8 w-8 place-items-center rounded-act-md text-text-faint hover:bg-hover-overlay hover:text-text-main"
+                aria-label="关闭 Git 操作"
+                onClick={onClose}
+              >
                 <X size={15} aria-hidden="true" />
               </button>
             </div>
             <div className="mt-4 grid gap-2">
               {state.remotes.map((remote) => (
-                <button key={remote} type="button" className="flex h-10 items-center gap-2 rounded-act-md border border-line bg-surface px-3 text-left text-act-sm font-medium text-text-main transition hover:border-line-strong hover:bg-surface-subtle" disabled={busy} onClick={() => void onSelectRemote(remote, state.action, state.input)}>
+                <button
+                  key={remote}
+                  type="button"
+                  className="flex h-10 items-center gap-2 rounded-act-md border border-line bg-surface px-3 text-left text-act-sm font-medium text-text-main transition hover:border-line-strong hover:bg-surface-subtle"
+                  disabled={busy}
+                  onClick={() => void onSelectRemote(remote, state.action, state.input)}
+                >
                   <MonitorUp size={15} aria-hidden="true" /> {remote}
                 </button>
               ))}

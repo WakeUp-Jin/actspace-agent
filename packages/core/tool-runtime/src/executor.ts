@@ -12,7 +12,10 @@ export type ToolArtifactRef = {
   readonly sha256: string;
 };
 
-export type SessionArtifactResolver = (sessionId: string, artifactId: string) => Promise<{ readonly path: string; readonly mediaType: string }>;
+export type SessionArtifactResolver = (
+  sessionId: string,
+  artifactId: string,
+) => Promise<{ readonly path: string; readonly mediaType: string }>;
 
 export type ToolArtifactOwner = {
   readonly sessionId: string;
@@ -82,7 +85,10 @@ export type ToolExecutionContext = {
   readonly notifyAgent?: (content: RuntimeJsonValue) => Promise<void>;
   /** false in subagent Sessions: the tool must finish in the foreground instead of moving to the background. */
   readonly backgroundAllowed?: boolean;
-  readonly createArtifact: (input: { readonly bytes: Uint8Array; readonly mediaType: string }) => Promise<ToolArtifactRef>;
+  readonly createArtifact: (input: {
+    readonly bytes: Uint8Array;
+    readonly mediaType: string;
+  }) => Promise<ToolArtifactRef>;
   readonly defer: (finalizer: () => Promise<void>) => void;
 };
 

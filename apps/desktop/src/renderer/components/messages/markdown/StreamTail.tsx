@@ -34,7 +34,11 @@ function fadePieces(value: string, offset: number): ReactNode[] {
   while (end > 0 && consumed < TAIL_FADE_LIMIT) {
     const level = TAIL_LEVELS.findIndex((threshold) => consumed < threshold);
     const take = Math.min(end, TAIL_LEVELS[level] - consumed);
-    pieces.unshift(<span key={end} className={`md-tail md-tail-${level + 1}`}>{value.slice(end - take, end)}</span>);
+    pieces.unshift(
+      <span key={end} className={`md-tail md-tail-${level + 1}`}>
+        {value.slice(end - take, end)}
+      </span>,
+    );
     end -= take;
     consumed += take;
   }

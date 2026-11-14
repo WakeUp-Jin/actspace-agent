@@ -1,4 +1,38 @@
 import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
 export const BROWSER_TOOLS_PLUGIN_ID = "actspace.browser-tools" as const;
-export const BROWSER_TOOLS_MANIFEST = Object.freeze({ pluginId: BROWSER_TOOLS_PLUGIN_ID, version: "2.0.0", frontend: { required: false, rendererKeys: [] as readonly string[] }, tools: Object.freeze(["browser_cua", "browser_dom", "browser_locator", "browser_navigation", "browser_tabs", "browser_user", "browser_wait", "browser_io", "browser_debug", "browser_help", "browser_run"]) });
-export const manifest = defineBuiltinPluginManifest({ display: { title: "操控浏览器", description: "通过 Chrome 扩展操作网页", scope: "session", defaultEnabled: false, canDisable: true }, pluginId: BROWSER_TOOLS_PLUGIN_ID, version: "2.0.0", name: "ActSpace Browser Tools", entry: { entryId: "tools.browser", behavior: "./plugin.js", required: false }, config: { disposeHost: false }, host: { required: ["browser"], optional: ["approval"] }, frontend: { required: false, rendererKeys: [] }, injects: ["tools.runtime"], contributions: { services: ["tools.browser"], tools: BROWSER_TOOLS_MANIFEST.tools, prompts: [], events: [] } });
+export const BROWSER_TOOLS_MANIFEST = Object.freeze({
+  pluginId: BROWSER_TOOLS_PLUGIN_ID,
+  version: "2.0.0",
+  frontend: { required: false, rendererKeys: [] as readonly string[] },
+  tools: Object.freeze([
+    "browser_cua",
+    "browser_dom",
+    "browser_locator",
+    "browser_navigation",
+    "browser_tabs",
+    "browser_user",
+    "browser_wait",
+    "browser_io",
+    "browser_debug",
+    "browser_help",
+    "browser_run",
+  ]),
+});
+export const manifest = defineBuiltinPluginManifest({
+  display: {
+    title: "操控浏览器",
+    description: "通过 Chrome 扩展操作网页",
+    scope: "session",
+    defaultEnabled: false,
+    canDisable: true,
+  },
+  pluginId: BROWSER_TOOLS_PLUGIN_ID,
+  version: "2.0.0",
+  name: "ActSpace Browser Tools",
+  entry: { entryId: "tools.browser", behavior: "./plugin.js", required: false },
+  config: { disposeHost: false },
+  host: { required: ["browser"], optional: ["approval"] },
+  frontend: { required: false, rendererKeys: [] },
+  injects: ["tools.runtime"],
+  contributions: { services: ["tools.browser"], tools: BROWSER_TOOLS_MANIFEST.tools, prompts: [], events: [] },
+});

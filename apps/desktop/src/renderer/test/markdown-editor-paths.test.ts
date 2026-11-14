@@ -21,12 +21,21 @@ describe("resolveCodePath：行内代码路径（D12）", () => {
     expect(resolveCodePath(text, ctx)).toEqual(expected);
   });
 
-  it.each(["1.2.3", "a/b", "console.log", "foo bar.ts", "https://x.com/a.ts", "../../../escape.ts", "/etc/passwd", "/etc/hosts.conf", "/work/space-x/a.ts", "~/a.ts", ""])(
-    "不识别 %s",
-    (text) => {
-      expect(resolveCodePath(text, ctx)).toBeNull();
-    },
-  );
+  it.each([
+    "1.2.3",
+    "a/b",
+    "console.log",
+    "foo bar.ts",
+    "https://x.com/a.ts",
+    "../../../escape.ts",
+    "/etc/passwd",
+    "/etc/hosts.conf",
+    "/work/space-x/a.ts",
+    "~/a.ts",
+    "",
+  ])("不识别 %s", (text) => {
+    expect(resolveCodePath(text, ctx)).toBeNull();
+  });
 
   it("没有工作区根时，绝对路径一律不识别", () => {
     expect(resolveCodePath("/work/space/a.ts", { docPath: "a.md", baseDir: "" })).toBeNull();
@@ -50,9 +59,12 @@ describe("routeHref：链接目标路由", () => {
     expect(routeHref("mailto:a@b.c", ctx)).toEqual({ kind: "external", url: "mailto:a@b.c" });
   });
 
-  it.each(["javascript:alert(1)", "file:///etc/passwd", "data:text/html,x", "vbscript:x", "//evil.com/a", ""])("%s 不可点", (href) => {
-    expect(routeHref(href, ctx)).toEqual({ kind: "none" });
-  });
+  it.each(["javascript:alert(1)", "file:///etc/passwd", "data:text/html,x", "vbscript:x", "//evil.com/a", ""])(
+    "%s 不可点",
+    (href) => {
+      expect(routeHref(href, ctx)).toEqual({ kind: "none" });
+    },
+  );
 
   it("本地链接相对当前文档所在目录", () => {
     expect(routeHref("other.md", ctx)).toEqual({ kind: "path", relativePath: "docs/guide/other.md" });
@@ -75,9 +87,12 @@ describe("routeHref：链接目标路由", () => {
     expect(routeHref("/work/space/docs/a.md", ctx)).toEqual({ kind: "path", relativePath: "docs/a.md" });
   });
 
-  it.each(["/etc/passwd", "/work/other/a.md", "~/a.md", "../../../x.md", "../../../../x.md"])("工作区外 / 越界 %s 不可点", (href) => {
-    expect(routeHref(href, ctx)).toEqual({ kind: "none" });
-  });
+  it.each(["/etc/passwd", "/work/other/a.md", "~/a.md", "../../../x.md", "../../../../x.md"])(
+    "工作区外 / 越界 %s 不可点",
+    (href) => {
+      expect(routeHref(href, ctx)).toEqual({ kind: "none" });
+    },
+  );
 
   it("没有工作区根目录就不认绝对路径", () => {
     expect(routeHref("/work/space/docs/a.md", { ...ctx, workspaceRoot: undefined })).toEqual({ kind: "none" });

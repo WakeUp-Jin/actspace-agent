@@ -8,10 +8,19 @@ import { makeAnnotation } from "./fixtures/response-annotation-helpers";
 function setup(initial: { draftKey?: string; draftRestore?: ComposerDraftRestore | null } = {}) {
   const store = new Map<string, ResponseAnnotationReference[]>();
   const readAnnotationDraft = vi.fn((key: string) => store.get(key) ?? []);
-  const writeAnnotationDraft = vi.fn((key: string, list: readonly ResponseAnnotationReference[]) => { store.set(key, [...list]); });
+  const writeAnnotationDraft = vi.fn((key: string, list: readonly ResponseAnnotationReference[]) => {
+    store.set(key, [...list]);
+  });
   const scrollContainerRef = { current: null as HTMLElement | null };
   const hook = renderHook(
-    (props: { draftKey?: string; draftRestore?: ComposerDraftRestore | null }) => useResponseAnnotationState({ ...props, readAnnotationDraft, writeAnnotationDraft, scrollContainerRef, canAnnotate: () => true }),
+    (props: { draftKey?: string; draftRestore?: ComposerDraftRestore | null }) =>
+      useResponseAnnotationState({
+        ...props,
+        readAnnotationDraft,
+        writeAnnotationDraft,
+        scrollContainerRef,
+        canAnnotate: () => true,
+      }),
     { initialProps: { draftKey: initial.draftKey ?? "s1", draftRestore: initial.draftRestore ?? null } },
   );
   return { ...hook, store, writeAnnotationDraft, scrollContainerRef };
@@ -20,7 +29,8 @@ function setup(initial: { draftKey?: string; draftRestore?: ComposerDraftRestore
 /** 和 AssistantReply 同结构的回复 DOM：可批注文本是「第一段内容\n第二段的正文」。 */
 function mountReply(scrollContainerRef: { current: HTMLElement | null }) {
   const container = document.createElement("section");
-  container.innerHTML = '<article data-assistant-message-id="v2-1"><div data-annotation-root><p>第一段内容</p><p>第二段的正文</p></div></article>';
+  container.innerHTML =
+    '<article data-assistant-message-id="v2-1"><div data-annotation-root><p>第一段内容</p><p>第二段的正文</p></div></article>';
   document.body.append(container);
   scrollContainerRef.current = container;
   const paragraph = container.querySelectorAll("p")[1];
@@ -50,7 +60,9 @@ describe("useResponseAnnotationState", () => {
     const { result } = setup();
     act(() => {
       for (let index = 0; index < 21; index += 1) {
-        result.current.contextValue.addDraft(makeAnnotation({ annotationId: `a${index}`, startOffset: index, endOffset: index + 1 }));
+        result.current.contextValue.addDraft(
+          makeAnnotation({ annotationId: `a${index}`, startOffset: index, endOffset: index + 1 }),
+        );
       }
     });
     expect(result.current.drafts).toHaveLength(20);
@@ -85,7 +97,10 @@ describe("useResponseAnnotationState", () => {
 
     act(() => result.current.setDrafts([]));
     const restored = makeAnnotation({ annotationId: "restored" });
-    rerender({ draftKey: "s1", draftRestore: { id: 1, sessionId: "other", text: "", responseAnnotations: [restored] } });
+    rerender({
+      draftKey: "s1",
+      draftRestore: { id: 1, sessionId: "other", text: "", responseAnnotations: [restored] },
+    });
     expect(result.current.drafts).toEqual([]);
     rerender({ draftKey: "s1", draftRestore: { id: 2, sessionId: "s1", text: "", responseAnnotations: [restored] } });
     expect(result.current.drafts.map((item) => item.annotationId)).toEqual(["restored"]);
@@ -96,7 +111,11 @@ describe("useResponseAnnotationState", () => {
     mountReply(scrollContainerRef);
     expect(result.current.contextValue.resolveRange(makeAnnotation())?.toString()).toBe("第二段");
     expect(result.current.contextValue.resolveRange(makeAnnotation({ assistantMessageId: "v2-99" }))).toBeNull();
-    expect(result.current.contextValue.resolveRange(makeAnnotation({ selectedText: "不存在", prefixContext: "", suffixContext: "" }))).toBeNull();
+    expect(
+      result.current.contextValue.resolveRange(
+        makeAnnotation({ selectedText: "不存在", prefixContext: "", suffixContext: "" }),
+      ),
+    ).toBeNull();
   });
 
   it("locates an annotation by scrolling to its text and highlighting it briefly", () => {
@@ -106,7 +125,9 @@ describe("useResponseAnnotationState", () => {
     act(() => result.current.contextValue.locateAnnotation(makeAnnotation({ annotationId: "loc" })));
     expect(paragraph.scrollIntoView).toHaveBeenCalledWith({ block: "center", behavior: "smooth" });
     expect(result.current.contextValue.activeAnnotationId).toBe("loc");
-    act(() => { vi.advanceTimersByTime(1600); });
+    act(() => {
+      vi.advanceTimersByTime(1600);
+    });
     expect(result.current.contextValue.activeAnnotationId).toBeNull();
   });
 
@@ -118,7 +139,9 @@ describe("useResponseAnnotationState", () => {
     act(() => result.current.contextValue.setEditingAnnotationId(null));
     act(() => result.current.contextValue.editAnnotation("a"));
     expect(paragraph.scrollIntoView).toHaveBeenCalledWith({ block: "center", behavior: "auto" });
-    act(() => { vi.advanceTimersByTime(20); });
+    act(() => {
+      vi.advanceTimersByTime(20);
+    });
     expect(result.current.contextValue.editingAnnotationId).toBe("a");
   });
 });

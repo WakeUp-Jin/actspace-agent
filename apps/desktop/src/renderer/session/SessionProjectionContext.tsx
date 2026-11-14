@@ -1,5 +1,20 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { ClientSessionStore, emptyClientSessionCell, type ClientLiveOverlay, type ClientSessionCell } from "@actspace/client/sessions";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import {
+  ClientSessionStore,
+  emptyClientSessionCell,
+  type ClientLiveOverlay,
+  type ClientSessionCell,
+} from "@actspace/client/sessions";
 import { createDesktopSessionBridge, type DesktopSessionBridge } from "./desktop-session-bridge";
 import { liveEvents } from "../api/live-events";
 import { sessionsApi } from "../api/sessions";
@@ -33,8 +48,15 @@ const SessionProjectionTargetContext = createContext<SessionProjectionTarget | n
  * store 的通知是全局的（后台会话的事件也会来），这里读 `peek(id)` 比较引用，别的会话的变化不会触发重渲染。
  */
 function useProjectionPair(store: ClientSessionStore | null, sessionId: string | null): ProjectionPair {
-  const cache = useRef<{ cell: ClientSessionCell | null; overlay: ClientLiveOverlay | null; pair: ProjectionPair } | null>(null);
-  const subscribe = useCallback((onChange: () => void) => (store ? store.subscribe(onChange) : subscribeNothing()), [store]);
+  const cache = useRef<{
+    cell: ClientSessionCell | null;
+    overlay: ClientLiveOverlay | null;
+    pair: ProjectionPair;
+  } | null>(null);
+  const subscribe = useCallback(
+    (onChange: () => void) => (store ? store.subscribe(onChange) : subscribeNothing()),
+    [store],
+  );
   const getSnapshot = useCallback((): ProjectionPair => {
     if (!store || sessionId === null) return NO_PAIR;
     const cell = store.peek(sessionId);
@@ -48,16 +70,26 @@ function useProjectionPair(store: ClientSessionStore | null, sessionId: string |
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-function useCoarseValue(store: ClientSessionStore | null, bridge: DesktopSessionBridge | null, sessionId: string | null): SessionProjectionContextValue | null {
+function useCoarseValue(
+  store: ClientSessionStore | null,
+  bridge: DesktopSessionBridge | null,
+  sessionId: string | null,
+): SessionProjectionContextValue | null {
   const pair = useProjectionPair(store, sessionId);
-  return useMemo<SessionProjectionContextValue | null>(() => store ? {
-    sessionId,
-    // 没有 cell 时沿用旧行为：读到一个空 cell，而不是 null。
-    cell: sessionId === null ? null : pair.cell ?? store.get(sessionId),
-    overlay: sessionId === null ? null : pair.overlay,
-    store,
-    bridge,
-  } : null, [store, bridge, sessionId, pair]);
+  return useMemo<SessionProjectionContextValue | null>(
+    () =>
+      store
+        ? {
+            sessionId,
+            // 没有 cell 时沿用旧行为：读到一个空 cell，而不是 null。
+            cell: sessionId === null ? null : (pair.cell ?? store.get(sessionId)),
+            overlay: sessionId === null ? null : pair.overlay,
+            store,
+            bridge,
+          }
+        : null,
+    [store, bridge, sessionId, pair],
+  );
 }
 
 /**
@@ -85,11 +117,14 @@ export function SessionProjectionProvider({
   const ownsStore = suppliedStore === undefined;
 
   useEffect(() => {
-    const created = createDesktopSessionBridge({
-      getSessionProjectionSnapshot: sessionsApi.getProjectionSnapshot,
-      onSessionLiveEvent: liveEvents.subscribe,
-      setObservedSessions: sessionsApi.setObserved,
-    }, store);
+    const created = createDesktopSessionBridge(
+      {
+        getSessionProjectionSnapshot: sessionsApi.getProjectionSnapshot,
+        onSessionLiveEvent: liveEvents.subscribe,
+        setObservedSessions: sessionsApi.setObserved,
+      },
+      store,
+    );
     bridgeRef.current = created;
     created.start();
     setBridge(created);
@@ -132,12 +167,21 @@ export function SessionProjectionProvider({
  * 给非当前会话（右栏的侧边对话）一份投影：沿用外层 Provider 的 store 和 bridge，用 `bridge.watch`
  * 拉取并跟随它，不改 store 的选中会话。scope 里的 Composer、上下文胶囊和统计读到的是这个会话。
  */
-export function SessionProjectionScope({ sessionId, children }: { readonly sessionId: string; readonly children: ReactNode }) {
+export function SessionProjectionScope({
+  sessionId,
+  children,
+}: {
+  readonly sessionId: string;
+  readonly children: ReactNode;
+}) {
   const outer = useContext(SessionProjectionTargetContext);
   const bridge = outer?.bridge ?? null;
   const store = outer?.store ?? null;
   useEffect(() => bridge?.watch(sessionId), [bridge, sessionId]);
-  const target = useMemo<SessionProjectionTarget | null>(() => store ? { sessionId, store, bridge } : null, [sessionId, store, bridge]);
+  const target = useMemo<SessionProjectionTarget | null>(
+    () => (store ? { sessionId, store, bridge } : null),
+    [sessionId, store, bridge],
+  );
   const value = useCoarseValue(store, bridge, sessionId);
   if (!target) return <>{children}</>;
   return (
@@ -172,10 +216,18 @@ export function useProjectionSelect<T>(
 ): T {
   const target = useContext(SessionProjectionTargetContext);
   const store = target?.store ?? null;
-  const id = sessionId === undefined ? target?.sessionId ?? null : sessionId;
-  const cache = useRef<{ cell: ClientSessionCell | null; overlay: ClientLiveOverlay | null; selector: typeof selector; value: T } | null>(null);
+  const id = sessionId === undefined ? (target?.sessionId ?? null) : sessionId;
+  const cache = useRef<{
+    cell: ClientSessionCell | null;
+    overlay: ClientLiveOverlay | null;
+    selector: typeof selector;
+    value: T;
+  } | null>(null);
   const empty = useRef<ClientSessionCell | null>(null);
-  const subscribe = useCallback((onChange: () => void) => (store ? store.subscribe(onChange) : subscribeNothing()), [store]);
+  const subscribe = useCallback(
+    (onChange: () => void) => (store ? store.subscribe(onChange) : subscribeNothing()),
+    [store],
+  );
   const getSnapshot = useCallback((): T => {
     let cell: ClientSessionCell | null = null;
     let overlay: ClientLiveOverlay | null = null;
@@ -188,7 +240,8 @@ export function useProjectionSelect<T>(
       overlay = store.getOverlay(id);
     }
     const cached = cache.current;
-    if (cached && cached.cell === cell && cached.overlay === overlay && cached.selector === selector) return cached.value;
+    if (cached && cached.cell === cell && cached.overlay === overlay && cached.selector === selector)
+      return cached.value;
     const value = selector(cell, overlay);
     const next = cached && isEqual(cached.value, value) ? cached.value : value;
     cache.current = { cell, overlay, selector, value: next };

@@ -15,7 +15,15 @@ import { clearImageCache } from "../components/markdown-editor/core/widgets/imag
 import { ImageWidget } from "../components/markdown-editor/core/widgets/image";
 import { MathWidget, renderTex, resetMathStateForTests } from "../components/markdown-editor/core/widgets/math";
 import { MermaidWidget } from "../components/markdown-editor/core/widgets/mermaid";
-import { cleanupViews, decos, focusView, makeHost, makeState, mermaidResult, mountEditor } from "./markdown-editor-helpers";
+import {
+  cleanupViews,
+  decos,
+  focusView,
+  makeHost,
+  makeState,
+  mermaidResult,
+  mountEditor,
+} from "./markdown-editor-helpers";
 
 beforeEach(() => {
   clearImageCache();
@@ -26,7 +34,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const mousedown = (el: Element) => el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+const mousedown = (el: Element) =>
+  el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
 
 /** 挂载并把光标放在文末（所有节点都处于“平时”状态） */
 function mount(doc: string, extra: Parameters<typeof mountEditor>[0] extends infer T ? Partial<T> : never = {}) {
@@ -104,7 +113,14 @@ describe("代码块复制（D5）", () => {
   });
 
   it("剪贴板不可用：显示「复制失败」", async () => {
-    Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn(async () => { throw new Error("denied"); }) }, configurable: true });
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: vi.fn(async () => {
+          throw new Error("denied");
+        }),
+      },
+      configurable: true,
+    });
     const { parent } = mount("```ts\nx\n```\n\n末尾");
     const copy = parent.querySelector(".md-code-copy") as HTMLButtonElement;
     copy.click();
@@ -134,7 +150,11 @@ describe("公式（D9）", () => {
   });
 
   it("KaTeX 意外抛错：返回 null，由 widget 显示源码并标 is-error", async () => {
-    const engine = { renderToString: () => { throw new Error("boom"); } } as never;
+    const engine = {
+      renderToString: () => {
+        throw new Error("boom");
+      },
+    } as never;
     expect(renderTex("x", false, engine)).toBeNull();
   });
 
@@ -192,7 +212,11 @@ describe("本地图片（D10）", () => {
   });
 
   it("loadImage 抛错：当读不到", async () => {
-    const host = makeHost({ loadImage: vi.fn(async () => { throw new Error("io"); }) });
+    const host = makeHost({
+      loadImage: vi.fn(async () => {
+        throw new Error("io");
+      }),
+    });
     const { parent } = mount("![图](img/a.png)\n\n末尾", { host });
     await vi.waitFor(() => expect(parent.querySelector(".md-img.is-missing")).not.toBeNull());
   });
@@ -233,7 +257,11 @@ describe("Mermaid（D8）", () => {
   });
 
   it("渲染出错：状态条显示错误", async () => {
-    const host = makeHost({ renderMermaid: vi.fn(async () => { throw new MermaidRenderError("syntax", "Parse error on line 2"); }) });
+    const host = makeHost({
+      renderMermaid: vi.fn(async () => {
+        throw new MermaidRenderError("syntax", "Parse error on line 2");
+      }),
+    });
     const { parent } = mount(doc, { host });
     await vi.waitFor(() => expect(parent.querySelector(".md-mermaid.has-error")).not.toBeNull());
     expect(parent.querySelector(".md-mermaid-status")?.textContent).toBe("Mermaid：Parse error on line 2");
@@ -270,12 +298,16 @@ describe("Mermaid（D8）", () => {
     view.dispatch({ selection: { anchor: 14 } });
     await vi.waitFor(() => expect(parent.querySelector(".md-mermaid-below .md-mermaid-figure svg")).not.toBeNull());
     const first = parent.querySelector(".md-mermaid-below .md-mermaid-figure svg")?.getAttribute("data-len");
-    renderMermaid.mockImplementationOnce(async () => { throw new MermaidRenderError("syntax", "bad"); });
+    renderMermaid.mockImplementationOnce(async () => {
+      throw new MermaidRenderError("syntax", "bad");
+    });
     view.dispatch({ changes: { from: 14, insert: "x" } });
     // 防抖：改动后立刻不会重新渲染
     const calls = renderMermaid.mock.calls.length;
     expect(renderMermaid.mock.calls.length).toBe(calls);
-    await vi.waitFor(() => expect(parent.querySelector(".md-mermaid-below.has-error")).not.toBeNull(), { timeout: 2000 });
+    await vi.waitFor(() => expect(parent.querySelector(".md-mermaid-below.has-error")).not.toBeNull(), {
+      timeout: 2000,
+    });
     expect(parent.querySelector(".md-mermaid-below .md-mermaid-figure svg")?.getAttribute("data-len")).toBe(first);
     view.dispatch({ changes: { from: 14, insert: "y" } });
     await vi.waitFor(() => expect(parent.querySelector(".md-mermaid-below.has-error")).toBeNull(), { timeout: 2000 });
@@ -309,7 +341,7 @@ describe("Frontmatter（D7）", () => {
   });
 
   it("属性卡片：键淡色、值正文色；值按文本写入，不当 HTML", () => {
-    const { parent } = mount('---\ntitle: <img src=x onerror=alert(1)>\nstatus: 草稿\n---\n\n正文');
+    const { parent } = mount("---\ntitle: <img src=x onerror=alert(1)>\nstatus: 草稿\n---\n\n正文");
     expect(Array.from(parent.querySelectorAll(".md-fm-key")).map((el) => el.textContent)).toEqual(["title", "status"]);
     expect(parent.querySelector(".md-fm-val")?.textContent).toBe("<img src=x onerror=alert(1)>");
     expect(parent.querySelector(".md-fm-card img")).toBeNull();
@@ -377,7 +409,9 @@ describe("widget 的 eq 和原子范围", () => {
     ].join("\n");
     const state = makeState(doc, { cursor: doc.length });
     const { decorations, atomic } = buildInlineDecorations(state);
-    const replaced = decos(decorations).filter((d) => (d.kind === "hide" || d.kind === "widget") && d.to > d.from).map((d) => `${d.from}-${d.to}`);
+    const replaced = decos(decorations)
+      .filter((d) => (d.kind === "hide" || d.kind === "widget") && d.to > d.from)
+      .map((d) => `${d.from}-${d.to}`);
     const atomicRanges = decos(atomic).map((d) => `${d.from}-${d.to}`);
     expect(replaced.length).toBeGreaterThan(10);
     expect(new Set(atomicRanges)).toEqual(new Set(replaced));

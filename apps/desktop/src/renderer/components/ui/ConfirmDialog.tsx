@@ -40,14 +40,36 @@ export function ConfirmDialog({
     }
   };
   return (
-    <Dialog open onOpenChange={(open) => { if (!open && !pending) onCancel(); }}>
-      <DialogContent role="alertdialog" size="md" withDescription closeOnOutsideClick={false} returnFocus={returnFocus} className="p-5">
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !pending) onCancel();
+      }}
+    >
+      <DialogContent
+        role="alertdialog"
+        size="md"
+        withDescription
+        closeOnOutsideClick={false}
+        returnFocus={returnFocus}
+        className="p-5"
+      >
         <DialogTitle className="text-act-lg font-semibold text-text-main">{title}</DialogTitle>
-        <DialogDescription className="mt-2 text-act-xs leading-relaxed text-text-muted">{description}</DialogDescription>
-        {error ? <p role="alert" className="mt-3 text-act-xs text-on-danger">{error}</p> : null}
+        <DialogDescription className="mt-2 text-act-xs leading-relaxed text-text-muted">
+          {description}
+        </DialogDescription>
+        {error ? (
+          <p role="alert" className="mt-3 text-act-xs text-on-danger">
+            {error}
+          </p>
+        ) : null}
         <DialogFooter className="mt-6">
-          <Button variant="secondary" size="md" autoFocus onClick={onCancel} disabled={pending}>取消</Button>
-          <Button variant="danger-solid" size="md" onClick={() => void confirm()} disabled={pending}>{pending ? pendingLabel : confirmLabel}</Button>
+          <Button variant="secondary" size="md" autoFocus onClick={onCancel} disabled={pending}>
+            取消
+          </Button>
+          <Button variant="danger-solid" size="md" onClick={() => void confirm()} disabled={pending}>
+            {pending ? pendingLabel : confirmLabel}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

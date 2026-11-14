@@ -102,7 +102,10 @@ export function createEditorView(parent: HTMLElement, options: EditorOptions): E
 /** 切换预览 / 源码；行号跟着变（预览关、源码开）。文档、历史、选区、滚动位置不变，也不抢焦点。 */
 export function setMode(view: EditorView, mode: EditorMode): void {
   view.dispatch({
-    effects: [modeCompartment.reconfigure(modeExtensions(mode)), lineNumbersCompartment.reconfigure(lineNumberExtensions(mode === "source"))],
+    effects: [
+      modeCompartment.reconfigure(modeExtensions(mode)),
+      lineNumbersCompartment.reconfigure(lineNumberExtensions(mode === "source")),
+    ],
   });
 }
 

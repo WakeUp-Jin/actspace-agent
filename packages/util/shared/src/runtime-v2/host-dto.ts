@@ -27,9 +27,7 @@ export function narrowRuntimeCapabilityCeiling(
   const allowed = new Set(current);
   for (const capability of requested) {
     if (!allowed.has(capability)) {
-      throw new TypeError(
-        `Runtime v2 capability ceiling cannot add ${capability}.`,
-      );
+      throw new TypeError(`Runtime v2 capability ceiling cannot add ${capability}.`);
     }
   }
   return Object.freeze([...new Set(requested)]);
@@ -62,9 +60,7 @@ export type RuntimeDiagnosticCode =
   | "RESTART_REQUIRED"
   | "SHUTDOWN_INCOMPLETE";
 
-export type RuntimeDiagnosticDetails = Readonly<
-  Record<string, RuntimeJsonPrimitive>
->;
+export type RuntimeDiagnosticDetails = Readonly<Record<string, RuntimeJsonPrimitive>>;
 
 export type RuntimeHostDiagnostic = {
   readonly code: RuntimeDiagnosticCode;
@@ -91,9 +87,7 @@ export function isRuntimeJsonValue(value: unknown): value is RuntimeJsonValue {
       if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) {
         return false;
       }
-      return Object.values(value as Record<string, unknown>).every(
-        isRuntimeJsonValue,
-      );
+      return Object.values(value as Record<string, unknown>).every(isRuntimeJsonValue);
     default:
       return false;
   }

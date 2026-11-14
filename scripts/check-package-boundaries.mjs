@@ -13,13 +13,18 @@ const manifests = new Map();
 
 async function walk(dir, kind) {
   let entries;
-  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
   for (const entry of entries) {
     if (entry.name === "node_modules" || entry.name === "dist") continue;
     const path = join(dir, entry.name);
     // 隐藏目录不放包（如 apps/web/.host-data 是本地 Host 数据，里面的产物带 package.json）
-    if (entry.isDirectory()) { if (!entry.name.startsWith(".")) await walk(path, kind); }
-    else if (entry.name === "package.json") {
+    if (entry.isDirectory()) {
+      if (!entry.name.startsWith(".")) await walk(path, kind);
+    } else if (entry.name === "package.json") {
       const manifest = JSON.parse(await readFile(path, "utf8"));
       manifests.set(manifest.name, { manifest, path, dir, kind });
     }
@@ -31,9 +36,17 @@ function dependencyNames(manifest) {
 }
 
 function assertExports(name, manifest) {
-  const exempt = new Set(["@actspace/desktop", "@actspace/agent-cli", "@actspace/shared", "@actspace/site", "@actspace/web", "@actspace/promo-video"]);
+  const exempt = new Set([
+    "@actspace/desktop",
+    "@actspace/agent-cli",
+    "@actspace/shared",
+    "@actspace/site",
+    "@actspace/web",
+    "@actspace/promo-video",
+  ]);
   if (exempt.has(name)) return;
-  if (!manifest.exports || typeof manifest.exports !== "object" || !manifest.exports["."]) failures.push(`${name}: missing package exports['.']`);
+  if (!manifest.exports || typeof manifest.exports !== "object" || !manifest.exports["."])
+    failures.push(`${name}: missing package exports['.']`);
   const isLeaf = name.startsWith("@actspace/");
   if (isLeaf && !manifest.type) failures.push(`${name}: leaf package must declare type`);
 }
@@ -41,20 +54,28 @@ function assertExports(name, manifest) {
 async function assertPluginContract(name, manifest, dir) {
   if (!manifest.exports?.["./plugin"]) return;
   if (!manifest.exports?.["./manifest"]) failures.push(`${name}: loadable plugin package must export './manifest'`);
-  if (!(await fileExists(join(dir, "src", "manifest.ts")))) failures.push(`${name}: loadable plugin package is missing src/manifest.ts`);
-  if (!(await fileExists(join(dir, "src", "plugin.ts")))) failures.push(`${name}: loadable plugin package is missing src/plugin.ts`);
-  if (!(await hasLifecycleTest(dir))) failures.push(`${name}: loadable plugin package is missing a lifecycle.test/spec.ts contract`);
+  if (!(await fileExists(join(dir, "src", "manifest.ts"))))
+    failures.push(`${name}: loadable plugin package is missing src/manifest.ts`);
+  if (!(await fileExists(join(dir, "src", "plugin.ts"))))
+    failures.push(`${name}: loadable plugin package is missing src/plugin.ts`);
+  if (!(await hasLifecycleTest(dir)))
+    failures.push(`${name}: loadable plugin package is missing a lifecycle.test/spec.ts contract`);
 
   const codecPath = join(dir, "src", "codec.ts");
   const hasCodec = await fileExists(codecPath);
-  if (hasCodec && !manifest.exports?.["./codec"]) failures.push(`${name}: src/codec.ts must be exposed through './codec'`);
+  if (hasCodec && !manifest.exports?.["./codec"])
+    failures.push(`${name}: src/codec.ts must be exposed through './codec'`);
   if (manifest.exports?.["./codec"] && !hasCodec) failures.push(`${name}: './codec' export requires src/codec.ts`);
 }
 
 // pnpm-workspace.yaml `catalog:` 里的依赖只能在那一个文件里定版本，各包必须写 `catalog:`。
 async function readCatalogNames() {
   let source;
-  try { source = await readFile(join(repoRoot, "pnpm-workspace.yaml"), "utf8"); } catch { return []; }
+  try {
+    source = await readFile(join(repoRoot, "pnpm-workspace.yaml"), "utf8");
+  } catch {
+    return [];
+  }
   const block = source.match(/^catalog:\n((?:[ \t]+.*\n?)+)/m);
   if (!block) return [];
   return [...block[1].matchAll(/^[ \t]+"?([^"\s:]+)"?\s*:/gm)].map((match) => match[1]);
@@ -64,13 +85,21 @@ function assertCatalogVersions(name, manifest, catalogNames) {
   for (const field of ["dependencies", "devDependencies", "optionalDependencies"]) {
     for (const dependency of catalogNames) {
       const spec = manifest[field]?.[dependency];
-      if (spec !== undefined && spec !== "catalog:") failures.push(`${name}: ${field}.${dependency} must be "catalog:" (version is pinned in pnpm-workspace.yaml), found ${spec}`);
+      if (spec !== undefined && spec !== "catalog:")
+        failures.push(
+          `${name}: ${field}.${dependency} must be "catalog:" (version is pinned in pnpm-workspace.yaml), found ${spec}`,
+        );
     }
   }
 }
 
 async function fileExists(path) {
-  try { await access(path); return true; } catch { return false; }
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function hasLifecycleTest(dir) {
@@ -81,9 +110,13 @@ async function hasLifecycleTest(dir) {
 
 async function findLifecycleTest(dir) {
   let entries;
-  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return false; }
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return false;
+  }
   for (const entry of entries) {
-    if (entry.isDirectory() && await findLifecycleTest(join(dir, entry.name))) return true;
+    if (entry.isDirectory() && (await findLifecycleTest(join(dir, entry.name)))) return true;
     if (entry.isFile() && /lifecycle\.(?:test|spec)\.tsx?$/.test(entry.name)) return true;
   }
   return false;
@@ -99,12 +132,18 @@ const sharedInlineTypePattern = /import\(["']@actspace\/shared["']\)\.([A-Za-z0-
 async function collectDesktopIpcContractNames() {
   const names = new Set();
   let entries;
-  try { entries = await readdir(desktopIpcContractDir, { withFileTypes: true }); } catch { return names; }
+  try {
+    entries = await readdir(desktopIpcContractDir, { withFileTypes: true });
+  } catch {
+    return names;
+  }
   for (const entry of entries) {
     if (!entry.isFile() || !/\.ts$/.test(entry.name) || entry.name === "index.ts") continue;
     const source = await readFile(join(desktopIpcContractDir, entry.name), "utf8");
-    for (const match of source.matchAll(/^export (?:type|interface|const|function|class|enum) ([A-Za-z0-9_$]+)/mg)) names.add(match[1]);
-    for (const match of source.matchAll(/^export (?:type )?\{([^}]*)\}/mg)) for (const name of importedNames(match[1])) names.add(name);
+    for (const match of source.matchAll(/^export (?:type|interface|const|function|class|enum) ([A-Za-z0-9_$]+)/gm))
+      names.add(match[1]);
+    for (const match of source.matchAll(/^export (?:type )?\{([^}]*)\}/gm))
+      for (const name of importedNames(match[1])) names.add(name);
   }
   return names;
 }
@@ -112,20 +151,31 @@ async function collectDesktopIpcContractNames() {
 function importedNames(specifierList) {
   return specifierList
     .split(",")
-    .map((specifier) => specifier.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim())
+    .map((specifier) =>
+      specifier
+        .trim()
+        .replace(/^type\s+/, "")
+        .split(/\s+as\s+/)[0]
+        .trim(),
+    )
     .filter(Boolean);
 }
 
 function findDesktopIpcContractUses(source, contractNames) {
   const used = new Set();
-  for (const match of source.matchAll(sharedImportPattern)) for (const name of importedNames(match[1])) if (contractNames.has(name)) used.add(name);
+  for (const match of source.matchAll(sharedImportPattern))
+    for (const name of importedNames(match[1])) if (contractNames.has(name)) used.add(name);
   for (const match of source.matchAll(sharedInlineTypePattern)) if (contractNames.has(match[1])) used.add(match[1]);
   return [...used].sort();
 }
 
 async function scanSource(dir, name, { desktopIpcContractNames } = {}) {
   let entries;
-  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
   for (const entry of entries) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) await scanSource(path, name, { desktopIpcContractNames });
@@ -137,7 +187,10 @@ async function scanSource(dir, name, { desktopIpcContractNames } = {}) {
       }
       if (desktopIpcContractNames?.size) {
         const used = findDesktopIpcContractUses(source, desktopIpcContractNames);
-        if (used.length) failures.push(`${name}: desktop IPC contract (${used.join(", ")}) imported in ${relativePath}; only apps/*, packages/client/*, packages/host/* may use packages/util/shared/src/ipc/ types`);
+        if (used.length)
+          failures.push(
+            `${name}: desktop IPC contract (${used.join(", ")}) imported in ${relativePath}; only apps/*, packages/client/*, packages/host/* may use packages/util/shared/src/ipc/ types`,
+          );
       }
     }
   }
@@ -145,7 +198,11 @@ async function scanSource(dir, name, { desktopIpcContractNames } = {}) {
 
 function findCycles() {
   const graph = new Map();
-  for (const [name, { manifest }] of manifests) graph.set(name, dependencyNames(manifest).filter((dependency) => manifests.has(dependency)));
+  for (const [name, { manifest }] of manifests)
+    graph.set(
+      name,
+      dependencyNames(manifest).filter((dependency) => manifests.has(dependency)),
+    );
   const active = new Set();
   const visited = new Set();
   const stack = [];
@@ -156,38 +213,52 @@ function findCycles() {
       return;
     }
     if (visited.has(name)) return;
-    active.add(name); stack.push(name);
+    active.add(name);
+    stack.push(name);
     for (const dependency of graph.get(name) ?? []) visit(dependency);
-    stack.pop(); active.delete(name); visited.add(name);
+    stack.pop();
+    active.delete(name);
+    visited.add(name);
   }
   for (const name of graph.keys()) visit(name);
 }
 
 for (const workspaceRoot of workspaceRoots) await walk(workspaceRoot.path, workspaceRoot.kind);
-if (manifests.has("@actspace/harness") || manifests.has("@actspace/plugins")) failures.push("generic harness/plugins package is forbidden");
+if (manifests.has("@actspace/harness") || manifests.has("@actspace/plugins"))
+  failures.push("generic harness/plugins package is forbidden");
 const desktopIpcContractNames = await collectDesktopIpcContractNames();
 const catalogNames = await readCatalogNames();
 for (const [name, { manifest, dir, kind }] of manifests) {
   let guardsDesktopIpc = false;
-  if (kind === "app" && manifest.private !== true) failures.push(`${name}: applications must remain private workspace packages`);
+  if (kind === "app" && manifest.private !== true)
+    failures.push(`${name}: applications must remain private workspace packages`);
   if (kind === "app") {
     for (const dependency of dependencyNames(manifest)) {
-      if (manifests.get(dependency)?.kind === "app") failures.push(`${name}: applications cannot depend on sibling application ${dependency}`);
+      if (manifests.get(dependency)?.kind === "app")
+        failures.push(`${name}: applications cannot depend on sibling application ${dependency}`);
     }
   }
   if (kind === "package") {
     const segments = relative(join(repoRoot, "packages"), dir).split(sep);
-    if (segments.length !== 2) failures.push(`${name}: packages must sit exactly at packages/<capability>/<package>, found packages/${segments.join("/")}`);
-    else if (name.startsWith("@actspace/") && segments[1] !== name.slice("@actspace/".length)) failures.push(`${name}: directory name must equal the package name without @actspace/, found ${segments[1]}`);
+    if (segments.length !== 2)
+      failures.push(
+        `${name}: packages must sit exactly at packages/<capability>/<package>, found packages/${segments.join("/")}`,
+      );
+    else if (name.startsWith("@actspace/") && segments[1] !== name.slice("@actspace/".length))
+      failures.push(`${name}: directory name must equal the package name without @actspace/, found ${segments[1]}`);
     for (const dependency of dependencyNames(manifest)) {
-      if (manifests.get(dependency)?.kind === "app") failures.push(`${name}: reusable packages cannot depend on application ${dependency}`);
+      if (manifests.get(dependency)?.kind === "app")
+        failures.push(`${name}: reusable packages cannot depend on application ${dependency}`);
     }
-    guardsDesktopIpc = segments.length === 2 && !desktopIpcConsumerCapabilities.has(segments[0]) && name !== "@actspace/shared";
+    guardsDesktopIpc =
+      segments.length === 2 && !desktopIpcConsumerCapabilities.has(segments[0]) && name !== "@actspace/shared";
   }
   assertExports(name, manifest);
   assertCatalogVersions(name, manifest, catalogNames);
   await assertPluginContract(name, manifest, dir);
-  await scanSource(join(dir, "src"), name, { desktopIpcContractNames: guardsDesktopIpc ? desktopIpcContractNames : undefined });
+  await scanSource(join(dir, "src"), name, {
+    desktopIpcContractNames: guardsDesktopIpc ? desktopIpcContractNames : undefined,
+  });
 }
 findCycles();
 

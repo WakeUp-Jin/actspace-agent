@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { SettingGroup, SettingLinkRow, SettingEditor, SettingsInput, useSettingsSaveNotice, useSingleEditor } from "../SettingsPrimitives";
+import {
+  SettingGroup,
+  SettingLinkRow,
+  SettingEditor,
+  SettingsInput,
+  useSettingsSaveNotice,
+  useSingleEditor,
+} from "../SettingsPrimitives";
 import { type SectionProps, SETTINGS_TEXTAREA_CLASS } from "./shared";
 
 export function GeneralSection({ settingsV4, onUpdateNamespace }: SectionProps) {
@@ -67,7 +74,7 @@ export function GeneralSection({ settingsV4, onUpdateNamespace }: SectionProps) 
       {editor.isOpen("displayName") ? (
         <SettingEditor
           id="personalization-display-name"
-                    error={saveError}
+          error={saveError}
           saving={saving}
           saveAriaLabel="保存显示名称"
           onCancel={cancelEditing}
@@ -99,7 +106,7 @@ export function GeneralSection({ settingsV4, onUpdateNamespace }: SectionProps) 
       {editor.isOpen("responseStyle") ? (
         <SettingEditor
           id="personalization-response-style"
-                    error={saveError}
+          error={saveError}
           saving={saving}
           saveAriaLabel="保存回复风格"
           onCancel={cancelEditing}

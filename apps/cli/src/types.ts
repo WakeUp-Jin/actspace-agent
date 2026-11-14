@@ -49,4 +49,3 @@ export interface CliArtifactResult {
   error?: { code: string; message: string };
   persistent?: boolean;
 }
-

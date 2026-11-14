@@ -14,7 +14,8 @@ export type TurnPromptDraft = {
 };
 
 type JsonRecord = Record<string, unknown>;
-const isRecord = (value: unknown): value is JsonRecord => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+const isRecord = (value: unknown): value is JsonRecord =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const ATTACHED_FILE = /^Attached file: (.+) \(([^()\s]+)\)$/;
 
 /**
@@ -28,7 +29,15 @@ export function preparedAttachments(prepared: unknown): ComposerAttachment[] {
     if (block.type === "artifact" && isRecord(block.artifact) && typeof block.artifact.artifactId === "string") {
       const artifactId = block.artifact.artifactId;
       const mimeType = typeof block.artifact.mediaType === "string" ? block.artifact.mediaType : undefined;
-      return [{ id: artifactId, artifactId, kind: mimeType?.startsWith("image/") ? "image" : "file", name: typeof block.label === "string" ? block.label : artifactId, ...(mimeType ? { mimeType } : {}) }];
+      return [
+        {
+          id: artifactId,
+          artifactId,
+          kind: mimeType?.startsWith("image/") ? "image" : "file",
+          name: typeof block.label === "string" ? block.label : artifactId,
+          ...(mimeType ? { mimeType } : {}),
+        },
+      ];
     }
     const match = block.type === "text" && typeof block.text === "string" ? ATTACHED_FILE.exec(block.text) : null;
     return match ? [{ id: match[2], artifactId: match[2], kind: "file", name: match[1] }] : [];
@@ -37,24 +46,30 @@ export function preparedAttachments(prepared: unknown): ComposerAttachment[] {
 
 /** durable 用户块里的附件：`id` 和 `path` 都是 artifactId。 */
 function durableAttachments(user: UserBlock): ComposerAttachment[] {
-  return (user.attachments ?? []).map(({ previewUrl: _previewUrl, path, ...attachment }) =>
-    ({ ...attachment, artifactId: attachment.artifactId ?? path ?? attachment.id }));
+  return (user.attachments ?? []).map(({ previewUrl: _previewUrl, path, ...attachment }) => ({
+    ...attachment,
+    artifactId: attachment.artifactId ?? path ?? attachment.id,
+  }));
 }
 
 /** 编辑器的初始内容：优先取任务快照里这一轮的任务，找不到时退回 durable 用户块（很旧的会话）。 */
 export function turnPromptDraft(sessionId: string, user: UserBlock, tasks: TaskSnapshot | undefined): TurnPromptDraft {
-  const task = user.runId ? tasks?.tasks.find((item) => item.runId === user.runId && !isBackgroundWake(item.content)) : undefined;
+  const task = user.runId
+    ? tasks?.tasks.find((item) => item.runId === user.runId && !isBackgroundWake(item.content))
+    : undefined;
   const envelope = task && isRecord(task.content) && task.content.kind === "composer-task" ? task.content : undefined;
   const original = envelope && isRecord(envelope.original) ? envelope.original : undefined;
   if (envelope && original) {
     const attachments = isLocalSession(sessionId)
       ? preparedAttachments(envelope.prepared)
-      : taskAttachments(sessionId, envelope as never) ?? [];
+      : (taskAttachments(sessionId, envelope as never) ?? []);
     return {
       text: typeof original.userInput === "string" ? original.userInput : user.content,
       attachments,
-      fileReferences: Array.isArray(original.fileReferences) ? original.fileReferences as FileReference[] : [],
-      responseAnnotations: Array.isArray(original.responseAnnotations) ? original.responseAnnotations as ResponseAnnotationReference[] : [],
+      fileReferences: Array.isArray(original.fileReferences) ? (original.fileReferences as FileReference[]) : [],
+      responseAnnotations: Array.isArray(original.responseAnnotations)
+        ? (original.responseAnnotations as ResponseAnnotationReference[])
+        : [],
     };
   }
   return {

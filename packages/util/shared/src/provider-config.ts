@@ -3,11 +3,36 @@ import type { ModelApi } from "./model-config";
 export type ProviderId = "deepseek" | "kimi" | "openrouter";
 
 export type ProviderLogoKey =
-  | "deepseek" | "moonshot" | "openrouter" | "openai" | "anthropic" | "copilot" | "grok"
-  | "opencode" | "minimax" | "zai" | "mistral" | "groq" | "cohere" | "huggingface"
-  | "alibaba" | "tencent" | "volcengine" | "siliconcloud" | "localai" | "lmstudio"
-  | "fireworks" | "together" | "nvidia" | "vercel" | "cloudflare" | "deepinfra"
-  | "stepfun" | "xiaomi" | "zenmux" | "generic";
+  | "deepseek"
+  | "moonshot"
+  | "openrouter"
+  | "openai"
+  | "anthropic"
+  | "copilot"
+  | "grok"
+  | "opencode"
+  | "minimax"
+  | "zai"
+  | "mistral"
+  | "groq"
+  | "cohere"
+  | "huggingface"
+  | "alibaba"
+  | "tencent"
+  | "volcengine"
+  | "siliconcloud"
+  | "localai"
+  | "lmstudio"
+  | "fireworks"
+  | "together"
+  | "nvidia"
+  | "vercel"
+  | "cloudflare"
+  | "deepinfra"
+  | "stepfun"
+  | "xiaomi"
+  | "zenmux"
+  | "generic";
 export type ProviderCategory = "direct" | "compatible" | "coding" | "custom";
 export type ProviderAuthKind = "api-key";
 

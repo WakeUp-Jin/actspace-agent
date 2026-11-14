@@ -42,12 +42,24 @@ export function thinkingScenario(clock: MockClock): MockHandlers | void {
 function play(clock: MockClock, sessionId: string, agentRunId: string): void {
   const base = { sessionId, agentRunId, turnId: `${agentRunId}:turn-0`, llmCallId: `${agentRunId}:llm-0` };
   const toolCallId = `${agentRunId}:read-0`;
-  const preview = { kind: "read" as const, filePath: "components/messages/ThinkingBlock.tsx", displayText: "Read components/messages/ThinkingBlock.tsx" };
+  const preview = {
+    kind: "read" as const,
+    filePath: "components/messages/ThinkingBlock.tsx",
+    displayText: "Read components/messages/ThinkingBlock.tsx",
+  };
   const think = (messageId: string, text: string, then: () => void) => {
     const chunks = text.match(/[\s\S]{1,4}/g) ?? [];
     const step = (index: number) => {
-      if (index >= chunks.length) { then(); return; }
-      clock.emit("agentStream", { type: "assistant_thinking_delta", ...base, messageId, delta: chunks[index] as string });
+      if (index >= chunks.length) {
+        then();
+        return;
+      }
+      clock.emit("agentStream", {
+        type: "assistant_thinking_delta",
+        ...base,
+        messageId,
+        delta: chunks[index] as string,
+      });
       clock.schedule(() => step(index + 1), 120);
     };
     step(0);
@@ -55,9 +67,24 @@ function play(clock: MockClock, sessionId: string, agentRunId: string): void {
 
   clock.emit("agentStream", { type: "agent_run_started", sessionId, agentRunId });
   think("thinking-mock-1", FIRST_THOUGHT, () => {
-    clock.emit("agentStream", { type: "tool_started", ...base, toolCallId, toolName: "read_file", argsPreview: JSON.stringify({ path: preview.filePath }), preview });
+    clock.emit("agentStream", {
+      type: "tool_started",
+      ...base,
+      toolCallId,
+      toolName: "read_file",
+      argsPreview: JSON.stringify({ path: preview.filePath }),
+      preview,
+    });
     clock.schedule(() => {
-      clock.emit("agentStream", { type: "tool_finished", ...base, toolCallId, toolName: "read_file", resultEventId: `${toolCallId}:result`, isError: false, preview });
+      clock.emit("agentStream", {
+        type: "tool_finished",
+        ...base,
+        toolCallId,
+        toolName: "read_file",
+        resultEventId: `${toolCallId}:result`,
+        isError: false,
+        preview,
+      });
       think("thinking-mock-2", SECOND_THOUGHT, () => {});
     }, 900);
   });

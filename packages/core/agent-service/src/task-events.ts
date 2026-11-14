@@ -10,22 +10,42 @@ export const QUEUE_EVENT = `plugin/${TASK_OWNER}/queue`;
 // A new required fact keeps historical designate/finish/recover replay unchanged.
 export const QUEUE_RETURN_EVENT = `plugin/${TASK_OWNER}/queue-return`;
 type Owned = { readonly sessionId: string };
-export type TaskEvent = Owned & (
-  | { readonly op: "accept"; readonly taskId: string; readonly submissionId: string; readonly content: RuntimeJsonValue; readonly continuationOf: string | null }
-  | { readonly op: "designate"; readonly taskId: string; readonly runId: string | null }
-  | { readonly op: "cancel"; readonly taskId: string }
-  | { readonly op: "operation-start"; readonly taskId: string }
-  | { readonly op: "operation-finish"; readonly taskId: string; readonly outcome: RunOutcome; readonly result?: RuntimeJsonValue }
-  | { readonly op: "claim"; readonly taskId: string; readonly runId: string }
-);
-export type RunEvent = Owned & (
-  | { readonly op: "start"; readonly runId: string; readonly taskId: string; readonly harness: HarnessIdentity; readonly configuration: RuntimeJsonValue }
-  | { readonly op: "finish"; readonly runId: string; readonly outcome: RunOutcome; readonly result: RuntimeJsonValue }
-);
-export type QueueEvent = Owned & (
-  | { readonly op: "pause" | "resume" | "recover" }
-  | { readonly op: "move"; readonly taskId: string; readonly beforeTaskId: string }
-);
+export type TaskEvent = Owned &
+  (
+    | {
+        readonly op: "accept";
+        readonly taskId: string;
+        readonly submissionId: string;
+        readonly content: RuntimeJsonValue;
+        readonly continuationOf: string | null;
+      }
+    | { readonly op: "designate"; readonly taskId: string; readonly runId: string | null }
+    | { readonly op: "cancel"; readonly taskId: string }
+    | { readonly op: "operation-start"; readonly taskId: string }
+    | {
+        readonly op: "operation-finish";
+        readonly taskId: string;
+        readonly outcome: RunOutcome;
+        readonly result?: RuntimeJsonValue;
+      }
+    | { readonly op: "claim"; readonly taskId: string; readonly runId: string }
+  );
+export type RunEvent = Owned &
+  (
+    | {
+        readonly op: "start";
+        readonly runId: string;
+        readonly taskId: string;
+        readonly harness: HarnessIdentity;
+        readonly configuration: RuntimeJsonValue;
+      }
+    | { readonly op: "finish"; readonly runId: string; readonly outcome: RunOutcome; readonly result: RuntimeJsonValue }
+  );
+export type QueueEvent = Owned &
+  (
+    | { readonly op: "pause" | "resume" | "recover" }
+    | { readonly op: "move"; readonly taskId: string; readonly beforeTaskId: string }
+  );
 export type QueueReturnEvent = Owned & {
   readonly op: "return-steering";
   readonly runId: string;
@@ -35,14 +55,25 @@ export type QueueReturnEvent = Owned & {
 export type SchedulingEvent = TaskEvent | RunEvent | QueueEvent | QueueReturnEvent;
 
 /** Pure codec entry: no behavior, filesystem, Host or Loop activation. */
-export const taskCodecs: readonly EventCodec[] = [TASK_EVENT, RUN_EVENT, QUEUE_EVENT, QUEUE_RETURN_EVENT].map(type => ({
-  type, ownerPluginId: TASK_OWNER, currentVersion: 1, criticality: "required" as const,
-  validate: (value: RuntimeJsonValue) => validateSchedulingEvent(type, value),
-}));
+export const taskCodecs: readonly EventCodec[] = [TASK_EVENT, RUN_EVENT, QUEUE_EVENT, QUEUE_RETURN_EVENT].map(
+  (type) => ({
+    type,
+    ownerPluginId: TASK_OWNER,
+    currentVersion: 1,
+    criticality: "required" as const,
+    validate: (value: RuntimeJsonValue) => validateSchedulingEvent(type, value),
+  }),
+);
 
 export function eventCandidate(type: string, data: SchedulingEvent): SessionEventCandidateV1 {
   validateSchedulingEvent(type, data);
-  return { type, eventVersion: 1, source: { ownerPluginId: TASK_OWNER }, data: snapshotSessionJson(data) as RuntimeJsonValue, surface: null };
+  return {
+    type,
+    eventVersion: 1,
+    source: { ownerPluginId: TASK_OWNER },
+    data: snapshotSessionJson(data) as RuntimeJsonValue,
+    surface: null,
+  };
 }
 
 export function validateSchedulingEvent(type: string, value: unknown): asserts value is SchedulingEvent {
@@ -61,16 +92,20 @@ export function validateSchedulingEvent(type: string, value: unknown): asserts v
       if (op === "claim" || value.runId !== null) text(value.runId);
       keys = ["taskId", "runId"];
     } else if (op === "cancel" || op === "operation-start") keys = ["taskId"];
-    else if (op === "operation-finish") { if (!["completed", "failed", "cancelled"].includes(String(value.outcome))) invalid(); if (value.result !== undefined) snapshotSessionJson(value.result); keys = ["taskId", "outcome", "result"]; }
-    else invalid();
+    else if (op === "operation-finish") {
+      if (!["completed", "failed", "cancelled"].includes(String(value.outcome))) invalid();
+      if (value.result !== undefined) snapshotSessionJson(value.result);
+      keys = ["taskId", "outcome", "result"];
+    } else invalid();
   } else if (type === RUN_EVENT) {
     text(value.runId);
     if (op === "start") {
       text(value.taskId);
       if (!record(value.harness)) invalid();
-      text(value.harness.harnessId); text(value.harness.generationId);
+      text(value.harness.harnessId);
+      text(value.harness.generationId);
       if (!Number.isSafeInteger(value.harness.revision) || (value.harness.revision as number) < 1) invalid();
-      if (Object.keys(value.harness).some(key => !["harnessId", "generationId", "revision"].includes(key))) invalid();
+      if (Object.keys(value.harness).some((key) => !["harnessId", "generationId", "revision"].includes(key))) invalid();
       snapshotSessionJson(value.configuration);
       keys = ["runId", "taskId", "harness", "configuration"];
     } else if (op === "finish") {
@@ -79,8 +114,11 @@ export function validateSchedulingEvent(type: string, value: unknown): asserts v
       keys = ["runId", "outcome", "result"];
     } else invalid();
   } else if (type === QUEUE_EVENT) {
-    if (op === "move") { text(value.taskId); text(value.beforeTaskId); keys = ["taskId", "beforeTaskId"]; }
-    else if (op === "pause" || op === "resume" || op === "recover") keys = [];
+    if (op === "move") {
+      text(value.taskId);
+      text(value.beforeTaskId);
+      keys = ["taskId", "beforeTaskId"];
+    } else if (op === "pause" || op === "resume" || op === "recover") keys = [];
     else invalid();
   } else if (type === QUEUE_RETURN_EVENT) {
     if (op !== "return-steering" || value.placement !== "front") invalid();
@@ -91,8 +129,14 @@ export function validateSchedulingEvent(type: string, value: unknown): asserts v
     keys = ["runId", "taskIds", "placement"];
   } else invalid();
   const allowed = new Set(["op", "sessionId", ...keys]);
-  if (Object.keys(value).some(key => !allowed.has(key))) invalid();
+  if (Object.keys(value).some((key) => !allowed.has(key))) invalid();
 }
-function record(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === "object" && !Array.isArray(value); }
-function text(value: unknown): asserts value is string { if (typeof value !== "string" || !value.length) invalid(); }
-function invalid(): never { throw new Error("Invalid agent-service scheduling event"); }
+function record(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function text(value: unknown): asserts value is string {
+  if (typeof value !== "string" || !value.length) invalid();
+}
+function invalid(): never {
+  throw new Error("Invalid agent-service scheduling event");
+}

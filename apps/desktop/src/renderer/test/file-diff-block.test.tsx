@@ -41,19 +41,35 @@ function makeEditBlock(
 
 describe("FileDiffBlock running state", () => {
   it("rounds generation counts, shows saving, then replaces progress with final diff", () => {
-    const { rerender } = render(<FileDiffBlock message={makeWriteBlock({ status: "running", generationProgress: { phase: "generating", characters: 2499 } })} />);
+    const { rerender } = render(
+      <FileDiffBlock
+        message={makeWriteBlock({ status: "running", generationProgress: { phase: "generating", characters: 2499 } })}
+      />,
+    );
     expect(screen.getByText("Write 夜雨.md · 已生成 2.4 千字符")).toBeInTheDocument();
     expect(screen.queryByRole("button")).toBeNull();
-    rerender(<FileDiffBlock message={makeWriteBlock({ status: "running", generationProgress: { phase: "saving", characters: 2499 } })} />);
+    rerender(
+      <FileDiffBlock
+        message={makeWriteBlock({ status: "running", generationProgress: { phase: "saving", characters: 2499 } })}
+      />,
+    );
     expect(screen.getByText("Write 夜雨.md · 正在保存")).toBeInTheDocument();
-    rerender(<FileDiffBlock message={makeWriteBlock({ additions: 35, generationProgress: { phase: "saving", characters: 2499 } })} />);
+    rerender(
+      <FileDiffBlock
+        message={makeWriteBlock({ additions: 35, generationProgress: { phase: "saving", characters: 2499 } })}
+      />,
+    );
     expect(screen.getByText("+35")).toBeInTheDocument();
     expect(screen.queryByText(/正在保存|已生成/)).toBeNull();
   });
 
   it("hides generation amounts when the existing display setting is disabled", async () => {
     setupBridge({ "settings.getV4": async () => ({ settings: { tools: { showFileChangeStats: false } } }) });
-    render(<FileDiffBlock message={makeEditBlock({ status: "running", generationProgress: { phase: "generating", characters: 2400 } })} />);
+    render(
+      <FileDiffBlock
+        message={makeEditBlock({ status: "running", generationProgress: { phase: "generating", characters: 2400 } })}
+      />,
+    );
     expect(await screen.findByText("Edit index.ts · 正在生成")).toBeInTheDocument();
     expect(screen.queryByText(/字符/)).toBeNull();
   });
@@ -139,7 +155,11 @@ describe("FileDiffBlock completed state", () => {
   });
 
   it("shows generation status instead of zero counters while running", () => {
-    render(<FileDiffBlock message={makeWriteBlock({ status: "running", additions: 0, deletions: 0, diff: "", collapsedLines: 0 })} />);
+    render(
+      <FileDiffBlock
+        message={makeWriteBlock({ status: "running", additions: 0, deletions: 0, diff: "", collapsedLines: 0 })}
+      />,
+    );
     expect(screen.getByText("Write 夜雨.md · 正在生成")).toBeInTheDocument();
   });
 
@@ -220,7 +240,10 @@ describe("FileDiffBlock approval state", () => {
     expect(screen.getByText("编辑")).toBeInTheDocument();
     expect(screen.getByText("vocab.md")).toBeInTheDocument();
     // 未识别的原因不丢失，收进原因图标的 title。
-    expect(screen.getByLabelText("审批原因")).toHaveAttribute("title", expect.stringContaining("outside the workspace"));
+    expect(screen.getByLabelText("审批原因")).toHaveAttribute(
+      "title",
+      expect.stringContaining("outside the workspace"),
+    );
 
     await userEvent.click(screen.getByRole("button", { name: "应用" }));
 
@@ -250,13 +273,44 @@ describe("FileDiffBlock approval state", () => {
     const submitApproval = vi.fn(async () => ({ ok: true }));
     setupBridge({
       "approvals.submit": submitApproval,
-      "approvals.listPending": async () => [{
-        requestId: "approval-edit-1", toolName: "edit_file", summary: "Edit", reason: "Outside workspace", createdAt: Date.now(), expiresAt: Date.now() + 60_000,
-        grantSuggestions: [
-          { suggestionId: "exact-1", lifetime: "session", action: "file.write", access: "write", selector: { kind: "exact", canonicalPath: "/Users/me/.agents/vocab.md" }, audience: { pluginId: "actspace.filesystem-write", permissionDomain: "filesystem-write", policyVersion: 1 }, label: "This file only" },
-          { suggestionId: "tree-1", lifetime: "session", action: "file.write", access: "write", selector: { kind: "subtree", canonicalRoot: "/Users/me/.agents" }, audience: { pluginId: "actspace.filesystem-write", permissionDomain: "filesystem-write", policyVersion: 1 }, label: "This directory tree" },
-        ],
-      }],
+      "approvals.listPending": async () => [
+        {
+          requestId: "approval-edit-1",
+          toolName: "edit_file",
+          summary: "Edit",
+          reason: "Outside workspace",
+          createdAt: Date.now(),
+          expiresAt: Date.now() + 60_000,
+          grantSuggestions: [
+            {
+              suggestionId: "exact-1",
+              lifetime: "session",
+              action: "file.write",
+              access: "write",
+              selector: { kind: "exact", canonicalPath: "/Users/me/.agents/vocab.md" },
+              audience: {
+                pluginId: "actspace.filesystem-write",
+                permissionDomain: "filesystem-write",
+                policyVersion: 1,
+              },
+              label: "This file only",
+            },
+            {
+              suggestionId: "tree-1",
+              lifetime: "session",
+              action: "file.write",
+              access: "write",
+              selector: { kind: "subtree", canonicalRoot: "/Users/me/.agents" },
+              audience: {
+                pluginId: "actspace.filesystem-write",
+                permissionDomain: "filesystem-write",
+                policyVersion: 1,
+              },
+              label: "This directory tree",
+            },
+          ],
+        },
+      ],
     });
 
     render(<FileDiffBlock message={makePendingEditBlock()} />);
@@ -264,11 +318,19 @@ describe("FileDiffBlock approval state", () => {
     expect(sessionButton).toHaveAttribute("title", "精确路径 · 写入 · /Users/me/.agents/vocab.md · 本会话");
     expect(screen.queryByText("This directory tree")).toBeNull();
     await userEvent.click(sessionButton);
-    expect(submitApproval).toHaveBeenCalledWith({ requestId: "approval-edit-1", decision: "session", suggestionId: "exact-1" });
+    expect(submitApproval).toHaveBeenCalledWith({
+      requestId: "approval-edit-1",
+      decision: "session",
+      suggestionId: "exact-1",
+    });
   });
 
   it("keeps the diff collapsed until the change stats are opened", async () => {
-    render(<FileDiffBlock message={{ ...makePendingEditBlock(), additions: 1, deletions: 1, diff: "-old line\n+new line" }} />);
+    render(
+      <FileDiffBlock
+        message={{ ...makePendingEditBlock(), additions: 1, deletions: 1, diff: "-old line\n+new line" }}
+      />,
+    );
 
     expect(screen.queryByText("+new line")).toBeNull();
     const stats = screen.getByRole("button", { name: "查看改动" });
@@ -279,7 +341,18 @@ describe("FileDiffBlock approval state", () => {
   });
 
   it("labels a pending write with the write verb", () => {
-    render(<FileDiffBlock message={makeWriteBlock({ status: "pending", filePath: "notes/new.md", additions: 3, deletions: 0, diff: "+a\n+b\n+c", approvalRequestId: "approval-write-1" })} />);
+    render(
+      <FileDiffBlock
+        message={makeWriteBlock({
+          status: "pending",
+          filePath: "notes/new.md",
+          additions: 3,
+          deletions: 0,
+          diff: "+a\n+b\n+c",
+          approvalRequestId: "approval-write-1",
+        })}
+      />,
+    );
 
     expect(screen.getByRole("button", { name: "写入" })).toBeInTheDocument();
     expect(screen.getByText("+3")).toBeInTheDocument();

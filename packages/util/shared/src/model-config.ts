@@ -1,11 +1,7 @@
 import { DEEPSEEK_FLASH_ALIASES, DEEPSEEK_FLASH_KEY, deepSeekPeakPricing } from "./deepseek-model-facts";
 import type { ProviderId } from "./provider-config";
 
-export type LegacyModelId =
-  | "deepseek-v4-flash"
-  | "deepseek-v4-pro"
-  | "kimi-k2.6"
-  | "kimi-k2.7-code";
+export type LegacyModelId = "deepseek-v4-flash" | "deepseek-v4-pro" | "kimi-k2.6" | "kimi-k2.7-code";
 
 /** @deprecated 新配置使用 provider-qualified ModelKey；该别名只保留现有消费者兼容。 */
 export type ModelId = LegacyModelId;
@@ -107,10 +103,21 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
   },
   // Retired ID kept only for legacy session readers; never offered as a separate model.
   "deepseek-v4-pro": {
-    id: "deepseek-v4-pro", label: "deepseek-flash", api: "openai-completions", provider: "deepseek",
-    apiModel: "deepseek-flash", defaultBaseUrl: "https://api.deepseek.com", thinkingDefault: true,
-    supportsThinkingToggle: true, reasoning: true, reasoningEfforts: ["low", "high", "max"], reasoningDefaultEffort: "high",
-    input: ["text", "image"], contextWindow: 1_000_000, maxTokens: 393_216, visibility: "internal",
+    id: "deepseek-v4-pro",
+    label: "deepseek-flash",
+    api: "openai-completions",
+    provider: "deepseek",
+    apiModel: "deepseek-flash",
+    defaultBaseUrl: "https://api.deepseek.com",
+    thinkingDefault: true,
+    supportsThinkingToggle: true,
+    reasoning: true,
+    reasoningEfforts: ["low", "high", "max"],
+    reasoningDefaultEffort: "high",
+    input: ["text", "image"],
+    contextWindow: 1_000_000,
+    maxTokens: 393_216,
+    visibility: "internal",
     pricing: deepSeekPeakPricing("deepseek-flash"),
   },
   "kimi-k2.6": {
@@ -284,12 +291,14 @@ export const CURATED_OPENROUTER_MODEL_LIST: ModelDefinition[] = [
   },
 ];
 
-export const CURATED_OPENROUTER_MODEL_REGISTRY: Partial<Record<ModelKey, ModelDefinition>> =
-  Object.fromEntries(CURATED_OPENROUTER_MODEL_LIST.map((definition) => [definition.key, definition]));
+export const CURATED_OPENROUTER_MODEL_REGISTRY: Partial<Record<ModelKey, ModelDefinition>> = Object.fromEntries(
+  CURATED_OPENROUTER_MODEL_LIST.map((definition) => [definition.key, definition]),
+);
 
 export function normalizeModelKey(value: unknown): ModelKey | undefined {
   if (typeof value !== "string") return undefined;
-  if (DEEPSEEK_FLASH_ALIASES.some((alias) => value === alias || value === `deepseek:${alias}`)) return DEEPSEEK_FLASH_KEY;
+  if (DEEPSEEK_FLASH_ALIASES.some((alias) => value === alias || value === `deepseek:${alias}`))
+    return DEEPSEEK_FLASH_KEY;
   if (value === "deepseek:deepseek-v4-pro") return DEEPSEEK_FLASH_KEY;
   if (value in LEGACY_MODEL_KEY_MAP) return LEGACY_MODEL_KEY_MAP[value as LegacyModelId];
   const separatorIndex = value.indexOf(":");
@@ -310,11 +319,9 @@ export function resolveModelDefinition(modelId: ModelSelectionId): ModelDefiniti
   return key ? BUILTIN_MODEL_REGISTRY[key] : undefined;
 }
 
-export function resolveModelDefinitionByApiModel(
-  apiModel: string,
-  provider?: ProviderId,
-): ModelDefinition | undefined {
-  if ((!provider || provider === "deepseek") && DEEPSEEK_FLASH_ALIASES.some((alias) => alias === apiModel)) return BUILTIN_MODEL_REGISTRY[DEEPSEEK_FLASH_KEY];
+export function resolveModelDefinitionByApiModel(apiModel: string, provider?: ProviderId): ModelDefinition | undefined {
+  if ((!provider || provider === "deepseek") && DEEPSEEK_FLASH_ALIASES.some((alias) => alias === apiModel))
+    return BUILTIN_MODEL_REGISTRY[DEEPSEEK_FLASH_KEY];
   return BUILTIN_MODEL_LIST.find(
     (definition) => definition.apiModel === apiModel && (!provider || definition.provider === provider),
   );
@@ -326,9 +333,9 @@ export function resolveModelSpec(modelId?: ModelId): ModelSpec {
 }
 
 export function isPublicModelId(value: unknown): value is ModelId {
-  return typeof value === "string" &&
-    value in MODEL_REGISTRY &&
-    MODEL_REGISTRY[value as ModelId].visibility === "public";
+  return (
+    typeof value === "string" && value in MODEL_REGISTRY && MODEL_REGISTRY[value as ModelId].visibility === "public"
+  );
 }
 
 export function resolveModelSpecByApiModel(apiModel: string, provider?: ModelSpec["provider"]): ModelSpec | undefined {

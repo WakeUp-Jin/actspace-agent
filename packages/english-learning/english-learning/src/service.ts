@@ -1,5 +1,13 @@
 import type { AgentHandle } from "@actspace/agent";
-import { ACTSPACE_SERVICE_IDS, containNotification, getService, requireService, serviceKey, serviceView, type CordisContext } from "@actspace/cordis-adapter";
+import {
+  ACTSPACE_SERVICE_IDS,
+  containNotification,
+  getService,
+  requireService,
+  serviceKey,
+  serviceView,
+  type CordisContext,
+} from "@actspace/cordis-adapter";
 import { PROMPT_HOST_PORT } from "@actspace/prompt";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { EnglishLearningState } from "@actspace/shared";
@@ -9,9 +17,16 @@ import { ENGLISH_LEARNING_SECTION, PROMPT_ID, PLUGIN_ID } from "./prompt.js";
 import type { SpeechHostPort } from "./host-port.js";
 import { SpeechQueue } from "./queue.js";
 
-type Binding = { session: AgentHandle["session"]; watermark: number; injected: Map<string, Set<string>>; remove: () => void };
+type Binding = {
+  session: AgentHandle["session"];
+  watermark: number;
+  injected: Map<string, Set<string>>;
+  remove: () => void;
+};
 /** 这个包用到的 `session.runtime`：按 id 取打开着的会话。 */
-export const ENGLISH_LEARNING_SESSIONS_VIEW = serviceView<{ getOpen(id: string): AgentHandle["session"] | undefined }>(ACTSPACE_SERVICE_IDS.sessionRuntime);
+export const ENGLISH_LEARNING_SESSIONS_VIEW = serviceView<{ getOpen(id: string): AgentHandle["session"] | undefined }>(
+  ACTSPACE_SERVICE_IDS.sessionRuntime,
+);
 export class EnglishLearningService {
   private binding: Binding | undefined;
   private closed = false;
@@ -22,20 +37,45 @@ export class EnglishLearningService {
   private readonly removeSettings: () => void;
   private state: EnglishLearningState;
 
-  constructor(private readonly ctx: CordisContext, private readonly host: SpeechHostPort) {
-    this.state = { enabled: false, targetSessionId: null, revision: 0, promptStatus: "off", speechStatus: "idle", queuedSegments: 0, hasApiKey: false, error: null, notice: null };
+  constructor(
+    private readonly ctx: CordisContext,
+    private readonly host: SpeechHostPort,
+  ) {
+    this.state = {
+      enabled: false,
+      targetSessionId: null,
+      revision: 0,
+      promptStatus: "off",
+      speechStatus: "idle",
+      queuedSegments: 0,
+      hasApiKey: false,
+      error: null,
+      notice: null,
+    };
     this.queue = new SpeechQueue(host, (patch) => this.update(patch));
     this.update({ speechStatus: this.queue.available() });
     const service = this;
-    const remove = ctx.on?.("session/event", containNotification(ctx, function (this: { sessionId?: string } | undefined, event: SessionEventEnvelopeV1) {
-      service.observe(this?.sessionId, event);
-    }));
-    this.removeEvents = typeof remove === "function" ? remove as () => void : () => {};
-    this.removeSettings = host.subscribeSettings(() => { void this.queue.stop(); });
+    const remove = ctx.on?.(
+      "session/event",
+      containNotification(ctx, function (this: { sessionId?: string } | undefined, event: SessionEventEnvelopeV1) {
+        service.observe(this?.sessionId, event);
+      }),
+    );
+    this.removeEvents = typeof remove === "function" ? (remove as () => void) : () => {};
+    this.removeSettings = host.subscribeSettings(() => {
+      void this.queue.stop();
+    });
   }
 
-  getState(): EnglishLearningState { return structuredClone(this.state); }
-  subscribe(listener: (state: EnglishLearningState) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  getState(): EnglishLearningState {
+    return structuredClone(this.state);
+  }
+  subscribe(listener: (state: EnglishLearningState) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
 
   async enableSession(sessionId: string): Promise<EnglishLearningState> {
     const session = requireService(this.ctx, ENGLISH_LEARNING_SESSIONS_VIEW, "English learning").getOpen(sessionId);
@@ -57,18 +97,33 @@ export class EnglishLearningService {
     if (!extensions) throw new Error("会话提示词入口不可用。");
     this.binding?.remove();
     const remove = extensions.registerMainSession(session.header.sessionId, {
-      id: PROMPT_ID, owner: PLUGIN_ID, order: 100, criticality: "optional", fields: ["system"],
+      id: PROMPT_ID,
+      owner: PLUGIN_ID,
+      order: 100,
+      criticality: "optional",
+      fields: ["system"],
       get: (context, write) => {
         if (this.binding !== binding) return;
-        write({ system: { sections: [{ id: PROMPT_ID, owner: PLUGIN_ID, order: 5000, content: ENGLISH_LEARNING_SECTION }], modelFacts: [] } });
+        write({
+          system: {
+            sections: [{ id: PROMPT_ID, owner: PLUGIN_ID, order: 5000, content: ENGLISH_LEARNING_SECTION }],
+            modelFacts: [],
+          },
+        });
         const { turnId, stepId } = context.request;
         if (!turnId || !stepId) return;
         let steps = binding.injected.get(turnId);
-        if (!steps) { steps = new Set(); binding.injected.set(turnId, steps); }
+        if (!steps) {
+          steps = new Set();
+          binding.injected.set(turnId, steps);
+        }
         steps.add(stepId);
       },
     });
-    binding.remove = () => { remove(); binding.injected.clear(); };
+    binding.remove = () => {
+      remove();
+      binding.injected.clear();
+    };
     this.binding = binding;
     this.seen.clear();
     this.update({ enabled: true, targetSessionId: session.header.sessionId, promptStatus: "active" });
@@ -86,9 +141,13 @@ export class EnglishLearningService {
     return this.getState();
   }
 
-  async stop(): Promise<EnglishLearningState> { await this.queue.stop(); return this.getState(); }
+  async stop(): Promise<EnglishLearningState> {
+    await this.queue.stop();
+    return this.getState();
+  }
   preview(): EnglishLearningState {
-    if (this.state.speechStatus === "playing" || this.state.speechStatus === "synthesizing") throw new Error("请先停止当前语音。");
+    if (this.state.speechStatus === "playing" || this.state.speechStatus === "synthesizing")
+      throw new Error("请先停止当前语音。");
     this.queue.enqueue(["Learning English can be part of everyday work."]);
     return this.getState();
   }
@@ -96,8 +155,10 @@ export class EnglishLearningService {
   async dispose(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
-    this.removeEvents(); this.removeSettings();
-    await this.disable(); await this.queue.dispose();
+    this.removeEvents();
+    this.removeSettings();
+    await this.disable();
+    await this.queue.dispose();
     this.listeners.clear();
   }
 
@@ -118,7 +179,10 @@ export class EnglishLearningService {
     binding.injected.delete(turnId);
     if (!injected) return;
     const sessions = getService(this.ctx, ENGLISH_LEARNING_SESSIONS_VIEW);
-    const latest = (sessions?.getOpen(sessionId) ?? binding.session).journal.latestEvent("assistant/message", event.seq - 1);
+    const latest = (sessions?.getOpen(sessionId) ?? binding.session).journal.latestEvent(
+      "assistant/message",
+      event.seq - 1,
+    );
     const message = completedMessage(latest ? [latest] : [], event);
     if (!message || !injected.has(message.stepId)) return;
     const key = `${sessionId}:${turnId}:${message.messageId}`;
@@ -129,8 +193,19 @@ export class EnglishLearningService {
   }
 
   private update(patch: Partial<EnglishLearningState>): void {
-    this.state = { ...this.state, ...patch, revision: this.state.revision + 1, hasApiKey: Boolean(this.host.resolveCredential()) };
-    for (const listener of this.listeners) { try { listener(this.getState()); } catch { /* UI observers cannot affect the Agent. */ } }
+    this.state = {
+      ...this.state,
+      ...patch,
+      revision: this.state.revision + 1,
+      hasApiKey: Boolean(this.host.resolveCredential()),
+    };
+    for (const listener of this.listeners) {
+      try {
+        listener(this.getState());
+      } catch {
+        /* UI observers cannot affect the Agent. */
+      }
+    }
   }
 }
 export const ENGLISH_LEARNING_SERVICE = serviceKey<EnglishLearningService>("english-learning");

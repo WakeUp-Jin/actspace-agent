@@ -51,9 +51,14 @@ export function ModelsError() {
   const { controller } = useModelsPage();
   if (!controller.error) return null;
   return (
-    <div role="alert" className="flex items-center gap-2.5 rounded-act-md bg-danger-soft px-3 py-2 text-act-xs text-on-danger">
+    <div
+      role="alert"
+      className="flex items-center gap-2.5 rounded-act-md bg-danger-soft px-3 py-2 text-act-xs text-on-danger"
+    >
       <span className="min-w-0 flex-1">{controller.error}</span>
-      <Button variant="ghost" size="xs" onClick={() => controller.setError(null)}>知道了</Button>
+      <Button variant="ghost" size="xs" onClick={() => controller.setError(null)}>
+        知道了
+      </Button>
     </div>
   );
 }
@@ -80,8 +85,18 @@ export function ModelsPage({ onChanged }: { onChanged?: () => void }) {
     page = <TemplateCatalogPage />;
   } else if (route.name === "setup" && draft) {
     page = <ConnectionSetupPage draft={draft} />;
-  } else if (route.name === "detail" && controller.view.connections.some((item) => item.connectionId === route.connectionId)) {
-    page = <ConnectionDetailPage key={route.connectionId} connectionId={route.connectionId} initialExpanded={route.expand ?? null} initialProbe={route.probe ?? null} />;
+  } else if (
+    route.name === "detail" &&
+    controller.view.connections.some((item) => item.connectionId === route.connectionId)
+  ) {
+    page = (
+      <ConnectionDetailPage
+        key={route.connectionId}
+        connectionId={route.connectionId}
+        initialExpanded={route.expand ?? null}
+        initialProbe={route.probe ?? null}
+      />
+    );
   } else {
     page = (
       <>

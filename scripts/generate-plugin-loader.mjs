@@ -11,10 +11,16 @@ const target = join(runtimeDir, "cordis.yml");
 const HEADER = "# 由 scripts/generate-plugin-loader.mjs 生成，勿手改\n";
 
 export function renderPluginLoader(catalog) {
-  const rows = catalog.filter(entry => entry.loaders.includes("host")).map(entry => {
-    const inject = entry.manifest.behaviors[0]?.injects ?? [];
-    return [`- id: ${entry.id}`, `  name: ${JSON.stringify(entry.module)}`, ...(inject.length > 0 ? [`  inject: [${inject.join(", ")}]`] : [])].join("\n");
-  });
+  const rows = catalog
+    .filter((entry) => entry.loaders.includes("host"))
+    .map((entry) => {
+      const inject = entry.manifest.behaviors[0]?.injects ?? [];
+      return [
+        `- id: ${entry.id}`,
+        `  name: ${JSON.stringify(entry.module)}`,
+        ...(inject.length > 0 ? [`  inject: [${inject.join(", ")}]`] : []),
+      ].join("\n");
+    });
   return HEADER + rows.join("\n") + "\n";
 }
 

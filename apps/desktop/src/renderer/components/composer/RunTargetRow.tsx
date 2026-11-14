@@ -47,7 +47,8 @@ export type RunTargetRowProps = {
 };
 
 const RECENT_WORKSPACE_LIMIT = 5;
-const ROW_CLASS = "initial-context-row relative z-20 flex min-h-7 flex-wrap items-center gap-x-2 gap-y-1 px-1 text-act-sm text-text-muted";
+const ROW_CLASS =
+  "initial-context-row relative z-20 flex min-h-7 flex-wrap items-center gap-x-2 gap-y-1 px-1 text-act-sm text-text-muted";
 const TEXT_BUTTON_CLASS =
   "inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-act-sm px-1.5 text-act-sm text-text-muted outline-none transition-colors duration-(--motion-fast) hover:bg-hover-overlay hover:text-text-main focus-visible:bg-hover-overlay focus-visible:text-text-main data-[state=open]:bg-hover-overlay data-[state=open]:text-text-main";
 const ICON_CLASS = "shrink-0";
@@ -62,14 +63,16 @@ type TextButtonProps = ComponentPropsWithoutRef<"button"> & { icon: ReactNode; l
  * 无边框的文字按钮，作为 MenuTrigger asChild 的子元素（需要转发 ref 和 Radix 给的属性）。
  * 用原生 button：demo 的运行目标行是 14px 常规字重、6px 内边距、展开时保持高亮，Button 的 sm / md 档都不是这个规格。
  */
-const TextButton = forwardRef<HTMLButtonElement, TextButtonProps>(({ icon, label, trailing, className, ...props }, ref) => (
-  <button ref={ref} type="button" className={cn(TEXT_BUTTON_CLASS, className)} {...props}>
-    {icon}
-    <span className="min-w-0 truncate">{label}</span>
-    {trailing}
-    <ChevronDown className={CHEVRON_CLASS} size={12} aria-hidden="true" />
-  </button>
-));
+const TextButton = forwardRef<HTMLButtonElement, TextButtonProps>(
+  ({ icon, label, trailing, className, ...props }, ref) => (
+    <button ref={ref} type="button" className={cn(TEXT_BUTTON_CLASS, className)} {...props}>
+      {icon}
+      <span className="min-w-0 truncate">{label}</span>
+      {trailing}
+      <ChevronDown className={CHEVRON_CLASS} size={12} aria-hidden="true" />
+    </button>
+  ),
+);
 TextButton.displayName = "TextButton";
 
 /**
@@ -77,29 +80,58 @@ TextButton.displayName = "TextButton";
  * 远端时不显示分支，工作区列 Host 上的工作区（名称 + 第二行路径）；运行位置按钮写 Host 名，没就绪时带状态点和短文案。
  */
 export function RunTargetRow({
-  openField, onOpenChange, target, notReady, locationOnly = false, hosts, remoteDescription, onSelectHost, onSelectRemoteWorkspace, onConnectHost, local,
+  openField,
+  onOpenChange,
+  target,
+  notReady,
+  locationOnly = false,
+  hosts,
+  remoteDescription,
+  onSelectHost,
+  onSelectRemoteWorkspace,
+  onConnectHost,
+  local,
 }: RunTargetRowProps) {
   const remote = target.kind === "remote" ? target : null;
-  const openProps = (field: RunTargetField) => ({ open: openField === field, onOpenChange: (open: boolean) => onOpenChange(field, open) });
+  const openProps = (field: RunTargetField) => ({
+    open: openField === field,
+    onOpenChange: (open: boolean) => onOpenChange(field, open),
+  });
   return (
     <div className={ROW_CLASS} aria-label="初始工作区与运行位置选择">
       {locationOnly ? null : remote ? (
-        <RemoteWorkspaceMenu {...openProps("workspace")} target={remote} description={remoteDescription} onSelect={onSelectRemoteWorkspace} />
+        <RemoteWorkspaceMenu
+          {...openProps("workspace")}
+          target={remote}
+          description={remoteDescription}
+          onSelect={onSelectRemoteWorkspace}
+        />
       ) : (
         <LocalWorkspaceMenu {...openProps("workspace")} local={local} />
       )}
       {!locationOnly && !remote && local.branchLabel ? (
         <Menu {...openProps("branch")}>
           <MenuTrigger asChild>
-            <TextButton aria-label="选择分支" icon={<GitBranch className={ICON_CLASS} size={14} aria-hidden="true" />} label={local.branchLabel} />
+            <TextButton
+              aria-label="选择分支"
+              icon={<GitBranch className={ICON_CLASS} size={14} aria-hidden="true" />}
+              label={local.branchLabel}
+            />
           </MenuTrigger>
           <MenuContent className="max-h-[320px] w-[300px]">
             <MenuLabel>分支</MenuLabel>
             {local.branches.map((branch) => (
-              <MenuItem key={branch.name} role="menuitemradio" aria-checked={branch.name === local.selectedBranch} onSelect={() => local.onSelectBranch?.(branch.name)}>
+              <MenuItem
+                key={branch.name}
+                role="menuitemradio"
+                aria-checked={branch.name === local.selectedBranch}
+                onSelect={() => local.onSelectBranch?.(branch.name)}
+              >
                 <GitBranch className={ITEM_ICON_CLASS} size={14} aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate">{branch.name}</span>
-                {branch.name === local.selectedBranch ? <Check className="shrink-0" size={14} aria-hidden="true" /> : null}
+                {branch.name === local.selectedBranch ? (
+                  <Check className="shrink-0" size={14} aria-hidden="true" />
+                ) : null}
               </MenuItem>
             ))}
           </MenuContent>
@@ -122,25 +154,39 @@ export function RunTargetRow({
       >
         <TextButton
           aria-label="选择运行位置"
-          icon={remote
-            ? <Server className={ICON_CLASS} size={14} aria-hidden="true" />
-            : local.runLocation === "worktree"
-              ? <GitFork className={ICON_CLASS} size={14} aria-hidden="true" />
-              : <Laptop className={ICON_CLASS} size={14} aria-hidden="true" />}
+          icon={
+            remote ? (
+              <Server className={ICON_CLASS} size={14} aria-hidden="true" />
+            ) : local.runLocation === "worktree" ? (
+              <GitFork className={ICON_CLASS} size={14} aria-hidden="true" />
+            ) : (
+              <Laptop className={ICON_CLASS} size={14} aria-hidden="true" />
+            )
+          }
           label={remote ? remote.hostName || "远端机器" : local.runLocation === "worktree" ? "新建工作树" : "本机"}
-          trailing={notReady?.tone && notReady.label ? (
-            <span className="inline-flex shrink-0 items-center gap-1 text-act-xs text-text-faint">
-              <RunTargetDot tone={notReady.tone} />
-              {notReady.label}
-            </span>
-          ) : null}
+          trailing={
+            notReady?.tone && notReady.label ? (
+              <span className="inline-flex shrink-0 items-center gap-1 text-act-xs text-text-faint">
+                <RunTargetDot tone={notReady.tone} />
+                {notReady.label}
+              </span>
+            ) : null
+          }
         />
       </RunLocationMenu>
     </div>
   );
 }
 
-function LocalWorkspaceMenu({ open, onOpenChange, local }: { open: boolean; onOpenChange: (open: boolean) => void; local: RunTargetRowProps["local"] }) {
+function LocalWorkspaceMenu({
+  open,
+  onOpenChange,
+  local,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  local: RunTargetRowProps["local"];
+}) {
   const [creating, setCreating] = useState(false);
   const [folderName, setFolderName] = useState("");
   const recent = local.workspaces.slice(0, RECENT_WORKSPACE_LIMIT);
@@ -161,14 +207,25 @@ function LocalWorkspaceMenu({ open, onOpenChange, local }: { open: boolean; onOp
   return (
     <Menu open={open} onOpenChange={changeOpen}>
       <MenuTrigger asChild>
-        <TextButton aria-label="选择工作区" icon={<Folder className={ICON_CLASS} size={14} aria-hidden="true" />} label={local.workspaceLabel} />
+        <TextButton
+          aria-label="选择工作区"
+          icon={<Folder className={ICON_CLASS} size={14} aria-hidden="true" />}
+          label={local.workspaceLabel}
+        />
       </MenuTrigger>
       <MenuContent className="w-[260px]">
         <MenuLabel>最近使用</MenuLabel>
         {recent.map((workspace) => {
           const selected = workspace.value === local.selectedWorkspaceRoot;
           return (
-            <MenuItem key={workspace.value} role="menuitemradio" aria-checked={selected} textValue={workspace.label} className="py-1" onSelect={() => local.onSelectWorkspace?.(workspace.value)}>
+            <MenuItem
+              key={workspace.value}
+              role="menuitemradio"
+              aria-checked={selected}
+              textValue={workspace.label}
+              className="py-1"
+              onSelect={() => local.onSelectWorkspace?.(workspace.value)}
+            >
               <Folder className={ITEM_ICON_CLASS} size={14} aria-hidden="true" />
               <span className="flex min-w-0 flex-1 flex-col leading-tight">
                 <span className="truncate">{workspace.label}</span>
@@ -224,7 +281,13 @@ function LocalWorkspaceMenu({ open, onOpenChange, local }: { open: boolean; onOp
   );
 }
 
-function RemoteWorkspaceMenu({ open, onOpenChange, target, description, onSelect }: {
+function RemoteWorkspaceMenu({
+  open,
+  onOpenChange,
+  target,
+  description,
+  onSelect,
+}: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   target: Extract<RunTarget, { kind: "remote" }>;
@@ -235,16 +298,29 @@ function RemoteWorkspaceMenu({ open, onOpenChange, target, description, onSelect
   return (
     <Menu open={open} onOpenChange={onOpenChange}>
       <MenuTrigger asChild>
-        <TextButton aria-label="选择工作区" icon={<Folder className={ICON_CLASS} size={14} aria-hidden="true" />} label={label} />
+        <TextButton
+          aria-label="选择工作区"
+          icon={<Folder className={ICON_CLASS} size={14} aria-hidden="true" />}
+          label={label}
+        />
       </MenuTrigger>
       <MenuContent className="w-[280px]">
         <MenuLabel>{`${target.hostName || "远端机器"} 上的工作区`}</MenuLabel>
         {!description ? <div className={EMPTY_CLASS}>等待 Host 工作区</div> : null}
-        {description && description.workspaces.length === 0 ? <div className={EMPTY_CLASS}>这台机器上还没有工作区</div> : null}
+        {description && description.workspaces.length === 0 ? (
+          <div className={EMPTY_CLASS}>这台机器上还没有工作区</div>
+        ) : null}
         {description?.workspaces.map((workspace) => {
           const selected = workspace.id === target.workspaceId;
           return (
-            <MenuItem key={workspace.id} role="menuitemradio" aria-checked={selected} textValue={workspace.name} className="py-1" onSelect={() => onSelect(workspace.id)}>
+            <MenuItem
+              key={workspace.id}
+              role="menuitemradio"
+              aria-checked={selected}
+              textValue={workspace.name}
+              className="py-1"
+              onSelect={() => onSelect(workspace.id)}
+            >
               <Folder className={ITEM_ICON_CLASS} size={14} aria-hidden="true" />
               <span className="flex min-w-0 flex-1 flex-col leading-tight">
                 <span className="truncate">{workspace.name}</span>

@@ -1,5 +1,10 @@
 import { catalogProviderForEndpoint } from "@actspace/shared";
-import { createRequestRedactor, type LlmAdapter, type LlmAdapterDispatchInput, type LlmStreamSource } from "@actspace/llm-service";
+import {
+  createRequestRedactor,
+  type LlmAdapter,
+  type LlmAdapterDispatchInput,
+  type LlmStreamSource,
+} from "@actspace/llm-service";
 import { LegacyProxyWireEngine, type LegacyProxyWireEngineOptions } from "./legacy-proxy-wire-engine.js";
 import { streamPiAi, type PiAiConnectionOptions } from "./pi-ai-stream.js";
 
@@ -10,15 +15,24 @@ export type PiAiAdapterOptions = {
 
 /** The sole backend selection boundary; no fallback after Provider I/O. */
 export class PiAiAdapter implements LlmAdapter {
-  constructor(private readonly options: PiAiAdapterOptions, readonly adapterVersion = "pi-ai-1.5.0") {}
+  constructor(
+    private readonly options: PiAiAdapterOptions,
+    readonly adapterVersion = "pi-ai-1.5.0",
+  ) {}
 
   async dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
     const wire = this.options.wire;
-    const hasImage = input.request.messages.some((message) => typeof message.content !== "string" && message.content.some((block) => block.type === "image"));
+    const hasImage = input.request.messages.some(
+      (message) => typeof message.content !== "string" && message.content.some((block) => block.type === "image"),
+    );
     const endpoint = input.credential.baseUrl ?? wire.baseUrl ?? "";
     // A proxy alone no longer needs the compatibility backend: pi-ai takes a request-scoped fetch.
-    const needsLegacy = (catalogProviderForEndpoint(endpoint) === "openrouter" && wire.route !== "anthropic-messages")
-      || (hasImage && wire.providerId === "deepseek" && wire.route === "openai-completions" && wire.deepSeekFiles !== undefined);
+    const needsLegacy =
+      (catalogProviderForEndpoint(endpoint) === "openrouter" && wire.route !== "anthropic-messages") ||
+      (hasImage &&
+        wire.providerId === "deepseek" &&
+        wire.route === "openai-completions" &&
+        wire.deepSeekFiles !== undefined);
     // Host routing may bind credentials after PreparedLlmCall has resolved them.
     // Sanitize with the actual wire credential before failures leave this adapter.
     const redactor = createRequestRedactor(input.credential);

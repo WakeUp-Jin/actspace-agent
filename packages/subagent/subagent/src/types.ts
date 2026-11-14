@@ -8,7 +8,11 @@ export const SUBAGENT_HOST_SERVICE = "actspace.host.subagents" as const;
 
 /** What a subagent tool returns: the model-visible text, plus result details on success. */
 export type SubagentToolOutcome =
-  | { readonly ok: true; readonly text: string; readonly detail?: readonly { readonly label: string; readonly value: RuntimeJsonValue }[] }
+  | {
+      readonly ok: true;
+      readonly text: string;
+      readonly detail?: readonly { readonly label: string; readonly value: RuntimeJsonValue }[];
+    }
   | { readonly ok: false; readonly code: string; readonly text: string };
 
 /** The calling agent: its Session and, for a main agent, its scope (child callers are resolved by the Host). */
@@ -46,7 +50,9 @@ export interface SubagentHostPort {
   spawnFork(input: SpawnForkInput): Promise<SubagentToolOutcome>;
   /** `agent_codex` / `agent_claude_code` (design 04): one CLI run, scheduled like any subagent. */
   spawnExternal(backend: ExternalSubagentBackend, input: SpawnExternalInput): Promise<SubagentToolOutcome>;
-  sendMessage(input: SubagentCaller & { readonly agentId: string; readonly message: string }): Promise<SubagentToolOutcome>;
+  sendMessage(
+    input: SubagentCaller & { readonly agentId: string; readonly message: string },
+  ): Promise<SubagentToolOutcome>;
   listModels(input: SubagentCaller): Promise<SubagentToolOutcome>;
 }
 export const SUBAGENT_HOST_PORT = serviceKey<SubagentHostPort>(SUBAGENT_HOST_SERVICE);

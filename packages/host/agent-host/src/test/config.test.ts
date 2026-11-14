@@ -4,30 +4,62 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { readHostConfig } from "../config.js";
 const roots: string[] = [];
-afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
 it("validates configured paths, provider references, unknown fields and public TLS policy", async () => {
-  const root = await mkdtemp(join(tmpdir(), "host-config-")); roots.push(root);
+  const root = await mkdtemp(join(tmpdir(), "host-config-"));
+  roots.push(root);
   const file = join(root, "host.json");
-  const config = { schemaVersion: 1, dataRoot: "./data", listen: { address: "127.0.0.1", port: 4317 }, allowedOrigins: [], workspaces: [{ id: "main", name: "Main", path: "." }], providers: [{ id: "p", type: "openai-completions", baseUrl: "https://example.com", keyEnv: "FIXTURE_KEY", models: ["m"] }], defaultModel: "p/m" };
+  const config = {
+    schemaVersion: 1,
+    dataRoot: "./data",
+    listen: { address: "127.0.0.1", port: 4317 },
+    allowedOrigins: [],
+    workspaces: [{ id: "main", name: "Main", path: "." }],
+    providers: [
+      { id: "p", type: "openai-completions", baseUrl: "https://example.com", keyEnv: "FIXTURE_KEY", models: ["m"] },
+    ],
+    defaultModel: "p/m",
+  };
   await writeFile(file, JSON.stringify(config));
   expect((await readHostConfig(file, { FIXTURE_KEY: "secret" })).dataRoot).toBe(join(root, "data"));
   await expect(readHostConfig(file, {})).rejects.toThrow("Missing provider credential");
-  await writeFile(file, JSON.stringify({ ...config, unknown: true })); await expect(readHostConfig(file)).rejects.toThrow("fields");
-  await writeFile(file, JSON.stringify({ ...config, listen: { address: "0.0.0.0", port: 4317 } })); await expect(readHostConfig(file)).rejects.toThrow("TLS");
+  await writeFile(file, JSON.stringify({ ...config, unknown: true }));
+  await expect(readHostConfig(file)).rejects.toThrow("fields");
+  await writeFile(file, JSON.stringify({ ...config, listen: { address: "0.0.0.0", port: 4317 } }));
+  await expect(readHostConfig(file)).rejects.toThrow("TLS");
   await writeFile(file, JSON.stringify({ ...config, providers: [{ ...config.providers[0], models: ["m", "m"] }] }));
   await expect(readHostConfig(file, { FIXTURE_KEY: "secret" })).rejects.toThrow("duplicate provider model");
   await writeFile(file, JSON.stringify({ ...config, workspaces: [{ id: "a/b", name: "Main", path: "." }] }));
   await expect(readHostConfig(file, { FIXTURE_KEY: "secret" })).rejects.toThrow("identifier");
-  await writeFile(file, JSON.stringify({ ...config, defaultModel: "p/missing" })); await expect(readHostConfig(file, { FIXTURE_KEY: "secret" })).rejects.toThrow("defaultModel");
+  await writeFile(file, JSON.stringify({ ...config, defaultModel: "p/missing" }));
+  await expect(readHostConfig(file, { FIXTURE_KEY: "secret" })).rejects.toThrow("defaultModel");
 });
 it("resolves webRoot against the config dir and requires an existing directory", async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), "host-webroot-"))); roots.push(root);
-  const file = join(root, "host.json"); await mkdir(join(root, "dist"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "host-webroot-")));
+  roots.push(root);
+  const file = join(root, "host.json");
+  await mkdir(join(root, "dist"));
   await writeFile(join(root, "plain.txt"), "x");
-  const config = { schemaVersion: 1, dataRoot: "./data", listen: { address: "127.0.0.1", port: 4317 }, allowedOrigins: [], workspaces: [{ id: "main", name: "Main", path: "." }], providers: [{ id: "p", type: "openai-completions", baseUrl: "https://example.com", keyEnv: "FIXTURE_KEY", models: ["m"] }], defaultModel: "p/m" };
+  const config = {
+    schemaVersion: 1,
+    dataRoot: "./data",
+    listen: { address: "127.0.0.1", port: 4317 },
+    allowedOrigins: [],
+    workspaces: [{ id: "main", name: "Main", path: "." }],
+    providers: [
+      { id: "p", type: "openai-completions", baseUrl: "https://example.com", keyEnv: "FIXTURE_KEY", models: ["m"] },
+    ],
+    defaultModel: "p/m",
+  };
   const env = { FIXTURE_KEY: "secret" };
-  await writeFile(file, JSON.stringify({ ...config, webRoot: "./dist" })); expect((await readHostConfig(file, env)).webRoot).toBe(join(root, "dist"));
-  await writeFile(file, JSON.stringify(config)); expect("webRoot" in await readHostConfig(file, env)).toBe(false);
-  await writeFile(file, JSON.stringify({ ...config, webRoot: "./nope" })); await expect(readHostConfig(file, env)).rejects.toThrow("webRoot must be an existing directory");
-  await writeFile(file, JSON.stringify({ ...config, webRoot: "./plain.txt" })); await expect(readHostConfig(file, env)).rejects.toThrow("webRoot must be an existing directory");
+  await writeFile(file, JSON.stringify({ ...config, webRoot: "./dist" }));
+  expect((await readHostConfig(file, env)).webRoot).toBe(join(root, "dist"));
+  await writeFile(file, JSON.stringify(config));
+  expect("webRoot" in (await readHostConfig(file, env))).toBe(false);
+  await writeFile(file, JSON.stringify({ ...config, webRoot: "./nope" }));
+  await expect(readHostConfig(file, env)).rejects.toThrow("webRoot must be an existing directory");
+  await writeFile(file, JSON.stringify({ ...config, webRoot: "./plain.txt" }));
+  await expect(readHostConfig(file, env)).rejects.toThrow("webRoot must be an existing directory");
 });

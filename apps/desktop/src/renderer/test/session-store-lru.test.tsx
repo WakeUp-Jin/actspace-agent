@@ -1,7 +1,11 @@
 import { act, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ClientSessionStore, type ClientSessionCell } from "@actspace/client/sessions";
-import { surfaceNode, type RuntimeDesktopSessionProjection, type SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import {
+  surfaceNode,
+  type RuntimeDesktopSessionProjection,
+  type SessionEventEnvelopeV1,
+} from "@actspace/shared/runtime-v2";
 import { createSessionCellRetention, SESSION_CELL_RETAIN_LIMIT, useSessionCell } from "../session/session-store";
 import { loadEarlier } from "../session/session-pages";
 import { projectionFixture } from "./projection-fixture";
@@ -9,27 +13,44 @@ import { projectionFixture } from "./projection-fixture";
 // 14 T9：cell 保留策略（活动 / 运行中常驻，其余最近查看的 5 个）、useSessionCell、loadEarlier。
 function message(seq: number): SessionEventEnvelopeV1 {
   const messageId = `m-${seq}`;
-  return { recordKind: "event", seq, type: "user/message", eventVersion: 1, criticality: "ignorable", time: "2026-10-06T00:00:00.000Z", source: { ownerPluginId: "@actspace/core" },
-    data: { agentRunId: "run", messageId, content: `message ${seq}` }, surface: { kind: "append" },
-    provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
+  return {
+    recordKind: "event",
+    seq,
+    type: "user/message",
+    eventVersion: 1,
+    criticality: "ignorable",
+    time: "2026-10-06T00:00:00.000Z",
+    source: { ownerPluginId: "@actspace/core" },
+    data: { agentRunId: "run", messageId, content: `message ${seq}` },
+    surface: { kind: "append" },
+    provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null },
+  };
 }
 
 /** seq 为 [fromSeq, toSeq] 的一页；整个会话的最新 seq 是 latest。 */
 function page(sessionId: string, fromSeq: number, toSeq: number, latest = toSeq): RuntimeDesktopSessionProjection {
   const events = Array.from({ length: toSeq - fromSeq + 1 }, (_, index) => message(fromSeq + index));
   const base = projectionFixture(sessionId, latest, events);
-  return { ...base, activeMessageIds: events.map((event) => surfaceNode(event)!.messageId), snapshot: { ...base.snapshot, messages: events.map((event) => surfaceNode(event)!) },
-    window: { ...base.window, fromSeq, throughJournalSeq: toSeq, beforeSeq: fromSeq === 0 ? null : fromSeq } };
+  return {
+    ...base,
+    activeMessageIds: events.map((event) => surfaceNode(event)!.messageId),
+    snapshot: { ...base.snapshot, messages: events.map((event) => surfaceNode(event)!) },
+    window: { ...base.window, fromSeq, throughJournalSeq: toSeq, beforeSeq: fromSeq === 0 ? null : fromSeq },
+  };
 }
 
 function viewAll(store: ClientSessionStore, ids: string[]) {
   const retention = createSessionCellRetention(store);
-  return { retention, view: (id: string, pinned: ReadonlySet<string> = new Set([id])) => {
-    store.select(id);
-    store.applyEnvelope(page(id, 0, 1));
-    retention.retain(pinned);
-    retention.viewed(id);
-  }, ids };
+  return {
+    retention,
+    view: (id: string, pinned: ReadonlySet<string> = new Set([id])) => {
+      store.select(id);
+      store.applyEnvelope(page(id, 0, 1));
+      retention.retain(pinned);
+      retention.viewed(id);
+    },
+    ids,
+  };
 }
 
 describe("session cell retention", () => {
@@ -98,12 +119,16 @@ describe("useSessionCell", () => {
     }
     const view = render(<Probe sessionId="s-1" />);
     expect(seen.at(-1)).toEqual({ count: 0 });
-    act(() => { store.applyEnvelope(page("s-1", 0, 1)); });
+    act(() => {
+      store.applyEnvelope(page("s-1", 0, 1));
+    });
     expect(seen.at(-1)).toEqual({ count: 2 });
     const rendered = seen.length;
     const calls = selector.mock.calls.length;
 
-    act(() => { store.applyEnvelope(page("s-2", 0, 4)); });
+    act(() => {
+      store.applyEnvelope(page("s-2", 0, 4));
+    });
     expect(seen.length).toBe(rendered);
     expect(selector.mock.calls.length).toBe(calls);
     view.rerender(<Probe sessionId="s-1" />);
@@ -133,7 +158,12 @@ describe("loadEarlier", () => {
     const store = new ClientSessionStore();
     store.applyEnvelope(page("s-1", 10, 19));
     let resolve!: (value: RuntimeDesktopSessionProjection) => void;
-    const getPage = vi.fn(() => new Promise<RuntimeDesktopSessionProjection>((done) => { resolve = done; }));
+    const getPage = vi.fn(
+      () =>
+        new Promise<RuntimeDesktopSessionProjection>((done) => {
+          resolve = done;
+        }),
+    );
     const first = loadEarlier(store, "s-1", getPage);
     expect(loadEarlier(store, "s-1", getPage)).toBe(first);
     resolve(page("s-1", 0, 9, 19));
@@ -145,7 +175,10 @@ describe("loadEarlier", () => {
     const store = new ClientSessionStore();
     store.applyEnvelope(page("s-1", 10, 19));
     let resolve!: (value: RuntimeDesktopSessionProjection) => void;
-    const getPage = () => new Promise<RuntimeDesktopSessionProjection>((done) => { resolve = done; });
+    const getPage = () =>
+      new Promise<RuntimeDesktopSessionProjection>((done) => {
+        resolve = done;
+      });
 
     const evicted = loadEarlier(store, "s-1", getPage);
     store.evict("s-1");
@@ -165,7 +198,10 @@ describe("loadEarlier", () => {
   it("propagates a failed read so the caller can show it, and allows a retry", async () => {
     const store = new ClientSessionStore();
     store.applyEnvelope(page("s-1", 10, 19));
-    const getPage = vi.fn().mockRejectedValueOnce(new Error("读取失败")).mockResolvedValueOnce(page("s-1", 0, 9, 19));
+    const getPage = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("读取失败"))
+      .mockResolvedValueOnce(page("s-1", 0, 9, 19));
     await expect(loadEarlier(store, "s-1", getPage)).rejects.toThrow("读取失败");
     await expect(loadEarlier(store, "s-1", getPage)).resolves.toBe(true);
   });

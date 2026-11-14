@@ -48,7 +48,9 @@ export class SessionProjectionRegistry {
 
   constructor(private readonly accepts: (event: SessionEventEnvelopeV1) => boolean = () => true) {}
 
-  register<State, Value extends RuntimeJsonValue = RuntimeJsonValue>(definition: ProjectionDefinition<State, Value>): () => void {
+  register<State, Value extends RuntimeJsonValue = RuntimeJsonValue>(
+    definition: ProjectionDefinition<State, Value>,
+  ): () => void {
     if (this.#sealed) throw new Error("Register projection definitions before sealing the runtime registry.");
     validateDefinition(definition as unknown as ProjectionDefinition<unknown>);
     if (this.#definitions.has(definition.key)) throw new TypeError(`Duplicate projection key ${definition.key}.`);
@@ -87,9 +89,10 @@ export class SessionProjectionRegistry {
     const cell = this.#cells.get(sessionId) ?? this.#createCell();
     const nextStates = new Map<string, unknown>();
     const effective = effectiveSessionEvents(events);
-    for (const definition of this.#definitions.values()) nextStates.set(definition.key, fold(definition, effective.filter(this.accepts)));
+    for (const definition of this.#definitions.values())
+      nextStates.set(definition.key, fold(definition, effective.filter(this.accepts)));
     cell.events = this.#sealed ? [] : [...events];
-    cell.fingerprints = new Map(events.slice(-512).map(event => [event.seq, fingerprint(event)]));
+    cell.fingerprints = new Map(events.slice(-512).map((event) => [event.seq, fingerprint(event)]));
     cell.states = nextStates;
     cell.lastSeq = events.length === 0 ? -1 : (events[events.length - 1]?.seq ?? -1);
     cell.pending = events.slice(effective.length);
@@ -102,11 +105,12 @@ export class SessionProjectionRegistry {
     validateSessionId(sessionId);
     const cell = this.#cells.get(sessionId) ?? this.#createCell();
     if (event.seq <= cell.lastSeq) {
-      const prior = cell.events.find(candidate => candidate.seq === event.seq);
+      const prior = cell.events.find((candidate) => candidate.seq === event.seq);
       if ((prior && sameEvent(prior, event)) || cell.fingerprints.get(event.seq) === fingerprint(event)) return null;
       throw new Error(`Projection sequence conflict for ${sessionId} at seq ${event.seq}; resync required.`);
     }
-    if (event.seq !== cell.lastSeq + 1) throw new Error(`Projection event gap for ${sessionId}: expected ${cell.lastSeq + 1}, received ${event.seq}.`);
+    if (event.seq !== cell.lastSeq + 1)
+      throw new Error(`Projection event gap for ${sessionId}: expected ${cell.lastSeq + 1}, received ${event.seq}.`);
 
     const nextStates = new Map(cell.states);
     const changedKeys: RuntimeProjectionKey[] = [];
@@ -116,7 +120,8 @@ export class SessionProjectionRegistry {
     for (const definition of this.#definitions.values()) {
       const previous = cell.states.get(definition.key);
       let next = previous;
-      for (const accepted of effective) if (this.accepts(accepted)) next = immutableState(definition.apply(next, accepted));
+      for (const accepted of effective)
+        if (this.accepts(accepted)) next = immutableState(definition.apply(next, accepted));
       if (next !== previous) {
         nextStates.set(definition.key, next);
         changedKeys.push(definition.key);
@@ -152,7 +157,8 @@ export class SessionProjectionRegistry {
     const cell = this.#cells.get(sessionId) ?? this.#createCell();
     for (let index = 0; index < events.length; index++) {
       const expected = cell.lastSeq + index + 1;
-      if (events[index].seq !== expected) throw new Error(`Projection event gap for ${sessionId}: expected ${expected}, received ${events[index].seq}.`);
+      if (events[index].seq !== expected)
+        throw new Error(`Projection event gap for ${sessionId}: expected ${expected}, received ${events[index].seq}.`);
     }
     const candidate = [...cell.pending, ...events];
     const effective = effectiveSessionEvents(candidate);
@@ -201,7 +207,9 @@ export class SessionProjectionRegistry {
     this.#cells.delete(sessionId);
   }
 
-  throughSeq(sessionId: string): number { return this.#cells.get(sessionId)?.lastSeq ?? -1; }
+  throughSeq(sessionId: string): number {
+    return this.#cells.get(sessionId)?.lastSeq ?? -1;
+  }
 
   value(sessionId: string, key: string): RuntimeJsonValue | undefined {
     const definition = this.#definitions.get(key);
@@ -220,17 +228,24 @@ export class SessionProjectionRegistry {
 
   restore(sessionId: string, checkpoint: ProjectionCheckpoint): void {
     validateSessionId(sessionId);
-    if (!Number.isSafeInteger(checkpoint.throughJournalSeq) || checkpoint.throughJournalSeq < -1 || !Array.isArray(checkpoint.pending)) throw new Error("Invalid projection checkpoint.");
+    if (
+      !Number.isSafeInteger(checkpoint.throughJournalSeq) ||
+      checkpoint.throughJournalSeq < -1 ||
+      !Array.isArray(checkpoint.pending)
+    )
+      throw new Error("Invalid projection checkpoint.");
     const cell = this.#createCell();
     for (const [key, definition] of this.#definitions) {
       const row = checkpoint.rows[key];
-      if (!row || row.stateVersion !== definition.stateVersion) throw new Error(`Projection checkpoint version mismatch: ${key}.`);
+      if (!row || row.stateVersion !== definition.stateVersion)
+        throw new Error(`Projection checkpoint version mismatch: ${key}.`);
       const state = immutableState(detached(row.state));
       sharedView(definition.view(state));
       cell.states.set(key, state);
     }
     for (let index = 0; index < checkpoint.pending.length; index++) {
-      if (checkpoint.pending[index].seq !== checkpoint.throughJournalSeq - checkpoint.pending.length + index + 1) throw new Error("Invalid pending projection transaction.");
+      if (checkpoint.pending[index].seq !== checkpoint.throughJournalSeq - checkpoint.pending.length + index + 1)
+        throw new Error("Invalid pending projection transaction.");
     }
     cell.lastSeq = checkpoint.throughJournalSeq;
     cell.pending = structuredClone(checkpoint.pending);
@@ -264,7 +279,15 @@ export class SessionProjectionRegistry {
   #createCell(): ProjectionCell {
     const states = new Map<string, unknown>();
     for (const definition of this.#definitions.values()) states.set(definition.key, immutableState(definition.init()));
-    return { events: [], fingerprints: new Map(), states, lastSeq: -1, listeners: new Set(), pending: [], restored: false };
+    return {
+      events: [],
+      fingerprints: new Map(),
+      states,
+      lastSeq: -1,
+      listeners: new Set(),
+      pending: [],
+      restored: false,
+    };
   }
 }
 
@@ -275,13 +298,21 @@ function fold(definition: ProjectionDefinition<unknown>, events: readonly Sessio
 }
 
 function validateDefinition(definition: ProjectionDefinition<unknown>): void {
-  if (typeof definition.key !== "string" || definition.key.length === 0) throw new TypeError("Projection key must be a non-empty string.");
-  if (!Number.isSafeInteger(definition.stateVersion) || definition.stateVersion < 1) throw new TypeError(`Projection ${definition.key} stateVersion must be >= 1.`);
-  if (typeof definition.init !== "function" || typeof definition.apply !== "function" || typeof definition.view !== "function") throw new TypeError(`Projection ${definition.key} must define init, apply and view.`);
+  if (typeof definition.key !== "string" || definition.key.length === 0)
+    throw new TypeError("Projection key must be a non-empty string.");
+  if (!Number.isSafeInteger(definition.stateVersion) || definition.stateVersion < 1)
+    throw new TypeError(`Projection ${definition.key} stateVersion must be >= 1.`);
+  if (
+    typeof definition.init !== "function" ||
+    typeof definition.apply !== "function" ||
+    typeof definition.view !== "function"
+  )
+    throw new TypeError(`Projection ${definition.key} must define init, apply and view.`);
 }
 
 function validateSessionId(sessionId: string): void {
-  if (typeof sessionId !== "string" || sessionId.length === 0) throw new TypeError("Projection sessionId must be a non-empty string.");
+  if (typeof sessionId !== "string" || sessionId.length === 0)
+    throw new TypeError("Projection sessionId must be a non-empty string.");
 }
 
 function validateEventSequence(events: readonly SessionEventEnvelopeV1[]): void {
@@ -308,8 +339,21 @@ function detached(value: RuntimeJsonValue): RuntimeJsonValue {
 }
 
 function assertJson(value: unknown, seen = new Set<object>()): void {
-  if (value === null || typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) return;
-  if (typeof value !== "object" || seen.has(value) || (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) throw new TypeError("Projection state and view must be synchronous plain JSON.");
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (typeof value === "number" && Number.isFinite(value))
+  )
+    return;
+  if (
+    typeof value !== "object" ||
+    seen.has(value) ||
+    (!Array.isArray(value) &&
+      Object.getPrototypeOf(value) !== Object.prototype &&
+      Object.getPrototypeOf(value) !== null)
+  )
+    throw new TypeError("Projection state and view must be synchronous plain JSON.");
   seen.add(value);
   for (const item of Object.values(value)) assertJson(item, seen);
   seen.delete(value);
@@ -328,4 +372,6 @@ function sameEvent(left: SessionEventEnvelopeV1, right: SessionEventEnvelopeV1):
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function fingerprint(event: SessionEventEnvelopeV1): string { return createHash("sha256").update(JSON.stringify(event)).digest("hex"); }
+function fingerprint(event: SessionEventEnvelopeV1): string {
+  return createHash("sha256").update(JSON.stringify(event)).digest("hex");
+}

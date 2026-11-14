@@ -15,12 +15,15 @@ const MENU_GAP_PX = 6;
 const VIEWPORT_MARGIN_PX = 12;
 
 function closestReply(node: Node): HTMLElement | null {
-  const element = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement;
+  const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
   return element?.closest<HTMLElement>("[data-assistant-message-id]") ?? null;
 }
 
 function lastLineRect(range: Range): DOMRect {
-  const rects = typeof range.getClientRects === "function" ? Array.from(range.getClientRects()).filter((rect) => rect.width > 0) : [];
+  const rects =
+    typeof range.getClientRects === "function"
+      ? Array.from(range.getClientRects()).filter((rect) => rect.width > 0)
+      : [];
   return rects[rects.length - 1] ?? range.getBoundingClientRect();
 }
 
@@ -38,7 +41,10 @@ function readSelection(canAnnotate: (messageId: string) => boolean): MenuState |
   const model = collectAnnotatableText(root);
   const offsets = rangeToOffsets(model, range, root);
   if (!offsets) return null;
-  if (codePointLength(model.text.slice(offsets.start, offsets.end)) > COMPOSER_REFERENCE_LIMITS.maxSelectedTextCodePoints) return null;
+  if (
+    codePointLength(model.text.slice(offsets.start, offsets.end)) > COMPOSER_REFERENCE_LIMITS.maxSelectedTextCodePoints
+  )
+    return null;
   const rect = lastLineRect(range);
   return {
     draft: createAnnotationDraft(model, offsets.start, offsets.end, messageId),
@@ -113,7 +119,12 @@ export function ResponseSelectionMenu({
 
   if (!state) return null;
   return (
-    <Popover open onOpenChange={(open) => { if (!open) setState(null); }}>
+    <Popover
+      open
+      onOpenChange={(open) => {
+        if (!open) setState(null);
+      }}
+    >
       <PopoverAnchor virtualRef={anchorRef} />
       <PopoverContent
         ref={menuRef}

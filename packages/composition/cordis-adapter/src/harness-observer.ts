@@ -25,5 +25,8 @@ export interface HarnessPluginObservation {
 /** Optional, generic mount observation port. Without one, mounting behaves exactly as before. */
 export interface HarnessMountObserver {
   /** Called once per entry while the tree is prepared; `entries` is every entry of this mount. Return undefined to skip it. */
-  observePlugin(entry: HarnessMountPluginInfo, entries: readonly HarnessMountPluginInfo[]): HarnessPluginObservation | undefined;
+  observePlugin(
+    entry: HarnessMountPluginInfo,
+    entries: readonly HarnessMountPluginInfo[],
+  ): HarnessPluginObservation | undefined;
 }

@@ -7,7 +7,11 @@ import { runToolStreamFixture } from "../testing.js";
 async function withRoot<T>(run: (context: CordisContext) => Promise<T>): Promise<T> {
   const root = await createCordisRoot();
   root.context.provide?.(LOOP_CHECKPOINT_VIEW.id, { flush: async () => {} });
-  try { return await run(root.context); } finally { await root.dispose(); }
+  try {
+    return await run(root.context);
+  } finally {
+    await root.dispose();
+  }
 }
 
 describe("Loop hooks registered with onHook", () => {
@@ -20,7 +24,9 @@ describe("Loop hooks registered with onHook", () => {
       });
       return await runToolStreamFixture({ context });
     });
-    const starts = run.journal.filter(event => event.type === "step/start").map(event => event.data as { stepId: string; metadata: Record<string, unknown> });
+    const starts = run.journal
+      .filter((event) => event.type === "step/start")
+      .map((event) => event.data as { stepId: string; metadata: Record<string, unknown> });
     expect(starts).toMatchObject([
       { stepIndex: 1, metadata: { stepIndex: 1, note: "step 1" } },
       { stepIndex: 2, metadata: { stepIndex: 2, note: "step 2" } },
@@ -30,19 +36,29 @@ describe("Loop hooks registered with onHook", () => {
       expect(start.metadata.stepId).toBe(start.stepId);
       expect(start.metadata).not.toHaveProperty("agent");
     }
-    expect(agents).toEqual([{ agentId: "main:test", scopeId: "main:test" }, { agentId: "main:test", scopeId: "main:test" }]);
+    expect(agents).toEqual([
+      { agentId: "main:test", scopeId: "main:test" },
+      { agentId: "main:test", scopeId: "main:test" },
+    ]);
   });
 
   it("ends the turn whatever agent/turn-stopping returns", async () => {
     const calls: string[] = [];
     const run = await withRoot(async (context) => {
-      onHook(context, "agent/turn-stopping", (payload) => { calls.push(`first: ${payload.reason} after ${payload.stepCount} steps`); return "keep going"; });
-      onHook(context, "agent/turn-stopping", () => { calls.push("second"); });
+      onHook(context, "agent/turn-stopping", (payload) => {
+        calls.push(`first: ${payload.reason} after ${payload.stepCount} steps`);
+        return "keep going";
+      });
+      onHook(context, "agent/turn-stopping", () => {
+        calls.push("second");
+      });
       return await runToolStreamFixture({ context });
     });
     // 第一个监听器返回了值，后面的不再被调用；Loop 不读这个值。
     expect(calls).toEqual(["first: completed after 2 steps"]);
     expect(run.result).toMatchObject({ reason: "completed", steps: 2 });
-    expect(run.journal.filter(event => event.type === "turn/end").map(event => event.data)).toMatchObject([{ reason: "completed" }]);
+    expect(run.journal.filter((event) => event.type === "turn/end").map((event) => event.data)).toMatchObject([
+      { reason: "completed" },
+    ]);
   });
 });

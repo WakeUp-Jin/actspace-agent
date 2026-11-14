@@ -28,7 +28,14 @@ const editMessage: Extract<MessageBlock, { kind: "edit_diff" }> = {
 const presentMessage: Extract<MessageBlock, { kind: "present" }> = {
   kind: "present",
   id: "present-1",
-  files: [{ path: "docs/report.md", outputPath: "/workspace/docs/report.md", outputRelativePath: "docs/report.md", description: "季度报告（终稿）" }],
+  files: [
+    {
+      path: "docs/report.md",
+      outputPath: "/workspace/docs/report.md",
+      outputRelativePath: "docs/report.md",
+      description: "季度报告（终稿）",
+    },
+  ],
   displayText: "Presented 1 file",
   status: "completed",
   createdAt: "2026-10-13T00:00:02.000Z",
@@ -49,7 +56,11 @@ function ActiveTabProbe() {
 
 function bridge(overrides: BridgeOverrides = {}, showTurnCodeChanges = true) {
   return setupBridge({
-    "settings.getV4": vi.fn(async () => ({ version: 4, revision: "r", settings: { general: { showTurnCodeChanges } } })),
+    "settings.getV4": vi.fn(async () => ({
+      version: 4,
+      revision: "r",
+      settings: { general: { showTurnCodeChanges } },
+    })),
     ...overrides,
   });
 }
@@ -58,7 +69,14 @@ async function renderTurn(messages: MessageBlock[], props: Record<string, unknow
   await act(async () => {
     render(
       <RightPanelProvider>
-        <TestConversationView messages={messages} contextSnapshot={null} sessionId="session-1" selectedWorkspaceRoot="/workspace" isSessionReady={false} {...props} />
+        <TestConversationView
+          messages={messages}
+          contextSnapshot={null}
+          sessionId="session-1"
+          selectedWorkspaceRoot="/workspace"
+          isSessionReady={false}
+          {...props}
+        />
         <ActiveTabProbe />
       </RightPanelProvider>,
     );
@@ -103,14 +121,22 @@ describe("turn tail", () => {
     expect(statFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/report.md" });
     expect(screen.getByTestId("active-tab")).toHaveTextContent("docs:MD 文档");
 
-    statFile.mockResolvedValueOnce({ relativePath: "docs/report.md", size: 0, mtimeMs: 0, error: "not_found" } as never);
+    statFile.mockResolvedValueOnce({
+      relativePath: "docs/report.md",
+      size: 0,
+      mtimeMs: 0,
+      error: "not_found",
+    } as never);
     await userEvent.click(screen.getByRole("button", { name: "打开 docs/report.md" }));
     expect(await screen.findByText("文件不存在或已被移动。")).toBeInTheDocument();
   });
 
   it("folds more than four deliverables behind a toggle", async () => {
     bridge();
-    const files = ["a", "b", "c", "d", "e"].map((name) => ({ path: `out/${name}.md`, outputRelativePath: `out/${name}.md` }));
+    const files = ["a", "b", "c", "d", "e"].map((name) => ({
+      path: `out/${name}.md`,
+      outputRelativePath: `out/${name}.md`,
+    }));
     await renderTurn(turn({ ...presentMessage, files }));
 
     expect(document.querySelectorAll("[data-presented-file]")).toHaveLength(4);
@@ -124,12 +150,20 @@ describe("turn tail", () => {
     await renderTurn(turn(presentMessage));
 
     await userEvent.click(screen.getByRole("button", { name: "用默认应用打开" }));
-    expect(openFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/report.md", action: "open" });
+    expect(openFile).toHaveBeenCalledWith({
+      workspaceRoot: "/workspace",
+      relativePath: "docs/report.md",
+      action: "open",
+    });
     expect(await screen.findByText("已请求打开")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "更多打开方式" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "显示文件位置" }));
-    expect(openFile).toHaveBeenLastCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/report.md", action: "reveal" });
+    expect(openFile).toHaveBeenLastCalledWith({
+      workspaceRoot: "/workspace",
+      relativePath: "docs/report.md",
+      action: "reveal",
+    });
     expect(await screen.findByText("已请求在文件管理器中显示")).toBeInTheDocument();
   });
 
@@ -141,8 +175,16 @@ describe("turn tail", () => {
     fireEvent.contextMenu(screen.getByRole("button", { name: "查看 src/app.ts 的改动" }));
     fireEvent.contextMenu(screen.getByRole("button", { name: "打开 docs/report.md" }));
     await vi.waitFor(() => expect(showArtifactContextMenu).toHaveBeenCalledTimes(2));
-    expect(showArtifactContextMenu).toHaveBeenNthCalledWith(1, { kind: "workspace_file", workspaceRoot: "/workspace", relativePath: "src/app.ts" });
-    expect(showArtifactContextMenu).toHaveBeenNthCalledWith(2, { kind: "workspace_file", workspaceRoot: "/workspace", relativePath: "docs/report.md" });
+    expect(showArtifactContextMenu).toHaveBeenNthCalledWith(1, {
+      kind: "workspace_file",
+      workspaceRoot: "/workspace",
+      relativePath: "src/app.ts",
+    });
+    expect(showArtifactContextMenu).toHaveBeenNthCalledWith(2, {
+      kind: "workspace_file",
+      workspaceRoot: "/workspace",
+      relativePath: "docs/report.md",
+    });
   });
 
   it("previews and downloads through the Host for remote sessions, without native open buttons", async () => {
@@ -151,7 +193,13 @@ describe("turn tail", () => {
     const download = vi.fn(async () => undefined);
     const readFile = vi.fn();
     const showArtifactContextMenu = vi.fn();
-    bridge({ "hosts.call": call, "hosts.preview": preview, "hosts.download": download, "workspaces.readFile": readFile, "dialogs.showArtifactContextMenu": showArtifactContextMenu });
+    bridge({
+      "hosts.call": call,
+      "hosts.preview": preview,
+      "hosts.download": download,
+      "workspaces.readFile": readFile,
+      "dialogs.showArtifactContextMenu": showArtifactContextMenu,
+    });
     await renderTurn(turn(presentMessage), {
       sessionId: encodeSessionLocator({ hostId: "server", sessionId: "remote-1" }),
       runTarget: { kind: "remote", hostId: "server", hostName: "Cloud" },
@@ -163,7 +211,9 @@ describe("turn tail", () => {
     expect(preview).toHaveBeenCalledWith({ hostId: "server", sessionId: "remote-1", artifactId: "artifact-1" });
     expect(screen.getByTestId("active-tab")).toHaveTextContent("text:report.md");
     fireEvent.contextMenu(card);
-    await vi.waitFor(() => expect(download).toHaveBeenCalledWith({ hostId: "server", sessionId: "remote-1", artifactId: "artifact-1" }));
+    await vi.waitFor(() =>
+      expect(download).toHaveBeenCalledWith({ hostId: "server", sessionId: "remote-1", artifactId: "artifact-1" }),
+    );
     expect(readFile).not.toHaveBeenCalled();
     expect(showArtifactContextMenu).not.toHaveBeenCalled();
   });
@@ -172,8 +222,15 @@ describe("turn tail", () => {
     let enabled = false;
     let changed = () => {};
     bridge({
-      "settings.getV4": vi.fn(async () => ({ version: 4, revision: "r", settings: { general: { showTurnCodeChanges: enabled } } })),
-      "events.settingsChanged": vi.fn((callback) => { changed = callback; return () => {}; }),
+      "settings.getV4": vi.fn(async () => ({
+        version: 4,
+        revision: "r",
+        settings: { general: { showTurnCodeChanges: enabled } },
+      })),
+      "events.settingsChanged": vi.fn((callback) => {
+        changed = callback;
+        return () => {};
+      }),
     });
     await renderTurn(turn(editMessage, presentMessage));
 
@@ -182,23 +239,45 @@ describe("turn tail", () => {
     expect(within(tail).getByRole("button", { name: "打开 docs/report.md" })).toBeInTheDocument();
 
     enabled = true;
-    await act(async () => { changed(); });
+    await act(async () => {
+      changed();
+    });
     expect(await screen.findByRole("button", { name: "查看 src/app.ts 的改动" })).toBeInTheDocument();
   });
 });
 
 describe("turn review tab", () => {
   const second: Extract<MessageBlock, { kind: "edit_diff" }> = {
-    ...editMessage, id: "edit-2", filePath: "util.ts", outputPath: "/workspace/src/util.ts", outputRelativePath: "src/util.ts",
-    diff: "--- a/src/util.ts\n+++ b/src/util.ts\n@@ -1,1 +1,2 @@\n export {};\n+export const x = 1;", additions: 1, deletions: 0,
+    ...editMessage,
+    id: "edit-2",
+    filePath: "util.ts",
+    outputPath: "/workspace/src/util.ts",
+    outputRelativePath: "src/util.ts",
+    diff: "--- a/src/util.ts\n+++ b/src/util.ts\n@@ -1,1 +1,2 @@\n export {};\n+export const x = 1;",
+    additions: 1,
+    deletions: 0,
   };
   const changes = collectTurnChanges([editMessage, second])!;
-  const tab = { id: "turn-review:s:t", kind: "turnReview" as const, title: "第 1 轮改动", changes, index: 1, revision: 1, sessionId: "session-1", workspaceRoot: "/workspace" };
+  const tab = {
+    id: "turn-review:s:t",
+    kind: "turnReview" as const,
+    title: "第 1 轮改动",
+    changes,
+    index: 1,
+    revision: 1,
+    sessionId: "session-1",
+    workspaceRoot: "/workspace",
+  };
 
   it("selects the clicked file, toggles split and wrap, and opens the whole file", async () => {
     const openFile = vi.fn(async () => ({ ok: true }));
     bridge({ "workspaces.openFile": openFile });
-    render(<RightPanelProvider><TurnReviewView tab={tab} /><ActiveTabProbe /></RightPanelProvider>);
+    render(
+      <RightPanelProvider>
+        <TurnReviewView tab={tab} />
+        <ActiveTabProbe />
+      </RightPanelProvider>,
+    );
 
     expect(document.querySelector("[data-review-file]")).toHaveAttribute("data-review-file", "src/util.ts");
     // 纯新增的文件即使开着左右对比也只有一栏。

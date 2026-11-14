@@ -9,20 +9,33 @@ import type { RunTargetRowProps } from "./RunTargetRow";
  * context 用量的来源：会话投影里的上下文估算（与面板「当前」同源）；投影不属于当前会话时，
  * 才用调用方给的快照或 ContextState（没传 sessionId 时视为当前会话）。
  */
-export function useComposerContextSnapshot(sessionId: string | null | undefined, contextState: ContextState | null | undefined, contextSnapshot: ContextUsageSnapshot | null): ContextUsageSnapshot | null {
+export function useComposerContextSnapshot(
+  sessionId: string | null | undefined,
+  contextState: ContextState | null | undefined,
+  contextSnapshot: ContextUsageSnapshot | null,
+): ContextUsageSnapshot | null {
   const target = useOptionalProjectionTarget();
   const belongs = target !== null && target.sessionId !== null && target.sessionId === (sessionId ?? target.sessionId);
   // 只订阅派生出的用量快照：流式时 cell 每帧换一次，快照几乎不变，输入框外壳不随帧重渲染。
-  const projectedSnapshot = useProjectionSelect<ContextUsageSnapshot | null>(selectProjectedContextSnapshot, jsonEqual, belongs ? undefined : null);
-  return projectedSnapshot ?? (contextState ? {
-    basis: contextState.basis,
-    totalTokens: contextState.totalEstimatedTokens,
-    maxTokens: contextState.maxTokens,
-    percentUsed: contextState.percentUsed,
-    estimator: contextState.estimator,
-    buckets: contextState.buckets,
-  } : null)
-    ?? contextSnapshot;
+  const projectedSnapshot = useProjectionSelect<ContextUsageSnapshot | null>(
+    selectProjectedContextSnapshot,
+    jsonEqual,
+    belongs ? undefined : null,
+  );
+  return (
+    projectedSnapshot ??
+    (contextState
+      ? {
+          basis: contextState.basis,
+          totalTokens: contextState.totalEstimatedTokens,
+          maxTokens: contextState.maxTokens,
+          percentUsed: contextState.percentUsed,
+          estimator: contextState.estimator,
+          buckets: contextState.buckets,
+        }
+      : null) ??
+    contextSnapshot
+  );
 }
 
 function selectProjectedContextSnapshot(cell: ClientSessionCell | null): ContextUsageSnapshot | null {
@@ -53,12 +66,21 @@ export type ComposerLocalRunTargetOptions = {
 };
 
 /** 新建页运行位置行的本机部分：工作区、分支和运行位置。工作区名找不到时退回第一项，再退回「工作区」。 */
-export function composerLocalRunTarget({ workspaceOptions, selectedWorkspaceRoot, onSelectWorkspace, executionContext, newWorktree }: ComposerLocalRunTargetOptions): RunTargetRowProps["local"] {
+export function composerLocalRunTarget({
+  workspaceOptions,
+  selectedWorkspaceRoot,
+  onSelectWorkspace,
+  executionContext,
+  newWorktree,
+}: ComposerLocalRunTargetOptions): RunTargetRowProps["local"] {
   const { gitHasBranch, selectedBranch, branchLabel, runLocation } = composerGitFacts(executionContext);
   return {
     workspaces: workspaceOptions,
     selectedWorkspaceRoot,
-    workspaceLabel: workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ?? workspaceOptions[0]?.label ?? "选择工作区",
+    workspaceLabel:
+      workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ??
+      workspaceOptions[0]?.label ??
+      "选择工作区",
     onSelectWorkspace,
     onUseExistingWorkspace: executionContext?.onUseExistingWorkspace,
     onCreateWorkspaceFolder: executionContext?.onCreateWorkspaceFolder,

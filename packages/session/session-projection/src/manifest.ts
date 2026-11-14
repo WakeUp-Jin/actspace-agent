@@ -1,2 +1,18 @@
 import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
-export const manifest = defineBuiltinPluginManifest({ display: { title: "会话视图", description: "把日志整理成界面和 Agent 能读的状态", scope: "global", defaultEnabled: true, canDisable: false }, pluginId: "actspace.session.projection", version: "0.1.0", name: "ActSpace Session Projection", entry: { entryId: "session.projection", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: [], contributions: { services: ["session.projection"], tools: [], prompts: [], events: [] } });
+export const manifest = defineBuiltinPluginManifest({
+  display: {
+    title: "会话视图",
+    description: "把日志整理成界面和 Agent 能读的状态",
+    scope: "global",
+    defaultEnabled: true,
+    canDisable: false,
+  },
+  pluginId: "actspace.session.projection",
+  version: "0.1.0",
+  name: "ActSpace Session Projection",
+  entry: { entryId: "session.projection", behavior: "./plugin.js" },
+  host: { required: [], optional: [] },
+  frontend: null,
+  injects: [],
+  contributions: { services: ["session.projection"], tools: [], prompts: [], events: [] },
+});

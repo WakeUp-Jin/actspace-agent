@@ -15,7 +15,8 @@ export type BashLog = { readonly id: string; readonly path: string };
 
 /** `<dataRoot>/sessions-v2/<sessionId>/bash-log/`. */
 export function bashLogDirectory(dataRoot: string, sessionId: string): string {
-  if (!SESSION_ID.test(sessionId) || sessionId === "." || sessionId === "..") throw new Error("Session id is not path-safe.");
+  if (!SESSION_ID.test(sessionId) || sessionId === "." || sessionId === "..")
+    throw new Error("Session id is not path-safe.");
   return join(dataRoot, "sessions-v2", sessionId, BASH_LOG_DIRECTORY_NAME);
 }
 
@@ -26,7 +27,10 @@ export function bashLogDirectory(dataRoot: string, sessionId: string): string {
 export class SessionBashLogs {
   /** One pass at a time per Session, so two passes never count the same files. */
   readonly #passes = new Map<string, Promise<void>>();
-  constructor(private readonly dataRoot: string, private readonly capBytes = SESSION_BASH_LOG_CAP_BYTES) {}
+  constructor(
+    private readonly dataRoot: string,
+    private readonly capBytes = SESSION_BASH_LOG_CAP_BYTES,
+  ) {}
 
   async create(sessionId: string): Promise<BashLog> {
     const directory = bashLogDirectory(this.dataRoot, sessionId);
@@ -46,20 +50,30 @@ export class SessionBashLogs {
     const pass = previous.then(() => this.#prune(sessionId, running, onPruned));
     const settled = pass.catch(() => undefined);
     this.#passes.set(sessionId, settled);
-    void settled.then(() => { if (this.#passes.get(sessionId) === settled) this.#passes.delete(sessionId); });
+    void settled.then(() => {
+      if (this.#passes.get(sessionId) === settled) this.#passes.delete(sessionId);
+    });
     return pass;
   }
 
-  async #prune(sessionId: string, running: ReadonlySet<string>, onPruned: (taskId: string) => Promise<void>): Promise<void> {
+  async #prune(
+    sessionId: string,
+    running: ReadonlySet<string>,
+    onPruned: (taskId: string) => Promise<void>,
+  ): Promise<void> {
     const directory = bashLogDirectory(this.dataRoot, sessionId);
     const names = await readdir(directory).catch(() => [] as string[]);
-    const logs = (await Promise.all(names.map(async name => {
-      const id = LOG_FILE.exec(name)?.[1];
-      if (id === undefined) return undefined;
-      const path = join(directory, name);
-      const info = await stat(path).catch(() => undefined);
-      return info?.isFile() ? { id, path, size: info.size, mtimeMs: info.mtimeMs } : undefined;
-    }))).filter(log => log !== undefined);
+    const logs = (
+      await Promise.all(
+        names.map(async (name) => {
+          const id = LOG_FILE.exec(name)?.[1];
+          if (id === undefined) return undefined;
+          const path = join(directory, name);
+          const info = await stat(path).catch(() => undefined);
+          return info?.isFile() ? { id, path, size: info.size, mtimeMs: info.mtimeMs } : undefined;
+        }),
+      )
+    ).filter((log) => log !== undefined);
     let total = logs.reduce((sum, log) => sum + log.size, 0);
     if (total <= this.capBytes) return;
     for (const log of logs.sort((a, b) => a.mtimeMs - b.mtimeMs)) {
@@ -73,7 +87,11 @@ export class SessionBashLogs {
 }
 
 /** Process scratch directories under `<tmpRoot>/bash-v2/` left by a crash: older than `maxAgeMs` and not `keep`. */
-export async function sweepStaleScratchDirectories(bashRoot: string, keep: string, options: { readonly now?: number; readonly maxAgeMs?: number } = {}): Promise<readonly string[]> {
+export async function sweepStaleScratchDirectories(
+  bashRoot: string,
+  keep: string,
+  options: { readonly now?: number; readonly maxAgeMs?: number } = {},
+): Promise<readonly string[]> {
   const now = options.now ?? Date.now();
   const maxAgeMs = options.maxAgeMs ?? 24 * 60 * 60 * 1000;
   const removed: string[] = [];

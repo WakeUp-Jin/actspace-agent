@@ -4,7 +4,6 @@ import { CordisContextClass } from "@actspace/cordis-adapter";
 import { SystemPromptService } from "../plugin.js";
 
 describe("prompt plugin lifecycle", () => {
-
   it("owns prompt source cache through a Cordis Service", async () => {
     const ctx = new CordisContextClass();
     ctx.provide(PROMPT_HOST_PORT_ID, { workspaceRoot: "/workspace" });

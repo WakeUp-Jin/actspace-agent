@@ -8,7 +8,10 @@ const KEY_PREFIX = "actspace:pending-submission:";
 export const PENDING_SUBMISSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** 恢复为草稿用的内容；附件去掉了 previewUrl（blob URL 跨重启无效）。 */
-export type PendingSubmissionDraft = Pick<ComposerDraftRestore, "sessionId" | "text" | "attachments" | "fileReferences" | "responseAnnotations">;
+export type PendingSubmissionDraft = Pick<
+  ComposerDraftRestore,
+  "sessionId" | "text" | "attachments" | "fileReferences" | "responseAnnotations"
+>;
 
 export type PendingSubmissionRecord = {
   /** 序列化后的提交内容：再次发送相同内容时复用同一个 submissionId，让 Runtime 去重。 */
@@ -35,16 +38,31 @@ function parse(sessionId: string, raw: string | null): PendingSubmissionRecord |
 
 /** 读不到、格式不对或不属于这个会话时返回 null。 */
 export function readPendingSubmission(sessionId: string): PendingSubmissionRecord | null {
-  try { return parse(sessionId, localStorage.getItem(keyFor(sessionId))); } catch { return null; }
+  try {
+    return parse(sessionId, localStorage.getItem(keyFor(sessionId)));
+  } catch {
+    return null;
+  }
 }
 
-export function writePendingSubmission(sessionId: string, record: Omit<PendingSubmissionRecord, "createdAt">, now = new Date()): void {
-  try { localStorage.setItem(keyFor(sessionId), JSON.stringify({ ...record, createdAt: now.toISOString() })); }
-  catch (error) { console.error("Failed to record pending submission", error); }
+export function writePendingSubmission(
+  sessionId: string,
+  record: Omit<PendingSubmissionRecord, "createdAt">,
+  now = new Date(),
+): void {
+  try {
+    localStorage.setItem(keyFor(sessionId), JSON.stringify({ ...record, createdAt: now.toISOString() }));
+  } catch (error) {
+    console.error("Failed to record pending submission", error);
+  }
 }
 
 export function clearPendingSubmission(sessionId: string): void {
-  try { localStorage.removeItem(keyFor(sessionId)); } catch { /* storage unavailable */ }
+  try {
+    localStorage.removeItem(keyFor(sessionId));
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 /**
@@ -53,12 +71,20 @@ export function clearPendingSubmission(sessionId: string): void {
  */
 export function sweepExpiredPendingSubmissions(now = Date.now()): void {
   let keys: string[];
-  try { keys = Object.keys(localStorage).filter((key) => key.startsWith(KEY_PREFIX)); } catch { return; }
+  try {
+    keys = Object.keys(localStorage).filter((key) => key.startsWith(KEY_PREFIX));
+  } catch {
+    return;
+  }
   for (const key of keys) {
     const record = parse(key.slice(KEY_PREFIX.length), localStorage.getItem(key));
-    if (!record) { localStorage.removeItem(key); continue; }
+    if (!record) {
+      localStorage.removeItem(key);
+      continue;
+    }
     const created = Date.parse(record.createdAt);
-    if (record.createdAt === undefined || Number.isNaN(created)) localStorage.setItem(key, JSON.stringify({ ...record, createdAt: new Date(now).toISOString() }));
+    if (record.createdAt === undefined || Number.isNaN(created))
+      localStorage.setItem(key, JSON.stringify({ ...record, createdAt: new Date(now).toISOString() }));
     else if (now - created > PENDING_SUBMISSION_TTL_MS) localStorage.removeItem(key);
   }
 }

@@ -1,7 +1,12 @@
 import type { EventCodecRegistry } from "./codec-registry.js";
 import type { SessionEventEnvelopeV1 } from "./event-envelope.js";
 import { SessionError } from "./errors.js";
-import { createSessionHeader, type SessionCreatedWithV1, type SessionHeaderV1, type SessionLineageOrigin } from "./header.js";
+import {
+  createSessionHeader,
+  type SessionCreatedWithV1,
+  type SessionHeaderV1,
+  type SessionLineageOrigin,
+} from "./header.js";
 import { validateSessionEvents } from "./invariant-validator.js";
 
 /** `createdWith.presetId` of an `agent_fork` child: a delegation that copies the parent's context and runs as the main agent. */
@@ -24,8 +29,15 @@ export function createSessionForkSeed(options: {
   /** The `agent_fork` call of a forked subagent (`origin: "delegation"`), whose Turn is still open at the boundary. */
   readonly parentCallId?: string;
 }): SessionForkSeed {
-  if (!Number.isSafeInteger(options.boundarySeq) || options.boundarySeq < -1 || options.boundarySeq >= options.parentEvents.length) {
-    throw new SessionError("INVALID_FORK_BOUNDARY", `Fork boundary ${options.boundarySeq} is outside the persisted Journal.`);
+  if (
+    !Number.isSafeInteger(options.boundarySeq) ||
+    options.boundarySeq < -1 ||
+    options.boundarySeq >= options.parentEvents.length
+  ) {
+    throw new SessionError(
+      "INVALID_FORK_BOUNDARY",
+      `Fork boundary ${options.boundarySeq} is outside the persisted Journal.`,
+    );
   }
   const events = options.parentEvents.slice(0, options.boundarySeq + 1);
   const validation = validateSessionEvents(events, options.registry);
@@ -40,7 +52,10 @@ export function createSessionForkSeed(options: {
     validation.relations.openRequestIds.length > 0 ||
     validation.relations.openToolCallIds.length > 0
   ) {
-    throw new SessionError("INVALID_FORK_BOUNDARY", "Fork boundary must be balanced with no dangling request or tool call.");
+    throw new SessionError(
+      "INVALID_FORK_BOUNDARY",
+      "Fork boundary must be balanced with no dangling request or tool call.",
+    );
   }
   const parentDepth = options.parentHeader.lineage?.delegationDepth ?? 0;
   const header = createSessionHeader({
@@ -53,7 +68,12 @@ export function createSessionForkSeed(options: {
       parentBoundarySeq: options.boundarySeq,
       origin,
       delegationDepth: origin === "delegation" ? parentDepth + 1 : parentDepth,
-      ...(origin === "delegation" ? { inheritedThroughSeq: options.boundarySeq, ...(options.parentCallId === undefined ? {} : { parentCallId: options.parentCallId }) } : {}),
+      ...(origin === "delegation"
+        ? {
+            inheritedThroughSeq: options.boundarySeq,
+            ...(options.parentCallId === undefined ? {} : { parentCallId: options.parentCallId }),
+          }
+        : {}),
     },
     createdWith: options.createdWith,
   });

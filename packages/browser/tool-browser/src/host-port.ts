@@ -3,7 +3,11 @@ import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tool-runtim
 
 export type BrowserCapability = {
   readonly ready: boolean;
-  readonly command: (name: string, args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
+  readonly command: (
+    name: string,
+    args: Readonly<Record<string, RuntimeJsonValue>>,
+    context: ToolExecutionContext,
+  ) => Promise<ToolBodyResult>;
   readonly endTurn?: (sessionId: string, turnId: string) => Promise<void>;
   readonly dispose?: () => Promise<void>;
 };

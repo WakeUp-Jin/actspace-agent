@@ -27,16 +27,22 @@ describe("approval path formatting", () => {
     expect(compactApprovalDir("/private/tmp/actspace-acceptance-20260925/scope/")).toBe("/private/tmp/…/scope/");
     expect(compactApprovalDir("apps/desktop/src/renderer/components/")).toBe("apps/desktop/…/components/");
     expect(compactApprovalDir("docs/histories/")).toBe("docs/histories/");
-    expect(compactApprovalDir("/a-very-long-directory-name/another-long-directory/")).toBe("/a-very-long-directory-name/another-long-directory/");
+    expect(compactApprovalDir("/a-very-long-directory-name/another-long-directory/")).toBe(
+      "/a-very-long-directory-name/another-long-directory/",
+    );
   });
 });
 
 describe("approval reason mapping", () => {
   it("hides known Runtime reasons and generic prompts", () => {
-    expect(getApprovalReasonNotes("The requested file is outside the workspace.\nAllow this file to be deleted once?")).toEqual([]);
+    expect(
+      getApprovalReasonNotes("The requested file is outside the workspace.\nAllow this file to be deleted once?"),
+    ).toEqual([]);
     expect(getApprovalReasonNotes("This file may contain credentials and requires one-time approval.")).toEqual([]);
     expect(getApprovalReasonNotes(undefined)).toEqual([]);
-    expect(getApprovalReasonNotes("Allow Bash to run this command once?\nBash always-ask mode is enabled")).toEqual(["Bash always-ask mode is enabled"]);
+    expect(getApprovalReasonNotes("Allow Bash to run this command once?\nBash always-ask mode is enabled")).toEqual([
+      "Bash always-ask mode is enabled",
+    ]);
   });
 
   it("keeps unknown reasons available behind an info icon", () => {
@@ -46,15 +52,16 @@ describe("approval reason mapping", () => {
 });
 
 describe("command prefix grant suggestion", () => {
-  const suggestion = (selector: unknown) => ({
-    suggestionId: "s1",
-    lifetime: "session",
-    action: "file.read",
-    access: "read",
-    selector,
-    audience: { pluginId: "shell", permissionDomain: "process", policyVersion: 1 },
-    label: "本会话内运行以 pnpm 开头的命令不再询问",
-  }) as unknown as Parameters<typeof getCommandPrefixGrant>[0];
+  const suggestion = (selector: unknown) =>
+    ({
+      suggestionId: "s1",
+      lifetime: "session",
+      action: "file.read",
+      access: "read",
+      selector,
+      audience: { pluginId: "shell", permissionDomain: "process", policyVersion: 1 },
+      label: "本会话内运行以 pnpm 开头的命令不再询问",
+    }) as unknown as Parameters<typeof getCommandPrefixGrant>[0];
 
   it("reads the prefix tokens of a command_prefix selector", () => {
     expect(getCommandPrefixGrant(suggestion({ kind: "command_prefix", prefix: ["git", "status"] }))).toBe("git status");
@@ -82,15 +89,26 @@ describe("submitApprovalDecision", () => {
 describe("useApprovalDecision on a remote Session", () => {
   // 15 T11：远端审批的 Host 取自会话的运行目标，提交时带 hostId；不再从 requestId 里拆。
   const remote: RunTarget = { kind: "remote", hostId: "h:with:colons", hostName: "Cloud" };
-  const wrapper = (target: RunTarget) => ({ children }: { children: ReactNode }) => (
-    <RunTargetContext.Provider value={legacyRunTarget({ runTarget: target })}>{children}</RunTargetContext.Provider>
-  );
+  const wrapper =
+    (target: RunTarget) =>
+    ({ children }: { children: ReactNode }) => (
+      <RunTargetContext.Provider value={legacyRunTarget({ runTarget: target })}>{children}</RunTargetContext.Provider>
+    );
   function bridge(state: "connected" | "offline") {
     const submit = vi.fn(async () => ({ ok: true }));
     setupBridge({
       "approvals.submit": submit,
-      "hosts.list": async () => [{ id: "h:with:colons", hostId: "h:with:colons", name: "Cloud", state, endpoint: { kind: "wss", url: "wss://cloud" } }],
-      "events.hostsChanged": () => () => {}, "events.hostEvent": () => () => {},
+      "hosts.list": async () => [
+        {
+          id: "h:with:colons",
+          hostId: "h:with:colons",
+          name: "Cloud",
+          state,
+          endpoint: { kind: "wss", url: "wss://cloud" },
+        },
+      ],
+      "events.hostsChanged": () => () => {},
+      "events.hostEvent": () => () => {},
     });
     return submit;
   }
@@ -123,10 +141,23 @@ describe("useApprovalDecision on a remote Session", () => {
 
 describe("prefix suggestions follow the current approval request", () => {
   it("drops the previous prefix immediately and stays empty on a failed refresh", async () => {
-    const grant = { suggestionId: "g1", action: "process.execute", access: "execute", lifetime: "session", selector: { kind: "command_prefix", prefix: ["pnpm"], cwdRoot: "/workspace" }, audience: { pluginId: "actspace.shell-tools", permissionDomain: "bash", policyVersion: 1 }, label: "pnpm" };
-    const list = vi.fn().mockResolvedValueOnce([{ requestId: "r1", grantSuggestions: [grant] }]).mockRejectedValueOnce(new Error("offline"));
+    const grant = {
+      suggestionId: "g1",
+      action: "process.execute",
+      access: "execute",
+      lifetime: "session",
+      selector: { kind: "command_prefix", prefix: ["pnpm"], cwdRoot: "/workspace" },
+      audience: { pluginId: "actspace.shell-tools", permissionDomain: "bash", policyVersion: 1 },
+      label: "pnpm",
+    };
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce([{ requestId: "r1", grantSuggestions: [grant] }])
+      .mockRejectedValueOnce(new Error("offline"));
     setupBridge({ "approvals.listPending": list });
-    const { result, rerender } = renderHook(({ id }) => useCommandPrefixGrantSuggestion(id), { initialProps: { id: "r1" } });
+    const { result, rerender } = renderHook(({ id }) => useCommandPrefixGrantSuggestion(id), {
+      initialProps: { id: "r1" },
+    });
     await waitFor(() => expect(result.current?.suggestionId).toBe("g1"));
     rerender({ id: "r2" });
     expect(result.current).toBeUndefined();

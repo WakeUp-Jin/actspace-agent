@@ -1,5 +1,9 @@
 /** settings 旧版本迁移和 v4 解析：v1 / v2 / v3 → v4，v4 → 旧结构。冻结，最早支持 v1。 */
-import { DEFAULT_SPEECH_SETTINGS, sanitizeExternalSubagentSettings, type ExternalSubagentSettings } from "@actspace/shared";
+import {
+  DEFAULT_SPEECH_SETTINGS,
+  sanitizeExternalSubagentSettings,
+  type ExternalSubagentSettings,
+} from "@actspace/shared";
 import {
   LEGACY_MODEL_KEY_MAP,
   PROVIDER_IDS,
@@ -40,7 +44,9 @@ import {
 import type { PersistedSettingsV3, ReadSettingsResult, SettingsV4Metadata } from "./types";
 import { cloneJson, isRecord } from "./utils";
 
-function taskBindingsFromTaskModels(taskModels: PersistedSettingsV3["taskModels"]): SettingsV4["models"]["taskBindings"] {
+function taskBindingsFromTaskModels(
+  taskModels: PersistedSettingsV3["taskModels"],
+): SettingsV4["models"]["taskBindings"] {
   return {
     defaultChat: taskModels.defaultChatModel,
     utility: taskModels.utilityModel,
@@ -97,30 +103,41 @@ export function toSettingsV4(settings: PersistedSettingsV3, metadata: SettingsV4
   // Quick Open still mutates through the legacy facade. Persist the same
   // shortcut state returned to callers, rather than stale v4 metadata.
   general.shortcuts = cloneJson(settings.shortcuts);
-  if (!general.agentInstructions.systemPromptPath) general.agentInstructions.systemPromptPath = settings.agent.systemPromptPath;
-  if (general.taskDefaults.temperature === null && settings.agent.temperature !== null) general.taskDefaults.temperature = settings.agent.temperature;
-  if (general.taskDefaults.maxOutputTokens === null && settings.agent.maxTokens !== null) general.taskDefaults.maxOutputTokens = settings.agent.maxTokens;
+  if (!general.agentInstructions.systemPromptPath)
+    general.agentInstructions.systemPromptPath = settings.agent.systemPromptPath;
+  if (general.taskDefaults.temperature === null && settings.agent.temperature !== null)
+    general.taskDefaults.temperature = settings.agent.temperature;
+  if (general.taskDefaults.maxOutputTokens === null && settings.agent.maxTokens !== null)
+    general.taskDefaults.maxOutputTokens = settings.agent.maxTokens;
   const tools = cloneJson(metadata.tools);
-  if (tools.disabledTools.length === 0 && settings.agent.disabledTools.length > 0) tools.disabledTools = [...settings.agent.disabledTools];
+  if (tools.disabledTools.length === 0 && settings.agent.disabledTools.length > 0)
+    tools.disabledTools = [...settings.agent.disabledTools];
   if (!tools.bash.alwaysAsk && settings.agent.bashAlwaysAsk) tools.bash.alwaysAsk = true;
   const subagents = cloneJson(metadata.subagents);
   return {
     version: 4,
     general,
     models: {
-      connections: { ...cloneJson(metadata.models.connections), ...Object.fromEntries(PROVIDER_IDS.map((providerId) => [
-        `${providerId}:default`,
-        {
-          connectionId: `${providerId}:default`,
-          providerId,
-          ...cloneJson(settings.providers[providerId]),
-        },
-      ])) },
+      connections: {
+        ...cloneJson(metadata.models.connections),
+        ...Object.fromEntries(
+          PROVIDER_IDS.map((providerId) => [
+            `${providerId}:default`,
+            {
+              connectionId: `${providerId}:default`,
+              providerId,
+              ...cloneJson(settings.providers[providerId]),
+            },
+          ]),
+        ),
+      },
       definitions: cloneJson(settings.customModels),
-      installed: Object.fromEntries(Object.entries(settings.installedModels).map(([modelKey, model]) => [
-        modelKey,
-        { connectionId: `${modelKey.split(":")[0]}:default`, ...cloneJson(model!) },
-      ])),
+      installed: Object.fromEntries(
+        Object.entries(settings.installedModels).map(([modelKey, model]) => [
+          modelKey,
+          { connectionId: `${modelKey.split(":")[0]}:default`, ...cloneJson(model!) },
+        ]),
+      ),
       taskBindings: taskBindingsFromTaskModels(settings.taskModels),
       overrides: cloneJson(settings.modelOverrides),
       ...(metadata.models.layersVersion !== undefined ? { layersVersion: metadata.models.layersVersion } : {}),
@@ -138,16 +155,30 @@ export function toSettingsV4(settings: PersistedSettingsV3, metadata: SettingsV4
 
 export function legacySettingsFromV4(settings: SettingsV4, dataRoot: string): PersistedSettingsV3 {
   const seed = defaultSettingsFromEnv(dataRoot);
-  const providers = Object.fromEntries(PROVIDER_IDS.map((providerId) => {
-    const connection = settings.models.connections[`${providerId}:default`];
-    return [providerId, connection ? sanitizeProviderSettings(connection, seed.providers[providerId], providerId) : seed.providers[providerId]];
-  })) as PersistedSettingsV3["providers"];
-  const installedModels = Object.fromEntries(Object.entries(settings.models.installed as Record<string, SettingsV4InstalledModelSettings>).map(([modelKey, model]) => [modelKey, {
-    enabled: model.enabled,
-    addedAt: model.addedAt,
-    ...(model.connectionId ? { connectionId: model.connectionId } : {}),
-    ...(model.customLabel !== undefined && { customLabel: model.customLabel }),
-  }])) as PersistedSettingsV3["installedModels"];
+  const providers = Object.fromEntries(
+    PROVIDER_IDS.map((providerId) => {
+      const connection = settings.models.connections[`${providerId}:default`];
+      return [
+        providerId,
+        connection
+          ? sanitizeProviderSettings(connection, seed.providers[providerId], providerId)
+          : seed.providers[providerId],
+      ];
+    }),
+  ) as PersistedSettingsV3["providers"];
+  const installedModels = Object.fromEntries(
+    Object.entries(settings.models.installed as Record<string, SettingsV4InstalledModelSettings>).map(
+      ([modelKey, model]) => [
+        modelKey,
+        {
+          enabled: model.enabled,
+          addedAt: model.addedAt,
+          ...(model.connectionId ? { connectionId: model.connectionId } : {}),
+          ...(model.customLabel !== undefined && { customLabel: model.customLabel }),
+        },
+      ],
+    ),
+  ) as PersistedSettingsV3["installedModels"];
   const general = settings.general;
   return {
     version: 3,
@@ -164,24 +195,40 @@ export function legacySettingsFromV4(settings: SettingsV4, dataRoot: string): Pe
       ...(settings.models.taskBindings.thinking ? { thinking: cloneJson(settings.models.taskBindings.thinking) } : {}),
     },
     imageGeneration: sanitizeImageGenerationSettings(settings.media.imageGeneration, seed.imageGeneration),
-    agent: sanitizeAgentV2({
-      systemPromptPath: general.agentInstructions.systemPromptPath,
-      temperature: general.taskDefaults.temperature,
-      maxTokens: general.taskDefaults.maxOutputTokens,
-      disabledTools: settings.tools.disabledTools,
-      bashAlwaysAsk: settings.tools.bash.alwaysAsk,
-    }, seed.agent),
+    agent: sanitizeAgentV2(
+      {
+        systemPromptPath: general.agentInstructions.systemPromptPath,
+        temperature: general.taskDefaults.temperature,
+        maxTokens: general.taskDefaults.maxOutputTokens,
+        disabledTools: settings.tools.disabledTools,
+        bashAlwaysAsk: settings.tools.bash.alwaysAsk,
+      },
+      seed.agent,
+    ),
     skills: sanitizeSkills(settings.skills),
     shortcuts: sanitizeShortcuts(general.shortcuts),
   };
 }
 
-export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string): {
-  settings: PersistedSettingsV3;
-  v4Metadata: SettingsV4Metadata;
-} | undefined {
-  if (!isRecord(raw.general) || !isRecord(raw.models) || !isRecord(raw.tools) || !isRecord(raw.media) ||
-    !isRecord(raw.skills) || !isRecord(raw.subagents) || !isRecord(raw.activity)) return undefined;
+export function parseSettingsV4(
+  raw: Record<string, unknown>,
+  dataRoot: string,
+):
+  | {
+      settings: PersistedSettingsV3;
+      v4Metadata: SettingsV4Metadata;
+    }
+  | undefined {
+  if (
+    !isRecord(raw.general) ||
+    !isRecord(raw.models) ||
+    !isRecord(raw.tools) ||
+    !isRecord(raw.media) ||
+    !isRecord(raw.skills) ||
+    !isRecord(raw.subagents) ||
+    !isRecord(raw.activity)
+  )
+    return undefined;
   const seed = defaultSettingsFromEnv(dataRoot);
   const general = isRecord(raw.general) ? raw.general : {};
   const personalization = isRecord(general.personalization) ? general.personalization : {};
@@ -198,18 +245,30 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
   const definitions = isRecord(models.definitions) ? models.definitions : {};
   const installed = (isRecord(models.installed) ? models.installed : {}) as Record<string, unknown>;
   const connections = (isRecord(models.connections) ? models.connections : {}) as Record<string, unknown>;
-  const routes = (isRecord(raw.subagents) && isRecord(raw.subagents.routes) ? raw.subagents.routes : {}) as Record<string, unknown>;
+  const routes = (isRecord(raw.subagents) && isRecord(raw.subagents.routes) ? raw.subagents.routes : {}) as Record<
+    string,
+    unknown
+  >;
   const settings: SettingsV4 = {
     version: 4,
     general: {
       performanceMonitoring: general.performanceMonitoring === true,
       showTurnCodeChanges: general.showTurnCodeChanges !== false,
       simplifyThinking: general.simplifyThinking !== false,
-      defaultPermissionMode: general.defaultPermissionMode === "auto-review" || general.defaultPermissionMode === "full-access" ? general.defaultPermissionMode : "default",
-      englishLearning: { lastSessionId: isRecord(general.englishLearning) && typeof general.englishLearning.lastSessionId === "string" ? general.englishLearning.lastSessionId.slice(0, 200) : null },
+      defaultPermissionMode:
+        general.defaultPermissionMode === "auto-review" || general.defaultPermissionMode === "full-access"
+          ? general.defaultPermissionMode
+          : "default",
+      englishLearning: {
+        lastSessionId:
+          isRecord(general.englishLearning) && typeof general.englishLearning.lastSessionId === "string"
+            ? general.englishLearning.lastSessionId.slice(0, 200)
+            : null,
+      },
       personalization: {
         displayName: typeof personalization.displayName === "string" ? personalization.displayName.slice(0, 60) : "",
-        responseStyle: typeof personalization.responseStyle === "string" ? personalization.responseStyle.slice(0, 500) : "",
+        responseStyle:
+          typeof personalization.responseStyle === "string" ? personalization.responseStyle.slice(0, 500) : "",
       },
       agentInstructions: {
         systemPromptPath: sanitizeSystemPromptPath(instructions.systemPromptPath, seed.agent.systemPromptPath),
@@ -222,38 +281,61 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
       shortcuts: sanitizeShortcuts(general.shortcuts),
     },
     models: {
-      connections: Object.fromEntries(Object.entries(connections).flatMap(([id, value]) => {
-        if (!isRecord(value) || typeof value.providerId !== "string" || !isProviderId(value.providerId)) return [];
-        return [[id, {
-          connectionId: id,
-          providerId: value.providerId,
-          protocol: isConnectionProtocol(value.protocol) ? value.protocol : "openai-completions",
-          ...(typeof value.displayName === "string" ? { displayName: value.displayName.slice(0, 120) } : {}),
-          ...(value.defaultModel === null
-            ? { defaultModel: null }
-            : typeof value.defaultModel === "string"
-              ? { defaultModel: value.defaultModel.slice(0, 200) }
-              : {}),
-          ...(typeof value.catalogId === "string" ? { catalogId: value.catalogId.slice(0, 80) } : {}),
-          promptCacheMode: resolvePromptCacheMode(
-            isConnectionProtocol(value.protocol) ? value.protocol : "openai-completions",
-            value.promptCacheMode === "short" || value.promptCacheMode === "off" ? value.promptCacheMode : undefined,
-          ),
-          ...(isCustomConnectionAuthMode(value.authMode) ? { authMode: value.authMode } : {}),
-          ...(value.authMode === "auto" && isResolvedAuth(value.resolvedAuth) ? { resolvedAuth: value.resolvedAuth } : {}),
-          ...sanitizeProviderSettings(value, seed.providers[value.providerId], value.providerId),
-        } satisfies SettingsV4["models"]["connections"][string]]];
-      })),
+      connections: Object.fromEntries(
+        Object.entries(connections).flatMap(([id, value]) => {
+          if (!isRecord(value) || typeof value.providerId !== "string" || !isProviderId(value.providerId)) return [];
+          return [
+            [
+              id,
+              {
+                connectionId: id,
+                providerId: value.providerId,
+                protocol: isConnectionProtocol(value.protocol) ? value.protocol : "openai-completions",
+                ...(typeof value.displayName === "string" ? { displayName: value.displayName.slice(0, 120) } : {}),
+                ...(value.defaultModel === null
+                  ? { defaultModel: null }
+                  : typeof value.defaultModel === "string"
+                    ? { defaultModel: value.defaultModel.slice(0, 200) }
+                    : {}),
+                ...(typeof value.catalogId === "string" ? { catalogId: value.catalogId.slice(0, 80) } : {}),
+                promptCacheMode: resolvePromptCacheMode(
+                  isConnectionProtocol(value.protocol) ? value.protocol : "openai-completions",
+                  value.promptCacheMode === "short" || value.promptCacheMode === "off"
+                    ? value.promptCacheMode
+                    : undefined,
+                ),
+                ...(isCustomConnectionAuthMode(value.authMode) ? { authMode: value.authMode } : {}),
+                ...(value.authMode === "auto" && isResolvedAuth(value.resolvedAuth)
+                  ? { resolvedAuth: value.resolvedAuth }
+                  : {}),
+                ...sanitizeProviderSettings(value, seed.providers[value.providerId], value.providerId),
+              } satisfies SettingsV4["models"]["connections"][string],
+            ],
+          ];
+        }),
+      ),
       definitions: sanitizeCustomModels(definitions),
-      installed: Object.fromEntries(Object.entries(installed).sort(([a], [b]) => modelKeyMigrationPriority(a) - modelKeyMigrationPriority(b)).flatMap(([modelKey, value]) => {
-        const normalized = normalizeModelKey(modelKey);
-        if (!normalized || !isRecord(value)) return [];
-        const providerId = normalized.split(":")[0] as LlmProviderId;
-        return [[normalized, {
-          connectionId: typeof value.connectionId === "string" ? value.connectionId : `${providerId}:default`,
-          ...sanitizeInstalledModel(value, seed.installedModels[normalized] ?? { enabled: false, addedAt: BUILTIN_MODEL_ADDED_AT }),
-        } satisfies SettingsV4InstalledModelSettings]];
-      })),
+      installed: Object.fromEntries(
+        Object.entries(installed)
+          .sort(([a], [b]) => modelKeyMigrationPriority(a) - modelKeyMigrationPriority(b))
+          .flatMap(([modelKey, value]) => {
+            const normalized = normalizeModelKey(modelKey);
+            if (!normalized || !isRecord(value)) return [];
+            const providerId = normalized.split(":")[0] as LlmProviderId;
+            return [
+              [
+                normalized,
+                {
+                  connectionId: typeof value.connectionId === "string" ? value.connectionId : `${providerId}:default`,
+                  ...sanitizeInstalledModel(
+                    value,
+                    seed.installedModels[normalized] ?? { enabled: false, addedAt: BUILTIN_MODEL_ADDED_AT },
+                  ),
+                } satisfies SettingsV4InstalledModelSettings,
+              ],
+            ];
+          }),
+      ),
       taskBindings: {
         defaultChat: normalizeModelKeyOrNull(taskBindings.defaultChat),
         utility: normalizeModelKeyOrNull(taskBindings.utility),
@@ -263,19 +345,25 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
         ...(sanitizePurposeThinking(taskBindings.thinking) ?? {}),
       },
       overrides: sanitizeModelOverridesMap(models.overrides),
-      ...(typeof models.layersVersion === "number" && Number.isInteger(models.layersVersion) ? { layersVersion: models.layersVersion } : {}),
+      ...(typeof models.layersVersion === "number" && Number.isInteger(models.layersVersion)
+        ? { layersVersion: models.layersVersion }
+        : {}),
     },
     tools: {
-      disabledTools: Array.isArray(tools.disabledTools) ? tools.disabledTools.filter((value): value is string => typeof value === "string").slice(0, 200) : [],
+      disabledTools: Array.isArray(tools.disabledTools)
+        ? tools.disabledTools.filter((value): value is string => typeof value === "string").slice(0, 200)
+        : [],
       bash: { alwaysAsk: bash.alwaysAsk === true },
       showFileChangeStats: tools.showFileChangeStats !== false,
       deepseekFetchEnabled: tools.deepseekFetchEnabled === true,
       ...sanitizePluginSwitches(tools.plugins),
       ...sanitizeExternalSubagents(tools.externalSubagents),
-      searchProviders: Object.fromEntries(SEARCH_PROVIDER_IDS.map((id) => {
-        const provider = isRecord(searchProviders[id]) ? searchProviders[id] : {};
-        return [id, { enabled: id === "deepseek" ? provider.enabled === true : provider.enabled !== false }];
-      })),
+      searchProviders: Object.fromEntries(
+        SEARCH_PROVIDER_IDS.map((id) => {
+          const provider = isRecord(searchProviders[id]) ? searchProviders[id] : {};
+          return [id, { enabled: id === "deepseek" ? provider.enabled === true : provider.enabled !== false }];
+        }),
+      ),
     },
     media: {
       speech: sanitizeSpeechSettings(media.speech),
@@ -283,13 +371,20 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
     },
     skills: sanitizeSkills(raw.skills),
     subagents: {
-      routes: Object.fromEntries(Object.entries(routes).flatMap(([id, value]) => {
-        if (!isRecord(value)) return [];
-        return [[id, {
-          enabled: value.enabled !== false,
-          model: normalizeModelKeyOrNull(value.model),
-        } satisfies SettingsV4SubagentRoute]];
-      })),
+      routes: Object.fromEntries(
+        Object.entries(routes).flatMap(([id, value]) => {
+          if (!isRecord(value)) return [];
+          return [
+            [
+              id,
+              {
+                enabled: value.enabled !== false,
+                model: normalizeModelKeyOrNull(value.model),
+              } satisfies SettingsV4SubagentRoute,
+            ],
+          ];
+        }),
+      ),
     },
     activity: {
       usage: sanitizeUsagePreferences(usage),
@@ -315,13 +410,16 @@ export function migrateV1Settings(
         utilityModel: hasDeepSeekKey ? LEGACY_MODEL_KEY_MAP["deepseek-v4-flash"] : null,
         subagentDefaultModel: null,
       },
-      agent: sanitizeAgentV2({
-        systemPromptPath: agent.systemPromptPath,
-        temperature: agent.temperature,
-        maxTokens: agent.maxTokens,
-        disabledTools: agent.disabledTools,
-        bashAlwaysAsk: agent.bashAlwaysAsk,
-      }, seed.agent),
+      agent: sanitizeAgentV2(
+        {
+          systemPromptPath: agent.systemPromptPath,
+          temperature: agent.temperature,
+          maxTokens: agent.maxTokens,
+          disabledTools: agent.disabledTools,
+          bashAlwaysAsk: agent.bashAlwaysAsk,
+        },
+        seed.agent,
+      ),
       skills: sanitizeSkills(isRecord(raw.skills) ? raw.skills : {}),
     },
   };
@@ -331,11 +429,7 @@ export function mergePersistedSettingsV3(raw: Record<string, unknown>, dataRoot:
   const seed = defaultSettingsFromEnv(dataRoot);
   const providers = isRecord(raw.providers) ? raw.providers : {};
   for (const id of PROVIDER_IDS) {
-    seed.providers[id] = sanitizeProviderSettings(
-      isRecord(providers[id]) ? providers[id] : {},
-      seed.providers[id],
-      id,
-    );
+    seed.providers[id] = sanitizeProviderSettings(isRecord(providers[id]) ? providers[id] : {}, seed.providers[id], id);
   }
   seed.installedModels = sanitizeInstalledModels(raw.installedModels, seed.installedModels);
   seed.customModels = sanitizeCustomModels(raw.customModels);
@@ -354,13 +448,17 @@ export function hasRemovedDuckCodingSettings(raw: Record<string, unknown>): bool
     ...(isRecord(raw.customModels) ? Object.keys(raw.customModels) : []),
   ];
   const taskModels = isRecord(raw.taskModels) ? Object.values(raw.taskModels) : [];
-  return providers || modelKeys.some((key) => key.startsWith("duckcoding:")) ||
-    taskModels.some((value) => typeof value === "string" && value.startsWith("duckcoding:"));
+  return (
+    providers ||
+    modelKeys.some((key) => key.startsWith("duckcoding:")) ||
+    taskModels.some((value) => typeof value === "string" && value.startsWith("duckcoding:"))
+  );
 }
 
 export function hasRequiredSettingsSections(raw: Record<string, unknown>): boolean {
-  return ["providers", "installedModels", "customModels", "taskModels", "imageGeneration", "agent", "skills"]
-    .every((key) => isRecord(raw[key]));
+  return ["providers", "installedModels", "customModels", "taskModels", "imageGeneration", "agent", "skills"].every(
+    (key) => isRecord(raw[key]),
+  );
 }
 
 function sanitizeExternalSubagents(value: unknown): { externalSubagents?: ExternalSubagentSettings } {
@@ -371,6 +469,8 @@ function sanitizeExternalSubagents(value: unknown): { externalSubagents?: Extern
 /** Keeps only boolean switches; an empty result is omitted so a missing key keeps meaning "manifest default". */
 function sanitizePluginSwitches(value: unknown): { plugins?: Record<string, boolean> } {
   if (!isRecord(value)) return {};
-  const plugins = Object.fromEntries(Object.entries(value).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"));
+  const plugins = Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"),
+  );
   return Object.keys(plugins).length > 0 ? { plugins } : {};
 }

@@ -1,8 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { createActors, createSpaces } from "../components/space/model/fixtures";
 import {
-  availablePanelKinds, describeMember, filterRoster, groupMembers, hasDiff, panelContextOf, panelDefaults, panelFor, panelKey,
-  panelScope, parseActorRefs, pillCounts, plainOf, showTodo, splitDirs, trayList, waitCount,
+  availablePanelKinds,
+  describeMember,
+  filterRoster,
+  groupMembers,
+  hasDiff,
+  panelContextOf,
+  panelDefaults,
+  panelFor,
+  panelKey,
+  panelScope,
+  parseActorRefs,
+  pillCounts,
+  plainOf,
+  showTodo,
+  splitDirs,
+  trayList,
+  waitCount,
 } from "../components/space/model/selectors";
 import { initialState } from "../components/space/model/space-demo-store";
 import { fileRows, reviewFiles, terminalLines } from "../components/space/model/panel-fixtures";
@@ -45,7 +60,9 @@ describe("describeMember", () => {
   it("空闲写上次，没有任务时灰字", () => {
     expect(describeMember(member(space, "env"))).toMatchObject({ text: "上次：确认压测环境", faint: true });
     expect(describeMember(member(space, "tester")).text).toBe("还没有任务");
-    expect(describeMember({ ...member(space, "env"), note: "命令被拒绝，等你给方向" }).text).toBe("命令被拒绝，等你给方向");
+    expect(describeMember({ ...member(space, "env"), note: "命令被拒绝，等你给方向" }).text).toBe(
+      "命令被拒绝，等你给方向",
+    );
   });
   it("待办进度只在三种状态显示", () => {
     expect(showTodo(member(space, "be"))).toBe(true);
@@ -59,8 +76,11 @@ describe("parseActorRefs", () => {
   const actors = createActors();
   it("把 [[id]] 拆成片段", () => {
     expect(parseActorRefs("交给 [[be]] 和 [[fe]]。", actors)).toEqual([
-      { type: "text", text: "交给 " }, { type: "actor", id: "be" },
-      { type: "text", text: " 和 " }, { type: "actor", id: "fe" }, { type: "text", text: "。" },
+      { type: "text", text: "交给 " },
+      { type: "actor", id: "be" },
+      { type: "text", text: " 和 " },
+      { type: "actor", id: "fe" },
+      { type: "text", text: "。" },
     ]);
   });
   it("未知引用原样保留，并和相邻文字合并", () => {
@@ -117,7 +137,10 @@ describe("panelKey / panelFor / panelScope", () => {
     const s = base();
     expect(panelKey(s)).toBe("sp1:coord");
     expect(panelContextOf(s)).toBe("coord");
-    const withTab: SpaceDemoState = { ...s, spaces: s.spaces.map((sp) => (sp.id === "sp1" ? { ...sp, openTabs: ["be"], activeTab: "be" } : sp)) };
+    const withTab: SpaceDemoState = {
+      ...s,
+      spaces: s.spaces.map((sp) => (sp.id === "sp1" ? { ...sp, openTabs: ["be"], activeTab: "be" } : sp)),
+    };
     expect(panelKey(withTab)).toBe("sp1:be");
     expect(panelContextOf(withTab)).toBe("actor");
     expect(panelKey({ ...s, view: "chat", chatWith: "fe" })).toBe("chat:fe");
@@ -128,7 +151,10 @@ describe("panelKey / panelFor / panelScope", () => {
   it("目录范围：协调 Agent 用 Space 目录，Actor 用自己的目录或工作树", () => {
     const s = base();
     expect(panelScope(s)).toMatchObject({ roots: ["payments-api", "checkout-web"], coord: true });
-    const load: SpaceDemoState = { ...s, spaces: s.spaces.map((sp) => (sp.id === "sp1" ? { ...sp, openTabs: ["load"], activeTab: "load" } : sp)) };
+    const load: SpaceDemoState = {
+      ...s,
+      spaces: s.spaces.map((sp) => (sp.id === "sp1" ? { ...sp, openTabs: ["load"], activeTab: "load" } : sp)),
+    };
     expect(panelScope(load)).toMatchObject({ dir: "payments-api", branch: "space/load-test", tree: "space/load-test" });
     expect(panelScope({ ...s, view: "chat", chatWith: "fe" })).toMatchObject({ dir: "payments-api", branch: "main" });
     expect(panelScope({ ...s, view: "roster" })).toBeNull();

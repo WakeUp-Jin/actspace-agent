@@ -64,7 +64,11 @@ export class DeepSeekFileUploader {
         form.append("purpose", "user_data");
         form.append("expires_after[anchor]", "created_at");
         form.append("expires_after[seconds]", String(DEFAULT_EXPIRY_SECONDS));
-        form.append("file", new Blob([Buffer.from(input.bytes)], { type: input.mimeType }), input.filename ?? filenameFor(input.artifactId, input.mimeType));
+        form.append(
+          "file",
+          new Blob([Buffer.from(input.bytes)], { type: input.mimeType }),
+          input.filename ?? filenameFor(input.artifactId, input.mimeType),
+        );
         const response = await fetchImpl(endpoint, {
           method: "POST",
           headers: { Authorization: `Bearer ${input.apiKey}`, Accept: "application/json" },
@@ -77,7 +81,8 @@ export class DeepSeekFileUploader {
           continue;
         }
         const payload = await boundedJson(response);
-        const fileId = typeof payload.id === "string" && /^file-api-[A-Za-z0-9_-]+$/.test(payload.id) ? payload.id : undefined;
+        const fileId =
+          typeof payload.id === "string" && /^file-api-[A-Za-z0-9_-]+$/.test(payload.id) ? payload.id : undefined;
         if (!fileId) throw new Error("DeepSeek Files API returned an invalid file id.");
         const createdAt = number(payload.created_at) ?? Math.floor(Date.now() / 1_000);
         const expiresAt = number(payload.expires_at) ?? createdAt + DEFAULT_EXPIRY_SECONDS;
@@ -100,21 +105,32 @@ export function filesEndpoint(baseUrl: string): string {
 
 /** 缓存键按 apiKey 做 HMAC：不同账号上传同一张图拿到的 file id 不能互用，但 apiKey 本身不进摘要内容。 */
 function cacheKey(input: DeepSeekFileUploadInput): string {
-  return createHmac("sha256", input.apiKey).update(`${input.baseUrl}\0${input.sessionId}\0${input.artifactId}\0`).update(input.bytes).digest("hex");
+  return createHmac("sha256", input.apiKey)
+    .update(`${input.baseUrl}\0${input.sessionId}\0${input.artifactId}\0`)
+    .update(input.bytes)
+    .digest("hex");
 }
 
 function filenameFor(artifactId: string, mimeType: string): string {
-  const extension = mimeType === "image/png" ? "png" : mimeType === "image/jpeg" ? "jpg" : mimeType === "image/gif" ? "gif" : "webp";
+  const extension =
+    mimeType === "image/png" ? "png" : mimeType === "image/jpeg" ? "jpg" : mimeType === "image/gif" ? "gif" : "webp";
   return `${artifactId}.${extension}`;
 }
 
 async function boundedJson(response: Response): Promise<Record<string, unknown>> {
   const text = (await response.text()).slice(0, MAX_RESPONSE_BYTES).trim();
   const parsed: unknown = JSON.parse(text);
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("DeepSeek Files API returned an invalid response.");
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new Error("DeepSeek Files API returned an invalid response.");
   return parsed as Record<string, unknown>;
 }
 
-function retryableStatus(status: number): boolean { return status === 408 || status === 429 || status >= 500; }
-function isRetryableError(error: unknown): boolean { return !(error instanceof Error) || error.name !== "AbortError"; }
-function number(value: unknown): number | undefined { return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined; }
+function retryableStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+function isRetryableError(error: unknown): boolean {
+  return !(error instanceof Error) || error.name !== "AbortError";
+}
+function number(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+}

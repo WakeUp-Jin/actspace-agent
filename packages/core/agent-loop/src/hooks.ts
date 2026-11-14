@@ -1,6 +1,12 @@
 import type { AgentSubject } from "@actspace/agent";
 import type { SerialHook, WaterfallHook } from "@actspace/cordis-adapter";
-import type { LlmFailure, LlmMessage, LlmStreamEvent, LlmToolDefinition, ResolvedLlmRequest } from "@actspace/llm-service";
+import type {
+  LlmFailure,
+  LlmMessage,
+  LlmStreamEvent,
+  LlmToolDefinition,
+  ResolvedLlmRequest,
+} from "@actspace/llm-service";
 import type { RuntimeAgentMode, RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 
 // 五个 payload 里的 `agent` 都由 Loop 的 dispatcher 填：分发的地方给其余字段，监听器收到的是带 `agent` 的完整 payload。
@@ -103,4 +109,6 @@ export interface AgentLoopHooks {
   "agent/turn-stopping": SerialHook<AgentTurnStoppingPayload>;
 }
 
-declare module "@actspace/cordis-adapter" { interface DomainEvents extends AgentLoopHooks {} }
+declare module "@actspace/cordis-adapter" {
+  interface DomainEvents extends AgentLoopHooks {}
+}

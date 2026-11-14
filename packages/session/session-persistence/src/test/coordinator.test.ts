@@ -3,14 +3,27 @@ import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { SessionPersistenceCoordinator } from "../coordinator.js";
 
 function event(seq: number): SessionEventEnvelopeV1 {
-  return { recordKind: "event", seq, type: "turn/start", eventVersion: 1, criticality: "core", time: "2026-09-20T00:00:00.000Z", source: { ownerPluginId: "@actspace/core" }, data: { turnId: `turn-${seq}` }, surface: null, provenance: {} } as SessionEventEnvelopeV1;
+  return {
+    recordKind: "event",
+    seq,
+    type: "turn/start",
+    eventVersion: 1,
+    criticality: "core",
+    time: "2026-09-20T00:00:00.000Z",
+    source: { ownerPluginId: "@actspace/core" },
+    data: { turnId: `turn-${seq}` },
+    surface: null,
+    provenance: {},
+  } as SessionEventEnvelopeV1;
 }
 
 describe("SessionPersistenceCoordinator", () => {
   it("accepts events before the backend append and makes a requested prefix durable on flush", async () => {
     const order: string[] = [];
     const driver = {
-      append: async (events: readonly SessionEventEnvelopeV1[]) => { order.push(`write:${events[0]?.seq}`); },
+      append: async (events: readonly SessionEventEnvelopeV1[]) => {
+        order.push(`write:${events[0]?.seq}`);
+      },
       flush: async () => undefined,
       assertOwned: async () => undefined,
       close: async () => undefined,
@@ -26,7 +39,9 @@ describe("SessionPersistenceCoordinator", () => {
   it("retains the failure boundary when the backend rejects a batch", async () => {
     const cause = new Error("fsync failed");
     const driver = {
-      append: async () => { throw cause; },
+      append: async () => {
+        throw cause;
+      },
       flush: async () => undefined,
       assertOwned: async () => undefined,
       close: async () => undefined,
@@ -42,25 +57,52 @@ describe("SessionPersistenceCoordinator", () => {
 
 it("does not advance durable sequence when append succeeds but flush fails, and still closes", async () => {
   let closed = false;
-  const coordinator = new SessionPersistenceCoordinator({ append: async () => undefined, flush: async () => { throw new Error("flush failed"); }, assertOwned: async () => undefined, close: async () => { closed = true; } }, []);
+  const coordinator = new SessionPersistenceCoordinator(
+    {
+      append: async () => undefined,
+      flush: async () => {
+        throw new Error("flush failed");
+      },
+      assertOwned: async () => undefined,
+      close: async () => {
+        closed = true;
+      },
+    },
+    [],
+  );
   void coordinator.accept(event(0));
   await expect(coordinator.flush(0)).rejects.toThrow("flush failed");
   expect(coordinator.durableSeq).toBe(-1);
   expect(coordinator.blocked).toBe(true);
-  await expect(coordinator.close(0)).rejects.toThrow(); expect(closed).toBe(true);
+  await expect(coordinator.close(0)).rejects.toThrow();
+  expect(closed).toBe(true);
 });
 
 it("backpressures a full queue until a slow durable write finishes", async () => {
   let release!: () => void;
-  const gate = new Promise<void>(resolve => { release = resolve; });
-  const coordinator = new SessionPersistenceCoordinator({ append: async () => gate, flush: async () => undefined, assertOwned: async () => undefined, close: async () => undefined }, []);
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const coordinator = new SessionPersistenceCoordinator(
+    {
+      append: async () => gate,
+      flush: async () => undefined,
+      assertOwned: async () => undefined,
+      close: async () => undefined,
+    },
+    [],
+  );
   for (let i = 0; i < 127; i++) expect(coordinator.accept(event(i))).toBeUndefined();
   let completed = false;
-  const waiting = Promise.resolve(coordinator.accept(event(127))).then(() => { completed = true; });
-  await Promise.resolve(); await Promise.resolve();
+  const waiting = Promise.resolve(coordinator.accept(event(127))).then(() => {
+    completed = true;
+  });
+  await Promise.resolve();
+  await Promise.resolve();
   expect(completed).toBe(false);
   expect(coordinator.durableSeq).toBe(-1);
-  release(); await waiting;
+  release();
+  await waiting;
   expect(coordinator.durableSeq).toBe(127);
   await coordinator.close(127);
 });

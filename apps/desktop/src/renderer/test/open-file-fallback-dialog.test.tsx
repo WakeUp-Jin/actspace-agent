@@ -13,12 +13,27 @@ const APPS: WorkspaceFileApplication[] = [
 
 function Trigger({ path = "src/main.go" }: { path?: string }) {
   const openPath = useOpenWorkspacePath();
-  return <button type="button" onClick={() => void openPath({ workspaceRoot: "/ws", relativePath: path, openTab: vi.fn() })}>点开</button>;
+  return (
+    <button type="button" onClick={() => void openPath({ workspaceRoot: "/ws", relativePath: path, openTab: vi.fn() })}>
+      点开
+    </button>
+  );
 }
 
-function install({ applications = APPS, tools = [] as WorkspaceOpenTool[], noApp = true }: { applications?: WorkspaceFileApplication[]; tools?: WorkspaceOpenTool[]; noApp?: boolean } = {}) {
+function install({
+  applications = APPS,
+  tools = [] as WorkspaceOpenTool[],
+  noApp = true,
+}: {
+  applications?: WorkspaceFileApplication[];
+  tools?: WorkspaceOpenTool[];
+  noApp?: boolean;
+} = {}) {
   const openFile = vi.fn(async (input: { action: string; applicationId?: string }) =>
-    noApp && input.action === "open" && !input.applicationId ? { ok: false, error: "no_application" as const, message: "Failed to open path" } : { ok: true });
+    noApp && input.action === "open" && !input.applicationId
+      ? { ok: false, error: "no_application" as const, message: "Failed to open path" }
+      : { ok: true },
+  );
   setupBridge({
     "workspaces.openFile": openFile,
     "workspaces.listFileApplications": async () => ({ applications }),
@@ -28,7 +43,11 @@ function install({ applications = APPS, tools = [] as WorkspaceOpenTool[], noApp
 }
 
 async function openDialog() {
-  render(<OpenFileFallbackProvider><Trigger /></OpenFileFallbackProvider>);
+  render(
+    <OpenFileFallbackProvider>
+      <Trigger />
+    </OpenFileFallbackProvider>,
+  );
   await userEvent.click(screen.getByRole("button", { name: "点开" }));
   return screen.findByRole("dialog");
 }
@@ -41,7 +60,11 @@ beforeEach(() => {
 describe("OpenFileFallbackDialog", () => {
   it("does not appear when the system opens the file", async () => {
     install({ noApp: false });
-    render(<OpenFileFallbackProvider><Trigger /></OpenFileFallbackProvider>);
+    render(
+      <OpenFileFallbackProvider>
+        <Trigger />
+      </OpenFileFallbackProvider>,
+    );
     await userEvent.click(screen.getByRole("button", { name: "点开" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
@@ -66,7 +89,14 @@ describe("OpenFileFallbackDialog", () => {
     const openFile = install();
     await openDialog();
     await userEvent.click(await screen.findByRole("button", { name: "TextEdit" }));
-    await waitFor(() => expect(openFile).toHaveBeenLastCalledWith({ workspaceRoot: "/ws", relativePath: "src/main.go", action: "open", applicationId: "/System/Applications/TextEdit.app" }));
+    await waitFor(() =>
+      expect(openFile).toHaveBeenLastCalledWith({
+        workspaceRoot: "/ws",
+        relativePath: "src/main.go",
+        action: "open",
+        applicationId: "/System/Applications/TextEdit.app",
+      }),
+    );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
@@ -74,7 +104,13 @@ describe("OpenFileFallbackDialog", () => {
     const openFile = install();
     await openDialog();
     await userEvent.click(screen.getByRole("button", { name: "在 Finder 中显示" }));
-    await waitFor(() => expect(openFile).toHaveBeenLastCalledWith({ workspaceRoot: "/ws", relativePath: "src/main.go", action: "reveal" }));
+    await waitFor(() =>
+      expect(openFile).toHaveBeenLastCalledWith({
+        workspaceRoot: "/ws",
+        relativePath: "src/main.go",
+        action: "reveal",
+      }),
+    );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
@@ -94,8 +130,16 @@ describe("OpenFileFallbackDialog", () => {
   });
 
   it("keeps the dialog open and explains when the chosen application fails", async () => {
-    const openFile = vi.fn(async (input: { applicationId?: string }) => input.applicationId ? { ok: false, error: "open_failed" as const } : { ok: false, error: "no_application" as const });
-    setupBridge({ "workspaces.openFile": openFile, "workspaces.listFileApplications": async () => ({ applications: APPS }), "workspaces.listOpenTools": async () => ({ tools: [] }) });
+    const openFile = vi.fn(async (input: { applicationId?: string }) =>
+      input.applicationId
+        ? { ok: false, error: "open_failed" as const }
+        : { ok: false, error: "no_application" as const },
+    );
+    setupBridge({
+      "workspaces.openFile": openFile,
+      "workspaces.listFileApplications": async () => ({ applications: APPS }),
+      "workspaces.listOpenTools": async () => ({ tools: [] }),
+    });
     await openDialog();
     await userEvent.click(await screen.findByRole("button", { name: "Xcode" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("无法用这个应用打开");

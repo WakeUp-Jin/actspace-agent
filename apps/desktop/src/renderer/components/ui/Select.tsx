@@ -30,7 +30,15 @@ function groupOptions(options: SelectOption[]) {
 }
 
 export function Select({
-  value, onValueChange, options, placeholder, disabled = false, ariaLabel, className, contentClassName, wrapOptions = false,
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  disabled = false,
+  ariaLabel,
+  className,
+  contentClassName,
+  wrapOptions = false,
 }: {
   value: string;
   onValueChange: (value: string) => void;
@@ -47,33 +55,63 @@ export function Select({
 }) {
   const selected = options.find((option) => option.value === value);
   return (
-    <SelectPrimitive.Root value={toRadix(value)} onValueChange={(next) => onValueChange(fromRadix(next))} disabled={disabled}>
+    <SelectPrimitive.Root
+      value={toRadix(value)}
+      onValueChange={(next) => onValueChange(fromRadix(next))}
+      disabled={disabled}
+    >
       <SelectPrimitive.Trigger aria-label={ariaLabel} className={cn(SELECT_TRIGGER_CLASS, "group", className)}>
         <span className={cn("truncate", !selected && "text-text-subtle")}>
           <SelectPrimitive.Value>{selected?.label ?? placeholder ?? value}</SelectPrimitive.Value>
         </span>
         <SelectPrimitive.Icon asChild>
-          <ChevronDown size={14} aria-hidden="true"
-            className="shrink-0 text-text-faint transition-transform duration-(--motion-base) group-data-[state=open]:rotate-180 motion-reduce:transition-none" />
+          <ChevronDown
+            size={14}
+            aria-hidden="true"
+            className="shrink-0 text-text-faint transition-transform duration-(--motion-base) group-data-[state=open]:rotate-180 motion-reduce:transition-none"
+          />
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
-        <SelectPrimitive.Content position="popper" sideOffset={6} collisionPadding={8} aria-label={ariaLabel}
+        <SelectPrimitive.Content
+          position="popper"
+          sideOffset={6}
+          collisionPadding={8}
+          aria-label={ariaLabel}
           // 和 Menu 一样：Esc 只收起下拉，不冒泡到外层表单的 Esc（返回上一步、取消编辑）。
-          onKeyDown={(event) => { if (event.key === "Escape") event.stopPropagation(); }}
-          className={cn(MENU_SURFACE_CLASS, "max-h-[min(280px,var(--radix-select-content-available-height))] min-w-(--radix-select-trigger-width) overflow-hidden", contentClassName)}>
+          onKeyDown={(event) => {
+            if (event.key === "Escape") event.stopPropagation();
+          }}
+          className={cn(
+            MENU_SURFACE_CLASS,
+            "max-h-[min(280px,var(--radix-select-content-available-height))] min-w-(--radix-select-trigger-width) overflow-hidden",
+            contentClassName,
+          )}
+        >
           <SelectPrimitive.Viewport>
             {groupOptions(options).map((entry, index) => (
               <SelectPrimitive.Group key={`${entry.group ?? ""}:${index}`}>
-                {entry.group ? <SelectPrimitive.Label className={MENU_LABEL_CLASS}>{entry.group}</SelectPrimitive.Label> : null}
+                {entry.group ? (
+                  <SelectPrimitive.Label className={MENU_LABEL_CLASS}>{entry.group}</SelectPrimitive.Label>
+                ) : null}
                 {entry.options.map((option) => (
-                  <SelectPrimitive.Item key={option.value} value={toRadix(option.value)} disabled={option.disabled}
-                    className={cn(MENU_ITEM_CLASS, "data-[state=checked]:bg-selected data-[state=checked]:font-medium")}>
-                    <SelectPrimitive.ItemIndicator className="shrink-0"><Check size={14} aria-hidden="true" /></SelectPrimitive.ItemIndicator>
+                  <SelectPrimitive.Item
+                    key={option.value}
+                    value={toRadix(option.value)}
+                    disabled={option.disabled}
+                    className={cn(MENU_ITEM_CLASS, "data-[state=checked]:bg-selected data-[state=checked]:font-medium")}
+                  >
+                    <SelectPrimitive.ItemIndicator className="shrink-0">
+                      <Check size={14} aria-hidden="true" />
+                    </SelectPrimitive.ItemIndicator>
                     {option.value === value ? null : <span className="w-[14px] shrink-0" aria-hidden="true" />}
-                    {wrapOptions ? <span className="min-w-0 whitespace-normal break-all py-1">
+                    {wrapOptions ? (
+                      <span className="min-w-0 whitespace-normal break-all py-1">
+                        <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
+                      </span>
+                    ) : (
                       <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
-                    </span> : <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>}
+                    )}
                   </SelectPrimitive.Item>
                 ))}
               </SelectPrimitive.Group>

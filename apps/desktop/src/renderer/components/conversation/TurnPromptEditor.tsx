@@ -26,11 +26,18 @@ const EDITOR_BAR_CLASS = "flex min-h-[30px] items-center gap-1.5 px-2.5 pb-2 pt-
 const FILE_REFERENCE_CLASS =
   "inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-act-md border border-line bg-surface-subtle pl-2 pr-0.5 text-act-sm leading-5 text-text-main";
 const INPUT_MAX_PX = 240;
-const SEND_VARIANT: Record<ComposerMode, "accent" | "warning" | "operational"> = { agent: "accent", plan: "warning", chat: "operational" };
+const SEND_VARIANT: Record<ComposerMode, "accent" | "warning" | "operational"> = {
+  agent: "accent",
+  plan: "warning",
+  chat: "operational",
+};
 
 /** 编辑器打开的弹层（模型菜单、Tooltip）在 portal 里：里面的点击不算点到编辑器外面。 */
 function insideFloatingLayer(target: EventTarget | null): boolean {
-  return target instanceof Element && Boolean(target.closest("[data-radix-popper-content-wrapper], [role='menu'], [role='listbox']"));
+  return (
+    target instanceof Element &&
+    Boolean(target.closest("[data-radix-popper-content-wrapper], [role='menu'], [role='listbox']"))
+  );
 }
 
 export type TurnPromptEditorProps = {
@@ -42,7 +49,14 @@ export type TurnPromptEditorProps = {
 
 /** 消息流里的提问编辑器：附件可删可加，模型和下方 Composer 共用；回车发送，Esc 或点到外面取消。 */
 export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: TurnPromptEditorProps) {
-  const { models, defaultModelId, selectedModelId, onSelectedModelChange, composerMode = "agent", selectedSkills = [] } = useComposerContext();
+  const {
+    models,
+    defaultModelId,
+    selectedModelId,
+    onSelectedModelChange,
+    composerMode = "agent",
+    selectedSkills = [],
+  } = useComposerContext();
   const { target, capabilities, readiness } = useRunTargetContext();
   const isRemoteTarget = target.kind === "remote";
   const isChatForm = composerMode === "chat";
@@ -50,16 +64,29 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [text, setText] = useState(initial.text);
   const [fileReferences, setFileReferences] = useState<readonly FileReference[]>(initial.fileReferences);
-  const [responseAnnotations, setResponseAnnotations] = useState<readonly ResponseAnnotationReference[]>(initial.responseAnnotations);
+  const [responseAnnotations, setResponseAnnotations] = useState<readonly ResponseAnnotationReference[]>(
+    initial.responseAnnotations,
+  );
   const [modelOpen, setModelOpen] = useState(false);
   const attachmentState = useComposerAttachments({
-    isChatForm, isRemoteTarget, inputLocked: false, initial: initial.attachments,
-    onBeforePick: () => setModelOpen(false), onRemoved: () => undefined,
+    isChatForm,
+    isRemoteTarget,
+    inputLocked: false,
+    initial: initial.attachments,
+    onBeforePick: () => setModelOpen(false),
+    onRemoved: () => undefined,
   });
   const { attachments, setAttachments } = attachmentState;
   const model = useComposerModel({
-    target, sessionId, models, defaultModelId, selectedModelId, onSelectedModelChange,
-    remoteReady: readiness.state === "ready", selectedSkills, configure: false,
+    target,
+    sessionId,
+    models,
+    defaultModelId,
+    selectedModelId,
+    onSelectedModelChange,
+    remoteReady: readiness.state === "ready",
+    selectedSkills,
+    configure: false,
   });
   const onCancelRef = useRef(onCancel);
   onCancelRef.current = onCancel;
@@ -68,19 +95,32 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
 
   // 原提问里的图片已经存在会话里：按 artifactId 读出预览。只在打开编辑器时读一次，之后附件变化不重读。
   useEffect(() => {
-    const pending = attachmentsRef.current.filter((attachment) => attachment.kind === "image" && !attachment.previewUrl && (attachment.artifactId || attachment.remoteArtifact));
+    const pending = attachmentsRef.current.filter(
+      (attachment) =>
+        attachment.kind === "image" && !attachment.previewUrl && (attachment.artifactId || attachment.remoteArtifact),
+    );
     if (pending.length === 0) return;
     let active = true;
-    void Promise.all(pending.map(async (attachment) => {
-      const artifactPath = attachment.artifactId ?? attachment.remoteArtifact!.artifactId;
-      const result = await sessionsApi.readArtifact({ sessionId, artifactPath }).catch(() => null);
-      return result?.dataUrl ? [attachment.id, result.dataUrl] as const : null;
-    })).then((entries) => {
+    void Promise.all(
+      pending.map(async (attachment) => {
+        const artifactPath = attachment.artifactId ?? attachment.remoteArtifact!.artifactId;
+        const result = await sessionsApi.readArtifact({ sessionId, artifactPath }).catch(() => null);
+        return result?.dataUrl ? ([attachment.id, result.dataUrl] as const) : null;
+      }),
+    ).then((entries) => {
       const previews = new Map(entries.filter((entry): entry is readonly [string, string] => entry !== null));
       if (!active || previews.size === 0) return;
-      setAttachments((current) => current.map((attachment) => previews.has(attachment.id) && !attachment.previewUrl ? { ...attachment, previewUrl: previews.get(attachment.id) } : attachment));
+      setAttachments((current) =>
+        current.map((attachment) =>
+          previews.has(attachment.id) && !attachment.previewUrl
+            ? { ...attachment, previewUrl: previews.get(attachment.id) }
+            : attachment,
+        ),
+      );
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [sessionId, setAttachments]);
 
   useLayoutEffect(() => {
@@ -114,8 +154,12 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
   function submit() {
     if (!canSend) return;
     const options = composerSendOptions({
-      model: model.selectedModelId, mode: composerMode, selectedSkills, runtimeOptions: model.runtimeOptions,
-      attachments, responseAnnotations,
+      model: model.selectedModelId,
+      mode: composerMode,
+      selectedSkills,
+      runtimeOptions: model.runtimeOptions,
+      attachments,
+      responseAnnotations,
     });
     if (fileReferences.length > 0) options.fileReferences = [...fileReferences];
     onSubmit({ text: text.trim(), attachments, fileReferences, responseAnnotations }, options);
@@ -146,12 +190,23 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
             <span key={reference.relativePath} className={FILE_REFERENCE_CLASS} title={reference.relativePath}>
               <FileText size={14} aria-hidden="true" className="shrink-0 text-text-faint" />
               <span className="truncate">{reference.displayName}</span>
-              <IconButton label={`移除 ${reference.displayName}`} variant="ghost" size="xs" onClick={() => setFileReferences((current) => current.filter((item) => item !== reference))}>
+              <IconButton
+                label={`移除 ${reference.displayName}`}
+                variant="ghost"
+                size="xs"
+                onClick={() => setFileReferences((current) => current.filter((item) => item !== reference))}
+              >
                 <X size={12} aria-hidden="true" />
               </IconButton>
             </span>
           ))}
-          {responseAnnotations.length > 0 ? <ResponseAnnotationPill annotations={responseAnnotations} variant="draft" onClear={() => setResponseAnnotations([])} /> : null}
+          {responseAnnotations.length > 0 ? (
+            <ResponseAnnotationPill
+              annotations={responseAnnotations}
+              variant="draft"
+              onClear={() => setResponseAnnotations([])}
+            />
+          ) : null}
         </div>
       ) : null}
       <textarea
@@ -165,9 +220,18 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
         onKeyDown={handleKeyDown}
       />
       {attachments.length > 0 ? (
-        <ComposerAttachments attachments={attachments} selectedSkills={[]} onRemove={attachmentState.remove} onRemoveSkill={() => undefined} />
+        <ComposerAttachments
+          attachments={attachments}
+          selectedSkills={[]}
+          onRemove={attachmentState.remove}
+          onRemoveSkill={() => undefined}
+        />
       ) : null}
-      {attachmentState.error ? <p role="alert" className="px-3.5 pt-1 text-act-xs leading-4 text-danger">{attachmentState.error}</p> : null}
+      {attachmentState.error ? (
+        <p role="alert" className="px-3.5 pt-1 text-act-xs leading-4 text-danger">
+          {attachmentState.error}
+        </p>
+      ) : null}
       <div className={EDITOR_BAR_CLASS}>
         <IconButton
           label={acceptsFiles ? "添加图片或文件" : "添加图片"}
@@ -181,7 +245,10 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
         <ModelPicker
           catalog={model.catalog}
           selectedModelId={model.catalogSelectedModelId}
-          onSelect={(modelId) => { model.selectModel(modelId); setModelOpen(false); }}
+          onSelect={(modelId) => {
+            model.selectModel(modelId);
+            setModelOpen(false);
+          }}
           options={model.pickerOptions}
           open={modelOpen}
           onOpenChange={setModelOpen}
@@ -190,7 +257,9 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
           disabled={isRemoteTarget && readiness.state !== "ready"}
         />
         <span className="flex-1" />
-        <Button variant="ghost" size="xs" onClick={onCancel}>取消</Button>
+        <Button variant="ghost" size="xs" onClick={onCancel}>
+          取消
+        </Button>
         <IconButton
           label="发送修改后的提问"
           tooltip="发送"

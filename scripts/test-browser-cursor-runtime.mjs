@@ -7,10 +7,7 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const source = readFileSync(
-  path.join(repoRoot, "browser-bridge/apps/chrome-extension/src/cursor-overlay.js"),
-  "utf8",
-);
+const source = readFileSync(path.join(repoRoot, "browser-bridge/apps/chrome-extension/src/cursor-overlay.js"), "utf8");
 
 const elements = [];
 const transformWrites = [];
@@ -31,11 +28,19 @@ const createElement = (tagName) => {
       },
     }),
     classList: {
-      add(value) { classes.add(value); },
-      remove(value) { classes.delete(value); },
+      add(value) {
+        classes.add(value);
+      },
+      remove(value) {
+        classes.delete(value);
+      },
     },
     setAttribute() {},
-    appendChild(child) { this.children.push(child); elements.push(child); return child; },
+    appendChild(child) {
+      this.children.push(child);
+      elements.push(child);
+      return child;
+    },
     remove() {
       const index = elements.indexOf(this);
       if (index >= 0) elements.splice(index, 1);
@@ -53,7 +58,12 @@ const context = vm.createContext({
   document: {
     createElement,
     getElementById: (id) => elements.find((element) => element.id === id) ?? null,
-    documentElement: { appendChild(element) { elements.push(element); return element; } },
+    documentElement: {
+      appendChild(element) {
+        elements.push(element);
+        return element;
+      },
+    },
   },
   window: {
     innerWidth: 1000,
@@ -70,7 +80,9 @@ const context = vm.createContext({
     });
     return id;
   },
-  cancelAnimationFrame(id) { cancelledFrames.add(id); },
+  cancelAnimationFrame(id) {
+    cancelledFrames.add(id);
+  },
   setTimeout,
   clearTimeout,
   setImmediate,

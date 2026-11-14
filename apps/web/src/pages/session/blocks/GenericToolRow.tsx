@@ -10,13 +10,27 @@ const text = (block: MessageBlock, keys: readonly string[]): string => {
 /** 其余工具的动作与目标：有桌面端文案的照搬，没有的显示工具给出的标题。 */
 export function genericLine(block: MessageBlock): { verb: string; target: string } {
   switch (block.kind) {
-    case "directory_list": return { verb: "Listed", target: block.path };
-    case "delete": return { verb: "Deleted", target: block.filePath };
-    case "media_analysis": return { verb: "Analyzed", target: block.mediaName };
-    case "image_generation": return { verb: "Generated image", target: block.promptPreview || block.displayText };
-    case "present": return { verb: "Presented", target: block.files.map(file => file.path).join(", ") || block.displayText };
-    case "agent": return { verb: subagentKindLabel({ ...(block.subagentKind ? { subagentKind: block.subagentKind } : {}), ...(block.preset ? { preset: block.preset } : {}), ...(block.agentKind ? { agentKind: block.agentKind } : {}) }), target: text(block, ["description", "title", "promptPreview"]) };
-    default: return { verb: text(block, ["title", "displayText", "description"]) || block.kind, target: "" };
+    case "directory_list":
+      return { verb: "Listed", target: block.path };
+    case "delete":
+      return { verb: "Deleted", target: block.filePath };
+    case "media_analysis":
+      return { verb: "Analyzed", target: block.mediaName };
+    case "image_generation":
+      return { verb: "Generated image", target: block.promptPreview || block.displayText };
+    case "present":
+      return { verb: "Presented", target: block.files.map((file) => file.path).join(", ") || block.displayText };
+    case "agent":
+      return {
+        verb: subagentKindLabel({
+          ...(block.subagentKind ? { subagentKind: block.subagentKind } : {}),
+          ...(block.preset ? { preset: block.preset } : {}),
+          ...(block.agentKind ? { agentKind: block.agentKind } : {}),
+        }),
+        target: text(block, ["description", "title", "promptPreview"]),
+      };
+    default:
+      return { verb: text(block, ["title", "displayText", "description"]) || block.kind, target: "" };
   }
 }
 

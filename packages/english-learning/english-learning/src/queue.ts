@@ -11,7 +11,11 @@ export class SpeechQueue {
   private closed = false;
   private stopping: Promise<void> = Promise.resolve();
   private phase: EnglishLearningState["speechStatus"] = "idle";
-  constructor(private readonly host: SpeechHostPort, private readonly changed: (status: QueueStatus) => void, private readonly synthesize = synthesizeEnglish) {}
+  constructor(
+    private readonly host: SpeechHostPort,
+    private readonly changed: (status: QueueStatus) => void,
+    private readonly synthesize = synthesizeEnglish,
+  ) {}
 
   available(): "idle" | "unsupported" | "unconfigured" {
     return !this.host.supported ? "unsupported" : !this.host.resolveCredential() ? "unconfigured" : "idle";
@@ -20,11 +24,18 @@ export class SpeechQueue {
   enqueue(texts: readonly string[]): void {
     if (this.closed) return;
     const availability = this.available();
-    if (availability !== "idle") { this.report(availability); return; }
-    if (!texts.length) { this.report(this.phase, "没有可朗读的英文。"); return; }
+    if (availability !== "idle") {
+      this.report(availability);
+      return;
+    }
+    if (!texts.length) {
+      this.report(this.phase, "没有可朗读的英文。");
+      return;
+    }
     const count = [...this.items, ...texts].reduce((sum, text) => sum + [...text].length, 0);
     if (this.items.length + texts.length > 20 || count > 20_000) {
-      this.report(this.phase, "语音队列已满，本条回答未加入朗读。"); return;
+      this.report(this.phase, "语音队列已满，本条回答未加入朗读。");
+      return;
     }
     this.items.push(...texts);
     this.report(this.running ? this.phase : "synthesizing");
@@ -37,16 +48,27 @@ export class SpeechQueue {
     this.current?.abort();
     const epoch = this.epoch;
     this.stopping = this.stopping.then(async () => {
-      try { await this.host.stop(); }
-      catch { if (epoch === this.epoch) this.report("error", null, { code: "playback", message: "停止语音失败，请重试。" }); return; }
+      try {
+        await this.host.stop();
+      } catch {
+        if (epoch === this.epoch) this.report("error", null, { code: "playback", message: "停止语音失败，请重试。" });
+        return;
+      }
       if (epoch === this.epoch) this.report(this.available());
     });
     await this.stopping;
   }
 
-  async dispose(): Promise<void> { this.closed = true; await this.stop(); }
+  async dispose(): Promise<void> {
+    this.closed = true;
+    await this.stop();
+  }
 
-  private report(speechStatus: EnglishLearningState["speechStatus"], notice: string | null = null, error: EnglishLearningState["error"] = null) {
+  private report(
+    speechStatus: EnglishLearningState["speechStatus"],
+    notice: string | null = null,
+    error: EnglishLearningState["error"] = null,
+  ) {
     this.phase = speechStatus;
     this.changed({ speechStatus, queuedSegments: this.items.length, notice, error });
   }
@@ -66,7 +88,11 @@ export class SpeechQueue {
         const text = this.items.shift()!;
         try {
           const credential = this.host.resolveCredential();
-          if (!credential) { this.items = []; this.report("unconfigured"); break; }
+          if (!credential) {
+            this.items = [];
+            this.report("unconfigured");
+            break;
+          }
           this.report("synthesizing");
           const audio = await this.synthesize(text, this.host.settings(), credential, controller.signal);
           if (epoch !== this.epoch || controller.signal.aborted) continue;
@@ -76,12 +102,15 @@ export class SpeechQueue {
         } catch (error) {
           if (epoch !== this.epoch || controller.signal.aborted) continue;
           this.items = [];
-          const safe = error instanceof SpeechError ? error : new SpeechError("playback", "语音播放失败，请停止后重试。");
+          const safe =
+            error instanceof SpeechError ? error : new SpeechError("playback", "语音播放失败，请停止后重试。");
           this.report("error", null, { code: safe.code, message: safe.message });
         } finally {
           if (this.current === controller) this.current = undefined;
         }
       }
-    } finally { this.running = false; }
+    } finally {
+      this.running = false;
+    }
   }
 }

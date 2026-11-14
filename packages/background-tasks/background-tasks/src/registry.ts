@@ -2,8 +2,24 @@ import { MainAgentInbox } from "@actspace/agent";
 import { serviceKey } from "@actspace/cordis-adapter";
 import { coreEvent, type CoreEventDataMap, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionHandle } from "@actspace/session-persistence";
-import { renderLostNotification, renderOutputMatchNotification, renderTaskNotification, userStoppedSummary, type NotifiedTask } from "./notification.js";
-import { BackgroundTaskError, type BackgroundTaskDelivery, type BackgroundTaskKind, type BackgroundTaskOutput, type BackgroundTaskOutputOptions, type BackgroundTaskRecord, type BackgroundTaskSource, type BackgroundTaskStatus, type BackgroundTaskTerminal } from "./types.js";
+import {
+  renderLostNotification,
+  renderOutputMatchNotification,
+  renderTaskNotification,
+  userStoppedSummary,
+  type NotifiedTask,
+} from "./notification.js";
+import {
+  BackgroundTaskError,
+  type BackgroundTaskDelivery,
+  type BackgroundTaskKind,
+  type BackgroundTaskOutput,
+  type BackgroundTaskOutputOptions,
+  type BackgroundTaskRecord,
+  type BackgroundTaskSource,
+  type BackgroundTaskStatus,
+  type BackgroundTaskTerminal,
+} from "./types.js";
 
 export type BackgroundTaskRegistryOptions = {
   readonly openSession: (sessionId: string) => Promise<SessionHandle>;
@@ -36,32 +52,75 @@ export class BackgroundTaskRegistry {
   readonly #entries = new Map<string, Entry>();
   readonly #now: () => number;
   #disposed = false;
-  constructor(private readonly options: BackgroundTaskRegistryOptions) { this.#now = options.now ?? Date.now; }
+  constructor(private readonly options: BackgroundTaskRegistryOptions) {
+    this.#now = options.now ?? Date.now;
+  }
 
   async register(source: BackgroundTaskSource): Promise<BackgroundTaskRecord> {
-    if (this.#entries.has(source.taskId)) throw new BackgroundTaskError("TASK_ID_CONFLICT", `Background task ${source.taskId} is already registered.`);
-    const entry: Entry = { source, startedAt: this.#now(), status: "running", delivery: "pending", settled: Promise.resolve() };
+    if (this.#entries.has(source.taskId))
+      throw new BackgroundTaskError("TASK_ID_CONFLICT", `Background task ${source.taskId} is already registered.`);
+    const entry: Entry = {
+      source,
+      startedAt: this.#now(),
+      status: "running",
+      delivery: "pending",
+      settled: Promise.resolve(),
+    };
     this.#entries.set(source.taskId, entry);
     // A subagent's start names its transcript, so a restart can tell the model where it got to.
-    await this.#append(source.sessionId, { op: "start", taskId: source.taskId, kind: source.kind, callId: source.callId, description: source.description, startedAt: new Date(entry.startedAt).toISOString(), ...(source.agent ? { transcriptPath: source.agent.transcriptPath } : {}) });
-    entry.settled = source.done.then(
-      terminal => this.#settle(entry, terminal),
-      error => this.#settle(entry, { status: "failed", summary: `Background ${source.kind} task failed: ${error instanceof Error ? error.message : String(error)}`, body: "" }),
-    ).catch(error => this.options.onError?.(error));
+    await this.#append(source.sessionId, {
+      op: "start",
+      taskId: source.taskId,
+      kind: source.kind,
+      callId: source.callId,
+      description: source.description,
+      startedAt: new Date(entry.startedAt).toISOString(),
+      ...(source.agent ? { transcriptPath: source.agent.transcriptPath } : {}),
+    });
+    entry.settled = source.done
+      .then(
+        (terminal) => this.#settle(entry, terminal),
+        (error) =>
+          this.#settle(entry, {
+            status: "failed",
+            summary: `Background ${source.kind} task failed: ${error instanceof Error ? error.message : String(error)}`,
+            body: "",
+          }),
+      )
+      .catch((error) => this.options.onError?.(error));
     return record(entry);
   }
 
-  list(sessionId: string, options: { readonly activeOnly?: boolean; readonly limit?: number } = {}): readonly BackgroundTaskRecord[] {
-    const entries = this.#owned(sessionId).filter(entry => !options.activeOnly || entry.status === "running");
-    return entries.sort((a, b) => b.startedAt - a.startedAt).slice(0, options.limit ?? entries.length).map(record);
+  list(
+    sessionId: string,
+    options: { readonly activeOnly?: boolean; readonly limit?: number } = {},
+  ): readonly BackgroundTaskRecord[] {
+    const entries = this.#owned(sessionId).filter((entry) => !options.activeOnly || entry.status === "running");
+    return entries
+      .sort((a, b) => b.startedAt - a.startedAt)
+      .slice(0, options.limit ?? entries.length)
+      .map(record);
   }
-  get(sessionId: string, taskId: string): BackgroundTaskRecord { return record(this.#require(sessionId, taskId)); }
-  hasRunning(sessionId?: string, kind?: BackgroundTaskKind): boolean { return this.runningCount(sessionId, kind) > 0; }
+  get(sessionId: string, taskId: string): BackgroundTaskRecord {
+    return record(this.#require(sessionId, taskId));
+  }
+  hasRunning(sessionId?: string, kind?: BackgroundTaskKind): boolean {
+    return this.runningCount(sessionId, kind) > 0;
+  }
   runningCount(sessionId?: string, kind?: BackgroundTaskKind): number {
-    return [...this.#entries.values()].filter(entry => entry.status === "running" && (sessionId === undefined || entry.source.sessionId === sessionId) && (kind === undefined || entry.source.kind === kind)).length;
+    return [...this.#entries.values()].filter(
+      (entry) =>
+        entry.status === "running" &&
+        (sessionId === undefined || entry.source.sessionId === sessionId) &&
+        (kind === undefined || entry.source.kind === kind),
+    ).length;
   }
 
-  async output(sessionId: string, taskId: string, options: BackgroundTaskOutputOptions = {}): Promise<{ readonly task: BackgroundTaskRecord; readonly output: BackgroundTaskOutput }> {
+  async output(
+    sessionId: string,
+    taskId: string,
+    options: BackgroundTaskOutputOptions = {},
+  ): Promise<{ readonly task: BackgroundTaskRecord; readonly output: BackgroundTaskOutput }> {
     const entry = this.#require(sessionId, taskId);
     return { task: record(entry), output: await this.#output(entry, options) };
   }
@@ -75,15 +134,26 @@ export class BackgroundTaskRegistry {
     if (entry && entry.source.sessionId !== sessionId) return;
     if (entry?.pruned) return;
     const session = await this.options.openSession(sessionId);
-    const known = session.journal.project(PRUNABLE_TASKS, () => new Map<string, boolean>(), (state, event) => {
-      if (event.type !== "background/task") return state;
-      const data = event.data as Readonly<Record<string, RuntimeJsonValue>>;
-      if (typeof data.taskId !== "string" || (data.op !== "start" && data.op !== "prune")) return state;
-      return new Map(state).set(data.taskId, data.op === "prune");
-    });
+    const known = session.journal.project(
+      PRUNABLE_TASKS,
+      () => new Map<string, boolean>(),
+      (state, event) => {
+        if (event.type !== "background/task") return state;
+        const data = event.data as Readonly<Record<string, RuntimeJsonValue>>;
+        if (typeof data.taskId !== "string" || (data.op !== "start" && data.op !== "prune")) return state;
+        return new Map(state).set(data.taskId, data.op === "prune");
+      },
+    );
     if (entry) entry.pruned = true;
     if (known.get(taskId) !== false) return;
-    await session.append(coreEvent("background/task", { op: "prune", taskId, prunedAt: new Date(this.#now()).toISOString(), reason: "session-cap" }));
+    await session.append(
+      coreEvent("background/task", {
+        op: "prune",
+        taskId,
+        prunedAt: new Date(this.#now()).toISOString(),
+        reason: "session-cap",
+      }),
+    );
   }
 
   /** The stop result is the delivery; a stopped task never sends a notification. */
@@ -106,7 +176,11 @@ export class BackgroundTaskRegistry {
     if (entry.status !== "running") return record(entry);
     await this.stop(sessionId, taskId, "user");
     const { source } = entry;
-    await this.#enqueue(sessionId, renderTaskNotification(notified(source), { status: "stopped", summary: userStoppedSummary(source), body: "" }), { taskId, kind: source.kind, title: source.description, status: "stopped" });
+    await this.#enqueue(
+      sessionId,
+      renderTaskNotification(notified(source), { status: "stopped", summary: userStoppedSummary(source), body: "" }),
+      { taskId, kind: source.kind, title: source.description, status: "stopped" },
+    );
     return record(entry);
   }
 
@@ -115,7 +189,12 @@ export class BackgroundTaskRegistry {
     const entry = this.#entries.get(taskId);
     if (entry?.status !== "running" || this.#disposed) return;
     const { source } = entry;
-    await this.#enqueue(source.sessionId, renderOutputMatchNotification(source, summary, line), { taskId: source.taskId, kind: source.kind, title: source.description, status: "output_match" });
+    await this.#enqueue(source.sessionId, renderOutputMatchNotification(source, summary, line), {
+      taskId: source.taskId,
+      kind: source.kind,
+      title: source.description,
+      status: "output_match",
+    });
     this.options.wake(source.sessionId);
   }
 
@@ -124,29 +203,55 @@ export class BackgroundTaskRegistry {
     const entry = this.#entries.get(taskId);
     if (entry?.status !== "running" || this.#disposed) return;
     const { source } = entry;
-    await this.#enqueue(source.sessionId, renderTaskNotification(source, { status: "subscription_stopped", summary, body: "" }), { taskId: source.taskId, kind: source.kind, title: source.description, status: "subscription_stopped" });
+    await this.#enqueue(
+      source.sessionId,
+      renderTaskNotification(source, { status: "subscription_stopped", summary, body: "" }),
+      { taskId: source.taskId, kind: source.kind, title: source.description, status: "subscription_stopped" },
+    );
     this.options.wake(source.sessionId);
   }
 
   /** After a restart, tasks started by an earlier process are lost; tell the model without waking it. */
   async reconcile(session: SessionHandle): Promise<void> {
-    const open = session.journal.project(OPEN_TASKS, () => new Map<string, { readonly kind: BackgroundTaskKind; readonly description: string; readonly transcriptPath?: string }>(), (state, event) => {
-      if (event.type !== "background/task") return state;
-      const data = event.data as Readonly<Record<string, RuntimeJsonValue>>;
-      const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
-      if (taskId === undefined) return state;
-      const next = new Map(state);
-      const description = typeof data.description === "string" ? data.description : "";
-      if (data.op === "start" && data.kind === "bash") next.set(taskId, { kind: "bash", description });
-      // Old `agent` starts (before subagents joined the registry) have no transcript and are not ours to settle.
-      if (data.op === "start" && data.kind === "agent" && typeof data.transcriptPath === "string") next.set(taskId, { kind: "agent", description, transcriptPath: data.transcriptPath });
-      if (data.op === "settle") next.delete(taskId);
-      return next;
-    });
+    const open = session.journal.project(
+      OPEN_TASKS,
+      () =>
+        new Map<
+          string,
+          { readonly kind: BackgroundTaskKind; readonly description: string; readonly transcriptPath?: string }
+        >(),
+      (state, event) => {
+        if (event.type !== "background/task") return state;
+        const data = event.data as Readonly<Record<string, RuntimeJsonValue>>;
+        const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+        if (taskId === undefined) return state;
+        const next = new Map(state);
+        const description = typeof data.description === "string" ? data.description : "";
+        if (data.op === "start" && data.kind === "bash") next.set(taskId, { kind: "bash", description });
+        // Old `agent` starts (before subagents joined the registry) have no transcript and are not ours to settle.
+        if (data.op === "start" && data.kind === "agent" && typeof data.transcriptPath === "string")
+          next.set(taskId, { kind: "agent", description, transcriptPath: data.transcriptPath });
+        if (data.op === "settle") next.delete(taskId);
+        return next;
+      },
+    );
     for (const [taskId, task] of open) {
       if (this.#entries.has(taskId)) continue;
-      await session.append(coreEvent("background/task", { op: "settle", taskId, status: "lost", endedAt: new Date(this.#now()).toISOString(), delivery: "lost" }));
-      await new MainAgentInbox(session).enqueue(renderLostNotification({ taskId, ...task }), { taskId, kind: noticeKind(task.kind), title: task.description, status: "lost" });
+      await session.append(
+        coreEvent("background/task", {
+          op: "settle",
+          taskId,
+          status: "lost",
+          endedAt: new Date(this.#now()).toISOString(),
+          delivery: "lost",
+        }),
+      );
+      await new MainAgentInbox(session).enqueue(renderLostNotification({ taskId, ...task }), {
+        taskId,
+        kind: noticeKind(task.kind),
+        title: task.description,
+        status: "lost",
+      });
     }
   }
 
@@ -169,8 +274,10 @@ export class BackgroundTaskRegistry {
   async dispose(): Promise<void> {
     this.#disposed = true;
     const entries = [...this.#entries.values()];
-    await Promise.allSettled(entries.filter(entry => entry.status === "running").map(entry => entry.source.stop("host-shutdown")));
-    await Promise.allSettled(entries.map(entry => entry.settled));
+    await Promise.allSettled(
+      entries.filter((entry) => entry.status === "running").map((entry) => entry.source.stop("host-shutdown")),
+    );
+    await Promise.allSettled(entries.map((entry) => entry.settled));
     this.#entries.clear();
   }
 
@@ -183,11 +290,23 @@ export class BackgroundTaskRegistry {
     let delivery: BackgroundTaskDelivery;
     if (entry.delivery === "stopped") delivery = "stopped";
     else {
-      await this.#enqueue(source.sessionId, renderTaskNotification(notified(source), terminal), { taskId: source.taskId, kind: source.kind, title: source.description, status: terminal.status });
+      await this.#enqueue(source.sessionId, renderTaskNotification(notified(source), terminal), {
+        taskId: source.taskId,
+        kind: source.kind,
+        title: source.description,
+        status: terminal.status,
+      });
       entry.delivery = "enqueued";
       delivery = "notified";
     }
-    await this.#append(source.sessionId, { op: "settle", taskId: source.taskId, status: terminal.status, ...(terminal.exitCode === undefined ? {} : { exitCode: terminal.exitCode }), endedAt: new Date(entry.endedAt).toISOString(), delivery });
+    await this.#append(source.sessionId, {
+      op: "settle",
+      taskId: source.taskId,
+      status: terminal.status,
+      ...(terminal.exitCode === undefined ? {} : { exitCode: terminal.exitCode }),
+      endedAt: new Date(entry.endedAt).toISOString(),
+      delivery,
+    });
     if (delivery === "notified") this.options.wake(source.sessionId);
   }
 
@@ -197,16 +316,31 @@ export class BackgroundTaskRegistry {
     return entry.source.output(options);
   }
 
-  async #enqueue(sessionId: string, text: string, notice: { readonly taskId: string; readonly kind: BackgroundTaskKind; readonly title: string; readonly status: string }) {
-    return new MainAgentInbox(await this.options.openSession(sessionId)).enqueue(text, { ...notice, kind: noticeKind(notice.kind) });
+  async #enqueue(
+    sessionId: string,
+    text: string,
+    notice: {
+      readonly taskId: string;
+      readonly kind: BackgroundTaskKind;
+      readonly title: string;
+      readonly status: string;
+    },
+  ) {
+    return new MainAgentInbox(await this.options.openSession(sessionId)).enqueue(text, {
+      ...notice,
+      kind: noticeKind(notice.kind),
+    });
   }
   async #append(sessionId: string, data: CoreEventDataMap["background/task"]): Promise<void> {
     await (await this.options.openSession(sessionId)).append(coreEvent("background/task", data));
   }
-  #owned(sessionId: string): Entry[] { return [...this.#entries.values()].filter(entry => entry.source.sessionId === sessionId); }
+  #owned(sessionId: string): Entry[] {
+    return [...this.#entries.values()].filter((entry) => entry.source.sessionId === sessionId);
+  }
   #require(sessionId: string, taskId: string): Entry {
     const entry = this.#entries.get(taskId);
-    if (!entry || entry.source.sessionId !== sessionId) throw new BackgroundTaskError("TASK_NOT_FOUND", `Unknown background task: ${taskId || "(missing taskId)"}`);
+    if (!entry || entry.source.sessionId !== sessionId)
+      throw new BackgroundTaskError("TASK_NOT_FOUND", `Unknown background task: ${taskId || "(missing taskId)"}`);
     return entry;
   }
 }
@@ -215,34 +349,57 @@ export class BackgroundTaskRegistry {
  * The inbox notice's kind is what the UI shows: a subagent's notice keeps `subagent`, the kind the conversation
  * already hides and the 子 Agent panel opens; Bash stays `bash`.
  */
-function noticeKind(kind: BackgroundTaskKind): string { return kind === "agent" ? "subagent" : kind; }
+function noticeKind(kind: BackgroundTaskKind): string {
+  return kind === "agent" ? "subagent" : kind;
+}
 
 /** Bash notifications name the log; a subagent's name its transcript, so the model can read the whole record. */
 function notified(source: BackgroundTaskSource): NotifiedTask {
   const { taskId, kind } = source;
-  if (source.agent) return { taskId, kind, description: source.description, transcriptPath: source.agent.transcriptPath };
+  if (source.agent)
+    return { taskId, kind, description: source.description, transcriptPath: source.agent.transcriptPath };
   return source.bash?.outputPath ? { taskId, kind, outputPath: source.bash.outputPath } : { taskId, kind };
 }
 
 function record(entry: Entry): BackgroundTaskRecord {
   const { source } = entry;
-  return Object.freeze({ taskId: source.taskId, kind: source.kind, sessionId: source.sessionId, callId: source.callId, description: source.description, status: entry.status, startedAt: entry.startedAt,
+  return Object.freeze({
+    taskId: source.taskId,
+    kind: source.kind,
+    sessionId: source.sessionId,
+    callId: source.callId,
+    description: source.description,
+    status: entry.status,
+    startedAt: entry.startedAt,
     ...(entry.endedAt === undefined ? {} : { endedAt: entry.endedAt }),
     ...(entry.terminal?.exitCode === undefined ? {} : { exitCode: entry.terminal.exitCode }),
     ...(entry.terminal === undefined ? {} : { summary: entry.terminal.summary }),
     ...(source.bash === undefined ? {} : { bash: source.bash }),
-    ...(source.agent === undefined ? {} : { agent: source.agent }) });
+    ...(source.agent === undefined ? {} : { agent: source.agent }),
+  });
 }
 
 /** The surface Harness plugins use through `actspace.host.background-tasks`. */
-export type BackgroundTaskHost = Pick<BackgroundTaskRegistry, "register" | "list" | "get" | "output" | "stop" | "notifyOutputMatch" | "notifySubscriptionStopped" | "markPruned" | "hasRunning" | "runningCount">;
+export type BackgroundTaskHost = Pick<
+  BackgroundTaskRegistry,
+  | "register"
+  | "list"
+  | "get"
+  | "output"
+  | "stop"
+  | "notifyOutputMatch"
+  | "notifySubscriptionStopped"
+  | "markPruned"
+  | "hasRunning"
+  | "runningCount"
+>;
 export const BACKGROUND_TASK_HOST_SERVICE = "actspace.host.background-tasks" as const;
 export const BACKGROUND_TASK_HOST_PORT = serviceKey<BackgroundTaskHost>(BACKGROUND_TASK_HOST_SERVICE);
 
 /** Late-bound Host service: the registry exists only after the Agent runtime starts. */
 export function createBackgroundTaskHost(resolve: () => BackgroundTaskRegistry): BackgroundTaskHost {
   return Object.freeze({
-    register: source => resolve().register(source),
+    register: (source) => resolve().register(source),
     list: (sessionId, options) => resolve().list(sessionId, options),
     get: (sessionId, taskId) => resolve().get(sessionId, taskId),
     output: (sessionId, taskId, options) => resolve().output(sessionId, taskId, options),

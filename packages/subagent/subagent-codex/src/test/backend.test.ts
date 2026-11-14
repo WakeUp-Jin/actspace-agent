@@ -9,7 +9,9 @@ import { manifest } from "../manifest.js";
 
 // S5：Codex 后端（设计 04 §3.1）。假 `codex app-server` 按 FAKE_MODE 写死 JSON-RPC 输出，不调真实 CLI。
 const roots: string[] = [];
-afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
 
 const FAKE_CODEX = String.raw`
 const { appendFileSync, writeFileSync } = require("node:fs");
@@ -51,13 +53,28 @@ process.on("SIGTERM", () => { note("sigterm"); if (mode !== "stubborn") process.
 `;
 
 async function fakeCodex(mode: string) {
-  const dir = await mkdtemp(join(tmpdir(), "fake-codex-")); roots.push(dir);
-  const command = join(dir, "codex"), log = join(dir, "rollout-thread-1.jsonl"), trace = join(dir, "trace.txt");
-  await writeFile(command, `#!${process.execPath}\n${FAKE_CODEX}`); await chmod(command, 0o755); await writeFile(trace, "");
-  const backend = createCodexBackend({ command: async () => command, env: { ...process.env, FAKE_MODE: mode, FAKE_LOG: log, FAKE_TRACE: trace }, stopGraceMs: 300 });
+  const dir = await mkdtemp(join(tmpdir(), "fake-codex-"));
+  roots.push(dir);
+  const command = join(dir, "codex"),
+    log = join(dir, "rollout-thread-1.jsonl"),
+    trace = join(dir, "trace.txt");
+  await writeFile(command, `#!${process.execPath}\n${FAKE_CODEX}`);
+  await chmod(command, 0o755);
+  await writeFile(trace, "");
+  const backend = createCodexBackend({
+    command: async () => command,
+    env: { ...process.env, FAKE_MODE: mode, FAKE_LOG: log, FAKE_TRACE: trace },
+    stopGraceMs: 300,
+  });
   return { dir, backend, log, trace: async () => (await readFile(trace, "utf8")).split("\n").filter(Boolean) };
 }
-const start = (backend: ReturnType<typeof createCodexBackend>, cwd: string, model?: string) => backend.start({ prompt: "List the packages.", cwd, ...(model ? { model } : {}), signal: new AbortController().signal });
+const start = (backend: ReturnType<typeof createCodexBackend>, cwd: string, model?: string) =>
+  backend.start({
+    prompt: "List the packages.",
+    cwd,
+    ...(model ? { model } : {}),
+    signal: new AbortController().signal,
+  });
 
 describe("Codex backend", () => {
   it("starts a non-ephemeral thread, refuses server requests and returns the last agent message", async () => {
@@ -68,15 +85,33 @@ describe("Codex backend", () => {
     expect(existsSync(fake.log)).toBe(true);
     const trace = await fake.trace();
     expect(trace[0]).toMatch(/^argv app-server cwd /);
-    expect(trace.filter(line => line.startsWith("<- ")).slice(0, 5)).toEqual(["<- initialize", "<- initialized", "<- account/read", "<- thread/start", "<- turn/start"]);
-    expect(JSON.parse(trace.find(line => line.startsWith("thread "))!.slice(7))).toEqual({ cwd: fake.dir, approvalPolicy: "never", sandbox: "workspace-write", model: "gpt-5.5", ephemeral: false });
-    expect(JSON.parse(trace.find(line => line.startsWith("turn "))!.slice(5))).toEqual([{ type: "text", text: "List the packages.", text_elements: [] }]);
+    expect(trace.filter((line) => line.startsWith("<- ")).slice(0, 5)).toEqual([
+      "<- initialize",
+      "<- initialized",
+      "<- account/read",
+      "<- thread/start",
+      "<- turn/start",
+    ]);
+    expect(JSON.parse(trace.find((line) => line.startsWith("thread "))!.slice(7))).toEqual({
+      cwd: fake.dir,
+      approvalPolicy: "never",
+      sandbox: "workspace-write",
+      model: "gpt-5.5",
+      ephemeral: false,
+    });
+    expect(JSON.parse(trace.find((line) => line.startsWith("turn "))!.slice(5))).toEqual([
+      { type: "text", text: "List the packages.", text_elements: [] },
+    ]);
     expect(trace).toContain("<- reply approval-1 error -32601");
   });
 
   it("reports a failed turn with the error's first line", async () => {
     const fake = await fakeCodex("fail");
-    expect(await (await start(fake.backend, fake.dir)).result).toEqual({ status: "failed", text: "thinking out loud", error: "unexpected status 401 Unauthorized" });
+    expect(await (await start(fake.backend, fake.dir)).result).toEqual({
+      status: "failed",
+      text: "thinking out loud",
+      error: "unexpected status 401 Unauthorized",
+    });
   });
 
   it("interrupts the turn, and kills a server that ignores the interrupt", async () => {
@@ -84,7 +119,9 @@ describe("Codex backend", () => {
     const run = await start(polite.backend, polite.dir);
     await run.interrupt();
     expect(await run.result).toEqual({ status: "interrupted", text: "thinking out loud" });
-    expect((await polite.trace()).some(line => line.startsWith("interrupt {\"threadId\":\"thread-1\",\"turnId\":\"turn-1\"}"))).toBe(true);
+    expect(
+      (await polite.trace()).some((line) => line.startsWith('interrupt {"threadId":"thread-1","turnId":"turn-1"}')),
+    ).toBe(true);
 
     const stubborn = await fakeCodex("stubborn");
     const stuck = await start(stubborn.backend, stubborn.dir);
@@ -98,7 +135,9 @@ describe("Codex backend", () => {
 
   it("refuses to start when Codex is not logged in or the server dies", async () => {
     const loggedOut = await fakeCodex("logged-out");
-    await expect(start(loggedOut.backend, loggedOut.dir)).rejects.toThrow("Codex is not logged in. Run codex login in a terminal.");
+    await expect(start(loggedOut.backend, loggedOut.dir)).rejects.toThrow(
+      "Codex is not logged in. Run codex login in a terminal.",
+    );
     const crash = await fakeCodex("crash");
     await expect(start(crash.backend, crash.dir)).rejects.toThrow("Error: codex app-server failed to load config");
   });
@@ -107,8 +146,13 @@ describe("Codex backend", () => {
     const missing = createCodexBackend({ command: async () => undefined });
     expect(await missing.available()).toEqual({ ok: false, reason: CODEX_NOT_FOUND });
     expect(CODEX_NOT_FOUND).toBe("本机没有找到 codex 命令");
-    await expect(missing.start({ prompt: "x", cwd: tmpdir(), signal: new AbortController().signal })).rejects.toThrow(CODEX_NOT_FOUND);
-    expect(codexConfig({ approvalPolicy: "on-request", sandbox: "read-only" })).toEqual({ approvalPolicy: "on-request", sandbox: "read-only" });
+    await expect(missing.start({ prompt: "x", cwd: tmpdir(), signal: new AbortController().signal })).rejects.toThrow(
+      CODEX_NOT_FOUND,
+    );
+    expect(codexConfig({ approvalPolicy: "on-request", sandbox: "read-only" })).toEqual({
+      approvalPolicy: "on-request",
+      sandbox: "read-only",
+    });
     expect(codexConfig({ approvalPolicy: "always", sandbox: 3 })).toEqual(DEFAULT_CODEX_CONFIG);
     expect(await resolveCommand("actspace-no-such-command-xyz")).toBeUndefined();
     expect(await resolveCommand("bad;name")).toBeUndefined();
@@ -118,6 +162,10 @@ describe("Codex backend", () => {
   it("is an optional plugin, off by default, with the design's settings", () => {
     const behavior = manifest.behaviors[0];
     expect(manifest.display).toMatchObject({ scope: "session", defaultEnabled: false, canDisable: true });
-    expect(behavior).toMatchObject({ required: false, config: { approvalPolicy: "never", sandbox: "workspace-write" }, host: { required: ["process"] } });
+    expect(behavior).toMatchObject({
+      required: false,
+      config: { approvalPolicy: "never", sandbox: "workspace-write" },
+      host: { required: ["process"] },
+    });
   });
 });

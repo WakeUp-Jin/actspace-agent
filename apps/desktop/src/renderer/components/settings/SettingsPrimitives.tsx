@@ -11,7 +11,16 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleExclamationPoint, Minus, Plus, RotateCcw } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleExclamationPoint,
+  Minus,
+  Plus,
+  RotateCcw,
+} from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
@@ -44,9 +53,16 @@ export function PageShell({
   children: ReactNode;
 }) {
   return (
-    <div className={cx("mx-auto w-full px-12 pb-24 pt-9 max-[600px]:px-4 max-[600px]:pb-16 max-[600px]:pt-6", width === "wide" ? "max-w-[928px]" : "max-w-[736px]")}>
+    <div
+      className={cx(
+        "mx-auto w-full px-12 pb-24 pt-9 max-[600px]:px-4 max-[600px]:pb-16 max-[600px]:pt-6",
+        width === "wide" ? "max-w-[928px]" : "max-w-[736px]",
+      )}
+    >
       {title ? <PageHeader title={title} /> : null}
-      <div className={cx("flex min-w-0 flex-col gap-9 max-[600px]:gap-7", title && "mt-9 max-[600px]:mt-6")}>{children}</div>
+      <div className={cx("flex min-w-0 flex-col gap-9 max-[600px]:gap-7", title && "mt-9 max-[600px]:mt-6")}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -77,17 +93,29 @@ export function PageHeader({
     <header className="flex min-w-0 flex-col gap-4">
       <div className="flex min-w-0 items-center gap-3">
         {onBack ? (
-          <IconButton label={backLabel ? `返回${backLabel}` : "返回"} tooltip={backLabel ? `返回${backLabel}` : "返回"} tooltipSide="bottom" className="-ml-2 shrink-0" onClick={onBack}>
+          <IconButton
+            label={backLabel ? `返回${backLabel}` : "返回"}
+            tooltip={backLabel ? `返回${backLabel}` : "返回"}
+            tooltipSide="bottom"
+            className="-ml-2 shrink-0"
+            onClick={onBack}
+          >
             <ChevronLeft size={18} aria-hidden="true" />
           </IconButton>
         ) : null}
         {leading ? <span className="shrink-0 [&>*]:h-10 [&>*]:w-10">{leading}</span> : null}
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h2 className="min-w-0 truncate text-act-xl font-semibold leading-tight tracking-tight text-text-main">{title}</h2>
+            <h2 className="min-w-0 truncate text-act-xl font-semibold leading-tight tracking-tight text-text-main">
+              {title}
+            </h2>
             {tag}
           </div>
-          {description ? <div className="flex max-w-[62ch] flex-wrap items-center gap-1 text-act-sm leading-relaxed text-text-muted">{description}</div> : null}
+          {description ? (
+            <div className="flex max-w-[62ch] flex-wrap items-center gap-1 text-act-sm leading-relaxed text-text-muted">
+              {description}
+            </div>
+          ) : null}
         </div>
       </div>
       {children}
@@ -172,7 +200,11 @@ export function SettingGroup({
   return (
     <section id={id} className="flex min-w-0 flex-col gap-2.5 scroll-mt-8">
       <GroupHeader title={title} description={description} right={right} headingLevel={headingLevel} />
-      <div className={plain ? "contents" : "divide-y divide-line/60 overflow-hidden rounded-act-group border border-line bg-surface"}>
+      <div
+        className={
+          plain ? "contents" : "divide-y divide-line/60 overflow-hidden rounded-act-group border border-line bg-surface"
+        }
+      >
         {children}
       </div>
     </section>
@@ -182,10 +214,7 @@ export function SettingGroup({
 /* ---------------------------------------------------------------- 行 */
 
 function rowPadding({ tight }: { tight?: boolean }) {
-  return cx(
-    "px-4",
-    tight ? "min-h-[44px] py-2" : "min-h-[52px] py-2.5",
-  );
+  return cx("px-4", tight ? "min-h-[44px] py-2" : "min-h-[52px] py-2.5");
 }
 
 function RowLabel({
@@ -199,9 +228,17 @@ function RowLabel({
 }) {
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 text-act-sm font-medium leading-snug text-text-main">{title}</div>
+      <div className="flex flex-wrap items-center gap-2 text-act-sm font-medium leading-snug text-text-main">
+        {title}
+      </div>
       {description ? (
-        <div className={monoDescription ? "mt-0.5 break-all font-mono text-act-xs leading-relaxed text-text-faint" : "mt-0.5 text-act-xs leading-relaxed text-text-muted"}>
+        <div
+          className={
+            monoDescription
+              ? "mt-0.5 break-all font-mono text-act-xs leading-relaxed text-text-faint"
+              : "mt-0.5 text-act-xs leading-relaxed text-text-muted"
+          }
+        >
           {description}
         </div>
       ) : null}
@@ -243,7 +280,14 @@ export function SettingRow({
         <RowLabel title={title} description={description} monoDescription={monoDescription} />
       </div>
       {control ? (
-        <div className={cx("flex shrink-0 items-center gap-2 max-[600px]:w-full max-[600px]:flex-wrap", disabled && "opacity-45")}>{control}</div>
+        <div
+          className={cx(
+            "flex shrink-0 items-center gap-2 max-[600px]:w-full max-[600px]:flex-wrap",
+            disabled && "opacity-45",
+          )}
+        >
+          {control}
+        </div>
       ) : null}
     </div>
   );
@@ -303,7 +347,10 @@ export function SettingLinkRow({
         <ChevronRight
           size={14}
           aria-hidden="true"
-          className={cx("shrink-0 text-text-subtle transition-transform duration-(--motion-base)", expanded && "rotate-90")}
+          className={cx(
+            "shrink-0 text-text-subtle transition-transform duration-(--motion-base)",
+            expanded && "rotate-90",
+          )}
         />
       </span>
     </button>
@@ -312,9 +359,7 @@ export function SettingLinkRow({
 
 export function SettingSubhead({ children }: { children: ReactNode }) {
   return (
-    <div className="bg-surface-subtle px-4 pb-1.5 pt-2.5 text-act-xxs font-medium text-text-faint">
-      {children}
-    </div>
+    <div className="bg-surface-subtle px-4 pb-1.5 pt-2.5 text-act-xxs font-medium text-text-faint">{children}</div>
   );
 }
 
@@ -365,8 +410,11 @@ export function SettingEditor({
         if (editor.isConnected || (active && active !== document.body && active !== document.documentElement)) return;
         const trigger = returnFocusId
           ? document.getElementById(returnFocusId)
-          : id ? Array.from(document.querySelectorAll<HTMLElement>("[aria-controls]"))
-            .find((element) => element.getAttribute("aria-controls") === id) : undefined;
+          : id
+            ? Array.from(document.querySelectorAll<HTMLElement>("[aria-controls]")).find(
+                (element) => element.getAttribute("aria-controls") === id,
+              )
+            : undefined;
         trigger?.focus();
       });
     };
@@ -383,13 +431,23 @@ export function SettingEditor({
       {children}
       <div className="mt-2.5 flex items-center justify-between gap-3 max-[600px]:flex-col max-[600px]:items-start">
         {error ? (
-          <span role="alert" className="text-act-xs leading-relaxed text-on-danger">{error}</span>
+          <span role="alert" className="text-act-xs leading-relaxed text-on-danger">
+            {error}
+          </span>
         ) : (
           <span className="text-act-xs leading-relaxed text-text-faint">{hint}</span>
         )}
         <div className="flex shrink-0 items-center gap-1.5">
-          <Button variant="ghost" onClick={onCancel} disabled={saving}>取消</Button>
-          <Button variant="primary" onClick={onSave} disabled={saving || saveDisabled} busy={saving} aria-label={saveAriaLabel}>
+          <Button variant="ghost" onClick={onCancel} disabled={saving}>
+            取消
+          </Button>
+          <Button
+            variant="primary"
+            onClick={onSave}
+            disabled={saving || saveDisabled}
+            busy={saving}
+            aria-label={saveAriaLabel}
+          >
             {saving ? "保存中…" : saveLabel}
           </Button>
         </div>
@@ -469,8 +527,10 @@ export function SettingTag({ tone = "neutral", children }: { tone?: "neutral" | 
     <span
       className={cx(
         "inline-flex h-[18px] shrink-0 items-center rounded-act-xs border px-1.5 text-act-xxs font-medium leading-none",
-        tone === "warn" ? "border-transparent bg-warning-soft text-warning"
-          : tone === "ok" ? "border-transparent bg-operational-soft text-operational"
+        tone === "warn"
+          ? "border-transparent bg-warning-soft text-warning"
+          : tone === "ok"
+            ? "border-transparent bg-operational-soft text-operational"
             : "border-line/60 bg-surface-subtle text-text-muted",
       )}
     >
@@ -502,7 +562,12 @@ export function SegmentedControl<T extends string>({
     event.currentTarget.querySelector<HTMLButtonElement>(`[data-value="${next.value}"]`)?.focus();
   };
   return (
-    <div role="radiogroup" aria-label={ariaLabel} onKeyDown={onKeyDown} className="inline-flex max-w-full rounded-act-sm border border-line bg-surface-subtle p-0.5 max-[600px]:w-full">
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      onKeyDown={onKeyDown}
+      className="inline-flex max-w-full rounded-act-sm border border-line bg-surface-subtle p-0.5 max-[600px]:w-full"
+    >
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -534,7 +599,12 @@ const INPUT_WIDTH = { sm: "w-[120px]", md: "w-[220px]", full: "w-full" } as cons
 
 export const SettingsInput = forwardRef<
   HTMLInputElement,
-  Omit<InputHTMLAttributes<HTMLInputElement>, "width"> & { width?: keyof typeof INPUT_WIDTH; numeric?: boolean; mono?: boolean; invalid?: boolean }
+  Omit<InputHTMLAttributes<HTMLInputElement>, "width"> & {
+    width?: keyof typeof INPUT_WIDTH;
+    numeric?: boolean;
+    mono?: boolean;
+    invalid?: boolean;
+  }
 >(function SettingsInput({ width = "md", numeric = false, mono = false, invalid = false, className, ...rest }, ref) {
   return (
     <input
@@ -671,7 +741,10 @@ export function MultiSelect({
           />
         </button>
       </MenuTrigger>
-      <MenuContent align="end" className="max-h-[min(280px,var(--radix-dropdown-menu-content-available-height))] min-w-(--radix-dropdown-menu-trigger-width)">
+      <MenuContent
+        align="end"
+        className="max-h-[min(280px,var(--radix-dropdown-menu-content-available-height))] min-w-(--radix-dropdown-menu-trigger-width)"
+      >
         {options.map((option) => (
           <MenuCheckboxItem
             key={option.value}
@@ -755,7 +828,8 @@ export function Stepper({
   const atMax = disabled || value >= max - 1e-9;
   const display = format ? format(value) : String(value);
   const canReset = !disabled && defaultValue !== undefined && Math.abs(value - defaultValue) > 1e-9;
-  const stepButton = "grid h-full w-7 place-items-center text-text-faint transition-colors hover:text-text-main aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:text-text-faint";
+  const stepButton =
+    "grid h-full w-7 place-items-center text-text-faint transition-colors hover:text-text-main aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:text-text-faint";
 
   return (
     <div className="inline-flex items-center gap-1.5">
@@ -769,7 +843,14 @@ export function Stepper({
           <RotateCcw size={13} aria-hidden="true" />
         </IconButton>
       ) : null}
-      <div role="group" aria-label={ariaLabel} className={cx("inline-flex h-[30px] items-center rounded-act-sm border border-line bg-surface", disabled && "opacity-55")}>
+      <div
+        role="group"
+        aria-label={ariaLabel}
+        className={cx(
+          "inline-flex h-[30px] items-center rounded-act-sm border border-line bg-surface",
+          disabled && "opacity-55",
+        )}
+      >
         <Tooltip>
           <TooltipTrigger asChild>
             <button

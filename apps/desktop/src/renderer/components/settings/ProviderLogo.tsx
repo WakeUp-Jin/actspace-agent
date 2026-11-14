@@ -34,18 +34,60 @@ const MARKS: Partial<Record<ProviderLogoKey, { src: string; monochrome?: boolean
 };
 
 /** size：md 36px（默认）、sm 32px、xs 24px（模型行的家族 mark）。 */
-export function ProviderLogo({ provider, logoKey, compact = false, size }: { provider?: LlmProviderId; logoKey?: ProviderLogoKey; compact?: boolean; size?: "xs" | "sm" | "md" }) {
+export function ProviderLogo({
+  provider,
+  logoKey,
+  compact = false,
+  size,
+}: {
+  provider?: LlmProviderId;
+  logoKey?: ProviderLogoKey;
+  compact?: boolean;
+  size?: "xs" | "sm" | "md";
+}) {
   const key = logoKey ?? PROVIDER_DEFINITIONS.find((item) => item.id === provider)?.logoKey ?? "generic";
   const mark = MARKS[key];
   const resolved = size ?? (compact ? "sm" : "md");
-  const box = resolved === "xs" ? "h-6 w-6 rounded-act-sm" : resolved === "sm" ? "h-8 w-8 rounded-act-md" : "h-9 w-9 rounded-act-md";
+  const box =
+    resolved === "xs"
+      ? "h-6 w-6 rounded-act-sm"
+      : resolved === "sm"
+        ? "h-8 w-8 rounded-act-md"
+        : "h-9 w-9 rounded-act-md";
   const glyph = resolved === "xs" ? "h-3.5 w-3.5" : "h-5 w-5";
   return (
-    <span data-provider-logo={mark ? key : "generic"} className={`grid shrink-0 place-items-center bg-surface-subtle ${box}`} aria-hidden="true">
-      {mark ? mark.monochrome ? (
-        <span className={`block ${glyph} bg-text-main`} style={{ maskImage: `url("${mark.src}")`, WebkitMaskImage: `url("${mark.src}")`, maskSize: "contain", maskRepeat: "no-repeat", maskPosition: "center" }} />
-      ) : <img src={mark.src} alt="" className={glyph} /> : (
-        <svg viewBox="0 0 24 24" className={`${glyph} text-text-muted`} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="8" /><path d="M8 12h8M12 8v8" /></svg>
+    <span
+      data-provider-logo={mark ? key : "generic"}
+      className={`grid shrink-0 place-items-center bg-surface-subtle ${box}`}
+      aria-hidden="true"
+    >
+      {mark ? (
+        mark.monochrome ? (
+          <span
+            className={`block ${glyph} bg-text-main`}
+            style={{
+              maskImage: `url("${mark.src}")`,
+              WebkitMaskImage: `url("${mark.src}")`,
+              maskSize: "contain",
+              maskRepeat: "no-repeat",
+              maskPosition: "center",
+            }}
+          />
+        ) : (
+          <img src={mark.src} alt="" className={glyph} />
+        )
+      ) : (
+        <svg
+          viewBox="0 0 24 24"
+          className={`${glyph} text-text-muted`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        >
+          <circle cx="12" cy="12" r="8" />
+          <path d="M8 12h8M12 8v8" />
+        </svg>
       )}
     </span>
   );

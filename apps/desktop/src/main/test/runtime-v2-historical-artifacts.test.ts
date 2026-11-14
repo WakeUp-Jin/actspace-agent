@@ -20,7 +20,11 @@ afterEach(async () => {
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "actspace-historical-artifacts-"));
   const store = new DesktopArtifactStore(root);
-  const ref = await store.create({ bytes: Buffer.from("owned image"), mediaType: "image/png", owner: { sessionId: "session", callId: "attachment", pluginId: "desktop", name: "user-attachment" } });
+  const ref = await store.create({
+    bytes: Buffer.from("owned image"),
+    mediaType: "image/png",
+    owner: { sessionId: "session", callId: "attachment", pluginId: "desktop", name: "user-attachment" },
+  });
   const content = [{ type: "artifact", artifact: { artifactId: ref.artifactId, mediaType: ref.mediaType } }];
   const journal = [{ type: "user/message", data: { messageId: "original", content }, surface: { kind: "append" } }];
   const snapshot = { messages: [{ kind: "user", content: { text: "compacted summary" } }], tools: [] };
@@ -30,11 +34,19 @@ async function fixture() {
     listSessions: vi.fn(async () => []),
     subscribeSessionProjection: () => () => {},
   };
-  bootDesktopRuntime.mockResolvedValue({ artifacts: store, browserReady: false, profile: {
-    context: { get: (name: string) => name === "desktop.app" ? app : undefined },
-    getState: () => ({ runtimeInstanceId: "test" }), shutdown: vi.fn(),
-  } });
-  const registry = new DesktopRuntimeRegistry({ roots: { dataRoot: root, workspaceRoot: root, defaultWorkspaceRoot: root }, loadModule: async () => ({}) } as unknown as DesktopRuntimeRegistryOptions);
+  bootDesktopRuntime.mockResolvedValue({
+    artifacts: store,
+    browserReady: false,
+    profile: {
+      context: { get: (name: string) => (name === "desktop.app" ? app : undefined) },
+      getState: () => ({ runtimeInstanceId: "test" }),
+      shutdown: vi.fn(),
+    },
+  });
+  const registry = new DesktopRuntimeRegistry({
+    roots: { dataRoot: root, workspaceRoot: root, defaultWorkspaceRoot: root },
+    loadModule: async () => ({}),
+  } as unknown as DesktopRuntimeRegistryOptions);
   fixtures.push({ root, registry });
   await registry.boot();
   return { root, store, ref, content, journal, snapshot, app, registry };
@@ -53,13 +65,17 @@ describe("Desktop historical artifact authorization", () => {
   it("keeps current references on the snapshot fast path", async () => {
     const f = await fixture();
     f.snapshot.messages = [{ kind: "user", content: f.content }] as unknown as typeof f.snapshot.messages;
-    await expect(f.registry.resolveArtifact("session", f.ref.artifactId)).resolves.toMatchObject({ mediaType: "image/png" });
+    await expect(f.registry.resolveArtifact("session", f.ref.artifactId)).resolves.toMatchObject({
+      mediaType: "image/png",
+    });
     expect(f.app.inspectSessionEvents).not.toHaveBeenCalled();
   });
 
   it("rejects an unreferenced staged image and an ID mentioned only in text", async () => {
     const f = await fixture();
-    (f.journal[0] as unknown as { data: { content: unknown } }).data.content = [{ type: "text", text: f.ref.artifactId }];
+    (f.journal[0] as unknown as { data: { content: unknown } }).data.content = [
+      { type: "text", text: f.ref.artifactId },
+    ];
     await expect(f.registry.resolveArtifact("session", f.ref.artifactId)).rejects.toThrow("not referenced");
     f.journal.length = 0;
     await expect(f.registry.resolveArtifact("session", f.ref.artifactId)).rejects.toThrow("not referenced");
@@ -84,9 +100,15 @@ describe("Desktop historical artifact authorization", () => {
 
   it("rolls back only unsubmitted images and preserves compacted durable attachments", async () => {
     const f = await fixture();
-    const staged = await f.store.create({ bytes: Buffer.from("unsubmitted"), mediaType: "image/png", owner: { sessionId: "session", callId: "staged", pluginId: "desktop", name: "user-attachment" } });
+    const staged = await f.store.create({
+      bytes: Buffer.from("unsubmitted"),
+      mediaType: "image/png",
+      owner: { sessionId: "session", callId: "staged", pluginId: "desktop", name: "user-attachment" },
+    });
     await f.registry.rollbackImportedAttachments("session", [f.ref.artifactId, staged.artifactId]);
-    await expect(f.store.readForSession("session", f.ref.artifactId)).resolves.toMatchObject({ mediaType: "image/png" });
+    await expect(f.store.readForSession("session", f.ref.artifactId)).resolves.toMatchObject({
+      mediaType: "image/png",
+    });
     await expect(f.store.readForSession("session", staged.artifactId)).rejects.toThrow();
   });
 });

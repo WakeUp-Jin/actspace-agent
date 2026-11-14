@@ -1,4 +1,14 @@
-import { isCommandPrefixSelector, isSurfaceNode, SUBAGENT_ACTIVATION_STATUSES, SUBAGENT_DELIVERIES, SUBAGENT_KINDS, SUBAGENT_PRESETS, SUBAGENT_RESULT_LIMIT_BYTES, type CoreEventType, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
+import {
+  isCommandPrefixSelector,
+  isSurfaceNode,
+  SUBAGENT_ACTIVATION_STATUSES,
+  SUBAGENT_DELIVERIES,
+  SUBAGENT_KINDS,
+  SUBAGENT_PRESETS,
+  SUBAGENT_RESULT_LIMIT_BYTES,
+  type CoreEventType,
+  type RuntimeJsonValue,
+} from "@actspace/shared/runtime-v2";
 import { EventCodecRegistry, type EventCodec } from "./codec-registry.js";
 import { SessionError } from "./errors.js";
 import { validateAuxiliaryRequest } from "./auxiliary-codec.js";
@@ -122,28 +132,44 @@ function createExtensionCodec(type: PersistedExtensionEventType): EventCodec {
       if (type === "agent/mode-set") {
         const mode = (data as Readonly<Record<string, RuntimeJsonValue>>).mode;
         const revision = (data as Readonly<Record<string, RuntimeJsonValue>>).revision;
-        if (mode !== "chat" && mode !== "plan" && mode !== "agent") throw invalid(type, "mode must be chat, plan or agent");
-        if (!Number.isSafeInteger(revision) || (revision as number) < 1) throw invalid(type, "revision must be a positive integer");
+        if (mode !== "chat" && mode !== "plan" && mode !== "agent")
+          throw invalid(type, "mode must be chat, plan or agent");
+        if (!Number.isSafeInteger(revision) || (revision as number) < 1)
+          throw invalid(type, "revision must be a positive integer");
       }
-      if (type.startsWith("permission/")) validatePermissionData(type, data as Readonly<Record<string, RuntimeJsonValue>>);
-      if (type === "background/task") validateBackgroundTaskData(type, data as Readonly<Record<string, RuntimeJsonValue>>);
-      if (type === "surface/replaced") validateSurfaceReplaced(type, data as Readonly<Record<string, RuntimeJsonValue>>);
+      if (type.startsWith("permission/"))
+        validatePermissionData(type, data as Readonly<Record<string, RuntimeJsonValue>>);
+      if (type === "background/task")
+        validateBackgroundTaskData(type, data as Readonly<Record<string, RuntimeJsonValue>>);
+      if (type === "surface/replaced")
+        validateSurfaceReplaced(type, data as Readonly<Record<string, RuntimeJsonValue>>);
       // 恢复结果的模型可见文案存在 data.content，节点由 surfaceNode 推出（agent-spec-surface-derived.md §4.2）。
-      if (type === "tool/recovery-outcome" && typeof (data as Readonly<Record<string, RuntimeJsonValue>>).content !== "string") throw invalid(type, "content must be a string");
-      if (type === "subagent/spawned") validateSubagentSpawned(type, data as Readonly<Record<string, RuntimeJsonValue>>);
-      if (type === "subagent/activation") validateSubagentActivation(type, data as Readonly<Record<string, RuntimeJsonValue>>);
+      if (
+        type === "tool/recovery-outcome" &&
+        typeof (data as Readonly<Record<string, RuntimeJsonValue>>).content !== "string"
+      )
+        throw invalid(type, "content must be a string");
+      if (type === "subagent/spawned")
+        validateSubagentSpawned(type, data as Readonly<Record<string, RuntimeJsonValue>>);
+      if (type === "subagent/activation")
+        validateSubagentActivation(type, data as Readonly<Record<string, RuntimeJsonValue>>);
       if (type === "session/rewound") validateSessionRewound(type, data as Readonly<Record<string, RuntimeJsonValue>>);
     },
   });
 }
 
 /** 替换事件带被替换范围的估算，上下文估算投影据此扣减（agent-spec-request-record.md §6.3.1）。 */
-function validateSurfaceReplaced(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
+function validateSurfaceReplaced(
+  type: PersistedExtensionEventType,
+  data: Readonly<Record<string, RuntimeJsonValue>>,
+): void {
   const replaced = data.replacedTokens;
-  if (replaced === null || typeof replaced !== "object" || Array.isArray(replaced)) throw invalid(type, "replacedTokens must be an object");
+  if (replaced === null || typeof replaced !== "object" || Array.isArray(replaced))
+    throw invalid(type, "replacedTokens must be an object");
   for (const field of ["conversation", "summarizedConversation"] as const) {
     const value = (replaced as Readonly<Record<string, RuntimeJsonValue>>)[field];
-    if (!Number.isSafeInteger(value) || (value as number) < 0) throw invalid(type, `replacedTokens.${field} must be a non-negative integer`);
+    if (!Number.isSafeInteger(value) || (value as number) < 0)
+      throw invalid(type, `replacedTokens.${field} must be a non-negative integer`);
   }
   requireId(data.estimatorVersion, type, "estimatorVersion");
   // 压缩摘要节点只存在 data 里，surface 只记替换范围（agent-spec-surface-derived.md §4.2）。
@@ -151,17 +177,25 @@ function validateSurfaceReplaced(type: PersistedExtensionEventType, data: Readon
 }
 
 /** 从某一轮重来之后，重新打开的会话追加这一条（agent-edit-resend-rewind.md §3.6）。 */
-function validateSessionRewound(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
+function validateSessionRewound(
+  type: PersistedExtensionEventType,
+  data: Readonly<Record<string, RuntimeJsonValue>>,
+): void {
   for (const field of ["cutSeq", "droppedThroughSeq"] as const) {
-    if (!Number.isSafeInteger(data[field]) || (data[field] as number) < 0) throw invalid(type, `${field} must be a non-negative integer`);
+    if (!Number.isSafeInteger(data[field]) || (data[field] as number) < 0)
+      throw invalid(type, `${field} must be a non-negative integer`);
   }
-  if ((data.droppedThroughSeq as number) < (data.cutSeq as number)) throw invalid(type, "droppedThroughSeq must not be before cutSeq");
+  if ((data.droppedThroughSeq as number) < (data.cutSeq as number))
+    throw invalid(type, "droppedThroughSeq must not be before cutSeq");
   requireId(data.runId, type, "runId");
   requireId(data.archive, type, "archive");
   requireTimestamp(data.rewoundAt, type, "rewoundAt");
 }
 
-function validateBackgroundTaskData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
+function validateBackgroundTaskData(
+  type: PersistedExtensionEventType,
+  data: Readonly<Record<string, RuntimeJsonValue>>,
+): void {
   requireId(data.taskId, type, "taskId");
   if (data.op === "start") {
     if (data.kind !== "bash" && data.kind !== "agent") throw invalid(type, "kind must be bash or agent");
@@ -171,9 +205,17 @@ function validateBackgroundTaskData(type: PersistedExtensionEventType, data: Rea
     return;
   }
   if (data.op === "settle") {
-    if (data.status !== "completed" && data.status !== "failed" && data.status !== "stopped" && data.status !== "lost") throw invalid(type, "status must be completed, failed, stopped or lost");
-    if (data.delivery !== "notified" && data.delivery !== "wait" && data.delivery !== "stopped" && data.delivery !== "lost") throw invalid(type, "delivery must be notified, wait, stopped or lost");
-    if (data.exitCode !== undefined && data.exitCode !== null && !Number.isSafeInteger(data.exitCode)) throw invalid(type, "exitCode must be an integer or null when present");
+    if (data.status !== "completed" && data.status !== "failed" && data.status !== "stopped" && data.status !== "lost")
+      throw invalid(type, "status must be completed, failed, stopped or lost");
+    if (
+      data.delivery !== "notified" &&
+      data.delivery !== "wait" &&
+      data.delivery !== "stopped" &&
+      data.delivery !== "lost"
+    )
+      throw invalid(type, "delivery must be notified, wait, stopped or lost");
+    if (data.exitCode !== undefined && data.exitCode !== null && !Number.isSafeInteger(data.exitCode))
+      throw invalid(type, "exitCode must be an integer or null when present");
     requireTimestamp(data.endedAt, type, "endedAt");
     return;
   }
@@ -185,20 +227,29 @@ function validateBackgroundTaskData(type: PersistedExtensionEventType, data: Rea
   throw invalid(type, "op must be start, settle or prune");
 }
 
-function validateSubagentSpawned(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
-  for (const field of ["agentId", "callId", "description", "transcriptPath"] as const) requireId(data[field], type, field);
+function validateSubagentSpawned(
+  type: PersistedExtensionEventType,
+  data: Readonly<Record<string, RuntimeJsonValue>>,
+): void {
+  for (const field of ["agentId", "callId", "description", "transcriptPath"] as const)
+    requireId(data[field], type, field);
   if (!oneOf(data.kind, SUBAGENT_KINDS)) throw invalid(type, "kind must be local, fork, codex or claude-code");
   if (data.kind === "local") {
-    if (!oneOf(data.preset, SUBAGENT_PRESETS)) throw invalid(type, "preset must be general or explore for a local subagent");
+    if (!oneOf(data.preset, SUBAGENT_PRESETS))
+      throw invalid(type, "preset must be general or explore for a local subagent");
   } else if (data.preset !== undefined) throw invalid(type, "preset is only allowed for a local subagent");
   if (data.inheritedThroughSeq !== undefined) {
     if (data.kind !== "fork") throw invalid(type, "inheritedThroughSeq is only allowed for a fork");
-    if (!Number.isSafeInteger(data.inheritedThroughSeq) || (data.inheritedThroughSeq as number) < 0) throw invalid(type, "inheritedThroughSeq must be a non-negative integer");
+    if (!Number.isSafeInteger(data.inheritedThroughSeq) || (data.inheritedThroughSeq as number) < 0)
+      throw invalid(type, "inheritedThroughSeq must be a non-negative integer");
   }
   requireTimestamp(data.createdAt, type, "createdAt");
 }
 
-function validateSubagentActivation(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
+function validateSubagentActivation(
+  type: PersistedExtensionEventType,
+  data: Readonly<Record<string, RuntimeJsonValue>>,
+): void {
   requireId(data.agentId, type, "agentId");
   requireId(data.activationId, type, "activationId");
   if (data.op === "start") {
@@ -206,19 +257,24 @@ function validateSubagentActivation(type: PersistedExtensionEventType, data: Rea
     requireId(data.callId, type, "callId");
     if (data.senderId !== undefined) requireId(data.senderId, type, "senderId");
     if (typeof data.background !== "boolean") throw invalid(type, "background must be a boolean");
-    for (const field of ["model", "reasoningEffort"] as const) if (data[field] !== undefined) requireId(data[field], type, field);
+    for (const field of ["model", "reasoningEffort"] as const)
+      if (data[field] !== undefined) requireId(data[field], type, field);
     requireTimestamp(data.startedAt, type, "startedAt");
     return;
   }
   if (data.op === "settle") {
-    if (!oneOf(data.status, SUBAGENT_ACTIVATION_STATUSES)) throw invalid(type, "status must be completed, interrupted, failed, max_steps or lost");
+    if (!oneOf(data.status, SUBAGENT_ACTIVATION_STATUSES))
+      throw invalid(type, "status must be completed, interrupted, failed, max_steps or lost");
     if (typeof data.summary !== "string") throw invalid(type, "summary must be a string");
-    if (!oneOf(data.delivery, SUBAGENT_DELIVERIES)) throw invalid(type, "delivery must be returned, notified, stopped or lost");
+    if (!oneOf(data.delivery, SUBAGENT_DELIVERIES))
+      throw invalid(type, "delivery must be returned, notified, stopped or lost");
     if (data.result !== undefined) {
       if (typeof data.result !== "string") throw invalid(type, "result must be a string when present");
-      if (new TextEncoder().encode(data.result).length > SUBAGENT_RESULT_LIMIT_BYTES) throw invalid(type, `result must be at most ${SUBAGENT_RESULT_LIMIT_BYTES} UTF-8 bytes`);
+      if (new TextEncoder().encode(data.result).length > SUBAGENT_RESULT_LIMIT_BYTES)
+        throw invalid(type, `result must be at most ${SUBAGENT_RESULT_LIMIT_BYTES} UTF-8 bytes`);
     }
-    if (data.resultTruncated !== undefined && typeof data.resultTruncated !== "boolean") throw invalid(type, "resultTruncated must be a boolean when present");
+    if (data.resultTruncated !== undefined && typeof data.resultTruncated !== "boolean")
+      throw invalid(type, "resultTruncated must be a boolean when present");
     requireTimestamp(data.endedAt, type, "endedAt");
     return;
   }
@@ -229,9 +285,13 @@ function oneOf<T extends string>(value: RuntimeJsonValue | undefined, values: re
   return typeof value === "string" && (values as readonly string[]).includes(value);
 }
 
-function validatePermissionData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
+function validatePermissionData(
+  type: PersistedExtensionEventType,
+  data: Readonly<Record<string, RuntimeJsonValue>>,
+): void {
   if (type === "permission/mode-set") {
-    if (data.mode !== "default" && data.mode !== "full-access" && data.mode !== "auto-review") throw invalid(type, "mode must be default or full-access or auto-review");
+    if (data.mode !== "default" && data.mode !== "full-access" && data.mode !== "auto-review")
+      throw invalid(type, "mode must be default or full-access or auto-review");
     return;
   }
   if (type === "permission/scope-denied") {
@@ -246,39 +306,78 @@ function validatePermissionData(type: PersistedExtensionEventType, data: Readonl
   }
   if (type === "permission/grant-used") {
     requireSchemaVersion(data, type);
-    for (const field of ["grantId", "sessionId", "agentId", "callId", "pluginId", "toolName", "commandDigest"] as const) requireId(data[field], type, field);
+    for (const field of ["grantId", "sessionId", "agentId", "callId", "pluginId", "toolName", "commandDigest"] as const)
+      requireId(data[field], type, field);
     requireTimestamp(data.usedAt, type, "usedAt");
     return;
   }
   if (type === "permission/grant-revoked") {
     requireSchemaVersion(data, type);
     for (const field of ["grantId", "sessionId", "agentId", "revokedAt"] as const) requireId(data[field], type, field);
-    if (data.reason !== undefined && (typeof data.reason !== "string" || data.reason.length === 0 || data.reason.length > 240)) throw invalid(type, "reason must be a non-empty string of at most 240 characters when present");
+    if (
+      data.reason !== undefined &&
+      (typeof data.reason !== "string" || data.reason.length === 0 || data.reason.length > 240)
+    )
+      throw invalid(type, "reason must be a non-empty string of at most 240 characters when present");
     requireTimestamp(data.revokedAt, type, "revokedAt");
     return;
   }
   requireId(data.requestId, type, "requestId");
   if (type === "permission/asked") {
     if (data.schemaVersion !== 1) throw invalid(type, "schemaVersion must be 1");
-    for (const field of ["callId", "sessionId", "agentRunId", "agentId", "pluginId", "toolName", "definitionDigest", "normalizedArgsDigest", "requestedAt", "expiresAt"] as const) requireId(data[field], type, field);
-    if (!Array.isArray(data.reasons) || data.reasons.length === 0) throw invalid(type, "reasons must be a non-empty array");
-    if (!Array.isArray(data.resources) || !Array.isArray(data.grantSuggestions) || !Array.isArray(data.supportedLifetimes)) throw invalid(type, "resources, grantSuggestions and supportedLifetimes must be arrays");
-    if (data.supportedLifetimes.some(value => value !== "once" && value !== "session")) throw invalid(type, "supportedLifetimes contains an invalid lifetime");
+    for (const field of [
+      "callId",
+      "sessionId",
+      "agentRunId",
+      "agentId",
+      "pluginId",
+      "toolName",
+      "definitionDigest",
+      "normalizedArgsDigest",
+      "requestedAt",
+      "expiresAt",
+    ] as const)
+      requireId(data[field], type, field);
+    if (!Array.isArray(data.reasons) || data.reasons.length === 0)
+      throw invalid(type, "reasons must be a non-empty array");
+    if (
+      !Array.isArray(data.resources) ||
+      !Array.isArray(data.grantSuggestions) ||
+      !Array.isArray(data.supportedLifetimes)
+    )
+      throw invalid(type, "resources, grantSuggestions and supportedLifetimes must be arrays");
+    if (data.supportedLifetimes.some((value) => value !== "once" && value !== "session"))
+      throw invalid(type, "supportedLifetimes contains an invalid lifetime");
     if (!data.supportedLifetimes.includes("once")) throw invalid(type, "supportedLifetimes must include once");
     for (const suggestion of data.grantSuggestions) validateGrantSuggestion(type, record(suggestion));
-    if (data.supportedLifetimes.includes("session") !== (data.grantSuggestions.length > 0)) throw invalid(type, "session lifetime and grantSuggestions must appear together");
+    if (data.supportedLifetimes.includes("session") !== data.grantSuggestions.length > 0)
+      throw invalid(type, "session lifetime and grantSuggestions must appear together");
     return;
   }
-  if (data.kind !== "once" && data.kind !== "session" && data.kind !== "deny") throw invalid(type, "kind must be once, session or deny");
+  if (data.kind !== "once" && data.kind !== "session" && data.kind !== "deny")
+    throw invalid(type, "kind must be once, session or deny");
   requireId(data.decidedAt, type, "decidedAt");
   requireTimestamp(data.decidedAt, type, "decidedAt");
   if (data.kind === "session") requireId(data.suggestionId, type, "suggestionId");
-  if (data.kind === "deny" && !["user-denied", "timeout", "aborted", "broker-unavailable", "invalid-decision"].includes(String(data.code))) throw invalid(type, "deny code is invalid");
+  if (
+    data.kind === "deny" &&
+    !["user-denied", "timeout", "aborted", "broker-unavailable", "invalid-decision"].includes(String(data.code))
+  )
+    throw invalid(type, "deny code is invalid");
 }
 
 function validateGrantAdded(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   requireSchemaVersion(data, type);
-  for (const field of ["grantId", "sessionId", "agentId", "sourceRequestId", "sourceCallId", "sourceToolName", "issuedAt"] as const) requireId(data[field], type, field);
+  for (const field of [
+    "grantId",
+    "sessionId",
+    "agentId",
+    "sourceRequestId",
+    "sourceCallId",
+    "sourceToolName",
+    "issuedAt",
+  ] as const)
+    requireId(data[field], type, field);
   requireTimestamp(data.issuedAt, type, "issuedAt");
   if (data.expiresAt !== undefined) {
     requireId(data.expiresAt, type, "expiresAt");
@@ -287,7 +386,10 @@ function validateGrantAdded(type: PersistedExtensionEventType, data: Readonly<Re
   validateGrantScope(type, data);
 }
 
-function validateGrantSuggestion(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
+function validateGrantSuggestion(
+  type: PersistedExtensionEventType,
+  data: Readonly<Record<string, RuntimeJsonValue>>,
+): void {
   for (const field of ["suggestionId", "label"] as const) requireId(data[field], type, `grantSuggestions.${field}`);
   if (data.lifetime !== "session") throw invalid(type, "grantSuggestions.lifetime must be session");
   validateGrantScope(type, data);
@@ -295,11 +397,14 @@ function validateGrantSuggestion(type: PersistedExtensionEventType, data: Readon
 
 function validateGrantScope(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   const process = data.action === "process.execute";
-  if (!process && data.action !== "file.read" && data.action !== "file.write") throw invalid(type, "invalid grant action");
-  if (data.access !== (process ? "execute" : data.action === "file.read" ? "read" : "write")) throw invalid(type, "action and access must agree");
+  if (!process && data.action !== "file.read" && data.action !== "file.write")
+    throw invalid(type, "invalid grant action");
+  if (data.access !== (process ? "execute" : data.action === "file.read" ? "read" : "write"))
+    throw invalid(type, "action and access must agree");
   const audience = record(data.audience);
   for (const field of ["pluginId", "permissionDomain"] as const) requireId(audience[field], type, `audience.${field}`);
-  if (!Number.isSafeInteger(audience.policyVersion) || (audience.policyVersion as number) < 1) throw invalid(type, "audience.policyVersion must be a positive integer");
+  if (!Number.isSafeInteger(audience.policyVersion) || (audience.policyVersion as number) < 1)
+    throw invalid(type, "audience.policyVersion must be a positive integer");
   const selector = record(data.selector);
   if (process) {
     if (!isCommandPrefixSelector(selector)) throw invalid(type, "invalid command_prefix selector");
@@ -315,11 +420,18 @@ function requireSchemaVersion(data: Readonly<Record<string, RuntimeJsonValue>>, 
 }
 
 function requireTimestamp(value: RuntimeJsonValue | undefined, type: string, field: string): void {
-  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) throw invalid(type, `${field} must be a valid timestamp`);
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value)))
+    throw invalid(type, `${field} must be a valid timestamp`);
 }
 
 function requireCanonicalPath(value: RuntimeJsonValue | undefined, type: string, field: string): void {
-  if (typeof value !== "string" || value.length === 0 || !(/^\//.test(value) || /^[A-Za-z]:[\\/]/.test(value)) || /[*?\[\]{}]/.test(value)) throw invalid(type, `${field} must be an absolute canonical path without glob syntax`);
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    !(/^\//.test(value) || /^[A-Za-z]:[\\/]/.test(value)) ||
+    /[*?\[\]{}]/.test(value)
+  )
+    throw invalid(type, `${field} must be an absolute canonical path without glob syntax`);
 }
 
 function validateCoreData(type: CoreSessionEventType, data: RuntimeJsonValue): void {
@@ -354,11 +466,14 @@ function validateCoreData(type: CoreSessionEventType, data: RuntimeJsonValue): v
       requireToolName(data.name, type);
       break;
     case "tool/result":
-      if (data.approvalMode !== undefined && !["auto", "manual", "session"].includes(data.approvalMode as string)) throw invalid(type, "invalid approvalMode");
-      if (data.approvalReason != null && typeof data.approvalReason !== "string") throw invalid(type, "invalid approvalReason");
+      if (data.approvalMode !== undefined && !["auto", "manual", "session"].includes(data.approvalMode as string))
+        throw invalid(type, "invalid approvalMode");
+      if (data.approvalReason != null && typeof data.approvalReason !== "string")
+        throw invalid(type, "invalid approvalReason");
       requireId(data.callId ?? data.toolCallId, type, "callId");
       requireToolName(data.name, type);
-      if (typeof data.status !== "string" || data.status.length === 0) throw invalid(type, "status must be a non-empty string");
+      if (typeof data.status !== "string" || data.status.length === 0)
+        throw invalid(type, "status must be a non-empty string");
       break;
     case "request/header":
     case "request/context":
@@ -401,7 +516,8 @@ function requireId(value: RuntimeJsonValue | undefined, type: string, field: str
 }
 
 function requireToolName(value: RuntimeJsonValue | undefined, type: string): void {
-  if (typeof value !== "string" || !/^[a-zA-Z0-9_-]+$/.test(value)) throw invalid(type, "name must match ^[a-zA-Z0-9_-]+$");
+  if (typeof value !== "string" || !/^[a-zA-Z0-9_-]+$/.test(value))
+    throw invalid(type, "name must match ^[a-zA-Z0-9_-]+$");
 }
 
 function invalid(type: string, reason: string): SessionError {

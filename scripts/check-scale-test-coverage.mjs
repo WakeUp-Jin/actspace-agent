@@ -37,9 +37,17 @@ export function loadManifest(manifestPath = MANIFEST_PATH) {
 /** 一份规模测试源码的问题列表（空数组 = 合格）。 */
 export function checkScaleTestSource(source) {
   const problems = [];
-  if (!SMALL_SCALE.test(source) || !LARGE_SCALE.test(source)) problems.push("没有同时在 1k 和 10k 事件的会话上跑同一个操作");
-  if (!COUNTING_IMPORT.test(source)) problems.push("没有用读取计数（@actspace/session-journal/testing 的 countingHistory / syntheticJournal，或对 @actspace/session-journal 的计数 mock）");
-  const timed = source.split("\n").some((line, index, lines) => TIMING.test(line) && !ALLOW.test(line) && !(index > 0 && ALLOW.test(lines[index - 1])));
+  if (!SMALL_SCALE.test(source) || !LARGE_SCALE.test(source))
+    problems.push("没有同时在 1k 和 10k 事件的会话上跑同一个操作");
+  if (!COUNTING_IMPORT.test(source))
+    problems.push(
+      "没有用读取计数（@actspace/session-journal/testing 的 countingHistory / syntheticJournal，或对 @actspace/session-journal 的计数 mock）",
+    );
+  const timed = source
+    .split("\n")
+    .some(
+      (line, index, lines) => TIMING.test(line) && !ALLOW.test(line) && !(index > 0 && ALLOW.test(lines[index - 1])),
+    );
   if (timed) problems.push("断言或使用了时间（performance.now / Date.now / hrtime）；规模测试只计数，不计时");
   return problems;
 }
@@ -51,7 +59,10 @@ export function findScaleTests(root = repoRoot) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.name.startsWith(".")) continue;
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) { if (!SKIP_DIRS.has(entry.name)) walk(full); continue; }
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name)) walk(full);
+        continue;
+      }
       if (SCALE_TEST.test(entry.name)) found.push(path.relative(root, full).split(path.sep).join("/"));
     }
   };
@@ -61,7 +72,9 @@ export function findScaleTests(root = repoRoot) {
 
 /** 基线里带「整份读日志」规则的文件。 */
 export function journalReadingFiles(baseline) {
-  return Object.keys(baseline).filter((file) => JOURNAL_READ_RULES.some((rule) => (baseline[file][rule] ?? 0) > 0)).sort();
+  return Object.keys(baseline)
+    .filter((file) => JOURNAL_READ_RULES.some((rule) => (baseline[file][rule] ?? 0) > 0))
+    .sort();
 }
 
 /**
@@ -75,27 +88,41 @@ export function checkCoverage(manifest, { readFile, scaleTests, baseline }) {
   const covered = new Set();
   const registeredTests = new Set();
   for (const entry of entries) {
-    if (typeof entry.source !== "string" || !Array.isArray(entry.tests) || entry.tests.length === 0) { problems.push(`entries 里有一项缺 source 或 tests：${JSON.stringify(entry)}`); continue; }
+    if (typeof entry.source !== "string" || !Array.isArray(entry.tests) || entry.tests.length === 0) {
+      problems.push(`entries 里有一项缺 source 或 tests：${JSON.stringify(entry)}`);
+      continue;
+    }
     if (readFile(entry.source) === null) problems.push(`${entry.source}：entries 里的源文件不存在`);
     covered.add(entry.source);
     for (const test of entry.tests) {
       registeredTests.add(test);
-      if (!SCALE_TEST.test(test)) { problems.push(`${test}：规模测试的文件名要以 .scale.test.ts 结尾`); continue; }
+      if (!SCALE_TEST.test(test)) {
+        problems.push(`${test}：规模测试的文件名要以 .scale.test.ts 结尾`);
+        continue;
+      }
       const source = readFile(test);
-      if (source === null) { problems.push(`${test}：entries 里的规模测试不存在`); continue; }
+      if (source === null) {
+        problems.push(`${test}：entries 里的规模测试不存在`);
+        continue;
+      }
       for (const problem of checkScaleTestSource(source)) problems.push(`${test}：${problem}`);
     }
   }
-  for (const test of scaleTests) if (!registeredTests.has(test)) problems.push(`${test}：规模测试没有登记在 scripts/scale-test-coverage.json 的 entries 里`);
+  for (const test of scaleTests)
+    if (!registeredTests.has(test))
+      problems.push(`${test}：规模测试没有登记在 scripts/scale-test-coverage.json 的 entries 里`);
   const reading = journalReadingFiles(baseline);
   for (const file of reading) {
     if (covered.has(file) || file in pending) continue;
-    problems.push(`${file}：hot-path-reads 基线里还有整份读日志的写法，但没有规模测试。补一个 entry 和 *.scale.test.ts；确实低频就写进 pending 并说明原因`);
+    problems.push(
+      `${file}：hot-path-reads 基线里还有整份读日志的写法，但没有规模测试。补一个 entry 和 *.scale.test.ts；确实低频就写进 pending 并说明原因`,
+    );
   }
   for (const [file, reason] of Object.entries(pending)) {
     if (typeof reason !== "string" || !reason.trim()) problems.push(`${file}：pending 要写明还没有规模测试的原因`);
     if (covered.has(file)) problems.push(`${file}：已经有规模测试，从 pending 删掉`);
-    else if (!reading.includes(file)) problems.push(`${file}：hot-path-reads 基线里已经没有它的整份读写法，从 pending 删掉`);
+    else if (!reading.includes(file))
+      problems.push(`${file}：hot-path-reads 基线里已经没有它的整份读写法，从 pending 删掉`);
   }
   return problems;
 }
@@ -103,7 +130,10 @@ export function checkCoverage(manifest, { readFile, scaleTests, baseline }) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const manifest = loadManifest();
   const problems = checkCoverage(manifest, {
-    readFile: (relative) => { const full = path.join(repoRoot, relative); return fs.existsSync(full) ? fs.readFileSync(full, "utf8") : null; },
+    readFile: (relative) => {
+      const full = path.join(repoRoot, relative);
+      return fs.existsSync(full) ? fs.readFileSync(full, "utf8") : null;
+    },
     scaleTests: findScaleTests(),
     baseline: loadBaseline(),
   });
@@ -112,5 +142,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     for (const problem of problems) console.error(`  ${problem}`);
     process.exit(1);
   }
-  console.log(`规模测试覆盖检查通过（${manifest.entries.length} 个入口，${Object.keys(manifest.pending ?? {}).length} 个待补）`);
+  console.log(
+    `规模测试覆盖检查通过（${manifest.entries.length} 个入口，${Object.keys(manifest.pending ?? {}).length} 个待补）`,
+  );
 }

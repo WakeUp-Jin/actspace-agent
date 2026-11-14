@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * 标题栏「后退 / 前进」用的会话访问历史（16 T15，从 WorkbenchLayout 搬出）。
  * 切换到新会话时截掉前进分支再追加；后退 / 前进触发的切换不记入历史，切换失败时把位置退回去。
  */
-export function useSessionHistory(activeSessionId: string | null, onSelectSession: ((sessionId: string) => unknown) | undefined) {
+export function useSessionHistory(
+  activeSessionId: string | null,
+  onSelectSession: ((sessionId: string) => unknown) | undefined,
+) {
   const sessionHistoryRef = useRef<string[]>([]);
   const sessionHistoryIndexRef = useRef(-1);
   const suppressSessionHistoryRef = useRef(false);

@@ -9,8 +9,12 @@ const OTHER_TITLE = "梳理 preload 接口";
 
 // 右栏打开时窗口窄会自动收起侧栏；给足宽度，侧栏、会话区、右栏同时在。
 const initialWidth = window.innerWidth;
-beforeEach(() => { Object.defineProperty(window, "innerWidth", { configurable: true, value: 1800 }); });
-afterEach(() => { Object.defineProperty(window, "innerWidth", { configurable: true, value: initialWidth }); });
+beforeEach(() => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1800 });
+});
+afterEach(() => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: initialWidth });
+});
 
 async function clickSession(user: ReturnType<typeof userEvent.setup>, title: string) {
   const row = await waitFor(() => {
@@ -51,7 +55,11 @@ it("opens a side chat from the right panel, answers there, and keeps it out of t
   const sideChats = [...db.sessions.values()].filter((session) => session.sideChat);
   expect(sideChats).toHaveLength(3);
   expect(sideChats.at(-1)?.messages.some((message) => message.content === "插件之间能共享状态吗？")).toBe(true);
-  expect(db.sessions.get(sideChats[0].sideChat!.parentId)?.messages.some((message) => message.content === "插件之间能共享状态吗？")).toBe(false);
+  expect(
+    db.sessions
+      .get(sideChats[0].sideChat!.parentId)
+      ?.messages.some((message) => message.content === "插件之间能共享状态吗？"),
+  ).toBe(false);
   // tab 标题换成第一条问题；侧栏里还是只有两个主会话。
   expect(await screen.findByRole("tab", { name: /插件之间能共享状态吗？/ })).toBeInTheDocument();
   expect(document.querySelectorAll("[data-session-id]")).toHaveLength(2);
@@ -78,7 +86,9 @@ it("hides a main session's side chats after switching sessions and reopens colla
   await clickSession(user, MAIN_TITLE);
   expect(await screen.findByRole("region", { name: /^侧边对话：/ })).toBeInTheDocument();
 
-  await user.click(within(screen.getByRole("tablist", { name: "右侧面板" })).getByRole("button", { name: /^收起 侧边对话/ }));
+  await user.click(
+    within(screen.getByRole("tablist", { name: "右侧面板" })).getByRole("button", { name: /^收起 侧边对话/ }),
+  );
   const collapsed = await screen.findByRole("region", { name: "本会话的侧边对话 · 已收起" });
   expect(within(collapsed).getAllByRole("button")).toHaveLength(3);
   await user.click(within(collapsed).getByRole("button", { name: "ctx.plugin 和 ctx.inject 的区别" }));

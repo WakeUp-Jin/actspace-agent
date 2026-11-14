@@ -249,7 +249,7 @@ function buildRequestBody(scenario: Scenario, model: string): Record<string, unk
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value !== null && typeof value === "object" ? value as Record<string, unknown> : undefined;
+  return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
 }
 
 function stringValue(record: Record<string, unknown> | undefined, key: string): string | undefined {
@@ -271,12 +271,7 @@ function addCount(target: Record<string, number>, key: string, amount = 1): void
   target[key] = (target[key] ?? 0) + amount;
 }
 
-function addPreview(
-  observation: StreamObservation,
-  key: string,
-  value: unknown,
-  showContent: boolean,
-): void {
+function addPreview(observation: StreamObservation, key: string, value: unknown, showContent: boolean): void {
   if (!showContent || typeof value !== "string" || value.length === 0) return;
   observation.previews ??= {};
   observation.previews[key] = `${observation.previews[key] ?? ""}${value}`.slice(0, 240);
@@ -361,11 +356,7 @@ function observeChatChunk(
   observation.reasoningTokens = reasoningTokensFromUsage(payload.usage) ?? observation.reasoningTokens;
 }
 
-async function consumeSse(
-  response: Response,
-  protocol: Protocol,
-  showContent: boolean,
-): Promise<StreamObservation> {
+async function consumeSse(response: Response, protocol: Protocol, showContent: boolean): Promise<StreamObservation> {
   const observation = emptyObservation();
   if (!response.body) return observation;
   const reader = response.body.getReader();
@@ -376,7 +367,7 @@ async function consumeSse(
     const { done, value } = await reader.read();
     buffer += decoder.decode(value, { stream: !done });
     const lines = buffer.split(/\r?\n/);
-    buffer = done ? "" : lines.pop() ?? "";
+    buffer = done ? "" : (lines.pop() ?? "");
 
     for (const line of lines) {
       if (!line.startsWith("data:")) continue;
@@ -421,11 +412,7 @@ async function safeErrorBody(response: Response, apiKey: string): Promise<string
   }
 }
 
-async function runProbe(
-  scenario: Scenario,
-  options: CliOptions,
-  apiKey: string,
-): Promise<ProbeResult> {
+async function runProbe(scenario: Scenario, options: CliOptions, apiKey: string): Promise<ProbeResult> {
   const model = modelFor(scenario, options);
   const url = endpointFor(scenario.protocol);
   const startedAt = performance.now();
@@ -479,12 +466,14 @@ async function runProbe(
 }
 
 function hasReadableReasoning(observation: StreamObservation): boolean {
-  return observation.reasoningSummaryChars > 0 ||
+  return (
+    observation.reasoningSummaryChars > 0 ||
     observation.finalReasoningSummaryChars > 0 ||
     observation.reasoningTextChars > 0 ||
     observation.reasoningContentChars > 0 ||
     observation.reasoningChars > 0 ||
-    observation.analysisChars > 0;
+    observation.analysisChars > 0
+  );
 }
 
 function classify(results: ProbeResult[]): string[] {
@@ -495,70 +484,101 @@ function classify(results: ProbeResult[]): string[] {
   const grok = results.find((result) => result.scenarioId === "chat-grok" && result.ok);
 
   if (baseline && (baseline.observation.reasoningTokens ?? 0) > 0 && !hasReadableReasoning(baseline.observation)) {
-    findings.push("Codex baseline used reasoning tokens but returned no readable reasoning text. Reasoning computation and readable summaries are separate capabilities.");
+    findings.push(
+      "Codex baseline used reasoning tokens but returned no readable reasoning text. Reasoning computation and readable summaries are separate capabilities.",
+    );
   }
   if (summary && hasReadableReasoning(summary.observation)) {
-    findings.push("Codex returned readable reasoning only when reasoning.summary=auto was requested. The runtime must request and parse reasoning summary events.");
+    findings.push(
+      "Codex returned readable reasoning only when reasoning.summary=auto was requested. The runtime must request and parse reasoning summary events.",
+    );
   } else if (summary && (summary.observation.reasoningTokens ?? 0) > 0) {
-    findings.push("Codex accepted reasoning.summary=auto and used reasoning tokens, but this gateway still returned no readable reasoning summary.");
+    findings.push(
+      "Codex accepted reasoning.summary=auto and used reasoning tokens, but this gateway still returned no readable reasoning summary.",
+    );
   }
   if (baseline && baseline.observation.encryptedReasoningItems > 0 && !hasReadableReasoning(baseline.observation)) {
     findings.push("Encrypted reasoning items are opaque replay state, not user-readable Thinking content.");
   }
   if (legacySummary && hasReadableReasoning(legacySummary.observation)) {
-    findings.push("Codex returned readable reasoning with legacy reasoning.generate_summary=auto. This gateway expects the deprecated summary parameter.");
+    findings.push(
+      "Codex returned readable reasoning with legacy reasoning.generate_summary=auto. This gateway expects the deprecated summary parameter.",
+    );
   } else if (legacySummary && (legacySummary.observation.reasoningTokens ?? 0) > 0) {
-    findings.push("Codex accepted legacy reasoning.generate_summary=auto and used reasoning tokens, but still returned no readable reasoning summary.");
+    findings.push(
+      "Codex accepted legacy reasoning.generate_summary=auto and used reasoning tokens, but still returned no readable reasoning summary.",
+    );
   } else if (legacySummary) {
-    findings.push("Codex accepted legacy reasoning.generate_summary=auto but returned neither reasoning state nor a readable summary. The deprecated parameter is not a usable Thinking path on this gateway.");
+    findings.push(
+      "Codex accepted legacy reasoning.generate_summary=auto but returned neither reasoning state nor a readable summary. The deprecated parameter is not a usable Thinking path on this gateway.",
+    );
   }
   if (grok) {
     const fields = Object.keys(grok.observation.deltaFields);
-    const readableFields = ["reasoning_content", "reasoning", "analysis"].filter((field) =>
-      fields.includes(field) && (
-        field === "reasoning_content" ? grok.observation.reasoningContentChars > 0 :
-        field === "reasoning" ? grok.observation.reasoningChars > 0 :
-        grok.observation.analysisChars > 0
-      )
+    const readableFields = ["reasoning_content", "reasoning", "analysis"].filter(
+      (field) =>
+        fields.includes(field) &&
+        (field === "reasoning_content"
+          ? grok.observation.reasoningContentChars > 0
+          : field === "reasoning"
+            ? grok.observation.reasoningChars > 0
+            : grok.observation.analysisChars > 0),
     );
     if (readableFields.length > 0) {
-      findings.push(`Grok exposed readable reasoning through: ${readableFields.join(", ")}. The Chat converter must normalize the matching field.`);
+      findings.push(
+        `Grok exposed readable reasoning through: ${readableFields.join(", ")}. The Chat converter must normalize the matching field.`,
+      );
     } else if ((grok.observation.reasoningTokens ?? 0) > 0) {
-      findings.push("Grok reported reasoning tokens but exposed no readable reasoning_content/reasoning/analysis delta in this Chat stream.");
+      findings.push(
+        "Grok reported reasoning tokens but exposed no readable reasoning_content/reasoning/analysis delta in this Chat stream.",
+      );
     } else {
-      findings.push("Grok exposed no recognized readable reasoning field and reported no reasoning-token usage in this probe.");
+      findings.push(
+        "Grok exposed no recognized readable reasoning field and reported no reasoning-token usage in this probe.",
+      );
     }
   }
   if (results.some((result) => !result.ok)) {
-    findings.push(`Failed scenarios: ${results.filter((result) => !result.ok).map((result) => result.scenarioId).join(", ")}. HTTP errors remain useful compatibility evidence.`);
+    findings.push(
+      `Failed scenarios: ${results
+        .filter((result) => !result.ok)
+        .map((result) => result.scenarioId)
+        .join(", ")}. HTTP errors remain useful compatibility evidence.`,
+    );
   }
-  return findings.length > 0 ? findings : ["No conclusive difference was observed; inspect the event and delta field inventories above."];
+  return findings.length > 0
+    ? findings
+    : ["No conclusive difference was observed; inspect the event and delta field inventories above."];
 }
 
 function printScenarioList(scenarios: Scenario[], options: CliOptions): void {
-  console.table(scenarios.map((scenario) => ({
-    id: scenario.id,
-    protocol: scenario.protocol,
-    model: modelFor(scenario, options),
-    summary: scenario.reasoningSummary === "omitted" ? "omitted" : `${scenario.reasoningSummary}=auto`,
-    description: scenario.description,
-  })));
+  console.table(
+    scenarios.map((scenario) => ({
+      id: scenario.id,
+      protocol: scenario.protocol,
+      model: modelFor(scenario, options),
+      summary: scenario.reasoningSummary === "omitted" ? "omitted" : `${scenario.reasoningSummary}=auto`,
+      description: scenario.description,
+    })),
+  );
 }
 
 function printResults(results: ProbeResult[]): void {
-  console.table(results.map((result) => ({
-    scenario: result.scenarioId,
-    http: result.status ?? "ERR",
-    ms: result.durationMs,
-    reasoningTokens: result.observation.reasoningTokens ?? "-",
-    summaryDeltaChars: result.observation.reasoningSummaryChars,
-    finalSummaryChars: result.observation.finalReasoningSummaryChars,
-    reasoningContentChars: result.observation.reasoningContentChars,
-    reasoningChars: result.observation.reasoningChars,
-    analysisChars: result.observation.analysisChars,
-    encryptedItems: result.observation.encryptedReasoningItems,
-    outputChars: result.observation.outputTextChars,
-  })));
+  console.table(
+    results.map((result) => ({
+      scenario: result.scenarioId,
+      http: result.status ?? "ERR",
+      ms: result.durationMs,
+      reasoningTokens: result.observation.reasoningTokens ?? "-",
+      summaryDeltaChars: result.observation.reasoningSummaryChars,
+      finalSummaryChars: result.observation.finalReasoningSummaryChars,
+      reasoningContentChars: result.observation.reasoningContentChars,
+      reasoningChars: result.observation.reasoningChars,
+      analysisChars: result.observation.analysisChars,
+      encryptedItems: result.observation.encryptedReasoningItems,
+      outputChars: result.observation.outputTextChars,
+    })),
+  );
   for (const result of results) {
     console.log(`\n${result.scenarioId}`);
     console.log(`  events: ${JSON.stringify(result.observation.eventTypes)}`);
@@ -592,9 +612,7 @@ async function main(): Promise<void> {
         protocol: scenario.protocol,
         model: modelFor(scenario, options),
         url: endpointFor(scenario.protocol),
-        reasoningSummary: scenario.reasoningSummary === "omitted"
-          ? "omitted"
-          : `${scenario.reasoningSummary}=auto`,
+        reasoningSummary: scenario.reasoningSummary === "omitted" ? "omitted" : `${scenario.reasoningSummary}=auto`,
       })),
     };
     if (options.json) console.log(JSON.stringify(summary, null, 2));
@@ -607,11 +625,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  const missingKeyNames = [...new Set(
-    scenarios
-      .filter((scenario) => !apiKeyForScenario(scenario))
-      .map(apiKeyEnvironmentName),
-  )];
+  const missingKeyNames = [
+    ...new Set(scenarios.filter((scenario) => !apiKeyForScenario(scenario)).map(apiKeyEnvironmentName)),
+  ];
   if (missingKeyNames.length > 0) {
     fail(`set ${missingKeyNames.join(" and ")} before running the selected scenario(s)`);
   }
@@ -627,7 +643,9 @@ async function main(): Promise<void> {
     console.log("\nResults");
     printResults(results);
     console.log("\nInterpretation");
-    findings.forEach((finding) => { console.log(`- ${finding}`); });
+    findings.forEach((finding) => {
+      console.log(`- ${finding}`);
+    });
   }
   if (!results.some((result) => result.ok)) process.exitCode = 2;
 }

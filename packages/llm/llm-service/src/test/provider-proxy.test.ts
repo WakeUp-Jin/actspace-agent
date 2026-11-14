@@ -7,8 +7,12 @@ describe("ProviderProxyPool", () => {
     const loaded: string[] = [];
     const pool = new ProviderProxyPool(async () => ({
       ProxyAgent: class {
-        constructor(readonly url: string) { loaded.push(url); }
-        async close(): Promise<void> { closed.push(this.url); }
+        constructor(readonly url: string) {
+          loaded.push(url);
+        }
+        async close(): Promise<void> {
+          closed.push(this.url);
+        }
       },
       fetch: async () => new Response("ok"),
     }));
@@ -30,11 +34,19 @@ describe("ProviderProxyPool", () => {
 
 it("loads the production proxy dependency without a mock", async () => {
   const pool = new ProviderProxyPool();
-  try { expect(await pool.getFetch("http://127.0.0.1:9")).toBeTypeOf("function"); }
-  finally { await pool.dispose(); }
+  try {
+    expect(await pool.getFetch("http://127.0.0.1:9")).toBeTypeOf("function");
+  } finally {
+    await pool.dispose();
+  }
 });
 
 it("classifies dependency initialization failures as proxy errors without exposing internals", async () => {
-  const pool = new ProviderProxyPool(async () => { throw new Error("missing private module path"); });
-  await expect(pool.getFetch("http://127.0.0.1:9")).rejects.toMatchObject({ name: "ProviderProxyError", message: "Provider proxy connection failed." });
+  const pool = new ProviderProxyPool(async () => {
+    throw new Error("missing private module path");
+  });
+  await expect(pool.getFetch("http://127.0.0.1:9")).rejects.toMatchObject({
+    name: "ProviderProxyError",
+    message: "Provider proxy connection failed.",
+  });
 });

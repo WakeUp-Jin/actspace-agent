@@ -20,12 +20,17 @@ export default defineConfig({
       input: { main: resolve(__dirname, "index.html"), sw: resolve(__dirname, "src/pwa/sw.ts") },
       // Service Worker 的作用域取决于它的路径，所以固定输出到根目录的 /sw.js。
       output: {
-        entryFileNames: chunk => (chunk.name === "sw" ? "sw.js" : "assets/[name]-[hash].js"),
+        entryFileNames: (chunk) => (chunk.name === "sw" ? "sw.js" : "assets/[name]-[hash].js"),
         // 依赖单独成块：应用更新时手机只需重新下载业务代码。
-        manualChunks: id => {
+        manualChunks: (id) => {
           if (!id.includes("node_modules")) return undefined;
           if (/[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "react";
-          if (/[\\/](react-markdown|remark-|mdast-|micromark|unified|hast-|unist-|vfile|property-information|decode-named-character-reference|character-entities)/.test(id)) return "markdown";
+          if (
+            /[\\/](react-markdown|remark-|mdast-|micromark|unified|hast-|unist-|vfile|property-information|decode-named-character-reference|character-entities)/.test(
+              id,
+            )
+          )
+            return "markdown";
           return "vendor";
         },
       },

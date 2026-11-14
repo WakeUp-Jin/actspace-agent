@@ -15,13 +15,18 @@ const OUTSIDE = "不在默认组合";
 const ORDER = ["全局", "会话"];
 
 async function exists(path) {
-  try { await access(path); return true; } catch { return false; }
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function subdirs(dir) {
   return (await readdir(dir, { withFileTypes: true }))
-    .filter(entry => entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules")
-    .map(entry => entry.name)
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules")
+    .map((entry) => entry.name)
     .sort();
 }
 
@@ -44,30 +49,36 @@ async function scanPackages(repoRoot) {
 /** Rows of the first table whose header starts with `firstHeader`; each row is its trimmed cells. */
 export function parseTable(markdown, firstHeader) {
   const lines = markdown.split("\n");
-  const start = lines.findIndex(line => line.startsWith("|") && line.split("|")[1]?.trim() === firstHeader);
+  const start = lines.findIndex((line) => line.startsWith("|") && line.split("|")[1]?.trim() === firstHeader);
   if (start === -1) return undefined;
-  const header = lines[start].split("|").slice(1, -1).map(cell => cell.trim());
+  const header = lines[start]
+    .split("|")
+    .slice(1, -1)
+    .map((cell) => cell.trim());
   const rows = [];
   for (const line of lines.slice(start + 2)) {
     if (!line.startsWith("|")) break;
-    const cells = line.split("|").slice(1, -1).map(cell => cell.trim());
+    const cells = line
+      .split("|")
+      .slice(1, -1)
+      .map((cell) => cell.trim());
     rows.push(Object.fromEntries(header.map((name, index) => [name, cells[index] ?? ""])));
   }
   return rows;
 }
 
-const stripTicks = cell => cell.replace(/^\[?`([^`]+)`.*$/s, "$1").replace(/\/$/, "");
+const stripTicks = (cell) => cell.replace(/^\[?`([^`]+)`.*$/s, "$1").replace(/\/$/, "");
 
 /** Category and default cells a package's README row must show. */
 function expectedCells(packageName, catalog, outsideDefault) {
-  const rows = catalog.filter(entry => entry.module.split("/").slice(0, 2).join("/") === packageName);
+  const rows = catalog.filter((entry) => entry.module.split("/").slice(0, 2).join("/") === packageName);
   if (rows.length > 0) {
-    const scopes = new Set(rows.map(entry => (entry.loaders.includes("host") ? "全局" : "会话")));
-    const category = ORDER.filter(scope => scopes.has(scope)).join("+");
-    const enabled = rows.every(entry => entry.manifest.display?.defaultEnabled !== false) ? "开" : "关";
+    const scopes = new Set(rows.map((entry) => (entry.loaders.includes("host") ? "全局" : "会话")));
+    const category = ORDER.filter((scope) => scopes.has(scope)).join("+");
+    const enabled = rows.every((entry) => entry.manifest.display?.defaultEnabled !== false) ? "开" : "关";
     return { category, enabled };
   }
-  if (outsideDefault.some(item => item.package === packageName)) return { category: OUTSIDE, enabled: "—" };
+  if (outsideDefault.some((item) => item.package === packageName)) return { category: OUTSIDE, enabled: "—" };
   return { category: LIBRARY, enabled: "—" };
 }
 
@@ -78,7 +89,7 @@ function expectedMapCategory(categories) {
     if (category === OUTSIDE || category === LIBRARY) parts.add(LIBRARY);
     else for (const scope of category.split("+")) parts.add(scope);
   }
-  return [...ORDER, LIBRARY].filter(name => parts.has(name)).join("、");
+  return [...ORDER, LIBRARY].filter((name) => parts.has(name)).join("、");
 }
 
 /** @returns {Promise<string[]>} failure messages; empty when the READMEs match the repository. */
@@ -91,24 +102,38 @@ export async function checkPackageReadmes({ repoRoot, catalog, outsideDefault })
   if (mapText === undefined) failures.push("packages/README.md: missing");
   else if (mapRows === undefined) failures.push("packages/README.md: no capability table (header starting with 目录)");
 
-  const mapped = new Map((mapRows ?? []).map(row => [stripTicks(row["目录"]), row]));
+  const mapped = new Map((mapRows ?? []).map((row) => [stripTicks(row["目录"]), row]));
   for (const capability of mapped.keys()) {
-    if (!capabilities.has(capability)) failures.push(`packages/README.md: lists "${capability}/" but packages/${capability}/ has no packages`);
+    if (!capabilities.has(capability))
+      failures.push(`packages/README.md: lists "${capability}/" but packages/${capability}/ has no packages`);
   }
 
   for (const [capability, packages] of capabilities) {
     const mapRow = mapped.get(capability);
-    if (mapRows !== undefined && mapRow === undefined) failures.push(`packages/README.md: capability directory "${capability}/" is not in the table`);
-    if (mapRow !== undefined && Number(mapRow["包数"]) !== packages.size) failures.push(`packages/README.md: "${capability}/" says ${mapRow["包数"]} packages but has ${packages.size}`);
+    if (mapRows !== undefined && mapRow === undefined)
+      failures.push(`packages/README.md: capability directory "${capability}/" is not in the table`);
+    if (mapRow !== undefined && Number(mapRow["包数"]) !== packages.size)
+      failures.push(`packages/README.md: "${capability}/" says ${mapRow["包数"]} packages but has ${packages.size}`);
 
     const readmePath = join(repoRoot, "packages", capability, "README.md");
-    if (!(await exists(readmePath))) { failures.push(`packages/${capability}/README.md: missing`); continue; }
+    if (!(await exists(readmePath))) {
+      failures.push(`packages/${capability}/README.md: missing`);
+      continue;
+    }
     const rows = parseTable(await readFile(readmePath, "utf8"), "包");
-    if (rows === undefined) { failures.push(`packages/${capability}/README.md: no package table (header starting with 包)`); continue; }
+    if (rows === undefined) {
+      failures.push(`packages/${capability}/README.md: no package table (header starting with 包)`);
+      continue;
+    }
 
-    const listed = new Map(rows.map(row => [stripTicks(row["包"]), row]));
-    for (const dir of packages.keys()) if (!listed.has(dir)) failures.push(`packages/${capability}/README.md: package "${dir}" is not in the table`);
-    for (const dir of listed.keys()) if (!packages.has(dir)) failures.push(`packages/${capability}/README.md: table lists "${dir}" but packages/${capability}/${dir}/ does not exist`);
+    const listed = new Map(rows.map((row) => [stripTicks(row["包"]), row]));
+    for (const dir of packages.keys())
+      if (!listed.has(dir)) failures.push(`packages/${capability}/README.md: package "${dir}" is not in the table`);
+    for (const dir of listed.keys())
+      if (!packages.has(dir))
+        failures.push(
+          `packages/${capability}/README.md: table lists "${dir}" but packages/${capability}/${dir}/ does not exist`,
+        );
     if (rows.length !== listed.size) failures.push(`packages/${capability}/README.md: duplicate package rows`);
 
     if (catalog === undefined) continue;
@@ -118,30 +143,46 @@ export async function checkPackageReadmes({ repoRoot, catalog, outsideDefault })
       categories.push(expected.category);
       const row = listed.get(dir);
       if (row === undefined) continue;
-      if (row["类别"] !== expected.category) failures.push(`packages/${capability}/README.md: "${dir}" 类别 is "${row["类别"]}" but the catalog implies "${expected.category}"`);
-      if (row["默认"] !== expected.enabled) failures.push(`packages/${capability}/README.md: "${dir}" 默认 is "${row["默认"]}" but the manifest implies "${expected.enabled}"`);
+      if (row["类别"] !== expected.category)
+        failures.push(
+          `packages/${capability}/README.md: "${dir}" 类别 is "${row["类别"]}" but the catalog implies "${expected.category}"`,
+        );
+      if (row["默认"] !== expected.enabled)
+        failures.push(
+          `packages/${capability}/README.md: "${dir}" 默认 is "${row["默认"]}" but the manifest implies "${expected.enabled}"`,
+        );
     }
     const expectedMap = expectedMapCategory(categories);
-    if (mapRow !== undefined && mapRow["类别"] !== expectedMap) failures.push(`packages/README.md: "${capability}/" 类别 is "${mapRow["类别"]}" but its packages imply "${expectedMap}"`);
+    if (mapRow !== undefined && mapRow["类别"] !== expectedMap)
+      failures.push(
+        `packages/README.md: "${capability}/" 类别 is "${mapRow["类别"]}" but its packages imply "${expectedMap}"`,
+      );
   }
   return failures;
 }
 
 async function loadCatalog(repoRoot) {
   const catalogPath = join(repoRoot, "packages/core/runtime/dist/plugin-catalog.js");
-  if (!(await exists(catalogPath))) return { skipped: "packages/core/runtime/dist/plugin-catalog.js is missing (runtime not built)" };
+  if (!(await exists(catalogPath)))
+    return { skipped: "packages/core/runtime/dist/plugin-catalog.js is missing (runtime not built)" };
   try {
     const module = await import(pathToFileURL(catalogPath).href);
     return { catalog: module.PLUGIN_CATALOG, outsideDefault: module.PLUGIN_PACKAGES_OUTSIDE_DEFAULT };
   } catch (error) {
-    return { skipped: `the built plugin catalog could not be loaded (${error instanceof Error ? error.message : String(error)})` };
+    return {
+      skipped: `the built plugin catalog could not be loaded (${error instanceof Error ? error.message : String(error)})`,
+    };
   }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
   const loaded = await loadCatalog(repoRoot);
-  const failures = await checkPackageReadmes({ repoRoot, catalog: loaded.catalog, outsideDefault: loaded.outsideDefault });
+  const failures = await checkPackageReadmes({
+    repoRoot,
+    catalog: loaded.catalog,
+    outsideDefault: loaded.outsideDefault,
+  });
   if (loaded.skipped) process.stdout.write(`package README category checks skipped: ${loaded.skipped}\n`);
   if (failures.length > 0) {
     process.stderr.write(`package README check failed (${failures.length}):\n${failures.join("\n")}\n`);

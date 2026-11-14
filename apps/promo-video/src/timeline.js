@@ -63,11 +63,20 @@ export function createTimeline(film, scenes) {
     const drivers = [];
     for (const node of element.querySelectorAll("[data-type]")) drivers.push(typingDriver(node));
     for (const node of element.querySelectorAll("[data-count]")) drivers.push(countDriver(node));
-    for (const node of element.querySelectorAll("[data-cam]")) drivers.push(cameraDriver(node, scene.shots[node.dataset.cam]));
+    for (const node of element.querySelectorAll("[data-cam]"))
+      drivers.push(cameraDriver(node, scene.shots[node.dataset.cam]));
 
     const start = cursor;
     cursor += scene.duration;
-    return { id: scene.id, element, start, duration: scene.duration, visible: scene.duration + tail, drivers, on: false };
+    return {
+      id: scene.id,
+      element,
+      start,
+      duration: scene.duration,
+      visible: scene.duration + tail,
+      drivers,
+      on: false,
+    };
   });
 
   const duration = cursor;

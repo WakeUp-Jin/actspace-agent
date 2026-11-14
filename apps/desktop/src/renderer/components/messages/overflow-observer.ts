@@ -21,7 +21,9 @@ export function observeOverflow(element: Element, callback: () => void): () => v
     set = new Set();
     callbacks.set(element, set);
     if (typeof ResizeObserver !== "undefined") {
-      observer ??= new ResizeObserver((entries) => { for (const entry of entries) notify(entry.target); });
+      observer ??= new ResizeObserver((entries) => {
+        for (const entry of entries) notify(entry.target);
+      });
       observer.observe(element);
     }
   }
@@ -40,7 +42,10 @@ export function observeOverflow(element: Element, callback: () => void): () => v
     if (callbacks.size === 0) {
       observer?.disconnect();
       observer = null;
-      if (windowListening) { window.removeEventListener("resize", onWindowResize); windowListening = false; }
+      if (windowListening) {
+        window.removeEventListener("resize", onWindowResize);
+        windowListening = false;
+      }
     }
   };
 }

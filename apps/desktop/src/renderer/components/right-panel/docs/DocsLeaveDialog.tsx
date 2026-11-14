@@ -42,17 +42,39 @@ export function DocsLeaveDialog({ workspaceRoot }: { workspaceRoot?: string }) {
   };
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open && !saving) close(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !saving) close();
+      }}
+    >
       <DialogContent role="alertdialog" size="md" withDescription closeOnOutsideClick={false} className="p-5">
         <DialogTitle className="text-act-lg font-semibold text-text-main">{`要保存对「${fileName}」的修改吗？`}</DialogTitle>
         <DialogDescription className="mt-2 text-act-xs leading-relaxed text-text-muted">
           这篇文档有未保存的修改。不保存的话，这些修改会丢失。
         </DialogDescription>
-        {error ? <p role="alert" className="mt-3 text-act-xs text-on-danger">{error}</p> : null}
+        {error ? (
+          <p role="alert" className="mt-3 text-act-xs text-on-danger">
+            {error}
+          </p>
+        ) : null}
         <DialogFooter className="mt-6">
-          <Button variant="secondary" size="md" onClick={close} disabled={saving}>取消</Button>
-          <Button variant="secondary" size="md" onClick={leave} disabled={saving}>不保存</Button>
-          <Button variant="primary" size="md" autoFocus onClick={() => void saveAndLeave()} busy={saving} disabled={saving}>保存</Button>
+          <Button variant="secondary" size="md" onClick={close} disabled={saving}>
+            取消
+          </Button>
+          <Button variant="secondary" size="md" onClick={leave} disabled={saving}>
+            不保存
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            autoFocus
+            onClick={() => void saveAndLeave()}
+            busy={saving}
+            disabled={saving}
+          >
+            保存
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -7,7 +7,10 @@ type ProfileLike = { readonly context: { readonly get?: (id: string) => unknown 
  * 主进程只能动态加载 Runtime，拿不到服务定义这个值，所以按 id 取；类型查 Runtime 导出的 `ProfileServices`，
  * 那张表由服务定义推出来。主进程里「按 id 取出后断言类型」只在这里做一次。
  */
-export function profileService<K extends keyof ProfileServices>(profile: ProfileLike, id: K): ProfileServices[K] | undefined {
+export function profileService<K extends keyof ProfileServices>(
+  profile: ProfileLike,
+  id: K,
+): ProfileServices[K] | undefined {
   return profile.context.get?.(id) as ProfileServices[K] | undefined;
 }
 

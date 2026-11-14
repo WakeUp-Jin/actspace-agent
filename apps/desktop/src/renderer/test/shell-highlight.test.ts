@@ -3,8 +3,9 @@ import { getShellCommandHeads, tokenizeShellCommand } from "../components/messag
 
 describe("tokenizeShellCommand", () => {
   it("marks each segment's command, operators, flags and quoted strings", () => {
-    const tokens = tokenizeShellCommand('git status --short && grep -n "a && b" x | tail -n 5')
-      .filter((token) => token.kind !== "text" || token.text.trim());
+    const tokens = tokenizeShellCommand('git status --short && grep -n "a && b" x | tail -n 5').filter(
+      (token) => token.kind !== "text" || token.text.trim(),
+    );
     expect(tokens).toEqual([
       { text: "git", kind: "command" },
       { text: "status", kind: "text" },
@@ -23,7 +24,11 @@ describe("tokenizeShellCommand", () => {
 
   it("keeps the original text when joined back", () => {
     const command = "pnpm --filter @actspace/desktop exec vitest run  a.test.tsx; echo 'done'";
-    expect(tokenizeShellCommand(command).map((token) => token.text).join("")).toBe(command);
+    expect(
+      tokenizeShellCommand(command)
+        .map((token) => token.text)
+        .join(""),
+    ).toBe(command);
   });
 });
 

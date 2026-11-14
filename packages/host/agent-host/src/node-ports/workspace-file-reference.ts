@@ -15,7 +15,10 @@ function isInside(root: string, target: string): boolean {
  * 确认 `@` 引用的相对路径在 session workspace 内确实是一个普通文件。
  * 先做字面检查，再比对 realpath，挡住指向 workspace 外的符号链接；不读文件内容。
  */
-export async function resolveWorkspaceFileReference(workspaceRoot: string, relativePath: string): Promise<WorkspaceFileReferenceResolution> {
+export async function resolveWorkspaceFileReference(
+  workspaceRoot: string,
+  relativePath: string,
+): Promise<WorkspaceFileReferenceResolution> {
   const normalized = normalizeWorkspaceRelativePath(relativePath);
   if (!normalized) return { ok: false, code: "file_outside_workspace" };
   const root = resolve(workspaceRoot);

@@ -12,9 +12,10 @@ export async function ensureSystemPromptFile(filePath: string, legacySystemPromp
   } catch (error) {
     if (!isNotFoundError(error)) throw error;
   }
-  const initialContent = legacySystemPrompt && legacySystemPrompt.trim().length > 0
-    ? legacySystemPrompt.slice(0, AGENT_SYSTEM_PROMPT_MAX_CHARS)
-    : MAIN_AGENT_SYSTEM_PROMPT;
+  const initialContent =
+    legacySystemPrompt && legacySystemPrompt.trim().length > 0
+      ? legacySystemPrompt.slice(0, AGENT_SYSTEM_PROMPT_MAX_CHARS)
+      : MAIN_AGENT_SYSTEM_PROMPT;
   await writeTextAtomic(filePath, initialContent);
 }
 

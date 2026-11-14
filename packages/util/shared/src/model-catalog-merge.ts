@@ -62,7 +62,8 @@ export function mergeModelCatalog(
     const key = catalogEntryKey(override);
     const existing = merged.get(key);
     if (!existing) throw new Error(`Price override has no catalog entry: ${key}`);
-    if (!sameRates(existing.rates, override.rates)) report.overridden.push({ key, from: existing.rates, to: override.rates });
+    if (!sameRates(existing.rates, override.rates))
+      report.overridden.push({ key, from: existing.rates, to: override.rates });
     merged.set(key, { ...existing, rates: { ...override.rates } });
   }
   return { entries: [...merged.values()].sort(compareCatalogEntries), report };

@@ -13,7 +13,13 @@ import { apply as applySideChat, PROMPT_ID } from "@actspace/side-chat";
 import { RuntimeSessionController } from "../session/session-controller.js";
 
 const source = { ownerPluginId: "@actspace/core" } as const;
-const event = (type: string, data: SessionEventCandidateV1["data"]): SessionEventCandidateV1 => ({ type, eventVersion: 1, source, data, surface: null });
+const event = (type: string, data: SessionEventCandidateV1["data"]): SessionEventCandidateV1 => ({
+  type,
+  eventVersion: 1,
+  source,
+  data,
+  surface: null,
+});
 
 async function turn(session: SessionHandle, turnId: string, finished: boolean): Promise<void> {
   await session.append(event("turn/start", { turnId }));
@@ -31,14 +37,24 @@ it("opens a Plan-mode side chat from a running parent and attaches the boundary 
   const cordis = await createCordisRoot();
   const registry = createCoreCodecRegistry();
   const extensions = new PromptExtensionRegistry();
-  const sessions = new RuntimeSessionController({
-    dataRoot: root, runtimeId: "side-chat-test", registry, profileId: "test", manifestDigest: "test", plugins: [],
-    onCreated: (sessionId) => emitNotification(cordis.context, "session/created", { sessionId }),
-    onDisposed: (sessionId, outcome) => emitNotification(cordis.context, "session/disposed", { sessionId, outcome }),
-  }, new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot: root, runtimeId: "side-chat-test", registry })));
+  const sessions = new RuntimeSessionController(
+    {
+      dataRoot: root,
+      runtimeId: "side-chat-test",
+      registry,
+      profileId: "test",
+      manifestDigest: "test",
+      plugins: [],
+      onCreated: (sessionId) => emitNotification(cordis.context, "session/created", { sessionId }),
+      onDisposed: (sessionId, outcome) => emitNotification(cordis.context, "session/disposed", { sessionId, outcome }),
+    },
+    new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot: root, runtimeId: "side-chat-test", registry })),
+  );
   cordis.context.provide?.("actspace.host.prompt", { workspaceRoot: "/workspace", extensions });
   cordis.context.provide?.("session.runtime", sessions);
-  await cordis.mount("side-chat", ({ context }) => { applySideChat(context!); });
+  await cordis.mount("side-chat", ({ context }) => {
+    applySideChat(context!);
+  });
   const runs = {
     inspectCapability: (_key: { readonly id: string }, inspect: (service: undefined) => unknown) => inspect(undefined),
     configuration: () => ({}),
@@ -46,12 +62,20 @@ it("opens a Plan-mode side chat from a running parent and attaches the boundary 
     isActive: () => false,
     initialize: async () => {},
   };
-  const services = new Map<string, unknown>([["session.runtime", sessions], ["session.journal", { registry }], ["agent.runtime", { runs }], ["compaction.runtime", {}], ["llm.service", {}]]);
+  const services = new Map<string, unknown>([
+    ["session.runtime", sessions],
+    ["session.journal", { registry }],
+    ["agent.runtime", { runs }],
+    ["compaction.runtime", {}],
+    ["llm.service", {}],
+  ]);
   const app = new DesktopAppService({ get: (id: string) => services.get(id) } as CordisContext);
-  const prompts = (sessionId: string) => extensions.list(sessionId, `main:${sessionId}`, "main").map(item => item.id);
+  const prompts = (sessionId: string) => extensions.list(sessionId, `main:${sessionId}`, "main").map((item) => item.id);
   try {
     const parent = await sessions.create("parent", "/workspace", "agent");
-    await expect(app.openSideChat("parent", "too-early")).rejects.toMatchObject({ code: "SIDE_CHAT_NO_COMPLETED_TURN" });
+    await expect(app.openSideChat("parent", "too-early")).rejects.toMatchObject({
+      code: "SIDE_CHAT_NO_COMPLETED_TURN",
+    });
     await turn(parent, "t1", true);
     await turn(parent, "t2", true);
     const completedThrough = parent.journal.lastSeq;
@@ -59,8 +83,17 @@ it("opens a Plan-mode side chat from a running parent and attaches the boundary 
 
     const opened = await app.openSideChat("parent", "side");
     expect(opened).toMatchObject({ inheritedTurnCount: 2, runningTurnExcluded: true });
-    expect(opened.snapshot).toMatchObject({ agentMode: "plan", lineage: { origin: "side-chat", parentSessionId: "parent", parentBoundarySeq: completedThrough } });
-    expect(sessions.getOpen("side")?.journal.events.some(item => item.type === "turn/start" && (item.data as { turnId?: string }).turnId === "t3")).toBe(false);
+    expect(opened.snapshot).toMatchObject({
+      agentMode: "plan",
+      lineage: { origin: "side-chat", parentSessionId: "parent", parentBoundarySeq: completedThrough },
+    });
+    expect(
+      sessions
+        .getOpen("side")
+        ?.journal.events.some(
+          (item) => item.type === "turn/start" && (item.data as { turnId?: string }).turnId === "t3",
+        ),
+    ).toBe(false);
     expect(prompts("side")).toEqual([PROMPT_ID]);
     expect(prompts("parent")).toEqual([]);
     await expect(app.openSideChat("side", "nested")).rejects.toThrow("SIDE_CHAT_PARENT_NOT_MAIN");

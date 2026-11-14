@@ -10,8 +10,7 @@ import { useRemotePaging } from "./use-remote-paging";
 import { SIDEBAR_BUTTON_RESET_CLASS } from "./styles";
 
 const SESSION_LIST_CLASS = "flex min-w-0 flex-col gap-px";
-const SESSION_LIST_TOGGLE_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} inline-flex h-[26px] items-center self-start pl-[30px] pr-2 text-left text-act-xs leading-4 font-medium text-text-faint transition-colors duration-(--motion-fast) ease-in-out hover:text-text-main disabled:cursor-default`;
+const SESSION_LIST_TOGGLE_CLASS = `${SIDEBAR_BUTTON_RESET_CLASS} inline-flex h-[26px] items-center self-start pl-[30px] pr-2 text-left text-act-xs leading-4 font-medium text-text-faint transition-colors duration-(--motion-fast) ease-in-out hover:text-text-main disabled:cursor-default`;
 
 export type SessionListProps = {
   /** 已按当前排序排好的会话。 */
@@ -50,12 +49,24 @@ export function SessionList({
   workspaceLabelOf,
   rowDrag,
 }: SessionListProps) {
-  const { onTogglePin, onRenameSession: onRename, onCopySessionId, onCopyTranscript, onForkSession: onFork, onArchiveSession: onArchive, onRestoreSession: onRestore } = useSessionActions();
+  const {
+    onTogglePin,
+    onRenameSession: onRename,
+    onCopySessionId,
+    onCopyTranscript,
+    onForkSession: onFork,
+    onArchiveSession: onArchive,
+    onRestoreSession: onRestore,
+  } = useSessionActions();
   const [extra, setExtra] = useState(0);
   const paging = useRemotePaging({ pinned: groupKey === "pinned", group, sessions });
   const statusOf = (session: SessionListItem) => sessionStatusOf(session.id, busySessionIds, sessionStatuses);
   const { visible, hidden } = limited
-    ? limitGroupSessions(sessions, extra, (session) => session.id === activeSessionId || isSessionBusy(statusOf(session)))
+    ? limitGroupSessions(
+        sessions,
+        extra,
+        (session) => session.id === activeSessionId || isSessionBusy(statusOf(session)),
+      )
     : { visible: sessions, hidden: [] };
   const loadMore = async () => {
     // 新加载的会话直接露出来，不再折叠到「展开其余」后面。
@@ -63,8 +74,18 @@ export function SessionList({
   };
 
   let toggle: { label: string; onClick: () => void } | null = null;
-  if (hidden.length > 0) toggle = { label: `展开其余 ${hidden.length} 个会话`, onClick: () => setExtra((value) => value + nextRevealCount(hidden.length)) };
-  else if (paged && paging.hasMore) toggle = { label: paging.loading ? "正在加载…" : "加载更多会话", onClick: () => { void loadMore(); } };
+  if (hidden.length > 0)
+    toggle = {
+      label: `展开其余 ${hidden.length} 个会话`,
+      onClick: () => setExtra((value) => value + nextRevealCount(hidden.length)),
+    };
+  else if (paged && paging.hasMore)
+    toggle = {
+      label: paging.loading ? "正在加载…" : "加载更多会话",
+      onClick: () => {
+        void loadMore();
+      },
+    };
   else if (extra > 0) toggle = { label: "收起", onClick: () => setExtra(0) };
 
   return (
@@ -88,7 +109,19 @@ export function SessionList({
           onRestore={onRestore ? () => onRestore(session.id) : undefined}
         />
       ))}
-      {paging.error && <p role="alert" className="px-2 text-act-xs leading-4 text-text-muted">{paging.error} <button type="button" onClick={() => { void loadMore(); }}>重试</button></p>}
+      {paging.error && (
+        <p role="alert" className="px-2 text-act-xs leading-4 text-text-muted">
+          {paging.error}{" "}
+          <button
+            type="button"
+            onClick={() => {
+              void loadMore();
+            }}
+          >
+            重试
+          </button>
+        </p>
+      )}
       {toggle ? (
         <button
           className={`session-list-toggle ${SESSION_LIST_TOGGLE_CLASS}`}

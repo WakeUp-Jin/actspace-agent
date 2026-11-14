@@ -3,7 +3,13 @@ import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
 export const HARNESS_EVALUATION_PLUGIN_ID = "actspace.harness-evaluation" as const;
 
 export const manifest = defineBuiltinPluginManifest({
-  display: { title: "Harness 评估", description: "评估候选 Harness 时单独装配", scope: "global", defaultEnabled: true, canDisable: false },
+  display: {
+    title: "Harness 评估",
+    description: "评估候选 Harness 时单独装配",
+    scope: "global",
+    defaultEnabled: true,
+    canDisable: false,
+  },
   pluginId: HARNESS_EVALUATION_PLUGIN_ID,
   version: "0.1.0",
   name: "ActSpace Harness Evaluation",

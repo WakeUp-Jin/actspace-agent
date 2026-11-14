@@ -25,7 +25,7 @@ test("finds every way of writing the core event source by hand", () => {
 
 test("ignores other owners, objects with more fields, comparisons and comment lines", () => {
   const source = [
-    'return { type, eventVersion: 1, source: { ownerPluginId: TODO_PLUGIN_ID }, data, surface: null };',
+    "return { type, eventVersion: 1, source: { ownerPluginId: TODO_PLUGIN_ID }, data, surface: null };",
     'return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/tool-todo" }, data, surface: null };',
     'const codec = { type: "turn/start", ownerPluginId: "@actspace/core", eventVersion: 1 };',
     'const provenance = { contributorId: id, ownerPluginId: "@actspace/core", layer, order };',
@@ -34,22 +34,34 @@ test("ignores other owners, objects with more fields, comparisons and comment li
     'if (codec.ownerPluginId === "@actspace/core") return true;',
     'export const CORE_EVENT_OWNER = "@actspace/core";',
     'const other = { ownerPluginId: "@actspace/core-tools" };',
-    'const named = { ownerPluginId: MY_CORE_EVENT_OWNER_ID };',
+    "const named = { ownerPluginId: MY_CORE_EVENT_OWNER_ID };",
     '// 以前写的是 source: { ownerPluginId: "@actspace/core" }',
     "/**",
     ' * 不要再写 { ownerPluginId: "@actspace/core" }。',
     " */",
-    '  /* { ownerPluginId: CORE_EVENT_OWNER } */',
+    "  /* { ownerPluginId: CORE_EVENT_OWNER } */",
   ].join("\n");
   assert.deepEqual(findCoreEventSources(source), []);
 });
 
 test("reports each hand-written source in a file that is not on the list", () => {
-  const errors = auditCoreEventWrites([
-    { path: "packages/a/src/writer.ts", text: 'const a = 1;\nawait session.append({ type: "x", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });' },
-    { path: "apps/b/src/main.ts", text: '// 注释行不算，也不让后面的行号往前挪\nconst one = { ownerPluginId: "@actspace/core" };\n\nconst two = { ownerPluginId: CORE_EVENT_OWNER };' },
-    { path: "packages/a/src/clean.ts", text: 'await session.append(coreEvent("turn/end", { turnId, reason: "completed" }));' },
-  ], []);
+  const errors = auditCoreEventWrites(
+    [
+      {
+        path: "packages/a/src/writer.ts",
+        text: 'const a = 1;\nawait session.append({ type: "x", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });',
+      },
+      {
+        path: "apps/b/src/main.ts",
+        text: '// 注释行不算，也不让后面的行号往前挪\nconst one = { ownerPluginId: "@actspace/core" };\n\nconst two = { ownerPluginId: CORE_EVENT_OWNER };',
+      },
+      {
+        path: "packages/a/src/clean.ts",
+        text: 'await session.append(coreEvent("turn/end", { turnId, reason: "completed" }));',
+      },
+    ],
+    [],
+  );
   assert.deepEqual(errors, [
     "apps/b/src/main.ts:2 手写了 core 的事件来源",
     "apps/b/src/main.ts:4 手写了 core 的事件来源",
@@ -64,9 +76,10 @@ test("a listed file must contain exactly the recorded number of sources", () => 
   assert.deepEqual(auditCoreEventWrites([{ path: "packages/a/src/impl.ts", text: `${one}\n\n${one}` }], allowed), [
     "packages/a/src/impl.ts：手写 core 事件来源的有 2 处（第 1、3 行），清单只允许 1 处",
   ]);
-  assert.deepEqual(auditCoreEventWrites([{ path: "packages/a/src/impl.ts", text: "return coreEvent(type, data);" }], allowed), [
-    "packages/a/src/impl.ts：清单记了 1 处，现在只有 0 处，请同步修改 ALLOWED",
-  ]);
+  assert.deepEqual(
+    auditCoreEventWrites([{ path: "packages/a/src/impl.ts", text: "return coreEvent(type, data);" }], allowed),
+    ["packages/a/src/impl.ts：清单记了 1 处，现在只有 0 处，请同步修改 ALLOWED"],
+  );
   assert.deepEqual(auditCoreEventWrites([], allowed), [
     "packages/a/src/impl.ts：清单记了 1 处，现在只有 0 处，请同步修改 ALLOWED",
   ]);

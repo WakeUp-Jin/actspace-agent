@@ -1,6 +1,11 @@
 import * as net from "node:net";
 import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
-import type { ToolArtifactRef, ToolBodyResult, ToolExecutionContext, ToolModelOutputBlock } from "@actspace/tool-runtime";
+import type {
+  ToolArtifactRef,
+  ToolBodyResult,
+  ToolExecutionContext,
+  ToolModelOutputBlock,
+} from "@actspace/tool-runtime";
 import type { BrowserCapability } from "./host-port.js";
 import { redactBrowserValue } from "./redaction.js";
 
@@ -30,13 +35,16 @@ export type NodeBrowserCapabilityOptions = {
 };
 
 export function createNodeBrowserCapability(options: NodeBrowserCapabilityOptions): BrowserCapability {
-  const transportFactory = options.transportFactory ?? ((identity) => new SocketBrowserBridgeTransport({
-    socketPath: options.socketPath,
-    sessionId: identity.sessionId,
-    turnId: identity.turnId,
-    timeoutMs: options.timeoutMs,
-    maxFrameBytes: options.maxFrameBytes,
-  }));
+  const transportFactory =
+    options.transportFactory ??
+    ((identity) =>
+      new SocketBrowserBridgeTransport({
+        socketPath: options.socketPath,
+        sessionId: identity.sessionId,
+        turnId: identity.turnId,
+        timeoutMs: options.timeoutMs,
+        maxFrameBytes: options.maxFrameBytes,
+      }));
   const turns = new Map<string, { transport: BrowserBridgeTransport; pending: number; ending: boolean }>();
   const keyFor = (sessionId: string, turnId: string) => JSON.stringify([sessionId, turnId]);
   const end = async (key: string) => {
@@ -57,11 +65,16 @@ export function createNodeBrowserCapability(options: NodeBrowserCapabilityOption
       await Promise.allSettled(entries.map((entry) => entry.transport.dispose()));
     },
     async command(name, args, context) {
-      if (!options.ready || options.isAllowed?.() === false) return failure("BROWSER_UNAVAILABLE", "Chrome is disconnected in Settings.", true);
+      if (!options.ready || options.isAllowed?.() === false)
+        return failure("BROWSER_UNAVAILABLE", "Chrome is disconnected in Settings.", true);
       const key = keyFor(context.sessionId, context.turnId);
       let entry = turns.get(key);
       if (!entry) {
-        entry = { transport: transportFactory({ sessionId: context.sessionId, turnId: context.turnId }), pending: 0, ending: false };
+        entry = {
+          transport: transportFactory({ sessionId: context.sessionId, turnId: context.turnId }),
+          pending: 0,
+          ending: false,
+        };
         turns.set(key, entry);
       }
       if (entry.ending) return failure("BROWSER_UNAVAILABLE", "Browser turn has ended.", false);
@@ -71,7 +84,9 @@ export function createNodeBrowserCapability(options: NodeBrowserCapabilityOption
       } catch (error) {
         entry.ending = true;
         const aborted = context.signal.aborted;
-        const message = aborted ? "Browser command stopped. An action already sent to Chrome may have taken effect; check the page before retrying." : redactBrowserValue(error instanceof Error ? error.message : String(error));
+        const message = aborted
+          ? "Browser command stopped. An action already sent to Chrome may have taken effect; check the page before retrying."
+          : redactBrowserValue(error instanceof Error ? error.message : String(error));
         return failure(aborted ? "TOOL_ABORTED" : "BROWSER_OUTCOME_UNKNOWN", message, false);
       } finally {
         entry.pending--;
@@ -122,7 +137,8 @@ export class SocketBrowserBridgeTransport implements BrowserBridgeTransport {
   }
 
   async #connect(): Promise<void> {
-    if (this.#connectionLost) throw new Error("Browser session was lost. Open Settings to reconnect; this action was not replayed.");
+    if (this.#connectionLost)
+      throw new Error("Browser session was lost. Open Settings to reconnect; this action was not replayed.");
     if (this.#connectPromise === undefined && this.#socket !== undefined && !this.#socket.destroyed) return;
     if (this.#connectPromise === undefined) this.#connectPromise = this.#openAndStart();
     try {
@@ -157,7 +173,10 @@ export class SocketBrowserBridgeTransport implements BrowserBridgeTransport {
       candidate.once("error", failed);
       candidate.once("close", closed);
     });
-    if (this.#disposed) { socket.destroy(); throw new Error("Browser Bridge transport is disposed."); }
+    if (this.#disposed) {
+      socket.destroy();
+      throw new Error("Browser Bridge transport is disposed.");
+    }
     this.#socket = socket;
     socket.on("data", (chunk) => this.#handleData(chunk));
     socket.on("error", (error) => this.#disconnect(error));
@@ -175,11 +194,13 @@ export class SocketBrowserBridgeTransport implements BrowserBridgeTransport {
 
   #sendConnected(method: string, params: unknown, signal?: AbortSignal): Promise<unknown> {
     const socket = this.#socket;
-    if (socket === undefined || socket.destroyed) return Promise.reject(new Error("Browser Bridge socket is not connected."));
+    if (socket === undefined || socket.destroyed)
+      return Promise.reject(new Error("Browser Bridge socket is not connected."));
     if (signal?.aborted === true) return Promise.reject(abortError());
     const id = String(++this.#counter);
     const payload = Buffer.from(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, id, method, params }), "utf8");
-    if (payload.byteLength > this.#maxFrameBytes) return Promise.reject(new Error(`Browser Bridge request frame exceeds ${this.#maxFrameBytes} bytes.`));
+    if (payload.byteLength > this.#maxFrameBytes)
+      return Promise.reject(new Error(`Browser Bridge request frame exceeds ${this.#maxFrameBytes} bytes.`));
     return new Promise<unknown>((resolve, reject) => {
       const abort = () => {
         const pending = this.#pending.get(id);
@@ -238,7 +259,12 @@ export class SocketBrowserBridgeTransport implements BrowserBridgeTransport {
       clearTimeout(pending.timer);
       pending.signal?.removeEventListener("abort", pending.abort);
       if (response.ok) pending.resolve(response.result);
-      else pending.reject(new Error(`${response.error?.code ?? "BROWSER_BRIDGE_ERROR"}: ${response.error?.message ?? "Browser Bridge request failed."}`));
+      else
+        pending.reject(
+          new Error(
+            `${response.error?.code ?? "BROWSER_BRIDGE_ERROR"}: ${response.error?.message ?? "Browser Bridge request failed."}`,
+          ),
+        );
     }
   }
 
@@ -284,50 +310,94 @@ async function executeBrowserCommand(
   const category = name === "browser_action" ? stringValue(args.category) : name.replace(/^browser_/, "");
   const action = stringValue(args.action);
   if (!category || !action) return failure("INVALID_ARGUMENTS", "Browser category and action are required.", false);
-  const params = name === "browser_action"
-    ? recordValue(args.params) ?? {}
-    : Object.fromEntries(Object.entries(args).filter(([key]) => key !== "action"));
-  const execution = await transport.request("agent_browser_bridge.command.execute", { category, action, params }, context.signal);
+  const params =
+    name === "browser_action"
+      ? (recordValue(args.params) ?? {})
+      : Object.fromEntries(Object.entries(args).filter(([key]) => key !== "action"));
+  const execution = await transport.request(
+    "agent_browser_bridge.command.execute",
+    { category, action, params },
+    context.signal,
+  );
   return renderExecutions([execution], context, "Browser action completed");
 }
 
-async function browserHelp(transport: BrowserBridgeTransport, args: Readonly<Record<string, RuntimeJsonValue>>, signal: AbortSignal): Promise<ToolBodyResult> {
+async function browserHelp(
+  transport: BrowserBridgeTransport,
+  args: Readonly<Record<string, RuntimeJsonValue>>,
+  signal: AbortSignal,
+): Promise<ToolBodyResult> {
   const category = stringValue(args.category);
   const action = stringValue(args.action);
   const query = stringValue(args.query)?.toLowerCase();
   if (category && action) {
     const result = await transport.request("agent_browser_bridge.command.describe", { category, action }, signal);
-    return completed(truncate(redactBrowserValue(JSON.stringify(result, null, 2)), 20_000), "Described Browser command");
+    return completed(
+      truncate(redactBrowserValue(JSON.stringify(result, null, 2)), 20_000),
+      "Described Browser command",
+    );
   }
   const result = await transport.request("agent_browser_bridge.command.list", {}, signal);
   const report = recordValue(result);
-  const commands = Array.isArray(report?.commands) ? report.commands.filter((command) => {
-    const item = recordValue(command);
-    if (category && item?.category !== category) return false;
-    return !query || JSON.stringify(item).toLowerCase().includes(query);
-  }) : [];
-  return completed(truncate(redactBrowserValue(JSON.stringify({ count: commands.length, categories: report?.categories ?? [], commands }, null, 2)), 20_000), "Listed Browser commands");
+  const commands = Array.isArray(report?.commands)
+    ? report.commands.filter((command) => {
+        const item = recordValue(command);
+        if (category && item?.category !== category) return false;
+        return !query || JSON.stringify(item).toLowerCase().includes(query);
+      })
+    : [];
+  return completed(
+    truncate(
+      redactBrowserValue(
+        JSON.stringify({ count: commands.length, categories: report?.categories ?? [], commands }, null, 2),
+      ),
+      20_000,
+    ),
+    "Listed Browser commands",
+  );
 }
 
-async function browserRun(transport: BrowserBridgeTransport, args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext): Promise<ToolBodyResult> {
+async function browserRun(
+  transport: BrowserBridgeTransport,
+  args: Readonly<Record<string, RuntimeJsonValue>>,
+  context: ToolExecutionContext,
+): Promise<ToolBodyResult> {
   const actions = normalizeActions(args.actions);
   if (actions.length === 0) return failure("INVALID_ARGUMENTS", "browser_run requires at least one action.", false);
   const identity = { sessionId: context.sessionId, turnId: context.turnId };
-  const preflight = recordValue(await transport.request("agent_browser_bridge.command.preflight", { actions, ...identity }, context.signal));
+  const preflight = recordValue(
+    await transport.request("agent_browser_bridge.command.preflight", { actions, ...identity }, context.signal),
+  );
   const approval = stringValue(preflight?.approval);
-  if (!approval) return failure("BROWSER_PREFLIGHT_REJECTED", "Browser Bridge preflight did not issue an action-bound token.", false);
-  const result = recordValue(await transport.request("agent_browser_bridge.command.run", {
-    actions,
-    stopOnError: args.stop_on_error !== false,
-    approval,
-    ...identity,
-  }, context.signal));
+  if (!approval)
+    return failure(
+      "BROWSER_PREFLIGHT_REJECTED",
+      "Browser Bridge preflight did not issue an action-bound token.",
+      false,
+    );
+  const result = recordValue(
+    await transport.request(
+      "agent_browser_bridge.command.run",
+      {
+        actions,
+        stopOnError: args.stop_on_error !== false,
+        approval,
+        ...identity,
+      },
+      context.signal,
+    ),
+  );
   const executions = Array.isArray(result?.results) ? result.results : [];
   return renderExecutions(executions, context, `Browser run completed: ${executions.length} actions`);
 }
 
-async function renderExecutions(executions: readonly unknown[], context: ToolExecutionContext, summary: string): Promise<ToolBodyResult> {
-  if (executions.length === 0) return failure("BROWSER_INVALID_RESPONSE", "Browser Bridge returned no execution results.", false);
+async function renderExecutions(
+  executions: readonly unknown[],
+  context: ToolExecutionContext,
+  summary: string,
+): Promise<ToolBodyResult> {
+  if (executions.length === 0)
+    return failure("BROWSER_INVALID_RESPONSE", "Browser Bridge returned no execution results.", false);
   const output: string[] = [summary];
   const artifacts: ToolArtifactRef[] = [];
   const modelOutput: ToolModelOutputBlock[] = [];
@@ -356,7 +426,9 @@ async function renderExecutions(executions: readonly unknown[], context: ToolExe
       const artifact = await createImageArtifact(result, context);
       artifacts.push(artifact);
       modelOutput.push({ type: "artifact", artifact, label: `${category}.${action} screenshot` });
-      output.push(`Screenshot stored as artifact ${artifact.artifactId} (${artifact.mediaType}, ${artifact.size} bytes).`);
+      output.push(
+        `Screenshot stored as artifact ${artifact.artifactId} (${artifact.mediaType}, ${artifact.size} bytes).`,
+      );
     } else {
       output.push(renderBrowserValue(result, category, action));
     }
@@ -366,24 +438,51 @@ async function renderExecutions(executions: readonly unknown[], context: ToolExe
     }
   }
   const text = truncate(redactBrowserValue(output.join("\n")), MAX_TEXT_CHARS);
-  const safeFailure = firstFailure === undefined ? undefined : { code: firstFailure.code, message: redactBrowserValue(firstFailure.message) };
+  const safeFailure =
+    firstFailure === undefined
+      ? undefined
+      : { code: firstFailure.code, message: redactBrowserValue(firstFailure.message) };
   return firstFailure === undefined
     ? { status: "completed", summary, modelOutput: [{ type: "text", text }, ...modelOutput], artifacts }
-    : { status: "failed", summary: safeFailure!.message, modelOutput: [{ type: "text", text }, ...modelOutput], artifacts, failure: { ...safeFailure!, retryable: false } };
+    : {
+        status: "failed",
+        summary: safeFailure!.message,
+        modelOutput: [{ type: "text", text }, ...modelOutput],
+        artifacts,
+        failure: { ...safeFailure!, retryable: false },
+      };
 }
 
 function renderBrowserValue(value: unknown, category: string, action: string): string {
   const record = recordValue(value);
   if (typeof record?.dom_snapshot === "string") return truncate(record.dom_snapshot, 50_000);
   if (category === "dom" && action === "snapshot" && Array.isArray(record?.nodes)) {
-    return truncate(JSON.stringify({ generation: record.generation, total: record.total, returned: record.returned, truncated: record.truncated, nodes: record.nodes }, null, 2), 50_000);
+    return truncate(
+      JSON.stringify(
+        {
+          generation: record.generation,
+          total: record.total,
+          returned: record.returned,
+          truncated: record.truncated,
+          nodes: record.nodes,
+        },
+        null,
+        2,
+      ),
+      50_000,
+    );
   }
   return truncate(JSON.stringify(value ?? {}, null, 2), 20_000);
 }
 
-async function createImageArtifact(value: { readonly mimeType: string; readonly data: string }, context: ToolExecutionContext): Promise<ToolArtifactRef> {
-  if (!/^image\/(?:png|jpeg|gif|webp)$/.test(value.mimeType)) throw new Error(`Unsupported Browser image type: ${value.mimeType}`);
-  if (value.data.length > MAX_IMAGE_BASE64_CHARS || !/^[A-Za-z0-9+/]*={0,2}$/.test(value.data)) throw new Error("Browser screenshot payload is invalid or too large.");
+async function createImageArtifact(
+  value: { readonly mimeType: string; readonly data: string },
+  context: ToolExecutionContext,
+): Promise<ToolArtifactRef> {
+  if (!/^image\/(?:png|jpeg|gif|webp)$/.test(value.mimeType))
+    throw new Error(`Unsupported Browser image type: ${value.mimeType}`);
+  if (value.data.length > MAX_IMAGE_BASE64_CHARS || !/^[A-Za-z0-9+/]*={0,2}$/.test(value.data))
+    throw new Error("Browser screenshot payload is invalid or too large.");
   const bytes = Buffer.from(value.data, "base64");
   return context.createArtifact({ bytes, mediaType: value.mimeType });
 }
@@ -405,7 +504,9 @@ function isImageResult(value: unknown): value is { readonly mimeType: string; re
 }
 
 function recordValue(value: unknown): Readonly<Record<string, RuntimeJsonValue>> | undefined {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : undefined;
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Readonly<Record<string, RuntimeJsonValue>>)
+    : undefined;
 }
 
 function stringValue(value: RuntimeJsonValue | undefined): string | undefined {
@@ -417,7 +518,12 @@ function completed(text: string, summary: string): ToolBodyResult {
 }
 
 function failure(code: string, message: string, retryable: boolean): ToolBodyResult {
-  return { status: "failed", summary: message, modelOutput: [{ type: "text", text: message }], failure: { code, message, retryable } };
+  return {
+    status: "failed",
+    summary: message,
+    modelOutput: [{ type: "text", text: message }],
+    failure: { code, message, retryable },
+  };
 }
 
 function truncate(value: string, limit: number): string {

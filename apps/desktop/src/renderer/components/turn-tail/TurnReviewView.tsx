@@ -33,13 +33,23 @@ export function TurnReviewView({ tab }: { tab: Extract<RightPanelTab, { kind: "t
   const [wrap, setWrap] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 每次从卡片点进来（revision 变化）都跳到点的那个文件；之前在菜单里选的不保留。
-  useEffect(() => { setIndex(tab.index); }, [tab.index, tab.revision]);
+  useEffect(() => {
+    setIndex(tab.index);
+  }, [tab.index, tab.revision]);
   const file = files[index] ?? files[0];
   if (!file) return <p className="m-0 p-4 text-act-sm text-text-muted">这轮没有可显示的改动。</p>;
 
   async function openWholeFile() {
     setError(null);
-    setError(await openTurnFile({ sessionId: tab.sessionId, workspaceRoot: tab.workspaceRoot, relativePath: file.path, openTab, openPath }));
+    setError(
+      await openTurnFile({
+        sessionId: tab.sessionId,
+        workspaceRoot: tab.workspaceRoot,
+        relativePath: file.path,
+        openTab,
+        openPath,
+      }),
+    );
   }
 
   return (
@@ -74,20 +84,46 @@ export function TurnReviewView({ tab }: { tab: Extract<RightPanelTab, { kind: "t
           <Counts additions={file.additions} deletions={file.deletions} />
         </span>
         <span className="ml-auto inline-flex flex-none items-center gap-0.5">
-          <IconButton label="左右对比" tooltip={split ? "切换为单栏对比" : "切换为左右对比"} tooltipSide="bottom" aria-pressed={split} className={PRESSED_CLASS} onClick={() => setSplit((value) => !value)} data-review-tool="split">
+          <IconButton
+            label="左右对比"
+            tooltip={split ? "切换为单栏对比" : "切换为左右对比"}
+            tooltipSide="bottom"
+            aria-pressed={split}
+            className={PRESSED_CLASS}
+            onClick={() => setSplit((value) => !value)}
+            data-review-tool="split"
+          >
             <Columns2 size={15} />
           </IconButton>
-          <IconButton label="自动换行" tooltip={wrap ? "关闭自动换行" : "开启自动换行"} tooltipSide="bottom" aria-pressed={wrap} className={PRESSED_CLASS} onClick={() => setWrap((value) => !value)} data-review-tool="wrap">
+          <IconButton
+            label="自动换行"
+            tooltip={wrap ? "关闭自动换行" : "开启自动换行"}
+            tooltipSide="bottom"
+            aria-pressed={wrap}
+            className={PRESSED_CLASS}
+            onClick={() => setWrap((value) => !value)}
+            data-review-tool="wrap"
+          >
             <TextWrap size={15} />
           </IconButton>
           {file.deleted ? null : (
-            <IconButton label={`打开 ${file.path}`} tooltip="打开整个文件" tooltipSide="bottom" onClick={() => void openWholeFile()} data-review-tool="open-file">
+            <IconButton
+              label={`打开 ${file.path}`}
+              tooltip="打开整个文件"
+              tooltipSide="bottom"
+              onClick={() => void openWholeFile()}
+              data-review-tool="open-file"
+            >
               <FileSearch size={15} />
             </IconButton>
           )}
         </span>
       </div>
-      {error ? <p className="turn-diff-status text-danger" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="turn-diff-status text-danger" role="alert">
+          {error}
+        </p>
+      ) : null}
       <TurnFileDiff key={file.path} file={file} split={split} wrap={wrap} />
     </div>
   );

@@ -5,4 +5,8 @@ import { ConnectionStore } from "./connection/connection-store";
 import "./styles/index.css";
 
 const store = new ConnectionStore();
-createRoot(document.getElementById("root")!).render(<StrictMode><App store={store} /></StrictMode>);
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <App store={store} />
+  </StrictMode>,
+);

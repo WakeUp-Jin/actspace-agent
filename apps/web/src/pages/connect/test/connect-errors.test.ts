@@ -1,7 +1,10 @@
 import { describeConnectError, revokedMessage } from "../connect-errors";
 
 it("maps an invalid pair code onto the code field", () => {
-  expect(describeConnectError({ kind: "UNAUTHENTICATED", message: "x" })).toEqual({ field: "code", message: "配对码无效或已过期，请在服务器上重新生成" });
+  expect(describeConnectError({ kind: "UNAUTHENTICATED", message: "x" })).toEqual({
+    field: "code",
+    message: "配对码无效或已过期，请在服务器上重新生成",
+  });
 });
 it("maps rate limiting", () => {
   expect(describeConnectError({ kind: "LIMIT_EXCEEDED", message: "x" }).message).toBe("尝试太频繁，请一分钟后再试");

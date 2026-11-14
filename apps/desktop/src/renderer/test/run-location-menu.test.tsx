@@ -3,7 +3,12 @@ import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import type { HostConnection } from "@actspace/shared/host-protocol";
-import { hostStateLabel, hostStateTone, RunLocationMenu, type RunLocationMenuProps } from "../components/composer/RunLocationMenu";
+import {
+  hostStateLabel,
+  hostStateTone,
+  RunLocationMenu,
+  type RunLocationMenuProps,
+} from "../components/composer/RunLocationMenu";
 import { capabilitiesOf, type RunTarget } from "../target/run-target";
 
 function host(hostId: string, name: string, state: HostConnection["state"] = "connected"): HostConnection {
@@ -102,7 +107,11 @@ describe("RunLocationMenu", () => {
     expect(hosts.className).toContain("w-[min(260px,var(--radix-dropdown-menu-content-available-width))]");
     const rows = within(hosts).getAllByRole("menuitemradio");
     expect(rows.map((row) => row.textContent)).toEqual(["dev-box", "nas离线", "gpu-1连接中"]);
-    expect(rows.map((row) => row.querySelector("[data-tone]")?.getAttribute("data-tone"))).toEqual(["connected", "offline", "pending"]);
+    expect(rows.map((row) => row.querySelector("[data-tone]")?.getAttribute("data-tone"))).toEqual([
+      "connected",
+      "offline",
+      "pending",
+    ]);
     expect(within(hosts).getByRole("menuitem", { name: "连接新机器…" })).toBeInTheDocument();
 
     // 不可用的 Host 也能选中，发送由 readiness 禁用。
@@ -158,14 +167,23 @@ describe("RunLocationMenu", () => {
     await user.keyboard("lab{ArrowLeft}");
     expect(search).toHaveValue("lab");
     expect(search).toHaveFocus();
-    expect(within(hosts).getAllByRole("menuitemradio").map((row) => row.textContent)).toEqual(["lab-mac需要重新配对"]);
+    expect(
+      within(hosts)
+        .getAllByRole("menuitemradio")
+        .map((row) => row.textContent),
+    ).toEqual(["lab-mac需要重新配对"]);
     await user.keyboard("{ArrowDown}");
     expect(within(hosts).getByRole("menuitemradio", { name: /lab-mac/ })).toHaveFocus();
     await user.keyboard("{Enter}");
     expect(calls.onSelectHost).toHaveBeenCalledWith("lab");
 
     await user.click(screen.getByRole("button", { name: "选择运行位置" }));
-    const reopened = await (async () => { screen.getByRole("menuitem", { name: /远端机器/ }).focus(); await user.keyboard("{ArrowRight}"); await settle(); return screen.getByRole("menu", { name: /^远端机器/ }); })();
+    const reopened = await (async () => {
+      screen.getByRole("menuitem", { name: /远端机器/ }).focus();
+      await user.keyboard("{ArrowRight}");
+      await settle();
+      return screen.getByRole("menu", { name: /^远端机器/ });
+    })();
     await user.type(within(reopened).getByRole("textbox", { name: "搜索机器" }), "zzz");
     expect(within(reopened).queryAllByRole("menuitemradio")).toEqual([]);
     expect(within(reopened).getByText("没有匹配的机器")).toBeInTheDocument();

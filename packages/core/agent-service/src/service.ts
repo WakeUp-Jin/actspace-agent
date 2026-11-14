@@ -20,7 +20,10 @@ import { projectTasks } from "./task-projection.js";
 
 export interface AgentServicePorts {
   openSession(sessionId: string): Promise<SessionHandle>;
-  operationForTask?(session: SessionHandle, task: TaskRecord): ((signal: AbortSignal) => Promise<RuntimeJsonValue | void>) | undefined;
+  operationForTask?(
+    session: SessionHandle,
+    task: TaskRecord,
+  ): ((signal: AbortSignal) => Promise<RuntimeJsonValue | void>) | undefined;
   runIdForTask?(sessionId: string, task: TaskRecord): string | undefined;
   harnessId(session: SessionHandle): string;
   acquire(harnessId: string, signal?: AbortSignal): RunLease | Promise<RunLease>;
@@ -49,7 +52,12 @@ export class AgentService {
   #closing: Promise<void> | undefined;
   constructor(private readonly ports: AgentServicePorts) {}
 
-  async submit(sessionId: string, submissionId: string, content: RuntimeJsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
+  async submit(
+    sessionId: string,
+    submissionId: string,
+    content: RuntimeJsonValue,
+    continuationOf: string | null = null,
+  ): Promise<TaskReceipt> {
     const manager = await this.#manager(sessionId);
     if (this.#draining) throw new Error("HOST_DRAINING");
     return manager.submit(submissionId, content, continuationOf);
@@ -60,7 +68,9 @@ export class AgentService {
     const id = ledger.session.header.sessionId;
     if (this.#sessions.has(id) || this.#externalLedgers.has(id)) throw new TaskError("SESSION_BUSY");
     this.#externalLedgers.set(id, ledger);
-    return () => { if (this.#externalLedgers.get(id) === ledger) this.#externalLedgers.delete(id); };
+    return () => {
+      if (this.#externalLedgers.get(id) === ledger) this.#externalLedgers.delete(id);
+    };
   }
   async snapshot(sessionId: string): Promise<TaskSnapshot> {
     if (this.#closed) throw new Error("Agent service is closed");
@@ -75,17 +85,20 @@ export class AgentService {
   async designate(sessionId: string, taskId: string, runId: string | null, revision: number): Promise<TaskSnapshot> {
     const manager = await this.#manager(sessionId);
     const snapshot = await manager.ledger.designate(taskId, runId, revision);
-    manager.kick(); return snapshot;
+    manager.kick();
+    return snapshot;
   }
   async cancel(sessionId: string, taskId: string, revision: number): Promise<TaskSnapshot> {
     const manager = await this.#manager(sessionId);
     const snapshot = await manager.ledger.cancel(taskId, revision);
-    manager.kick(); return snapshot;
+    manager.kick();
+    return snapshot;
   }
   async move(sessionId: string, taskId: string, beforeTaskId: string, revision: number): Promise<TaskSnapshot> {
     const manager = await this.#manager(sessionId);
     const snapshot = await manager.ledger.move(taskId, beforeTaskId, revision);
-    manager.kick(); return snapshot;
+    manager.kick();
+    return snapshot;
   }
   async resume(sessionId: string, revision: number): Promise<void> {
     const manager = await this.#manager(sessionId);
@@ -96,7 +109,10 @@ export class AgentService {
   wake(sessionId: string): void {
     const manager = this.#sessions.get(sessionId);
     if (!manager || this.#closed || this.#draining) return;
-    void manager.then(value => value.wake(), () => undefined);
+    void manager.then(
+      (value) => value.wake(),
+      () => undefined,
+    );
   }
   /**
    * Hold a Session while it rewinds (agent-edit-resend-rewind.md §3.2): no Run, operation or wake starts
@@ -112,21 +128,34 @@ export class AgentService {
       released = true;
       this.#held.delete(sessionId);
       const manager = this.#settled.get(sessionId);
-      if (manager && !this.#closed) { manager.wake(); manager.kick(); }
+      if (manager && !this.#closed) {
+        manager.wake();
+        manager.kick();
+      }
     };
   }
-  isHeld(sessionId: string): boolean { return this.#held.has(sessionId); }
+  isHeld(sessionId: string): boolean {
+    return this.#held.has(sessionId);
+  }
   /** Stop queue claims without aborting owned Runs or their approval waits. */
-  beginDrain(): void { this.#draining = true; }
-  get draining(): boolean { return this.#draining; }
+  beginDrain(): void {
+    this.#draining = true;
+  }
+  get draining(): boolean {
+    return this.#draining;
+  }
   async waitForOwnedRuns(): Promise<void> {
     if (!this.#draining) throw new Error("Begin draining before waiting for Host idle");
     const managers = await Promise.allSettled(this.#sessions.values());
     // Failed opens own no Run. Keep their recovery failure cached, but drain every
     // successfully opened manager and propagate failures from its running work.
-    await Promise.all(managers.flatMap(result => result.status === "fulfilled" ? [result.value.waitForIdle()] : []));
+    await Promise.all(
+      managers.flatMap((result) => (result.status === "fulfilled" ? [result.value.waitForIdle()] : [])),
+    );
   }
-  async stop(sessionId: string, runId: string): Promise<boolean> { return (await this.#manager(sessionId)).stop(runId); }
+  async stop(sessionId: string, runId: string): Promise<boolean> {
+    return (await this.#manager(sessionId)).stop(runId);
+  }
   async exclusive<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
     // Mode, workspace and compaction writes wait out a rewind instead of landing in a Journal about to be replaced.
     if (this.#held.has(sessionId)) throw new TaskError("SESSION_BUSY");
@@ -138,21 +167,33 @@ export class AgentService {
     return new Promise((resolve, reject) => {
       let unsubscribe = () => {};
       let unsubscribeFailure = () => {};
-      const cleanup = () => { unsubscribe(); unsubscribeFailure(); };
+      const cleanup = () => {
+        unsubscribe();
+        unsubscribeFailure();
+      };
       const check = (snapshot: TaskSnapshot) => {
-        const task = snapshot.tasks.find(item => item.taskId === taskId);
-        if (!task) { cleanup(); reject(new Error("Task does not exist")); return; }
+        const task = snapshot.tasks.find((item) => item.taskId === taskId);
+        if (!task) {
+          cleanup();
+          reject(new Error("Task does not exist"));
+          return;
+        }
         if (task.state === "pending" || task.state === "claimed") return;
         cleanup();
-        const result = snapshot.runs.find(run => run.runId === task.runId) ?? null;
+        const result = snapshot.runs.find((run) => run.runId === task.runId) ?? null;
         void manager.waitForSettlement(task.runId).then(() => resolve(result), reject);
       };
-      unsubscribeFailure = manager.subscribeFailure(error => { cleanup(); reject(error); });
+      unsubscribeFailure = manager.subscribeFailure((error) => {
+        cleanup();
+        reject(error);
+      });
       unsubscribe = manager.ledger.subscribe(check);
       check(manager.ledger.snapshot());
     });
   }
-  async waitForIdle(sessionId: string): Promise<void> { await (await this.#manager(sessionId)).waitForIdle(); }
+  async waitForIdle(sessionId: string): Promise<void> {
+    await (await this.#manager(sessionId)).waitForIdle();
+  }
   /** True when this service holds nothing a release would lose: no manager, or an idle settled one. */
   canRelease(sessionId: string): boolean {
     if (this.#closed || this.#externalLedgers.has(sessionId)) return false;
@@ -176,12 +217,18 @@ export class AgentService {
   dispose(): Promise<void> {
     if (this.#closing) return this.#closing;
     this.#closed = true;
-    return this.#closing = (async () => {
+    return (this.#closing = (async () => {
       const managers = await Promise.allSettled(this.#sessions.values());
-      const results = await Promise.allSettled(managers.flatMap(result => result.status === "fulfilled" ? [result.value.dispose()] : []));
+      const results = await Promise.allSettled(
+        managers.flatMap((result) => (result.status === "fulfilled" ? [result.value.dispose()] : [])),
+      );
       const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
-      if (failures.length) throw new AggregateError(failures.map(result => result.reason), "Agent service shutdown failed");
-    })();
+      if (failures.length)
+        throw new AggregateError(
+          failures.map((result) => result.reason),
+          "Agent service shutdown failed",
+        );
+    })());
   }
   #manager(sessionId: string): Promise<SessionRunManager> {
     if (this.#closed) return Promise.reject(new Error("Agent service is closed"));
@@ -195,15 +242,32 @@ export class AgentService {
       acquired = true;
       if (session.header.sessionId !== sessionId) throw new Error("Session owner mismatch");
       const ledger = await TaskLedger.open(session);
-      ledger.subscribe(snapshot => this.ports.onSnapshot?.(sessionId, snapshot));
-      return new SessionRunManager({ ledger, canStart: () => !this.#draining && !this.#held.has(sessionId), operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: () => this.ports.harnessId(session), acquire: (id, signal) => this.ports.acquire(id, signal), readConfiguration: () => this.ports.readConfiguration(session), hasPendingNotifications: () => this.ports.hasPendingNotifications?.(session) ?? false, onFailure: error => this.ports.onFailure?.(sessionId, error) });
+      ledger.subscribe((snapshot) => this.ports.onSnapshot?.(sessionId, snapshot));
+      return new SessionRunManager({
+        ledger,
+        canStart: () => !this.#draining && !this.#held.has(sessionId),
+        operationForTask: (task) => this.ports.operationForTask?.(session, task),
+        runIdForTask: (task) => this.ports.runIdForTask?.(sessionId, task),
+        harnessId: () => this.ports.harnessId(session),
+        acquire: (id, signal) => this.ports.acquire(id, signal),
+        readConfiguration: () => this.ports.readConfiguration(session),
+        hasPendingNotifications: () => this.ports.hasPendingNotifications?.(session) ?? false,
+        onFailure: (error) => this.ports.onFailure?.(sessionId, error),
+      });
     })();
     // Only an unacquired writer lease may be retried by the next request.
     // Recovery and durability failures remain cached to protect accepted writes.
     this.#sessions.set(sessionId, opening);
-    void opening.then(manager => { if (this.#sessions.get(sessionId) === opening) this.#settled.set(sessionId, manager); }, () => undefined);
-    void opening.catch(error => {
-      const retryable = (error instanceof SessionError && error.code === "SESSION_WRITER_LOCKED") || (error instanceof TaskError && error.code === "SESSION_BUSY");
+    void opening.then(
+      (manager) => {
+        if (this.#sessions.get(sessionId) === opening) this.#settled.set(sessionId, manager);
+      },
+      () => undefined,
+    );
+    void opening.catch((error) => {
+      const retryable =
+        (error instanceof SessionError && error.code === "SESSION_WRITER_LOCKED") ||
+        (error instanceof TaskError && error.code === "SESSION_BUSY");
       if (!acquired && retryable && this.#sessions.get(sessionId) === opening) this.#sessions.delete(sessionId);
     });
     return opening;

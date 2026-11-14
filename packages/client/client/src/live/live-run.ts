@@ -1,11 +1,25 @@
 import type { MessageBlock, RuntimeStreamEvent } from "@actspace/shared";
 import type { SessionRunState } from "./run-state.js";
 import { createCompactionBlock, streamingStateToBlocks } from "./stream-blocks.js";
-import { appendOrMergeSegment, dropTrailingStreamSegments, hasFinishedAllActiveTools, upsertCompactionSegment, upsertStreamingTool, upsertWorkspacePreparationSegment } from "./stream-state.js";
+import {
+  appendOrMergeSegment,
+  dropTrailingStreamSegments,
+  hasFinishedAllActiveTools,
+  upsertCompactionSegment,
+  upsertStreamingTool,
+  upsertWorkspacePreparationSegment,
+} from "./stream-state.js";
 
 type UserBlock = Extract<MessageBlock, { kind: "user" }>;
 /** steer 插入的消息正文；桌面端的排队消息结构上满足它。 */
-export type SteeredMessage = { readonly text: string; readonly options: { readonly attachments?: UserBlock["attachments"]; readonly fileReferences?: UserBlock["fileReferences"]; readonly responseAnnotations?: UserBlock["responseAnnotations"] } };
+export type SteeredMessage = {
+  readonly text: string;
+  readonly options: {
+    readonly attachments?: UserBlock["attachments"];
+    readonly fileReferences?: UserBlock["fileReferences"];
+    readonly responseAnnotations?: UserBlock["responseAnnotations"];
+  };
+};
 
 // 运行中的 run 与它的流式块（14 S6，从 App 的 sessionRunsRef / streamingBlocks / handleStreamEvent 迁入）。
 // run.state 由事件就地修改；改完调用 refresh，视图在下次读取时重算并缓存。
@@ -39,13 +53,22 @@ export interface LiveRunStore {
   markTerminal(runId: string): void;
   isTerminal(runId: string): boolean;
   /** 把流式事件归并进对应 run；不属于当前 run 的事件忽略。steer 的正文由 `onSteered` 提供。 */
-  applyStreamEvent(event: StreamEvent, onSteered: (sessionId: string, messageId: string) => SteeredMessage | undefined): void;
+  applyStreamEvent(
+    event: StreamEvent,
+    onSteered: (sessionId: string, messageId: string) => SteeredMessage | undefined,
+  ): void;
   subscribe(listener: () => void): () => void;
   /** 释放会话的视图缓存；run 仍在时不释放。 */
   evict(sessionId: string): void;
 }
 
-const IDLE_VIEW: LiveRunView = Object.freeze({ blocks: Object.freeze([]) as readonly MessageBlock[], isStreaming: false, isAborting: false, runId: null, recovered: false });
+const IDLE_VIEW: LiveRunView = Object.freeze({
+  blocks: Object.freeze([]) as readonly MessageBlock[],
+  isStreaming: false,
+  isAborting: false,
+  runId: null,
+  recovered: false,
+});
 
 /** 插入顺序即新旧顺序；重复加入的 id 移到最新，超出上限时淘汰最旧的。 */
 export function createBoundedSet(limit: number) {
@@ -57,7 +80,9 @@ export function createBoundedSet(limit: number) {
       while (items.size > limit) items.delete(items.values().next().value!);
     },
     has: (value: string) => items.has(value),
-    get size() { return items.size; },
+    get size() {
+      return items.size;
+    },
   };
 }
 
@@ -70,28 +95,47 @@ export type LiveRunStoreOptions = {
 };
 
 /** 高频的流式增量：一个回复可能有上千个，按帧合并通知即可。 */
-const DEFERRABLE_STREAM_EVENTS: ReadonlySet<StreamEvent["type"]> = new Set(["assistant_text_delta", "assistant_thinking_delta", "tool_call_streaming"]);
+const DEFERRABLE_STREAM_EVENTS: ReadonlySet<StreamEvent["type"]> = new Set([
+  "assistant_text_delta",
+  "assistant_thinking_delta",
+  "tool_call_streaming",
+]);
 
-export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: LiveRunStoreOptions = {}): LiveRunStore {
+export function createLiveRunStore(
+  terminalLimit = TERMINAL_RUN_LIMIT,
+  options: LiveRunStoreOptions = {},
+): LiveRunStore {
   const runs = new Map<string, SessionRunState>();
   const views = new Map<string, LiveRunView>();
   const terminal = createBoundedSet(terminalLimit);
   const listeners = new Set<() => void>();
   let busy = new Set<string>();
   let notifyScheduled = false;
-  const notify = () => { notifyScheduled = false; for (const listener of [...listeners]) listener(); };
-  const refresh = (sessionId: string) => { views.delete(sessionId); notify(); };
+  const notify = () => {
+    notifyScheduled = false;
+    for (const listener of [...listeners]) listener();
+  };
+  const refresh = (sessionId: string) => {
+    views.delete(sessionId);
+    notify();
+  };
   const refreshSoon = (sessionId: string) => {
     views.delete(sessionId);
-    if (!options.scheduleNotify) { notify(); return; }
+    if (!options.scheduleNotify) {
+      notify();
+      return;
+    }
     if (notifyScheduled) return;
     notifyScheduled = true;
-    options.scheduleNotify(() => { if (notifyScheduled) notify(); });
+    options.scheduleNotify(() => {
+      if (notifyScheduled) notify();
+    });
   };
   const setBusy = (sessionId: string, included: boolean) => {
     if (busy.has(sessionId) === included) return;
     const next = new Set(busy);
-    if (included) next.add(sessionId); else next.delete(sessionId);
+    if (included) next.add(sessionId);
+    else next.delete(sessionId);
     busy = next;
   };
   const view = (sessionId: string | null): LiveRunView => {
@@ -101,12 +145,21 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
     const run = runs.get(sessionId);
     if (!run) return IDLE_VIEW;
     const blocks = streamingStateToBlocks(run.state, run.agentRunId);
-    const next: LiveRunView = { blocks: run.userBlock ? [run.userBlock, ...blocks] : blocks, isStreaming: true, isAborting: run.aborting, runId: run.agentRunId, recovered: run.recovered === true };
+    const next: LiveRunView = {
+      blocks: run.userBlock ? [run.userBlock, ...blocks] : blocks,
+      isStreaming: true,
+      isAborting: run.aborting,
+      runId: run.agentRunId,
+      recovered: run.recovered === true,
+    };
     views.set(sessionId, next);
     return next;
   };
 
-  function applyStreamEvent(event: StreamEvent, onSteered: (sessionId: string, messageId: string) => SteeredMessage | undefined) {
+  function applyStreamEvent(
+    event: StreamEvent,
+    onSteered: (sessionId: string, messageId: string) => SteeredMessage | undefined,
+  ) {
     const run = runs.get(event.sessionId);
     if (!run || run.agentRunId !== event.agentRunId) return;
     // A recovered run starts from the host's live baseline (unsettled text only; settled messages are in the
@@ -114,7 +167,10 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
     // A recovered operation (compaction) never gets a baseline, so its deltas are dropped as before.
     if (run.recovered && (event.type === "assistant_text_delta" || event.type === "assistant_thinking_delta")) {
       if (run.operationTaskId !== undefined) return;
-      if (run.liveCut === undefined) { (run.liveBuffer ??= []).push(event); return; }
+      if (run.liveCut === undefined) {
+        (run.liveBuffer ??= []).push(event);
+        return;
+      }
       if (event.liveRevision !== undefined && event.liveRevision <= run.liveCut) return;
     }
     const state = run.state;
@@ -128,7 +184,10 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
         if (!run.recovered || run.liveCut !== undefined) break;
         for (const segment of event.segments) {
           if (!segment.text) continue;
-          appendOrMergeSegment(state.segments, segment.kind, segment.text, { messageId: segment.messageId, ...(segment.requestId === undefined ? {} : { llmCallId: segment.requestId }) });
+          appendOrMergeSegment(state.segments, segment.kind, segment.text, {
+            messageId: segment.messageId,
+            ...(segment.requestId === undefined ? {} : { llmCallId: segment.requestId }),
+          });
           if (segment.text.trim().length > 0) state.waitingForModel = false;
         }
         run.liveCut = event.revision;
@@ -144,10 +203,16 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
         state.segments.push({
           type: "user_message",
           block: {
-            kind: "user", id: `turn:${event.agentRunId}:steer:${event.messageId}`, runId: event.agentRunId, content: item.text,
-            createdAt: new Date().toISOString(), attachments: item.options.attachments,
+            kind: "user",
+            id: `turn:${event.agentRunId}:steer:${event.messageId}`,
+            runId: event.agentRunId,
+            content: item.text,
+            createdAt: new Date().toISOString(),
+            attachments: item.options.attachments,
             ...(item.options.fileReferences?.length ? { fileReferences: item.options.fileReferences } : {}),
-            ...(item.options.responseAnnotations?.length ? { responseAnnotations: item.options.responseAnnotations } : {}),
+            ...(item.options.responseAnnotations?.length
+              ? { responseAnnotations: item.options.responseAnnotations }
+              : {}),
           },
         });
         state.waitingForModel = true;
@@ -159,7 +224,19 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
         const notices = state.segments.filter((segment) => segment.type === "background_notice");
         if (notices.some((segment) => segment.messageId === event.messageId)) break;
         const id = `turn:${event.agentRunId}:background-notice:${notices.length}`;
-        const segment = { type: "background_notice" as const, messageId: event.messageId, block: { kind: "background_notice" as const, id, renderKey: id, runId: event.agentRunId, content: event.content, createdAt: new Date().toISOString(), ...event.notice } };
+        const segment = {
+          type: "background_notice" as const,
+          messageId: event.messageId,
+          block: {
+            kind: "background_notice" as const,
+            id,
+            renderKey: id,
+            runId: event.agentRunId,
+            content: event.content,
+            createdAt: new Date().toISOString(),
+            ...event.notice,
+          },
+        };
         // 唤醒这一轮的通知排在最前；轮内读到的接在当时已有内容之后。
         if (event.notice.opensTurn !== false) {
           const first = state.segments.findIndex((item) => item.type !== "background_notice");
@@ -204,44 +281,56 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
       case "context_compaction_started":
         state.waitingForModel = false;
         upsertCompactionSegment(state, event.agentRunId);
-        state.activeCompactions.set(event.agentRunId, createCompactionBlock({
-          agentRunId: event.agentRunId,
-          status: "running",
-          startedAt: event.startedAt,
-        }));
+        state.activeCompactions.set(
+          event.agentRunId,
+          createCompactionBlock({
+            agentRunId: event.agentRunId,
+            status: "running",
+            startedAt: event.startedAt,
+          }),
+        );
         break;
 
       case "context_compaction_finished": {
         state.waitingForModel = false;
         if (event.payload.status === "skipped") {
           state.activeCompactions.delete(event.agentRunId);
-          state.segments = state.segments.filter((segment) => !(segment.type === "compaction" && segment.agentRunId === event.agentRunId));
+          state.segments = state.segments.filter(
+            (segment) => !(segment.type === "compaction" && segment.agentRunId === event.agentRunId),
+          );
           break;
         }
         upsertCompactionSegment(state, event.agentRunId);
-        state.activeCompactions.set(event.agentRunId, createCompactionBlock({
-          agentRunId: event.agentRunId,
-          status: event.payload.status === "failed" ? "failed" : "completed",
-          removedCount: event.payload.removedCount ?? Math.max(event.payload.beforeCount - event.payload.afterCount, 0),
-          durationMs: event.payload.durationMs,
-          compactionId: event.payload.compactionId,
-          trigger: event.payload.trigger,
-          beforeTokens: event.payload.beforeTokens,
-          afterTokens: event.payload.afterTokens,
-          beforeEstimated: event.payload.beforeEstimated,
-          errorMessage: event.payload.reason,
-        }));
+        state.activeCompactions.set(
+          event.agentRunId,
+          createCompactionBlock({
+            agentRunId: event.agentRunId,
+            status: event.payload.status === "failed" ? "failed" : "completed",
+            removedCount:
+              event.payload.removedCount ?? Math.max(event.payload.beforeCount - event.payload.afterCount, 0),
+            durationMs: event.payload.durationMs,
+            compactionId: event.payload.compactionId,
+            trigger: event.payload.trigger,
+            beforeTokens: event.payload.beforeTokens,
+            afterTokens: event.payload.afterTokens,
+            beforeEstimated: event.payload.beforeEstimated,
+            errorMessage: event.payload.reason,
+          }),
+        );
         break;
       }
 
       case "context_compaction_failed":
         state.waitingForModel = false;
         upsertCompactionSegment(state, event.agentRunId);
-        state.activeCompactions.set(event.agentRunId, createCompactionBlock({
-          agentRunId: event.agentRunId,
-          status: "failed",
-          errorMessage: event.error.message,
-        }));
+        state.activeCompactions.set(
+          event.agentRunId,
+          createCompactionBlock({
+            agentRunId: event.agentRunId,
+            status: "failed",
+            errorMessage: event.error.message,
+          }),
+        );
         break;
 
       case "assistant_thinking_delta":
@@ -250,7 +339,10 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
         if (event.delta.trim().length > 0) {
           state.waitingForModel = false;
         }
-        appendOrMergeSegment(state.segments, "thinking", event.delta, { llmCallId: event.llmCallId, messageId: event.messageId });
+        appendOrMergeSegment(state.segments, "thinking", event.delta, {
+          llmCallId: event.llmCallId,
+          messageId: event.messageId,
+        });
         break;
 
       case "assistant_text_delta":
@@ -258,7 +350,10 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
         if (event.delta.length > 0) {
           state.waitingForModel = false;
         }
-        appendOrMergeSegment(state.segments, "text", event.delta, { llmCallId: event.llmCallId, messageId: event.messageId });
+        appendOrMergeSegment(state.segments, "text", event.delta, {
+          llmCallId: event.llmCallId,
+          messageId: event.messageId,
+        });
         break;
 
       case "llm_retry":
@@ -336,9 +431,10 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
             tool.preview = {
               ...tool.preview,
               command: event.command ?? tool.preview.command,
-              sandboxed: event.executionEnvironment === undefined
-                ? tool.preview.sandboxed
-                : event.executionEnvironment === "sandbox",
+              sandboxed:
+                event.executionEnvironment === undefined
+                  ? tool.preview.sandboxed
+                  : event.executionEnvironment === "sandbox",
               notExecuted: undefined,
             };
           }
@@ -431,7 +527,9 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
     applyStreamEvent,
     subscribe(listener) {
       listeners.add(listener);
-      return () => { listeners.delete(listener); };
+      return () => {
+        listeners.delete(listener);
+      };
     },
     evict(sessionId) {
       if (!runs.has(sessionId)) views.delete(sessionId);

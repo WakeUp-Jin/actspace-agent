@@ -2,10 +2,19 @@ import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
 export const SHELL_TOOLS_PLUGIN_ID = "actspace.shell-tools" as const;
 export const SHELL_TOOLS_TOOLS = Object.freeze(["bash"] as const);
 export const manifest = defineBuiltinPluginManifest({
-  display: { title: "命令行", description: "运行 Bash 命令", scope: "session", defaultEnabled: true, canDisable: false },
-  pluginId: SHELL_TOOLS_PLUGIN_ID, version: "2.0.0", name: "ActSpace Shell Tools",
+  display: {
+    title: "命令行",
+    description: "运行 Bash 命令",
+    scope: "session",
+    defaultEnabled: true,
+    canDisable: false,
+  },
+  pluginId: SHELL_TOOLS_PLUGIN_ID,
+  version: "2.0.0",
+  name: "ActSpace Shell Tools",
   entry: { entryId: "tools.shell-tools", behavior: "./plugin.js" },
-  host: { required: ["process"], optional: [] }, frontend: null,
+  host: { required: ["process"], optional: [] },
+  frontend: null,
   injects: ["tools.runtime", "actspace.host.background-tasks", "actspace.host.session"],
   // Without sandbox Bash still works, but every command runs outside any sandbox and needs approval.
   // Without the process grant bash registers but reports the capability as unavailable.

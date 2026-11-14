@@ -11,7 +11,11 @@ type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { node?: unknown };
 function followFragment(event: MouseEvent<HTMLAnchorElement>, href: string) {
   event.preventDefault();
   let id: string;
-  try { id = decodeURIComponent(href.slice(1)); } catch { return; }
+  try {
+    id = decodeURIComponent(href.slice(1));
+  } catch {
+    return;
+  }
   const reply = event.currentTarget.closest(".markdown-prose");
   const target = Array.from(reply?.querySelectorAll<HTMLElement>("[id]") ?? []).find((element) => element.id === id);
   if (!target) return;
@@ -35,14 +39,28 @@ export function MarkdownLink({ href, children, node: _node, ...rest }: LinkProps
   const prefix = useContext(IdPrefixContext);
   const footnoteNumbers = useContext(FootnoteNumbersContext);
   const target = href ? classifyLinkTarget(href) : ({ kind: "blocked" } as const);
-  const describedBy = rest["aria-describedby"]?.split(/\s+/).map((id) => (id === "footnote-label" ? `${prefix}footnote-label` : id)).join(" ");
+  const describedBy = rest["aria-describedby"]
+    ?.split(/\s+/)
+    .map((id) => (id === "footnote-label" ? `${prefix}footnote-label` : id))
+    .join(" ");
 
   if (target.kind === "anchor" && href) {
-    const number = (rest as Record<string, unknown>)["data-footnote-ref"] !== undefined ? footnoteNumbers.get(footnoteKeyFromHref(href, prefix) ?? "") : undefined;
-    return <a {...rest} href={href} aria-describedby={describedBy} onClick={(event) => followFragment(event, href)}>{number ?? children}</a>;
+    const number =
+      (rest as Record<string, unknown>)["data-footnote-ref"] !== undefined
+        ? footnoteNumbers.get(footnoteKeyFromHref(href, prefix) ?? "")
+        : undefined;
+    return (
+      <a {...rest} href={href} aria-describedby={describedBy} onClick={(event) => followFragment(event, href)}>
+        {number ?? children}
+      </a>
+    );
   }
   if (target.kind === "external") {
-    return <a {...rest} href={target.url} target="_blank" rel="noreferrer noopener">{children}</a>;
+    return (
+      <a {...rest} href={target.url} target="_blank" rel="noreferrer noopener">
+        {children}
+      </a>
+    );
   }
   if (target.kind === "local") {
     const path = resolveWorkspacePath(target.path, { workspaceRoot });

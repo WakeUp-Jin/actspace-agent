@@ -21,13 +21,7 @@ export const SETTINGS_PROVIDER_IDS: readonly LegacySettingsProviderId[] = ["deep
 /** 网络搜索供应商：deepseek、zhipu 为独立聚合通道，其余为国际通道候选。 */
 export type SearchProviderId = "zhipu" | "tavily" | "tinyfish" | "exa" | "deepseek";
 
-export const SEARCH_PROVIDER_IDS: readonly SearchProviderId[] = [
-  "deepseek",
-  "zhipu",
-  "tavily",
-  "tinyfish",
-  "exa",
-];
+export const SEARCH_PROVIDER_IDS: readonly SearchProviderId[] = ["deepseek", "zhipu", "tavily", "tinyfish", "exa"];
 
 export const DEFAULT_IMAGE_GENERATION_BASE_URL = "https://www.duckcoding.ai/v1";
 export const DEFAULT_IMAGE_GENERATION_MODEL = "gpt-image-2";
@@ -115,7 +109,9 @@ export interface TaskModelSettings {
   /** 看图；null = 跟随会话默认（需能看图）。 */
   visionModel?: ModelKey | null;
   /** 每个用途的思考档位；缺省用模型的默认档位。 */
-  thinking?: Partial<Record<import("./model-connections").PurposeId, import("./model-thinking-profiles").ThinkingLevel>>;
+  thinking?: Partial<
+    Record<import("./model-connections").PurposeId, import("./model-thinking-profiles").ThinkingLevel>
+  >;
 }
 
 export interface AgentSettings {
@@ -162,7 +158,8 @@ export interface AppSettingsV1 {
   defaultModelId: ModelId | null;
   providers: Record<LegacySettingsProviderId, ProviderSettingsView>;
   /** 网络搜索供应商的密钥状态（web_search 工具）。 */
-  searchProviders: Record<Exclude<SearchProviderId, "deepseek">, ProviderSettingsView> & Partial<Record<"deepseek", ProviderSettingsView>>;
+  searchProviders: Record<Exclude<SearchProviderId, "deepseek">, ProviderSettingsView> &
+    Partial<Record<"deepseek", ProviderSettingsView>>;
   agent: AgentSettings;
   skills: SkillsSettings;
 }
@@ -175,7 +172,8 @@ export interface AppSettingsV2 {
   customModels: Partial<Record<ModelKey, ModelDefinition>>;
   taskModels: TaskModelSettings;
   /** 网络搜索供应商继续独立于 LLM Provider Registry。 */
-  searchProviders: Record<Exclude<SearchProviderId, "deepseek">, ProviderSettingsView> & Partial<Record<"deepseek", ProviderSettingsView>>;
+  searchProviders: Record<Exclude<SearchProviderId, "deepseek">, ProviderSettingsView> &
+    Partial<Record<"deepseek", ProviderSettingsView>>;
   /** OpenAI-compatible 图片生成连接；与 LLM/search provider 布局保持独立。 */
   imageGeneration: ImageGenerationSettingsView;
   agent: AgentSettingsV2;
@@ -190,14 +188,7 @@ export interface AppSettingsV2 {
  */
 export type SettingsRevision = string;
 
-export type SettingsV4Namespace =
-  | "general"
-  | "models"
-  | "tools"
-  | "media"
-  | "skills"
-  | "subagents"
-  | "activity";
+export type SettingsV4Namespace = "general" | "models" | "tools" | "media" | "skills" | "subagents" | "activity";
 
 export interface SettingsV4General {
   performanceMonitoring?: boolean;
@@ -253,7 +244,9 @@ export type CustomConnectionProbeResult = {
   readonly statusCode?: number;
   readonly resolvedAuth?: CustomConnectionResolvedAuth;
   /** 服务不提供模型列表时为 null（404/405/501） */
-  readonly models: readonly { readonly id: string; readonly label?: string; readonly facts?: import("./model-layers").ModelFacts }[] | null;
+  readonly models:
+    | readonly { readonly id: string; readonly label?: string; readonly facts?: import("./model-layers").ModelFacts }[]
+    | null;
 };
 
 export interface SettingsV4InstalledModelSettings extends InstalledModelSettings {
@@ -284,7 +277,14 @@ export interface SettingsV4Models {
  */
 export const CODEX_APPROVAL_POLICY_VALUES = ["untrusted", "on-request", "never"] as const;
 export const CODEX_SANDBOX_VALUES = ["read-only", "workspace-write", "danger-full-access"] as const;
-export const CLAUDE_CODE_PERMISSION_MODE_VALUES = ["dontAsk", "acceptEdits", "auto", "manual", "plan", "bypassPermissions"] as const;
+export const CLAUDE_CODE_PERMISSION_MODE_VALUES = [
+  "dontAsk",
+  "acceptEdits",
+  "auto",
+  "manual",
+  "plan",
+  "bypassPermissions",
+] as const;
 
 export interface ExternalSubagentSettings {
   codex?: {
@@ -305,15 +305,20 @@ export const DEFAULT_EXTERNAL_SUBAGENT_SETTINGS = Object.freeze({
 export function sanitizeExternalSubagentSettings(value: unknown): ExternalSubagentSettings | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
   const raw = value as Record<string, unknown>;
-  const pick = <T extends string>(input: unknown, allowed: readonly T[]): T | undefined => allowed.find((item) => item === input);
-  const codexRaw = typeof raw.codex === "object" && raw.codex !== null ? raw.codex as Record<string, unknown> : {};
-  const claudeRaw = typeof raw.claudeCode === "object" && raw.claudeCode !== null ? raw.claudeCode as Record<string, unknown> : {};
+  const pick = <T extends string>(input: unknown, allowed: readonly T[]): T | undefined =>
+    allowed.find((item) => item === input);
+  const codexRaw = typeof raw.codex === "object" && raw.codex !== null ? (raw.codex as Record<string, unknown>) : {};
+  const claudeRaw =
+    typeof raw.claudeCode === "object" && raw.claudeCode !== null ? (raw.claudeCode as Record<string, unknown>) : {};
   const approvalPolicy = pick(codexRaw.approvalPolicy, CODEX_APPROVAL_POLICY_VALUES);
   const sandbox = pick(codexRaw.sandbox, CODEX_SANDBOX_VALUES);
   const permissionMode = pick(claudeRaw.permissionMode, CLAUDE_CODE_PERMISSION_MODE_VALUES);
   const codex = { ...(approvalPolicy ? { approvalPolicy } : {}), ...(sandbox ? { sandbox } : {}) };
   const claudeCode = { ...(permissionMode ? { permissionMode } : {}) };
-  const result: ExternalSubagentSettings = { ...(Object.keys(codex).length ? { codex } : {}), ...(Object.keys(claudeCode).length ? { claudeCode } : {}) };
+  const result: ExternalSubagentSettings = {
+    ...(Object.keys(codex).length ? { codex } : {}),
+    ...(Object.keys(claudeCode).length ? { claudeCode } : {}),
+  };
   return Object.keys(result).length ? result : undefined;
 }
 
@@ -376,7 +381,10 @@ export interface SettingsV4 {
 }
 
 /** models 的补丁：connections 和三张模型表按「null = 删除」合并，taskBindings 按字段覆盖。 */
-export type SettingsV4ModelsPatch = Omit<Partial<SettingsV4Models>, "connections" | "definitions" | "installed" | "overrides" | "taskBindings"> & {
+export type SettingsV4ModelsPatch = Omit<
+  Partial<SettingsV4Models>,
+  "connections" | "definitions" | "installed" | "overrides" | "taskBindings"
+> & {
   connections?: Partial<Record<string, SettingsV4ConnectionSettings | null>>;
   definitions?: Partial<Record<ModelKey, ModelDefinition | null>>;
   installed?: Partial<Record<ModelKey, SettingsV4InstalledModelSettings | null>>;

@@ -55,36 +55,79 @@ const SESSION: readonly Row[] = [
 ];
 
 /** Plugins that can be switched; the mock launched with 操控浏览器 on and 英语学习 off, like the demo. */
-const MOCK_LOADED: Readonly<Record<string, boolean>> = { "english-learning": false, "browser-tools": true, "subagent-codex": true, "subagent-claude-code": false };
+const MOCK_LOADED: Readonly<Record<string, boolean>> = {
+  "english-learning": false,
+  "browser-tools": true,
+  "subagent-codex": true,
+  "subagent-claude-code": false,
+};
 
 /** The mock machine has codex but no claude, so one subagent plugin is available and the other shows why it is not. */
 const MOCK_UNAVAILABLE: Readonly<Record<string, string>> = { "subagent-claude-code": "本机没有找到 claude 命令" };
 
 export function mockPluginList(settings: SettingsV4Snapshot["settings"]): PluginListItem[] {
-  const build = (rows: readonly Row[], scope: "global" | "session"): PluginListItem[] => rows.map(([id, title, description, directory]) => {
-    const canDisable = id in MOCK_LOADED;
-    return {
-      id, title, description, scope, directory, canDisable,
-      loaded: canDisable ? MOCK_LOADED[id] : true,
-      enabled: canDisable ? settings.tools.plugins?.[id] ?? MOCK_LOADED[id] : true,
-      ...(MOCK_UNAVAILABLE[id] ? { unavailableReason: MOCK_UNAVAILABLE[id] } : {}),
-      ...mockPluginSettings(id, settings),
-    };
-  });
+  const build = (rows: readonly Row[], scope: "global" | "session"): PluginListItem[] =>
+    rows.map(([id, title, description, directory]) => {
+      const canDisable = id in MOCK_LOADED;
+      return {
+        id,
+        title,
+        description,
+        scope,
+        directory,
+        canDisable,
+        loaded: canDisable ? MOCK_LOADED[id] : true,
+        enabled: canDisable ? (settings.tools.plugins?.[id] ?? MOCK_LOADED[id]) : true,
+        ...(MOCK_UNAVAILABLE[id] ? { unavailableReason: MOCK_UNAVAILABLE[id] } : {}),
+        ...mockPluginSettings(id, settings),
+      };
+    });
   return [...build(GLOBAL, "global"), ...build(SESSION, "session")];
 }
 
-function mockPluginSettings(id: string, settings: SettingsV4Snapshot["settings"]): Pick<PluginListItem, "settings" | "settingsPendingRestart"> {
+function mockPluginSettings(
+  id: string,
+  settings: SettingsV4Snapshot["settings"],
+): Pick<PluginListItem, "settings" | "settingsPendingRestart"> {
   const stored = settings.tools.externalSubagents;
-  if (id === "subagent-codex") return { settings: { approvalPolicy: stored?.codex?.approvalPolicy ?? "never", sandbox: stored?.codex?.sandbox ?? "workspace-write" }, settingsPendingRestart: stored?.codex !== undefined };
-  if (id === "subagent-claude-code") return { settings: { permissionMode: stored?.claudeCode?.permissionMode ?? "dontAsk" }, settingsPendingRestart: stored?.claudeCode !== undefined };
+  if (id === "subagent-codex")
+    return {
+      settings: {
+        approvalPolicy: stored?.codex?.approvalPolicy ?? "never",
+        sandbox: stored?.codex?.sandbox ?? "workspace-write",
+      },
+      settingsPendingRestart: stored?.codex !== undefined,
+    };
+  if (id === "subagent-claude-code")
+    return {
+      settings: { permissionMode: stored?.claudeCode?.permissionMode ?? "dontAsk" },
+      settingsPendingRestart: stored?.claudeCode !== undefined,
+    };
   return {};
 }
 
 /** 浏览器开发模式下的脚本运行时：核心层随包就绪，数据扩展未下载。 */
 export function mockPythonRuntimeStatus(): PythonRuntimeStatus {
   return {
-    runtime: { version: "3.12.16", root: "/Applications/ActSpace.app/Contents/Resources/app/runtime/python", corePackages: ["openpyxl", "xlsxwriter", "python-docx", "python-pptx", "lxml", "pillow", "pypdf", "pdfplumber", "pypdfium2"] },
-    extension: { packages: ["numpy", "pandas", "markitdown"], state: "missing", localWheelsDirectory: "/Users/me/Library/Application Support/ActSpace/runtime/python-ext/wheels" },
+    runtime: {
+      version: "3.12.16",
+      root: "/Applications/ActSpace.app/Contents/Resources/app/runtime/python",
+      corePackages: [
+        "openpyxl",
+        "xlsxwriter",
+        "python-docx",
+        "python-pptx",
+        "lxml",
+        "pillow",
+        "pypdf",
+        "pdfplumber",
+        "pypdfium2",
+      ],
+    },
+    extension: {
+      packages: ["numpy", "pandas", "markitdown"],
+      state: "missing",
+      localWheelsDirectory: "/Users/me/Library/Application Support/ActSpace/runtime/python-ext/wheels",
+    },
   };
 }

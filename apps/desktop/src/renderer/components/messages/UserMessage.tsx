@@ -112,22 +112,28 @@ export function UserMessage({
     const pendingImages = attachments.filter((attachment) => attachment.kind === "image" && !attachment.previewUrl);
     if (pendingImages.length === 0) return;
     let active = true;
-    void Promise.all(pendingImages.map(async (attachment) => {
-      const result = await sessionsApi.readArtifact({ sessionId, artifactPath: attachment.path ?? attachment.id });
-      return result.dataUrl ? [attachment.id, result.dataUrl] as const : null;
-    })).then((entries) => {
-      if (!active) return;
-      setPreviewById((current) => {
-        let next = current;
-        for (const entry of entries) {
-          if (!entry || next[entry[0]] === entry[1]) continue;
-          if (next === current) next = { ...current };
-          next[entry[0]] = entry[1];
-        }
-        return next;
-      });
-    }).catch(() => undefined);
-    return () => { active = false; };
+    void Promise.all(
+      pendingImages.map(async (attachment) => {
+        const result = await sessionsApi.readArtifact({ sessionId, artifactPath: attachment.path ?? attachment.id });
+        return result.dataUrl ? ([attachment.id, result.dataUrl] as const) : null;
+      }),
+    )
+      .then((entries) => {
+        if (!active) return;
+        setPreviewById((current) => {
+          let next = current;
+          for (const entry of entries) {
+            if (!entry || next[entry[0]] === entry[1]) continue;
+            if (next === current) next = { ...current };
+            next[entry[0]] = entry[1];
+          }
+          return next;
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [attachments, sessionId]);
 
   return (
@@ -143,7 +149,10 @@ export function UserMessage({
           <div className={USER_ATTACHMENTS_CLASS} aria-label="Message attachments">
             {attachments.map((attachment) => {
               if (attachment.kind === "image") {
-                const effectiveAttachment = { ...attachment, previewUrl: attachment.previewUrl ?? previewById[attachment.id] };
+                const effectiveAttachment = {
+                  ...attachment,
+                  previewUrl: attachment.previewUrl ?? previewById[attachment.id],
+                };
                 return (
                   <button
                     type="button"
@@ -159,7 +168,11 @@ export function UserMessage({
               }
 
               return (
-                <div className={USER_FILE_ATTACHMENT_CLASS} aria-label={`Attached file ${attachment.name}`} key={attachment.id}>
+                <div
+                  className={USER_FILE_ATTACHMENT_CLASS}
+                  aria-label={`Attached file ${attachment.name}`}
+                  key={attachment.id}
+                >
                   <FileText size={16} aria-hidden="true" />
                   <span className={USER_FILE_NAME_CLASS}>{attachment.name}</span>
                 </div>

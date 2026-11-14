@@ -35,7 +35,11 @@ function Counts({ added, deleted }: { added: number; deleted: number }) {
   );
 }
 
-export function TurnChangesCard({ changes, onOpenReview, onFileContextMenu }: {
+export function TurnChangesCard({
+  changes,
+  onOpenReview,
+  onFileContextMenu,
+}: {
   changes: TurnChanges;
   /** 在右侧打开本轮 Review，并选中 `index` 指向的文件。 */
   onOpenReview: (index: number) => void;
@@ -89,10 +93,16 @@ export function TurnChangesCard({ changes, onOpenReview, onFileContextMenu }: {
     >
       {singleFile ? (
         <>
-          <DiffHoverCard cardRef={cardRef} file={singleFile}>{header}</DiffHoverCard>
-          <span id={describedBy} hidden>{singleFile.absolutePath ?? singleFile.path}</span>
+          <DiffHoverCard cardRef={cardRef} file={singleFile}>
+            {header}
+          </DiffHoverCard>
+          <span id={describedBy} hidden>
+            {singleFile.absolutePath ?? singleFile.path}
+          </span>
         </>
-      ) : header}
+      ) : (
+        header
+      )}
       {singleFile ? null : (
         <ul className="m-0 list-none border-t-[0.5px] border-line p-0">
           {rows.map((file, index) => (
@@ -112,7 +122,9 @@ export function TurnChangesCard({ changes, onOpenReview, onFileContextMenu }: {
                   </span>
                 </button>
               </DiffHoverCard>
-              <span id={`${describedBy}-${index}`} hidden>{file.absolutePath ?? file.path}</span>
+              <span id={`${describedBy}-${index}`} hidden>
+                {file.absolutePath ?? file.path}
+              </span>
             </li>
           ))}
         </ul>
@@ -137,7 +149,11 @@ export function TurnChangesCard({ changes, onOpenReview, onFileContextMenu }: {
  * 悬停 500ms 弹出的 diff 浮层，宽度跟随整张卡（左右各让出 24px），最高 420px。
  * 内容只在浮层打开时挂载，划过行不会白算 diff。
  */
-function DiffHoverCard({ cardRef, file, children }: {
+function DiffHoverCard({
+  cardRef,
+  file,
+  children,
+}: {
   cardRef: React.RefObject<HTMLDivElement | null>;
   file: TurnChangedFile;
   children: ReactNode;

@@ -20,7 +20,11 @@ export type PythonRuntimeManifest = {
   readonly shimDirectory: string;
   readonly core: readonly PythonPackagePin[];
   /** The on-demand layer: `digest` names its install directory; `wheels` are what to download and verify. */
-  readonly extension: { readonly digest: string; readonly packages: readonly string[]; readonly wheels: readonly PythonWheel[] };
+  readonly extension: {
+    readonly digest: string;
+    readonly packages: readonly string[];
+    readonly wheels: readonly PythonWheel[];
+  };
 };
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -43,7 +47,8 @@ function string(record: Record<string, unknown>, key: string, where: string): st
 
 function relativePath(record: Record<string, unknown>, key: string): string {
   const value = string(record, key, "manifest");
-  if (!RELATIVE.test(value) || value.split("/").some((segment) => segment === "." || segment === "..")) fail(`${key} must be a relative path without '.' or '..' segments or separators other than '/'`);
+  if (!RELATIVE.test(value) || value.split("/").some((segment) => segment === "." || segment === ".."))
+    fail(`${key} must be a relative path without '.' or '..' segments or separators other than '/'`);
   return value;
 }
 
@@ -70,12 +75,16 @@ export function parsePythonRuntimeManifest(value: unknown): PythonRuntimeManifes
   const target = string(value, "target", "manifest");
   if (!(PYTHON_RUNTIME_TARGETS as readonly string[]).includes(target)) fail(`unknown target ${target}`);
   if (!isRecord(value.python)) fail("python must be an object");
-  const python = { version: string(value.python, "version", "python"), release: string(value.python, "release", "python") };
+  const python = {
+    version: string(value.python, "version", "python"),
+    release: string(value.python, "release", "python"),
+  };
   if (!Array.isArray(value.core)) fail("core must be an array");
   if (!isRecord(value.extension)) fail("extension must be an object");
   const digest = string(value.extension, "digest", "extension");
   if (!DIGEST.test(digest)) fail("extension.digest must be 16 hex characters");
-  if (!Array.isArray(value.extension.packages) || !value.extension.packages.every((item) => typeof item === "string")) fail("extension.packages must be strings");
+  if (!Array.isArray(value.extension.packages) || !value.extension.packages.every((item) => typeof item === "string"))
+    fail("extension.packages must be strings");
   if (!Array.isArray(value.extension.wheels)) fail("extension.wheels must be an array");
   return Object.freeze({
     schemaVersion: 1,
@@ -94,7 +103,10 @@ export function parsePythonRuntimeManifest(value: unknown): PythonRuntimeManifes
 }
 
 /** The target name of a machine, or undefined when no runtime is built for it. */
-export function pythonRuntimeTarget(platform: NodeJS.Platform = process.platform, arch: string = process.arch): PythonRuntimeTarget | undefined {
+export function pythonRuntimeTarget(
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+): PythonRuntimeTarget | undefined {
   if (platform === "darwin") return arch === "arm64" ? "mac-arm64" : arch === "x64" ? "mac-x64" : undefined;
   if (platform === "linux") return arch === "x64" ? "linux-x64" : arch === "arm64" ? "linux-arm64" : undefined;
   if (platform === "win32") return arch === "x64" ? "win-x64" : undefined;

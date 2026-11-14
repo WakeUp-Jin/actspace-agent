@@ -41,7 +41,11 @@ describe("OpenInAppMenu", () => {
     expect(screen.getByRole("menuitem", { name: /Cursor/ })).toHaveAttribute("aria-disabled", "true");
 
     await user.click(vscode);
-    expect(openInTool).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", relativePath: "src/index.ts", toolId: "vscode" });
+    expect(openInTool).toHaveBeenCalledWith({
+      workspaceRoot: "/tmp/workspace",
+      relativePath: "src/index.ts",
+      toolId: "vscode",
+    });
     await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
     await waitFor(() => expect(trigger).toHaveFocus());
 

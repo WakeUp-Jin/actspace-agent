@@ -2,10 +2,19 @@ import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
 export const FILESYSTEM_WRITE_PLUGIN_ID = "actspace.filesystem-write" as const;
 export const FILESYSTEM_WRITE_TOOLS = Object.freeze(["edit_file", "write_file", "delete_file"] as const);
 export const manifest = defineBuiltinPluginManifest({
-  display: { title: "写文件", description: "新建和修改工作区里的文件", scope: "session", defaultEnabled: true, canDisable: false },
-  pluginId: FILESYSTEM_WRITE_PLUGIN_ID, version: "2.0.0", name: "ActSpace Filesystem Write",
+  display: {
+    title: "写文件",
+    description: "新建和修改工作区里的文件",
+    scope: "session",
+    defaultEnabled: true,
+    canDisable: false,
+  },
+  pluginId: FILESYSTEM_WRITE_PLUGIN_ID,
+  version: "2.0.0",
+  name: "ActSpace Filesystem Write",
   entry: { entryId: "tools.filesystem-write", behavior: "./plugin.js" },
-  host: { required: ["filesystem.write"], optional: [] }, frontend: null,
+  host: { required: ["filesystem.write"], optional: [] },
+  frontend: null,
   injects: ["tools.runtime"],
   // Without the grant the tools register but report the capability as unavailable.
   optionalInjects: ["actspace.host.filesystem"],

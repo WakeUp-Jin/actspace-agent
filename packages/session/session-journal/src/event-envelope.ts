@@ -1,8 +1,19 @@
-
 import { SessionError } from "./errors.js";
 
-export type { SessionEventCriticality, SessionEventSourceV1, SessionEventProvenanceV1, SessionSurfaceNodeV1, SessionSurfaceOperationV1, SessionEventEnvelopeV1, SessionEventCandidateV1 } from "@actspace/shared/runtime-v2";
-import type { SessionEventEnvelopeV1, SessionEventProvenanceV1, SessionSurfaceOperationV1 } from "@actspace/shared/runtime-v2";
+export type {
+  SessionEventCriticality,
+  SessionEventSourceV1,
+  SessionEventProvenanceV1,
+  SessionSurfaceNodeV1,
+  SessionSurfaceOperationV1,
+  SessionEventEnvelopeV1,
+  SessionEventCandidateV1,
+} from "@actspace/shared/runtime-v2";
+import type {
+  SessionEventEnvelopeV1,
+  SessionEventProvenanceV1,
+  SessionSurfaceOperationV1,
+} from "@actspace/shared/runtime-v2";
 
 const FORBIDDEN_SECRET_KEYS = new Set([
   "authorization",
@@ -55,9 +66,11 @@ export function freezeSessionJson<T>(value: T): Readonly<T> {
 
 export function validateEventEnvelopeShape(value: unknown): asserts value is SessionEventEnvelopeV1 {
   if (!isPlainRecord(value) || value.recordKind !== "event") invalid("Event envelope must be an event object.");
-  if (!Number.isSafeInteger(value.seq) || (value.seq as number) < 0) invalid("Event seq must be a non-negative integer.");
+  if (!Number.isSafeInteger(value.seq) || (value.seq as number) < 0)
+    invalid("Event seq must be a non-negative integer.");
   requireNonEmptyString(value.type, "type");
-  if (!Number.isSafeInteger(value.eventVersion) || (value.eventVersion as number) < 1) invalid("eventVersion must be >= 1.");
+  if (!Number.isSafeInteger(value.eventVersion) || (value.eventVersion as number) < 1)
+    invalid("eventVersion must be >= 1.");
   if (value.criticality !== "required" && value.criticality !== "ignorable") invalid("Invalid event criticality.");
   requireNonEmptyString(value.time, "time");
   if (!Number.isFinite(Date.parse(value.time as string))) invalid("Event time must be RFC3339.");
@@ -66,7 +79,11 @@ export function validateEventEnvelopeShape(value: unknown): asserts value is Ses
   if (!isPlainRecord(value.provenance)) invalid("Event provenance must be an object.");
   validateIntegerArray(value.provenance.sourceEventSeqs, "provenance.sourceEventSeqs");
   validateStringArray(value.provenance.contributorIds, "provenance.contributorIds");
-  if (value.provenance.runtimeSelectionSeq !== null && (!Number.isSafeInteger(value.provenance.runtimeSelectionSeq) || (value.provenance.runtimeSelectionSeq as number) < 0)) {
+  if (
+    value.provenance.runtimeSelectionSeq !== null &&
+    (!Number.isSafeInteger(value.provenance.runtimeSelectionSeq) ||
+      (value.provenance.runtimeSelectionSeq as number) < 0)
+  ) {
     invalid("runtimeSelectionSeq must be null or a non-negative integer.");
   }
   if (value.surface !== null) validateSurfaceOperation(value.surface);
@@ -74,20 +91,31 @@ export function validateEventEnvelopeShape(value: unknown): asserts value is Ses
 }
 
 export function defaultSessionProvenance(): SessionEventProvenanceV1 {
-  return Object.freeze({ sourceEventSeqs: Object.freeze([]), contributorIds: Object.freeze([]), runtimeSelectionSeq: null });
+  return Object.freeze({
+    sourceEventSeqs: Object.freeze([]),
+    contributorIds: Object.freeze([]),
+    runtimeSelectionSeq: null,
+  });
 }
 
 /** surface 只是标记，节点内容在 data 里（agent-spec-surface-derived.md §4.1）；带 `node` 的旧格式直接拒绝。 */
 function validateSurfaceOperation(value: unknown): asserts value is SessionSurfaceOperationV1 {
   if (!isPlainRecord(value)) invalid("Surface operation must be an object.");
-  if ("node" in value) invalid("Surface operation must not carry a node (old Session format); the node is derived from event data.");
+  if ("node" in value)
+    invalid("Surface operation must not carry a node (old Session format); the node is derived from event data.");
   if (value.kind === "append") {
     if (Object.keys(value).length !== 1) invalid("Surface append operation only has kind.");
     return;
   }
   if (value.kind !== "replace") invalid("Surface operation kind is invalid.");
-  if (Object.keys(value).some(key => !["kind", "start", "end", "sourceEventSeqs"].includes(key))) invalid("Surface replace operation has unknown fields.");
-  if (!Number.isSafeInteger(value.start) || !Number.isSafeInteger(value.end) || (value.start as number) < 0 || (value.end as number) <= (value.start as number)) {
+  if (Object.keys(value).some((key) => !["kind", "start", "end", "sourceEventSeqs"].includes(key)))
+    invalid("Surface replace operation has unknown fields.");
+  if (
+    !Number.isSafeInteger(value.start) ||
+    !Number.isSafeInteger(value.end) ||
+    (value.start as number) < 0 ||
+    (value.end as number) <= (value.start as number)
+  ) {
     invalid("Surface replace span must be a non-empty integer range.");
   }
   validateIntegerArray(value.sourceEventSeqs, "surface.sourceEventSeqs");
@@ -118,14 +146,18 @@ function validateJsonValue(value: unknown, depth: number): number {
 }
 
 /** Each UTF-16 unit serializes to at most 6 bytes (\\uXXXX escape); plus the quotes. */
-function jsonStringBound(value: string): number { return value.length * 6 + 2; }
+function jsonStringBound(value: string): number {
+  return value.length * 6 + 2;
+}
 
 function validateIntegerArray(value: unknown, field: string): asserts value is number[] {
-  if (!Array.isArray(value) || value.some((item) => !Number.isSafeInteger(item) || item < 0)) invalid(`${field} must contain non-negative integers.`);
+  if (!Array.isArray(value) || value.some((item) => !Number.isSafeInteger(item) || item < 0))
+    invalid(`${field} must contain non-negative integers.`);
 }
 
 function validateStringArray(value: unknown, field: string): asserts value is string[] {
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || item.length === 0)) invalid(`${field} must contain non-empty strings.`);
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || item.length === 0))
+    invalid(`${field} must contain non-empty strings.`);
 }
 
 function requireNonEmptyString(value: unknown, field: string): asserts value is string {

@@ -5,9 +5,24 @@ import { TrajectoryTimeline } from "../components/trajectory/TrajectoryTimeline"
 import { buildTrajectorySnapshot, deriveLayout, deriveTimeline } from "../trajectory";
 
 let seq = 0;
-const node = (eventType: string, time: string, data: Record<string, unknown>, callId: string | null = null): RuntimeTrajectoryNode => {
+const node = (
+  eventType: string,
+  time: string,
+  data: Record<string, unknown>,
+  callId: string | null = null,
+): RuntimeTrajectoryNode => {
   seq += 1;
-  return { key: `s:${seq}`, sessionId: "s", eventSeq: seq, eventType, time: `2026-10-14T00:00:${time}Z`, kind: "other", state: "observed", callId, data } as RuntimeTrajectoryNode;
+  return {
+    key: `s:${seq}`,
+    sessionId: "s",
+    eventSeq: seq,
+    eventType,
+    time: `2026-10-14T00:00:${time}Z`,
+    kind: "other",
+    state: "observed",
+    callId,
+    data,
+  } as RuntimeTrajectoryNode;
 };
 const t1 = { turnId: "t1" };
 const nodes = [
@@ -15,16 +30,35 @@ const nodes = [
   node("user/message", "00.100", { ...t1, content: "读一下 README" }),
   node("step/start", "00.200", { ...t1, stepId: "st1" }),
   node("request/header", "00.200", { ...t1, stepId: "st1", requestId: "r1" }),
-  node("request/system-prompt", "00.200", { ...t1, stepId: "st1", requestId: "r1", digest: "p", sections: [{ id: "model-prompt", owner: "actspace.context-system", order: 0, content: "你是助手" }], modelFacts: [], contributorProvenance: [] }),
+  node("request/system-prompt", "00.200", {
+    ...t1,
+    stepId: "st1",
+    requestId: "r1",
+    digest: "p",
+    sections: [{ id: "model-prompt", owner: "actspace.context-system", order: 0, content: "你是助手" }],
+    modelFacts: [],
+    contributorProvenance: [],
+  }),
   node("request/tools", "00.200", { ...t1, stepId: "st1", requestId: "r1", digest: "t", tools: [] }),
   node("request/context", "00.200", { ...t1, stepId: "st1", requestId: "r1", snapshot: { schemaVersion: 3 } }),
   node("assistant/message", "01.000", { ...t1, stepId: "st1", requestId: "r1", messageId: "m1", content: "先读文件" }),
-  node("tool/call", "01.100", { ...t1, stepId: "st1", callId: "c1", name: "read_file", arguments: { path: "README.md" } }, "c1"),
+  node(
+    "tool/call",
+    "01.100",
+    { ...t1, stepId: "st1", callId: "c1", name: "read_file", arguments: { path: "README.md" } },
+    "c1",
+  ),
   node("tool/result", "01.500", { ...t1, stepId: "st1", callId: "c1", result: "ok" }, "c1"),
   node("step/end", "01.500", { ...t1, stepId: "st1" }),
   node("turn/end", "01.500", t1),
 ];
-const snapshot: RuntimeTrajectorySnapshot = { kind: "trajectory", schemaVersion: 1, sessionId: "s", throughJournalSeq: seq, nodes };
+const snapshot: RuntimeTrajectorySnapshot = {
+  kind: "trajectory",
+  schemaVersion: 1,
+  sessionId: "s",
+  throughJournalSeq: seq,
+  nodes,
+};
 const model = deriveTimeline(deriveLayout(buildTrajectorySnapshot(snapshot)).turns)!;
 
 const WIDTH = 700;
@@ -32,17 +66,44 @@ const noop = () => undefined;
 const setup = (props: Partial<Parameters<typeof TrajectoryTimeline>[0]> = {}) => {
   const onRange = vi.fn();
   const onSelect = vi.fn();
-  const view = render(<TrajectoryTimeline model={model} mode="sequence" selectedId={null} matches={null} range={null} onRange={onRange} onSelect={onSelect}
-    hasEarlier={false} loadingEarlier={false} onLoadEarlier={noop} {...props} />);
+  const view = render(
+    <TrajectoryTimeline
+      model={model}
+      mode="sequence"
+      selectedId={null}
+      matches={null}
+      range={null}
+      onRange={onRange}
+      onSelect={onSelect}
+      hasEarlier={false}
+      loadingEarlier={false}
+      onLoadEarlier={noop}
+      {...props}
+    />,
+  );
   const track = view.container.querySelector<HTMLElement>(".tjl-track")!;
   const spans = () => Array.from(view.container.querySelectorAll<HTMLElement>(".tjl-span"));
   return { ...view, onRange, onSelect, track, spans };
 };
-const pointer = (target: Element, type: "pointerDown" | "pointerMove" | "pointerUp", clientX: number, target2: Element = target) =>
-  fireEvent[type](target2, { clientX, pointerId: 1, button: 0 });
+const pointer = (
+  target: Element,
+  type: "pointerDown" | "pointerMove" | "pointerUp",
+  clientX: number,
+  target2: Element = target,
+) => fireEvent[type](target2, { clientX, pointerId: 1, button: 0 });
 
 beforeEach(() => {
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, right: WIDTH, bottom: 50, width: WIDTH, height: 50, x: 0, y: 0, toJSON: noop });
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    top: 0,
+    right: WIDTH,
+    bottom: 50,
+    width: WIDTH,
+    height: 50,
+    x: 0,
+    y: 0,
+    toJSON: noop,
+  });
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -56,7 +117,7 @@ describe("trajectory timeline view", () => {
     expect(first.style.getPropertyValue("--trajectory-span-width")).toBe(`${100 / n}%`);
     expect(first.style.getPropertyValue("--trajectory-span-lane")).toBe(String(model.spans[0].lane));
     expect(spans()[2].style.getPropertyValue("--trajectory-span-left")).toBe(`${200 / n}%`);
-    expect(spans().map(span => span.dataset.lane)).toEqual(model.spans.map(span => String(span.lane)));
+    expect(spans().map((span) => span.dataset.lane)).toEqual(model.spans.map((span) => String(span.lane)));
     expect(spans()[0].getAttribute("aria-hidden")).toBe("true");
   });
 
@@ -75,8 +136,8 @@ describe("trajectory timeline view", () => {
     pointer(track, "pointerMove", 400);
     pointer(track, "pointerUp", 400);
     const range = onRange.mock.calls.at(-1)![0];
-    expect(range.start).toBeCloseTo(model.spans.length * 100 / WIDTH);
-    expect(range.end).toBeCloseTo(model.spans.length * 400 / WIDTH);
+    expect(range.start).toBeCloseTo((model.spans.length * 100) / WIDTH);
+    expect(range.end).toBeCloseTo((model.spans.length * 400) / WIDTH);
     onRange.mockClear();
     fireEvent.keyDown(track, { key: "Escape" });
     expect(onRange).not.toHaveBeenCalled();
@@ -92,12 +153,16 @@ describe("trajectory timeline view", () => {
   it("marks spans outside the search matches", () => {
     const keep = model.spans[1].recordId;
     const { spans } = setup({ matches: new Set([keep]) });
-    expect(spans().map(span => span.dataset.searchMatch)).toEqual(model.spans.map(span => span.recordId === keep ? "true" : "false"));
+    expect(spans().map((span) => span.dataset.searchMatch)).toEqual(
+      model.spans.map((span) => (span.recordId === keep ? "true" : "false")),
+    );
   });
 
   it("marks the selected span and the spans inside the range", () => {
     const { spans } = setup({ selectedId: model.spans[0].recordId, range: { start: 1, end: 2 } });
     expect(spans()[0].dataset.current).toBe("true");
-    expect(spans().map(span => span.dataset.selected)).toEqual(model.spans.map(span => span.start <= 2 && span.end >= 1 ? "true" : "false"));
+    expect(spans().map((span) => span.dataset.selected)).toEqual(
+      model.spans.map((span) => (span.start <= 2 && span.end >= 1 ? "true" : "false")),
+    );
   });
 });

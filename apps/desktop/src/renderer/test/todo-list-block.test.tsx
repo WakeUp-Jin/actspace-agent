@@ -20,7 +20,8 @@ function todoMessage(
       },
       {
         id: "todo-2",
-        content: "Implement the Todo renderer with a deliberately long line that must remain readable without resizing the message layout",
+        content:
+          "Implement the Todo renderer with a deliberately long line that must remain readable without resizing the message layout",
         status: "in_progress",
         activeForm: "Implementing the Todo renderer",
         createdAt: "2026-08-08T00:00:00.000Z",
@@ -81,13 +82,17 @@ describe("TodoListBlock", () => {
   });
 
   it("renders an empty snapshot without placeholder controls", () => {
-    render(<TodoListBlock message={todoMessage({
-      todos: [],
-      totalCount: 0,
-      completedCount: 0,
-      revision: 0,
-      displayText: "0 of 0 To-dos Completed",
-    })} />);
+    render(
+      <TodoListBlock
+        message={todoMessage({
+          todos: [],
+          totalCount: 0,
+          completedCount: 0,
+          revision: 0,
+          displayText: "0 of 0 To-dos Completed",
+        })}
+      />,
+    );
 
     expect(screen.getByText("0 of 0 To-dos Completed")).toBeInTheDocument();
     expect(screen.queryByRole("list")).toBeNull();

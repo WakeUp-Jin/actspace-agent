@@ -4,13 +4,7 @@ import { ToolLogLine } from "./ToolLogLine";
 
 type BrowserApprovalMessage = Extract<MessageBlock, { kind: "tool" }>;
 
-export function BrowserApprovalBlock({
-  message,
-  className,
-}: {
-  message: BrowserApprovalMessage;
-  className?: string;
-}) {
+export function BrowserApprovalBlock({ message, className }: { message: BrowserApprovalMessage; className?: string }) {
   const decision = useApprovalDecision(message.approvalRequestId);
 
   if (decision.resolved) {
@@ -33,7 +27,11 @@ export function BrowserApprovalBlock({
     <ApprovalCard
       className={className}
       verb="确认浏览器操作"
-      target={<span className="min-w-0 truncate" title={message.title}>{message.title}</span>}
+      target={
+        <span className="min-w-0 truncate" title={message.title}>
+          {message.title}
+        </span>
+      }
       note="只授权这一次。该动作可能更改 Chrome 标签页或网页内容，连接浏览器不会自动批准这类操作。"
       actions={<ApprovalActions state={decision} primaryLabel="允许这次" />}
     />

@@ -12,9 +12,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 // jsdom 没有布局：ProseMirror 的 posAtCoords / coordsAtPos 需要这几个 API 存在。
 document.elementFromPoint ??= () => null;
-const emptyRect = { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON: () => ({}) } as DOMRect;
+const emptyRect = {
+  x: 0,
+  y: 0,
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  width: 0,
+  height: 0,
+  toJSON: () => ({}),
+} as DOMRect;
 Range.prototype.getBoundingClientRect ??= () => emptyRect;
-Range.prototype.getClientRects ??= () => ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList;
+Range.prototype.getClientRects ??= () =>
+  ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList;
 
 const schema = new Schema({
   nodes: {
@@ -28,7 +39,11 @@ const schema = new Schema({
       atom: true,
       selectable: true,
       attrs: { relativePath: {}, displayName: {} },
-      toDOM: (node) => ["span", { "data-file-mention": node.attrs.relativePath, contenteditable: "false" }, node.attrs.displayName],
+      toDOM: (node) => [
+        "span",
+        { "data-file-mention": node.attrs.relativePath, contenteditable: "false" },
+        node.attrs.displayName,
+      ],
     },
   },
 });
@@ -51,9 +66,8 @@ function queryBeforeCursor(state: EditorState, trigger: "@" | "/"): { from: numb
   const { $from, empty } = state.selection;
   if (!empty) return null;
   const textBefore = $from.parent.textBetween(0, $from.parentOffset, undefined, "￼");
-  const match = trigger === "@"
-    ? /(?:^|[\s(（，。,.])@([^\s@￼]*)$/u.exec(textBefore)
-    : /^\/([^/\s]*)$/u.exec(textBefore);
+  const match =
+    trigger === "@" ? /(?:^|[\s(（，。,.])@([^\s@￼]*)$/u.exec(textBefore) : /^\/([^/\s]*)$/u.exec(textBefore);
   if (!match) return null;
   const query = match[1] ?? "";
   return { from: $from.pos - query.length - 1, to: $from.pos, query };
@@ -90,7 +104,15 @@ function mount(onEnter = vi.fn()) {
       ],
     }),
     attributes: { role: "textbox", "aria-multiline": "true", "aria-label": "消息输入框" },
-    clipboardTextSerializer: (slice) => toPlainText(schema.topNodeType.create(null, slice.content.firstChild?.type.name === "paragraph" ? slice.content : schema.nodes.paragraph.create(null, slice.content))),
+    clipboardTextSerializer: (slice) =>
+      toPlainText(
+        schema.topNodeType.create(
+          null,
+          slice.content.firstChild?.type.name === "paragraph"
+            ? slice.content
+            : schema.nodes.paragraph.create(null, slice.content),
+        ),
+      ),
   });
   return { view, onEnter, dom: view.dom as HTMLElement };
 }
@@ -120,13 +142,18 @@ describe("ProseMirror PoC in jsdom", () => {
     await user.type(dom, "看 @Comp");
     await waitFor(() => expect(queryBeforeCursor(view!.state, "@")).not.toBeNull());
     const range = queryBeforeCursor(view!.state, "@")!;
-    const node = schema.nodes.file_mention.create({ relativePath: "src/components/Composer.tsx", displayName: "Composer.tsx" });
+    const node = schema.nodes.file_mention.create({
+      relativePath: "src/components/Composer.tsx",
+      displayName: "Composer.tsx",
+    });
     view!.dispatch(closeHistory(view!.state.tr.replaceWith(range.from, range.to, [node, schema.text(" ")])));
     expect(toPlainText(view!.state.doc)).toBe("看 @src/components/Composer.tsx ");
     expect(dom.querySelector("[data-file-mention]")?.textContent).toBe("Composer.tsx");
 
     view!.dispatch(closeHistory(view!.state.tr));
-    view!.dispatch(view!.state.tr.setSelection(TextSelection.create(view!.state.doc, view!.state.doc.content.size - 2)));
+    view!.dispatch(
+      view!.state.tr.setSelection(TextSelection.create(view!.state.doc, view!.state.doc.content.size - 2)),
+    );
     // 光标在 mention 之后：Backspace 一次删掉整个节点
     fireEvent.keyDown(dom, { key: "Backspace", keyCode: 8 });
     expect(toPlainText(view!.state.doc)).toBe("看  ");

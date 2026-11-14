@@ -36,12 +36,13 @@ import { useWorkspaceFileLinks } from "./conversation/use-workspace-file-links";
 const CONVERSATION_SHELL_CLASS =
   "conversation-shell grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] bg-surface pt-[var(--window-chrome-strip-height)]";
 const MESSAGE_VIEWPORT_CLASS = "conversation-message-viewport relative col-start-1 row-start-1 min-h-0 min-w-0";
-const MESSAGE_SCROLL_CLASS = "message-scroll h-full min-h-0 overflow-auto bg-surface pb-6 [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]";
+const MESSAGE_SCROLL_CLASS =
+  "message-scroll h-full min-h-0 overflow-auto bg-surface pb-6 [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_SCROLL_INITIAL_CLASS =
   "message-scroll message-scroll-initial h-full min-h-0 overflow-auto bg-surface pb-6 [overflow-anchor:none] [scrollbar-gutter:stable_both-edges]";
-const MESSAGE_COLUMN_WIDTH_CLASS = "w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))]";
-const MESSAGE_STACK_CLASS =
-  `message-stack mx-auto flex min-w-0 ${MESSAGE_COLUMN_WIDTH_CLASS} flex-col gap-7 pb-7`;
+const MESSAGE_COLUMN_WIDTH_CLASS =
+  "w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))]";
+const MESSAGE_STACK_CLASS = `message-stack mx-auto flex min-w-0 ${MESSAGE_COLUMN_WIDTH_CLASS} flex-col gap-7 pb-7`;
 // Composer 只挂一处（16 T14）：空会话时这一格叠在消息区上、居中显示（滚动与留白和原来放在消息区里时相同）；
 // 有消息后回到底部一行。切换只换两层 div 的 class，Composer 不重新挂载，焦点和输入法状态都还在。
 const INITIAL_COMPOSER_SCROLL_CLASS =
@@ -54,7 +55,8 @@ const EARLIER_PRELOAD_THRESHOLD_PX = 240;
 const SCROLL_BOTTOM_THRESHOLD_PX = 80;
 // 吸顶提问条点回某一轮时，提问卡片顶部留出的距离。
 const TURN_JUMP_OFFSET_PX = 8;
-const selectLineage = (cell: import("@actspace/client/sessions").ClientSessionCell | null): unknown => cell?.snapshot?.lineage ?? null;
+const selectLineage = (cell: import("@actspace/client/sessions").ClientSessionCell | null): unknown =>
+  cell?.snapshot?.lineage ?? null;
 
 export function ConversationView({
   contextSnapshot,
@@ -86,25 +88,46 @@ export function ConversationView({
   /** 返回整页设置后，通过已有 Composer 聚焦通道恢复键盘入口。 */
   focusRequest?: number;
 }) {
-  const { sessionId, isStreaming, isAborting, sendScrollRequestId, composerFocusRequestId, onAbort, onRetryCompaction, onResendTurn, readTaskSnapshot } = useActiveSession();
+  const {
+    sessionId,
+    isStreaming,
+    isAborting,
+    sendScrollRequestId,
+    composerFocusRequestId,
+    onAbort,
+    onRetryCompaction,
+    onResendTurn,
+    readTaskSnapshot,
+  } = useActiveSession();
   const messages = useTranscriptMessages();
   const { draftRestore, draftKey, readAnnotationDraft, writeAnnotationDraft, messageQueue } = useComposerContext();
   // 投影只订阅派生出的小块（见 workbench/projection-view.ts）：流式时 cell 每帧换一次，这几个值几乎不变。
   const projectionTarget = useOptionalProjectionTarget();
-  const projectionMatches = projectionTarget !== null && projectionTarget.sessionId !== null && (sessionId === null || sessionId === undefined || projectionTarget.sessionId === sessionId);
-  const projectionView = useProjectionSelect<SessionProjectionView | null>(selectSessionView, sameSessionView, projectionMatches ? undefined : null);
+  const projectionMatches =
+    projectionTarget !== null &&
+    projectionTarget.sessionId !== null &&
+    (sessionId === null || sessionId === undefined || projectionTarget.sessionId === sessionId);
+  const projectionView = useProjectionSelect<SessionProjectionView | null>(
+    selectSessionView,
+    sameSessionView,
+    projectionMatches ? undefined : null,
+  );
   const lineage = useProjectionSelect(selectLineage, Object.is, projectionMatches ? undefined : null);
   const browse = useSessionBrowse();
   const { target, selectedWorkspaceRoot } = useRunTargetContext();
   // 14 S9：App 读页失败用 browse.messageError；投影 cell 的打开 / refresh 失败（bridge 重试用完前也会先显示）用 cell 的 status/error。
-  const projectionError = projectionView?.status === "error" ? `会话同步失败：${projectionView.error ?? "未知错误"}` : null;
+  const projectionError =
+    projectionView?.status === "error" ? `会话同步失败：${projectionView.error ?? "未知错误"}` : null;
   // 15 S2：key 损坏时不去读页，也不给「重试」。
   const locatorError = target.kind === "invalid" ? "会话标识损坏，无法打开这个会话。" : null;
   const sessionError = locatorError ?? browse?.messageError ?? projectionError;
   const projectionBridge = projectionTarget?.bridge ?? null;
   const projectionSessionId = projectionTarget?.sessionId ?? null;
   const retrySession = useCallback(() => {
-    if (browse) { browse.retryMessages(); return; }
+    if (browse) {
+      browse.retryMessages();
+      return;
+    }
     // 没有 App（单独挂 SessionProjectionProvider）时直接重新打开；失败会再次写进 cell。
     if (projectionBridge && projectionSessionId) void projectionBridge.open(projectionSessionId).catch(() => undefined);
   }, [browse, projectionBridge, projectionSessionId]);
@@ -132,23 +155,33 @@ export function ConversationView({
     return numbers;
   }, [browse?.hasEarlier, turns]);
   const turnEditing = useTurnEditing({
-    sessionId: sessionId ?? null, turns, lineage, onResendTurn, readTaskSnapshot,
+    sessionId: sessionId ?? null,
+    turns,
+    lineage,
+    onResendTurn,
+    readTaskSnapshot,
     busy: isStreaming || Boolean(messageQueue && (!isQueueEmpty(messageQueue.queue) || messageQueue.queue.paused)),
   });
-  const turnNavigationItems = useMemo(
-    () => createTurnNavigationItems(turns, isStreaming),
-    [isStreaming, turns],
-  );
-  const durableMessageCount = durableSurfaceMessageCount ?? (projectedSurfaceMessageCount > 0 ? projectedSurfaceMessageCount : messages.length);
+  const turnNavigationItems = useMemo(() => createTurnNavigationItems(turns, isStreaming), [isStreaming, turns]);
+  const durableMessageCount =
+    durableSurfaceMessageCount ?? (projectedSurfaceMessageCount > 0 ? projectedSurfaceMessageCount : messages.length);
   const hasConversationContent = durableMessageCount > 0 || messages.length > 0;
   const requestedComposerPhase = composerPhase ?? projectedComposerPhase;
-  const resolvedComposerPhase = requestedComposerPhase === "blank" && hasConversationContent
-    ? "active"
-    : requestedComposerPhase ?? (durableMessageCount === 0 ? "blank" : "active");
+  const resolvedComposerPhase =
+    requestedComposerPhase === "blank" && hasConversationContent
+      ? "active"
+      : (requestedComposerPhase ?? (durableMessageCount === 0 ? "blank" : "active"));
   const projectionSessionReady = projectionView !== null && projectionView.status !== "error";
-  const resolvedSessionReady = (projectedComposerPhase != null && projectedComposerPhase !== "blank") || isSessionReady || projectionSessionReady;
+  const resolvedSessionReady =
+    (projectedComposerPhase != null && projectedComposerPhase !== "blank") || isSessionReady || projectionSessionReady;
   const waitingForInitialList = browse?.listLoading && !resolvedSessionReady;
-  const isInitialComposer = !browse?.messageLoading && !sessionError && !waitingForInitialList && resolvedSessionReady && resolvedComposerPhase === "blank" && !isStreaming;
+  const isInitialComposer =
+    !browse?.messageLoading &&
+    !sessionError &&
+    !waitingForInitialList &&
+    resolvedSessionReady &&
+    resolvedComposerPhase === "blank" &&
+    !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const messageStackRef = useRef<HTMLDivElement | null>(null);
@@ -156,7 +189,14 @@ export function ConversationView({
   const annotatableIdsRef = useRef<ReadonlySet<string>>(new Set());
   annotatableIdsRef.current = useMemo(() => annotatableMessageIds(messages), [messages]);
   const canAnnotate = useCallback((messageId: string) => annotatableIdsRef.current.has(messageId), []);
-  const annotations = useResponseAnnotationState({ draftKey, draftRestore, readAnnotationDraft, writeAnnotationDraft, scrollContainerRef, canAnnotate });
+  const annotations = useResponseAnnotationState({
+    draftKey,
+    draftRestore,
+    readAnnotationDraft,
+    writeAnnotationDraft,
+    scrollContainerRef,
+    canAnnotate,
+  });
   // 评论框保存 / 取消后把焦点还给 Composer：和上层的聚焦请求叠加成同一个递增 id。
   const [annotationFocusRequest, setAnnotationFocusRequest] = useState(0);
   const focusRequestId = composerFocusRequestId + annotationFocusRequest + focusRequest;
@@ -172,25 +212,58 @@ export function ConversationView({
   const openedSubagentRuns = useRef(new Set<string>());
   const { openTab } = useRightPanel();
   const openContextTab = useCallback(() => openTab({ id: "context", kind: "context", title: "上下文" }), [openTab]);
-  const openAttachmentPreview = useCallback((attachment: ComposerAttachment) => {
-    if (!attachment.previewUrl) return;
-    openTab({
-      id: `composer-attachment:${attachment.id}`,
-      kind: "image",
-      title: attachment.name,
-      src: attachment.previewUrl,
-    });
-  }, [openTab]);
+  const openAttachmentPreview = useCallback(
+    (attachment: ComposerAttachment) => {
+      if (!attachment.previewUrl) return;
+      openTab({
+        id: `composer-attachment:${attachment.id}`,
+        kind: "image",
+        title: attachment.name,
+        src: attachment.previewUrl,
+      });
+    },
+    [openTab],
+  );
 
-  const openSubagent = useCallback((agentId: string | undefined) => {
-    if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, ...(agentId ? { focus: { agentId, view: "chat" as const, revision: Date.now() } } : {}) });
-  }, [sessionId, openTab]);
-  const openBackgroundTask = useCallback((taskId: string) => {
-    if (sessionId) openTab({ id: "background-tasks", kind: "backgroundTasks", title: "后台任务", sessionId, focus: { taskId, revision: Date.now() } });
-  }, [sessionId, openTab]);
-  const openSubagentTrajectory = useCallback((agentId: string) => {
-    if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, focus: { agentId, view: "trajectory", revision: Date.now() } });
-  }, [sessionId, openTab]);
+  const openSubagent = useCallback(
+    (agentId: string | undefined) => {
+      if (sessionId)
+        openTab({
+          id: "subagents",
+          kind: "subagents",
+          title: "子 Agent",
+          sessionId,
+          ...(agentId ? { focus: { agentId, view: "chat" as const, revision: Date.now() } } : {}),
+        });
+    },
+    [sessionId, openTab],
+  );
+  const openBackgroundTask = useCallback(
+    (taskId: string) => {
+      if (sessionId)
+        openTab({
+          id: "background-tasks",
+          kind: "backgroundTasks",
+          title: "后台任务",
+          sessionId,
+          focus: { taskId, revision: Date.now() },
+        });
+    },
+    [sessionId, openTab],
+  );
+  const openSubagentTrajectory = useCallback(
+    (agentId: string) => {
+      if (sessionId)
+        openTab({
+          id: "subagents",
+          kind: "subagents",
+          title: "子 Agent",
+          sessionId,
+          focus: { agentId, view: "trajectory", revision: Date.now() },
+        });
+    },
+    [sessionId, openTab],
+  );
   const { openReadFile, openWorkspaceFile } = useWorkspaceFileLinks();
   useEffect(() => {
     const turn = turns.at(-1);
@@ -240,15 +313,19 @@ export function ConversationView({
       else if (top > previousTop && distanceFromBottom < SCROLL_BOTTOM_THRESHOLD_PX) stickToBottomRef.current = true;
     }
     updateConversationViewport();
-    if ((scrollContainerRef.current?.scrollTop ?? Infinity) < EARLIER_PRELOAD_THRESHOLD_PX && !browse?.earlierError) requestEarlier();
+    if ((scrollContainerRef.current?.scrollTop ?? Infinity) < EARLIER_PRELOAD_THRESHOLD_PX && !browse?.earlierError)
+      requestEarlier();
   }, [updateConversationViewport, requestEarlier, browse?.earlierError]);
   // 已停在顶部时继续向上滚不会产生 scroll 事件，用 wheel 兜底。
-  const handleMessagesWheel = useCallback((event: ReactWheelEvent<HTMLElement>) => {
-    // 向上滚轮的意图立刻生效：它的 scroll 事件可能晚于同一帧里的跟随写入。
-    if (event.deltaY < 0) stickToBottomRef.current = false;
-    if (event.deltaY >= 0 || (scrollContainerRef.current?.scrollTop ?? Infinity) > 0 || browse?.earlierError) return;
-    requestEarlier();
-  }, [requestEarlier, browse?.earlierError]);
+  const handleMessagesWheel = useCallback(
+    (event: ReactWheelEvent<HTMLElement>) => {
+      // 向上滚轮的意图立刻生效：它的 scroll 事件可能晚于同一帧里的跟随写入。
+      if (event.deltaY < 0) stickToBottomRef.current = false;
+      if (event.deltaY >= 0 || (scrollContainerRef.current?.scrollTop ?? Infinity) > 0 || browse?.earlierError) return;
+      requestEarlier();
+    },
+    [requestEarlier, browse?.earlierError],
+  );
 
   // 流式输出 / 消息增长时，若仍处于贴底状态则跟随滚动到底部。
   const scrollToBottomIfStuck = useCallback(() => {
@@ -270,26 +347,33 @@ export function ConversationView({
     updateConversationViewportRef.current();
   }, []);
 
-  const navigateToTurn = useCallback((turnId: string) => {
-    const scrolled = scrollToTurn(turnId, () => {
-      stickToBottomRef.current = false;
-      setIsAwayFromBottom(true);
-    });
-    if (scrolled) updateConversationViewport();
-  }, [scrollToTurn, updateConversationViewport]);
+  const navigateToTurn = useCallback(
+    (turnId: string) => {
+      const scrolled = scrollToTurn(turnId, () => {
+        stickToBottomRef.current = false;
+        setIsAwayFromBottom(true);
+      });
+      if (scrolled) updateConversationViewport();
+    },
+    [scrollToTurn, updateConversationViewport],
+  );
 
   // 吸顶提问条：平滑滚回这一轮（卡片顶部留 8px），可编辑就直接进入编辑（agent-edit-resend-rewind.md §5.3）。
   const { start: startTurnEdit, editableTurnIds } = turnEditing;
-  const jumpToPinnedTurn = useCallback((turnId: string) => {
-    const el = scrollContainerRef.current;
-    const turnElement = el?.querySelector<HTMLElement>(`[data-conversation-turn-id="${CSS.escape(turnId)}"]`);
-    if (!el || !turnElement) return;
-    stickToBottomRef.current = false;
-    setIsAwayFromBottom(true);
-    const top = el.scrollTop + turnElement.getBoundingClientRect().top - el.getBoundingClientRect().top - TURN_JUMP_OFFSET_PX;
-    el.scrollTo?.({ top: Math.max(0, top), behavior: "smooth" });
-    if (editableTurnIds.has(turnId)) startTurnEdit(turnId);
-  }, [editableTurnIds, startTurnEdit]);
+  const jumpToPinnedTurn = useCallback(
+    (turnId: string) => {
+      const el = scrollContainerRef.current;
+      const turnElement = el?.querySelector<HTMLElement>(`[data-conversation-turn-id="${CSS.escape(turnId)}"]`);
+      if (!el || !turnElement) return;
+      stickToBottomRef.current = false;
+      setIsAwayFromBottom(true);
+      const top =
+        el.scrollTop + turnElement.getBoundingClientRect().top - el.getBoundingClientRect().top - TURN_JUMP_OFFSET_PX;
+      el.scrollTo?.({ top: Math.max(0, top), behavior: "smooth" });
+      if (editableTurnIds.has(turnId)) startTurnEdit(turnId);
+    },
+    [editableTurnIds, startTurnEdit],
+  );
 
   useEffect(() => {
     if (sendScrollRequestId === 0) {
@@ -331,7 +415,10 @@ export function ConversationView({
   // 同一条 running 消息内部变高时（例如 write_file 持续追加 code preview），
   // messages 引用可能不变；观察消息栈尺寸，保持贴底状态继续跟随尾部。
   // 只在滚动容器 / 消息栈挂载或换掉时重建；最新的回调经 ref 读取，流式每帧更新 messages 不重建观察者。
-  const messageScrollMounted = !(messages.length === 0 && (browse?.messageLoading || waitingForInitialList || sessionError));
+  const messageScrollMounted = !(
+    messages.length === 0 &&
+    (browse?.messageLoading || waitingForInitialList || sessionError)
+  );
   useEffect(() => {
     if (typeof ResizeObserver === "undefined") return;
     const viewport = scrollContainerRef.current;
@@ -362,105 +449,163 @@ export function ConversationView({
   };
 
   if (!messageScrollMounted) {
-    return <main className={CONVERSATION_SHELL_CLASS}><p role={sessionError ? 'alert' : 'status'} className="px-5 py-4 text-act-sm leading-5 text-text-muted">
-      {sessionError ?? (browse?.messageLoading ? '正在加载消息…' : '正在加载会话…')}
-      {sessionError && !locatorError && <button type="button" onClick={retrySession}>重试</button>}
-    </p></main>;
+    return (
+      <main className={CONVERSATION_SHELL_CLASS}>
+        <p role={sessionError ? "alert" : "status"} className="px-5 py-4 text-act-sm leading-5 text-text-muted">
+          {sessionError ?? (browse?.messageLoading ? "正在加载消息…" : "正在加载会话…")}
+          {sessionError && !locatorError && (
+            <button type="button" onClick={retrySession}>
+              重试
+            </button>
+          )}
+        </p>
+      </main>
+    );
   }
   return (
     <ResponseAnnotationContext.Provider value={annotations.contextValue}>
-    <CompactionRetryContext.Provider value={onRetryCompaction}>
-    <BackgroundTaskLinkContext.Provider value={openBackgroundTask}>
-    <SubagentStatusContext.Provider value={subagentStatuses}>
-    <main className={CONVERSATION_SHELL_CLASS}>
-      <ResponseSelectionMenu
-        scrollContainerRef={scrollContainerRef}
-        canAnnotate={canAnnotate}
-        onAddAnnotation={annotations.contextValue.addDraft}
-      />
-      <ResponseAnnotationCommentPopover
-        scrollContainerRef={scrollContainerRef}
-        onClose={() => setAnnotationFocusRequest((current) => current + 1)}
-      />
-      <div className={MESSAGE_VIEWPORT_CLASS}>
-        <div
-          className={activeView === "trajectory" ? "hidden" : "block h-full min-h-0"}
-          aria-hidden={activeView === "trajectory"}
-        >
-          <section
-            ref={scrollContainerRef}
-            onScroll={handleMessagesScroll}
-            onWheel={handleMessagesWheel}
-            className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
-            aria-label="会话消息"
-          >
-              {browse?.messageLoading && <p role="status" className="px-5 py-3 text-act-sm leading-5 text-text-muted">正在加载消息…</p>}
-              {sessionError && <p role="alert" className="px-5 py-3 text-act-sm leading-5 text-text-muted">{sessionError}{locatorError ? null : <> <button type="button" onClick={retrySession}>重试</button></>}</p>}
-              {browse?.earlierLoading && <p role="status" className="flex items-center justify-center gap-1.5 py-2 text-act-xs leading-4 text-text-faint"><LoaderCircle className="animate-spin" size={12} aria-hidden="true" />正在加载更早消息…</p>}
-              {browse?.earlierError && <p role="alert" className="px-5 text-act-xs leading-4 text-text-muted">{browse.earlierError} <button type="button" onClick={requestEarlier}>重试</button></p>}
-              {isInitialComposer ? null : (
-                <TurnEditContext.Provider value={turnEditing.value}>
-                <div ref={messageStackRef} className={MESSAGE_STACK_CLASS}>
-                  {turns.map((turn, turnIndex) => (
-                    <TurnView
-                      key={turn.id}
-                      turn={turn}
-                      isActive={isStreaming && turnIndex === turns.length - 1}
-                      isLatest={turnIndex === turns.length - 1}
-                      sessionId={sessionId}
-                      workspaceRoot={selectedWorkspaceRoot}
-                      turnNumber={turnNumbers?.get(turn.id)}
-                      setTurnElement={turnNavigator.setTurnElement}
-                      onOpenAttachmentPreview={openAttachmentPreview}
-                      onOpenSubagent={openSubagent}
-                      onOpenReadFile={openReadFile}
-                      onOpenWorkspaceFile={openWorkspaceFile}
-                      editable={turnEditing.editableTurnIds.has(turn.id)}
-                      dim={turnEditing.dimOf(turnIndex)}
-                      leaving={turnEditing.leaving}
+      <CompactionRetryContext.Provider value={onRetryCompaction}>
+        <BackgroundTaskLinkContext.Provider value={openBackgroundTask}>
+          <SubagentStatusContext.Provider value={subagentStatuses}>
+            <main className={CONVERSATION_SHELL_CLASS}>
+              <ResponseSelectionMenu
+                scrollContainerRef={scrollContainerRef}
+                canAnnotate={canAnnotate}
+                onAddAnnotation={annotations.contextValue.addDraft}
+              />
+              <ResponseAnnotationCommentPopover
+                scrollContainerRef={scrollContainerRef}
+                onClose={() => setAnnotationFocusRequest((current) => current + 1)}
+              />
+              <div className={MESSAGE_VIEWPORT_CLASS}>
+                <div
+                  className={activeView === "trajectory" ? "hidden" : "block h-full min-h-0"}
+                  aria-hidden={activeView === "trajectory"}
+                >
+                  <section
+                    ref={scrollContainerRef}
+                    onScroll={handleMessagesScroll}
+                    onWheel={handleMessagesWheel}
+                    className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
+                    aria-label="会话消息"
+                  >
+                    {browse?.messageLoading && (
+                      <p role="status" className="px-5 py-3 text-act-sm leading-5 text-text-muted">
+                        正在加载消息…
+                      </p>
+                    )}
+                    {sessionError && (
+                      <p role="alert" className="px-5 py-3 text-act-sm leading-5 text-text-muted">
+                        {sessionError}
+                        {locatorError ? null : (
+                          <>
+                            {" "}
+                            <button type="button" onClick={retrySession}>
+                              重试
+                            </button>
+                          </>
+                        )}
+                      </p>
+                    )}
+                    {browse?.earlierLoading && (
+                      <p
+                        role="status"
+                        className="flex items-center justify-center gap-1.5 py-2 text-act-xs leading-4 text-text-faint"
+                      >
+                        <LoaderCircle className="animate-spin" size={12} aria-hidden="true" />
+                        正在加载更早消息…
+                      </p>
+                    )}
+                    {browse?.earlierError && (
+                      <p role="alert" className="px-5 text-act-xs leading-4 text-text-muted">
+                        {browse.earlierError}{" "}
+                        <button type="button" onClick={requestEarlier}>
+                          重试
+                        </button>
+                      </p>
+                    )}
+                    {isInitialComposer ? null : (
+                      <TurnEditContext.Provider value={turnEditing.value}>
+                        <div ref={messageStackRef} className={MESSAGE_STACK_CLASS}>
+                          {turns.map((turn, turnIndex) => (
+                            <TurnView
+                              key={turn.id}
+                              turn={turn}
+                              isActive={isStreaming && turnIndex === turns.length - 1}
+                              isLatest={turnIndex === turns.length - 1}
+                              sessionId={sessionId}
+                              workspaceRoot={selectedWorkspaceRoot}
+                              turnNumber={turnNumbers?.get(turn.id)}
+                              setTurnElement={turnNavigator.setTurnElement}
+                              onOpenAttachmentPreview={openAttachmentPreview}
+                              onOpenSubagent={openSubagent}
+                              onOpenReadFile={openReadFile}
+                              onOpenWorkspaceFile={openWorkspaceFile}
+                              editable={turnEditing.editableTurnIds.has(turn.id)}
+                              dim={turnEditing.dimOf(turnIndex)}
+                              leaving={turnEditing.leaving}
+                            />
+                          ))}
+                          <div ref={bottomAnchorRef} aria-hidden="true" />
+                        </div>
+                      </TurnEditContext.Provider>
+                    )}
+                  </section>
+
+                  {isInitialComposer || turnEditing.editing ? null : (
+                    <PinnedTurnPrompt
+                      scrollRef={scrollContainerRef}
+                      turns={turns}
+                      className={MESSAGE_COLUMN_WIDTH_CLASS}
+                      onJump={jumpToPinnedTurn}
                     />
-                  ))}
-                  <div ref={bottomAnchorRef} aria-hidden="true" />
+                  )}
+                  <TurnNavigator
+                    items={turnNavigationItems}
+                    visible={turnNavigator.railVisible}
+                    activeTurnId={turnNavigator.activeTurnId}
+                    onNavigate={navigateToTurn}
+                  />
+                  {isAwayFromBottom ? <ScrollToBottomButton onClick={scrollToBottom} /> : null}
                 </div>
-                </TurnEditContext.Provider>
-              )}
-          </section>
+                {activeView === "trajectory" ? (
+                  <div className="flex h-full min-h-0 flex-col">
+                    {/* 「停止」放在轨迹工具栏最右侧（DSH 工具栏只有 32px，不再单独占一行）。 */}
+                    <div className="min-h-0 flex-1">
+                      <Suspense fallback={null}>
+                        <TrajectoryView
+                          onAbort={isStreaming ? onAbort : undefined}
+                          isAborting={isAborting}
+                          onOpenSubagent={openSubagentTrajectory}
+                        />
+                      </Suspense>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              {/* 放在消息区之后：React 按树序挂 ref 并跑 layout effect，放前面时首帧拿不到 scrollContainerRef。 */}
+              <ResponseAnnotationHighlights messages={messages} scrollContainerRef={scrollContainerRef} />
 
-          {isInitialComposer || turnEditing.editing ? null : (
-            <PinnedTurnPrompt scrollRef={scrollContainerRef} turns={turns} className={MESSAGE_COLUMN_WIDTH_CLASS} onJump={jumpToPinnedTurn} />
-          )}
-          <TurnNavigator
-            items={turnNavigationItems}
-            visible={turnNavigator.railVisible}
-            activeTurnId={turnNavigator.activeTurnId}
-            onNavigate={navigateToTurn}
-          />
-          {isAwayFromBottom ? <ScrollToBottomButton onClick={scrollToBottom} /> : null}
-        </div>
-        {activeView === "trajectory" ? <div className="flex h-full min-h-0 flex-col">
-          {/* 「停止」放在轨迹工具栏最右侧（DSH 工具栏只有 32px，不再单独占一行）。 */}
-          <div className="min-h-0 flex-1"><Suspense fallback={null}><TrajectoryView onAbort={isStreaming ? onAbort : undefined} isAborting={isAborting} onOpenSubagent={openSubagentTrajectory} /></Suspense></div>
-        </div> : null}
-      </div>
-      {/* 放在消息区之后：React 按树序挂 ref 并跑 layout effect，放前面时首帧拿不到 scrollContainerRef。 */}
-      <ResponseAnnotationHighlights messages={messages} scrollContainerRef={scrollContainerRef} />
-
-      {resolvedSessionReady ? (
-        <div className={isInitialComposer ? INITIAL_COMPOSER_SCROLL_CLASS : COMPOSER_ZONE_CLASS} style={activeView === "trajectory" ? { display: "none" } : undefined} aria-hidden={activeView === "trajectory"}>
-          <div className={isInitialComposer ? INITIAL_COMPOSER_STAGE_CLASS : "contents"}>
-            <ConversationComposerSlot
-              surface={isInitialComposer ? "initial" : "followup"}
-              {...composerSlotProps}
-              reviewSummary={isInitialComposer ? undefined : reviewSummary}
-              onOpenReview={isInitialComposer ? undefined : onOpenReview}
-            />
-          </div>
-        </div>
-      ) : null}
-    </main>
-    </SubagentStatusContext.Provider>
-    </BackgroundTaskLinkContext.Provider>
-    </CompactionRetryContext.Provider>
+              {resolvedSessionReady ? (
+                <div
+                  className={isInitialComposer ? INITIAL_COMPOSER_SCROLL_CLASS : COMPOSER_ZONE_CLASS}
+                  style={activeView === "trajectory" ? { display: "none" } : undefined}
+                  aria-hidden={activeView === "trajectory"}
+                >
+                  <div className={isInitialComposer ? INITIAL_COMPOSER_STAGE_CLASS : "contents"}>
+                    <ConversationComposerSlot
+                      surface={isInitialComposer ? "initial" : "followup"}
+                      {...composerSlotProps}
+                      reviewSummary={isInitialComposer ? undefined : reviewSummary}
+                      onOpenReview={isInitialComposer ? undefined : onOpenReview}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </main>
+          </SubagentStatusContext.Provider>
+        </BackgroundTaskLinkContext.Provider>
+      </CompactionRetryContext.Provider>
     </ResponseAnnotationContext.Provider>
   );
 }

@@ -26,7 +26,10 @@ export async function ensureSoundtrack() {
   console.log(`下载配乐《${soundtrack.title}》（${soundtrack.artist}，${soundtrack.license}）…`);
   // 这个站点会拒绝不带浏览器 User-Agent 的请求。
   const response = await fetch(soundtrack.url, { headers: { "User-Agent": "Mozilla/5.0 (actspace promo-video)" } });
-  if (!response.ok) throw new Error(`配乐下载失败（HTTP ${response.status}）：${soundtrack.url}\n也可以手动从 ${soundtrack.page} 下载，存成 ${file}`);
+  if (!response.ok)
+    throw new Error(
+      `配乐下载失败（HTTP ${response.status}）：${soundtrack.url}\n也可以手动从 ${soundtrack.page} 下载，存成 ${file}`,
+    );
   await mkdir(dirname(file), { recursive: true });
   await writeFile(`${file}.part`, Buffer.from(await response.arrayBuffer()));
   await rename(`${file}.part`, file);

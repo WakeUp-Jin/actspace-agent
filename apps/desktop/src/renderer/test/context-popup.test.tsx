@@ -19,7 +19,13 @@ function makeSnapshot(): ContextUsageSnapshot {
     compressionCount: 3,
     cumulativeTokens: 100,
     buckets: [
-      { key: "systemPrompt", name: "systemPrompt", label: "System prompt", tokens: 40, colorToken: "--act-context-system" },
+      {
+        key: "systemPrompt",
+        name: "systemPrompt",
+        label: "System prompt",
+        tokens: 40,
+        colorToken: "--act-context-system",
+      },
       { key: "tools", name: "tools", label: "Tools", tokens: 60, colorToken: "--act-context-tools" },
     ],
   };
@@ -72,7 +78,13 @@ describe("ContextPopup", () => {
       cumulativeTokens: 2_190,
       buckets: [
         { key: "tools", name: "tools", label: "Tools", tokens: 1_879, colorToken: "--act-context-tools" },
-        { key: "conversation", name: "conversation", label: "Conversation", tokens: 311, colorToken: "--act-context-conversation" },
+        {
+          key: "conversation",
+          name: "conversation",
+          label: "Conversation",
+          tokens: 311,
+          colorToken: "--act-context-conversation",
+        },
       ],
     };
     renderContextPopup({ snapshot, onClose: vi.fn() });
@@ -99,7 +111,12 @@ describe("ContextPopup", () => {
 
     rerender(
       <TooltipProvider delayDuration={0}>
-        <ContextPopup anchorRef={{ current: document.body }} snapshot={makeSnapshot()} onClose={vi.fn()} onExpand={onExpand} />
+        <ContextPopup
+          anchorRef={{ current: document.body }}
+          snapshot={makeSnapshot()}
+          onClose={vi.fn()}
+          onExpand={onExpand}
+        />
       </TooltipProvider>,
     );
     await user.click(screen.getByLabelText("查看完整上下文"));

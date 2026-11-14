@@ -23,7 +23,10 @@ it("persists to localStorage", () => {
 });
 it("seeds a baseline only for sessions without a record", () => {
   markSeen("a", "2026-01-05");
-  seedSeen([{ sessionId: "a", updatedAt: "2026-01-09" }, { sessionId: "c", updatedAt: "2026-01-03" }]);
+  seedSeen([
+    { sessionId: "a", updatedAt: "2026-01-09" },
+    { sessionId: "c", updatedAt: "2026-01-03" },
+  ]);
   expect(isUnread("a", "2026-01-09", null)).toBe(true);
   expect(isUnread("c", "2026-01-03", null)).toBe(false);
   expect(isUnread("c", "2026-01-04", null)).toBe(true);

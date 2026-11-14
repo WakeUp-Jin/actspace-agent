@@ -13,9 +13,25 @@ export type ContextRequest = {
   readonly model: string;
   readonly options: LlmRequestOptions;
 };
-export type SystemSection = { readonly id: string; readonly owner: string; readonly order: number; readonly content: RuntimeJsonValue; readonly provenance?: RuntimeJsonValue };
-export type SystemContext = { readonly sections: readonly SystemSection[]; readonly modelFacts: readonly RuntimeJsonValue[]; readonly modelFactSources?: readonly { readonly id: string; readonly owner: string }[] };
-export type ContextSupplement = { readonly id: string; readonly owner: string; readonly sourceEventSeq: number; readonly afterEventSeq: number; readonly text: string };
+export type SystemSection = {
+  readonly id: string;
+  readonly owner: string;
+  readonly order: number;
+  readonly content: RuntimeJsonValue;
+  readonly provenance?: RuntimeJsonValue;
+};
+export type SystemContext = {
+  readonly sections: readonly SystemSection[];
+  readonly modelFacts: readonly RuntimeJsonValue[];
+  readonly modelFactSources?: readonly { readonly id: string; readonly owner: string }[];
+};
+export type ContextSupplement = {
+  readonly id: string;
+  readonly owner: string;
+  readonly sourceEventSeq: number;
+  readonly afterEventSeq: number;
+  readonly text: string;
+};
 export type ContextPathState = {
   readonly id: string;
   readonly path: string;
@@ -95,4 +111,7 @@ export type LlmInput = {
   readonly tools: readonly LlmToolDefinition[];
   readonly options: LlmRequestOptions;
 };
-export type ArtifactResolver = (sessionId: string, artifactId: string) => Promise<{ readonly path: string; readonly mediaType: string }>;
+export type ArtifactResolver = (
+  sessionId: string,
+  artifactId: string,
+) => Promise<{ readonly path: string; readonly mediaType: string }>;

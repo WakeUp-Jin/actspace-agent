@@ -21,14 +21,16 @@ async function fixture() {
     dataRoot,
     defaultWorkspaceRoot,
     fallbackWorkspaceRoot: defaultWorkspaceRoot,
-    sessions: [{
-      id: "session-1",
-      title: "Project session",
-      createdAt: "2026-07-29T00:00:00.000Z",
-      updatedAt: "2026-07-29T00:00:00.000Z",
-      agentRunCount: 1,
-      workspaceRoot,
-    }],
+    sessions: [
+      {
+        id: "session-1",
+        title: "Project session",
+        createdAt: "2026-07-29T00:00:00.000Z",
+        updatedAt: "2026-07-29T00:00:00.000Z",
+        agentRunCount: 1,
+        workspaceRoot,
+      },
+    ],
   };
   const registry = await readWorkspaceRegistry(options);
   const workspace = registry.items.find((item) => item.path === resolve(workspaceRoot));

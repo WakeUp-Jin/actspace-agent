@@ -52,7 +52,14 @@ export class SessionWriterLease {
     await mkdir(recoveryDir, { recursive: true });
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const stamp = now().toISOString();
-      const owner: SessionWriterLeaseOwner = Object.freeze({ sessionId: options.sessionId, runtimeId: options.runtimeId, pid, nonce: randomUUID(), acquiredAt: stamp, heartbeatAt: stamp });
+      const owner: SessionWriterLeaseOwner = Object.freeze({
+        sessionId: options.sessionId,
+        runtimeId: options.runtimeId,
+        pid,
+        nonce: randomUUID(),
+        acquiredAt: stamp,
+        heartbeatAt: stamp,
+      });
       try {
         await mkdir(lockDir);
         await writeFile(ownerPath, `${JSON.stringify(owner)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
@@ -67,7 +74,10 @@ export class SessionWriterLease {
         // 只看持有进程是否还在：进程退出后立即接管，不等心跳过期。重启 dev / 应用时新进程常在旧进程退出后
         // 几秒内启动，等 30 秒会让选择存储和会话一直锁着，排队任务被暂停。
         if ((options.isProcessAlive ?? defaultProcessAlive)(existing.pid)) {
-          throw new SessionError("SESSION_WRITER_LOCKED", `Session ${options.sessionId} is owned by runtime ${existing.runtimeId} pid ${existing.pid}.`);
+          throw new SessionError(
+            "SESSION_WRITER_LOCKED",
+            `Session ${options.sessionId} is owned by runtime ${existing.runtimeId} pid ${existing.pid}.`,
+          );
         }
         const stalePath = join(recoveryDir, `stale-lock-${existing.nonce}`);
         try {
@@ -86,7 +96,8 @@ export class SessionWriterLease {
   }
 
   async assertOwned(): Promise<void> {
-    if (this.#disposed || this.#lost) throw new SessionError("SESSION_LEASE_LOST", "Session writer lease is no longer owned.");
+    if (this.#disposed || this.#lost)
+      throw new SessionError("SESSION_LEASE_LOST", "Session writer lease is no longer owned.");
     const current = await readOwner(this.#ownerPath).catch(() => null);
     if (current?.nonce !== this.#owner.nonce) {
       this.#lost = true;
@@ -126,7 +137,8 @@ export class SessionWriterLease {
 
 async function readOwner(path: string): Promise<SessionWriterLeaseOwner> {
   const value = JSON.parse(await readFile(path, "utf8")) as SessionWriterLeaseOwner;
-  if (typeof value.nonce !== "string" || typeof value.runtimeId !== "string" || !Number.isSafeInteger(value.pid)) throw new Error("Invalid writer lease owner record.");
+  if (typeof value.nonce !== "string" || typeof value.runtimeId !== "string" || !Number.isSafeInteger(value.pid))
+    throw new Error("Invalid writer lease owner record.");
   return value;
 }
 
@@ -140,5 +152,7 @@ function defaultProcessAlive(pid: number): boolean {
 }
 
 function errorCode(error: unknown): string | undefined {
-  return error !== null && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code) : undefined;
+  return error !== null && typeof error === "object" && "code" in error
+    ? String((error as { code?: unknown }).code)
+    : undefined;
 }

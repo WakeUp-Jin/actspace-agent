@@ -32,7 +32,8 @@ export class ScopedRegistry<T> {
     const local = this.#local(true);
     if (local.has(entry.id)) throw new Error(`Duplicate scoped registration ${entry.id}.`);
     const inherited = this.#inherited(entry.id);
-    if (inherited?.owner === "@actspace/core" && entry.owner !== "@actspace/core") throw new Error(`Registration ${entry.id} cannot shadow an ActSpace Core contribution.`);
+    if (inherited?.owner === "@actspace/core" && entry.owner !== "@actspace/core")
+      throw new Error(`Registration ${entry.id} cannot shadow an ActSpace Core contribution.`);
     const retained = Object.freeze(entry);
     local.set(entry.id, retained);
     const remove = () => {
@@ -41,8 +42,14 @@ export class ScopedRegistry<T> {
       if (local.size === 0 && this.scopeKey !== undefined) this.#layers.scoped.delete(this.scopeKey);
     };
     try {
-      const cancel = this.ownerDisposer?.add(async () => { remove(); await disposer?.(); });
-      return () => { remove(); cancel?.(); };
+      const cancel = this.ownerDisposer?.add(async () => {
+        remove();
+        await disposer?.();
+      });
+      return () => {
+        remove();
+        cancel?.();
+      };
     } catch (error) {
       remove();
       throw error;
@@ -51,7 +58,8 @@ export class ScopedRegistry<T> {
 
   get(id: string): RegistryEntry<T> | undefined {
     let resolved = this.#layers.global.get(id);
-    for (const key of scopeChainOf(this.scopeKey).reverse()) resolved = this.#layers.scoped.get(key)?.get(id) ?? resolved;
+    for (const key of scopeChainOf(this.scopeKey).reverse())
+      resolved = this.#layers.scoped.get(key)?.get(id) ?? resolved;
     return resolved;
   }
 
@@ -63,12 +71,15 @@ export class ScopedRegistry<T> {
     return Object.freeze([...merged.values()]);
   }
 
-  localEntries(): readonly RegistryEntry<T>[] { return Object.freeze([...(this.#local(false)?.values() ?? [])]); }
+  localEntries(): readonly RegistryEntry<T>[] {
+    return Object.freeze([...(this.#local(false)?.values() ?? [])]);
+  }
 
   #inherited(id: string): RegistryEntry<T> | undefined {
     if (this.scopeKey === undefined) return undefined;
     let resolved = this.#layers.global.get(id);
-    for (const key of scopeChainOf(this.scopeKey).slice(1).reverse()) resolved = this.#layers.scoped.get(key)?.get(id) ?? resolved;
+    for (const key of scopeChainOf(this.scopeKey).slice(1).reverse())
+      resolved = this.#layers.scoped.get(key)?.get(id) ?? resolved;
     return resolved;
   }
 

@@ -15,7 +15,9 @@ export function StreamingText({ text, plain, typing, shown }: StreamingTextProps
   if (typing) {
     return (
       <span className="space-typing" role="status" aria-label="正在回复">
-        <i /><i /><i />
+        <i />
+        <i />
+        <i />
       </span>
     );
   }

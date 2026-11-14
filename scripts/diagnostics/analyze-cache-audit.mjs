@@ -48,9 +48,7 @@ function stableStringify(value) {
   const entries = Object.entries(value)
     .filter(([, v]) => v !== undefined)
     .sort(([a], [b]) => a.localeCompare(b));
-  return `{${entries
-    .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
-    .join(",")}}`;
+  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`).join(",")}}`;
 }
 
 function hash(value) {
@@ -165,7 +163,9 @@ function toolCallNamesFromMessage(message) {
   if (!message || typeof message !== "object") return [];
   const content = Array.isArray(message.content) ? message.content : [];
   return content
-    .filter((block) => block && typeof block === "object" && block.type === "toolCall" && typeof block.name === "string")
+    .filter(
+      (block) => block && typeof block === "object" && block.type === "toolCall" && typeof block.name === "string",
+    )
     .map((block) => block.name);
 }
 
@@ -180,7 +180,7 @@ function analyzeMessageDelta(diff) {
   const hasPrevious = Boolean(diff.previous);
   const baseIndex = hasPrevious
     ? diff.appendOnlyBroken
-      ? diff.firstChangedMessageIndex ?? 0
+      ? (diff.firstChangedMessageIndex ?? 0)
       : previousMessages.length
     : 0;
   const currentDeltaMessages = currentMessages.slice(baseIndex);

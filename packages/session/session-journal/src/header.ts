@@ -55,11 +55,7 @@ export type SessionHeaderV1 = {
 
 export type CreateSessionHeaderInput = Omit<
   SessionHeaderV1,
-  | "recordKind"
-  | "format"
-  | "formatVersion"
-  | "backend"
-  | "backendSchemaVersion"
+  "recordKind" | "format" | "formatVersion" | "backend" | "backendSchemaVersion"
 >;
 
 export function createSessionHeader(input: CreateSessionHeaderInput): SessionHeaderV1 {
@@ -91,8 +87,10 @@ export function validateSessionHeader(value: unknown, expectedSessionId?: string
   requireTimestamp(value.createdAt, "createdAt");
   if (value.cwd !== undefined) requireString(value.cwd, "cwd");
   if (value.worktree !== undefined) {
-    if (!isRecord(value.worktree) || value.worktree.kind !== "worktree") throw invalidHeader("Invalid worktree binding.");
-    for (const key of ["sourceWorkspaceRoot", "workspaceRoot", "baseBranch", "branch", "baseCommit"]) requireString(value.worktree[key], `worktree.${key}`);
+    if (!isRecord(value.worktree) || value.worktree.kind !== "worktree")
+      throw invalidHeader("Invalid worktree binding.");
+    for (const key of ["sourceWorkspaceRoot", "workspaceRoot", "baseBranch", "branch", "baseCommit"])
+      requireString(value.worktree[key], `worktree.${key}`);
     requireTimestamp(value.worktree.createdAt, "worktree.createdAt");
     if (value.worktree.workspaceRoot !== value.cwd) throw invalidHeader("Worktree must match Session cwd.");
   }
@@ -100,21 +98,30 @@ export function validateSessionHeader(value: unknown, expectedSessionId?: string
   if (!isRecord(value.createdWith)) throw invalidHeader("createdWith must be an object.");
   requireString(value.createdWith.profileId, "createdWith.profileId");
   if (value.createdWith.presetId !== undefined) requireString(value.createdWith.presetId, "createdWith.presetId");
-  if (value.createdWith.agentFormId !== undefined && value.createdWith.agentFormId !== "actspace.main") throw invalidHeader("Unsupported agent form.");
-  if (value.createdWith.agentFormVersion !== undefined && value.createdWith.agentFormVersion !== 1) throw invalidHeader("Unsupported agent form version.");
-  if (value.createdWith.agentCompositionDigest !== undefined) requireString(value.createdWith.agentCompositionDigest, "createdWith.agentCompositionDigest");
+  if (value.createdWith.agentFormId !== undefined && value.createdWith.agentFormId !== "actspace.main")
+    throw invalidHeader("Unsupported agent form.");
+  if (value.createdWith.agentFormVersion !== undefined && value.createdWith.agentFormVersion !== 1)
+    throw invalidHeader("Unsupported agent form version.");
+  if (value.createdWith.agentCompositionDigest !== undefined)
+    requireString(value.createdWith.agentCompositionDigest, "createdWith.agentCompositionDigest");
   if (value.createdWith.agentMembers !== undefined) {
-    if (!Array.isArray(value.createdWith.agentMembers)) throw invalidHeader("createdWith.agentMembers must be an array.");
+    if (!Array.isArray(value.createdWith.agentMembers))
+      throw invalidHeader("createdWith.agentMembers must be an array.");
     const memberIds = new Set<string>();
     for (const member of value.createdWith.agentMembers) {
       if (!isRecord(member)) throw invalidHeader("Agent member must be an object.");
       requireString(member.id, "createdWith.agentMembers[].id");
-      if (!Number.isSafeInteger(member.version) || (member.version as number) < 1) throw invalidHeader("Agent member version must be positive.");
+      if (!Number.isSafeInteger(member.version) || (member.version as number) < 1)
+        throw invalidHeader("Agent member version must be positive.");
       if (memberIds.has(member.id)) throw invalidHeader(`Duplicate Agent member ${member.id}.`);
       memberIds.add(member.id);
     }
   }
-  if (value.createdWith.initialAgentMode !== undefined && !["chat", "plan", "agent"].includes(String(value.createdWith.initialAgentMode))) throw invalidHeader("Unsupported initial Agent mode.");
+  if (
+    value.createdWith.initialAgentMode !== undefined &&
+    !["chat", "plan", "agent"].includes(String(value.createdWith.initialAgentMode))
+  )
+    throw invalidHeader("Unsupported initial Agent mode.");
   requireString(value.createdWith.runtimeContractVersion, "createdWith.runtimeContractVersion");
   requireString(value.createdWith.manifestDigest, "createdWith.manifestDigest");
   requireString(value.createdWith.codecSetDigest, "createdWith.codecSetDigest");
@@ -145,8 +152,10 @@ function validateLineage(value: unknown): asserts value is SessionLineageV1 {
   if (value.parentCallId !== undefined) requireString(value.parentCallId, "lineage.parentCallId");
   if (value.seedDigest !== undefined) requireString(value.seedDigest, "lineage.seedDigest");
   if (value.inheritedThroughSeq !== undefined) {
-    if (value.origin !== "delegation") throw invalidHeader("lineage.inheritedThroughSeq is only allowed for delegation.");
-    if (!Number.isSafeInteger(value.inheritedThroughSeq) || (value.inheritedThroughSeq as number) < 0) throw invalidHeader("lineage.inheritedThroughSeq must be a non-negative integer.");
+    if (value.origin !== "delegation")
+      throw invalidHeader("lineage.inheritedThroughSeq is only allowed for delegation.");
+    if (!Number.isSafeInteger(value.inheritedThroughSeq) || (value.inheritedThroughSeq as number) < 0)
+      throw invalidHeader("lineage.inheritedThroughSeq must be a non-negative integer.");
   }
 }
 

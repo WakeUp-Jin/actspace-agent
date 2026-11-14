@@ -38,7 +38,13 @@ export interface ResolvedRuntimeModel {
 
 export type RuntimeModelResolution =
   | { ok: true; model: ResolvedRuntimeModel }
-  | { ok: false; code: "model_unavailable" | ProviderRuntimeError["code"]; message: string; modelKey?: ModelKey; reason?: string };
+  | {
+      ok: false;
+      code: "model_unavailable" | ProviderRuntimeError["code"];
+      message: string;
+      modelKey?: ModelKey;
+      reason?: string;
+    };
 
 export class ModelRuntimeService {
   constructor(
@@ -67,13 +73,15 @@ export class ModelRuntimeService {
     const imageGeneration = this.settings.getImageGenerationRuntimeConfig();
     const tools = this.settings.getV4().settings.tools;
     const deepseekKey = this.settings.getStoredKey("deepseek");
-    const searchCredentials = tools.disabledTools.includes("web_search") ? {} : Object.fromEntries(
-      (["zhipu", "tavily", "tinyfish", "exa", "deepseek"] as const).flatMap((provider) => {
-        const enabled = tools.searchProviders[provider]?.enabled ?? (provider !== "deepseek");
-        const key = enabled ? this.settings.getStoredKey(provider) : undefined;
-        return key ? [[provider, key] as const] : [];
-      }),
-    );
+    const searchCredentials = tools.disabledTools.includes("web_search")
+      ? {}
+      : Object.fromEntries(
+          (["zhipu", "tavily", "tinyfish", "exa", "deepseek"] as const).flatMap((provider) => {
+            const enabled = tools.searchProviders[provider]?.enabled ?? provider !== "deepseek";
+            const key = enabled ? this.settings.getStoredKey(provider) : undefined;
+            return key ? [[provider, key] as const] : [];
+          }),
+        );
     return {
       hasWebSearchKey: Object.keys(searchCredentials).length > 0,
       searchCredentials,
@@ -91,7 +99,11 @@ export class ModelRuntimeService {
       return { ok: false, code: "model_unavailable", message: "请求的模型标识无效。" };
     }
     const key = requestedKey ?? taskModels.defaultChatModel ?? DEFAULT_MODEL_KEY;
-    return this.resolve(key, "chat", requestedKey ? "requested" : taskModels.defaultChatModel ? "configured" : "default");
+    return this.resolve(
+      key,
+      "chat",
+      requestedKey ? "requested" : taskModels.defaultChatModel ? "configured" : "default",
+    );
   }
 
   resolveUtilityModel(main: ResolvedRuntimeModel): RuntimeModelResolution {
@@ -99,7 +111,14 @@ export class ModelRuntimeService {
     if (configured) {
       const resolution = this.resolve(configured, "utility", "configured");
       if ("model" in resolution) return resolution;
-      return { ok: true, model: { ...main, source: "fallback", fallbackReason: `utility_to_main:${resolution.reason ?? resolution.code}` } };
+      return {
+        ok: true,
+        model: {
+          ...main,
+          source: "fallback",
+          fallbackReason: `utility_to_main:${resolution.reason ?? resolution.code}`,
+        },
+      };
     }
     return { ok: true, model: { ...main, source: "fallback", fallbackReason: "utility_to_main:not_configured" } };
   }
@@ -128,7 +147,11 @@ export class ModelRuntimeService {
     if (chat.ok) return this.fromUsable(chat.model, "fallback");
     const first = listUsableModels(snapshot, "vision")[0];
     if (first) return this.fromUsable(first, "fallback");
-    return { ok: false, code: "model_unavailable", message: "没有可用的看图模型，请在设置 › 模型的用途里选一个能看图的模型。" };
+    return {
+      ok: false,
+      code: "model_unavailable",
+      message: "没有可用的看图模型，请在设置 › 模型的用途里选一个能看图的模型。",
+    };
   }
 
   /** 设置里的子智能体默认模型；null = 未设置，跟随父会话当前模型。每次现读，改设置不用重启。 */
@@ -141,7 +164,11 @@ export class ModelRuntimeService {
     return this.settings.getModelStorageState().taskModels.thinking?.[purpose] ?? null;
   }
 
-  private resolve(key: ModelKey, purpose: ModelPurpose, source: ResolvedRuntimeModel["source"]): RuntimeModelResolution {
+  private resolve(
+    key: ModelKey,
+    purpose: ModelPurpose,
+    source: ResolvedRuntimeModel["source"],
+  ): RuntimeModelResolution {
     const resolution = resolveConfiguredModel(this.models.getModelSnapshot(), key, purpose);
     if (!resolution.ok) {
       const reason = "reason" in resolution ? resolution.reason : "model_missing";

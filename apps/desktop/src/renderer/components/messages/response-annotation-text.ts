@@ -12,13 +12,32 @@ export type AnnotatableText = {
 
 export type AnnotatableSegment = { node: Text; start: number; end: number };
 
-export type AnnotationResolution =
-  | { status: "resolved"; start: number; end: number }
-  | { status: "unresolved" };
+export type AnnotationResolution = { status: "resolved"; start: number; end: number } | { status: "unresolved" };
 
 const TEXT_BLOCK_SELECTOR = "p, h1, h2, h3, h4, h5, h6, li, blockquote, td, th";
 const EXCLUDED_SELECTOR = "pre, .markdown-code-shell, [data-annotation-exclude]";
-const BLOCK_LIKE_TAGS = new Set(["P", "UL", "OL", "LI", "BLOCKQUOTE", "PRE", "DIV", "TABLE", "THEAD", "TBODY", "TR", "TD", "TH", "H1", "H2", "H3", "H4", "H5", "H6", "HR"]);
+const BLOCK_LIKE_TAGS = new Set([
+  "P",
+  "UL",
+  "OL",
+  "LI",
+  "BLOCKQUOTE",
+  "PRE",
+  "DIV",
+  "TABLE",
+  "THEAD",
+  "TBODY",
+  "TR",
+  "TD",
+  "TH",
+  "H1",
+  "H2",
+  "H3",
+  "H4",
+  "H5",
+  "H6",
+  "HR",
+]);
 const CONTEXT_CODE_UNITS = COMPOSER_REFERENCE_LIMITS.maxContextCodeUnits;
 
 export function collectAnnotatableText(root: HTMLElement): AnnotatableText {
@@ -43,7 +62,11 @@ export function collectAnnotatableText(root: HTMLElement): AnnotatableText {
 }
 
 /** 选区映射为偏移；端点落在未收录的文字里、或选区跨过代码块等排除节点时返回 null。首尾空白会被收缩掉。 */
-export function rangeToOffsets(model: AnnotatableText, range: Range, root: HTMLElement): { start: number; end: number } | null {
+export function rangeToOffsets(
+  model: AnnotatableText,
+  range: Range,
+  root: HTMLElement,
+): { start: number; end: number } | null {
   if (range.collapsed || model.segments.length === 0) return null;
   if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return null;
   for (const excluded of Array.from(root.querySelectorAll(EXCLUDED_SELECTOR))) {
@@ -62,10 +85,12 @@ export function rangeToOffsets(model: AnnotatableText, range: Range, root: HTMLE
 export function offsetsToRange(model: AnnotatableText, start: number, end: number): Range | null {
   if (start < 0 || end > model.text.length || start >= end) return null;
   // 起点落在块间虚拟 \n 上时移到下一段开头；终点落在块间时收到上一段末尾。
-  const startSegment = model.segments.find((segment) => start < segment.end && segment.end > segment.start && start >= segment.start)
-    ?? model.segments.find((segment) => segment.start >= start);
-  const endSegment = [...model.segments].reverse().find((segment) => end > segment.start && end <= segment.end)
-    ?? [...model.segments].reverse().find((segment) => segment.end <= end);
+  const startSegment =
+    model.segments.find((segment) => start < segment.end && segment.end > segment.start && start >= segment.start) ??
+    model.segments.find((segment) => segment.start >= start);
+  const endSegment =
+    [...model.segments].reverse().find((segment) => end > segment.start && end <= segment.end) ??
+    [...model.segments].reverse().find((segment) => segment.end <= end);
   if (!startSegment || !endSegment) return null;
   const range = startSegment.node.ownerDocument.createRange();
   range.setStart(startSegment.node, Math.max(0, start - startSegment.start));
@@ -73,7 +98,12 @@ export function offsetsToRange(model: AnnotatableText, start: number, end: numbe
   return range.collapsed ? null : range;
 }
 
-export function createAnnotationDraft(model: AnnotatableText, start: number, end: number, assistantMessageId: string): ResponseAnnotationReference {
+export function createAnnotationDraft(
+  model: AnnotatableText,
+  start: number,
+  end: number,
+  assistantMessageId: string,
+): ResponseAnnotationReference {
   return {
     annotationId: createAnnotationId(),
     assistantMessageId,
@@ -90,9 +120,16 @@ export function createAnnotationId(): string {
 }
 
 /** 偏移仍对得上就直接用；否则按「前文 + 原文 + 后文」找唯一出现位置；0 个或多个都算 unresolved，绝不猜位置。 */
-export function resolveAnnotation(model: AnnotatableText, annotation: Pick<ResponseAnnotationReference, "selectedText" | "startOffset" | "endOffset" | "prefixContext" | "suffixContext">): AnnotationResolution {
+export function resolveAnnotation(
+  model: AnnotatableText,
+  annotation: Pick<
+    ResponseAnnotationReference,
+    "selectedText" | "startOffset" | "endOffset" | "prefixContext" | "suffixContext"
+  >,
+): AnnotationResolution {
   const { selectedText, startOffset, endOffset, prefixContext, suffixContext } = annotation;
-  if (model.text.slice(startOffset, endOffset) === selectedText) return { status: "resolved", start: startOffset, end: endOffset };
+  if (model.text.slice(startOffset, endOffset) === selectedText)
+    return { status: "resolved", start: startOffset, end: endOffset };
   const needle = `${prefixContext}${selectedText}${suffixContext}`;
   const first = model.text.indexOf(needle);
   if (first < 0 || model.text.indexOf(needle, first + 1) >= 0) return { status: "unresolved" };
@@ -103,7 +140,9 @@ export function resolveAnnotation(model: AnnotatableText, annotation: Pick<Respo
 /** 在容器里找到批注所属回复的可批注根节点并定位原文；回复没渲染或定位失败返回 null。 */
 export function resolveAnnotationRange(container: ParentNode, annotation: ResponseAnnotationReference): Range | null {
   const replies = container.querySelectorAll<HTMLElement>("[data-assistant-message-id]");
-  const reply = Array.from(replies).find((element) => element.dataset.assistantMessageId === annotation.assistantMessageId);
+  const reply = Array.from(replies).find(
+    (element) => element.dataset.assistantMessageId === annotation.assistantMessageId,
+  );
   const root = reply?.querySelector<HTMLElement>("[data-annotation-root]");
   if (!root) return null;
   const model = collectAnnotatableText(root);
@@ -111,7 +150,12 @@ export function resolveAnnotationRange(container: ParentNode, annotation: Respon
   return resolution.status === "resolved" ? offsetsToRange(model, resolution.start, resolution.end) : null;
 }
 
-function boundaryToIndex(model: AnnotatableText, container: Node, offset: number, edge: "start" | "end"): number | null {
+function boundaryToIndex(
+  model: AnnotatableText,
+  container: Node,
+  offset: number,
+  edge: "start" | "end",
+): number | null {
   if (container.nodeType === Node.TEXT_NODE) {
     const segment = model.segments.find((candidate) => candidate.node === container);
     if (segment) return segment.start + Math.min(offset, segment.node.data.length);
@@ -132,8 +176,10 @@ function boundaryToIndex(model: AnnotatableText, container: Node, offset: number
 function isLayoutWhitespace(node: Text): boolean {
   if (!/^\s*$/u.test(node.data)) return false;
   const siblings = [node.previousSibling, node.nextSibling];
-  return siblings.some((sibling) => sibling instanceof Element && BLOCK_LIKE_TAGS.has(sibling.tagName))
-    || (node.parentElement !== null && !node.parentElement.closest(TEXT_BLOCK_SELECTOR));
+  return (
+    siblings.some((sibling) => sibling instanceof Element && BLOCK_LIKE_TAGS.has(sibling.tagName)) ||
+    (node.parentElement !== null && !node.parentElement.closest(TEXT_BLOCK_SELECTOR))
+  );
 }
 
 function trimLeadingLowSurrogate(value: string): string {

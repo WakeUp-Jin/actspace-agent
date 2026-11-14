@@ -19,7 +19,9 @@ describe("PermissionModeControl", () => {
     expect(screen.getByRole("menuitemradio", { name: "自动" })).toHaveAttribute("aria-checked", "true");
     await user.click(screen.getByRole("menuitemradio", { name: "替我审批" }));
 
-    await waitFor(() => expect(setSessionPermissionMode).toHaveBeenCalledWith({ sessionId: "session-1", mode: "auto-review" }));
+    await waitFor(() =>
+      expect(setSessionPermissionMode).toHaveBeenCalledWith({ sessionId: "session-1", mode: "auto-review" }),
+    );
     expect(onChanged).toHaveBeenCalledOnce();
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
     await waitFor(() => expect(trigger).toHaveFocus());
@@ -30,9 +32,14 @@ describe("PermissionModeControl", () => {
     render(<PermissionModeControl sessionId="session-1" mode="default" disabled={false} onChanged={() => undefined} />);
     await user.click(screen.getByRole("button", { name: "会话权限模式" }));
     const menu = screen.getByRole("menu");
-    expect(screen.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual(["自动", "替我审批", "完全权限"]);
+    expect(screen.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual([
+      "自动",
+      "替我审批",
+      "完全权限",
+    ]);
     expect(within(menu).queryAllByRole("menuitem")).toHaveLength(0);
-    for (const text of ["按策略询问", "模型代为判断", "Bash 不进沙箱", "管理会话授权"]) expect(within(menu).queryByText(text)).toBeNull();
+    for (const text of ["按策略询问", "模型代为判断", "Bash 不进沙箱", "管理会话授权"])
+      expect(within(menu).queryByText(text)).toBeNull();
     expect(within(menu).queryByRole("separator")).toBeNull();
     expect(screen.getByRole("menuitemradio", { name: "自动" })).not.toHaveAttribute("aria-description");
   });
@@ -55,7 +62,9 @@ describe("PermissionModeControl", () => {
     expect(setSessionPermissionMode).not.toHaveBeenCalled();
 
     await user.click(within(dialog).getByRole("button", { name: "开启" }));
-    await waitFor(() => expect(setSessionPermissionMode).toHaveBeenCalledWith({ sessionId: "session-1", mode: "full-access" }));
+    await waitFor(() =>
+      expect(setSessionPermissionMode).toHaveBeenCalledWith({ sessionId: "session-1", mode: "full-access" }),
+    );
     expect(onChanged).toHaveBeenCalledOnce();
     await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
     await waitFor(() => expect(trigger).toHaveFocus());
@@ -101,11 +110,15 @@ describe("PermissionModeControl", () => {
     setupBridge({ "sessions.setPermissionMode": setSessionPermissionMode });
     const user = userEvent.setup();
 
-    render(<PermissionModeControl sessionId="session-1" mode="full-access" disabled={false} onChanged={() => undefined} />);
+    render(
+      <PermissionModeControl sessionId="session-1" mode="full-access" disabled={false} onChanged={() => undefined} />,
+    );
     await user.click(screen.getByRole("button", { name: "会话权限模式" }));
     await user.click(screen.getByRole("menuitemradio", { name: "自动" }));
     expect(screen.queryByRole("alertdialog")).toBeNull();
-    await waitFor(() => expect(setSessionPermissionMode).toHaveBeenCalledWith({ sessionId: "session-1", mode: "default" }));
+    await waitFor(() =>
+      expect(setSessionPermissionMode).toHaveBeenCalledWith({ sessionId: "session-1", mode: "default" }),
+    );
   });
 
   it("keeps the menu open when saving fails", async () => {
@@ -126,8 +139,20 @@ describe("PermissionModeControl", () => {
   it("disables the options while saving and gives focus back to the trigger once the refresh finishes", async () => {
     let finishSave: (value: { ok: true }) => void = () => {};
     let finishRefresh: () => void = () => {};
-    setupBridge({ "sessions.setPermissionMode": vi.fn(() => new Promise((resolve) => { finishSave = resolve; })) });
-    const onChanged = vi.fn(() => new Promise<void>((resolve) => { finishRefresh = resolve; }));
+    setupBridge({
+      "sessions.setPermissionMode": vi.fn(
+        () =>
+          new Promise((resolve) => {
+            finishSave = resolve;
+          }),
+      ),
+    });
+    const onChanged = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRefresh = resolve;
+        }),
+    );
     const user = userEvent.setup();
 
     render(<PermissionModeControl sessionId="session-1" mode="default" disabled={false} onChanged={onChanged} />);
@@ -139,7 +164,9 @@ describe("PermissionModeControl", () => {
 
     await act(async () => finishSave({ ok: true }));
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
     expect(trigger).not.toHaveFocus();
 
     await act(async () => finishRefresh());
@@ -149,10 +176,14 @@ describe("PermissionModeControl", () => {
 
   it("closes the menu when the session changes", async () => {
     const user = userEvent.setup();
-    const view = render(<PermissionModeControl sessionId="session-1" mode="default" disabled={false} onChanged={() => undefined} />);
+    const view = render(
+      <PermissionModeControl sessionId="session-1" mode="default" disabled={false} onChanged={() => undefined} />,
+    );
     await user.click(screen.getByRole("button", { name: "会话权限模式" }));
     expect(screen.getByRole("menu")).toBeInTheDocument();
-    view.rerender(<PermissionModeControl sessionId="session-2" mode="default" disabled={false} onChanged={() => undefined} />);
+    view.rerender(
+      <PermissionModeControl sessionId="session-2" mode="default" disabled={false} onChanged={() => undefined} />,
+    );
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 
@@ -161,7 +192,9 @@ describe("PermissionModeControl", () => {
     setupBridge({ "sessions.setPermissionMode": setSessionPermissionMode });
     const user = userEvent.setup();
 
-    render(<PermissionModeControl sessionId="session-1" mode="full-access" disabled={false} onChanged={() => undefined} />);
+    render(
+      <PermissionModeControl sessionId="session-1" mode="full-access" disabled={false} onChanged={() => undefined} />,
+    );
     const trigger = screen.getByRole("button", { name: "会话权限模式" });
     trigger.focus();
     await user.keyboard("{Enter}");
@@ -197,7 +230,9 @@ it("selects automatic review independently of full access", async () => {
   const save = vi.fn(async () => ({ ok: true as const }));
   setupBridge({ "sessions.setPermissionMode": save });
   const user = userEvent.setup();
-  render(<PermissionModeControl sessionId="auto-session" mode="default" disabled={false} onChanged={() => undefined} />);
+  render(
+    <PermissionModeControl sessionId="auto-session" mode="default" disabled={false} onChanged={() => undefined} />,
+  );
   await user.click(screen.getByRole("button", { name: "会话权限模式" }));
   await user.click(screen.getByRole("menuitemradio", { name: "替我审批" }));
   await waitFor(() => expect(save).toHaveBeenCalledWith({ sessionId: "auto-session", mode: "auto-review" }));

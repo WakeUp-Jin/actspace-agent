@@ -17,17 +17,31 @@ const START = Date.UTC(2026, 10, 11, 12, 0, 0);
 const FIRST = "用户希望思考过程不要打扰阅读";
 
 function thinking(overrides: Partial<Thinking> = {}): Thinking {
-  return { kind: "thinking", id: "t-1", title: "Thinking...", content: "用户希望", createdAt: "2026-11-11T12:00:00.000Z", collapsedByDefault: false, status: "running", startedAtMs: START, ...overrides };
+  return {
+    kind: "thinking",
+    id: "t-1",
+    title: "Thinking...",
+    content: "用户希望",
+    createdAt: "2026-11-11T12:00:00.000Z",
+    collapsedByDefault: false,
+    status: "running",
+    startedAtMs: START,
+    ...overrides,
+  };
 }
 
 async function withSetting(simplifyThinking: boolean) {
-  setupBridge({ "settings.getV4": vi.fn(async () => ({ version: 4, revision: "r", settings: { general: { simplifyThinking } } })) });
+  setupBridge({
+    "settings.getV4": vi.fn(async () => ({ version: 4, revision: "r", settings: { general: { simplifyThinking } } })),
+  });
 }
 
 /** 读取设置是异步的；渲染后冲一下微任务，让共享订阅拿到值。 */
 async function renderBlock(message: Thinking, props: { replyCompleted?: boolean } = {}) {
   let view!: ReturnType<typeof render>;
-  await act(async () => { view = render(<ThinkingBlock message={message} {...props} />); });
+  await act(async () => {
+    view = render(<ThinkingBlock message={message} {...props} />);
+  });
   await act(async () => {});
   return view;
 }
@@ -35,7 +49,9 @@ async function renderBlock(message: Thinking, props: { replyCompleted?: boolean 
 /** 思考块里只有标题这一个按钮。 */
 const toggle = () => screen.getByRole("button");
 
-afterEach(() => { vi.useRealTimers(); });
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("simplified thinking (setting on)", () => {
   it("stays one line while running and counts seconds", async () => {
@@ -46,7 +62,9 @@ describe("simplified thinking (setting on)", () => {
 
     expect(document.querySelector(".thinking-content")).toBeNull();
     expect(toggle()).toHaveAccessibleName("Thinking 1s");
-    await act(async () => { vi.advanceTimersByTime(5000); });
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
     expect(toggle()).toHaveAccessibleName("Thinking 5s");
   });
 
@@ -60,7 +78,11 @@ describe("simplified thinking (setting on)", () => {
     view.rerender(<ThinkingBlock message={thinking({ content: `${FIRST}。现在的问题是正文一边流式输出` })} />);
     expect(toggle()).toHaveAccessibleName(`Thinking 3s · ${FIRST}`);
 
-    view.rerender(<ThinkingBlock message={thinking({ content: `${FIRST}。现在的问题是正文一边流式输出。\n\n先看 ThinkingBlock，再决定。` })} />);
+    view.rerender(
+      <ThinkingBlock
+        message={thinking({ content: `${FIRST}。现在的问题是正文一边流式输出。\n\n先看 ThinkingBlock，再决定。` })}
+      />,
+    );
     expect(toggle()).toHaveAccessibleName(`Thinking 3s · ${FIRST}`);
   });
 
@@ -83,7 +105,18 @@ describe("simplified thinking (setting on)", () => {
     expect(toggle()).toHaveAccessibleName("Thought for 9s");
     expect(document.querySelector(".tool-log-shimmer")).toBeNull();
 
-    view.rerender(<ThinkingBlock message={{ kind: "thinking", id: "t-2", title: "Thinking", content: "done", createdAt: "2026-11-11T12:00:00.000Z", collapsedByDefault: true }} />);
+    view.rerender(
+      <ThinkingBlock
+        message={{
+          kind: "thinking",
+          id: "t-2",
+          title: "Thinking",
+          content: "done",
+          createdAt: "2026-11-11T12:00:00.000Z",
+          collapsedByDefault: true,
+        }}
+      />,
+    );
     expect(toggle()).toHaveAccessibleName("Thinking");
   });
 });
@@ -116,13 +149,21 @@ describe("thinkingOpeningClause", () => {
   });
 
   it("truncates past the width limit", () => {
-    expect(thinkingOpeningClause("这是一个非常非常长的开头句子并且一直没有出现任何标点符号所以需要截断")).toBe("这是一个非常非常长的开头句子并且一直…");
+    expect(thinkingOpeningClause("这是一个非常非常长的开头句子并且一直没有出现任何标点符号所以需要截断")).toBe(
+      "这是一个非常非常长的开头句子并且一直…",
+    );
     expect(thinkingOpeningClause(`${"a".repeat(40)}`)).toBe(`${"a".repeat(36)}…`);
   });
 });
 
 describe("formatThinkingElapsed", () => {
-  it.each([[0, "1s"], [400, "1s"], [6000, "6s"], [65_000, "1m 5s"], [120_000, "2m"]])("formats %i ms as %s", (ms, text) => {
+  it.each([
+    [0, "1s"],
+    [400, "1s"],
+    [6000, "6s"],
+    [65_000, "1m 5s"],
+    [120_000, "2m"],
+  ])("formats %i ms as %s", (ms, text) => {
     expect(formatThinkingElapsed(ms)).toBe(text);
   });
 });
@@ -134,11 +175,22 @@ describe("simplified thinking in the conversation", () => {
     await withSetting(true);
     const turn: MessageBlock[] = [
       { kind: "user", id: "u-1", content: "把思考过程做得安静一点", createdAt: "2026-11-11T12:00:00.000Z" },
-      { kind: "read", id: "r-1", filePath: "ThinkingBlock.tsx", displayText: "Read ThinkingBlock.tsx", status: "completed", createdAt: "2026-11-11T12:00:01.000Z" },
+      {
+        kind: "read",
+        id: "r-1",
+        filePath: "ThinkingBlock.tsx",
+        displayText: "Read ThinkingBlock.tsx",
+        status: "completed",
+        createdAt: "2026-11-11T12:00:01.000Z",
+      },
       thinking({ content: `${FIRST}。很长很长的推理正文` }),
     ];
     await act(async () => {
-      render(<RightPanelProvider><TestConversationView messages={turn} contextSnapshot={null} sessionId="session-1" isStreaming /></RightPanelProvider>);
+      render(
+        <RightPanelProvider>
+          <TestConversationView messages={turn} contextSnapshot={null} sessionId="session-1" isStreaming />
+        </RightPanelProvider>,
+      );
     });
     await act(async () => {});
     expect(screen.queryByText(`${FIRST}。很长很长的推理正文`)).toBeNull();
@@ -150,13 +202,19 @@ describe("simplified thinking in the conversation", () => {
 describe("conversation display settings", () => {
   it("writes general.simplifyThinking from its own toggle", async () => {
     const onUpdateNamespace = vi.fn(async () => null);
-    const settingsV4 = { version: 4, revision: "r", settings: { general: { simplifyThinking: true } } } as unknown as SettingsV4Snapshot;
+    const settingsV4 = {
+      version: 4,
+      revision: "r",
+      settings: { general: { simplifyThinking: true } },
+    } as unknown as SettingsV4Snapshot;
     render(<ConversationDisplaySection {...({ settingsV4, onUpdateNamespace } as unknown as SectionProps)} />);
 
     const row = screen.getByRole("switch", { name: "简化思考过程" });
     expect(row).toBeChecked();
     expect(screen.getByText("思考进行时只显示状态和用时，不展开正文。点击标题仍可查看全文。")).toBeInTheDocument();
-    await act(async () => { fireEvent.click(row); });
+    await act(async () => {
+      fireEvent.click(row);
+    });
     expect(onUpdateNamespace).toHaveBeenCalledWith({ namespace: "general", patch: { simplifyThinking: false } });
   });
 });

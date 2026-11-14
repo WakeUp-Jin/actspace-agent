@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { AgentScope } from "@actspace/scope";
 import type { ToolRuntime } from "@actspace/tool-runtime";
-import { activateAgentFormTools, agentFormComposition, defineMainAgentForm, type AgentFormMember } from "../agent-form.js";
+import {
+  activateAgentFormTools,
+  agentFormComposition,
+  defineMainAgentForm,
+  type AgentFormMember,
+} from "../agent-form.js";
 import { allowedAgentModeTools, type ModeVisibleTool } from "../agent-mode-policy.js";
 
 const MEMBERS: readonly AgentFormMember[] = [
@@ -12,9 +17,14 @@ const MEMBERS: readonly AgentFormMember[] = [
 const FORM = defineMainAgentForm(MEMBERS);
 
 function runtime(missing: readonly string[] = []): ToolRuntime {
-  return { registry: { listDefinitions: () => MEMBERS.flatMap(member => member.toolNames
-    .filter(name => !missing.includes(name))
-    .map(name => ({ name, pluginId: member.id }))) } } as unknown as ToolRuntime;
+  return {
+    registry: {
+      listDefinitions: () =>
+        MEMBERS.flatMap((member) =>
+          member.toolNames.filter((name) => !missing.includes(name)).map((name) => ({ name, pluginId: member.id })),
+        ),
+    },
+  } as unknown as ToolRuntime;
 }
 
 describe("main Agent form", () => {
@@ -23,7 +33,7 @@ describe("main Agent form", () => {
     const second = new AgentScope("second");
     const formed = activateAgentFormTools(FORM, first, runtime(["browser_help"]));
     activateAgentFormTools(FORM, second, runtime());
-    expect(formed.members.map(member => member.id)).toEqual(["test.read", "test.todo"]);
+    expect(formed.members.map((member) => member.id)).toEqual(["test.read", "test.todo"]);
     expect(first.tools.get("read_file")?.owner).toBe("test.read");
     expect(first.tools.get("browser_help")).toBeUndefined();
     expect(second.tools.get("browser_help")?.owner).toBe("test.browser");
@@ -43,9 +53,15 @@ describe("main Agent form", () => {
 
   it("rejects duplicate members, shared tool names, toolless members and zero versions", () => {
     expect(() => defineMainAgentForm([MEMBERS[0]!, MEMBERS[0]!])).toThrow(/listed twice/);
-    expect(() => defineMainAgentForm([MEMBERS[0]!, { id: "test.other", version: 1, required: true, toolNames: ["read_file"] }])).toThrow(/claimed by both/);
-    expect(() => defineMainAgentForm([{ id: "test.empty", version: 1, required: true, toolNames: [] }])).toThrow(/contributes no tools/);
-    expect(() => defineMainAgentForm([{ id: "test.zero", version: 0, required: true, toolNames: ["x"] }])).toThrow(/positive version/);
+    expect(() =>
+      defineMainAgentForm([MEMBERS[0]!, { id: "test.other", version: 1, required: true, toolNames: ["read_file"] }]),
+    ).toThrow(/claimed by both/);
+    expect(() => defineMainAgentForm([{ id: "test.empty", version: 1, required: true, toolNames: [] }])).toThrow(
+      /contributes no tools/,
+    );
+    expect(() => defineMainAgentForm([{ id: "test.zero", version: 0, required: true, toolNames: ["x"] }])).toThrow(
+      /positive version/,
+    );
   });
 
   it("records a stable member digest separate from Host plugin provenance", () => {
@@ -54,13 +70,24 @@ describe("main Agent form", () => {
     expect(required.members).toHaveLength(2);
     expect(browser.members).toHaveLength(3);
     expect(browser.digest).not.toBe(required.digest);
-    expect(agentFormComposition(FORM, [{ id: "unrelated.host-plugin", version: "1.0.0" }]).digest).toBe(required.digest);
+    expect(agentFormComposition(FORM, [{ id: "unrelated.host-plugin", version: "1.0.0" }]).digest).toBe(
+      required.digest,
+    );
   });
 });
 
 describe("mode policy", () => {
-  const tool = (name: string, modes: ModeVisibleTool["modes"], pluginId = "test.tools"): ModeVisibleTool => ({ name, pluginId, modes });
-  const definitions = [tool("web", ["chat"]), tool("read_file", ["plan", "agent"]), tool("bash", ["agent"]), tool("hidden", [])];
+  const tool = (name: string, modes: ModeVisibleTool["modes"], pluginId = "test.tools"): ModeVisibleTool => ({
+    name,
+    pluginId,
+    modes,
+  });
+  const definitions = [
+    tool("web", ["chat"]),
+    tool("read_file", ["plan", "agent"]),
+    tool("bash", ["agent"]),
+    tool("hidden", []),
+  ];
 
   it("shows a tool only in the modes its definition declares", () => {
     expect([...allowedAgentModeTools("chat", definitions)]).toEqual(["web"]);

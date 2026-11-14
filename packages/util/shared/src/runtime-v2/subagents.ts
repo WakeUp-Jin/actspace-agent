@@ -41,7 +41,11 @@ export type ContextTraceDetailValue = { readonly kind: "trace"; readonly path: s
 export const INBOX_SOURCES = ["task_notification", "subagent_notification", "agent_message", "steer"] as const;
 export type InboxSourceId = (typeof INBOX_SOURCES)[number];
 /** Sources that keep a finished turn going and can wake an idle Session. */
-export const INBOX_WAKE_SOURCES: readonly InboxSourceId[] = Object.freeze(["task_notification", "subagent_notification", "agent_message"]);
+export const INBOX_WAKE_SOURCES: readonly InboxSourceId[] = Object.freeze([
+  "task_notification",
+  "subagent_notification",
+  "agent_message",
+]);
 
 export function isInboxSource(value: unknown): value is InboxSourceId {
   return typeof value === "string" && (INBOX_SOURCES as readonly string[]).includes(value);

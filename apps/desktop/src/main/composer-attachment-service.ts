@@ -24,41 +24,47 @@ export async function hydrateSessionAttachmentPreviews(
 ): Promise<SessionRecord | null> {
   if (!record) return null;
 
-  const events = await Promise.all(record.events.map(async (event) => {
-    if (event.type !== "user_message") return event;
-    const payload = event.payload as UserMessagePayload;
-    if (!payload.attachments?.some((attachment) => (
-      attachment.kind === "image" && Boolean(attachment.path) && !attachment.previewUrl
-    ))) {
-      return event;
-    }
+  const events = await Promise.all(
+    record.events.map(async (event) => {
+      if (event.type !== "user_message") return event;
+      const payload = event.payload as UserMessagePayload;
+      if (
+        !payload.attachments?.some(
+          (attachment) => attachment.kind === "image" && Boolean(attachment.path) && !attachment.previewUrl,
+        )
+      ) {
+        return event;
+      }
 
-    const attachments = await Promise.all(payload.attachments.map(async (attachment) => {
-      if (attachment.kind !== "image" || !attachment.path || attachment.previewUrl) return attachment;
-      const previewUrl = await loadPreview(attachment.path);
-      return previewUrl ? { ...attachment, previewUrl } : attachment;
-    }));
+      const attachments = await Promise.all(
+        payload.attachments.map(async (attachment) => {
+          if (attachment.kind !== "image" || !attachment.path || attachment.previewUrl) return attachment;
+          const previewUrl = await loadPreview(attachment.path);
+          return previewUrl ? { ...attachment, previewUrl } : attachment;
+        }),
+      );
 
-    return {
-      ...event,
-      payload: { ...payload, attachments },
-    };
-  }));
+      return {
+        ...event,
+        payload: { ...payload, attachments },
+      };
+    }),
+  );
 
   return { ...record, events };
 }
 
 function detectSupportedImage(bytes: Uint8Array): SupportedImage | undefined {
   if (
-    bytes.length >= 8
-    && bytes[0] === 0x89
-    && bytes[1] === 0x50
-    && bytes[2] === 0x4e
-    && bytes[3] === 0x47
-    && bytes[4] === 0x0d
-    && bytes[5] === 0x0a
-    && bytes[6] === 0x1a
-    && bytes[7] === 0x0a
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
   ) {
     return { mimeType: "image/png", extension: ".png" };
   }
@@ -66,9 +72,9 @@ function detectSupportedImage(bytes: Uint8Array): SupportedImage | undefined {
     return { mimeType: "image/jpeg", extension: ".jpg" };
   }
   if (
-    bytes.length >= 12
-    && Buffer.from(bytes.subarray(0, 4)).toString("ascii") === "RIFF"
-    && Buffer.from(bytes.subarray(8, 12)).toString("ascii") === "WEBP"
+    bytes.length >= 12 &&
+    Buffer.from(bytes.subarray(0, 4)).toString("ascii") === "RIFF" &&
+    Buffer.from(bytes.subarray(8, 12)).toString("ascii") === "WEBP"
   ) {
     return { mimeType: "image/webp", extension: ".webp" };
   }

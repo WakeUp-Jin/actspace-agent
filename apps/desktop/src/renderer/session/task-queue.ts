@@ -1,4 +1,11 @@
-import { isBackgroundWake, taskOperation, type SubmitTaskInput, type TaskContentEnvelope, type TaskRecord, type TaskSnapshot } from "@actspace/shared/runtime-v2";
+import {
+  isBackgroundWake,
+  taskOperation,
+  type SubmitTaskInput,
+  type TaskContentEnvelope,
+  type TaskRecord,
+  type TaskSnapshot,
+} from "@actspace/shared/runtime-v2";
 import type { ComposerSendOptions } from "../components/Composer";
 import type { SessionLocalState } from "./session-local-store";
 import { projectTaskQueue, taskAttachments, type QueuedComposerMessage } from "./message-queue";
@@ -35,11 +42,17 @@ export function createTaskQueueStore(): TaskQueueStore {
   const steers = new Map<string, { sessionId: string; item: QueuedComposerMessage }>();
   return {
     snapshot: (sessionId) => snapshots.get(sessionId),
-    rememberOptions(sessionId, submissionId, options, agentRunId) { submitted.set(submissionId, { sessionId, options, ...(agentRunId ? { agentRunId } : {}) }); },
+    rememberOptions(sessionId, submissionId, options, agentRunId) {
+      submitted.set(submissionId, { sessionId, options, ...(agentRunId ? { agentRunId } : {}) });
+    },
     options: (submissionId) => submitted.get(submissionId)?.options,
     requestedRun: (submissionId) => submitted.get(submissionId)?.agentRunId,
-    forgetOptions(submissionId) { submitted.delete(submissionId); },
-    rememberSteer(sessionId, messageId, item) { steers.set(messageId, { sessionId, item }); },
+    forgetOptions(submissionId) {
+      submitted.delete(submissionId);
+    },
+    rememberSteer(sessionId, messageId, item) {
+      steers.set(messageId, { sessionId, item });
+    },
     takeSteer(messageId) {
       const entry = steers.get(messageId);
       steers.delete(messageId);
@@ -50,7 +63,9 @@ export function createTaskQueueStore(): TaskQueueStore {
       for (const [id, entry] of submitted) if (entry.sessionId === sessionId) submitted.delete(id);
       for (const [id, entry] of steers) if (entry.sessionId === sessionId) steers.delete(id);
     },
-    forgetSnapshot(sessionId) { snapshots.delete(sessionId); },
+    forgetSnapshot(sessionId) {
+      snapshots.delete(sessionId);
+    },
     accept(snapshot) {
       const previous = snapshots.get(snapshot.sessionId);
       if ((previous?.revision ?? -2) > snapshot.revision) return null;
@@ -72,28 +87,45 @@ export type TaskSnapshotEffects = {
 };
 
 /** 应用 Host 的任务快照：更新队列、结算本地选项，并按运行中的 run / 压缩任务挂上或卸下 live run。 */
-export function applyTaskSnapshot(snapshot: TaskSnapshot, { tasks, runs, patchLocal, notice, refreshSession, attachLiveBaseline }: TaskSnapshotEffects): void {
+export function applyTaskSnapshot(
+  snapshot: TaskSnapshot,
+  { tasks, runs, patchLocal, notice, refreshSession, attachLiveBaseline }: TaskSnapshotEffects,
+): void {
   const accepted = tasks.accept(snapshot);
   if (!accepted) return;
   const { previous } = accepted;
   for (const run of snapshot.runs) if (run.state !== "running") runs.markTerminal(run.runId);
   const existing = runs.get(snapshot.sessionId);
   // 乐观 run 正是为这条任务申请的：它正在开始，消息已在消息流里，不进托盘。
-  const starting = (task: TaskRecord) => existing !== undefined && tasks.requestedRun(task.submissionId) === existing.agentRunId;
+  const starting = (task: TaskRecord) =>
+    existing !== undefined && tasks.requestedRun(task.submissionId) === existing.agentRunId;
   // 先认出乐观 run 的任务，再释放结算任务的本地选项（申请的 run id 也在里面）。
   const optimistic = existing && !existing.operationTaskId ? snapshot.tasks.find(starting) : undefined;
-  const settled = snapshot.tasks.filter(task => !["pending", "claimed"].includes(task.state) && previous?.tasks.find(item => item.taskId === task.taskId)?.state !== task.state);
+  const settled = snapshot.tasks.filter(
+    (task) =>
+      !["pending", "claimed"].includes(task.state) &&
+      previous?.tasks.find((item) => item.taskId === task.taskId)?.state !== task.state,
+  );
   for (const task of settled) tasks.forgetOptions(task.submissionId);
   if (settled.length) refreshSession(snapshot.sessionId);
   const queue = projectTaskQueue(snapshot, starting);
   patchLocal(snapshot.sessionId, { messageQueue: queue });
-  const running = snapshot.runs.find(run => run.state === "running" && !runs.isTerminal(run.runId));
-  const operation = snapshot.tasks.find(task => task.state === "claimed" && task.runId === null && taskOperation(task.content));
+  const running = snapshot.runs.find((run) => run.state === "running" && !runs.isTerminal(run.runId));
+  const operation = snapshot.tasks.find(
+    (task) => task.state === "claimed" && task.runId === null && taskOperation(task.content),
+  );
   // Initial hydration must not replay notices from historical operations.
-  for (const task of settled.filter(task => previous && taskOperation(task.content))) {
-    const result = task.result && typeof task.result === "object" && !Array.isArray(task.result) ? task.result as Record<string, unknown> : {};
+  for (const task of settled.filter((task) => previous && taskOperation(task.content))) {
+    const result =
+      task.result && typeof task.result === "object" && !Array.isArray(task.result)
+        ? (task.result as Record<string, unknown>)
+        : {};
     if (task.state === "failed") {
-      const block = createCompactionBlock({ agentRunId: task.taskId, status: "failed", errorMessage: typeof result.error === "string" ? result.error : "压缩失败，可以重试。" });
+      const block = createCompactionBlock({
+        agentRunId: task.taskId,
+        status: "failed",
+        errorMessage: typeof result.error === "string" ? result.error : "压缩失败，可以重试。",
+      });
       patchLocal(snapshot.sessionId, { compactionFailure: block });
     } else if (task.state === "completed" && result.compacted === false) {
       notice(snapshot.sessionId, "对话还很短，暂时不需要压缩");
@@ -101,35 +133,69 @@ export function applyTaskSnapshot(snapshot: TaskSnapshot, { tasks, runs, patchLo
   }
   if (existing?.operationTaskId && !operation) runs.end(snapshot.sessionId);
   // 乐观 run 的任务没开始就结束了（被取消、开始前失败）：卸下它。
-  if (existing && optimistic && optimistic.state !== "pending" && optimistic.state !== "claimed" && !snapshot.runs.some(run => run.runId === existing.agentRunId)) runs.end(snapshot.sessionId, existing);
+  if (
+    existing &&
+    optimistic &&
+    optimistic.state !== "pending" &&
+    optimistic.state !== "claimed" &&
+    !snapshot.runs.some((run) => run.runId === existing.agentRunId)
+  )
+    runs.end(snapshot.sessionId, existing);
   if (operation && !runs.has(snapshot.sessionId)) {
     const state = createEmptyStreamingState();
     upsertCompactionSegment(state, operation.taskId);
-    state.activeCompactions.set(operation.taskId, createCompactionBlock({ agentRunId: operation.taskId, status: "running", startedAt: new Date().toISOString() }));
-    runs.start({ sessionId: snapshot.sessionId, agentRunId: operation.taskId, operationTaskId: operation.taskId, recovered: true,
-      state, userBlock: null, aborting: false });
+    state.activeCompactions.set(
+      operation.taskId,
+      createCompactionBlock({ agentRunId: operation.taskId, status: "running", startedAt: new Date().toISOString() }),
+    );
+    runs.start({
+      sessionId: snapshot.sessionId,
+      agentRunId: operation.taskId,
+      operationTaskId: operation.taskId,
+      recovered: true,
+      state,
+      userBlock: null,
+      aborting: false,
+    });
   }
-  if (!running && existing?.recovered && !existing.operationTaskId && snapshot.runs.some(run => run.runId === existing.agentRunId && run.state !== "running")) {
+  if (
+    !running &&
+    existing?.recovered &&
+    !existing.operationTaskId &&
+    snapshot.runs.some((run) => run.runId === existing.agentRunId && run.state !== "running")
+  ) {
     runs.end(snapshot.sessionId);
   }
   if (running && !runs.has(snapshot.sessionId)) {
     const state = createEmptyStreamingState();
     state.waitingForModel = true;
     runs.start({
-      sessionId: snapshot.sessionId, agentRunId: running.runId, recovered: true,
-      state, userBlock: null, aborting: false,
+      sessionId: snapshot.sessionId,
+      agentRunId: running.runId,
+      recovered: true,
+      state,
+      userBlock: null,
+      aborting: false,
     });
     attachLiveBaseline?.(snapshot.sessionId, running.runId);
   }
   const currentRun = runs.get(snapshot.sessionId);
-  const initial = running && snapshot.tasks.find(task => task.taskId === running.taskId);
+  const initial = running && snapshot.tasks.find((task) => task.taskId === running.taskId);
   // 后台任务唤醒的 run 没有用户消息，回合开头是 durable 的分隔行。
   if (currentRun && initial && !currentRun.userBlock && !isBackgroundWake(initial.content)) {
     const content = initial.content as TaskContentEnvelope;
-    const original = content?.kind === "composer-task" ? content.original as unknown as SubmitTaskInput : null;
+    const original = content?.kind === "composer-task" ? (content.original as unknown as SubmitTaskInput) : null;
     const submittedOptions = tasks.options(initial.submissionId);
-    currentRun.userBlock = { kind: "user", id: `turn:${currentRun.agentRunId}:user:0`, runId: currentRun.agentRunId, content: original?.userInput ?? (typeof initial.content === "string" ? initial.content : ""), createdAt: new Date().toISOString(),
-      attachments: submittedOptions?.attachments ?? taskAttachments(snapshot.sessionId, content), fileReferences: original?.fileReferences, responseAnnotations: original?.responseAnnotations };
+    currentRun.userBlock = {
+      kind: "user",
+      id: `turn:${currentRun.agentRunId}:user:0`,
+      runId: currentRun.agentRunId,
+      content: original?.userInput ?? (typeof initial.content === "string" ? initial.content : ""),
+      createdAt: new Date().toISOString(),
+      attachments: submittedOptions?.attachments ?? taskAttachments(snapshot.sessionId, content),
+      fileReferences: original?.fileReferences,
+      responseAnnotations: original?.responseAnnotations,
+    };
     runs.refresh(snapshot.sessionId);
   }
 }

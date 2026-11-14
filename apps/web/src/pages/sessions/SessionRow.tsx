@@ -22,16 +22,44 @@ export function SessionRow({ title, workspace, time, status, selected, archived,
       onClick={onOpen}
       aria-current={selected || undefined}
       aria-label={`${title}，${workspace.name}${STATUS_LABEL[status] ? `，${STATUS_LABEL[status]}` : ""}`}
-      className={cx("sess-row inset-row grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2 px-3 hover:bg-hover-overlay", selected && "bg-selected", archived && "opacity-55")}
+      className={cx(
+        "sess-row inset-row grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2 px-3 hover:bg-hover-overlay",
+        selected && "bg-selected",
+        archived && "opacity-55",
+      )}
     >
       <span aria-hidden className="grid size-4 place-items-center">
-        {status === "approval" ? <span className="pulse-dot size-1.5 rounded-full bg-warning" /> : status === "running" ? <span className="spinner" /> : status === "unread" ? <span className="size-1.5 rounded-full bg-success" /> : null}
+        {status === "approval" ? (
+          <span className="pulse-dot size-1.5 rounded-full bg-warning" />
+        ) : status === "running" ? (
+          <span className="spinner" />
+        ) : status === "unread" ? (
+          <span className="size-1.5 rounded-full bg-success" />
+        ) : null}
       </span>
       <span className="flex min-w-0 items-baseline gap-2">
-        <span className={cx("sess-title min-w-0 truncate", status === "unread" ? "font-semibold text-text-main" : hot ? "font-medium text-text-main" : "font-medium text-text-muted")}>{title}</span>
+        <span
+          className={cx(
+            "sess-title min-w-0 truncate",
+            status === "unread"
+              ? "font-semibold text-text-main"
+              : hot
+                ? "font-medium text-text-main"
+                : "font-medium text-text-muted",
+          )}
+        >
+          {title}
+        </span>
         <span className="sess-meta sess-ws flex-none truncate text-text-faint">{workspace.name}</span>
       </span>
-      <span className={cx("sess-meta min-w-6 text-right tabular-nums", status === "approval" ? "font-medium text-warning" : "text-text-faint")}>{status === "approval" ? "待审批" : time}</span>
+      <span
+        className={cx(
+          "sess-meta min-w-6 text-right tabular-nums",
+          status === "approval" ? "font-medium text-warning" : "text-text-faint",
+        )}
+      >
+        {status === "approval" ? "待审批" : time}
+      </span>
     </Pressable>
   );
 }

@@ -8,12 +8,7 @@ export type GitBranchItem = {
   checkedOutPath?: string;
 };
 
-export type WorkspaceGitContextStatus =
-  | "ready"
-  | "not_repository"
-  | "no_head"
-  | "git_not_found"
-  | "failed";
+export type WorkspaceGitContextStatus = "ready" | "not_repository" | "no_head" | "git_not_found" | "failed";
 
 export type WorkspaceGitContextInput = {
   workspaceRoot?: string;

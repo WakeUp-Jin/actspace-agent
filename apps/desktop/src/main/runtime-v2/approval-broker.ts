@@ -39,8 +39,19 @@ export class DesktopApprovalBroker implements ApprovalBroker {
       const decision = await Promise.race([decisionPromise, abortPromise]);
       const decidedAt = new Date(decision.decidedAt).toISOString();
       if (decision.decision === "once") return Object.freeze({ requestId: request.requestId, kind: "once", decidedAt });
-      if (decision.decision === "session" && decision.suggestionId !== undefined) return Object.freeze({ requestId: request.requestId, kind: "session", suggestionId: decision.suggestionId, decidedAt });
-      return Object.freeze({ requestId: request.requestId, kind: "deny", decidedAt, code: decision.decision === "timeout" ? "timeout" : decision.decision === "abort" ? "aborted" : "user-denied" });
+      if (decision.decision === "session" && decision.suggestionId !== undefined)
+        return Object.freeze({
+          requestId: request.requestId,
+          kind: "session",
+          suggestionId: decision.suggestionId,
+          decidedAt,
+        });
+      return Object.freeze({
+        requestId: request.requestId,
+        kind: "deny",
+        decidedAt,
+        code: decision.decision === "timeout" ? "timeout" : decision.decision === "abort" ? "aborted" : "user-denied",
+      });
     } catch {
       return denied(request.requestId, "aborted");
     } finally {
@@ -50,9 +61,15 @@ export class DesktopApprovalBroker implements ApprovalBroker {
 }
 
 /** Where an approved process runs: the card shows "real environment" when Bash leaves the sandbox. */
-export function executionEnvironment(resources: readonly ApprovalResourceSummary[]): DesktopRuntimeApprovalRequest["executionEnvironment"] {
+export function executionEnvironment(
+  resources: readonly ApprovalResourceSummary[],
+): DesktopRuntimeApprovalRequest["executionEnvironment"] {
   const process = resources.find((resource) => resource.kind === "process");
-  return process?.kind !== "process" || process.noSandbox === undefined ? undefined : process.noSandbox ? "real" : "sandbox";
+  return process?.kind !== "process" || process.noSandbox === undefined
+    ? undefined
+    : process.noSandbox
+      ? "real"
+      : "sandbox";
 }
 
 function denied(requestId: string, code: Extract<ApprovalDecision, { kind: "deny" }>["code"]): ApprovalDecision {

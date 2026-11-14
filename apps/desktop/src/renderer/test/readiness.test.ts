@@ -1,16 +1,46 @@
 import { describe, expect, it } from "vitest";
 import type { HostConnection } from "@actspace/shared/host-protocol";
-import { describeReadiness, hostReachable, resolveReadiness, summarizeError, type ReadinessInput, type RunTargetReadiness } from "../target/readiness";
+import {
+  describeReadiness,
+  hostReachable,
+  resolveReadiness,
+  summarizeError,
+  type ReadinessInput,
+  type RunTargetReadiness,
+} from "../target/readiness";
 import type { HostDescription } from "../target/host-directory";
 import type { RunTarget } from "../target/run-target";
 
 // 15 T7：能不能发送，以及 06 §4.5 的未就绪文案。
 
 const remote: RunTarget = { kind: "remote", hostId: "h", hostName: "Cloud" };
-const description: HostDescription = { state: "ready", workspaces: [{ id: "w1", name: "api", path: "/srv/api" }], models: [{ id: "m", name: "Model" }], defaultModel: "m" };
-const host = (state: HostConnection["state"], extra: Partial<HostConnection> = {}) => ({ id: "h", hostId: "h", name: "Cloud", state, endpoint: { kind: "wss", url: "wss://cloud" }, ...extra }) as HostConnection;
+const description: HostDescription = {
+  state: "ready",
+  workspaces: [{ id: "w1", name: "api", path: "/srv/api" }],
+  models: [{ id: "m", name: "Model" }],
+  defaultModel: "m",
+};
+const host = (state: HostConnection["state"], extra: Partial<HostConnection> = {}) =>
+  ({
+    id: "h",
+    hostId: "h",
+    name: "Cloud",
+    state,
+    endpoint: { kind: "wss", url: "wss://cloud" },
+    ...extra,
+  }) as HostConnection;
 
-function input(patch: { target?: RunTarget; loaded?: boolean; hosts?: HostConnection[]; description?: HostDescription | null; describeError?: string; workspaceId?: string; modelId?: string } = {}): ReadinessInput {
+function input(
+  patch: {
+    target?: RunTarget;
+    loaded?: boolean;
+    hosts?: HostConnection[];
+    description?: HostDescription | null;
+    describeError?: string;
+    workspaceId?: string;
+    modelId?: string;
+  } = {},
+): ReadinessInput {
   const desc = patch.description === undefined ? description : patch.description;
   return {
     target: patch.target ?? remote,
@@ -27,21 +57,37 @@ function input(patch: { target?: RunTarget; loaded?: boolean; hosts?: HostConnec
 
 describe("resolveReadiness", () => {
   it.each<[string, ReadinessInput, RunTargetReadiness]>([
-    ["local with a workspace", input({ target: { kind: "local", workspaceRoot: "/w" }, hosts: [] }), { state: "ready" }],
+    [
+      "local with a workspace",
+      input({ target: { kind: "local", workspaceRoot: "/w" }, hosts: [] }),
+      { state: "ready" },
+    ],
     ["local without a workspace", input({ target: { kind: "local" }, hosts: [] }), { state: "workspace-required" }],
     ["remote with workspace and model", input(), { state: "ready" }],
     ["corrupt session key", input({ target: { kind: "invalid", key: "x" } }), { state: "removed" }],
     ["hosts not listed yet", input({ loaded: false, hosts: [] }), { state: "connecting" }],
     ["host gone from the list", input({ hosts: [] }), { state: "removed" }],
     ["connecting", input({ hosts: [host("connecting")] }), { state: "connecting" }],
-    ["offline with error", input({ hosts: [host("offline", { error: "timeout" })] }), { state: "offline", error: "timeout" }],
+    [
+      "offline with error",
+      input({ hosts: [host("offline", { error: "timeout" })] }),
+      { state: "offline", error: "timeout" },
+    ],
     ["offline", input({ hosts: [host("offline")] }), { state: "offline" }],
     ["revoked", input({ hosts: [host("revoked")] }), { state: "revoked" }],
     ["incompatible", input({ hosts: [host("incompatible")] }), { state: "incompatible" }],
     ["describe failed", input({ describeError: "boom" }), { state: "describe-failed", error: "boom" }],
     ["describing", input({ description: null }), { state: "describing" }],
-    ["host draining", input({ description: { ...description, state: "draining" } }), { state: "host-unavailable", hostState: "draining" }],
-    ["host blocked", input({ description: { ...description, state: "blocked" } }), { state: "host-unavailable", hostState: "blocked" }],
+    [
+      "host draining",
+      input({ description: { ...description, state: "draining" } }),
+      { state: "host-unavailable", hostState: "draining" },
+    ],
+    [
+      "host blocked",
+      input({ description: { ...description, state: "blocked" } }),
+      { state: "host-unavailable", hostState: "blocked" },
+    ],
     ["no workspace selected", input({ workspaceId: undefined }), { state: "workspace-missing" }],
     ["workspace gone from host", input({ workspaceId: "w9" }), { state: "workspace-missing", workspaceId: "w9" }],
     ["no model", input({ modelId: undefined }), { state: "model-missing" }],
@@ -63,7 +109,14 @@ describe("describeReadiness", () => {
     [{ state: "incompatible" }, "版本不兼容", "Cloud 的 Agent 版本与当前应用不兼容"],
     [{ state: "removed" }, "已移除", "这台机器已从列表移除"],
     [{ state: "describing" }, "正在读取", "正在读取 Cloud 的工作区和模型"],
-    [{ state: "describe-failed", error: "Error invoking remote method 'hosts:call': Error: connection reset\n    at stack" }, "读取失败", "无法读取机器信息：connection reset"],
+    [
+      {
+        state: "describe-failed",
+        error: "Error invoking remote method 'hosts:call': Error: connection reset\n    at stack",
+      },
+      "读取失败",
+      "无法读取机器信息：connection reset",
+    ],
     [{ state: "host-unavailable", hostState: "draining" }, "暂不接受任务", "Cloud 正在停止，暂不接受新任务"],
     [{ state: "host-unavailable", hostState: "blocked" }, "暂不接受任务", "Cloud 恢复上次的任务时出错，暂不接受新任务"],
     [{ state: "workspace-missing" }, null, "选择一个远端工作区"],
@@ -90,9 +143,22 @@ describe("describeReadiness", () => {
 
 describe("hostReachable", () => {
   it("is false only while the Host itself is not connected", () => {
-    const states: RunTargetReadiness[] = [{ state: "connecting" }, { state: "offline" }, { state: "revoked" }, { state: "incompatible" }, { state: "removed" }];
+    const states: RunTargetReadiness[] = [
+      { state: "connecting" },
+      { state: "offline" },
+      { state: "revoked" },
+      { state: "incompatible" },
+      { state: "removed" },
+    ];
     for (const readiness of states) expect(hostReachable(readiness)).toBe(false);
-    const connected: RunTargetReadiness[] = [{ state: "ready" }, { state: "describing" }, { state: "describe-failed", error: "x" }, { state: "host-unavailable", hostState: "draining" }, { state: "workspace-missing" }, { state: "model-missing" }];
+    const connected: RunTargetReadiness[] = [
+      { state: "ready" },
+      { state: "describing" },
+      { state: "describe-failed", error: "x" },
+      { state: "host-unavailable", hostState: "draining" },
+      { state: "workspace-missing" },
+      { state: "model-missing" },
+    ];
     for (const readiness of connected) expect(hostReachable(readiness)).toBe(true);
   });
 });

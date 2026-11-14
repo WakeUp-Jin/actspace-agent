@@ -3,10 +3,22 @@ import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionSurfaceEntry } from "@actspace/session-journal";
 import { completeAuxiliaryText, type AuxiliaryRequestRecorder, type LlmServiceContract } from "@actspace/llm-service";
 
-export type CompactionSummary = { readonly content: string; readonly pathlist?: readonly string[]; readonly metadata?: RuntimeJsonValue };
+export type CompactionSummary = {
+  readonly content: string;
+  readonly pathlist?: readonly string[];
+  readonly metadata?: RuntimeJsonValue;
+};
 
 export interface CompactionSummarizer {
-  summarize(entries: readonly SessionSurfaceEntry[], context: { readonly sessionId: string; readonly turnId?: string; readonly summaryIds?: readonly string[]; readonly signal?: AbortSignal }): Promise<CompactionSummary>;
+  summarize(
+    entries: readonly SessionSurfaceEntry[],
+    context: {
+      readonly sessionId: string;
+      readonly turnId?: string;
+      readonly summaryIds?: readonly string[];
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<CompactionSummary>;
 }
 
 export class DeterministicCompactionSummarizer implements CompactionSummarizer {
@@ -17,17 +29,35 @@ export class DeterministicCompactionSummarizer implements CompactionSummarizer {
 }
 
 export class LlmCompactionSummarizer implements CompactionSummarizer {
-  constructor(private readonly options: { readonly llm: LlmServiceContract; readonly recorder: AuxiliaryRequestRecorder; readonly routeId: string; readonly model: string }) {}
+  constructor(
+    private readonly options: {
+      readonly llm: LlmServiceContract;
+      readonly recorder: AuxiliaryRequestRecorder;
+      readonly routeId: string;
+      readonly model: string;
+    },
+  ) {}
 
-  async summarize(entries: readonly SessionSurfaceEntry[], context: { readonly sessionId: string; readonly turnId?: string; readonly summaryIds?: readonly string[]; readonly signal?: AbortSignal }): Promise<CompactionSummary> {
-    const prior = entries.filter(entry => context.summaryIds?.includes(entry.node.messageId));
-    const conversation = entries.filter(entry => !context.summaryIds?.includes(entry.node.messageId));
+  async summarize(
+    entries: readonly SessionSurfaceEntry[],
+    context: {
+      readonly sessionId: string;
+      readonly turnId?: string;
+      readonly summaryIds?: readonly string[];
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<CompactionSummary> {
+    const prior = entries.filter((entry) => context.summaryIds?.includes(entry.node.messageId));
+    const conversation = entries.filter((entry) => !context.summaryIds?.includes(entry.node.messageId));
     const prepared = await this.options.llm.prepareAsync({
       routeId: this.options.routeId,
       model: this.options.model,
       messages: [
         { role: "system", content: COMPACTION_SYSTEM },
-        { role: "user", content: `${prior.length ? `<prior-summary>\n${prior.map(entry => summaryText(entry.node.content)).join("\n")}\n</prior-summary>\n` : ""}<conversation>\n${conversation.map(entry => `${entry.node.kind}: ${summaryText(entry.node.content)}`).join("\n")}\n</conversation>\n${COMPACTION_TEMPLATE}${prior.length ? `\n${PRIOR_SUMMARY_RULES}` : ""}` },
+        {
+          role: "user",
+          content: `${prior.length ? `<prior-summary>\n${prior.map((entry) => summaryText(entry.node.content)).join("\n")}\n</prior-summary>\n` : ""}<conversation>\n${conversation.map((entry) => `${entry.node.kind}: ${summaryText(entry.node.content)}`).join("\n")}\n</conversation>\n${COMPACTION_TEMPLATE}${prior.length ? `\n${PRIOR_SUMMARY_RULES}` : ""}`,
+        },
       ],
       tools: [],
       sessionId: context.sessionId,
@@ -35,22 +65,35 @@ export class LlmCompactionSummarizer implements CompactionSummarizer {
     });
     const { text } = await completeAuxiliaryText(prepared, {
       recorder: this.options.recorder,
-      owner: { sessionId: context.sessionId, purpose: "compaction", ...(context.turnId === undefined ? {} : { turnId: context.turnId }) },
+      owner: {
+        sessionId: context.sessionId,
+        purpose: "compaction",
+        ...(context.turnId === undefined ? {} : { turnId: context.turnId }),
+      },
       ...(context.signal ? { signal: context.signal } : {}),
     });
     if (!text.trim()) throw new Error("Compaction LLM returned no terminal summary.");
-    return { content: text.trim(), metadata: { attemptId: prepared.request.requestId, routeId: prepared.request.routeId, model: prepared.request.model, registrationId: prepared.registration.registrationId, adapterVersion: prepared.registration.adapter.adapterVersion } };
+    return {
+      content: text.trim(),
+      metadata: {
+        attemptId: prepared.request.requestId,
+        routeId: prepared.request.routeId,
+        model: prepared.request.model,
+        registrationId: prepared.registration.registrationId,
+        adapterVersion: prepared.registration.adapter.adapterVersion,
+      },
+    };
   }
 }
 
 function summaryText(value: RuntimeJsonValue): string {
   const sanitized = stripRuntimeContext(value);
-  return typeof sanitized === "string" ? sanitized : JSON.stringify(sanitized) ?? "";
+  return typeof sanitized === "string" ? sanitized : (JSON.stringify(sanitized) ?? "");
 }
 
 function stripRuntimeContext(value: RuntimeJsonValue): RuntimeJsonValue {
   if (typeof value === "string") return value;
-  if (Array.isArray(value)) return value.flatMap((item) => isRuntimeContext(item) ? [] : [stripRuntimeContext(item)]);
+  if (Array.isArray(value)) return value.flatMap((item) => (isRuntimeContext(item) ? [] : [stripRuntimeContext(item)]));
   if (value === null || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, stripRuntimeContext(child)]));
 }

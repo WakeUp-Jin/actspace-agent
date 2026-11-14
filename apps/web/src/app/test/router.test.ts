@@ -1,7 +1,12 @@
 import { formatRoute, parseRoute, type Route } from "../router";
 
 it("round-trips every route", () => {
-  const routes: Route[] = [{ name: "home" }, { name: "connect" }, { name: "settings" }, { name: "session", sessionId: "s 1/é" }];
+  const routes: Route[] = [
+    { name: "home" },
+    { name: "connect" },
+    { name: "settings" },
+    { name: "session", sessionId: "s 1/é" },
+  ];
   for (const route of routes) expect(parseRoute(formatRoute(route))).toEqual(route);
 });
 

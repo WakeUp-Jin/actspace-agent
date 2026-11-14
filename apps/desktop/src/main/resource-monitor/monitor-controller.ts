@@ -9,10 +9,23 @@ import { join } from "node:path";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import { app, BrowserWindow, nativeTheme, screen } from "electron";
 import { desktopBridgeContract as contract } from "@actspace/shared/desktop-bridge";
-import { RESOURCE_MONITOR_CHANNELS, type ResourceFloatLayout, type ResourceSampleNotice, type SettingsV4Snapshot, type SettingsV4UpdateInput } from "@actspace/shared";
+import {
+  RESOURCE_MONITOR_CHANNELS,
+  type ResourceFloatLayout,
+  type ResourceSampleNotice,
+  type SettingsV4Snapshot,
+  type SettingsV4UpdateInput,
+} from "@actspace/shared";
 import { createIpcRegistrar, type IpcRegistrar } from "../ipc/registry";
 import { attachNavigationGuards, createAppUrlMatcher } from "../window-security";
-import { FLOAT_HEIGHT_COLLAPSED, FLOAT_WIDTH_COLLAPSED, FLOAT_WIDTH_EXPANDED, readFloatWindowState, resolveFloatPosition, writeFloatWindowState } from "./float-bounds";
+import {
+  FLOAT_HEIGHT_COLLAPSED,
+  FLOAT_WIDTH_COLLAPSED,
+  FLOAT_WIDTH_EXPANDED,
+  readFloatWindowState,
+  resolveFloatPosition,
+  writeFloatWindowState,
+} from "./float-bounds";
 import { ResourceCollector } from "./resource-collector";
 import { formatResourceSnapshot, parseFootprint } from "./snapshot-text";
 
@@ -41,10 +54,15 @@ function runPs(): { pid: number | undefined; output: Promise<string> } {
   let pid: number | undefined;
   const output = new Promise<string>((resolve, reject) => {
     // 只取可执行文件路径（comm），不取命令行参数：参数里可能有路径和密钥。
-    const child = execFile("ps", ["-A", "-o", "pid=,ppid=,rss=,time=,comm="], { maxBuffer: 8 << 20, timeout: 5_000 }, (error, stdout) => {
-      if (error) reject(error);
-      else resolve(stdout);
-    });
+    const child = execFile(
+      "ps",
+      ["-A", "-o", "pid=,ppid=,rss=,time=,comm="],
+      { maxBuffer: 8 << 20, timeout: 5_000 },
+      (error, stdout) => {
+        if (error) reject(error);
+        else resolve(stdout);
+      },
+    );
     pid = child.pid;
   });
   return { pid, output };
@@ -52,10 +70,15 @@ function runPs(): { pid: number | undefined; output: Promise<string> } {
 
 function runFootprint(pids: readonly number[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile("/usr/bin/footprint", pids.flatMap(pid => ["-p", String(pid)]), { maxBuffer: 8 << 20, timeout: FOOTPRINT_TIMEOUT_MS }, (error, stdout) => {
-      if (error && !stdout) reject(error);
-      else resolve(stdout);
-    });
+    execFile(
+      "/usr/bin/footprint",
+      pids.flatMap((pid) => ["-p", String(pid)]),
+      { maxBuffer: 8 << 20, timeout: FOOTPRINT_TIMEOUT_MS },
+      (error, stdout) => {
+        if (error && !stdout) reject(error);
+        else resolve(stdout);
+      },
+    );
   });
 }
 
@@ -77,7 +100,7 @@ export class ResourceMonitorController {
     this.floatStatePath = join(options.dataRoot, "resource-monitor-window.json");
     this.collector = new ResourceCollector({
       getAppMetrics: () => app.getAppMetrics(),
-      createHistogram: resolution => monitorEventLoopDelay({ resolution }),
+      createHistogram: (resolution) => monitorEventLoopDelay({ resolution }),
       runPs: process.platform === "win32" ? null : runPs,
       mainPid: process.pid,
       monitorPids: () => {
@@ -97,8 +120,10 @@ export class ResourceMonitorController {
 
     // 悬浮窗只能发这两条；主窗口发来的被注册器按 sender 忽略。
     this.floatIpc = createIpcRegistrar({ getWindow: () => this.floatWindow });
-    this.floatIpc.on(contract.resourceMonitor.setFloatLayout, input => this.applyFloatLayout(input));
-    this.floatIpc.on(contract.resourceMonitor.closeFloat, () => { void this.turnFloatOff(); });
+    this.floatIpc.on(contract.resourceMonitor.setFloatLayout, (input) => this.applyFloatLayout(input));
+    this.floatIpc.on(contract.resourceMonitor.closeFloat, () => {
+      void this.turnFloatOff();
+    });
 
     this.unsubscribeSettings = options.settings.subscribeV4Changes(() => this.syncFloat());
     this.syncFloat();
@@ -132,7 +157,8 @@ export class ResourceMonitorController {
     if (this.pageUnsubscribe) return;
     this.pageUnsubscribe = this.collector.subscribe((sample, point) => {
       const window = this.options.getMainWindow();
-      if (window && !window.isDestroyed()) window.webContents.send(RESOURCE_MONITOR_CHANNELS.sample, { sample, point } satisfies ResourceSampleNotice);
+      if (window && !window.isDestroyed())
+        window.webContents.send(RESOURCE_MONITOR_CHANNELS.sample, { sample, point } satisfies ResourceSampleNotice);
     });
   }
 
@@ -155,9 +181,15 @@ export class ResourceMonitorController {
   private async turnFloatOff(): Promise<void> {
     try {
       const snapshot = this.options.settings.getV4();
-      await this.options.settings.updateNamespaceV4({ expectedRevision: snapshot.revision, namespace: "general", patch: { performanceMonitoring: false } });
+      await this.options.settings.updateNamespaceV4({
+        expectedRevision: snapshot.revision,
+        namespace: "general",
+        patch: { performanceMonitoring: false },
+      });
     } catch (error) {
-      this.options.log("resource monitor float close failed", { error: error instanceof Error ? error.message : String(error) });
+      this.options.log("resource monitor float close failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       // 写设置失败也要让 × 生效；下次启动按设置决定。
       this.closeFloatWindow();
     }
@@ -170,7 +202,12 @@ export class ResourceMonitorController {
       if (this.disposed || !this.floatEnabled() || this.floatWindow) return;
       this.floatExpanded = saved?.expanded === true;
       const width = this.floatExpanded ? FLOAT_WIDTH_EXPANDED : FLOAT_WIDTH_COLLAPSED;
-      const position = resolveFloatPosition(saved, width, screen.getAllDisplays().map(display => display.workArea), screen.getPrimaryDisplay().workArea);
+      const position = resolveFloatPosition(
+        saved,
+        width,
+        screen.getAllDisplays().map((display) => display.workArea),
+        screen.getPrimaryDisplay().workArea,
+      );
       const window = new BrowserWindow({
         ...position,
         width,
@@ -212,18 +249,28 @@ export class ResourceMonitorController {
       });
       window.webContents.on("did-finish-load", () => {
         if (window.isDestroyed()) return;
-        window.webContents.send(RESOURCE_MONITOR_CHANNELS.floatState, { ...this.collector.state(), expanded: this.floatExpanded });
+        window.webContents.send(RESOURCE_MONITOR_CHANNELS.floatState, {
+          ...this.collector.state(),
+          expanded: this.floatExpanded,
+        });
         if (!this.floatUnsubscribe) {
           this.floatUnsubscribe = this.collector.subscribe((sample, point) => {
-            if (!window.isDestroyed()) window.webContents.send(RESOURCE_MONITOR_CHANNELS.sample, { sample, point } satisfies ResourceSampleNotice);
+            if (!window.isDestroyed())
+              window.webContents.send(RESOURCE_MONITOR_CHANNELS.sample, {
+                sample,
+                point,
+              } satisfies ResourceSampleNotice);
           });
         }
         if (!window.isVisible()) window.showInactive();
       });
-      if (this.options.devServerUrl) await window.loadURL(new URL("monitor/index.html", this.options.devServerUrl).href);
+      if (this.options.devServerUrl)
+        await window.loadURL(new URL("monitor/index.html", this.options.devServerUrl).href);
       else await window.loadFile(indexHtmlPath);
     } catch (error) {
-      this.options.log("resource monitor float open failed", { error: error instanceof Error ? error.message : String(error) });
+      this.options.log("resource monitor float open failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       this.floatOpening = false;
     }
@@ -254,8 +301,11 @@ export class ResourceMonitorController {
       const window = this.floatWindow;
       if (!window || window.isDestroyed()) return;
       const { x, y } = window.getBounds();
-      writeFloatWindowState(this.floatStatePath, { x, y, expanded: this.floatExpanded })
-        .catch(error => this.options.log("resource monitor float state save failed", { error: error instanceof Error ? error.message : String(error) }));
+      writeFloatWindowState(this.floatStatePath, { x, y, expanded: this.floatExpanded }).catch((error) =>
+        this.options.log("resource monitor float state save failed", {
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
     }, SAVE_POSITION_DELAY_MS);
   }
 
@@ -264,9 +314,20 @@ export class ResourceMonitorController {
     if (!sample) throw new Error("还没有读数，请稍等 2 秒再复制。");
     let footprint: Map<number, string> | Error | null = null;
     if (process.platform === "darwin") {
-      const pids = sample.groups.filter(group => group.id !== "agent").flatMap(group => group.processes.map(row => row.pid)).filter(pid => pid > 0);
-      footprint = await runFootprint([...new Set(pids)]).then(parseFootprint, (error: unknown) => error instanceof Error ? error : new Error(String(error)));
+      const pids = sample.groups
+        .filter((group) => group.id !== "agent")
+        .flatMap((group) => group.processes.map((row) => row.pid))
+        .filter((pid) => pid > 0);
+      footprint = await runFootprint([...new Set(pids)]).then(parseFootprint, (error: unknown) =>
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
-    return formatResourceSnapshot({ sample, platform: `${process.platform} ${process.arch}`, cores: cpus().length, appVersion: app.getVersion(), footprint });
+    return formatResourceSnapshot({
+      sample,
+      platform: `${process.platform} ${process.arch}`,
+      cores: cpus().length,
+      appVersion: app.getVersion(),
+      footprint,
+    });
   }
 }

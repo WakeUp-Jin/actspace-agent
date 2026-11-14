@@ -12,20 +12,36 @@ export async function repairTornJsonlSession(options: {
 }): Promise<{ readonly repairId: string | null; readonly forensicPath: string }> {
   const { inspection } = options;
   if (inspection.header === null || inspection.tornTail === null || inspection.validation === null) {
-    throw new SessionError("SESSION_CORRUPT", "Only a validated prefix with a torn final line can use torn-tail repair.");
+    throw new SessionError(
+      "SESSION_CORRUPT",
+      "Only a validated prefix with a torn final line can use torn-tail repair.",
+    );
   }
   const sessionDir = dirname(inspection.journalPath);
   const recoveryDir = join(sessionDir, "recovery");
   await mkdir(recoveryDir, { recursive: true });
-  const lease = await SessionWriterLease.acquire({ sessionDir, sessionId: inspection.header.sessionId, runtimeId: options.runtimeId });
+  const lease = await SessionWriterLease.acquire({
+    sessionDir,
+    sessionId: inspection.header.sessionId,
+    runtimeId: options.runtimeId,
+  });
   const digest = inspection.contentDigest;
   const forensicPath = join(recoveryDir, `${digest}.journal.jsonl`);
   const temporaryPath = join(sessionDir, `.repair-${randomUUID()}.tmp`);
   try {
-    if (createHash("sha256").update(await readFile(inspection.journalPath)).digest("hex") !== digest) throw new Error("Journal changed after inspection; inspect again before repair.");
+    if (
+      createHash("sha256")
+        .update(await readFile(inspection.journalPath))
+        .digest("hex") !== digest
+    )
+      throw new Error("Journal changed after inspection; inspect again before repair.");
     await copyFile(inspection.journalPath, forensicPath);
     await syncFile(forensicPath);
-    const journal = new SessionJournal({ registry: options.registry, seed: inspection.events, now: () => new Date().toISOString() });
+    const journal = new SessionJournal({
+      registry: options.registry,
+      seed: inspection.events,
+      now: () => new Date().toISOString(),
+    });
     // Only repair the physical prefix. SessionStore performs semantic recovery after open.
     const temporary = await open(temporaryPath, "wx", 0o600);
     try {
@@ -45,10 +61,18 @@ export async function repairTornJsonlSession(options: {
 
 async function syncFile(path: string): Promise<void> {
   const handle = await open(path, "r");
-  try { await handle.sync(); } finally { await handle.close(); }
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
 }
 
 async function syncDirectory(path: string): Promise<void> {
   const handle = await open(path, "r");
-  try { await handle.sync(); } finally { await handle.close(); }
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
 }

@@ -9,7 +9,15 @@ import { prepareExecutionContext, rollbackPreparedExecution } from "../workspace
 import { homedir } from "node:os";
 import { stat } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
-import { dialog, nativeImage, nativeTheme, shell, type BrowserWindow, type OpenDialogOptions, type OpenDialogReturnValue } from "electron";
+import {
+  dialog,
+  nativeImage,
+  nativeTheme,
+  shell,
+  type BrowserWindow,
+  type OpenDialogOptions,
+  type OpenDialogReturnValue,
+} from "electron";
 import { spawn } from "node:child_process";
 import {
   fileReferenceBlocks,
@@ -53,16 +61,38 @@ import type { ModelStoreService } from "../model-store-service";
 import type { BrowserBridgeService } from "../browser-bridge-service";
 import type { QuickOpenShortcutController } from "../quick-open-shortcut-controller";
 import type { SettingsService } from "../settings-service";
-import { createWorkspaceFolder, resolveWorkspaceSelection, resolveRegisteredWorkspaceSelection, setWorkspaceHidden } from "../workspace-registry-service";
+import {
+  createWorkspaceFolder,
+  resolveWorkspaceSelection,
+  resolveRegisteredWorkspaceSelection,
+  setWorkspaceHidden,
+} from "../workspace-registry-service";
 import { isDelegatedSession, sideChatParentId } from "@actspace/shared/session-list-page";
-import { createWorkspaceAccessDeps, registeredWorkspaceRoot, resolveWorkspaceAccess, workspaceRegistryOptions, WORKSPACE_NOT_REGISTERED } from "../workspace-access";
+import {
+  createWorkspaceAccessDeps,
+  registeredWorkspaceRoot,
+  resolveWorkspaceAccess,
+  workspaceRegistryOptions,
+  WORKSPACE_NOT_REGISTERED,
+} from "../workspace-access";
 import { getWorkspaceGitContext } from "../workspace-git-context-service";
 import { openWorkspaceInIde } from "../workspace-ide-service";
-import { commitAndPushWorkspaceChanges, commitWorkspaceChanges, createWorkspaceBranch, getWorkspaceEnvironment, pushWorkspaceBranch, switchWorkspaceBranch } from "../workspace-environment-service";
+import {
+  commitAndPushWorkspaceChanges,
+  commitWorkspaceChanges,
+  createWorkspaceBranch,
+  getWorkspaceEnvironment,
+  pushWorkspaceBranch,
+  switchWorkspaceBranch,
+} from "../workspace-environment-service";
 import { listWorkspaceOpenTools, openWorkspaceInTool } from "../workspace-open-service";
 import type { ProviderNetworkService } from "./provider-network-service";
 import { ChatAttachmentValidationError, type DesktopRuntimeRegistry } from "./runtime-registry";
-import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRendererSkill } from "./fixed-renderer-skills";
+import {
+  installFixedRendererSkill,
+  listFixedRendererSkills,
+  uninstallFixedRendererSkill,
+} from "./fixed-renderer-skills";
 import {
   projectSubagentTranscript,
   createSubagentListState,
@@ -99,7 +129,8 @@ export type FixedRendererIpcRegistration = {
 };
 
 export function registerFixedRendererIpc(options: FixedRendererIpcOptions): FixedRendererIpcRegistration {
-  const readModel = usageReadModels.get(options.registry) ?? new UsageReadModelService(options.registry, options.roots.dataRoot);
+  const readModel =
+    usageReadModels.get(options.registry) ?? new UsageReadModelService(options.registry, options.roots.dataRoot);
   usageReadModels.set(options.registry, readModel);
   const contextPanel = new ContextPanelService(options.registry, readModel);
   let pendingQuickOpen = false;
@@ -111,31 +142,43 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     middleware: createSessionGateway(options.remote),
   });
 
-  ipc.handle(contract.app.getBootstrapState, (): BootstrapState => ({
-    appVersion: process.env.npm_package_version ?? "0.1.0",
-    dataRoot: options.roots.dataRoot,
-    sessionRoot: options.roots.sessionRoot,
-    logRoot: options.roots.logRoot,
-    tmpRoot: options.roots.tmpRoot,
-    workspaceRoot: options.roots.workspaceRoot,
-  }));
+  ipc.handle(
+    contract.app.getBootstrapState,
+    (): BootstrapState => ({
+      appVersion: process.env.npm_package_version ?? "0.1.0",
+      dataRoot: options.roots.dataRoot,
+      sessionRoot: options.roots.sessionRoot,
+      logRoot: options.roots.logRoot,
+      tmpRoot: options.roots.tmpRoot,
+      workspaceRoot: options.roots.workspaceRoot,
+    }),
+  );
 
   ipc.handle(contract.sessions.listPage, async (input = {}) => {
     if (input.hostId) return { items: [], groups: [], indexing: false, failed: 0 };
-    const service = usageReadModels.get(options.registry) ?? new UsageReadModelService(options.registry, options.roots.dataRoot);
+    const service =
+      usageReadModels.get(options.registry) ?? new UsageReadModelService(options.registry, options.roots.dataRoot);
     usageReadModels.set(options.registry, service);
     return service.getSessionPage(input);
   });
-  ipc.handle(contract.sessions.getToolDetail, (input) => options.registry.browseToolDetail(input.sessionId, input.callId));
+  ipc.handle(contract.sessions.getToolDetail, (input) =>
+    options.registry.browseToolDetail(input.sessionId, input.callId),
+  );
   ipc.handle(contract.sessions.getPage, (input) => options.registry.readSessionProjection(input));
   ipc.handle(contract.sessions.list, async (input = {}) => {
     const items = await options.registry.listSessions();
-    const selected = items.filter((item) => item.metadata.archived === (input.archived === true) && !isDelegatedSession(item.lineage));
+    const selected = items.filter(
+      (item) => item.metadata.archived === (input.archived === true) && !isDelegatedSession(item.lineage),
+    );
     return Promise.all(selected.map((item) => toSessionListItem(item, options.registry)));
   });
   ipc.handle(contract.sessions.get, async (input) => {
     try {
-      return await options.registry.readSessionProjection({ sessionId: input.sessionId, afterSeq: -1, includeToolDetails: true });
+      return await options.registry.readSessionProjection({
+        sessionId: input.sessionId,
+        afterSeq: -1,
+        includeToolDetails: true,
+      });
     } catch {
       return null;
     }
@@ -145,7 +188,9 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   ipc.handle(contract.sessions.getPreview, async (input) => {
     try {
       const snapshot = await options.registry.inspectSession(input.sessionId);
-      const estimate = await options.registry.readSessionProjectionValue(input.sessionId, "contextEstimate") as ContextEstimateView | undefined;
+      const estimate = (await options.registry.readSessionProjectionValue(input.sessionId, "contextEstimate")) as
+        | ContextEstimateView
+        | undefined;
       return {
         sessionId: snapshot.sessionId,
         workspaceRoot: snapshot.workspaceRoot ?? options.roots.workspaceRoot,
@@ -156,23 +201,44 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     }
   });
   ipc.handle(contract.sessions.create, async (input = {}) => {
-    const workspaceRoot = await registeredWorkspaceRoot(workspaceRegistryOptions(options.roots), input.workspaceRoot ?? options.roots.workspaceRoot);
-    const prepared = input.runLocation ? await prepareExecutionContext({
-      sourceWorkspaceRoot: workspaceRoot, runLocation: input.runLocation, branch: input.branch,
-    }, options.roots) : { ok: true as const, workspaceRoot };
+    const workspaceRoot = await registeredWorkspaceRoot(
+      workspaceRegistryOptions(options.roots),
+      input.workspaceRoot ?? options.roots.workspaceRoot,
+    );
+    const prepared = input.runLocation
+      ? await prepareExecutionContext(
+          {
+            sourceWorkspaceRoot: workspaceRoot,
+            runLocation: input.runLocation,
+            branch: input.branch,
+          },
+          options.roots,
+        )
+      : { ok: true as const, workspaceRoot };
     if (prepared.ok === false) throw new Error(prepared.message);
     let snapshot: RuntimeSessionSnapshot;
     try {
-      snapshot = await options.registry.createSession(undefined, prepared.workspaceRoot, input.agentForm, "worktree" in prepared ? prepared.worktree : undefined);
+      snapshot = await options.registry.createSession(
+        undefined,
+        prepared.workspaceRoot,
+        input.agentForm,
+        "worktree" in prepared ? prepared.worktree : undefined,
+      );
     } catch (error) {
       await rollbackPreparedExecution("rollback" in prepared ? prepared.rollback : undefined);
       throw error;
     }
     if (input.title?.trim()) {
-      snapshot = await options.registry.updateSessionMetadata({ sessionId: snapshot.sessionId, title: input.title.trim() });
+      snapshot = await options.registry.updateSessionMetadata({
+        sessionId: snapshot.sessionId,
+        title: input.title.trim(),
+      });
     }
     // 设置 → 通用 →「新会话默认权限」：写进新会话，第一轮就按它跑。Chat 形态没有工具，不需要。
-    const permissionMode = input.agentForm === "chat" ? "default" : options.settings.getV4().settings.general.defaultPermissionMode ?? "default";
+    const permissionMode =
+      input.agentForm === "chat"
+        ? "default"
+        : (options.settings.getV4().settings.general.defaultPermissionMode ?? "default");
     if (permissionMode !== "default" && snapshot.permissionMode !== permissionMode) {
       snapshot = await options.registry.updateSessionPermissionMode(snapshot.sessionId, permissionMode);
     }
@@ -180,9 +246,10 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
   ipc.handle(contract.sessions.fork, async (input) => {
     // 整个会话分叉截到当前末尾；从助手回复分叉由 Host 把 turnId 解析成该轮结束的边界。
-    const boundary = input.turnId !== undefined
-      ? { turnId: input.turnId }
-      : { boundarySeq: (await options.registry.inspectSession(input.sessionId)).throughJournalSeq };
+    const boundary =
+      input.turnId !== undefined
+        ? { turnId: input.turnId }
+        : { boundarySeq: (await options.registry.inspectSession(input.sessionId)).throughJournalSeq };
     const forked = await options.registry.forkSession({
       parentSessionId: input.sessionId,
       ...boundary,
@@ -197,7 +264,9 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
   ipc.handle(contract.sessions.listSideChats, async (input) => {
     const items = await options.registry.listSessions();
-    const selected = items.filter((item) => !item.metadata.archived && sideChatParentId(item.lineage) === input.parentSessionId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const selected = items
+      .filter((item) => !item.metadata.archived && sideChatParentId(item.lineage) === input.parentSessionId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     return Promise.all(selected.map((item) => toSessionListItem(item, options.registry)));
   });
   ipc.handle(contract.sessions.pin, async (input) => {
@@ -205,7 +274,10 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return { ok: true };
   });
   ipc.handle(contract.sessions.rename, async (input) => {
-    await options.registry.updateSessionMetadata({ sessionId: input.sessionId, title: input.title.trim() || "New chat" });
+    await options.registry.updateSessionMetadata({
+      sessionId: input.sessionId,
+      title: input.title.trim() || "New chat",
+    });
     return { ok: true };
   });
   ipc.handle(contract.sessions.setWorkspace, async (input) => {
@@ -218,7 +290,8 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return { ok: true };
   });
   ipc.handle(contract.sessions.setPermissionMode, async (input) => {
-    if (input.mode !== "default" && input.mode !== "full-access" && input.mode !== "auto-review") return { ok: false, error: "invalid_permission_mode" };
+    if (input.mode !== "default" && input.mode !== "full-access" && input.mode !== "auto-review")
+      return { ok: false, error: "invalid_permission_mode" };
     try {
       const snapshot = await options.registry.updateSessionPermissionMode(input.sessionId, input.mode);
       return { ok: true, mode: snapshot.permissionMode };
@@ -228,7 +301,11 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
   ipc.handle(contract.sessions.setAgentMode, async (input) => {
     try {
-      const snapshot = await options.registry.updateSessionAgentMode(input.sessionId, input.mode, input.expectedRevision);
+      const snapshot = await options.registry.updateSessionAgentMode(
+        input.sessionId,
+        input.mode,
+        input.expectedRevision,
+      );
       return { ok: true, mode: snapshot.agentMode, revision: snapshot.agentModeRevision };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -254,62 +331,124 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
 
   ipc.handle(contract.tasks.command, async (input) => options.registry.taskCommand(input));
   ipc.handle(contract.tasks.listBackground, async (input) => options.registry.listBackgroundTasks(input.sessionId));
-  ipc.handle(contract.tasks.readBackgroundOutput, async (input) => options.registry.readBackgroundTaskOutput(input.sessionId, input.taskId));
-  ipc.handle(contract.tasks.stopBackground, async (input) => options.registry.stopBackgroundTask(input.sessionId, input.taskId));
+  ipc.handle(contract.tasks.readBackgroundOutput, async (input) =>
+    options.registry.readBackgroundTaskOutput(input.sessionId, input.taskId),
+  );
+  ipc.handle(contract.tasks.stopBackground, async (input) =>
+    options.registry.stopBackgroundTask(input.sessionId, input.taskId),
+  );
   // Serialize duplicate preparation too: importing the same attachment twice must not change content identity.
   const submissions = new Map<string, Promise<unknown>>();
   ipc.handle(contract.tasks.submit, async (input) => {
     const key = `${input.sessionId}/${input.submissionId}`;
     const previous = submissions.get(key) ?? Promise.resolve();
-    const attempt = previous.catch(() => undefined).then(async (): Promise<TaskSubmissionResult> => {
-      const original = { userInput: input.userInput, attachments: input.attachments ?? [], fileReferences: input.fileReferences ?? [], responseAnnotations: input.responseAnnotations ?? [] };
-      const { snapshot } = await options.registry.taskCommand({ op: "snapshot", sessionId: input.sessionId });
-      const existing = snapshot.tasks.find(task => task.submissionId === input.submissionId);
-      if (existing) {
-        const content = existing.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
-        if (content?.kind !== "composer-task" || !isDeepStrictEqual(content.original, JSON.parse(JSON.stringify(original)))) throw new Error("SUBMISSION_CONFLICT");
-        // A retry after a rewind that lost its reply lands here too: the task exists, so nothing rewinds again.
-        return options.registry.submitTask(input.sessionId, input.submissionId, existing.content);
-      }
-      const references = await validateRunReferences(options.registry, input);
-      if (references.ok === false) return { status: "submission-failed", acknowledgement: "rejected", message: "消息引用已失效，请检查后重试。", referenceIssue: references.issue };
-      let prepared: Awaited<ReturnType<typeof toRunContent>>;
-      try {
-        prepared = await toRunContent(options.registry, input.sessionId, { userInput: input.userInput, attachments: input.attachments ?? [], fileReferences: references.fileReferences, responseAnnotations: references.responseAnnotations });
-      } catch (error) {
-        // Preparation has not attempted Task admission, so its failure is a definite rejection.
-        // Keep errors from submitTask below outside this catch: a lost reply may hide an accepted Task.
-        if (!(error instanceof ChatAttachmentValidationError)) return {
-          status: "submission-failed", acknowledgement: "rejected",
-          message: `附件准备失败，草稿已保留。${error instanceof Error ? error.message : "请检查附件后重试。"}`,
+    const attempt = previous
+      .catch(() => undefined)
+      .then(async (): Promise<TaskSubmissionResult> => {
+        const original = {
+          userInput: input.userInput,
+          attachments: input.attachments ?? [],
+          fileReferences: input.fileReferences ?? [],
+          responseAnnotations: input.responseAnnotations ?? [],
         };
-        const attachments = (input.attachments ?? []).filter(attachment => Boolean(attachment.path));
-        return { status: "submission-failed", acknowledgement: "rejected", message: "附件校验失败，请检查后重试。", attachmentIssue: {
-          ...error.issue,
-          ...(error.attachmentIndex === undefined ? {} : { attachmentId: attachments[error.attachmentIndex]?.id }),
-          ...(error.textCharacterCounts === undefined ? {} : { textCharacterCounts: Object.fromEntries(attachments.map((attachment, index) => [attachment.id, error.textCharacterCounts![index] ?? 0])) }),
-        } };
-      }
-      // Once admission is attempted a missing reply is uncertain; never delete imported content needed by a durable Task.
-      const content = { kind: "composer-task", original: JSON.parse(JSON.stringify(original)), prepared: prepared.content } as const;
-      if (!input.rewind) return options.registry.submitTask(input.sessionId, input.submissionId, content, ...(input.agentRunId ? [input.agentRunId] : []));
-      try { return await options.registry.rewindAndSubmit(input.sessionId, input.rewind, input.submissionId, content, input.agentRunId); }
-      catch (error) {
-        // A refused rewind changed nothing; the client keeps the editor open with this message.
-        const message = rewindErrorMessage(error);
-        if (message === undefined) throw error;
-        await options.registry.rollbackImportedAttachments(input.sessionId, prepared.importedArtifactIds).catch(() => undefined);
-        return { status: "submission-failed", acknowledgement: "rejected", message };
-      }
-    });
+        const { snapshot } = await options.registry.taskCommand({ op: "snapshot", sessionId: input.sessionId });
+        const existing = snapshot.tasks.find((task) => task.submissionId === input.submissionId);
+        if (existing) {
+          const content = existing.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
+          if (
+            content?.kind !== "composer-task" ||
+            !isDeepStrictEqual(content.original, JSON.parse(JSON.stringify(original)))
+          )
+            throw new Error("SUBMISSION_CONFLICT");
+          // A retry after a rewind that lost its reply lands here too: the task exists, so nothing rewinds again.
+          return options.registry.submitTask(input.sessionId, input.submissionId, existing.content);
+        }
+        const references = await validateRunReferences(options.registry, input);
+        if (references.ok === false)
+          return {
+            status: "submission-failed",
+            acknowledgement: "rejected",
+            message: "消息引用已失效，请检查后重试。",
+            referenceIssue: references.issue,
+          };
+        let prepared: Awaited<ReturnType<typeof toRunContent>>;
+        try {
+          prepared = await toRunContent(options.registry, input.sessionId, {
+            userInput: input.userInput,
+            attachments: input.attachments ?? [],
+            fileReferences: references.fileReferences,
+            responseAnnotations: references.responseAnnotations,
+          });
+        } catch (error) {
+          // Preparation has not attempted Task admission, so its failure is a definite rejection.
+          // Keep errors from submitTask below outside this catch: a lost reply may hide an accepted Task.
+          if (!(error instanceof ChatAttachmentValidationError))
+            return {
+              status: "submission-failed",
+              acknowledgement: "rejected",
+              message: `附件准备失败，草稿已保留。${error instanceof Error ? error.message : "请检查附件后重试。"}`,
+            };
+          const attachments = (input.attachments ?? []).filter((attachment) => Boolean(attachment.path));
+          return {
+            status: "submission-failed",
+            acknowledgement: "rejected",
+            message: "附件校验失败，请检查后重试。",
+            attachmentIssue: {
+              ...error.issue,
+              ...(error.attachmentIndex === undefined ? {} : { attachmentId: attachments[error.attachmentIndex]?.id }),
+              ...(error.textCharacterCounts === undefined
+                ? {}
+                : {
+                    textCharacterCounts: Object.fromEntries(
+                      attachments.map((attachment, index) => [attachment.id, error.textCharacterCounts![index] ?? 0]),
+                    ),
+                  }),
+            },
+          };
+        }
+        // Once admission is attempted a missing reply is uncertain; never delete imported content needed by a durable Task.
+        const content = {
+          kind: "composer-task",
+          original: JSON.parse(JSON.stringify(original)),
+          prepared: prepared.content,
+        } as const;
+        if (!input.rewind)
+          return options.registry.submitTask(
+            input.sessionId,
+            input.submissionId,
+            content,
+            ...(input.agentRunId ? [input.agentRunId] : []),
+          );
+        try {
+          return await options.registry.rewindAndSubmit(
+            input.sessionId,
+            input.rewind,
+            input.submissionId,
+            content,
+            input.agentRunId,
+          );
+        } catch (error) {
+          // A refused rewind changed nothing; the client keeps the editor open with this message.
+          const message = rewindErrorMessage(error);
+          if (message === undefined) throw error;
+          await options.registry
+            .rollbackImportedAttachments(input.sessionId, prepared.importedArtifactIds)
+            .catch(() => undefined);
+          return { status: "submission-failed", acknowledgement: "rejected", message };
+        }
+      });
     submissions.set(key, attempt);
-    try { return await attempt; } finally { if (submissions.get(key) === attempt) submissions.delete(key); }
+    try {
+      return await attempt;
+    } finally {
+      if (submissions.get(key) === attempt) submissions.delete(key);
+    }
   });
 
   ipc.handle(contract.tasks.abort, async (input) => {
     options.approvals.abortAgentRun(input.sessionId, input.agentRunId);
     const state = await options.registry.taskCommand({ op: "snapshot", sessionId: input.sessionId });
-    if (!state.snapshot.runs.some(run => run.runId === input.agentRunId && run.state === "running")) return false;
+    if (!state.snapshot.runs.some((run) => run.runId === input.agentRunId && run.state === "running")) return false;
     await options.registry.taskCommand({ op: "stop", sessionId: input.sessionId, runId: input.agentRunId });
     return true;
   });
@@ -317,7 +456,8 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   // Text deltas travel only on the renderer stream, coalesced there within ~33ms. Session live envelopes are
   // journal facts and run states (no per-token traffic since chunks left the Journal), so they go out at once.
   const unsubscribeLive = options.registry.subscribe((envelope) => {
-    if (envelope.event.kind === "runtime-live" || envelope.event.kind === "journal-update") usageReadModels.get(options.registry)?.invalidate();
+    if (envelope.event.kind === "runtime-live" || envelope.event.kind === "journal-update")
+      usageReadModels.get(options.registry)?.invalidate();
     // A finished message (or any other journal fact) must not overtake the text deltas streamed before it:
     // a delta arriving after its message was committed is drawn as a new live segment that stays until the run ends.
     options.registry.flushRendererStream();
@@ -328,7 +468,8 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
 
   const unsubscribeRendererStream = options.registry.subscribeRendererStream((event) => {
     const target = options.getMainWindow();
-    if (target !== undefined && !target.isDestroyed()) target.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.agentStream, event);
+    if (target !== undefined && !target.isDestroyed())
+      target.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.agentStream, event);
   });
 
   registerFixedRendererSettings(options, ipc);
@@ -363,7 +504,9 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
 
   return {
-    flushLive: () => { options.registry.flushRendererStream(); },
+    flushLive: () => {
+      options.registry.flushRendererStream();
+    },
     dispose: () => {
       unsubscribeLive();
       void usageReadModels.get(options.registry)?.dispose();
@@ -383,11 +526,18 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   };
 }
 
-function registerBrowserBridgeIpc(options: FixedRendererIpcOptions, ipc: IpcRegistrar, browserBridge: BrowserBridgeService): void {
+function registerBrowserBridgeIpc(
+  options: FixedRendererIpcOptions,
+  ipc: IpcRegistrar,
+  browserBridge: BrowserBridgeService,
+): void {
   ipc.handle(contract.browserBridge.getStatus, () => browserBridge.getStatus());
   ipc.handle(contract.browserBridge.connect, () => browserBridge.connect());
   ipc.handle(contract.browserBridge.selectSourceExtension, async () => {
-    const result = await showOpenDialog(options.getMainWindow(), { title: "选择 actspace 源码目录（需包含 browser-bridge/）", properties: ["openDirectory"] });
+    const result = await showOpenDialog(options.getMainWindow(), {
+      title: "选择 actspace 源码目录（需包含 browser-bridge/）",
+      properties: ["openDirectory"],
+    });
     if (result.canceled || !result.filePaths[0]) return { ok: true, canceled: true };
     return browserBridge.setSourceExtension(result.filePaths[0]);
   });
@@ -400,7 +550,9 @@ function registerBrowserBridgeIpc(options: FixedRendererIpcOptions, ipc: IpcRegi
       return new Promise<{ ok: boolean; error?: string }>((resolve) => {
         const child = spawn("open", ["-a", "Google Chrome", "chrome://extensions"], { stdio: "ignore" });
         child.once("error", (error) => resolve({ ok: false, error: error.message }));
-        child.once("exit", (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: "Chrome 扩展页未能打开。" }));
+        child.once("exit", (code) =>
+          resolve(code === 0 ? { ok: true } : { ok: false, error: "Chrome 扩展页未能打开。" }),
+        );
       });
     }
     return { ok: false, error: "请在 Chrome 地址栏打开 chrome://extensions。" };
@@ -441,9 +593,13 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, ipc: Ip
   });
   ipc.handle(contract.settings.getSearchUsage, () => options.settings.getSearchUsage());
   ipc.handle(contract.settings.readSystemPrompt, () => options.settings.readAgentSystemPrompt());
-  ipc.handle(contract.settings.writeSystemPrompt, (input) => options.settings.writeAgentSystemPrompt(typeof input?.content === "string" ? input.content : ""));
+  ipc.handle(contract.settings.writeSystemPrompt, (input) =>
+    options.settings.writeAgentSystemPrompt(typeof input?.content === "string" ? input.content : ""),
+  );
 
-  ipc.handle(contract.models.listUsable, (input) => ({ models: options.modelRuntime.listUsableModels(input?.purpose ?? "chat") }));
+  ipc.handle(contract.models.listUsable, (input) => ({
+    models: options.modelRuntime.listUsableModels(input?.purpose ?? "chat"),
+  }));
 }
 
 /** 设置 › 模型：连接、连接下的模型、用途表。入参校验在 ModelConnectionsService 里。 */
@@ -462,7 +618,11 @@ function registerModelConnections(options: FixedRendererIpcOptions, ipc: IpcRegi
   ipc.handle(contract.modelConnections.getBalance, (input) => connections.getBalance(input));
 }
 
-function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions, ipc: IpcRegistrar, contextPanel: ContextPanelService): void {
+function registerFixedRendererHostCapabilities(
+  options: FixedRendererIpcOptions,
+  ipc: IpcRegistrar,
+  contextPanel: ContextPanelService,
+): void {
   const registryOptions = workspaceRegistryOptions(options.roots);
   const workspaceAccess = createWorkspaceAccessDeps(registryOptions, () => options.registry.listSessions());
   // 「新建文件夹工作区」的父目录来自系统对话框，不在 registry 里。只认用户最近一次在对话框里选的目录，
@@ -471,18 +631,28 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   ipc.handle(contract.dialogs.selectFiles, async (input = {}) => {
     const result = await showOpenDialog(options.getMainWindow(), {
       properties: ["openFile", "multiSelections"],
-      filters: input.remote === true ? [{ name: "Files", extensions: ["*"] }] : [{ name: "Chat attachments", extensions: ["png", "jpg", "jpeg", "webp", "gif", "txt", "md", "markdown", "json", "csv"] }],
+      filters:
+        input.remote === true
+          ? [{ name: "Files", extensions: ["*"] }]
+          : [
+              {
+                name: "Chat attachments",
+                extensions: ["png", "jpg", "jpeg", "webp", "gif", "txt", "md", "markdown", "json", "csv"],
+              },
+            ],
     });
-    const attachments = await Promise.all(result.filePaths.map(async (path) => {
-      const image = /\.(png|jpe?g|webp|gif)$/i.test(path);
-      return {
-        id: `att_${randomUUID()}`,
-        kind: image ? "image" as const : "file" as const,
-        path,
-        name: path.split(/[\\/]/).at(-1) ?? path,
-        ...(image ? { previewUrl: await imagePreviewDataUrl(path) } : {}),
-      };
-    }));
+    const attachments = await Promise.all(
+      result.filePaths.map(async (path) => {
+        const image = /\.(png|jpe?g|webp|gif)$/i.test(path);
+        return {
+          id: `att_${randomUUID()}`,
+          kind: image ? ("image" as const) : ("file" as const),
+          path,
+          name: path.split(/[\\/]/).at(-1) ?? path,
+          ...(image ? { previewUrl: await imagePreviewDataUrl(path) } : {}),
+        };
+      }),
+    );
     return { canceled: result.canceled, attachments };
   });
   ipc.handle(contract.dialogs.selectImages, async () => {
@@ -490,16 +660,20 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       properties: ["openFile", "multiSelections"],
       filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
     });
-    const images = await Promise.all(result.filePaths.map(async (path) => ({
-      id: `att_${randomUUID()}`,
-      kind: "image" as const,
-      path,
-      name: path.split(/[\\/]/).at(-1) ?? path,
-      previewUrl: await imagePreviewDataUrl(path),
-    })));
+    const images = await Promise.all(
+      result.filePaths.map(async (path) => ({
+        id: `att_${randomUUID()}`,
+        kind: "image" as const,
+        path,
+        name: path.split(/[\\/]/).at(-1) ?? path,
+        previewUrl: await imagePreviewDataUrl(path),
+      })),
+    );
     return { canceled: result.canceled, attachments: images };
   });
-  ipc.handle(contract.dialogs.importComposerImage, (input) => importComposerImage(input, options.roots.tmpRoot, imagePreviewDataUrl));
+  ipc.handle(contract.dialogs.importComposerImage, (input) =>
+    importComposerImage(input, options.roots.tmpRoot, imagePreviewDataUrl),
+  );
   ipc.handle(contract.dialogs.selectWorkspaceDirectory, async (input = {}): Promise<SelectWorkspaceDirectoryResult> => {
     const result = await showOpenDialog(options.getMainWindow(), { properties: ["openDirectory"] });
     if (result.canceled || !result.filePaths[0]) return { canceled: true };
@@ -512,16 +686,27 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     return { canceled: false, workspaceRoot: resolved.workspaceRoot };
   });
   ipc.handle(contract.workspaces.openInIde, (input) => openWorkspaceInIde(registryOptions, input.workspaceId));
-  ipc.handle(contract.workspaces.setVisibility, (input) => setWorkspaceHidden(registryOptions, input.workspaceId, input.hidden));
-  ipc.handle(contract.workspaces.getGitContext, async (input) => getWorkspaceGitContext(
-    await resolveWorkspaceAccess({ workspaceRoot: input?.workspaceRoot ?? options.roots.workspaceRoot }, workspaceAccess),
-  ));
+  ipc.handle(contract.workspaces.setVisibility, (input) =>
+    setWorkspaceHidden(registryOptions, input.workspaceId, input.hidden),
+  );
+  ipc.handle(contract.workspaces.getGitContext, async (input) =>
+    getWorkspaceGitContext(
+      await resolveWorkspaceAccess(
+        { workspaceRoot: input?.workspaceRoot ?? options.roots.workspaceRoot },
+        workspaceAccess,
+      ),
+    ),
+  );
   ipc.handle(contract.workspaces.createFolder, async (input) => {
-    const parent = typeof input?.parentRoot === "string" && input.parentRoot.trim() ? resolvePath(input.parentRoot.trim()) : "";
+    const parent =
+      typeof input?.parentRoot === "string" && input.parentRoot.trim() ? resolvePath(input.parentRoot.trim()) : "";
     if (!parent) return { ok: false as const, error: WORKSPACE_NOT_REGISTERED };
     const picked = parent === pickedParentDirectory;
     if (!picked) {
-      const registered = await resolveWorkspaceAccess({ workspaceRoot: parent }, workspaceAccess).then(() => true, () => false);
+      const registered = await resolveWorkspaceAccess({ workspaceRoot: parent }, workspaceAccess).then(
+        () => true,
+        () => false,
+      );
       if (!registered) return { ok: false as const, error: WORKSPACE_NOT_REGISTERED };
     }
     const created = await createWorkspaceFolder(registryOptions, input);
@@ -535,7 +720,13 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
         return { name: "", relativePath: "", size: artifact.bytes.byteLength, error: "unsupported_format" as const };
       }
       if (artifact.bytes.byteLength > 25 * 1024 * 1024) {
-        return { name: "", relativePath: "", mimeType: artifact.mediaType, size: artifact.bytes.byteLength, error: "too_large" as const };
+        return {
+          name: "",
+          relativePath: "",
+          mimeType: artifact.mediaType,
+          size: artifact.bytes.byteLength,
+          error: "too_large" as const,
+        };
       }
       return {
         name: input.artifactPath,
@@ -550,8 +741,10 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
   ipc.handle(contract.dialogs.showArtifactContextMenu, async (input) => {
     if (input.kind === "workspace_file") {
-      const workspaceRoot = await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot ?? options.roots.defaultWorkspaceRoot }, workspaceAccess)
-        .catch(() => null);
+      const workspaceRoot = await resolveWorkspaceAccess(
+        { workspaceRoot: input.workspaceRoot ?? options.roots.defaultWorkspaceRoot },
+        workspaceAccess,
+      ).catch(() => null);
       if (!workspaceRoot) return { shown: false, error: "invalid_target" as const };
       return showArtifactContextMenu({ ...input, workspaceRoot }, options.roots, options.getMainWindow());
     }
@@ -560,19 +753,25 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       if (!isSupportedSessionImageMime(artifact.mediaType) || artifact.bytes.byteLength > 25 * 1024 * 1024) {
         return { shown: false, error: "invalid_target" as const };
       }
-      return showResolvedArtifactContextMenu({
-        kind: "session_image",
-        path: artifact.path,
-        size: artifact.bytes.byteLength,
-        sessionImageDataUrl: `data:${artifact.mediaType};base64,${Buffer.from(artifact.bytes).toString("base64")}`,
-      }, options.getMainWindow());
+      return showResolvedArtifactContextMenu(
+        {
+          kind: "session_image",
+          path: artifact.path,
+          size: artifact.bytes.byteLength,
+          sessionImageDataUrl: `data:${artifact.mediaType};base64,${Buffer.from(artifact.bytes).toString("base64")}`,
+        },
+        options.getMainWindow(),
+      );
     } catch {
       return { shown: false, error: "invalid_target" as const };
     }
   });
 
   ipc.handle(contract.workspaces.getEnvironment, async (input = {}) => {
-    const workspaceRoot = await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot ?? options.roots.defaultWorkspaceRoot }, workspaceAccess);
+    const workspaceRoot = await resolveWorkspaceAccess(
+      { workspaceRoot: input.workspaceRoot ?? options.roots.defaultWorkspaceRoot },
+      workspaceAccess,
+    );
     return getWorkspaceEnvironment({ ...input, workspaceRoot }, options.roots);
   });
   ipc.handle(contract.workspaces.createBranch, async (input) => {
@@ -602,108 +801,189 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
 
   ipc.handle(contract.approvals.listPending, async (input = {}): Promise<PendingApprovalInfo[]> => {
-    const pending = await Promise.all(options.approvals.listPending(input.sessionId).map(async (request): Promise<PendingApprovalInfo> => {
-      // Broker args are resource summaries, not tool arguments. Read the
-      // accepted call for a faithful path/command preview after renderer reload.
-      const detail = request.sessionId && request.toolCallId
-        ? await options.registry.browseToolDetail(request.sessionId, request.toolCallId).catch(() => undefined)
-        : undefined;
-      const call = detail?.journal.find(event => event.type === "tool/call" && (event.data as Record<string, unknown>).callId === request.toolCallId);
-      const callData = call?.data as Record<string, RuntimeJsonValue> | undefined;
-      return {
-        requestId: request.id,
-        ...(request.sessionId && request.agentRunId && request.toolCallId ? { recovery: {
-          agentRunId: request.agentRunId,
-          toolCallId: request.toolCallId,
-          preview: toolPreview(request.toolName, undefined, { summary: request.summary }, callData ?? { args: request.args as Record<string, RuntimeJsonValue> }, undefined, request.sessionId, request.agentRunId, "running", detail?.snapshot.workspaceRoot ?? undefined),
-          approvalScope: request.approvalScope,
-        } } : {}),
-        toolName: request.toolName,
-        summary: request.summary,
-        reason: request.reason,
-        riskLevel: request.riskLevel,
-        command: typeof request.args.command === "string" ? request.args.command : undefined,
-        createdAt: request.createdAt,
-        expiresAt: request.expiresAt,
-        grantSuggestions: request.grantSuggestions,
-        supportedLifetimes: request.supportedLifetimes,
-      };
-    }));
-    const live = new Set(options.approvals.listPending(input.sessionId).map(request => request.id));
-    return pending.filter(request => live.has(request.requestId));
+    const pending = await Promise.all(
+      options.approvals.listPending(input.sessionId).map(async (request): Promise<PendingApprovalInfo> => {
+        // Broker args are resource summaries, not tool arguments. Read the
+        // accepted call for a faithful path/command preview after renderer reload.
+        const detail =
+          request.sessionId && request.toolCallId
+            ? await options.registry.browseToolDetail(request.sessionId, request.toolCallId).catch(() => undefined)
+            : undefined;
+        const call = detail?.journal.find(
+          (event) =>
+            event.type === "tool/call" && (event.data as Record<string, unknown>).callId === request.toolCallId,
+        );
+        const callData = call?.data as Record<string, RuntimeJsonValue> | undefined;
+        return {
+          requestId: request.id,
+          ...(request.sessionId && request.agentRunId && request.toolCallId
+            ? {
+                recovery: {
+                  agentRunId: request.agentRunId,
+                  toolCallId: request.toolCallId,
+                  preview: toolPreview(
+                    request.toolName,
+                    undefined,
+                    { summary: request.summary },
+                    callData ?? { args: request.args as Record<string, RuntimeJsonValue> },
+                    undefined,
+                    request.sessionId,
+                    request.agentRunId,
+                    "running",
+                    detail?.snapshot.workspaceRoot ?? undefined,
+                  ),
+                  approvalScope: request.approvalScope,
+                },
+              }
+            : {}),
+          toolName: request.toolName,
+          summary: request.summary,
+          reason: request.reason,
+          riskLevel: request.riskLevel,
+          command: typeof request.args.command === "string" ? request.args.command : undefined,
+          createdAt: request.createdAt,
+          expiresAt: request.expiresAt,
+          grantSuggestions: request.grantSuggestions,
+          supportedLifetimes: request.supportedLifetimes,
+        };
+      }),
+    );
+    const live = new Set(options.approvals.listPending(input.sessionId).map((request) => request.id));
+    return pending.filter((request) => live.has(request.requestId));
   });
-  ipc.handle(contract.approvals.submit, (input) => options.approvals.decide(input.requestId, input.decision, input.decision === "session" ? input.suggestionId : undefined));
+  ipc.handle(contract.approvals.submit, (input) =>
+    options.approvals.decide(
+      input.requestId,
+      input.decision,
+      input.decision === "session" ? input.suggestionId : undefined,
+    ),
+  );
 
   if (options.browserBridge) registerBrowserBridgeIpc(options, ipc, options.browserBridge);
   else registerDisabledBrowserBridgeIpc(ipc);
 
-  ipc.handle(contract.skills.list, async (input = {}) => listFixedRendererSkills({
-    dataRoot: options.roots.dataRoot,
-    workspaceRoot: input.workspaceRoot ? await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot }, workspaceAccess) : options.roots.workspaceRoot,
-    homeDir: homedir(),
-    disabled: options.settings.get().skills.disabled,
-  }));
+  ipc.handle(contract.skills.list, async (input = {}) =>
+    listFixedRendererSkills({
+      dataRoot: options.roots.dataRoot,
+      workspaceRoot: input.workspaceRoot
+        ? await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot }, workspaceAccess)
+        : options.roots.workspaceRoot,
+      homeDir: homedir(),
+      disabled: options.settings.get().skills.disabled,
+    }),
+  );
   ipc.handle(contract.skills.install, async () => {
-    const result = await showOpenDialog(options.getMainWindow(), { title: "选择 Skill 目录（需包含 SKILL.md）", properties: ["openDirectory"] });
+    const result = await showOpenDialog(options.getMainWindow(), {
+      title: "选择 Skill 目录（需包含 SKILL.md）",
+      properties: ["openDirectory"],
+    });
     if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
     return installFixedRendererSkill(options.roots.dataRoot, result.filePaths[0]);
   });
-  ipc.handle(contract.skills.uninstall, (input) => uninstallFixedRendererSkill(options.roots.dataRoot, input.directory));
+  ipc.handle(contract.skills.uninstall, (input) =>
+    uninstallFixedRendererSkill(options.roots.dataRoot, input.directory),
+  );
 
   ipc.handle(contract.updates.getState, () => options.localUpdate.getState());
   ipc.handle(contract.updates.selectSource, async () => {
-    const result = await showOpenDialog(options.getMainWindow(), { title: "选择 actspace 源码目录", properties: ["openDirectory"] });
+    const result = await showOpenDialog(options.getMainWindow(), {
+      title: "选择 actspace 源码目录",
+      properties: ["openDirectory"],
+    });
     if (result.canceled || !result.filePaths[0]) return { canceled: true, state: await options.localUpdate.getState() };
     return { canceled: false, state: await options.localUpdate.setSourceRoot(result.filePaths[0]) };
   });
   ipc.handle(contract.updates.start, () => options.localUpdate.start());
 
-  ipc.handle(contract.usage.getStatus, input => usageReadModels.get(options.registry)?.getStatus(input.requestId) ?? null);
-  ipc.handle(contract.usage.cancel, input => usageReadModels.get(options.registry)?.cancel(input.requestId));
-  ipc.handle(contract.harnessStats.query, input => usageReadModelFor(options.registry, options.roots.dataRoot).queryHarnessStats(input));
+  ipc.handle(
+    contract.usage.getStatus,
+    (input) => usageReadModels.get(options.registry)?.getStatus(input.requestId) ?? null,
+  );
+  ipc.handle(contract.usage.cancel, (input) => usageReadModels.get(options.registry)?.cancel(input.requestId));
+  ipc.handle(contract.harnessStats.query, (input) =>
+    usageReadModelFor(options.registry, options.roots.dataRoot).queryHarnessStats(input),
+  );
   ipc.handle(contract.harnessStats.getStatus, () => usageReadModels.get(options.registry)?.getHarnessStatus() ?? null);
-  ipc.handle(contract.harnessStats.cancel, input => usageReadModels.get(options.registry)?.cancelHarnessStats(input.requestId));
-  ipc.handle(contract.sessions.describeContextPanel, input => contextPanel.describe(input));
-  ipc.handle(contract.sessions.listContextPaths, input => contextPanel.listPaths(input));
-  ipc.handle(contract.sessions.listContextEntries, input => contextPanel.listEntries(input));
-  ipc.handle(contract.sessions.readContextEntry, input => contextPanel.readEntry(input));
-  ipc.handle(contract.usage.getActivity, (input) => createUsageActivity(options.registry, options.roots.dataRoot, input));
+  ipc.handle(contract.harnessStats.cancel, (input) =>
+    usageReadModels.get(options.registry)?.cancelHarnessStats(input.requestId),
+  );
+  ipc.handle(contract.sessions.describeContextPanel, (input) => contextPanel.describe(input));
+  ipc.handle(contract.sessions.listContextPaths, (input) => contextPanel.listPaths(input));
+  ipc.handle(contract.sessions.listContextEntries, (input) => contextPanel.listEntries(input));
+  ipc.handle(contract.sessions.readContextEntry, (input) => contextPanel.readEntry(input));
+  ipc.handle(contract.usage.getActivity, (input) =>
+    createUsageActivity(options.registry, options.roots.dataRoot, input),
+  );
   ipc.handle(contract.sessions.getSubagents, async (input) => {
     const list = await subagentListFor(options.registry, input.sessionId);
     // The parent records a child's model only when it finishes; until then use the child's own request facts.
     // The panel polls every second: only the child's latest `request/header` is read (a live child answers from
     // its in-memory type index), and a finished child's answer is remembered.
     const childModels = new Map<string, string>();
-    await Promise.all(subagentListChildrenWithoutModel(list).map(async ({ childSessionId, finished }) => {
-      const cached = finishedChildModels.get(childSessionId);
-      const model = cached !== undefined ? cached : latestRequestModel(await options.registry.latestSessionEvent(childSessionId, "request/header").then(event => event ? [event] : [], () => [])) ?? null;
-      if (finished) rememberFinished(finishedChildModels, childSessionId, model);
-      if (model) childModels.set(childSessionId, model);
-    }));
+    await Promise.all(
+      subagentListChildrenWithoutModel(list).map(async ({ childSessionId, finished }) => {
+        const cached = finishedChildModels.get(childSessionId);
+        const model =
+          cached !== undefined
+            ? cached
+            : (latestRequestModel(
+                await options.registry.latestSessionEvent(childSessionId, "request/header").then(
+                  (event) => (event ? [event] : []),
+                  () => [],
+                ),
+              ) ?? null);
+        if (finished) rememberFinished(finishedChildModels, childSessionId, model);
+        if (model) childModels.set(childSessionId, model);
+      }),
+    );
     // List rows show each child's cumulative token usage, read from its own Session snapshot. External
     // subagents have no child Session and show none. A settled activation's count is remembered; a
     // continuation starts a new activation, so the cache key carries the activation count.
     const items = subagentListItems(list, childModels);
     const childTokens = new Map<string, number>();
-    await Promise.all(items.filter(item => item.kind === "local" || item.kind === "fork").map(async ({ agentId, status, activationCount }) => {
-      const key = `${agentId}#${activationCount}`;
-      const cached = settledChildTokens.get(key);
-      const tokens = cached !== undefined ? cached : await options.registry.inspectSession(agentId).then((child) => child.usage.totalTokens, () => undefined);
-      if (tokens === undefined) return;
-      if (status !== "running") rememberFinished(settledChildTokens, key, tokens);
-      childTokens.set(agentId, tokens);
-    }));
+    await Promise.all(
+      items
+        .filter((item) => item.kind === "local" || item.kind === "fork")
+        .map(async ({ agentId, status, activationCount }) => {
+          const key = `${agentId}#${activationCount}`;
+          const cached = settledChildTokens.get(key);
+          const tokens =
+            cached !== undefined
+              ? cached
+              : await options.registry.inspectSession(agentId).then(
+                  (child) => child.usage.totalTokens,
+                  () => undefined,
+                );
+          if (tokens === undefined) return;
+          if (status !== "running") rememberFinished(settledChildTokens, key, tokens);
+          childTokens.set(agentId, tokens);
+        }),
+    );
     // 运行中的通用 / 探索 / Fork 带上此刻在做什么（列表第二行）；外部子智能体没有实时事件。
-    return items.map(item => {
-      const activity = item.status === "running" && (item.kind === "local" || item.kind === "fork") ? options.registry.subagentActivity(item.agentId) : undefined;
+    return items.map((item) => {
+      const activity =
+        item.status === "running" && (item.kind === "local" || item.kind === "fork")
+          ? options.registry.subagentActivity(item.agentId)
+          : undefined;
       const tokens = childTokens.get(item.agentId);
-      return tokens === undefined && !activity ? item : { ...item, ...(tokens === undefined ? {} : { totalTokens: tokens }), ...(activity ? { activity } : {}) };
+      return tokens === undefined && !activity
+        ? item
+        : { ...item, ...(tokens === undefined ? {} : { totalTokens: tokens }), ...(activity ? { activity } : {}) };
     });
   });
-  ipc.handle(contract.sessions.interruptSubagent, async (input) => options.registry.interruptSubagent(input.sessionId, input.agentId));
+  ipc.handle(contract.sessions.interruptSubagent, async (input) =>
+    options.registry.interruptSubagent(input.sessionId, input.agentId),
+  );
   ipc.handle(contract.sessions.revealSubagentRecord, async (input) => {
     const path = (await subagentListFor(options.registry, input.sessionId)).tree.agents[input.agentId]?.transcriptPath;
-    if (!path || !(await stat(path).then(info => info.isFile(), () => false))) return { ok: false };
+    if (
+      !path ||
+      !(await stat(path).then(
+        (info) => info.isFile(),
+        () => false,
+      ))
+    )
+      return { ok: false };
     shell.showItemInFolder(path);
     return { ok: true };
   });
@@ -714,7 +994,6 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     // The child's unsettled text lives only in the live baseline; settled messages come from its Journal.
     return projectSubagentTranscript(snapshot, journal, options.registry.liveOutput(input.transcriptRef.runId));
   });
-
 }
 
 /**
@@ -723,15 +1002,22 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
  */
 const subagentLists = new Map<string, { throughSeq: number; state: SubagentListState }>();
 const SUBAGENT_LIST_CACHE_LIMIT = 16;
-async function subagentListFor(registry: Pick<DesktopRuntimeRegistry, "inspectSessionEventsAfter">, sessionId: string): Promise<SubagentListState> {
+async function subagentListFor(
+  registry: Pick<DesktopRuntimeRegistry, "inspectSessionEventsAfter">,
+  sessionId: string,
+): Promise<SubagentListState> {
   const cached = subagentLists.get(sessionId);
   let fold = cached ?? { throughSeq: -1, state: createSubagentListState() };
   let read = await registry.inspectSessionEventsAfter(sessionId, fold.throughSeq);
-  if (read.lastSeq < fold.throughSeq) { fold = { throughSeq: -1, state: createSubagentListState() }; read = await registry.inspectSessionEventsAfter(sessionId, -1); }
+  if (read.lastSeq < fold.throughSeq) {
+    fold = { throughSeq: -1, state: createSubagentListState() };
+    read = await registry.inspectSessionEventsAfter(sessionId, -1);
+  }
   let state = fold.state;
   for (const event of read.events) state = reduceSubagentList(state, event);
   subagentLists.delete(sessionId);
-  if (subagentLists.size >= SUBAGENT_LIST_CACHE_LIMIT) subagentLists.delete(subagentLists.keys().next().value as string);
+  if (subagentLists.size >= SUBAGENT_LIST_CACHE_LIMIT)
+    subagentLists.delete(subagentLists.keys().next().value as string);
   subagentLists.set(sessionId, { throughSeq: Math.max(fold.throughSeq, read.lastSeq), state });
   return state;
 }
@@ -747,7 +1033,10 @@ function rememberFinished<T>(cache: Map<string, T>, childSessionId: string, valu
   cache.set(childSessionId, value);
 }
 
-async function toSessionListItem(item: RuntimeSessionListItem, registry: DesktopRuntimeRegistry): Promise<SessionListItem> {
+async function toSessionListItem(
+  item: RuntimeSessionListItem,
+  registry: DesktopRuntimeRegistry,
+): Promise<SessionListItem> {
   const agentRunCount = item.completedTurnCount ?? 0;
   return {
     id: item.sessionId,
@@ -768,12 +1057,21 @@ async function toSessionListItem(item: RuntimeSessionListItem, registry: Desktop
 }
 
 /** Shared ownership validation; filesystem resolution remains a Node Host port. */
-async function validateRunReferences(registry: DesktopRuntimeRegistry, input: Pick<import("@actspace/shared/runtime-v2").SubmitTaskInput, "sessionId" | "fileReferences" | "responseAnnotations">) {
-  return validateSharedRunReferences({
-    inspectSession: id => registry.inspectSession(id),
-    readSessionProjection: input => registry.readSessionProjection(input),
-    resolveFile: resolveWorkspaceFileReference,
-  }, input);
+async function validateRunReferences(
+  registry: DesktopRuntimeRegistry,
+  input: Pick<
+    import("@actspace/shared/runtime-v2").SubmitTaskInput,
+    "sessionId" | "fileReferences" | "responseAnnotations"
+  >,
+) {
+  return validateSharedRunReferences(
+    {
+      inspectSession: (id) => registry.inspectSession(id),
+      readSessionProjection: (input) => registry.readSessionProjection(input),
+      resolveFile: resolveWorkspaceFileReference,
+    },
+    input,
+  );
 }
 
 async function toRunContent(
@@ -787,18 +1085,31 @@ async function toRunContent(
   },
 ): Promise<{ readonly content: RuntimeJsonValue; readonly importedArtifactIds: readonly string[] }> {
   const { userInput, attachments } = input;
-  const referenceBlocks: RuntimeJsonValue[] = [...fileReferenceBlocks(input.fileReferences), ...responseExcerptBlocks(input.responseAnnotations)];
+  const referenceBlocks: RuntimeJsonValue[] = [
+    ...fileReferenceBlocks(input.fileReferences),
+    ...responseExcerptBlocks(input.responseAnnotations),
+  ];
   if (attachments.length === 0 && referenceBlocks.length === 0) return { content: userInput, importedArtifactIds: [] };
   // 块顺序：正文 → 文件引用 → 回复批注 → 附件。
-  const blocks: RuntimeJsonValue[] = userInput ? [{ type: "text", text: userInput }, ...referenceBlocks] : [...referenceBlocks];
+  const blocks: RuntimeJsonValue[] = userInput
+    ? [{ type: "text", text: userInput }, ...referenceBlocks]
+    : [...referenceBlocks];
   if (attachments.length === 0) return { content: blocks, importedArtifactIds: [] };
   const snapshot = await registry.inspectSession(sessionId);
   const usableAttachments = attachments.filter((attachment) => Boolean(attachment.path));
   // An edited prompt resends attachments the Session already stores; they are reused, never imported again or rolled back.
-  const reuse = (chat: boolean) => Promise.all(attachments.filter((attachment) => !attachment.path && attachment.artifactId).map((attachment) => registry.reuseAttachment(sessionId, attachment.artifactId!, attachment.name, chat)));
+  const reuse = (chat: boolean) =>
+    Promise.all(
+      attachments
+        .filter((attachment) => !attachment.path && attachment.artifactId)
+        .map((attachment) => registry.reuseAttachment(sessionId, attachment.artifactId!, attachment.name, chat)),
+    );
   if (snapshot.agentMode === "chat") {
     const reused = await reuse(true);
-    const imported = await registry.importChatAttachments(sessionId, usableAttachments.map((attachment) => attachment.path!));
+    const imported = await registry.importChatAttachments(
+      sessionId,
+      usableAttachments.map((attachment) => attachment.path!),
+    );
     for (const attachment of [...reused, ...imported]) {
       blocks.push({
         type: "artifact",
@@ -813,12 +1124,19 @@ async function toRunContent(
   const importedArtifactIds: string[] = [];
   try {
     for (const attachment of attachments) {
-      const imported = attachment.path ? await registry.importAttachment(sessionId, attachment.path)
-        : attachment.artifactId ? await registry.reuseAttachment(sessionId, attachment.artifactId, attachment.name, false) : undefined;
+      const imported = attachment.path
+        ? await registry.importAttachment(sessionId, attachment.path)
+        : attachment.artifactId
+          ? await registry.reuseAttachment(sessionId, attachment.artifactId, attachment.name, false)
+          : undefined;
       if (!imported) continue;
       if (attachment.path) importedArtifactIds.push(imported.artifactId);
       if (attachment.kind === "image") {
-        blocks.push({ type: "artifact", artifact: { artifactId: imported.artifactId, mediaType: imported.mimeType }, label: imported.name });
+        blocks.push({
+          type: "artifact",
+          artifact: { artifactId: imported.artifactId, mediaType: imported.mimeType },
+          label: imported.name,
+        });
       } else {
         blocks.push({ type: "text", text: `Attached file: ${imported.name} (${imported.artifactId})` });
       }
@@ -839,7 +1157,11 @@ function usageReadModelFor(registry: DesktopRuntimeRegistry, dataRoot: string): 
   return service;
 }
 
-async function createUsageActivity(registry: DesktopRuntimeRegistry, dataRoot: string, input: UsageStatisticsGetInput): Promise<UsageActivitySnapshot | null> {
+async function createUsageActivity(
+  registry: DesktopRuntimeRegistry,
+  dataRoot: string,
+  input: UsageStatisticsGetInput,
+): Promise<UsageActivitySnapshot | null> {
   const service = usageReadModels.get(registry) ?? new UsageReadModelService(registry, dataRoot);
   usageReadModels.set(registry, service);
   return service.getActivity({ ...input, search: input.search?.slice(0, 300) });
@@ -863,6 +1185,9 @@ function safeErrorMessage(error: unknown): string {
 }
 
 /** 主窗口已关闭时弹无父窗口的对话框；Electron 运行时接受 undefined 父窗口，类型上不接受。 */
-function showOpenDialog(window: BrowserWindow | undefined, dialogOptions: OpenDialogOptions): Promise<OpenDialogReturnValue> {
+function showOpenDialog(
+  window: BrowserWindow | undefined,
+  dialogOptions: OpenDialogOptions,
+): Promise<OpenDialogReturnValue> {
   return window === undefined ? dialog.showOpenDialog(dialogOptions) : dialog.showOpenDialog(window, dialogOptions);
 }

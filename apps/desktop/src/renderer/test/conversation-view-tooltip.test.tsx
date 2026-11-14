@@ -105,11 +105,21 @@ function renderConversation(inputMessages: MessageBlock[] = messages) {
   );
 }
 
-function renderForkable(onFork: (sessionId: string, turnId?: string) => void, inputMessages: MessageBlock[], isStreaming = false) {
+function renderForkable(
+  onFork: (sessionId: string, turnId?: string) => void,
+  inputMessages: MessageBlock[],
+  isStreaming = false,
+) {
   return render(
     <TooltipProvider delayDuration={0}>
       <RightPanelProvider>
-        <TestConversationView messages={inputMessages} contextSnapshot={null} sessionId="session-1" isStreaming={isStreaming} onForkSession={onFork} />
+        <TestConversationView
+          messages={inputMessages}
+          contextSnapshot={null}
+          sessionId="session-1"
+          isStreaming={isStreaming}
+          onForkSession={onFork}
+        />
       </RightPanelProvider>
     </TooltipProvider>,
   );
@@ -167,13 +177,20 @@ describe("ConversationView tooltips", () => {
 
   it("keeps Thinking open until the final reply finishes, then collapses Work and Thinking", () => {
     const thinking: MessageBlock = {
-      kind: "thinking", id: "thinking-1", title: "Thinking...", content: "Long reasoning content",
-      createdAt: messages[0].createdAt, collapsedByDefault: false, status: "running",
+      kind: "thinking",
+      id: "thinking-1",
+      title: "Thinking...",
+      content: "Long reasoning content",
+      createdAt: messages[0].createdAt,
+      collapsedByDefault: false,
+      status: "running",
     };
     const view = (active: boolean, blocks: MessageBlock[]) => (
-      <TooltipProvider><RightPanelProvider>
-        <TestConversationView messages={blocks} contextSnapshot={null} sessionId="session-1" isStreaming={active} />
-      </RightPanelProvider></TooltipProvider>
+      <TooltipProvider>
+        <RightPanelProvider>
+          <TestConversationView messages={blocks} contextSnapshot={null} sessionId="session-1" isStreaming={active} />
+        </RightPanelProvider>
+      </TooltipProvider>
     );
     const { rerender } = render(view(true, [messages[0], thinking]));
     expect(screen.getByText("Long reasoning content")).toBeVisible();
@@ -238,19 +255,31 @@ describe("ConversationView tooltips", () => {
     const observe = vi.fn();
     const disconnect = vi.fn();
     const OriginalResizeObserver = globalThis.ResizeObserver;
-    const Observer = vi.fn(function () { return { observe, unobserve: vi.fn(), disconnect }; });
+    const Observer = vi.fn(function () {
+      return { observe, unobserve: vi.fn(), disconnect };
+    });
     globalThis.ResizeObserver = Observer as unknown as typeof ResizeObserver;
     try {
       const view = (blocks: MessageBlock[]) => (
-        <TooltipProvider><RightPanelProvider>
-          <TestConversationView messages={blocks} contextSnapshot={null} sessionId="session-1" isStreaming />
-        </RightPanelProvider></TooltipProvider>
+        <TooltipProvider>
+          <RightPanelProvider>
+            <TestConversationView messages={blocks} contextSnapshot={null} sessionId="session-1" isStreaming />
+          </RightPanelProvider>
+        </TooltipProvider>
       );
       const { rerender } = render(view(messages));
       const viewport = screen.getByLabelText("会话消息");
       const observersAfterMount = Observer.mock.calls.length;
       for (let step = 1; step <= 3; step += 1) {
-        rerender(view([messages[0], { ...messages[1], content: `${messages[1].kind === "assistant" ? messages[1].content : ""}${"。更多".repeat(step)}` } as MessageBlock]));
+        rerender(
+          view([
+            messages[0],
+            {
+              ...messages[1],
+              content: `${messages[1].kind === "assistant" ? messages[1].content : ""}${"。更多".repeat(step)}`,
+            } as MessageBlock,
+          ]),
+        );
       }
       expect(Observer).toHaveBeenCalledTimes(observersAfterMount);
       // The message viewport is observed once and never re-observed on later updates.
@@ -280,10 +309,14 @@ describe("ConversationView tooltips", () => {
       Object.defineProperty(viewport, "scrollTop", {
         configurable: true,
         get: () => scrollTop,
-        set: (value: number) => { scrollTop = Math.min(value, scrollHeight - clientHeight); },
+        set: (value: number) => {
+          scrollTop = Math.min(value, scrollHeight - clientHeight);
+        },
       });
 
-      act(() => { resizeCallback?.([], {} as ResizeObserver); });
+      act(() => {
+        resizeCallback?.([], {} as ResizeObserver);
+      });
       expect(scrollTop).toBe(800);
 
       // Streaming adds >80px after the write and before the resulting scroll event is dispatched.
@@ -291,7 +324,9 @@ describe("ConversationView tooltips", () => {
       fireEvent.scroll(viewport);
       expect(screen.queryByRole("button", { name: "滚动到底部" })).toBeNull();
 
-      act(() => { resizeCallback?.([], {} as ResizeObserver); });
+      act(() => {
+        resizeCallback?.([], {} as ResizeObserver);
+      });
       expect(scrollTop).toBe(1000);
       expect(screen.queryByRole("button", { name: "滚动到底部" })).toBeNull();
 
@@ -300,7 +335,9 @@ describe("ConversationView tooltips", () => {
       fireEvent.scroll(viewport);
       expect(screen.getByRole("button", { name: "滚动到底部" })).toBeInTheDocument();
       scrollHeight = 1600;
-      act(() => { resizeCallback?.([], {} as ResizeObserver); });
+      act(() => {
+        resizeCallback?.([], {} as ResizeObserver);
+      });
       expect(scrollTop).toBe(300);
     } finally {
       globalThis.ResizeObserver = OriginalResizeObserver;
@@ -326,7 +363,10 @@ describe("ConversationView tooltips", () => {
     await user.click(pill);
     const dialog = await screen.findByRole("dialog", { name: "本轮用量" });
     expect(dialog).toHaveTextContent("33,361 tok");
-    const rows = Array.from(dialog.querySelectorAll("dt")).map((term) => [term.textContent, term.nextElementSibling?.textContent]);
+    const rows = Array.from(dialog.querySelectorAll("dt")).map((term) => [
+      term.textContent,
+      term.nextElementSibling?.textContent,
+    ]);
     expect(rows).toEqual([
       ["提供方 / 模型", "deepseek/deepseek-flash"],
       ["缓存命中", "87.5%"],
@@ -436,8 +476,28 @@ describe("ConversationView tooltips", () => {
 
 it("hides the trajectory composer without losing the draft and keeps Stop available", async () => {
   const abort = vi.fn();
-  const draft = { id: 1, sessionId: "draft-test", text: "initial draft", attachments: [{ id: "att", kind: "file" as const, name: "notes.txt", path: "/fixture/notes.txt" }] };
-  const view = (activeView: "chat" | "trajectory") => <TooltipProvider><RightPanelProvider><TestConversationView messages={messages} contextSnapshot={null} activeView={activeView} draftKey="draft-test" draftRestore={draft} selectedModelId="deepseek-v4-flash" isStreaming onAbort={abort} /></RightPanelProvider></TooltipProvider>;
+  const draft = {
+    id: 1,
+    sessionId: "draft-test",
+    text: "initial draft",
+    attachments: [{ id: "att", kind: "file" as const, name: "notes.txt", path: "/fixture/notes.txt" }],
+  };
+  const view = (activeView: "chat" | "trajectory") => (
+    <TooltipProvider>
+      <RightPanelProvider>
+        <TestConversationView
+          messages={messages}
+          contextSnapshot={null}
+          activeView={activeView}
+          draftKey="draft-test"
+          draftRestore={draft}
+          selectedModelId="deepseek-v4-flash"
+          isStreaming
+          onAbort={abort}
+        />
+      </RightPanelProvider>
+    </TooltipProvider>
+  );
   const rendered = render(view("chat"));
   const input = rendered.container.querySelector("textarea")!;
   const model = screen.getByRole("button", { name: "deepseek-flash" });
@@ -456,17 +516,48 @@ it("hides the trajectory composer without losing the draft and keeps Stop availa
 
 it("shows and resumes accepted tasks even before the first conversation turn exists", async () => {
   const resume = vi.fn();
-  render(<TooltipProvider><RightPanelProvider><TestConversationView messages={[]} contextSnapshot={null} sessionId="recovered" isSessionReady
-    messageQueue={{ queue: { paused: true, steering: [], items: [{ id: "pending", kind: "message", text: "Accepted before startup failure", options: {} }] }, running: false, steerBlockedReason: null,
-      onSteer: vi.fn(), onUnsteer: vi.fn(), onRemove: vi.fn(), onMoveUp: vi.fn(), onEdit: vi.fn(), onResume: resume }}
-  /></RightPanelProvider></TooltipProvider>);
+  render(
+    <TooltipProvider>
+      <RightPanelProvider>
+        <TestConversationView
+          messages={[]}
+          contextSnapshot={null}
+          sessionId="recovered"
+          isSessionReady
+          messageQueue={{
+            queue: {
+              paused: true,
+              steering: [],
+              items: [{ id: "pending", kind: "message", text: "Accepted before startup failure", options: {} }],
+            },
+            running: false,
+            steerBlockedReason: null,
+            onSteer: vi.fn(),
+            onUnsteer: vi.fn(),
+            onRemove: vi.fn(),
+            onMoveUp: vi.fn(),
+            onEdit: vi.fn(),
+            onResume: resume,
+          }}
+        />
+      </RightPanelProvider>
+    </TooltipProvider>,
+  );
   expect(screen.getByText("Accepted before startup failure")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "继续发送" }));
   expect(resume).toHaveBeenCalledOnce();
 });
 
 it("does not present a fragment's usage as a complete turn total", () => {
-  const thinking: MessageBlock = { kind: "thinking", id: "partial-work", title: "Thinking...", content: "Visible fragment", createdAt: messages[0].createdAt, collapsedByDefault: true, status: "completed" };
+  const thinking: MessageBlock = {
+    kind: "thinking",
+    id: "partial-work",
+    title: "Thinking...",
+    content: "Visible fragment",
+    createdAt: messages[0].createdAt,
+    collapsedByDefault: true,
+    status: "completed",
+  };
   const view = renderConversation([thinking, messages[1]]);
   expect(screen.getByRole("button", { name: "Worked" })).toBeVisible();
   expect(screen.queryByRole("button", { name: /Worked for/ })).not.toBeInTheDocument();

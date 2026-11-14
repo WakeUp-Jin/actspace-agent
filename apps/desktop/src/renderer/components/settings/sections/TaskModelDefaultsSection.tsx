@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import type { SettingsV4NamespacePatch, SettingsV4Snapshot } from "@actspace/shared";
 import type { SettingsSectionId } from "../SettingsNav";
-import { SettingGroup, SettingLinkRow, SettingsInput, useSettingsSaveNotice, SettingRow, Stepper } from "../SettingsPrimitives";
+import {
+  SettingGroup,
+  SettingLinkRow,
+  SettingsInput,
+  useSettingsSaveNotice,
+  SettingRow,
+  Stepper,
+} from "../SettingsPrimitives";
 
 type GenerationDefaults = { temperature: string; maxOutputTokens: string; compactionPercent: number };
 
@@ -28,7 +35,11 @@ export function TaskModelDefaultsSection({
   onNavigate?: (section: SettingsSectionId) => void;
 }) {
   const notifySaved = useSettingsSaveNotice();
-  const [draft, setDraft] = useState<GenerationDefaults>({ temperature: "", maxOutputTokens: "", compactionPercent: 80 });
+  const [draft, setDraft] = useState<GenerationDefaults>({
+    temperature: "",
+    maxOutputTokens: "",
+    compactionPercent: 80,
+  });
   const [fieldError, setFieldError] = useState<{ temperature?: string; maxOutputTokens?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const v4Ready = Boolean(settingsV4 && onUpdateNamespace);
@@ -54,10 +65,13 @@ export function TaskModelDefaultsSection({
     setFieldError(errors);
     if (temperature === "invalid" || maxOutputTokens === "invalid" || !onUpdateNamespace) return;
     const chatCompactionTriggerRatio = next.compactionPercent / 100;
-    if (savedDefaults
-      && savedDefaults.temperature === temperature
-      && savedDefaults.maxOutputTokens === maxOutputTokens
-      && Math.abs((savedDefaults.chatCompactionTriggerRatio ?? 0.8) - chatCompactionTriggerRatio) < 1e-9) return;
+    if (
+      savedDefaults &&
+      savedDefaults.temperature === temperature &&
+      savedDefaults.maxOutputTokens === maxOutputTokens &&
+      Math.abs((savedDefaults.chatCompactionTriggerRatio ?? 0.8) - chatCompactionTriggerRatio) < 1e-9
+    )
+      return;
     setError(null);
     try {
       await onUpdateNamespace({
@@ -99,7 +113,9 @@ export function TaskModelDefaultsSection({
             disabled={!v4Ready}
             onChange={(event) => setDraft((current) => ({ ...current, temperature: event.target.value }))}
             onBlur={() => void commitDefaults(draft)}
-            onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+            }}
           />
         }
       />
@@ -121,7 +137,9 @@ export function TaskModelDefaultsSection({
             disabled={!v4Ready}
             onChange={(event) => setDraft((current) => ({ ...current, maxOutputTokens: event.target.value }))}
             onBlur={() => void commitDefaults(draft)}
-            onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+            }}
           />
         }
       />

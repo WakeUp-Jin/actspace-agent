@@ -13,8 +13,16 @@ function StatusLine() {
   const connecting = state.status === "connecting" || state.status === "reconnecting";
   return (
     <span className="flex min-w-0 items-center gap-1" aria-live="polite">
-      <span aria-hidden className={cx("size-1.5 flex-none rounded-full", online ? "bg-success" : connecting ? "pulse-dot bg-warning" : "bg-text-faint")} />
-      <span className="truncate">{name} · {online ? "在线" : connecting ? "连接中" : "离线"}</span>
+      <span
+        aria-hidden
+        className={cx(
+          "size-1.5 flex-none rounded-full",
+          online ? "bg-success" : connecting ? "pulse-dot bg-warning" : "bg-text-faint",
+        )}
+      />
+      <span className="truncate">
+        {name} · {online ? "在线" : connecting ? "连接中" : "离线"}
+      </span>
     </span>
   );
 }
@@ -25,8 +33,16 @@ export function ListHeader({ onTop }: { readonly onTop: () => void }) {
     <PageHeader
       title="会话"
       sub={<StatusLine />}
-      left={<HeaderButton label="回到顶部" onClick={onTop}><span className="text-act-md font-semibold tracking-tight">A</span></HeaderButton>}
-      right={<HeaderButton label="设置" onClick={() => navigate({ name: "settings" })}><Settings size={20} aria-hidden /></HeaderButton>}
+      left={
+        <HeaderButton label="回到顶部" onClick={onTop}>
+          <span className="text-act-md font-semibold tracking-tight">A</span>
+        </HeaderButton>
+      }
+      right={
+        <HeaderButton label="设置" onClick={() => navigate({ name: "settings" })}>
+          <Settings size={20} aria-hidden />
+        </HeaderButton>
+      }
     />
   );
 }

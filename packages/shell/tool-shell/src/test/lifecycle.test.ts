@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CordisContextClass } from "@actspace/cordis-adapter";
 import type { SandboxService } from "@actspace/sandbox/types";
-import { materializeToolArguments, PROCESS_HOST_PORT_ID, ToolRuntime, type ProcessHostGrant } from "@actspace/tool-runtime";
+import {
+  materializeToolArguments,
+  PROCESS_HOST_PORT_ID,
+  ToolRuntime,
+  type ProcessHostGrant,
+} from "@actspace/tool-runtime";
 import { describe, expect, it, vi } from "vitest";
 import { manifest } from "../manifest.js";
 import { apply, registerTools, TOOL_DEFINITIONS, type ShellToolsService } from "../plugin.js";
@@ -193,7 +198,9 @@ describe("shell-tools lifecycle", () => {
   });
   it("rejects a tree without tools.runtime or actspace.host.session before registering", async () => {
     const runtime = new ToolRuntime();
-    await expect(apply({ get: (id: string) => id === "tools.runtime" ? runtime : undefined } as never)).rejects.toThrow(/requires tools.runtime and actspace.host.session/);
+    await expect(
+      apply({ get: (id: string) => (id === "tools.runtime" ? runtime : undefined) } as never),
+    ).rejects.toThrow(/requires tools.runtime and actspace.host.session/);
     expect(runtime.registry.listDefinitions()).toEqual([]);
   });
   it("registers an unavailable bash without the process grant and hands the Host process control with it", async () => {
@@ -201,12 +208,17 @@ describe("shell-tools lifecycle", () => {
     try {
       const root = await realpath(dir);
       const onProcesses = vi.fn();
-      for (const grant of [undefined, { workspaceRoot: root, tmpRoot: join(root, "tmp"), onProcesses } satisfies ProcessHostGrant | undefined]) {
-        const ctx = new CordisContextClass(); const runtime = new ToolRuntime();
-        ctx.provide("tools.runtime", runtime); ctx.provide("actspace.host.session", { dataRoot: join(root, "data") });
+      for (const grant of [
+        undefined,
+        { workspaceRoot: root, tmpRoot: join(root, "tmp"), onProcesses } satisfies ProcessHostGrant | undefined,
+      ]) {
+        const ctx = new CordisContextClass();
+        const runtime = new ToolRuntime();
+        ctx.provide("tools.runtime", runtime);
+        ctx.provide("actspace.host.session", { dataRoot: join(root, "data") });
         if (grant) ctx.provide(PROCESS_HOST_PORT_ID, grant);
-        await ctx.plugin({ apply: inner => apply(inner as never) });
-        expect(runtime.registry.listDefinitions().map(item => item.name)).toEqual(["bash"]);
+        await ctx.plugin({ apply: (inner) => apply(inner as never) });
+        expect(runtime.registry.listDefinitions().map((item) => item.name)).toEqual(["bash"]);
         const service = ctx.get("tools.shell-tools") as ShellToolsService;
         expect(service.hasRunningBackgroundTask("s")).toBe(false);
         if (grant) {
@@ -218,16 +230,38 @@ describe("shell-tools lifecycle", () => {
           expect(service.scratchDirectory?.("fork")).toBe(own);
           expect(own).not.toBe(service.scratchDirectory?.("parent"));
         } else expect(service.scratchDirectory).toBeUndefined();
-        if (grant) expect(onProcesses).toHaveBeenCalledWith(expect.objectContaining({ forceTerminate: expect.any(Function) }));
+        if (grant)
+          expect(onProcesses).toHaveBeenCalledWith(expect.objectContaining({ forceTerminate: expect.any(Function) }));
         else {
           expect(onProcesses).not.toHaveBeenCalled();
-          const context = { pluginId: manifest.pluginId, name: "bash", callId: "c", sessionId: "s", workspaceRoot: root, agentRunId: "r", turnId: "t", stepId: "s", signal: new AbortController().signal, capabilities: { ids: [], has: () => true, get: () => undefined as never }, reportProgress: () => undefined, createArtifact: async () => { throw new Error("unused"); }, defer: () => undefined };
-          expect(await runtime.registry.capture("bash").executor.execute({ command: "true" }, context)).toMatchObject({ status: "failed", failure: { code: "CAPABILITY_UNAVAILABLE" } });
+          const context = {
+            pluginId: manifest.pluginId,
+            name: "bash",
+            callId: "c",
+            sessionId: "s",
+            workspaceRoot: root,
+            agentRunId: "r",
+            turnId: "t",
+            stepId: "s",
+            signal: new AbortController().signal,
+            capabilities: { ids: [], has: () => true, get: () => undefined as never },
+            reportProgress: () => undefined,
+            createArtifact: async () => {
+              throw new Error("unused");
+            },
+            defer: () => undefined,
+          };
+          expect(await runtime.registry.capture("bash").executor.execute({ command: "true" }, context)).toMatchObject({
+            status: "failed",
+            failure: { code: "CAPABILITY_UNAVAILABLE" },
+          });
         }
         await ctx.fiber.dispose();
         expect(runtime.registry.listDefinitions()).toEqual([]);
       }
-    } finally { await rm(dir, { recursive: true, force: true }); }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -17,12 +17,16 @@ export function ContextStats({ stats }: { stats: ContextPanelStats | null }) {
     { key: "cache", label: "缓存命中", value: hitRate === null ? "—" : `${(hitRate * 100).toFixed(1)}%` },
     { key: "cumulative", label: "累计 Token", value: cumulative === null ? "—" : formatTokenCount(cumulative) },
   ];
-  if (stats && stats.costUsd !== null) cells.push({ key: "cost", label: "费用", value: `$${stats.costUsd.toFixed(2)}` });
+  if (stats && stats.costUsd !== null)
+    cells.push({ key: "cost", label: "费用", value: `$${stats.costUsd.toFixed(2)}` });
 
   return (
     <section aria-label="会话统计" className={cn(CARD_CLASS, "grid grid-cols-3 pt-2")}>
       {cells.map((cell, index) => (
-        <div key={cell.key} className={cn("px-3 py-1.5", index === cells.length - 1 && cells.length % 3 === 2 && "col-span-2")}>
+        <div
+          key={cell.key}
+          className={cn("px-3 py-1.5", index === cells.length - 1 && cells.length % 3 === 2 && "col-span-2")}
+        >
           <div className="text-act-xxs text-text-faint">{cell.label}</div>
           <div className="mt-px text-act-md font-semibold tabular-nums text-text-main" data-stat={cell.key}>
             {cell.value}
