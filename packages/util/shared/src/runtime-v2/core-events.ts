@@ -135,7 +135,10 @@ export type CoreEventOptions = {
 
 export const CORE_EVENT_OWNER = "@actspace/core";
 
-/** 构造一条 `@actspace/core` 名下的事件，交给 `session.append` / `appendMany`。 */
+/**
+ * 构造一条 `@actspace/core` 名下的事件，交给 `session.append` / `appendMany`。
+ * 别处不要自己拼带这个来源的事件对象，`pnpm check:core-events` 会拦。
+ */
 export function coreEvent<T extends CoreEventType>(type: T, data: CoreEventDataMap[T], options: CoreEventOptions = {}): SessionEventCandidateV1 {
   return {
     type,
