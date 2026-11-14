@@ -1,6 +1,6 @@
 import type { SubagentPreset } from "@actspace/shared/runtime-v2";
 
-/** Read-only tools of the `explore` preset (design 02 §5.1). */
+/** Read-only tools of the `explore` preset (agent-subagent-runtime.md「能力与权限」). */
 export const EXPLORE_TOOL_NAMES = Object.freeze(["read_file", "list_directory", "grep", "glob"]);
 /** Every subagent can message its parent. */
 export const SUBAGENT_COORDINATION_TOOL_NAMES = Object.freeze(["send_message"]);

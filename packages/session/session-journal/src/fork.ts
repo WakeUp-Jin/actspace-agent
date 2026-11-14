@@ -33,7 +33,7 @@ export function createSessionForkSeed(options: {
     throw new SessionError("INVALID_FORK_BOUNDARY", `Cannot fork a ${validation.accessState} Session.`);
   }
   const origin = options.origin ?? "fork";
-  // A forked subagent copies the parent mid-Turn and closes that Turn itself (design 02 §8.3).
+  // A forked subagent copies the parent mid-Turn and closes that Turn itself (agent-subagent-runtime.md「Fork」).
   if (
     (validation.relations.openTurnId !== null && origin !== "delegation") ||
     validation.relations.openStepId !== null ||

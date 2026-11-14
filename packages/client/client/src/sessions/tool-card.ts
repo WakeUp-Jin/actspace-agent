@@ -94,7 +94,7 @@ function stoppedAgent(toolName: string, args: EventRecord, describe: ((agentId: 
 }
 
 /**
- * One-line rows for the subagent management tools (design 05 §1); `describe` turns an agent id into its description.
+ * One-line rows for the subagent management tools (front-子Agent与后台任务规范.md §2.1); `describe` turns an agent id into its description.
  * `interrupt_agent`, `wait_agent` and `list_agents` were removed; their rows stay for old Sessions.
  */
 export function subagentToolTitle(toolName: string, args: EventRecord, describe: (agentId: string) => string | undefined = () => undefined): string | undefined {

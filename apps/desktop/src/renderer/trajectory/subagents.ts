@@ -39,7 +39,7 @@ export function trajectoryDelegations(snapshot: RuntimeV2TrajectorySnapshot | nu
 }
 
 /**
- * Fork 子智能体的轨迹只显示分出之后的部分（设计 05 §2）：去掉 seq ≤ `inheritedThroughSeq` 的复制前缀，
+ * Fork 子智能体的轨迹只显示分出之后的部分（front-子Agent与后台任务规范.md §3.2）：去掉 seq ≤ `inheritedThroughSeq` 的复制前缀，
  * 但留下分出时还开着的那个 `turn/start`（fork 在父会话的轮次中途复制，由自己结束这一轮），更早的历史也不再分页加载。
  */
 export function trajectoryAfterSeq(snapshot: RuntimeV2TrajectorySnapshot | null, afterSeq: number | undefined): RuntimeV2TrajectorySnapshot | null {

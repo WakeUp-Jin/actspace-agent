@@ -1,6 +1,6 @@
 import type { SubagentCaller } from "./types.js";
 
-/** The two external subagent kinds (design 04); each comes from its own optional plugin. */
+/** The two external subagent kinds (agent-subagent-runtime.md「外部子智能体」); each comes from its own optional plugin. */
 export type ExternalSubagentKind = "codex" | "claude-code";
 
 /** How one external run ended. `text` is the CLI's final reply; `error` the first line of what went wrong. */
@@ -38,7 +38,7 @@ export type SpawnExternalInput = SubagentCaller & {
   readonly signal: AbortSignal;
 };
 
-/** The first non-empty line of a CLI error, for the `failed` summary (design 04 §3.3). */
+/** The first non-empty line of a CLI error, for the `failed` summary (agent-subagent-runtime.md「外部子智能体」). */
 export function firstErrorLine(value: unknown): string {
   const text = value instanceof Error ? value.message : typeof value === "string" ? value : String(value);
   return text.split("\n").map(line => line.trim()).find(Boolean) ?? "unknown error";

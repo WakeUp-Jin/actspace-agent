@@ -92,7 +92,7 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
   };
   const observeContextToolResult = (session: SessionHandle, event: import("@actspace/session-journal").SessionEventEnvelopeV1) => assembly.observeToolResult(session, event);
   const extensions = (sessionId: string, scopeId: string, kind: "main" | "subagent") => () => (ctx.get?.("actspace.host.prompt") as PromptHostPort | undefined)?.extensions?.list(sessionId, scopeId, kind) ?? [];
-  // A fork keeps its parent's system prompt (design 02 §8.4): the sections plugins registered for the parent main session,
+  // A fork keeps its parent's system prompt (agent-subagent-runtime.md「Fork」): the sections plugins registered for the parent main session,
   // plus whatever is registered for the fork's own scope.
   const forkExtensions = (session: import("@actspace/session-persistence").SessionHandle, scopeId: string) => {
     const parentId = session.header.lineage?.parentSessionId ?? session.header.sessionId;
@@ -143,7 +143,7 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
   /**
    * A child Loop. `subagent`: its own descriptor, child prompt extensions and every allowed tool.
    * `fork`: the main agent's descriptor, prompt extensions and tool scope, limited to the parent's
-   * visible tools, so the request matches the parent's (design 02 §8.4). Both run without approval.
+   * visible tools, so the request matches the parent's (agent-subagent-runtime.md「Fork」). Both run without approval.
    */
   const createLoop = async ({ session, scope, descriptor, role, allowedToolNames, signal, agentId }: {
     readonly session: import("@actspace/session-persistence").SessionHandle;

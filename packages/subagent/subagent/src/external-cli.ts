@@ -6,7 +6,7 @@ export const COMMAND_LOOKUP_TIMEOUT_MS = 5_000;
 const cache = new Map<string, Promise<string | undefined>>();
 
 /**
- * Find a CLI the way the user's terminal would (design 04 §1): an Electron app started from the Dock
+ * Find a CLI the way the user's terminal would (agent-subagent-runtime.md「外部子智能体」): an Electron app started from the Dock
  * does not get the terminal's PATH, so ask the login shell. The answer is cached until the plugin reloads
  * (`clearCommandCache` on dispose). Resolves to the absolute path, or undefined when it is not installed.
  */
@@ -38,7 +38,7 @@ function lookup(shell: string, name: string, timeoutMs: number): Promise<string 
   });
 }
 
-/** How long a stopped CLI gets to exit before it is killed (design 04 §3.1, §3.2). */
+/** How long a stopped CLI gets to exit before it is killed (agent-subagent-runtime.md「外部子智能体」). */
 export const EXTERNAL_STOP_GRACE_MS = 2_000;
 
 /** `SIGTERM`, then `SIGKILL` after the grace period; resolves once the process has exited. */

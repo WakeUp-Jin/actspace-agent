@@ -18,7 +18,7 @@ export class ForkBoundaryError extends Error {
 }
 
 /**
- * Where `agent_fork` cuts the parent (design 02 §8.1): in the Turn that holds the call, the last
+ * Where `agent_fork` cuts the parent (agent-subagent-runtime.md「Fork」): in the Turn that holds the call, the last
  * `step/end` before the Step making the call; when that Step is the Turn's first, the event right
  * before its `step/start`. Every tool call up to there has its result, so the copy is a valid context.
  */

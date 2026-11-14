@@ -102,7 +102,7 @@ export type AgentApplicationContract = {
   readonly listBackgroundTasks: (sessionId: string) => readonly BackgroundBashTaskView[];
   readonly readBackgroundTaskOutput: (sessionId: string, taskId: string) => Promise<import("@actspace/shared/runtime-v2").BackgroundTaskOutputView>;
   readonly stopBackgroundTask: (sessionId: string, taskId: string) => Promise<BackgroundBashTaskView>;
-  /** The 子 Agent panel's 停止 (design 05 §2): a background subagent stops like `task_stop` and the model is told the user stopped it; a synchronous one returns that to its waiting call. */
+  /** The 子 Agent panel's 停止 (front-子Agent与后台任务规范.md §2): a background subagent stops like `task_stop` and the model is told the user stopped it; a synchronous one returns that to its waiting call. */
   readonly interruptSubagent: (sessionId: string, agentId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
   readonly isIdleForReconfigure: () => Promise<boolean>;
   readonly readSessionProjection: ApplicationSessionService["readProjection"];

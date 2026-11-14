@@ -29,7 +29,7 @@ const ROW_LETTER_DOT_CLASS = "absolute size-[7px] rounded-full bg-info transitio
 /** 来信摘要在列表第二行停留多久（规范 §2.2）。 */
 export const RECENT_MESSAGE_MS = 6000;
 
-/** 右侧「子 Agent」面板（设计 05 §2）：一个子智能体一行；详情按种类分支，本地 / Fork 看对话与轨迹，Codex / Claude Code 看结果与原生记录。 */
+/** 右侧「子 Agent」面板（front-子Agent与后台任务规范.md §2、§3）：一个子智能体一行；详情按种类分支，本地 / Fork 看对话与轨迹，Codex / Claude Code 看结果与原生记录。 */
 export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null; focus?: SubagentFocus }) {
   const [agents, setAgents] = useState<SubagentListItem[]>([]);
   const [loaded, setLoaded] = useState(false);
