@@ -36,7 +36,7 @@ export async function ensureSoundtrack(soundtrack) {
   return file;
 }
 
-/** 量出这一段的综合响度（LUFS），用来算一个固定的增益——不用动态压缩，曲子本来的起伏原样保留。 */
+/** 量出这一段的综合响度（LUFS），用来算一个固定的增益——不用动态压缩，曲子本来的起伏保留下来；只有加了增益会过载的峰值交给限幅器。 */
 export async function measureLoudness(file, { offset, seconds }) {
   const { stderr } = await run("ffmpeg", [
     "-hide_banner",
@@ -68,6 +68,7 @@ export function audioArgs({ file, offset, seconds, loudness, fadeIn = FADE_IN })
   const fadeOut = Math.min(FADE_OUT, seconds / 2);
   const filters = [
     `volume=${gain.toFixed(2)}dB`,
+    // 限幅器只压加了增益会过载的峰值，其余时候不动声音。起伏大的曲子（比如吉他扫弦）扫得最重的几下会碰到它。
     "alimiter=limit=0.84:level=false",
     // ffmpeg 把 afade 的 d=0 当成「没写」，会按默认淡入 1 秒，所以不淡入时不能带这个滤镜。
     ...(fadeIn > 0 ? [`afade=t=in:d=${fadeIn}`] : []),
