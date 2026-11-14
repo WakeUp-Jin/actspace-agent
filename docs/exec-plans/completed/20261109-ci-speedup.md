@@ -61,8 +61,8 @@
 - [x] P1 `exclude` 修正、根脚本切到 `tsc -b`。
 - [x] P2 `ci.yml` 拆 job + 缓存。
 - [x] P3 desktop 分片 + node 环境（本地两分片 65 s / 68 s，全部通过）。
-- [ ] 推送后记录 CI 各 job 时长。
-- [ ] 文档同步，plan 移到 `completed/`。
+- [x] 推送后记录 CI 各 job 时长。2026-11-13 补记，取 #70 合入后、2026-11-11 至 11-13 仓库最近 50 次工作流运行（其中 `ci.yml` 14 次）的中位数：`Lint 与类型检查` 69 s、`仓库脚本与进程级测试` 119 s、`包测试` 131 s、`桌面端测试` 每片 138 s（p90 166 s）、`构建` 182 s（`main` 上带打包冒烟约 250 s）；缓存命中时 `build:deps` 约 8 s。PR 上整个 `ci.yml` 约 3 min，目标达成。数据来源和后续提速见 `docs/exec-plans/completed/20261113-ci-speedup-round2.md`。
+- [x] 文档同步，plan 移到 `completed/`（2026-11-13，随第二轮提速一起收尾）。
 
 ## 决策记录
 

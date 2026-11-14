@@ -2,7 +2,7 @@
 
 这里的计划实现已经完成，原文保持不动；本页只做检索。人工验收边界保留在各计划正文和对应的[执行摘要](../../exec-runs/README.md)里，不代表全部验证通过。生命周期规则见 [执行计划](../README.md)。
 
-共 214 项，按日期从新到旧；无日期前缀的早期计划排在最后。
+共 215 项，按日期从新到旧；无日期前缀的早期计划排在最后。
 
 另有 [design-archive/](design-archive/)：docs 整理时从前端设计文档里拆出的决策表、测试清单、交接记录和早期重构稿，只做追溯。
 
@@ -12,6 +12,7 @@
 | 2026-11-11 | [资源监控：悬浮窗与「资源占用」页](20261111-resource-monitor.md) | 侧栏性能文字换成常驻悬浮窗 + 设置页「资源占用」：单核口径 CPU、RSS、主线程延迟、分组进程表（含 Agent 子进程）、复制快照；关着时零开销；用户实机验收通过 |
 | 2026-11-11 | [简化思考过程](20261111-thinking-compact.md) | 设置 `general.simplifyThinking`（缺省开启）：思考进行时固定一行 `Thinking 6s · 开头一句` 加扫光，结束后 `Thought for 9s`，点标题仍可展开；用时只在流式状态里、不写入会话；只改桌面端；Electron 走查未做 |
 | 2026-11-11 | [字号规范落地：三层字号（界面 13 / 阅读 15）](20261111-typography-scale.md) | 新增 `text-act-base` 15 / `text-act-head` 18；聊天正文 16.5px 衬线 → 15px 界面字体，用户消息、输入框同字号，工具行与 Thinking 13px，表头 12px 浅色；46 处任意行高收到刻度；检查脚本新增三条规则；Electron 实机检查未做 |
+| 2026-11-09 | [CI 提速：类型检查与测试拆 job 并行 + tsc -b 增量缓存](20261109-ci-speedup.md) | `typecheck-test` 拆成四个并行 job，根脚本切 `tsc -b` 并跨运行缓存产物，desktop 测试拆 `main` / `renderer` 两个 project 并分两片；随 #70 合入，PR 上 `ci.yml` 约 3 分钟；`构建` 与发布链仍逐包构建 |
 | 2026-11-09 | [Desktop 安全遗留清零](20261109-desktop-security-debt.md) | safeStorage 迁异步、子进程不再继承凭据 env、Browser Bridge 源码目录由 main 对话框选择、主文档 CSP 经 `onHeadersReceived` 下发、IPC 审计禁止裸 `ipcMain.handle`；`style-src` 仍留 `'unsafe-inline'`；Electron 真机走查未做 |
 | 2026-11-09 | [后端插件包解耦：让 Harness 自进化不必改 core](20261109-harness-plugin-decoupling.md) | 工具自声明 `modes`、形态由 manifest 推导、默认 Harness 按插件产出产物、上下文来源登记式（新条目 `context-assembly`）、文件 / Shell 实现迁入 Harness 树（Host 只给 `actspace.host.filesystem` / `actspace.host.process` 授予）；PR #68；Desktop / CLI 实机走查未做 |
 | 2026-11-08 | [性能第三轮：高频路径不再整份读日志](20261108-perf-round3.md) | P1–P4：自动审查上下文、压缩摘要查找、子 Agent 面板轮询改成增量，读旧事件不再深拷贝；每项配 1k / 10k 规模测试，新增 `pnpm check:scale-tests` 覆盖检查；实机采样对比未做 |

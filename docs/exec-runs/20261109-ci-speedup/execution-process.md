@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261109-ci-speedup.md`
+- **关联计划**：`docs/exec-plans/completed/20261109-ci-speedup.md`
 - **执行模式**：交互
 - **开始时间**：2026-11-09 13:20
 - **结束时间**：见文末

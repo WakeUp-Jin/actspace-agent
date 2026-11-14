@@ -2,10 +2,10 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261109-ci-speedup.md`
+- **关联计划**：`docs/exec-plans/completed/20261109-ci-speedup.md`
 - **执行过程**：`docs/exec-runs/20261109-ci-speedup/execution-process.md`
 - **执行模式**：交互
-- **执行结果**：部分完成——代码与文档已落地并本地验证；修复首轮 CI 暴露的问题后的第二轮 CI 时长待 PR #70 的下一次运行确认。
+- **执行结果**：完成——代码与文档随 #70 合入；合入后的各 job 时长于 2026-11-13 补记在计划的进度记录里。
 
 ## 核心变更清单
 
@@ -52,4 +52,4 @@
 
 ## 后续建议
 
-- 第二轮 CI 出结果后，把各 job 时长补进计划的进度记录，再把计划移到 `docs/exec-plans/completed/`。
+- 各 job 时长已补进计划的进度记录，计划已移到 `docs/exec-plans/completed/`。之后的提速（去掉重复构建、测试再分片、路径过滤和缓存调整）见 `docs/exec-plans/completed/20261113-ci-speedup-round2.md`。
