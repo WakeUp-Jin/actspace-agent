@@ -185,7 +185,10 @@ describe("MarkdownEditor 外壳：生命周期", () => {
     ]);
     expect(staticImports(readerSource)).toEqual(['import { MarkdownEditor, type MarkdownEditorHandle } from "../../markdown-editor";']);
     expect(staticImports(outlineSource)).toEqual([]);
-    expect(entrySource).toMatch(/lazy\(\(\) => import\("\.\/MarkdownEditor"\)/);
+    // 入口那一句折成几行也认：只看「lazy 里动态 import 编辑器」。
+    const lazyImport = /lazy\(\s*\(\)\s*=>\s*import\(\s*"\.\/MarkdownEditor"\s*\)/;
+    expect('lazy(() =>\n  import("./MarkdownEditor").then((module) => module),\n)').toMatch(lazyImport);
+    expect(entrySource).toMatch(lazyImport);
     expect(entrySource).not.toMatch(/^export \{[^}]*\} from "\.\/(MarkdownEditor|core)/m);
     expect(LazyMarkdownEditor).toBeDefined();
   });
