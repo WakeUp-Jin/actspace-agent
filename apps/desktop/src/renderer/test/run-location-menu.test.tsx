@@ -98,7 +98,7 @@ describe("RunLocationMenu", () => {
     const calls = renderMenu();
     const hosts = await openHosts(user);
     expect(within(hosts).queryByRole("textbox")).not.toBeInTheDocument();
-    // jsdom 不排版；窄窗口不出视口靠宽度取 min(260px, 可用宽度)，CDP 480px 实测见执行记录。
+    // jsdom 不排版；窄窗口不出视口靠宽度取 min(260px, 可用宽度)，在 CDP 480px 宽的窗口里实测过。
     expect(hosts.className).toContain("w-[min(260px,var(--radix-dropdown-menu-content-available-width))]");
     const rows = within(hosts).getAllByRole("menuitemradio");
     expect(rows.map((row) => row.textContent)).toEqual(["dev-box", "nas离线", "gpu-1连接中"]);
