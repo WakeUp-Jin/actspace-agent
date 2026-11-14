@@ -16,6 +16,7 @@ test("contract matrix is deterministic and preserves declared event surfaces", a
   assert.doesNotMatch(renderJson(first), /\/Users\//u);
   assert.doesNotMatch(renderMarkdown(first), /\/Users\//u);
   assert.match(renderMarkdown(first), /Generated artifact; edit source declarations instead/u);
+  assert.equal(renderMarkdown(first).includes(first.sourceDigest), false);
 });
 
 test("contract matrix validator fails closed for duplicate ids and notification veto metadata", async () => {
@@ -62,7 +63,7 @@ test("matrix covers workspace packages and plugin manifests without stale source
   assert.ok(validateRows(invalid).some(row => row.code === "INVALID_DIGEST"));
 });
 
-test("clean checkout checks Markdown without artifacts and rejects source drift", async () => {
+test("clean checkout checks Markdown without artifacts, ignores comment-only edits and rejects declaration drift", async () => {
   const { mkdtemp, mkdir, copyFile, readFile, writeFile, rm, access, realpath } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join, dirname } = await import("node:path");
@@ -85,7 +86,11 @@ test("clean checkout checks Markdown without artifacts and rejects source drift"
     { const result = run("--check"); assert.equal(result.status, 0, result.stdout + result.stderr); }
     await assert.rejects(access(join(root, "artifacts")));
     const manifest = join(root, registry.MANIFEST_PATHS[0]);
-    await writeFile(manifest, (await readFile(manifest, "utf8")) + "\n// source drift fixture\n");
+    await writeFile(manifest, (await readFile(manifest, "utf8")) + "\n// comment-only edit fixture\n");
+    { const result = run("--check"); assert.equal(result.status, 0, result.stdout + result.stderr); }
+    const packageJson = join(root, registry.PACKAGE_PATHS[0]);
+    const declared = JSON.parse(await readFile(packageJson, "utf8"));
+    await writeFile(packageJson, JSON.stringify({ ...declared, exports: { ...declared.exports, "./drift-fixture": "./dist/drift-fixture.js" } }));
     const stale = run("--check");
     assert.equal(stale.status, 1);
     assert.match(stale.stderr, /stale or missing/);
