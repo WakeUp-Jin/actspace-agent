@@ -297,7 +297,7 @@ Web / PWA：
 
 - `apps/web/src/sessions/transcript-model.ts`：`ExploreBlock` 和 `EXPLORE_KINDS` 加 `deep_search`。
 - `apps/web/src/pages/session/blocks/ExploreGroup.tsx`：`exploreLine` 加 `case "deep_search": return { verb: "Deep Search", target: block.question, meta: block.stats }`。
-- 测试：`apps/web/src/sessions/test/transcript-model.test.ts` 加一条分组；`ExploreGroup` 的行文字加一条。
+- 测试：`apps/web/src/sessions/test/transcript-model.test.ts` 加一条分组；新建 `apps/web/src/pages/session/test/ExploreGroup.test.tsx`，测 `exploreLine` 对 `deep_search` 块返回的动作、目标和行尾。
 
 mock 场景：
 

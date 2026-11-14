@@ -112,11 +112,11 @@ export async function apply(ctx: CordisContext): Promise<void>;
 `read_document` 的两处特别之处：
 
 - 参数结构的 `required` 是空数组，所以 `{}` 能通过结构校验。`registerTools` 要在处理函数外面包一层：`path`、`artifact_id` 不是恰好一个时，直接返回 `INVALID_ARGUMENTS`，不调用端口。`tool-contracts.test.ts` 会断言 `{}` 得到 `INVALID_ARGUMENTS` 且端口没有被调用。
-- 权限契约照 `read_file`：`extractResources` 在有 `path` 时返回 `[await context.canonicalizeFile(args.path, "read")]`，只有 `artifact_id` 时返回 `[]`；`evaluate` 返回 `allow`；`suggestGrants` 给「只这个文件」和「这个目录树」。授权范围用自己的：`{ pluginId: "actspace.document", permissionDomain: "document-read", policyVersion: 1 }`。
+- 权限契约照 `read_file`：`extractResources` 在有 `path` 时返回 `[await context.canonicalizeFile(args.path, "read")]`，只有 `artifact_id` 时返回 `[]`；`evaluate` 返回 `allow`；`suggestGrants` 给两条建议：精确路径（`exact`，标签 `This file only`）和文件所在的目录（`subtree`，标签 `This directory tree`）。所在目录是根目录、用户主目录、`~/Documents`、`~/Desktop` 或在工作区内时只给第一条，判断照 `packages/fs/tool-fs-read/src/plugin.ts` 里的 `isSafeSubtreeCandidate`，复制到本包。授权范围用自己的：`{ pluginId: "actspace.document", permissionDomain: "document-read", policyVersion: 1 }`。
 
 `deep_search` 的权限契约和 `tool-web` 一样（不提取资源，`allow`）。
 
-`plugin.ts` 不能 import `node-ports.ts`：`scripts/build-default-harness.mjs` 从 `./plugin` 入口打包每个工具插件，Node 实现只能由 Host 引入。P0 里两个包都还没有 `node-ports.ts`。
+`plugin.ts` 不 import `node-ports.ts`。这两个工具的实现要用 Host 手里的 Key 和开关，所以和 `tool-web`、`tool-image-inspection` 一样，实现由 Host 通过端口交进来；`packages/core/runtime/scripts/build-default-harness.mjs` 从 `./plugin` 入口单独打包每个工具插件，这样 Harness 产物里不带 DeepSeek 的请求代码。（文件、Shell 工具的 `plugin.ts` 直接引入自己的 `node-ports.ts`，不是这里要照的写法。）P0 里两个包都还没有 `node-ports.ts`。
 
 ## 任务
 
