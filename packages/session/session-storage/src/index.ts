@@ -1,3 +1,4 @@
+import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType } from "@actspace/cordis-adapter";
 import type { SessionHeaderV1, SessionEventEnvelopeV1, SessionEventCandidateV1, SessionAccessState, SessionValidationResult } from "@actspace/session-journal";
 
 /** Opaque revision: compare only within one storage identity and session. */
@@ -105,3 +106,6 @@ export interface SessionStorage {
   retireInto?(sessionId: string, parentSessionId: string, label: string): Promise<void>;
   close(): Promise<void>;
 }
+
+/** 具体的存储后端（现在是 `@actspace/session-persistence-jsonl`）按这个定义提供，取用方按它取。 */
+export const SESSION_STORAGE_SERVICE = bindServiceType<SessionStorage>(ACTSPACE_SERVICE_DEFINITIONS.sessionStorage);

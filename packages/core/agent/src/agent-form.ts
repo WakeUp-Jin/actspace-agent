@@ -1,5 +1,5 @@
 import type { AgentScope } from "@actspace/scope";
-import type { ToolRuntime } from "@actspace/tool-runtime";
+import type { ToolRuntimeContract } from "@actspace/tool-runtime";
 import { createHash } from "node:crypto";
 
 export const MAIN_AGENT_FORM_ID = "actspace.main" as const;
@@ -60,7 +60,7 @@ export function agentFormComposition(form: AgentForm, plugins: readonly Readonly
 }
 
 /** Bind each member's registered tools to `scope`; a required member missing any declared tool fails the activation. */
-export function activateAgentFormTools(form: AgentForm, scope: AgentScope, runtime: ToolRuntime): ActivatedAgentForm {
+export function activateAgentFormTools(form: AgentForm, scope: AgentScope, runtime: ToolRuntimeContract): ActivatedAgentForm {
   const available = new Map(runtime.registry.listDefinitions().map(definition => [definition.name, definition]));
   const members: Array<{ id: string; version: number; toolNames: readonly string[] }> = [];
   for (const member of form.members) {

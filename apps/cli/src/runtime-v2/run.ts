@@ -6,6 +6,7 @@ import { writeArtifacts } from "../artifacts";
 import { CliError, CliUsageError } from "../errors";
 import { bootCliV2 } from "./host-adapter";
 import { resolveRuntimeV2DataRoot } from "./data-root";
+import { profileService } from "./profile-service";
 import type { RuntimeV2CliArtifactResult, RuntimeV2RunCommandControl, RuntimeV2RunCommandOptions } from "./types";
 
 export type RunV2Io = {
@@ -33,14 +34,14 @@ export async function runV2Command(options: RuntimeV2RunCommandOptions, io: RunV
   try {
     if (io.isInterrupted?.()) activeAbort?.();
     try {
-      const runner = booted.profile.context.get?.("headless.runner") as { readonly run: () => Promise<RuntimeV2RunTurnResponse & { readonly session: unknown }> } | undefined;
+      const runner = profileService(booted.profile, "headless.runner");
       if (runner === undefined) throw new Error("Headless runner is not enabled for the selected Profile.");
       const result = await runner.run(); activeSessionId = result.sessionId; throughJournalSeq = result.snapshot.throughJournalSeq;
       const approval = booted.approval.approvalRequired;
-      const sessions = booted.profile.context.get?.("session.runtime") as { inspectEvents: (sessionId: string) => Promise<readonly SessionEventEnvelopeV1[]> } | undefined;
+      const sessions = profileService(booted.profile, "session.runtime");
       const durableEvents = result.outcome === "failed" || options.out ? await sessions?.inspectEvents(result.sessionId) : undefined;
       const failure = result.outcome === "failed" ? failedRunDiagnostic(durableEvents ?? [], result.taskId) : undefined;
-      const harness = pinnedHarness ? mountedHarness(booted.profile.context) : undefined;
+      const harness = pinnedHarness ? mountedHarness(booted.profile) : undefined;
       const output = projectCliArtifactResult(result, { failure, workspace, startedAt, endedAt: (io.now?.() ?? new Date()).toISOString(), persistent, interrupted: io.isInterrupted?.() ?? false, interruptionExitCode: io.interruptionExitCode?.(), approvalName: approval?.toolName, harness });
       if (output.error) io.onDiagnostic?.(output.error.code, output.error.message);
       if (options.out) {
@@ -114,9 +115,8 @@ async function readPinnedHarness(path: string, dataRoot: string): Promise<Pinned
   const { executionDigest, ...description } = value;
   return { description: description as unknown as PinnedHarness["description"], ...(typeof executionDigest === "string" ? { executionDigest } : {}) };
 }
-function mountedHarness(context: { readonly get?: (id: string) => unknown }): RuntimeV2CliArtifactResult["harness"] {
-  const control = context.get?.("harness.control") as { inspect: (id: string) => { current?: { harnessId: string; revision: number; executionDigest: string } } } | undefined;
-  const current = control?.inspect("main").current;
+function mountedHarness(profile: Parameters<typeof profileService>[0]): RuntimeV2CliArtifactResult["harness"] {
+  const current = profileService(profile, "harness.control")?.inspect("main").current;
   return current ? { harnessId: current.harnessId, revision: current.revision, executionDigest: current.executionDigest } : undefined;
 }
 

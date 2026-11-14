@@ -7,6 +7,7 @@ export * from "./core-guards.js";
 export * from "./definition.js";
 export * from "./errors.js";
 export * from "./executor.js";
+export * from "./hooks.js";
 export * from "./host-ports.js";
 export * from "./ordered-commit.js";
 export * from "./output-limits.js";
@@ -17,5 +18,6 @@ export * from "./registry.js";
 export * from "./result.js";
 export * from "./runtime.js";
 export * from "./scheduler.js";
+export * from "./service-keys.js";
 
 export type { AutoReviewInput } from "./prepared-execution.js";

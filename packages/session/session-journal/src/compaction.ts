@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { coreEvent } from "@actspace/shared/runtime-v2";
 import type { SessionEventCandidateV1, SessionSurfaceNodeV1 } from "./event-envelope.js";
 import type { SessionSurfaceView } from "./surface.js";
 import { SessionError } from "./errors.js";
@@ -18,16 +18,11 @@ export function createCompactionReplacement(options: {
     throw new SessionError("INVALID_EVENT", "Compaction replacement span is invalid.");
   }
   const sources = [...new Set(options.surface.entries.slice(options.start, options.end).flatMap((entry) => entry.sourceEventSeqs))].sort((left, right) => left - right);
-  const candidate: SessionEventCandidateV1 = {
-    type: "surface/replaced",
-    eventVersion: 1,
-    source: { ownerPluginId: "@actspace/core" },
-    data: { compactionId: options.compactionId, sourceEventSeqs: sources, replacedTokens: { conversation: options.replacedTokens.conversation, summarizedConversation: options.replacedTokens.summarizedConversation }, estimatorVersion: options.estimatorVersion, node: options.summary as SessionSurfaceNodeV1 & RuntimeV2JsonValue },
+  return Object.freeze(coreEvent("surface/replaced", { compactionId: options.compactionId, sourceEventSeqs: sources, replacedTokens: { conversation: options.replacedTokens.conversation, summarizedConversation: options.replacedTokens.summarizedConversation }, estimatorVersion: options.estimatorVersion, node: options.summary }, {
     // 摘要节点只存在 data.node，surface 只记替换范围（agent-spec-surface-derived.md §4.2）。
     surface: { kind: "replace", start: options.start, end: options.end, sourceEventSeqs: sources },
     provenance: { sourceEventSeqs: sources, contributorIds: options.contributorIds, runtimeSelectionSeq: null },
-  };
-  return Object.freeze(candidate);
+  }));
 }
 
 export function createCompactionTransaction(options: {
@@ -45,18 +40,11 @@ export function createCompactionTransaction(options: {
   /** Display facts recorded on `compaction/end`: tokens before (flagged when it includes estimates), estimated tokens after. */
   readonly stats?: { readonly trigger: "manual" | "auto"; readonly beforeTokens?: number; readonly afterTokens?: number; readonly beforeEstimated?: true };
 }): readonly SessionEventCandidateV1[] {
-  const makeControl = (type: "compaction/start" | "compaction/summary" | "compaction/end", data: SessionEventCandidateV1["data"]): SessionEventCandidateV1 => ({
-    type,
-    eventVersion: 1,
-    source: { ownerPluginId: "@actspace/core" },
-    data,
-    surface: null,
-    provenance: { sourceEventSeqs: [], contributorIds: options.contributorIds, runtimeSelectionSeq: null },
-  });
+  const control = { provenance: { sourceEventSeqs: [], contributorIds: options.contributorIds, runtimeSelectionSeq: null } };
   return Object.freeze([
-    makeControl("compaction/start", { compactionId: options.compactionId, start: options.start, end: options.end }),
-    makeControl("compaction/summary", { compactionId: options.compactionId, summaryDigest: options.summaryDigest }),
+    coreEvent("compaction/start", { compactionId: options.compactionId, start: options.start, end: options.end }, control),
+    coreEvent("compaction/summary", { compactionId: options.compactionId, summaryDigest: options.summaryDigest }, control),
     createCompactionReplacement(options),
-    makeControl("compaction/end", { compactionId: options.compactionId, summaryDigest: options.summaryDigest, ...(options.durationMs === undefined ? {} : { durationMs: options.durationMs }), ...options.stats }),
+    coreEvent("compaction/end", { compactionId: options.compactionId, summaryDigest: options.summaryDigest, ...(options.durationMs === undefined ? {} : { durationMs: options.durationMs }), ...options.stats }, control),
   ]);
 }

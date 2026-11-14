@@ -1,6 +1,6 @@
 import { isBackgroundTaskError, type BackgroundTaskHost, type BackgroundTaskOutput, type BackgroundTaskRecord } from "@actspace/background-tasks";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { ToolBodyResult, ToolDefinition, ToolExecutionContext, ToolRuntime } from "@actspace/tool-runtime";
+import type { ToolBodyResult, ToolDefinition, ToolExecutionContext, ToolRuntimeContract } from "@actspace/tool-runtime";
 import { BACKGROUND_TASK_TOOLS_PLUGIN_ID } from "./manifest.js";
 
 export type BackgroundTaskToolRegistration = { readonly name: string; readonly dispose: () => Promise<void> };
@@ -9,8 +9,8 @@ type Args = Readonly<Record<string, RuntimeV2JsonValue>>;
 const NO_POLLING = "Background tasks notify you automatically when they finish; prefer waiting for that notification. Do not poll with sleep or repeated task_output.";
 const TASK_ID = { type: "string", description: "Background task id: a Bash task (bash_…) or a background subagent's agent id." } as const;
 
-export function registerBackgroundTaskTools(runtime: ToolRuntime, tasks: BackgroundTaskHost): readonly BackgroundTaskToolRegistration[] {
-  const handles: ReturnType<ToolRuntime["register"]>[] = [];
+export function registerBackgroundTaskTools(runtime: ToolRuntimeContract, tasks: BackgroundTaskHost): readonly BackgroundTaskToolRegistration[] {
+  const handles: ReturnType<ToolRuntimeContract["register"]>[] = [];
   const register = (name: string, description: string, properties: Record<string, RuntimeV2JsonValue>, required: string[], concurrency: ToolDefinition["concurrency"], execute: (args: Args, context: ToolExecutionContext) => Promise<ToolBodyResult>): BackgroundTaskToolRegistration => {
     const definition: ToolDefinition = Object.freeze({ abiVersion: 2, pluginId: BACKGROUND_TASK_TOOLS_PLUGIN_ID, name, definitionVersion: 1, description, inputSchema: { type: "object", properties, required, additionalProperties: false }, effects: [], modes: ["plan", "agent"] as const, concurrency, sensitiveArgumentPaths: [], resultSchemaVersion: 1 });
     const handle = runtime.register({ definition, executor: { concurrencySafe: concurrency !== "exclusive", execute: (args, context) => execute(args, context).catch(failed) } });

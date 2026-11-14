@@ -1,5 +1,5 @@
 export { manifest } from "./manifest.js";
-export { apply, PROMPT_HOST_PORT_ID } from "./plugin.js";
+export { apply, PROMPT_HOST_PORT, PROMPT_HOST_PORT_ID, PROMPT_RUNTIME_SERVICE } from "./plugin.js";
 export type { PromptHostPort } from "./plugin.js";
 export * from "./assembler.js";
 export * from "./contributor.js";

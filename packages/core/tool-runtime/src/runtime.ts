@@ -5,6 +5,7 @@ import type { ToolExecutionResult } from "./result.js";
 import { ToolExecutionScheduler } from "./scheduler.js";
 import { Service } from "@actspace/cordis-adapter";
 import type { CordisServiceContext } from "@actspace/cordis-adapter";
+import { TOOL_RUNTIME_SERVICE } from "./service-keys.js";
 
 export class ToolRuntime {
   readonly registry: ToolRegistry;
@@ -53,8 +54,14 @@ export class ToolRuntime {
   }
 }
 
+/**
+ * `ToolRuntime` 的公开成员。`tools.runtime` 下注册的是包装服务，不是 `ToolRuntime` 本身（类带私有字段，
+ * 包装服务不算它的实例），所以取用方的参数写这个类型：两者都满足。
+ */
+export type ToolRuntimeContract = Pick<ToolRuntime, keyof ToolRuntime>;
+
 /** Cordis owner for the tool registry and scheduler; executor bodies stay in providers. */
-export class ToolRuntimeService extends Service {
+export class ToolRuntimeService extends Service implements ToolRuntimeContract {
   static Config = {
     "~standard": {
       version: 1,
@@ -71,7 +78,7 @@ export class ToolRuntimeService extends Service {
   readonly scheduler: ToolExecutionScheduler;
 
   constructor(ctx: CordisServiceContext, config: { readonly maxParallel?: number } = {}) {
-    super(ctx, "tools.runtime");
+    super(ctx, TOOL_RUNTIME_SERVICE.id);
     this.runtime = new ToolRuntime({ ...config, requireAgentScope: true });
     this.registry = this.runtime.registry;
     this.scheduler = this.runtime.scheduler;

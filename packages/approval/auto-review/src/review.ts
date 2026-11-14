@@ -1,4 +1,5 @@
-import { completeAuxiliaryText, type AuxiliaryRequestRecorder, type LlmService } from "@actspace/llm-service";
+import { serviceKey } from "@actspace/cordis-adapter";
+import { completeAuxiliaryText, type AuxiliaryRequestRecorder, type LlmServiceContract } from "@actspace/llm-service";
 import { REVIEW_POLICY } from "./prompt.js";
 export type ReviewDecision = { readonly approved: boolean; readonly reason?: string | null };
 export function parseReview(text: string): ReviewDecision {
@@ -9,7 +10,8 @@ export function parseReview(text: string): ReviewDecision {
   return { approved: record.approved, ...(record.reason == null ? {} : { reason: (record.reason as string).slice(0, 500) }) };
 }
 export interface AutoReviewer { review(input: { sessionId: string; agentRunId: string; turnId: string; stepId: string; callId: string; logicalRequestId: string; model: string; snapshot: unknown; signal: AbortSignal }): Promise<ReviewDecision> }
-export function createAutoReviewer(llm: LlmService, recorder: AuxiliaryRequestRecorder): AutoReviewer {
+export const AUTO_REVIEW_SERVICE = serviceKey<AutoReviewer>("approval.auto-review");
+export function createAutoReviewer(llm: LlmServiceContract, recorder: AuxiliaryRequestRecorder): AutoReviewer {
   return { async review(input) {
     const content = JSON.stringify(input.snapshot);
     if (content.length > 96_000) throw new Error("Review context exceeds limit");

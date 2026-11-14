@@ -1,8 +1,7 @@
-import { containNotification, type CordisContext } from "@actspace/cordis-adapter";
+import { ACTSPACE_SERVICE_IDS, containNotification, getService, provideService, requireService, serviceKey, serviceView, type CordisContext } from "@actspace/cordis-adapter";
 import type { SessionHandle } from "@actspace/session-persistence";
-import type { RuntimeV2JsonValue, RuntimeV2RunTurnRequest, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
-import type { SessionEventCandidateV1 } from "@actspace/session-journal";
-import type { LlmService } from "@actspace/llm-service";
+import { coreEvent, type RuntimeV2JsonValue, type RuntimeV2RunTurnRequest, type RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import { LLM_AUXILIARY_REQUESTS_SERVICE, LLM_SERVICE } from "@actspace/llm-service";
 import { completeText } from "./complete-text.js";
 
 /** Optional Desktop behavior. Owns background requests and synchronous rename cancellation. */
@@ -47,7 +46,7 @@ export class SessionTitleBehavior {
     // Rename cancels synchronously, before its first await. Append queues before
     // any later rename, so an explicit user title always wins.
     if (!signal.aborted && !this.#disposed && this.#snapshot(session).metadata.title === null) {
-      await session.append(core("session/title-set", { title }));
+      await session.append(coreEvent("session/title-set", { title }));
       await session.flush();
     }
   }
@@ -60,14 +59,18 @@ export class SessionTitleBehavior {
   }
 }
 
+export const DESKTOP_TITLES_SERVICE = serviceKey<SessionTitleBehavior>("desktop.titles");
+/** 标题生成用到的 `session.runtime`：只要快照。 */
+export const TITLE_SESSIONS_VIEW = serviceView<{ snapshot(session: SessionHandle): RuntimeV2SessionSnapshot }>(ACTSPACE_SERVICE_IDS.sessionRuntime);
+
 export const inject = ["session.runtime", "llm.service", "llm.auxiliary-requests"];
 export function apply(ctx: CordisContext): void {
-  const sessions = ctx.get?.("session.runtime") as { snapshot(session: SessionHandle): RuntimeV2SessionSnapshot };
-  const llm = ctx.get?.("llm.service") as LlmService;
-  const recorder = ctx.get?.("llm.auxiliary-requests") as import("@actspace/llm-service").AuxiliaryRequestRecorder | undefined;
+  const sessions = requireService(ctx, TITLE_SESSIONS_VIEW, "Session title");
+  const llm = requireService(ctx, LLM_SERVICE, "Session title");
+  const recorder = getService(ctx, LLM_AUXILIARY_REQUESTS_SERVICE);
   if (!recorder) throw new Error("Session title requires llm.auxiliary-requests");
   const titles = new SessionTitleBehavior(session => sessions.snapshot(session), input => completeText(llm, { ...input, auxiliary: { recorder, owner: { sessionId: input.sessionId!, purpose: "session-title" } } }));
-  ctx.provide?.("desktop.titles", titles);
+  provideService(ctx, DESKTOP_TITLES_SERVICE, titles);
   ctx.on?.("application/run-preparing", containNotification(ctx, (event: { session: SessionHandle; input: RuntimeV2RunTurnRequest; snapshot: RuntimeV2SessionSnapshot }) => titles.prepare(event.session, event.input, event.snapshot)));
   ctx.on?.("application/title-changing", containNotification(ctx, (event: { sessionId: string }) => titles.cancel(event.sessionId)));
   ctx.effect?.(() => () => titles.dispose(), "desktop.titles");
@@ -85,4 +88,3 @@ function textFromContent(value: RuntimeV2JsonValue): string {
   return typeof value === "string" ? value : Array.isArray(value) ? value.flatMap((item) => item !== null && typeof item === "object" && !Array.isArray(item) && item.type === "text" && typeof item.text === "string" ? [item.text] : []).join(" ") : "";
 }
 
-function core(type: string, data: RuntimeV2JsonValue): SessionEventCandidateV1 { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }

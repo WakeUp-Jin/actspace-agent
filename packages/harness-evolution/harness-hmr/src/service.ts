@@ -1,11 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { serviceKey } from "@actspace/cordis-adapter";
 import { HarnessControlError, type HarnessControl } from "@actspace/harness-control";
 
 export type SessionHarnessBinding = { schemaVersion: 1; sessionId: string; revision: number; harnessId: string; selectionRevision: number; executionDigest: string };
 type Intent = { schemaVersion: 1; sessionId: string; changeId: string; candidateId: string; harnessId: string; executionDigest: string; expectedBindingRevision: number };
 export type HarnessHmrOptions = { dataRoot: string; control: HarnessControl };
+export const HARNESS_HMR_HOST_PORT = serviceKey<HarnessHmrOptions>("actspace.host.hmr");
 
 /** Host-owned commit coordinator. Never starts, stops or resumes a Run. */
 export class HarnessHmr {
@@ -100,3 +102,4 @@ export async function readJson<T>(path: string): Promise<T | undefined> {
 }
 function hash(value: string): string { return createHash("sha256").update(value).digest("hex"); }
 function digestCandidate(candidateId: string): string { return hash(JSON.stringify({ candidateId })); }
+export const HARNESS_HMR_SERVICE = serviceKey<HarnessHmr>("harness.hmr");

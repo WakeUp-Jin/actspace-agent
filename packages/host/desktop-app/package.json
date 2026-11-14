@@ -36,7 +36,6 @@
     "@actspace/bundle": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/llm-service": "workspace:*",
-    "@actspace/session-journal": "workspace:*",
     "@actspace/session-persistence": "workspace:*",
     "@actspace/shared": "workspace:*",
     "@actspace/agent-service": "workspace:*"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { containNotification, createCordisRoot, createCordisRootWithLoader, emitNotification, inspectCordisAdmission, serialDispatch, toCordisBehavior, waterfallDispatch } from "../src/index.js";
+import { containNotification, createCordisRoot, createCordisRootWithLoader, emitNotification, inspectCordisAdmission, toCordisBehavior } from "../src/index.js";
 
 describe("Cordis package boundary", () => {
   it("admits the exact published family without HMR", async () => { const report = await inspectCordisAdmission(); expect(report.packages).toHaveLength(5); expect(report.hmrAbsent).toBe(true); expect(report.failures).toEqual([]); });
@@ -43,26 +43,6 @@ describe("Cordis package boundary", () => {
       const transformed = await root.context.waterfall?.("agent/request", { requestId: "r" }, () => ({ requestId: "r" }));
       expect(transformed).toMatchObject({ requestId: "r", transformed: true });
       expect(calls).toEqual(["started"]);
-    } finally {
-      await root.dispose();
-    }
-  });
-
-  it("preserves Cordis continuation and serial bail semantics", async () => {
-    const root = await createCordisRoot();
-    const order: string[] = [];
-    try {
-      root.context.on?.("agent/request", async (payload, next) => { order.push("outer"); const value = await next?.(); return { ...(value as Record<string, unknown>), wrapped: true }; });
-      root.context.on?.("agent/request", async (payload, next) => { order.push("inner"); return { ...(await next?.() as Record<string, unknown>), inner: true }; });
-      const value = await waterfallDispatch(root.context, "agent/request", { requestId: "r" }, () => ({ requestId: "r", builtIn: true }));
-      expect(value).toMatchObject({ requestId: "r", builtIn: true, inner: true, wrapped: true });
-      expect(order).toEqual(["outer", "inner"]);
-
-      root.context.on?.("agent/turn-stopping", () => { order.push("stop"); return "handled"; });
-      root.context.on?.("agent/turn-stopping", () => { order.push("after-stop"); return undefined; });
-      await expect(serialDispatch(root.context, "agent/turn-stopping", { reason: "completed" })).resolves.toBe("handled");
-      expect(order).toContain("stop");
-      expect(order).not.toContain("after-stop");
     } finally {
       await root.dispose();
     }

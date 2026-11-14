@@ -1,11 +1,11 @@
-import type { CordisContext } from "@actspace/cordis-adapter";
-import { EnglishLearningService } from "./service.js";
-import { SPEECH_HOST_PORT_ID, type SpeechHostPort } from "./host-port.js";
+import { getService, provideService, type CordisContext } from "@actspace/cordis-adapter";
+import { ENGLISH_LEARNING_SERVICE, EnglishLearningService } from "./service.js";
+import { SPEECH_HOST_PORT } from "./host-port.js";
 export const inject = Object.freeze(["session.runtime"]);
 export function apply(ctx: CordisContext): void {
-  const host = ctx.get?.(SPEECH_HOST_PORT_ID) as SpeechHostPort | undefined;
+  const host = getService(ctx, SPEECH_HOST_PORT);
   if (!host) return;
   const service = new EnglishLearningService(ctx, host);
-  ctx.provide?.("english-learning", service);
+  provideService(ctx, ENGLISH_LEARNING_SERVICE, service);
   ctx.effect?.(() => () => service.dispose(), "english-learning");
 }

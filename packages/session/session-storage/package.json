@@ -19,6 +19,7 @@
     "test": "vitest run --globals --passWithNoTests"
   },
   "dependencies": {
+    "@actspace/cordis-adapter": "workspace:*",
     "@actspace/session-journal": "workspace:*"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-import { isBackgroundWake, taskOperation } from "@actspace/shared/runtime-v2";
+import { coreEvent, isBackgroundWake, taskOperation } from "@actspace/shared/runtime-v2";
 import { randomUUID } from "node:crypto";
 import { SessionError, snapshotSessionJson, type SessionEventCandidateV1 } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
@@ -157,12 +157,11 @@ export class TaskLedger {
     const claim = eventCandidate(TASK_EVENT, { op: "claim", sessionId: this.session.header.sessionId, taskId: task.taskId, runId });
     // A wake task has no user input; the Run opens with the claimed Inbox notifications.
     if (isBackgroundWake(task.content)) return [claim];
-    return [claim, {
-      type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, // 模型看到的内容只存在 data.content，节点由 surfaceNode 推出（agent-spec-surface-derived.md §4.2）。
-      data: { messageId: task.taskId, agentRunId: runId, content: task.content && typeof task.content === "object" && !Array.isArray(task.content) && "kind" in task.content && task.content.kind === "composer-task" ? task.content.prepared : task.content },
+    // 模型看到的内容只存在 data.content，节点由 surfaceNode 推出（agent-spec-surface-derived.md §4.2）。
+    return [claim, coreEvent("user/message", { messageId: task.taskId, agentRunId: runId, content: task.content && typeof task.content === "object" && !Array.isArray(task.content) && "kind" in task.content && task.content.kind === "composer-task" ? task.content.prepared : task.content }, {
       surface: { kind: "append" },
       provenance: { sourceEventSeqs: [task.acceptedSeq], contributorIds: [TASK_OWNER_ID], runtimeSelectionSeq: null },
-    }];
+    })];
   }
   async #commit(events: readonly SessionEventCandidateV1[]): Promise<void> {
     const previousSeq = this.session.lastSeq;

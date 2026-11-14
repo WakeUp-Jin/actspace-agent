@@ -1,8 +1,8 @@
-import { isBackgroundWake, taskOperation, type BackgroundBashTaskView } from "@actspace/shared/runtime-v2";
+import { coreEvent, isBackgroundWake, taskOperation, type BackgroundBashTaskView } from "@actspace/shared/runtime-v2";
 
 import { SessionModeWriter } from "./session-commands.js";
-import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
-import type { EventCodecRegistry, SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import { ACTSPACE_SERVICE_IDS, emitNotification, requireService, serviceView, type CordisContext, type ServiceKey } from "@actspace/cordis-adapter";
+import { SESSION_JOURNAL_SERVICE, type SessionEventCandidateV1, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { resolveSideChatBoundary, resolveTurnBoundary } from "@actspace/side-chat";
 import { projectTasks } from "./task-projection.js";
 import { TaskError } from "./contracts.js";
@@ -62,7 +62,8 @@ export type ApplicationSessionService = {
 
 export type ApplicationRunService = {
   readonly service: import("./service.js").AgentService;
-  inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R, sessionId?: string): R | Promise<R>;
+  /** 在一次 Harness 租约内读一个服务；`key` 决定 `inspect` 拿到的类型。 */
+  inspectCapability<T, R>(key: ServiceKey<T>, inspect: (service: T | undefined) => R, sessionId?: string): R | Promise<R>;
   configuration(sessionId: string): import("@actspace/shared/runtime-v2").TaskConfiguration;
   configure(sessionId: string, configuration: import("@actspace/shared/runtime-v2").TaskConfiguration): void;
   initialize(sessionId: string): Promise<void>;
@@ -92,6 +93,16 @@ type SubagentManagerLike = {
   stopAll?(rootId: string): Promise<void>;
 };
 type AgentRuntimeService = { readonly runs: ApplicationRunService; readonly subagents?: SubagentManagerLike; readonly backgroundTasks?: BackgroundTaskRegistryLike };
+
+/** Application 用到的服务，各取自己读的那一面。提供方的类型在上层包里，由 `@actspace/runtime` 的 service-views 核对。 */
+export const APPLICATION_SESSIONS_VIEW = serviceView<ApplicationSessionService>(ACTSPACE_SERVICE_IDS.sessionRuntime);
+export const APPLICATION_AGENT_RUNTIME_VIEW = serviceView<AgentRuntimeService>(ACTSPACE_SERVICE_IDS.agentRuntime);
+export const APPLICATION_BROWSER_TOOLS_VIEW = serviceView<{ readonly available?: boolean; readonly registrations?: readonly unknown[]; readonly definitions?: readonly unknown[] }>(ACTSPACE_SERVICE_IDS.browserTools);
+export const APPLICATION_CONTEXT_ENGINE_VIEW = serviceView<{
+  readonly instances?: { evict(sessionId: string, scope?: string): boolean };
+  readonly getProjection?: (id: string, scope?: string, basis?: "current-context" | "request") => ManagedContextProjection | undefined;
+  readonly readEntry?: (id: string, scope: string, key: string, revision: number, generation: string) => string | null;
+}>(ACTSPACE_SERVICE_IDS.contextEngine);
 
 export type AgentApplicationContract = {
   readonly browserAvailable: () => Promise<boolean>;
@@ -159,15 +170,15 @@ export class AgentApplication implements AgentApplicationContract {
   readonly #modeWriter = new SessionModeWriter();
 
   constructor(private readonly ctx: CordisContext, private readonly source = "application") {
-    this.#sessions = required(ctx, "session.runtime");
-    const agentRuntime = required<AgentRuntimeService>(ctx, "agent.runtime");
+    this.#sessions = requireService(ctx, APPLICATION_SESSIONS_VIEW, "Agent application");
+    const agentRuntime = requireService(ctx, APPLICATION_AGENT_RUNTIME_VIEW, "Agent application");
     this.#runs = agentRuntime.runs;
     this.#subagents = agentRuntime.subagents;
     this.#backgroundTasks = agentRuntime.backgroundTasks;
   }
 
   async browserAvailable(): Promise<boolean> {
-    return this.#runs.inspectCapability<{ available?: boolean; registrations?: readonly unknown[]; definitions?: readonly unknown[] }, boolean>("tools.browser", browser => browser?.available === true && (browser.registrations?.length ?? 0) > 0 && browser.registrations?.length === browser.definitions?.length);
+    return this.#runs.inspectCapability(APPLICATION_BROWSER_TOOLS_VIEW, browser => browser?.available === true && (browser.registrations?.length ?? 0) > 0 && browser.registrations?.length === browser.definitions?.length);
   }
   async submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue, agentRunId?: string) {
     this.#modeWriter.assertAvailable(sessionId);
@@ -219,7 +230,7 @@ export class AgentApplication implements AgentApplicationContract {
       await session.flush();
       // perf-allow: 只在用户点「编辑重发」时走一次，要在整份日志里找被编辑的那一轮
       const events = session.journal.readEvents();
-      const registry = required<{ readonly registry: EventCodecRegistry }>(this.ctx, "session.journal").registry;
+      const registry = requireService(this.ctx, SESSION_JOURNAL_SERVICE, "Agent application").registry;
       const lineage = session.header.lineage;
       const cut = resolveRewindCut(sessionId, events, registry, rewind.runId, lineage && lineage.origin !== "delegation" ? lineage.parentBoundarySeq : -1);
       const label = `rewind-${new Date().toISOString().replace(/[:.]/g, "-")}`;
@@ -228,7 +239,7 @@ export class AgentApplication implements AgentApplicationContract {
       rewound = { cutSeq: cut.cutSeq, retireFailures: result.retireFailures.map(item => item.sessionId) };
       try {
         // Context instances cache "through seq"; a shorter Journal would otherwise reuse the dropped conversation.
-        await this.#runs.inspectCapability<{ readonly instances?: { evict(sessionId: string, scope?: string): boolean } }, void>("context.engine", engine => {
+        await this.#runs.inspectCapability(APPLICATION_CONTEXT_ENGINE_VIEW, engine => {
           engine?.instances?.evict(sessionId, `main:${sessionId}`);
           engine?.instances?.evict(sessionId);
         }, sessionId);
@@ -236,7 +247,7 @@ export class AgentApplication implements AgentApplicationContract {
         await this.#runs.initialize(sessionId);
       } finally {
         // Clients, transcript and other observers learn of the rewind from this ordinary Journal fact.
-        await session.append(core("session/rewound", { cutSeq: cut.cutSeq, droppedThroughSeq: cut.droppedThroughSeq, runId: rewind.runId, archive: result.archive, rewoundAt: new Date().toISOString() }));
+        await session.append(coreEvent("session/rewound", { cutSeq: cut.cutSeq, droppedThroughSeq: cut.droppedThroughSeq, runId: rewind.runId, archive: result.archive, rewoundAt: new Date().toISOString() }));
         await session.flush();
       }
       receipt = await this.#submit(sessionId, submissionId, content, agentRunId);
@@ -315,11 +326,11 @@ export class AgentApplication implements AgentApplicationContract {
   latestSessionEvent(sessionId: string, type: string) { return this.#sessions.latestEvent(sessionId, type); }
   readSessionProjectionValue(sessionId: string, key: string) { return this.#sessions.projectionValue(sessionId, key); }
   async readContextProjection(sessionId: string, logicalAgentScopeId = `main:${sessionId}`): Promise<ManagedContextProjection | null> {
-    const projection = await this.#runs.inspectCapability<{ readonly getProjection?: (id: string, scope?: string, basis?: "current-context" | "request") => ManagedContextProjection | undefined }, ManagedContextProjection | undefined>("context.engine", service => service?.getProjection?.(sessionId, logicalAgentScopeId, "current-context"), sessionId);
+    const projection = await this.#runs.inspectCapability(APPLICATION_CONTEXT_ENGINE_VIEW, service => service?.getProjection?.(sessionId, logicalAgentScopeId, "current-context"), sessionId);
     return projection ?? null;
   }
   async readContextEntryText(sessionId: string, scope: string, key: string, revision: number, generation: string): Promise<string | null> {
-    return await this.#runs.inspectCapability<{ readEntry?: (id: string, scope: string, key: string, revision: number, generation: string) => string | null }, string | null>("context.engine", service => service?.readEntry?.(sessionId, scope, key, revision, generation) ?? null, sessionId);
+    return await this.#runs.inspectCapability(APPLICATION_CONTEXT_ENGINE_VIEW, service => service?.readEntry?.(sessionId, scope, key, revision, generation) ?? null, sessionId);
   }
   exportSession(sessionId: string) { return this.#sessions.export(sessionId); }
 
@@ -343,7 +354,7 @@ export class AgentApplication implements AgentApplicationContract {
     // A reply's fork ends with its Turn plus the Host's run-finish fact, so the copy holds no unfinished Run.
     const boundarySeq = typeof boundary === "number" ? boundary : resolveTurnBoundary(
       parent.events,
-      required<{ readonly registry: EventCodecRegistry }>(this.ctx, "session.journal").registry,
+      requireService(this.ctx, SESSION_JOURNAL_SERVICE, "Agent application").registry,
       boundary.turnId,
       prefix => { const tasks = projectTasks(parentSessionId, prefix); return tasks.runs.every(run => run.state !== "running") && tasks.tasks.every(task => task.state !== "claimed"); },
     );
@@ -363,7 +374,7 @@ export class AgentApplication implements AgentApplicationContract {
     const parent = await this.#sessions.store.inspect(parentSessionId);
     if (parent.header === null) throw new Error(`Parent Session ${parentSessionId} has no header.`);
     if (parent.header.lineage?.origin === "side-chat" || parent.header.lineage?.origin === "delegation") throw new Error("SIDE_CHAT_PARENT_NOT_MAIN");
-    const { boundarySeq, inheritedTurnCount, runningTurnExcluded } = resolveSideChatBoundary(parent.events, required<{ readonly registry: EventCodecRegistry }>(this.ctx, "session.journal").registry);
+    const { boundarySeq, inheritedTurnCount, runningTurnExcluded } = resolveSideChatBoundary(parent.events, requireService(this.ctx, SESSION_JOURNAL_SERVICE, "Agent application").registry);
     const session = await this.#fork(parent.header, boundarySeq, newSessionId, "side-chat");
     const forked = this.#sessions.snapshot(session);
     const snapshot = forked.agentMode !== "chat" && forked.workspaceRoot !== null ? await this.#changeAgentMode(session, "plan") : forked;
@@ -419,9 +430,9 @@ export class AgentApplication implements AgentApplicationContract {
     if (patch.title !== undefined) emitNotification(this.ctx, "application/title-changing", { sessionId });
     const session = await this.#sessions.resume(sessionId);
     const events: SessionEventCandidateV1[] = [];
-    if (patch.title !== undefined) events.push(core("session/title-set", { title: patch.title === null ? null : patch.title.trim().slice(0, 160) || null }));
-    if (patch.pinned !== undefined) events.push(core("session/pinned-set", { pinned: patch.pinned }));
-    if (patch.archived !== undefined) events.push(core("session/archived-set", { archived: patch.archived }));
+    if (patch.title !== undefined) events.push(coreEvent("session/title-set", { title: patch.title === null ? null : patch.title.trim().slice(0, 160) || null }));
+    if (patch.pinned !== undefined) events.push(coreEvent("session/pinned-set", { pinned: patch.pinned }));
+    if (patch.archived !== undefined) events.push(coreEvent("session/archived-set", { archived: patch.archived }));
     if (events.length > 0) { await session.appendMany(events); await session.flush(); }
     return this.#sessions.snapshot(session);
   }
@@ -436,10 +447,10 @@ export class AgentApplication implements AgentApplicationContract {
       const events: SessionEventCandidateV1[] = [];
       if (snapshot.workspaceRoot !== next) {
         for (const grant of snapshot.sessionGrants) {
-          if (grant.selector.kind === "command_prefix") events.push(core("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: new Date().toISOString(), reason: "workspace-changed" }));
+          if (grant.selector.kind === "command_prefix") events.push(coreEvent("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: new Date().toISOString(), reason: "workspace-changed" }));
         }
       }
-      events.push(core("session/workspace-set", { workspaceRoot: next }));
+      events.push(coreEvent("session/workspace-set", { workspaceRoot: next }));
       await session.appendMany(events);
       await session.flush();
       return this.#sessions.snapshot(session);
@@ -457,10 +468,10 @@ export class AgentApplication implements AgentApplicationContract {
       for (const grant of snapshot.sessionGrants) {
         if (grant.selector.kind === "command_prefix") continue;
         const path = grant.selector.kind === "exact" ? grant.selector.canonicalPath : grant.selector.canonicalRoot;
-        if (snapshot.workspaceRoot === null || !isLexicallyInside(nodePath, snapshot.workspaceRoot, path, { includeRoot: true })) events.push(core("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: changedAt, reason: "permission-mode-downgrade" }));
+        if (snapshot.workspaceRoot === null || !isLexicallyInside(nodePath, snapshot.workspaceRoot, path, { includeRoot: true })) events.push(coreEvent("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: changedAt, reason: "permission-mode-downgrade" }));
       }
     }
-    events.push(core("permission/mode-set", { mode, changedAt, source: this.source }));
+    events.push(coreEvent("permission/mode-set", { mode, changedAt, source: this.source }));
     await session.appendMany(events);
     await session.flush();
     return this.#sessions.snapshot(session);
@@ -472,20 +483,13 @@ export class AgentApplication implements AgentApplicationContract {
     const snapshot = this.#sessions.snapshot(session);
     const grant = snapshot.sessionGrants.find((candidate) => candidate.grantId === grantId);
     if (grant === undefined || grant.sessionId !== sessionId || grant.agentId !== `main:${sessionId}`) throw new Error("Session Grant is not active for this main Agent.");
-    await session.append(core("permission/grant-revoked", { schemaVersion: 1, grantId, sessionId, agentId: grant.agentId, revokedAt: new Date().toISOString(), reason: "user-revoked" }));
+    await session.append(coreEvent("permission/grant-revoked", { schemaVersion: 1, grantId, sessionId, agentId: grant.agentId, revokedAt: new Date().toISOString(), reason: "user-revoked" }));
     await session.flush();
     return this.#sessions.snapshot(session);
   }
 
 }
 
-function required<T>(ctx: CordisContext, id: string): T {
-  const value = ctx.get?.(id) as T | undefined;
-  if (value === undefined) throw new Error(`Agent application requires ${id}.`);
-  return value;
-}
-
-function core(type: string, data: RuntimeV2JsonValue): SessionEventCandidateV1 { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
 
 export type DesktopBrowsePage = { deferredToolCalls?: string[]; snapshot: RuntimeV2SessionSnapshot; journal: readonly SessionEventEnvelopeV1[]; history: { before: number | null; throughJournalSeq: number } };
 

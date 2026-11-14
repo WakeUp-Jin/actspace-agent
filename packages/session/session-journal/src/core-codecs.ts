@@ -1,4 +1,4 @@
-import { isCommandPrefixSelector, isSurfaceNode, SUBAGENT_ACTIVATION_STATUSES, SUBAGENT_DELIVERIES, SUBAGENT_KINDS, SUBAGENT_PRESETS, SUBAGENT_RESULT_LIMIT_BYTES, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { isCommandPrefixSelector, isSurfaceNode, SUBAGENT_ACTIVATION_STATUSES, SUBAGENT_DELIVERIES, SUBAGENT_KINDS, SUBAGENT_PRESETS, SUBAGENT_RESULT_LIMIT_BYTES, type CoreEventType, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { EventCodecRegistry, type EventCodec } from "./codec-registry.js";
 import { SessionError } from "./errors.js";
 import { validateAuxiliaryRequest } from "./auxiliary-codec.js";
@@ -84,6 +84,13 @@ export const PERSISTED_EXTENSION_EVENT_TYPES = [
 
 export type PersistedExtensionEventType = (typeof PERSISTED_EXTENSION_EVENT_TYPES)[number];
 export type ActSpaceSessionEventType = CoreSessionEventType | PersistedExtensionEventType;
+
+/**
+ * `coreEvent` 能写的事件都得在上面两张表里有 codec，不然要到 `append` 时才报「未知事件类型」。
+ * `CoreEventDataMap` 里多出一个这里没注册的事件名时，这一行编译不过，报错里带着那个名字。
+ */
+export type CoreEventTypeWithoutCodec = MustBeNever<Exclude<CoreEventType, ActSpaceSessionEventType>>;
+type MustBeNever<T extends never> = T;
 
 export function createCoreCodecRegistry(pluginCodecs: readonly EventCodec[] = []): EventCodecRegistry {
   const core = CORE_EVENT_TYPES.map((type) => createCoreCodec(type));

@@ -1,6 +1,6 @@
-import type { CordisContext } from "@actspace/cordis-adapter";
+import { provideService, type CordisContext } from "@actspace/cordis-adapter";
 import * as sessionTitle from "./session-title.js";
-import { DesktopAppService } from "./service.js";
+import { DESKTOP_APP_SERVICE, DesktopAppService } from "./service.js";
 
 export const inject = Object.freeze(["session.runtime", "agent.runtime", "llm.service", "llm.auxiliary-requests"]);
 
@@ -13,6 +13,6 @@ export async function apply(ctx: CordisContext): Promise<void> {
   if (ctx.get?.("actspace.host.desktop") === undefined) return;
   await ctx.plugin?.(sessionTitle);
   const service = new DesktopAppService(ctx);
-  ctx.provide?.("desktop.app", service);
+  provideService(ctx, DESKTOP_APP_SERVICE, service);
   ctx.effect?.(() => async () => service.dispose(), "desktop.app");
 }

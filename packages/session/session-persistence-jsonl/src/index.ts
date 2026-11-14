@@ -1,5 +1,5 @@
 export { manifest } from "./manifest.js";
-export { apply } from "./plugin.js";
+export { apply, JSONL_STORAGE_HOST_VIEW } from "./plugin.js";
 export * from "./jsonl-reader.js";
 export * from "./jsonl-writer.js";
 export * from "./storage.js";

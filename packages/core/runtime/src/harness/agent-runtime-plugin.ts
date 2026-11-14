@@ -1,25 +1,25 @@
 import { PluginManager } from "@actspace/plugin-manager";
-import { HarnessHmr } from "@actspace/harness-hmr";
+import { HARNESS_HMR_SERVICE, HarnessHmr } from "@actspace/harness-hmr";
 import { EvolutionApproval } from "./evolution-approval.js";
 import { join } from "node:path";
-import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
-import { HarnessControl, loadArtifact, type SelectionDescription } from "@actspace/harness-control";
+import { emitNotification, getLeasedService, getService, provideService, requireService, type CordisContext } from "@actspace/cordis-adapter";
+import { HARNESS_CONTROL_SERVICE, HarnessControl, loadArtifact, type SelectionDescription } from "@actspace/harness-control";
 import type { HarnessMountRequest } from "@actspace/boot";
 import { canonical } from "@actspace/composition";
-import type { AgentRegistry } from "@actspace/agent";
+import { AGENT_REGISTRY_SERVICE, type AgentRegistryContract } from "@actspace/agent";
 import { SubagentManager } from "@actspace/subagent";
-import { MODELS_HOST_PORT_ID, EMPTY_MODELS_HOST_PORT, type ModelsHostPort } from "@actspace/shared";
+import { EMPTY_MODELS_HOST_PORT } from "@actspace/shared";
 import { projectPermissionMode } from "@actspace/session-projection";
-import { transcriptPath, type SessionTranscriptService } from "@actspace/session-transcript";
-import type { RuntimeSessionController } from "../session/session-controller.js";
-import type { AgentFactoryService } from "./agent-factory-plugin.js";
+import { SESSION_TRANSCRIPT_SERVICE, transcriptPath } from "@actspace/session-transcript";
 import { PinnedHarnessError, type AgentRuntimeHostPort, type PinnedHarness } from "./agent-host-port.js";
-import type { RuntimeSessionHostPort } from "../session/session-plugin.js";
 import { prepareDefaultHarnessArtifact, defaultHarnessSharedModules, DEFAULT_HARNESS_SHARED_SERVICES, OPTIONAL_HOST_SHARED_SERVICES } from "./default-harness.js";
-import { TaskLedger } from "@actspace/agent-service";
+import { AGENT_SERVICE, TaskLedger } from "@actspace/agent-service";
 import { BackgroundTaskRegistry } from "@actspace/background-tasks";
 import { ManagedRuns } from "./managed-runs.js";
-import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
+import { SANDBOX_SERVICE } from "@actspace/sandbox/types";
+import { AGENT_FACTORY_SERVICE, AGENT_RUNTIME_HOST_PORT, AGENT_RUNTIME_SERVICE, MODELS_HOST_PORT, SESSION_RUNTIME_HOST_PORT, SESSION_RUNTIME_SERVICE } from "../service-keys.js";
+
+const CONSUMER = "Agent runtime plugin";
 
 export const inject = Object.freeze(DEFAULT_HARNESS_SHARED_SERVICES.filter(name => !OPTIONAL_HOST_SHARED_SERVICES.includes(name)));
 
@@ -32,18 +32,18 @@ export class AgentRuntimeService {
   hmr!: HarnessHmr;
   evolution!: PluginManager;
   #unregisterRelease: (() => void)[] = [];
-  readonly registry: AgentRegistry;
+  readonly registry: AgentRegistryContract;
   constructor(ctx: CordisContext) {
-    const host = get<AgentRuntimeHostPort>(ctx, "actspace.host.agent");
-    const sessions = get<RuntimeSessionController>(ctx, "session.runtime");
-    this.registry = get(ctx, "agent.registry");
+    const host = requireService(ctx, AGENT_RUNTIME_HOST_PORT, CONSUMER);
+    const sessions = requireService(ctx, SESSION_RUNTIME_SERVICE, CONSUMER);
+    this.registry = requireService(ctx, AGENT_REGISTRY_SERVICE, CONSUMER);
     this.backgroundTasks = new BackgroundTaskRegistry({ openSession: async id => sessions.getOpen(id) ?? await sessions.resume(id), wake: id => this.runs.service.wake(id), onError: error => host.onHarnessDiagnostic?.(error) });
     // Opening a main Session settles what an exit cut off: background Bash first, then subagent activations.
     const recover = { reconcile: async (session: import("@actspace/session-persistence").SessionHandle) => { await this.backgroundTasks.reconcile(session); await this.subagents.recoverLost(session); } };
     this.runs = new ManagedRuns(sessions, { acquire: (id, signal) => this.harnesses.acquire(id, signal), acquireSession: (id, signal) => this.hmr.acquire(id, signal), acquireVersion: (id, generationId) => this.harnesses.acquire(id, undefined, generationId) }, snapshot => { emitNotification(ctx, "agent/tasks-updated", snapshot); if (!snapshot.runs.some(run => run.state === "running")) sessions.requestSweep(); }, recover);
     // Read when a subagent is created: the session Host is required by `initialize`, not by construction.
-    const dataRoot = () => get<RuntimeSessionHostPort>(ctx, "actspace.host.session").dataRoot;
-    const transcripts = () => ctx.get?.("session.transcript") as SessionTranscriptService | undefined;
+    const dataRoot = () => requireService(ctx, SESSION_RUNTIME_HOST_PORT, CONSUMER).dataRoot;
+    const transcripts = () => getService(ctx, SESSION_TRANSCRIPT_SERVICE);
     // Idle Session release: work that must keep a Session resident, and the scheduler state that holds its handle.
     this.#unregisterRelease = [
       sessions.addPin(id => this.runs.isActive(id) || this.runs.hasQueuedTask(id) || this.subagents.runningCount(id) > 0 || this.backgroundTasks.hasRunning(id)),
@@ -56,7 +56,7 @@ export class AgentRuntimeService {
       acquireRun: async ({ scope, signal }) => {
         // The child Run uses the Harness generation its caller runs on.
         const lease = await this.harnesses.acquireForScope(scope, signal);
-        const factory = lease.getService<AgentFactoryService>("actspace.agent.factory");
+        const factory = getLeasedService(lease, AGENT_FACTORY_SERVICE);
         if (!factory) { await lease.release(); throw new Error("Harness has no child factory"); }
         let ledger: TaskLedger | undefined;
         let runId: string | undefined;
@@ -79,7 +79,7 @@ export class AgentRuntimeService {
       },
       transcriptPath: id => transcriptPath(dataRoot(), id),
       refreshTranscript: async id => { await transcripts()?.refresh(id); },
-      models: () => (ctx.get?.(MODELS_HOST_PORT_ID) as ModelsHostPort | undefined) ?? EMPTY_MODELS_HOST_PORT,
+      models: () => getService(ctx, MODELS_HOST_PORT) ?? EMPTY_MODELS_HOST_PORT,
       parentConfiguration: id => {
         const { model, thinkingEnabled, reasoningEffort, selectedSkillIds } = this.runs.configuration(id);
         return { ...(model === undefined ? {} : { model }), ...(thinkingEnabled === undefined ? {} : { thinkingEnabled }), ...(reasoningEffort === undefined ? {} : { reasoningEffort }), ...(selectedSkillIds === undefined ? {} : { selectedSkillIds }) };
@@ -96,10 +96,10 @@ export class AgentRuntimeService {
     });
   }
   async initialize(ctx: CordisContext): Promise<void> {
-    const host = get<AgentRuntimeHostPort>(ctx, "actspace.host.agent");
-    const sessionHost = get<RuntimeSessionHostPort>(ctx, "actspace.host.session");
+    const host = requireService(ctx, AGENT_RUNTIME_HOST_PORT, CONSUMER);
+    const sessionHost = requireService(ctx, SESSION_RUNTIME_HOST_PORT, CONSUMER);
     const sharedModules = await defaultHarnessSharedModules();
-    const sessions = get<RuntimeSessionController>(ctx, "session.runtime");
+    const sessions = requireService(ctx, SESSION_RUNTIME_SERVICE, CONSUMER);
     const approval = new EvolutionApproval(host, sessions);
     const artifactRoot = join(sessionHost.dataRoot, "harness-artifacts");
     const pinned = host.pinnedHarness;
@@ -119,7 +119,7 @@ export class AgentRuntimeService {
     await this.harnesses.initialize();
     if (pinned) assertPinned(this.harnesses.inspect("main"), pinned);
     void this.reportSandboxStatus(host);
-    ctx.provide?.("harness.control", this.harnesses);
+    provideService(ctx, HARNESS_CONTROL_SERVICE, this.harnesses);
     this.hmr = new HarnessHmr({ dataRoot: sessionHost.dataRoot, control: this.harnesses });
     this.evolution = new PluginManager({ dataRoot: sessionHost.dataRoot, artifactRoot: join(sessionHost.dataRoot, "harness-artifacts"), control: this.harnesses, hmr: this.hmr,
       source: async context => {
@@ -132,7 +132,7 @@ export class AgentRuntimeService {
       },
       authorize: (request, context) => approval.request(request, context),
     });
-    ctx.provide?.("harness.hmr", this.hmr);
+    provideService(ctx, HARNESS_HMR_SERVICE, this.hmr);
     ctx.provide?.("harness.plugin-manager", this.evolution);
   }
   /** Probing runs the backends, so it stays off the startup path; a blocked Harness is already reported. */
@@ -140,7 +140,7 @@ export class AgentRuntimeService {
     if (!host.onSandboxStatus) return;
     let lease;
     try { lease = await this.harnesses.acquire("main"); } catch { return; }
-    try { host.onSandboxStatus(await lease.getService<SandboxService>(SANDBOX_SERVICE_ID)?.status("tool")); }
+    try { host.onSandboxStatus(await getLeasedService(lease, SANDBOX_SERVICE)?.status("tool")); }
     catch (error) { host.onHarnessDiagnostic?.(error); }
     finally { await lease.release().catch(() => undefined); }
   }
@@ -176,14 +176,9 @@ export async function apply(ctx: CordisContext): Promise<void> {
   const runtime = new AgentRuntimeService(ctx);
   try { await runtime.initialize(ctx); }
   catch (error) { await runtime.dispose(); throw error; }
-  ctx.provide?.("agent.runtime", runtime);
-  ctx.provide?.("agent.service", runtime.runs.service);
+  provideService(ctx, AGENT_RUNTIME_SERVICE, runtime);
+  provideService(ctx, AGENT_SERVICE, runtime.runs.service);
   ctx.effect?.(() => () => runtime.dispose(), "agent.runtime");
-}
-function get<T>(ctx: CordisContext, id: string): T {
-  const value = ctx.get?.(id) as T | undefined;
-  if (value === undefined) throw new Error(`Agent runtime plugin requires ${id}.`);
-  return value;
 }
 
 /**

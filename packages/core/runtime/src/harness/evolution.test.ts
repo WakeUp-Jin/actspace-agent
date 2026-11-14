@@ -22,6 +22,7 @@ import { createAuxiliaryRequestRecorder } from "../session/auxiliary-request-rec
 import { createContextHost } from "./context-host.js";
 import { MAIN_AGENT_FORM } from "../main-agent-form.js";
 import { createNodeSandboxHostPort } from "@actspace/sandbox";
+import { TOOL_RUNTIME_SERVICE } from "@actspace/tool-runtime";
 
 it("runs the model/tool pipeline: explicit development, next-message activation, session isolation and restart", async () => {
   const directory = await mkdtemp(join(tmpdir(), "runtime-evolution-"));
@@ -58,7 +59,7 @@ it("runs the model/tool pipeline: explicit development, next-message activation,
           call = { name: "plugin_manager", args: { action: "build", workspaceId } };
         } else if (step === 2) call = { name: "plugin_manager", args: { action: "prepare", workspaceId } };
         else if (step === 3) call = { name: "plugin_manager", args: { action: "apply", workspaceId } };
-        else if (step === 4) expect(await runtime.runs.inspectCapability<import("@actspace/tool-runtime").ToolRuntime, boolean>("tools.runtime", tools => !!tools?.registry.listDefinitions().some(d => d.name === "custom_echo"), "local")).toBe(false);
+        else if (step === 4) expect(await runtime.runs.inspectCapability(TOOL_RUNTIME_SERVICE, tools => !!tools?.registry.listDefinitions().some(d => d.name === "custom_echo"), "local")).toBe(false);
       } else if (phase === "use" && step === 0) call = { name: "custom_echo", args: { value: "hello" } };
       step++;
       yield call ? { type: "done" as const, stopReason: "tool-use", usage: EMPTY_LLM_USAGE, content: [{ type: "tool-call" as const, callId: `${phase}-${step}`, name: call.name, arguments: JSON.stringify(call.args) }] } : { type: "done" as const, stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text" as const, text: "done" }] };
@@ -78,7 +79,7 @@ it("runs the model/tool pipeline: explicit development, next-message activation,
     expect(JSON.stringify(results.at(-1))).toContain('"bound"');
     expect(seen.filter(s => s.phase === "develop").every(s => !s.tools.includes("custom_echo"))).toBe(true);
     expect((await runtime.runs.service.snapshot("local")).runs).toHaveLength(1);
-    expect(await runtime.runs.inspectCapability<import("@actspace/tool-runtime").ToolRuntime, boolean>("tools.runtime", tools => !!tools?.registry.listDefinitions().some(d => d.name === "custom_echo"), "local")).toBe(true);
+    expect(await runtime.runs.inspectCapability(TOOL_RUNTIME_SERVICE, tools => !!tools?.registry.listDefinitions().some(d => d.name === "custom_echo"), "local")).toBe(true);
     phase = "use"; step = 0;
     expect(await runtime.runs.run("local", { agentRunId: "use-run", content: "Use it", model: "test" })).toMatchObject({ outcome: "completed" });
     expect(seen.filter(s => s.phase === "use").every(s => s.tools.includes("custom_echo"))).toBe(true);

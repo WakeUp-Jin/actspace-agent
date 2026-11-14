@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { AuthorizationDecision, HarnessAuthorizer } from "@actspace/harness-control";
 import type { EvolutionAuthorization } from "@actspace/plugin-manager";
 import type { ToolExecutionContext } from "@actspace/tool-runtime";
-import type { ApprovalRequest } from "@actspace/shared/runtime-v2";
+import { coreEvent, type ApprovalRequest, type CoreEventDataMap } from "@actspace/shared/runtime-v2";
 import type { AgentRuntimeHostPort } from "./agent-host-port.js";
 import type { RuntimeSessionController } from "../session/session-controller.js";
 
@@ -29,7 +29,8 @@ export class EvolutionApproval {
       reasons: [{ code: "HARNESS_EVOLUTION", message: `${input.phase === "initialize" ? "加载并初始化候选插件（同进程可信代码）" : "为当前会话的后续消息启用新 Harness"}：${input.purpose}\n版本：${input.candidate?.executionDigest ?? input.artifactId ?? input.executionDigest ?? "historical selection"}`, risk: "high" }], resources: [], grantSuggestions: [], supportedLifetimes: ["once"], requestedAt: new Date().toISOString(), expiresAt: new Date(expiresAt).toISOString() };
     const session = this.sessions.getOpen(context.sessionId);
     if (!session) throw new Error("Evolution requires an active session");
-    const append = async (type: string, data: unknown) => { await session.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: JSON.parse(JSON.stringify(data)), surface: null } as never); await session.flush(); };
+    // Journal 只收纯 JSON，值是 undefined 的字段也会被拒。Host 给的决定先按 JSON 复制一份再写。
+    const append = async <T extends "permission/asked" | "permission/decided">(type: T, data: CoreEventDataMap[T]) => { await session.append(coreEvent(type, JSON.parse(JSON.stringify(data)) as CoreEventDataMap[T])); await session.flush(); };
     await append("permission/asked", request);
     const signal = AbortSignal.any([context.signal, AbortSignal.timeout(Math.max(1, expiresAt - Date.now()))]);
     const decision = await requestApproval(request, signal).catch(async error => {

@@ -5,9 +5,9 @@ import { LlmRouteRegistry, type LlmRouteRegistrationHandle } from "./route-regis
 import type { CredentialResolver } from "./credential-port.js";
 import { matchesModel, type LlmAdapterPrepareInput, type LlmPreparedAdapterCall, type LlmRouteRegistration, type ResolvedLlmRequest } from "./adapter.js";
 import { normalizeRetryPolicy } from "./retry-policy.js";
-import { Service } from "@actspace/cordis-adapter";
+import { requireService, Service } from "@actspace/cordis-adapter";
 import type { CordisServiceContext } from "@actspace/cordis-adapter";
-import type { LlmHostPort } from "./plugin.js";
+import { LLM_HOST_PORT, LLM_HOST_PORT_ID, LLM_SERVICE } from "./service-keys.js";
 
 export type PrepareLlmRequest = {
   readonly requestId?: string;
@@ -146,9 +146,15 @@ function cloneJson<T>(value: T): T {
   return Object.freeze(Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, cloneJson(item)]))) as T;
 }
 
+/**
+ * `LlmService` 的公开成员。`llm.service` 下注册的是包装服务，不是 `LlmService` 本身（类带私有字段，
+ * 包装服务不算它的实例），所以取用方的参数写这个类型：两者都满足。
+ */
+export type LlmServiceContract = Pick<LlmService, keyof LlmService>;
+
 /** Cordis owner for the LLM route registry and its captured provider leases. */
-export class LlmRuntimeService extends Service {
-  static inject = Object.freeze(["actspace.host.llm"]);
+export class LlmRuntimeService extends Service implements LlmServiceContract {
+  static inject = Object.freeze([LLM_HOST_PORT_ID]);
   static Config = {
     "~standard": {
       version: 1,
@@ -165,9 +171,8 @@ export class LlmRuntimeService extends Service {
   readonly registrations: readonly LlmRouteRegistrationHandle[];
 
   constructor(ctx: CordisServiceContext, _config: Record<string, unknown> = {}) {
-    super(ctx, "llm.service");
-    const host = ctx.get("actspace.host.llm") as LlmHostPort | undefined;
-    if (host === undefined) throw new Error("LLM Runtime Service requires actspace.host.llm.");
+    super(ctx, LLM_SERVICE.id);
+    const host = requireService(ctx, LLM_HOST_PORT, "LLM Runtime Service");
     this.routes = new LlmRouteRegistry();
     this.runtime = new LlmService(this.routes, host.credentials);
     const registrations = host.routes.map((route) => this.runtime.register(route));

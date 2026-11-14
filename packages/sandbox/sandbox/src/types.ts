@@ -1,3 +1,5 @@
+import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType, serviceKey } from "@actspace/cordis-adapter";
+
 /** Host port: the only place that starts processes. Sandbox plugins build on it; they never decide whether to sandbox. */
 export const SANDBOX_HOST_PORT_ID = "actspace.host.sandbox" as const;
 export const SANDBOX_SERVICE_ID = "sandbox" as const;
@@ -123,3 +125,6 @@ export interface SandboxService {
 }
 /** No options: inherited mode comes from the Host port, so a Harness composition cannot turn the sandbox off. */
 export type SandboxManagerConfig = Record<string, never>;
+
+export const SANDBOX_SERVICE = bindServiceType<SandboxService>(ACTSPACE_SERVICE_DEFINITIONS.sandbox);
+export const SANDBOX_HOST_PORT = serviceKey<SandboxHostPort>(SANDBOX_HOST_PORT_ID);

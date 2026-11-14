@@ -90,6 +90,14 @@ util/shared  composition/cordis-adapter        最底层：不依赖其他 @acts
 
 想让用户能关这个插件，还要把 `display.canDisable` 设为 `true` 并处理关闭时的行为，见[插件结构设计](../docs/design-docs/架构优化/02-插件结构设计.md)第 7 节。
 
+插件代码里有三件事只有一种写法，各有一条检查：
+
+- 取用或注册服务按服务的定义来，不按字符串 id 取出后自己断言类型（`pnpm check:service-access`）。
+- 监听干预点（`agent/request`、`tools/pre-execute` 这些）用 `onHook`（`pnpm check:harness-events`）。
+- 写 core 名下的 Session 事件用 `coreEvent`（`pnpm check:core-events`）。
+
+前两条见 [cordis-adapter 的 README](composition/cordis-adapter/README.md)，第三条见 [util 的 README](util/README.md)。
+
 ## 5. 检查
 
 ```sh
