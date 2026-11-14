@@ -221,6 +221,16 @@ describe("shell-tools ports", () => {
     await ports.dispose?.();
     await vi.waitFor(() => expect(lastHost.terminals.get(taskId!)).toMatchObject({ status: "stopped" }));
   });
+  it("accepts a cwd whose name merely starts with two dots and rejects one that leaves the workspace", async () => {
+    const outer = await workspace(); const root = join(outer, "workspace"); await mkdir(join(root, "..data"), { recursive: true }); const tmpRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot });
+    try {
+      const inside = await invoke(ports.bash, { command: "pwd", cwd: "..data", intent: "verify cwd", blockMs: 5_000 });
+      expect(inside).toMatchObject({ status: "completed" }); expect(JSON.stringify(inside)).toContain(join("workspace", "..data"));
+      const outside = await invoke(ports.bash, { command: "pwd", cwd: "..", intent: "verify cwd", blockMs: 5_000 });
+      expect(outside).toMatchObject({ status: "failed", failure: { code: "WORKSPACE_BOUNDARY_DENIED" } });
+    } finally { await ports.dispose(); }
+  });
   it("keeps large foreground Bash output out of the model surface and exposes an artifact", async () => {
     const root = await workspace(); const tmpRoot = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot });
     const result = await invoke(ports.bash, { command: "node -e \"process.stdout.write('x'.repeat(9000))\"", intent: "verify bounded output", blockMs: 5_000 });

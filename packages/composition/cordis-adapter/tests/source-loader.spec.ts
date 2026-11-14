@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -25,5 +25,15 @@ describe("explicit plugin source loading", () => {
       expect(ctx.get("example.service")).toEqual({ ready: true });
     } finally { await ctx.fiber.dispose(); }
     expect(ctx.get("example.service")).toBeUndefined();
+  });
+
+  it("admits a module whose name merely starts with two dots and rejects modules outside the plugin root", async () => {
+    const root = await mkdtemp(join(tmpdir(), "actspace-package-plugin-")); roots.push(root); const pluginRoot = join(root, "plugin"); await mkdir(pluginRoot);
+    await writeFile(join(pluginRoot, "..codec.mjs"), "export const codecs = [];\n"); await writeFile(join(root, "outside.mjs"), "export const codecs = [];\n"); await symlink(join(root, "outside.mjs"), join(pluginRoot, "linked.mjs"));
+    const manifest = (module: string): PluginManifest => ({ schemaVersion: 1, pluginId: pluginId("example.local"), version: "1.0.0", name: "Example local", runtimeContract: "actspace.runtime.v2", source: { kind: "local-path", reference: pluginRoot }, codecs: [{ module, eventTypes: [eventTypeId("plugin/example.local/state")] }], behaviors: [], contributions: { services: [], events: [eventTypeId("plugin/example.local/state")], contributions: [] } });
+    expect(await computeLocalPluginIntegrity(pluginRoot, manifest("./..codec.mjs"))).toMatch(/^sha256-[0-9a-f]{64}$/);
+    await expect(computeLocalPluginIntegrity(pluginRoot, manifest("./../outside.mjs"))).rejects.toThrow("escapes its admitted root");
+    await expect(computeLocalPluginIntegrity(pluginRoot, manifest("./linked.mjs"))).rejects.toThrow("escapes its admitted root");
+    await expect(computeLocalPluginIntegrity(pluginRoot, manifest("../outside.mjs"))).rejects.toThrow("relative public file");
   });
 });

@@ -4,9 +4,10 @@ import { mkdir, open, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { sessionScratchDirectory } from "./scratch.js";
 export { sessionScratchDirectory } from "./scratch.js";
-import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
+import * as nodePath from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
-import { toolChildEnv } from "@actspace/shared";
+import { isLexicallyInside, toolChildEnv } from "@actspace/shared";
 import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { spawnHostProcess } from "@actspace/sandbox/node-ports";
 import type { HostProcessSpec, SandboxExecution, SandboxRequest, SandboxResult, SandboxService } from "@actspace/sandbox/types";
@@ -621,7 +622,7 @@ function backgroundBoundary(blockMs: number): { readonly promise: Promise<false>
   return { promise, cancel: () => { if (timer !== undefined) clearTimeout(timer); if (immediate !== undefined) clearImmediate(immediate); } };
 }
 
-function within(root: string, candidate: string): boolean { const nested = relative(resolve(root), resolve(candidate)); return nested === "" || (!nested.startsWith("..") && !isAbsolute(nested)); }
+function within(root: string, candidate: string): boolean { return isLexicallyInside(nodePath, root, candidate, { includeRoot: true }); }
 function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, name: string): string { return typeof args[name] === "string" ? args[name] : ""; }
 function clampInteger(value: RuntimeV2JsonValue | undefined, fallback: number, min: number, max: number): number { return typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.trunc(value))) : fallback; }
 function dataImage(output: string): { readonly mediaType: string; readonly data: string } | undefined { const match = output.trim().match(/^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\r\n]+)$/i); return match?.[1] && match[2] ? { mediaType: match[1].toLowerCase(), data: match[2].replace(/\s/g, "") } : undefined; }

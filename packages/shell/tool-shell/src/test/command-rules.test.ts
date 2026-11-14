@@ -84,6 +84,9 @@ describe("Bash hard rejections", () => {
     expect(reject("mv .git elsewhere")).toContain("deletes or moves repository metadata");
     expect(reject("rm -rf dist")).toBeUndefined();
     expect(reject("rm -rf 'dist'")).toBeUndefined();
+    // 名字以两个点开头的目录在工作区里面，不是往上走。
+    expect(reject("rm -rf ..cache")).toBeUndefined();
+    expect(reject("rm -rf ..cache/../..")).toContain("escapes or targets the workspace root");
   });
 
   it("applies the delete rules to every command in a pipeline", () => {
@@ -101,5 +104,7 @@ describe("Bash hard rejections", () => {
     expect(reject("echo hi > out.txt", join(root, "sub"))).toBeUndefined();
     expect(reject("echo hi > ../out.txt", join(root, "sub"))).toBeUndefined();
     expect(reject("echo hi > ../../out.txt", join(root, "sub"))).toContain("temp directory");
+    expect(reject("echo hi > ..out.txt")).toBeUndefined();
+    expect(reject("echo hi > ..cache/out.txt")).toBeUndefined();
   });
 });

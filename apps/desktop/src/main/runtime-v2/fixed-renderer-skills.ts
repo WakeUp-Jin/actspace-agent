@@ -1,7 +1,8 @@
 import { officialSkillsRoot, OFFICIAL_SKILLS_VERSION } from "@actspace/official-skills";
 import { cp, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import type { SkillInstallResult, SkillListResult, SkillUninstallResult } from "@actspace/shared";
+import * as nodePath from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { isLexicallyInside, type SkillInstallResult, type SkillListResult, type SkillUninstallResult } from "@actspace/shared";
 
 type SkillCandidate = {
   readonly id: string;
@@ -29,7 +30,7 @@ export async function listFixedRendererSkills(input: {
     { path: join(input.homeDir, ".claude", "skills"), source: "claude-user", scope: "user" as const },
     { path: officialSkillsRoot, source: `actspace-official@${OFFICIAL_SKILLS_VERSION}`, scope: "official" as const },
   ];
-  const managedRoot = `${resolve(input.dataRoot, "skills")}${sep}`;
+  const managedRoot = resolve(input.dataRoot, "skills");
   const disabled = new Set(input.disabled);
   const seen = new Set<string>();
   const items: SkillListResult["items"] = [];
@@ -42,7 +43,7 @@ export async function listFixedRendererSkills(input: {
       items.push({
         ...candidate,
         status: "available",
-        removable: `${resolve(candidate.directory)}${sep}`.startsWith(managedRoot),
+        removable: isInside(managedRoot, candidate.directory),
         enabledForAgent: !disabled.has(candidate.id) && !disabled.has(candidate.name),
         shadowed,
       });
@@ -123,7 +124,7 @@ async function readSkill(path: string, source: string, scope: "project" | "user"
   return { id, name, description, source, location: path, directory, scope };
 }
 
+/** 严格在 `root` 下面：`root` 本身不算，卸载时不能把整个用户 Skill 目录删掉。 */
 function isInside(root: string, target: string): boolean {
-  const path = relative(root, target);
-  return path !== "" && !path.startsWith("..") && !path.startsWith(sep);
+  return isLexicallyInside(nodePath, root, target, { includeRoot: false });
 }

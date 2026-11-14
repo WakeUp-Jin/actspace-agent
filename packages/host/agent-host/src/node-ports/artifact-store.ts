@@ -1,7 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative } from "node:path";
+import * as nodePath from "node:path";
+import { join } from "node:path";
+import { isLexicallyInside } from "@actspace/shared";
 import type { ToolArtifactOwner, ToolArtifactRef } from "@actspace/tool-runtime";
 import { VerifiedContent } from "../verified-content.js";
 
@@ -59,7 +61,7 @@ export class NodeArtifactStore {
     if (!/^[0-9a-f-]{36}$/i.test(artifactId)) throw new Error("Invalid artifact id.");
     const path = join(this.root, artifactId);
     const [root, file, metadataFile] = await Promise.all([realpath(this.root), realpath(path), realpath(`${path}.json`)]);
-    for (const target of [file, metadataFile]) { const nested = relative(root, target); if (nested.startsWith("..") || isAbsolute(nested)) throw new Error("Artifact escapes the store root."); }
+    for (const target of [file, metadataFile]) if (!isLexicallyInside(nodePath, root, target, { includeRoot: true })) throw new Error("Artifact escapes the store root.");
     return { file, metadataFile };
   }
   async resolveForSession(sessionId: string, artifactId: string): Promise<{ readonly path: string; readonly mediaType: string }> { const stored = await this.readForSession(sessionId, artifactId); return { path: await realpath(join(this.root, artifactId)), mediaType: stored.mediaType }; }

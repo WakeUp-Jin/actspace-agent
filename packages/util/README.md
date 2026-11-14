@@ -11,7 +11,7 @@ kind: "package-group"
 
 | 包 | 角色 | 类别 | 默认 | 职责 |
 | --- | --- | --- | --- | --- |
-| `shared` | 库 | 库 | — | 跨进程协议与类型：IPC、Host 协议、会话与上下文投影类型、模型配置与目录、浏览器桥接、英语学习协议；几乎所有能力包都依赖它 |
+| `shared` | 库 | 库 | — | 跨进程协议与类型：IPC、Host 协议、会话与上下文投影类型、模型配置与目录、浏览器桥接、英语学习协议；外加几个到处要用的纯函数（数据目录、子进程环境变量、路径包含判断）；几乎所有能力包都依赖它 |
 | `diagnostics` | 库 | 库 | — | `BootDiagnostics`：记录启动诊断，对授权、密钥、令牌等字段做 `[REDACTED]` 脱敏 |
 
 ## 包之间怎么连
@@ -26,6 +26,7 @@ kind: "package-group"
 - `shared` 里两组体量最大的类型各占一个目录，目录内再按主题分文件，`index.ts` 只做转出：
   - `shared/src/ipc/`：桌面 renderer ⇄ main 的 IPC 契约，按通道分 `bootstrap`、`models`、`composer`、`approvals`、`sessions`、`workspace-git`、`workspace-files`、`artifacts`、`usage`、`local-update`、`plugins`。**只有客户端表面能引用**（`apps/*`、`packages/client/*`、`packages/host/*`），`pnpm check:packages` 会检查其他能力包有没有从 `@actspace/shared` 拿这里的名字。
   - `shared/src/session/`：前后端共用的会话领域模型，分 `primitives`（id 别名、错误、费用）、`attachments`、`events`（持久化事件与 payload、`SessionMeta`、`AgentRunResult`）、`stream-events`（`RuntimeStreamEvent`）、`tool-preview`（工具与子 Agent 的 UI 预览）、`context`（上下文用量与状态）、`message-block`（聊天渲染块、diff 汇总）。
+- `shared/src/path-containment.ts`：「一个路径是不是在某个目录里面」只在这里实现一次。`isLexicallyInside(rules, root, candidate, { includeRoot })` 回答是或否，路径就是根目录本身时算不算必须写明；`relativePathInside(rules, root, candidate)` 在里面时返回相对路径，不在里面返回 `null`。`shared` 自己不引 `node:path`，路径规则由调用方传：Node 里传 `node:path`，界面里传 `pathe`。两个函数只比较字面，不解析符号链接，要防符号链接指到外面，先对两边做 realpath。别处不要再手写 `relative(...).startsWith("..")` 这类判断：`pnpm check:path-containment`（`scripts/check-path-containment.mjs`，CI 里随 `pnpm test:scripts` 跑）会报出来；确实要保留的文件记在那个脚本的 `ALLOWED` 里，写明理由和处数。
 - 测试：`pnpm --filter @actspace/shared test`、`pnpm --filter @actspace/diagnostics test`。
 
 ## 怎么扩展

@@ -40,6 +40,7 @@
 
 ## 文件系统访问控制
 
+- **路径包含判断只有一份实现**：判断「一个路径在不在某个目录里面」一律用 `@actspace/shared` 的 `isLexicallyInside` / `relativePathInside`（`packages/util/shared/src/path-containment.ts`），不手写 `relative(...).startsWith("..")`：这种写法会把 `..notes.md` 这样的合法名字当成越界，写死 `../` 的在 Windows 上又拦不住。这两个函数只比较字面；要防符号链接指到目录外面，先对两边做 `realpath` 再比。路径就是目录本身时算不算在里面，调用时必须写明（`includeRoot`）：删除、覆盖这类操作的目标填 `false`。`pnpm check:path-containment` 在 CI 里拦手写的写法。
 - **文件工具边界**：v2 Tool Runtime 在审批前 canonicalize file resource，并由 `default/full-access`、敏感分类、Tool Permission 与 Host capability 合并决策；`default` 的 workspace 外读写需要审批，Desktop 可对非敏感核心文件签发当前 Session/当前主 Agent 的 exact 或显式 subtree Grant，CLI 不签发或消费。Grant 仍按 action/access/audience/policyVersion 和当前资源完整覆盖复验；`full-access` 只扩大非敏感文件范围。executor 在 syscall 前重新解析并核对已准入资源，路径、目标类型、Grant 或符号链接状态变化时 fail-closed。
 - **Bash 边界**：Bash 默认要求批准；本地 Desktop 主 Agent 可显式签发当前会话、当前工作区的命令前缀授权，后续符合工具规则的简单命令可复用。硬拒绝优先于授权，复杂语法、排除参数及申请出沙箱（`sandbox_permissions: "require_escalated"`）的命令不复用；`full-access` 不扩大工作目录范围。前缀授权不是只读保证，包含项目脚本，只在命令会进沙箱执行时提供。Bash 经 Harness `sandbox` 服务执行（macOS：nono，其次 Seatbelt），`full-access` 下不进沙箱；其他模式下出沙箱必须附 `justification` 并每次批准；沙箱缺失或不可用时转审批并标为“真实环境”，不会静默在沙箱外执行，详见[沙箱设计](design-docs/execution-safety/agent-沙箱设计.md)。详见 [前缀授权方案](exec-plans/completed/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md)。
 - **读类工具边界**：v2 Tool Runtime 由 Host capability、Session permission mode 和 plugin manifest 共同约束读写范围；不得沿用 v1 的任意主 Agent 读边界。
@@ -59,7 +60,7 @@
 - **工作区访问入口**：renderer 传来的 `workspaceRoot` 一律经 `main/workspace-access.ts` 解析，不再直接 `resolve`。
   - 「MD 文档」面板的文件列表与读取、Git context、Skills 列表、工作区文件右键菜单走 `resolveWorkspaceAccess`：请求路径 realpath 后必须**等于** registry 中某个条目或某个已存在本地会话 `workspaceRoot`（含 worktree）的 realpath，子目录也不行；否则抛 `workspace_not_registered`。后续操作都基于返回的 realpath root。
   - `createSession` 只接受 registry 中的 root；`createWorkspaceFolder` 的父目录必须是用户最近一次在系统对话框中选中的目录（建成功后作废），或者通过上面的校验。
-  - root 内的路径用 `path.relative` 判断包含（合法文件名 `..foo` 不算越界），再对目标或其最近的已存在祖先做 realpath，确认仍在 root 内；指向 root 外的 symlink 返回 `escapes_root`，也不会泄露外部路径是否存在。
+  - root 内的路径用上面的共享实现判断包含（合法文件名 `..foo` 不算越界），再对目标或其最近的已存在祖先做 realpath，确认仍在 root 内；指向 root 外的 symlink 返回 `escapes_root`，也不会泄露外部路径是否存在。
 - 顶部 Environment 的分支创建、Commit、Push，以及“在编辑器中打开”都是 main-owned 本机能力。Renderer 只能传稳定 action / tool id；main 每次都把 `workspaceRoot` 解析回 workspace registry 或已有 session 中登记的路径，再使用固定 Git argv 或固定应用映射执行，不能让 renderer 用任意绝对路径、应用名或 argv 扩大能力边界。
 
 ## 真实模型调用

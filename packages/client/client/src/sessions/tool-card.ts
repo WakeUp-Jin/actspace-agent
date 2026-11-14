@@ -1,9 +1,10 @@
 import { isAbsolute, relative, resolve } from "pathe";
-const sep = "/";
-import { subagentActivationStatusLabel, type ToolUiPreview } from "@actspace/shared";
+import { relativePathInside, subagentActivationStatusLabel, type PathRules, type ToolUiPreview } from "@actspace/shared";
 import type { RuntimeV2JsonValue, RuntimeV2ToolView, SubagentKind, SubagentView } from "@actspace/shared/runtime-v2";
 type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
 type FileChangeStats = { readonly additions: number; readonly deletions: number };
+/** 界面里不能用 `node:path`。pathe 两种分隔符都认，输出统一成 `/`，Windows 的路径也能比。 */
+const PATH_RULES: PathRules = { relative, isAbsolute, sep: "/" };
 
 export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefined, data: EventRecord, call: EventRecord | undefined, child: { childSessionId: string; presetId: string; status: string; model?: string; subagent?: SubagentView } | undefined, sessionId: string, agentRunId: string, phase: "streaming" | "prepared" | "running" | "finished" = "finished", workspaceRoot?: string, fileChangeStats?: FileChangeStats, background?: { readonly status: string }, describeAgent?: (agentId: string) => string | undefined): ToolUiPreview {
   data = { ...(tool?.approvalMode ? { approvalMode: tool.approvalMode } : {}), ...(tool?.approvalReason ? { approvalReason: tool.approvalReason } : {}), ...data };
@@ -153,14 +154,13 @@ function nonNegative(value: RuntimeV2JsonValue | undefined): number { return typ
 export function workspaceDisplayPath(path: string, workspaceRoot?: string): string {
   if (!path || !workspaceRoot) return path;
   const absolute = resolve(workspaceRoot, path);
-  const local = relative(workspaceRoot, absolute);
-  return local === "" ? "." : local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local) ? absolute : local;
+  const local = relativePathInside(PATH_RULES, workspaceRoot, absolute);
+  return local === null ? absolute : local || ".";
 }
 
 function workspaceOutputMetadata(path: string, workspaceRoot?: string): { outputPath?: string; outputRelativePath?: string } {
   if (!path || !workspaceRoot) return {};
   const absolute = resolve(workspaceRoot, path);
-  const local = relative(workspaceRoot, absolute);
-  if (local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local)) return {};
-  return { outputPath: absolute, outputRelativePath: local || "." };
+  const local = relativePathInside(PATH_RULES, workspaceRoot, absolute);
+  return local === null ? {} : { outputPath: absolute, outputRelativePath: local || "." };
 }

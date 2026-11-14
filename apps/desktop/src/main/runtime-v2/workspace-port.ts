@@ -1,4 +1,6 @@
-import { isAbsolute, relative, resolve } from "node:path";
+import * as nodePath from "node:path";
+import { resolve } from "node:path";
+import { isLexicallyInside } from "@actspace/shared";
 
 export type DesktopWorkspaceFacts = {
   readonly workspaceRoot: string;
@@ -19,8 +21,7 @@ export class DesktopWorkspacePort {
 
   resolveInside(path: string): string {
     const target = resolve(this.root, path);
-    const fromRoot = relative(this.root, target);
-    if (fromRoot.startsWith("..") || isAbsolute(fromRoot)) {
+    if (!isLexicallyInside(nodePath, this.root, target, { includeRoot: true })) {
       throw new Error("Path escapes the active Desktop workspace.");
     }
     return target;

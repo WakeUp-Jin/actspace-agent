@@ -1,6 +1,8 @@
 import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import * as nodePath from "node:path";
+import { resolve } from "node:path";
+import { isLexicallyInside, relativePathInside } from "@actspace/shared";
 
 /**
  * Hard rejections that apply in every permission mode. The command is split the way the shell would split it, so
@@ -55,8 +57,8 @@ function classify(simple: SimpleCommand, cwd: string, workspaceRoot: string): st
     for (const target of targets) {
       if (SHELL_GLOB_RE.test(target)) return "Delete command uses a glob target.";
       if (isCriticalPath(target)) return "Command contains a dangerous delete target.";
-      const nested = relative(workspaceRoot, resolve(cwd, target));
-      if (nested === "" || nested === ".." || nested.startsWith(`..${sep}`) || isAbsolute(nested)) return "Delete command escapes or targets the workspace root.";
+      const nested = relativePathInside(nodePath, workspaceRoot, resolve(cwd, target));
+      if (nested === null || nested === "") return "Delete command escapes or targets the workspace root.";
       if (nested.split(/[\\/]+/).includes(".git")) return "Delete command targets repository metadata.";
     }
   }
@@ -80,8 +82,7 @@ function isAllowedOutputTarget(target: Word, cwd: string, workspaceRoot: string)
 }
 
 function isWithin(parent: string, child: string): boolean {
-  const nested = relative(parent, child);
-  return nested !== "" && nested !== ".." && !nested.startsWith(`..${sep}`) && !isAbsolute(nested);
+  return isLexicallyInside(nodePath, parent, child, { includeRoot: false });
 }
 
 let cachedTempRoots: readonly string[] | undefined;

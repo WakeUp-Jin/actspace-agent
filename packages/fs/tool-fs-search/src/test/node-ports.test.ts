@@ -21,6 +21,14 @@ describe("filesystem-search ports", () => {
     const grep = await invoke(ports.grep, { pattern: "needle", path: "src", glob: "*.ts" }); expect(JSON.stringify(grep)).toContain("src/old.ts:1:");
     const glob = await invoke(ports.glob, { pattern: "*.ts", path: "src" }); const text = JSON.stringify(glob); expect(text.indexOf("src/new.ts")).toBeLessThan(text.indexOf("src/old.ts"));
   });
+  it("searches a directory whose name merely starts with two dots and still rejects paths that leave the workspace", async () => {
+    const outer = await workspace(); const root = join(outer, "workspace"); await mkdir(join(root, "..data"), { recursive: true }); await writeFile(join(root, "..data", "note.ts"), "export const value = 'needle';\n"); await writeFile(join(outer, "outside.ts"), "export const value = 'needle';\n");
+    const ports = createNodeToolPorts({ workspaceRoot: root });
+    const grep = await invoke(ports.grep, { pattern: "needle", path: "..data" }); expect(JSON.stringify(grep)).toContain("..data/note.ts:1:");
+    const glob = await invoke(ports.glob, { pattern: "*.ts", path: "..data" }); expect(JSON.stringify(glob)).toContain("..data/note.ts");
+    const outside = await invoke(ports.grep, { pattern: "needle", path: ".." });
+    expect(outside).toMatchObject({ status: "failed" }); expect(JSON.stringify(outside.modelOutput)).toContain("Path escapes workspace boundary");
+  });
 });
 describe("filesystem-search output decoding", () => {
   it("keeps a multi-byte character whole when ripgrep's output arrives split inside it", async () => {
