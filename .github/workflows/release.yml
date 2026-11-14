@@ -89,8 +89,8 @@ jobs:
       # - Linux：pnpm store 和 Go 编译缓存 ci.yml 都在 main 上存过（key 相同），这里直接命中。
       # - macOS / Windows：没有任何 job 在 main 上存。发版（tag）时必然读不到，存下来也只落在别的运行读不到的
       #   tag 作用域里，两样都不开。PR 上同一个 PR 的后续推送读得到：Go 编译缓存每个平台 14 MB，命中后少编
-      #   7–18 秒，开；pnpm store 每个平台近 200 MB，恢复后再安装并不比直接下载安装快多少（darwin-x64 快十来秒，
-      #   另外两个平台一样），第一次还要花 10–50 秒压缩上传，不开。
+      #   7–18 秒，开；pnpm store 每个平台近 200 MB，恢复后再安装和直接下载安装用时相当（在同一台 runner 上
+      #   交替测过），第一次还要花 10–50 秒压缩上传，不开。
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
