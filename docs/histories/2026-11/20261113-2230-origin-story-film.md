@@ -87,3 +87,56 @@
 - `apps/promo-video/scripts/lib/soundtrack.mjs`、`scripts/test/{origin,soundtrack}.test.mjs`
 - `apps/promo-video/ORIGIN_STORY.md`、`apps/promo-video/README.md`
 - `docs/ARCHITECTURE.md`
+
+---
+
+## [2026-11-15 00:45] | Task: 按反馈再换一次《诞生记》的配乐
+
+### 🤖 Execution Context
+
+- **Agent ID**: `cursor-cloud-agent`
+- **Base Model**: `Claude Fable 5.2`
+- **Runtime**: `Cursor Cloud Agent`
+
+### 📥 User Query
+
+> 这个 BGM 有点重复，又有点刺耳，有那种嗡嗡嗡的声音，换一首 BGM 会更合适一点。
+
+### 🛠 Changes Overview
+
+**Scope:** `apps/promo-video`（《诞生记》的配乐、分镜时长、片尾署名）；`docs/ARCHITECTURE.md`
+
+**Key Actions:**
+
+- **配乐**：换成 Josh Woodward《Orbit (Instrumental Version)》（专辑《Addressed to the Stars》，CC BY 4.0，Free Music Archive），木吉他扫弦。成片从第一下扫弦用到余音收完，不剪接，开头不淡入。
+- **署名**：这一首要署名。片尾卡的署名行带上曲名、作者、作者的网站和授权（`soundtrack.js` 多一个 `site` 字段，单测守着这四样都有值）；发布时简介里要加的两行写在 ORIGIN_STORY.md 第 9 节。
+- **分镜按新曲重排**：94 拍/分，一小节 2.553 秒。全片还是 59.5 小节，一小节比上一首短，成片从 174.1 秒变成 151.9 秒。分镜的顺序和画面内容没有改；`cues.js` 里三个分镜的小节数变了：「越长越多」8 → 8.5、「再长一遍」6 → 4.5，是因为曲子的第二段整段晚半小节；「较真」6 → 7，是为了让第三句话落在全曲最响的那一句上。换章节落在曲子起新一句的地方；曲线断崖对新一句的开头，「做减法」对全曲最轻的间奏，片尾卡上的几行字对最后几下渐慢的扫弦。这些对应关系由 `scripts/test/origin.test.mjs` 守着。
+- **封面**不变：冷开场的最后一帧，导出的 PNG 和上一版逐字节相同（现在在第 10.1 秒）。
+- **文档**：ORIGIN_STORY.md 的分镜表、配乐、发布三节按新曲重写；宣传片 README、`docs/ARCHITECTURE.md` 的时长、授权和署名要求同步；混音代码里补上限幅器的注释。
+
+### 🧠 Design Intent (Why)
+
+前两次都是按风格挑曲子，两次都没挑对。这一次反馈给了三个具体的毛病，所以先把毛病变成能量的东西，把《Blue Skies》量一遍确认，再拿同样的指标去筛：
+
+- 「嗡嗡嗡」：120 Hz 以下的低频比 120 Hz 到 8 kHz 加起来还响 2.6 dB；粗糙度平均 0.35 asper，22% 的时间超过 0.6。
+- 「刺耳」：尖锐度峰值 5.5 acum；5 kHz 以上平时几乎没有东西，偶尔冒出来的一下比平时高 42 dB。
+- 「重复」：任取 4 秒，前面 16 秒里几乎总有和声一模一样的一段（相似度中位数 0.99）。
+
+候选池是 Free Music Archive 的下载榜和各流派收藏榜里，授权为 CC0、公有领域或 CC BY、页面标着不是 AI 生成、时长合适的 753 首，全部下载量过。《Orbit》在这三条上都和上一首隔得很远：低频比其余频段轻 13.6 dB，粗糙度平均 0.06，尖锐度峰值 2.5，和声相似度中位数 0.76。成片里的音轨又量了一遍，和原文件基本一样。
+
+没有说满的地方，文档里照实写了：我听不到声音，这些数只能说明新曲没有那三个毛病的成因，不能说明它好听；这把吉他夹着变调夹弹在高音区（作者的曲目页写的是夹在第 10 品），平时的尖锐度比上一首略高，少的是尖峰；它是一首有段落的歌，和弦进行会回来。它在 FMA 上也不热门，这次是按指标选的，不是按人气。
+
+换来的代价是署名。上一首是 CC0；这一首是 CC BY 4.0，作者在自己网站上写明署名里要留曲名、他的名字和网站，YouTube 上没署名的视频会被认领。所以片尾卡的署名行加了网站，发布时要贴的两行写进了文档，并写了免署名授权的价格。
+
+仍然只出一版。备选列了三首风格各不相同的（另一首木吉他独奏、巴赫 C 大调前奏曲的键盘独奏、一首 FMA 归在民谣的曲子），都带试听链接和授权；它们和《Orbit》骨架不同，换哪一首都要重排分镜，文档里写明了。
+
+中段没有变慢：小节数没变，一小节更短。重排之后量过，除片尾卡外没有哪一段画面静止超过 3.3 秒。
+
+顺带记两个坑。吉他扫弦的峰值比平均响度高得多，加了固定增益后最重的几下会过载，靠管线里原有的限幅器压回去（不到 2% 的时间，最多 3.5 dB 左右）；在它动得最多的四段上量过带不带它的差别，粗糙度的平均值差不到 0.002 asper，尖锐度不变。用 ffmpeg 的 `freezedetect` 找静止画面时，噪声阈值取 0.0008 会把划线这种小面积变化当成静止，调到 0.0001 才分得出来。
+
+### 📁 Files Modified
+
+- `apps/promo-video/src/origin/{soundtrack,cues}.js`、`src/origin/scenes/{opening,firstdays,growth,rewrite,discipline,ending}.js`
+- `apps/promo-video/scripts/lib/soundtrack.mjs`（注释）、`scripts/test/origin.test.mjs`
+- `apps/promo-video/ORIGIN_STORY.md`、`apps/promo-video/README.md`
+- `docs/ARCHITECTURE.md`
