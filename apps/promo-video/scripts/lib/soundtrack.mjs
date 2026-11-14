@@ -60,7 +60,7 @@ export async function measureLoudness(file, { offset, seconds }) {
 
 /**
  * 混音参数：从曲子的 offset 秒取 seconds 秒，调到目标响度，头尾淡入淡出。
- * fadeIn：从曲子中段切入的片子要淡入得长一点，默认 0.3 秒。
+ * fadeIn：从曲子中段切入的片子要淡入得长一点，默认 0.3 秒；从曲子第一个音用起的片子给 0，不淡入。
  * @returns {{ input: string[], output: string[] }} 分别接在 ffmpeg 的输入段和输出段
  */
 export function audioArgs({ file, offset, seconds, loudness, fadeIn = FADE_IN }) {
@@ -69,7 +69,8 @@ export function audioArgs({ file, offset, seconds, loudness, fadeIn = FADE_IN })
   const filters = [
     `volume=${gain.toFixed(2)}dB`,
     "alimiter=limit=0.84:level=false",
-    `afade=t=in:d=${fadeIn}`,
+    // ffmpeg 把 afade 的 d=0 当成「没写」，会按默认淡入 1 秒，所以不淡入时不能带这个滤镜。
+    ...(fadeIn > 0 ? [`afade=t=in:d=${fadeIn}`] : []),
     `afade=t=out:st=${(seconds - fadeOut).toFixed(3)}:d=${fadeOut.toFixed(3)}`,
   ];
   return {
