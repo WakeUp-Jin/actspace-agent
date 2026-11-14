@@ -91,16 +91,16 @@ Desktop main     CLI adapter
 type ToolPermissionContract = {
   readonly grantAudience?: GrantAudience;
   extractResources(
-    args: Readonly<Record<string, RuntimeV2JsonValue>>,
+    args: Readonly<Record<string, RuntimeJsonValue>>,
     context: ResourceExtractionContext,
   ): readonly ToolResource[];
   evaluate(
-    args: Readonly<Record<string, RuntimeV2JsonValue>>,
+    args: Readonly<Record<string, RuntimeJsonValue>>,
     resources: readonly ToolResource[],
     context: ToolPermissionContext,
   ): ToolPermissionDecision | Promise<ToolPermissionDecision>;
   suggestGrants?(
-    args: Readonly<Record<string, RuntimeV2JsonValue>>,
+    args: Readonly<Record<string, RuntimeJsonValue>>,
     resources: readonly ToolResource[],
     context: ToolPermissionContext,
   ): readonly ToolGrantSuggestion[];

@@ -1,6 +1,7 @@
 import { access, readFile, readdir } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { TRANSITIONAL_NAME } from "./check-transitional-names.mjs";
 
 export const currentTruthFiles = [
   "AGENTS.md",
@@ -83,6 +84,7 @@ const forbiddenCurrentClaims = [
   { pattern: /schema\s*(?:=\s*)?9\b|user_version\s*=\s*9\b/g, message: "仍把 SQLite 读模型写成 schema 9（以 usage-read-model-schema.ts 的 user_version 为准）", allowHistoricalLine: true },
   { pattern: /`billingMode`/g, message: "仍描述已删除的连接级 billingMode", allowHistoricalLine: true },
   { pattern: /\/Users\/[A-Za-z0-9_.-]+\//g, message: "仍包含个人机器的绝对路径" },
+  { pattern: TRANSITIONAL_NAME, message: "仍使用改名前的标识符（名字里带 V2 的那一类）；node scripts/check-transitional-names.mjs --write <这份文档> 可以直接改", allowHistoricalLine: true },
 ];
 
 /** Design docs outside the truth list still must not restate retired facts; links are checked separately. */

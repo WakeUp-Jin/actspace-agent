@@ -182,6 +182,7 @@ const SCOPE_FILES = {
   "packages/a/src/clean.ts": "export type Json = RuntimeJsonValue;\n",
   "scripts/check-transitional-names.mjs": BAD,
   "scripts/test/transitional-names-check.test.mjs": BAD,
+  "scripts/test/current-docs.test.mjs": BAD,
   "packages/a/dist/value.js": BAD,
   "packages/a/build/value.js": BAD,
   "packages/a/coverage/value.js": BAD,
@@ -214,7 +215,7 @@ const SCANNED = [
   "scripts/tool.mjs",
 ];
 
-test("scans TypeScript and JavaScript under the four roots, tests included, but not build output or this check", (t) => {
+test("scans TypeScript and JavaScript under the four roots, tests included, but not build output or the files that spell out old names", (t) => {
   const root = tempRepo(t, SCOPE_FILES);
   assert.deepEqual(runCheck(root, []), {
     files: SCANNED.length + 1,
@@ -298,4 +299,8 @@ test("every listed exception is unique and says why it is allowed", () => {
     assert.ok(Number.isInteger(entry.count) && entry.count > 0, entry.file);
     assert.ok(entry.reason.trim().length > 0, entry.file);
   }
+});
+
+test("the repository has no old names outside the listed exceptions", () => {
+  assert.deepEqual(runCheck().errors, []);
 });

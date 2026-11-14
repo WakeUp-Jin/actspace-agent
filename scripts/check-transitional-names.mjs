@@ -13,6 +13,7 @@
 // 扫描 apps/、packages/、scripts/、browser-bridge/ 下的 TypeScript 和 JavaScript 源码，含测试，不含构建产物。
 // 只按文本找「整个标识符」，不区分代码、注释和字符串：注释和字符串里写旧名字也会报。
 // 确实要保留的记在下面的 ALLOWED 里，按「文件、名字、处数」记，每条写明理由；处数多了少了都失败。
+// 文档不在这里查：`pnpm check:docs`（check-current-docs.mjs）用同一个模式查设计文档和当前事实文档，讲历史的那一行除外。
 //
 // 加 `--write` 按同一张表直接改名（跳过 ALLOWED 里的）。分支落后于改名的提交时，合并之后跑一次，再跑 `pnpm typecheck`。
 // `--write` 后面可以跟路径，只改这些文件或目录，这时 Markdown 也改：
@@ -24,8 +25,12 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ROOTS = ["apps", "packages", "scripts", "browser-bridge"];
 const SKIP_DIRS = new Set(["node_modules", "dist", "dist-electron", "build", "out", "coverage", "release"]);
-/** 这份脚本和它的用例要把旧名字写出来。 */
-const SELF = new Set(["scripts/check-transitional-names.mjs", "scripts/test/transitional-names-check.test.mjs"]);
+/** 这几个文件要把旧名字写出来：这份脚本、它的用例、文档检查的用例。整份不查，`--write` 也不改。 */
+const EXEMPT_FILES = new Set([
+  "scripts/check-transitional-names.mjs",
+  "scripts/test/transitional-names-check.test.mjs",
+  "scripts/test/current-docs.test.mjs",
+]);
 
 /** 名字里的这三段去掉 `V2`，其余不动。 */
 const FAMILY = [
@@ -57,7 +62,8 @@ export const ALLOWED = [
 ];
 
 const WORD = "[A-Za-z0-9_$]";
-const CANDIDATE = new RegExp(
+/** 匹配一个完整的旧名字。带 `g` 标志，只用在 `matchAll` 和 `replace` 里。文档检查（check-current-docs.mjs）也用它。 */
+export const TRANSITIONAL_NAME = new RegExp(
   `(?<!${WORD})(?:${WORD}*(?:${FAMILY.map(([from]) => from).join("|")})${WORD}*|${[...RENAMES.keys()].join("|")})(?!${WORD})`,
   "g",
 );
@@ -80,7 +86,7 @@ function lineOf(text, index) {
 /** 返回文本里的旧名字，一处一个：`{ name, line, replacement }`。 */
 export function findTransitionalNames(text) {
   const found = [];
-  for (const match of text.matchAll(CANDIDATE)) {
+  for (const match of text.matchAll(TRANSITIONAL_NAME)) {
     const replacement = replacementFor(match[0]);
     if (replacement !== null) found.push({ name: match[0], line: lineOf(text, match.index), replacement });
   }
@@ -89,7 +95,7 @@ export function findTransitionalNames(text) {
 
 /** 把文本里的旧名字换成新名字；`keep` 里的名字不动。 */
 export function renameTransitionalNames(text, keep = new Set()) {
-  return text.replace(CANDIDATE, (name) => (keep.has(name) ? name : (replacementFor(name) ?? name)));
+  return text.replace(TRANSITIONAL_NAME, (name) => (keep.has(name) ? name : (replacementFor(name) ?? name)));
 }
 
 function keptNames(file, allowed) {
@@ -130,7 +136,7 @@ function isTextFile(name) {
 
 function addFile(start, accept, out) {
   const file = start.split(path.sep).join("/");
-  if (accept(path.basename(start)) && !SELF.has(file)) out.push(file);
+  if (accept(path.basename(start)) && !EXEMPT_FILES.has(file)) out.push(file);
 }
 
 function walk(root, dir, accept, out) {
