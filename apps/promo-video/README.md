@@ -5,7 +5,7 @@
 | 片子 | 时长 | 讲什么 | 渲染 |
 | --- | --- | --- | --- |
 | 产品宣传片（默认） | 71 秒 | 它是什么、核心特点、怎么用、接下来 | `render` |
-| 《ActSpace 诞生记》 | 2 分 54 秒 | 头 176 天是怎么做出来的：第一夜、后端重写、做减法、较真 | `render --film origin` |
+| 《ActSpace 诞生记》 | 2 分 32 秒 | 头 176 天是怎么做出来的：第一夜、后端重写、做减法、较真 | `render --film origin` |
 
 片子清单在 `src/films.js`。成片和配乐都不入库（`out/`、`.cache/`），需要时在本机重新生成。
 
@@ -16,10 +16,10 @@
 ```bash
 pnpm install
 pnpm --filter @actspace/promo-video render                  # 产品宣传片，约 6 分钟，输出 apps/promo-video/out/actspace-promo.mp4
-pnpm --filter @actspace/promo-video render --film origin    # 《诞生记》，约 10 分钟，输出 apps/promo-video/out/actspace-origin.mp4
+pnpm --filter @actspace/promo-video render --film origin    # 《诞生记》，约 8 分钟，输出 apps/promo-video/out/actspace-origin.mp4
 ```
 
-第一次渲染会把配乐下载到 `.cache/music/`（5 – 7 MB）。调画面时不用每次都整片渲染。下面的命令默认对产品宣传片；加 `--film origin` 就换成《诞生记》，预览页相应是 `?film=origin`，单帧导出到 `out/stills-origin/`：
+第一次渲染会把配乐下载到 `.cache/music/`（每首约 6 MB）。调画面时不用每次都整片渲染。下面的命令默认对产品宣传片；加 `--film origin` 就换成《诞生记》，预览页相应是 `?film=origin`，单帧导出到 `out/stills-origin/`：
 
 ```bash
 pnpm --filter @actspace/promo-video music                           # 只下载配乐，预览页要用
@@ -65,7 +65,7 @@ pnpm --filter @actspace/promo-video test                            # 镜头、�
 
 《The Good Times》，HoliznaCC0，专辑《Be Happy With Who You Are》，[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)（公有领域，可商用，不要求署名）。来源：<https://freemusicarchive.org/music/holiznacc0/be-happy-with-who-you-are/the-good-times/>。
 
-曲目信息、下载地址和从第几秒开始用，都写在 `src/soundtrack.js`。渲染时 `scripts/lib/soundtrack.mjs` 取出成片长度的一段，量出响度后加一个固定增益调到 -16 LUFS（不做动态压缩），头尾淡入淡出。
+曲目信息、下载地址和从第几秒开始用，都写在 `src/soundtrack.js`。渲染时 `scripts/lib/soundtrack.mjs` 取出成片长度的一段，量出响度后加一个固定增益调到 -16 LUFS，后面接一个限幅器，只压加了增益会过载的峰值（不做别的动态压缩），头尾淡入淡出。
 
 曲子是 90 拍/分，成片从它的第 2 小节开始用，几个落点是对着曲子的结构排的：鼓进来的那一拍是品牌亮相；只剩和声的间奏落在「一切皆插件」；鼓回来时「怎么用」里的桌面端刚好启动。
 
@@ -92,11 +92,12 @@ pnpm --filter @actspace/promo-video render --music ~/Downloads/another.mp3 --mus
 | `src/origin/shared.js`、`src/origin/styles/` | 贯穿全片的时间轴、代码量曲线，和这部片子自己的样式 |
 | `scripts/origin-stats.mjs` | 对着截止提交把 `data.js` 里的数重新数一遍 |
 
-配乐是 HoliznaCC0 的《Blue Skies》（专辑《Lazy Summer Lofi》），[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)，可商用，不要求署名，和宣传片的配乐是同一位作者。来源：<https://freemusicarchive.org/music/holiznacc0/lazy-summer-lofi-1/blue-skiesmp3/>。
+配乐是 Josh Woodward 的《Orbit (Instrumental Version)》（专辑《Addressed to the Stars》），一首木吉他曲，[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)，可商用。来源：<https://freemusicarchive.org/music/Josh_Woodward/Addressed_to_the_Stars_1995/JoshWoodward-Orbit-NoVox_1885/>。
 
-和宣传片不同的两点：
+和宣传片不同的三点：
 
-- **长度按小节写，不按拍。** 这首曲子 82 拍/分，一小节 2.927 秒；成片把它从第 0 秒用到最后一个音，不剪接。分镜长度一律写成小节数，换章节对着曲子换段落（鼓进来、鼓停下、鼓回来、尾奏）；这个对应关系由 `scripts/test/origin.test.mjs` 守着。
+- **配乐要署名。** 宣传片的配乐是 CC0；这一首是 CC BY，作者要求署名里留着曲名、他的名字和他的网站。片尾卡最下面一行就是署名（`src/origin/scenes/ending.js`）；发布时简介里还要加的那两行，见 ORIGIN_STORY.md 第 9 节。
+- **长度按小节写，不按拍。** 这首曲子 94 拍/分，一小节 2.553 秒；成片把它从第一下扫弦用到余音收完，不剪接。分镜长度一律写成小节数，换章节对着曲子起新一句的地方，几个要紧的画面对着曲子的段落（进第二段、间奏、最响的一句）；这个对应关系由 `scripts/test/origin.test.mjs` 守着。
 - **数字来自仓库自己。** `node scripts/origin-stats.mjs` 读的是 git 历史和 `docs/histories/`，需要完整的克隆。它只在更新数字时手动跑，渲染和预览都不依赖它。
 
 ## 它是怎么做出来的
