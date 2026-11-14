@@ -10,6 +10,8 @@
 // 已有的出现次数记在 scripts/hot-path-reads-baseline.json（按文件、按规则）。超过基线就失败：
 // 新代码不要这样写；确实在低频路径上（打开会话、导出、恢复、用户点一次的操作），在同一行或上一行写
 // `perf-allow: <理由>` 注释，就不计数。改掉旧写法后基线变小，运行时会提示可以更新基线。
+// 按整份源码匹配，不按行：一次调用被格式化工具折成几行（括号后换行、末尾补逗号）照样认得出来。
+// 折成几行的调用，「同一行」指调用开头到匹配结束之间的任意一行；注释写在调用的上一行最稳妥。
 // 更新基线：node scripts/check-hot-path-reads.mjs --update-baseline（只在确实删掉了旧写法时用）。
 import fs from "node:fs";
 import path from "node:path";
@@ -25,25 +27,40 @@ export const RULES = [
   { id: "full-read", pattern: /\.readEvents\(\s*\)/g },
   { id: "journal-events", pattern: /\bjournal\.events(?![\w$(])/g },
   // 方法定义和接口声明（参数带类型标注）不算调用。
-  { id: "inspect-events", pattern: /\binspectSessionEvents\((?![\w$]+\s*:)/g },
-  { id: "per-entry-read", pattern: /\breadEvents\(\s*([\w$.]+)\s*,\s*\1\s*\+\s*1\s*\)/g },
+  { id: "inspect-events", pattern: /\binspectSessionEvents\((?!\s*[\w$]+\s*:)/g },
+  { id: "per-entry-read", pattern: /\breadEvents\(\s*([\w$.]+)\s*,\s*\1\s*\+\s*1\s*,?\s*\)/g },
   { id: "json-roundtrip", pattern: /JSON\.parse\(\s*JSON\.stringify\(/g },
   { id: "structured-clone", pattern: /\bstructuredClone\(/g },
 ];
 
 const ALLOW = /perf-allow:\s*\S/;
 
-/** 一个文件的源码 → { 规则: 次数 }。同一行或上一行带 `perf-allow: 理由` 的不计。 */
+/** 一个文件的源码 → { 规则: 次数 }。匹配到的那几行或开头的上一行带 `perf-allow: 理由` 的不计。 */
 export function countSource(source) {
   const lines = source.split("\n");
-  const counts = {};
-  lines.forEach((line, index) => {
-    if (ALLOW.test(line) || (index > 0 && ALLOW.test(lines[index - 1]))) return;
-    for (const rule of RULES) {
-      const hits = line.match(rule.pattern)?.length ?? 0;
-      if (hits) counts[rule.id] = (counts[rule.id] ?? 0) + hits;
+  const allowed = lines.map((line) => ALLOW.test(line));
+  const lineStarts = [0];
+  for (const line of lines) lineStarts.push(lineStarts.at(-1) + line.length + 1);
+  /** 第几行（从 0 起）包含源码的第 `offset` 个字符。 */
+  const lineAt = (offset) => {
+    let low = 0;
+    let high = lines.length - 1;
+    while (low < high) {
+      const middle = (low + high + 1) >> 1;
+      if (lineStarts[middle] <= offset) low = middle;
+      else high = middle - 1;
     }
-  });
+    return low;
+  };
+  const counts = {};
+  for (const rule of RULES) {
+    for (const match of source.matchAll(rule.pattern)) {
+      const first = lineAt(match.index);
+      const last = lineAt(match.index + match[0].length - 1);
+      if (allowed.slice(Math.max(0, first - 1), last + 1).includes(true)) continue;
+      counts[rule.id] = (counts[rule.id] ?? 0) + 1;
+    }
+  }
   return counts;
 }
 

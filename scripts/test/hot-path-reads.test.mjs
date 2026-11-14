@@ -36,6 +36,53 @@ test("an empty perf-allow reason does not count as allowed", () => {
   assert.deepEqual(countSource("const all = journal.readEvents(); // perf-allow:"), { "full-read": 1 });
 });
 
+test("counts calls that the formatter wrapped over several lines", () => {
+  const source = [
+    "for (const event of session.journal.iterateEvents(",
+    ")) {}",
+    "const all = journal.readEvents(",
+    ");",
+    "entries.flatMap((entry) =>",
+    "  journal.readEvents(",
+    "    entry.sequence,",
+    "    entry.sequence + 1,",
+    "  ),",
+    ");",
+    "const copy = JSON.parse(",
+    "  JSON.stringify(aVeryLongExpressionThatDoesNotFitOnOneLine),",
+    ");",
+    "const journal = await registry.inspectSessionEvents(",
+    "  input.sessionId,",
+    ");",
+  ].join("\n");
+  assert.deepEqual(countSource(source), { "full-iterate": 1, "full-read": 1, "per-entry-read": 1, "json-roundtrip": 1, "inspect-events": 1 });
+});
+
+test("a wrapped declaration is still not a call, and a wrapped bounded read is still bounded", () => {
+  const source = [
+    "inspectSessionEvents(",
+    "  sessionId: string,",
+    "): Promise<readonly Event[]>;",
+    "journal.readEvents(",
+    "  entry.sequence,",
+    "  entry.sequence + 2,",
+    ");",
+    "journal.iterateEvents(",
+    "  start,",
+    ");",
+  ].join("\n");
+  assert.deepEqual(countSource(source), {});
+});
+
+test("perf-allow covers a wrapped call from the line above or from any line of the match, not from later lines", () => {
+  const wrapped = (first, second, third) => [`const copy = JSON.parse(${first}`, `  JSON.stringify(value),${second}`, `);${third}`].join("\n");
+  assert.deepEqual(countSource(`// perf-allow: 导出时拷一次\n${wrapped("", "", "")}`), {});
+  assert.deepEqual(countSource(wrapped(" // perf-allow: 导出时拷一次", "", "")), {});
+  assert.deepEqual(countSource(wrapped("", " // perf-allow: 导出时拷一次", "")), {});
+  assert.deepEqual(countSource(wrapped("", "", " // perf-allow: 导出时拷一次")), { "json-roundtrip": 1 });
+  assert.deepEqual(countSource(`// perf-allow: 导出时拷一次\n\n${wrapped("", "", "")}`), { "json-roundtrip": 1 });
+});
+
 test("fails above the baseline and suggests tightening below it", () => {
   const { problems, notices } = compareWithBaseline(
     { "a.ts": { "full-read": 2 }, "b.ts": { "structured-clone": 1 } },
