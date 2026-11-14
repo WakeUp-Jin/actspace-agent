@@ -1,5 +1,5 @@
 /**
- * 《ActSpace 诞生记》的分镜顺序。每个分镜的时长写在 cues.js 里（按配乐的和弦数），这里只管先后。
+ * 《ActSpace 诞生记》的分镜顺序。每个分镜的时长写在 cues.js 里（按配乐的小节数），这里只管先后。
  * 讲什么、为什么这么排、每个数字的出处，见 ORIGIN_STORY.md。
  */
 import "./styles/shared.css";

@@ -74,7 +74,7 @@ const stats = [
   .join("");
 
 // 状态与官网首页「方向」一致：只有上下文管理引擎标「已上线」，其余如实标「进行中」。
-// 三个方向比「它还在长。」晚一个和弦，一拍进来一个（一个和弦六拍）。
+// 三个方向比「它还在长。」晚半小节，一拍进来一个（一小节四拍）。
 const directions = [
   ["live", "已上线", "上下文管理引擎"],
   ["wip", "进行中", "Harness 自进化"],
@@ -82,7 +82,7 @@ const directions = [
 ]
   .map(
     ([status, label, name], index) =>
-      `<li class="rise" style="${at(tally.beat(3 + index / 6))}"><em class="status status-${status}">${label}</em>${name}</li>`,
+      `<li class="rise" style="${at(tally.beat(2.5 + index / 4))}"><em class="status status-${status}">${label}</em>${name}</li>`,
   )
   .join("");
 
@@ -104,6 +104,12 @@ export const lookingBack = {
     ${axis(tallyTrip)}`,
 };
 
+// 尾奏只有零星几个音：第 0.75 小节有一个，然后空大半小节，从第 1.5 小节起是最后一句。
+// 链接对前面那个音，那句话对最后一句的头一个音，配乐署名再晚半小节。
+const LINKS = closing.beat(0.75);
+const MOTTO = closing.beat(1.5);
+const CREDIT = closing.beat(2);
+
 export const closingCard = {
   id: "closing",
   duration: closing.duration,
@@ -115,10 +121,10 @@ export const closingCard = {
       <img class="o-closing-mark pop" style="${at(0.6)}" src="${markUrl}" alt="">
       <h1 class="display o-closing-line">${lines(["它不是一次做对的，", "是一遍一遍<em>改</em>出来的。"], 0.9, { step: 0.22 })}</h1>
       <div class="o-closing-links">
-        <p class="rise" style="${at(closing.beat(1))}"><span>开源</span><b>github.com/WakeUp-Jin/actspace-agent</b></p>
-        <p class="rise" style="${at(closing.beat(1, 0.25))}"><span>官网</span><b>actspace.top</b></p>
+        <p class="rise" style="${at(LINKS)}"><span>开源</span><b>github.com/WakeUp-Jin/actspace-agent</b></p>
+        <p class="rise" style="${at(LINKS + 0.25)}"><span>官网</span><b>actspace.top</b></p>
       </div>
-      <p class="o-closing-motto fade" style="${at(closing.beat(1, 0.9))}">「不诱于誉，不恐于诽，率道而行，端然正己。」</p>
-      <p class="o-closing-credit fade" style="${at(closing.beat(1, 1.3))}">配乐（节选）：${soundtrack.credit}</p>
+      <p class="o-closing-motto fade" style="${at(MOTTO)}">「不诱于誉，不恐于诽，率道而行，端然正己。」</p>
+      <p class="o-closing-credit fade" style="${at(CREDIT)}">配乐：《${soundtrack.title}》 ${soundtrack.artist}（${soundtrack.license}）</p>
     </div>`,
 };

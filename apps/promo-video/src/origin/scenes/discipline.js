@@ -3,8 +3,8 @@ import { at, axis, between, chapter, journey, lines, timing } from "../shared.js
 const less = timing("less");
 const crisis = timing("crisis");
 
-// 做出来又删掉的功能：[名称, 出现在第几天, 删掉在第几天, 出现日期, 删掉日期, 第几个和弦上划掉]。起止都能在 docs/histories/ 里找到对应的记录。
-// Kairos 八月重写时就没带过来，所以一出场就划掉；11 月 1 日那三个落在第 1 个和弦上；Lab 是四天后删的，留到最后一个和弦。
+// 做出来又删掉的功能：[名称, 出现在第几天, 删掉在第几天, 出现日期, 删掉日期, 第几小节上划掉]。起止都能在 docs/histories/ 里找到对应的记录。
+// Kairos 八月重写时就没带过来，所以一出场就划掉；11 月 1 日那三个落在第 1 小节上；Lab 是四天后删的，留到最后一小节。
 const removed = [
   ["Kairos 自治模式", 7, 95, "05-27", "08-23", 0],
   ["Lab 实验页", 8, 169, "05-28", "11-05", 3],
@@ -51,17 +51,23 @@ export const subtraction = {
 };
 
 // 三句话都摘自 docs/histories/2026-11/ 对应记录的「User Query」，省略处用省略号标出。
-// 第一句晚一拍进来：上一个分镜这时还没淡完，同一块位置叠两行字会糊。
+// 六小节，一小节进来一样：三句话、第三句的后半句、回答、两条检查。
+// 第一句晚一点：上一个分镜这时还没淡完，同一块位置叠两行字会糊。
+const REST = crisis.beat(3);
+const ANSWER = crisis.beat(4);
+const CHECKS = crisis.beat(5);
 const said = [
   ["11-05 00:03", "桌面端内存到 600 左右，用起来卡。"],
   ["11-07 06:00", "之前出现的 bug，为什么又出现了，没有写测试代码吗？"],
-  ["11-07 19:00", "这次因为代码规范不到位，写出了近 3G 的内存占用……确保下次不再出现。"],
-].map(([time, text], index) => ({ time, text, start: crisis.beat(index, index === 0 ? 0.56 : 0) }));
+  ["11-07 19:00", "这次因为代码规范不到位，写出了近 3G 的内存占用……", "确保下次不再出现。"],
+].map(([time, text, rest], index) => ({ time, text, rest, start: crisis.beat(index, index === 0 ? 0.56 : 0) }));
 
 const quotes = said
-  .map(({ time, text, start }, index) => {
-    const dim = `--dim:${(said[index + 1]?.start ?? crisis.beat(3)).toFixed(3)}s;`;
-    return `<li class="o-said" style="${at(start)}${dim}"><time>${time}</time><q>${text}</q></li>`;
+  .map(({ time, text, rest, start }, index) => {
+    const dim = `--dim:${(said[index + 1]?.start ?? ANSWER).toFixed(3)}s;`;
+    const later = rest ? `--more:${REST}s;` : "";
+    const tail = rest ? `<br><span>${rest}</span>` : "";
+    return `<li class="o-said" style="${at(start)}${dim}${later}"><time>${time}</time><q>${text}${tail}</q></li>`;
   })
   .join("");
 
@@ -76,9 +82,9 @@ export const pushback = {
     <div class="o-crisis">
       <p class="eyebrow rise" style="${at(0.1)}"><b>摘自开发记录</b><i></i>开发者当时对 Agent 说的话</p>
       <ol class="o-saids">${quotes}</ol>
-      <div class="o-crisis-answer rise" style="${at(crisis.beat(3))}">
+      <div class="o-crisis-answer rise" style="${at(ANSWER)}">
         <p>于是，多了一份规范，和两条每次提交都要跑的检查。</p>
-        <code>pnpm check:hot-path-reads</code><code>pnpm check:scale-tests</code>
+        <code class="rise" style="${at(CHECKS)}">pnpm check:hot-path-reads</code><code class="rise" style="${at(CHECKS + 0.18)}">pnpm check:scale-tests</code>
       </div>
     </div>
     ${axis(crisisTrip)}`,

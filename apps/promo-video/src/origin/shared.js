@@ -4,13 +4,13 @@ import { curve, totals } from "./data.js";
 
 export { at, lines, markUrl };
 
-/** 入场动画要走一小段才看得清，所以比和弦早起一点，字正好在拍子上到位。 */
+/** 入场动画要走一小段才看得清，所以比重拍早起一点，字正好在拍子上到位。 */
 const EARLY = 0.12;
 
-/** 取一个分镜的时间表：duration 是时长，beat(n) 是它的第 n 个和弦对应的入场时刻（秒，可再加偏移）。 */
+/** 取一个分镜的时间表：duration 是时长，beat(n) 是它的第 n 小节对应的入场时刻（秒，可再加偏移）。 */
 export function timing(id) {
-  const { duration, at: chordAt } = cue(id);
-  return { duration, beat: (slot, shift = 0) => Number(Math.max(0, chordAt(slot) + shift - EARLY).toFixed(3)) };
+  const { duration, at: barAt } = cue(id);
+  return { duration, beat: (slot, shift = 0) => Number(Math.max(0, barAt(slot) + shift - EARLY).toFixed(3)) };
 }
 
 const AXIS_WIDTH = 1680;

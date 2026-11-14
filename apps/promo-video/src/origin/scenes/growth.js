@@ -6,8 +6,9 @@ const CHART = 360;
 const grow = timing("grow");
 const again = timing("again");
 
-// 头两周东西落得最密，所以前两个和弦只走到第 17 天，后面三个和弦走完剩下两个月。
-const growTrip = journey("grow", [[0.5, 3], [grow.beat(2), 17], [grow.beat(5, -0.4), 83], [grow.duration, 83]]);
+// 头两周东西落得最密，所以前三小节只走到第 17 天，后面四小节走完剩下两个月，最后一小节留给那句结论。
+const TOTAL = grow.beat(7);
+const growTrip = journey("grow", [[0.5, 3], [grow.beat(3), 17], [TOTAL - 0.4, 83], [grow.duration, 83]]);
 
 // [日期, 第几天, 做出了什么]。日期取自 docs/roadmap.md 的里程碑和 docs/histories/ 里对应的记录。
 const built = [
@@ -38,15 +39,15 @@ export const growing = {
   html: `
     <div class="grain"></div>
     ${chapter("03", "越长越多")}
-    <h2 class="display-m o-growth-title">${lines(["然后，它开始长。"], 0.2, { out: grow.beat(5, -0.5) })}</h2>
-    <h2 class="display-m o-growth-title">${lines(["不到三个月，<em>11 万行</em>代码。"], grow.beat(5))}</h2>
+    <h2 class="display-m o-growth-title">${lines(["然后，它开始长。"], 0.2, { out: TOTAL - 0.5 })}</h2>
+    <h2 class="display-m o-growth-title">${lines(["不到三个月，<em>11 万行</em>代码。"], TOTAL)}</h2>
     ${counter(growTrip.codeKeys)}
     <ul class="o-chips">${chips(growTrip, built)}</ul>
     ${chart(growTrip, { height: CHART })}
     ${axis(growTrip, { chartHeight: CHART })}`,
 };
 
-// 头两个和弦（间奏）走到第 116 天，主题回来的那一下钉住「它开始写自己」；第 140 天重新越过重写前的高度，落在第 4 个和弦上。
+// 头两小节走到第 116 天，钉住「它开始写自己」；第 140 天重新越过重写前的高度，落在第 4 小节上。
 const againTrip = journey("again", [
   [0.4, 102],
   [again.beat(2), 116],
