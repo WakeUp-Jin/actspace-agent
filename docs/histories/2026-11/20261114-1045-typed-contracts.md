@@ -114,6 +114,8 @@
 
 另外两处数字是那次提交时的，后来变了：检查扫的文件数 1,466 → 1,468，脚本用例 15 → 16 条（`8622ae7c`）。
 
+`118f580a`（这个 PR 的文档提交）写 `packages/` 下六份 README「各自写明对应的检查命令」。写了命令的是五份；`packages/composition/README.md` 没有写，它指向 `cordis-adapter` 的 README，命令在那一份里。
+
 ### 📁 Files Modified
 
 - `packages/util/shared/src/runtime-v2/core-events.ts`（新增）与测试；`apps/desktop/src/renderer/test/core-event-types.test.ts`（新增）
