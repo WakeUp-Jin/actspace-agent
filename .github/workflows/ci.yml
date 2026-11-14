@@ -152,6 +152,7 @@ jobs:
 
       # desktop 单包 300 多个测试文件、CPU 时间 6 min 以上，单台 4 vCPU runner 要 2 min 多；按文件数切到三台。
       # 片数只由上面的 matrix 决定，这里和 job 名都取 strategy.job-total。
+      # 加片数之前先数并发：账户同时只能跑 20 个 job，各工作流全部触发时已经是 21 个（见 docs/CICD.md）。
       - name: Test
         run: pnpm --filter @actspace/desktop exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
