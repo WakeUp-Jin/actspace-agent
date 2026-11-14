@@ -8,7 +8,7 @@
 |---|---|---|
 | [`perf-memory-conventions.md`](perf-memory-conventions.md) | 性能与内存：高频路径的工作量、只读数据不复制、同一份内容只存一份、缓存与轮询、流式渲染，以及怎么验证 | 写或改每次请求、流式片段、每帧渲染、IPC 轮询、审批、工具调用会经过的代码之前 |
 | [`frontend-style-scope-conventions.md`](frontend-style-scope-conventions.md) | 前端样式作用域、全局 CSS 与组件样式的归属边界、样式覆盖类 bug 的排查方式 | 改样式之前 |
-| [`lint-conventions.md`](lint-conventions.md) | Biome lint 的命令、规则分层（error / warn / off）、单处抑制写法和不强制的格式化 | 提交前跑 `pnpm lint` 报错时，或想调整规则时 |
+| [`lint-conventions.md`](lint-conventions.md) | Biome lint 和格式化的命令、规则分层（error / warn / off）、单处抑制写法和强制的格式化 | 提交前跑 `pnpm lint`、`pnpm format:check` 报错时，或想调整规则时 |
 
 ## 什么时候在这里加文件
 

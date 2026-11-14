@@ -84,6 +84,10 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # 只检查不改写；报错时在本地跑 pnpm format 再提交。
+      - name: Format check
+        run: pnpm format:check
+
       # 先 tsc -b 全部 packages（既是构建也是类型检查），再对 apps 和图外的两个包跑 tsc --noEmit。
       - name: Typecheck
         run: pnpm typecheck

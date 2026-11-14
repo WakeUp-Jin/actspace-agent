@@ -1,15 +1,16 @@
 # Lint 与格式化约定
 
-仓库用 [Biome](https://biomejs.dev) 做通用 lint；配置在根目录 `biome.jsonc`，每条偏离默认值的规则旁边都写了原因。仓库特有的约束（包边界、IPC 通道、设计 token、热路径读取等）仍由 `scripts/check-*.mjs` 负责，Biome 不替代它们。
+仓库用 [Biome](https://biomejs.dev) 做通用 lint 和格式化；配置在根目录 `biome.jsonc`，每条偏离默认值的规则旁边都写了原因。仓库特有的约束（包边界、IPC 通道、设计 token、热路径读取等）仍由 `scripts/check-*.mjs` 负责，Biome 不替代它们。
 
 ## 命令
 
 | 命令 | 做什么 | 什么时候跑 |
 | --- | --- | --- |
-| `pnpm lint` | 全库 lint，只输出并只在 error 级诊断上失败 | 提交前；CI `workspace-checks` 会跑 |
+| `pnpm lint` | 全库 lint，只输出并只在 error 级诊断上失败 | 提交前；CI 的 `lint-typecheck` 会跑 |
 | `pnpm lint:report` | 按规则汇总所有 error / warning / info 的数量 | 想看存量债务，或清零某条规则准备升级为 error 时 |
 | `pnpm exec biome lint --write <path>` | 应用安全自动修复；加 `--unsafe` 才会删未使用 import 之类 | 修自己改动的文件 |
-| `pnpm format` | 只格式化相对 `main` 改过的文件 | 可选；格式化不进 CI |
+| `pnpm format` | 全库格式化：写两遍，再检查一遍 | 提交前 |
+| `pnpm format:check` | 只检查格式，不改文件 | CI 的 `lint-typecheck` 会跑 |
 
 Biome 读取 `.gitignore`，`dist/`、`node_modules/` 等不会被扫描。检查范围只有 `apps/`、`packages/`、`scripts/`、`browser-bridge/`；`docs/` 下的 demo、`test-fixtures/`、`.html` 和 `.astro` 不在范围内（Biome 看不到 Astro 模板里的引用，会误报未使用 import）。
 
@@ -32,4 +33,38 @@ dangerouslySetInnerHTML={{ __html: html }}
 
 ## 格式化
 
-`biome.jsonc` 里格式化已配置（双引号、分号、2 空格、行宽 120），但**不强制**：存量代码大量单行超 200 字符，全库格式化会制造巨大 diff。`pnpm format` 只处理相对 `main` 改过的文件；对一个只改了几行的大文件运行它会重排整个文件，是否这么做自行判断。不要为了格式化单独提交全库改动。
+格式是强制的：双引号、分号、2 空格缩进、行宽 120。CI 的 `lint-typecheck` 跑 `pnpm format:check`，有文件不符合就失败；提交前跑 `pnpm format`。
+
+**范围。** 和 lint 相同的四个目录下的 JS、TS（含 JSX）和 YAML。CSS、JSON、Markdown 不格式化；两个由脚本生成、检查时逐字节比较的文件除外，文件名和原因写在 `biome.jsonc`。
+
+**为什么写两遍。** Biome 2.6.6 对两类写法一遍到不了稳定结果：返回类型里带多行对象类型的函数签名，和以多行参数结尾的成员调用链（`vi.fn().mockResolvedValue({ … })`）。第一遍的输出第二遍还会再改，只跑一遍 `biome format --write` 可能留下 CI 会报的文件。`pnpm format` 连写两遍再检查一遍，检查不过就失败。
+
+**格式化会碰到的几样东西。** 它只改排版，但下面这些认的是「行」或「字节」：
+
+- 只管下一行的注释指令（`// @ts-expect-error`、`// biome-ignore`、`// perf-allow`）。一条语句折成几行之后，指令要写在出错的那一行上面：对象字面量里出错的那个字段、JSX 里出错的那个标签，不要写在整条语句上面。没用上的 `@ts-expect-error` 由 `pnpm typecheck` 报出来。
+- 读源码的检查脚本和测试。按语法或整份文本匹配，不要假设一条语句写在一行里。
+- JSX 里紧挨着表达式或标签的行尾空格会被写成 `{" "}`，显示的文字不变。
+- 按源码字节记摘要的生成文件。格式化改到它们覆盖的源码时要重新生成：`pnpm gen:contract-matrix`（Agent 契约矩阵）、`pnpm build:browser-locator`（Browser Bridge 定位运行时）。
+
+**改格式化选项或升级 Biome。** 两者都会重排存量代码。重排单独放一个提交，整个提交只有 `pnpm format` 的输出，提交说明里写明怎么复现。
+
+### 格式化提交之前拉出去的分支
+
+直接合并 `main`，自己改过、又被重排的地方会冲突，要手工在两种排版之间取舍。按下面的顺序做，格式化这一步不产生冲突。命令里的哈希是 2026-11-14 那次全量格式化的：`1d68d3e8` 是格式化前的最后一个提交，`d26331ad` 是只含格式化的那个提交。
+
+```bash
+git fetch origin
+# 1. 合并格式化前的最后一个提交。这里出现的冲突是内容冲突，照常解决。
+git merge 1d68d3e8
+pnpm install
+# 2. 把自己分支上的代码也格式化。这时还没有新的 pnpm format，直接调 Biome，写两遍。
+pnpm exec biome format --write . && pnpm exec biome format --write .
+git commit -am "按 Biome 配置格式化"
+# 3. 合并格式化提交，整个保留自己这边。
+git merge-base --is-ancestor 1d68d3e8 HEAD && git merge -s ours d26331ad
+# 4. 合并其余的提交。
+git merge origin/main
+pnpm format:check
+```
+
+第 3 步用 `-s ours`：前两步做完，自己这边已经是格式化之后的样子。`-s ours` 会丢掉对方的全部内容，所以只能用在只含格式化的那一个提交上，而且必须先合并过它的上一个提交；命令的前半句检查的就是这一点。

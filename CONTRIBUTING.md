@@ -15,7 +15,7 @@
 
 ## 发起 Pull Request 之前
 
-- 运行 `npm run ci` 和 `pnpm lint`。
+- 运行 `npm run ci`、`pnpm lint` 和 `pnpm format`。
 - 如果本次改动涉及代码或仓库流程，补齐或更新对应 history。
 - 如果变更对用户可感知，补齐 release note。
 - 确认示例、脚本、说明文档和当前实现一致。

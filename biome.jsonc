@@ -20,7 +20,8 @@
       "!**/*.astro"
     ]
   },
-  // 格式化只配置、不强制：CI 只跑 lint；`pnpm format` 只格式化相对 main 改过的文件。
+  // 格式化是强制的：CI 跑 `pnpm format:check`，提交前跑 `pnpm format`。
+  // 改这里的选项或升级 Biome 会重排存量代码，做法见 docs/coding-standards/lint-conventions.md 的「格式化」。
   "formatter": {
     "enabled": true,
     // 下面两个文件由脚本生成，检查时和重新生成的结果逐字节比较，排版由生成脚本决定：

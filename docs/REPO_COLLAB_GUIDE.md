@@ -80,7 +80,7 @@
 
 - 只改需要改的；不顺手"改进"相邻代码、注释或格式，不重构没出问题的东西。
 - 匹配已有代码风格，即使你会用不同方式写。
-- 自己的改动产生的废弃 import / 变量 / 函数必须清理；原来就存在的死代码，提一嘴但不要动。提交前跑 `pnpm lint`（Biome，规则见 `docs/coding-standards/lint-conventions.md`）。
+- 自己的改动产生的废弃 import / 变量 / 函数必须清理；原来就存在的死代码，提一嘴但不要动。提交前跑 `pnpm lint` 和 `pnpm format`（Biome，规则见 `docs/coding-standards/lint-conventions.md`）。
 - 每一行变更都应能直接追溯到用户的需求。
 
 ### 目标驱动执行
