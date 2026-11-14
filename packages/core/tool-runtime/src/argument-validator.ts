@@ -1,39 +1,39 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { JsonSchema } from "./definition.js";
 import { ToolRuntimeError } from "./errors.js";
 
 export function materializeToolArguments(
   schema: JsonSchema,
   input: unknown,
-): Readonly<Record<string, RuntimeV2JsonValue>> {
+): Readonly<Record<string, RuntimeJsonValue>> {
   const value = cloneJson(input, "$");
   applyDefaults(schema, value);
   validateSchema(schema, value, "$", true);
   if (value === null || typeof value !== "object" || Array.isArray(value)) fail("$", "Tool arguments must be an object.");
-  return deepFreeze(value as Record<string, RuntimeV2JsonValue>);
+  return deepFreeze(value as Record<string, RuntimeJsonValue>);
 }
 
-function applyDefaults(schema: JsonSchema, value: RuntimeV2JsonValue): void {
+function applyDefaults(schema: JsonSchema, value: RuntimeJsonValue): void {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    const record = value as Record<string, RuntimeV2JsonValue>;
+    const record = value as Record<string, RuntimeJsonValue>;
     const properties = isRecord(schema.properties) ? schema.properties : {};
     for (const [key, childSchema] of Object.entries(properties)) {
       if (!isRecord(childSchema)) continue;
       if (!(key in record) && childSchema.default !== undefined) record[key] = cloneJson(childSchema.default, `$/defaults/${escapePointer(key)}`);
-      if (key in record) applyDefaults(childSchema, record[key] as RuntimeV2JsonValue);
+      if (key in record) applyDefaults(childSchema, record[key] as RuntimeJsonValue);
     }
   } else if (Array.isArray(value) && isRecord(schema.items)) {
     for (const item of value) applyDefaults(schema.items, item);
   }
 }
 
-function validateSchema(schema: JsonSchema, value: RuntimeV2JsonValue, path: string, root = false): void {
+function validateSchema(schema: JsonSchema, value: RuntimeJsonValue, path: string, root = false): void {
   if (schema.const !== undefined && !deepEqual(value, schema.const)) fail(path, "Value does not match const.");
   if (Array.isArray(schema.enum) && !schema.enum.some((candidate) => deepEqual(value, candidate))) fail(path, "Value is outside enum.");
   const type = schema.type;
   if (typeof type === "string" && !matchesType(type, value)) fail(path, `Expected ${type}.`);
   if ((type === "object" || root) && value !== null && typeof value === "object" && !Array.isArray(value)) {
-    const record = value as Record<string, RuntimeV2JsonValue>;
+    const record = value as Record<string, RuntimeJsonValue>;
     const properties = isRecord(schema.properties) ? schema.properties : {};
     const required = Array.isArray(schema.required) ? schema.required.filter((item): item is string => typeof item === "string") : [];
     for (const key of required) if (!(key in record)) fail(`${path}/${escapePointer(key)}`, "Required property is missing.");
@@ -60,7 +60,7 @@ function validateSchema(schema: JsonSchema, value: RuntimeV2JsonValue, path: str
   }
 }
 
-function cloneJson(value: unknown, path: string): RuntimeV2JsonValue {
+function cloneJson(value: unknown, path: string): RuntimeJsonValue {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
   if (typeof value === "number") {
     if (!Number.isFinite(value)) fail(path, "Number must be finite.");
@@ -68,12 +68,12 @@ function cloneJson(value: unknown, path: string): RuntimeV2JsonValue {
   }
   if (Array.isArray(value)) return value.map((child, index) => cloneJson(child, `${path}/${index}`));
   if (!isRecord(value)) fail(path, "Value must be JSON-safe.");
-  const result: Record<string, RuntimeV2JsonValue> = {};
+  const result: Record<string, RuntimeJsonValue> = {};
   for (const [key, child] of Object.entries(value)) result[key] = cloneJson(child, `${path}/${escapePointer(key)}`);
   return result;
 }
 
-function matchesType(type: string, value: RuntimeV2JsonValue): boolean {
+function matchesType(type: string, value: RuntimeJsonValue): boolean {
   switch (type) {
     case "object": return value !== null && typeof value === "object" && !Array.isArray(value);
     case "array": return Array.isArray(value);

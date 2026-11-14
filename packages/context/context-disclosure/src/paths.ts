@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ContextPathState, DisclosureArtifact } from "@actspace/context-engine";
 
 export type { DisclosureArtifact, PathReference } from "@actspace/context-engine";
@@ -10,9 +10,9 @@ export interface DisclosureHost {
 }
 
 /** Candidates are hints, never proof of a file. The Host validates each candidate. */
-export function collectPathHints(value: RuntimeV2JsonValue): readonly string[] {
+export function collectPathHints(value: RuntimeJsonValue): readonly string[] {
   const hints = new Set<string>();
-  const walk = (item: RuntimeV2JsonValue): void => {
+  const walk = (item: RuntimeJsonValue): void => {
     if (typeof item === "string") {
       item = item.replace(/^\s*\d+\|/gm, " ");
       for (const match of item.matchAll(/(?:^|[\s"'`(])((?:\.{0,2}\/|[A-Za-z0-9_.-]+\/)[^\s"'`<>|]*[A-Za-z0-9_.-])/g)) hints.add(match[1].replace(/:\d+(?::\d+)?$/, ""));
@@ -21,7 +21,7 @@ export function collectPathHints(value: RuntimeV2JsonValue): readonly string[] {
     }
     if (Array.isArray(item)) { item.forEach(walk); return; }
     if (item && typeof item === "object") {
-      const record = item as Readonly<Record<string, RuntimeV2JsonValue>>;
+      const record = item as Readonly<Record<string, RuntimeJsonValue>>;
       if (record.type === "file-reference" && typeof record.relativePath === "string") hints.add(record.relativePath);
       Object.values(record).forEach(walk);
     }

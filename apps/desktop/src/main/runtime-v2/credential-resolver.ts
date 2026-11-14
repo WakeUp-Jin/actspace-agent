@@ -1,11 +1,11 @@
 import type { CredentialResolver, LlmCredential } from "@actspace/llm-service";
-import type { DesktopRuntimeV2ModelPort } from "./model-port";
+import type { DesktopRuntimeModelPort } from "./model-port";
 
 const DEFAULT_CREDENTIAL_REF = "desktop:default";
 const IMAGE_INSPECTION_CREDENTIAL_REF = "desktop:image-inspection";
 
 export class DesktopCredentialResolver implements CredentialResolver {
-  constructor(private readonly models: DesktopRuntimeV2ModelPort) {}
+  constructor(private readonly models: DesktopRuntimeModelPort) {}
 
   async resolve(credentialRef: string, signal: AbortSignal): Promise<LlmCredential> {
     if (signal.aborted) throw signal.reason ?? new Error("Credential resolution aborted.");

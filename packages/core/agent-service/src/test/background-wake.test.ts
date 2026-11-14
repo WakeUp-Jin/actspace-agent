@@ -2,17 +2,17 @@ import { AgentScope } from "@actspace/scope";
 import { describe, expect, it } from "vitest";
 import { createCoreCodecRegistry, createSessionHeader } from "@actspace/session-journal";
 import { SessionHandle } from "@actspace/session-persistence";
-import { isBackgroundWake, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { isBackgroundWake, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { taskCodecs } from "../task-events.js";
 import { TaskLedger } from "../task-ledger.js";
 import { SessionRunManager, type RunExecutionResult } from "../run-manager.js";
 
-async function fixture(options: { readonly outcome?: (content: RuntimeV2JsonValue) => RunExecutionResult; readonly canStart?: () => boolean } = {}) {
+async function fixture(options: { readonly outcome?: (content: RuntimeJsonValue) => RunExecutionResult; readonly canStart?: () => boolean } = {}) {
   const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => { registry.register(codec); });
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "wake", createdAt: "2026-10-22T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
   const ledger = await TaskLedger.open(session);
-  const state = { pending: false, executed: [] as RuntimeV2JsonValue[] };
-  const factory = { create: async (input: { readonly initial: { readonly content: RuntimeV2JsonValue } }) => ({
+  const state = { pending: false, executed: [] as RuntimeJsonValue[] };
+  const factory = { create: async (input: { readonly initial: { readonly content: RuntimeJsonValue } }) => ({
     execute: async () => { state.executed.push(input.initial.content); if (isBackgroundWake(input.initial.content)) state.pending = false; return options.outcome?.(input.initial.content) ?? { outcome: "completed" as const, value: null }; },
     dispose: async () => {},
   }) };
@@ -21,7 +21,7 @@ async function fixture(options: { readonly outcome?: (content: RuntimeV2JsonValu
   const settle = async () => { for (let i = 0; i < 20; i++) { await manager.waitForIdle(); await new Promise(resolve => setTimeout(resolve, 0)); } };
   return { manager, ledger, session, state, settle };
 }
-const wakes = (contents: readonly RuntimeV2JsonValue[]) => contents.filter(content => isBackgroundWake(content)).length;
+const wakes = (contents: readonly RuntimeJsonValue[]) => contents.filter(content => isBackgroundWake(content)).length;
 
 describe("background wake", () => {
   it("submits one wake task for an idle Session with pending notifications", async () => {

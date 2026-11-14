@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeTrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { loadTrajectoryFixture } from "../trajectory/fixtures";
 import type { TrajectoryRevealTarget } from "../trajectory";
 import { TrajectoryView } from "../components/TrajectoryView";
@@ -12,7 +12,7 @@ import { projectionFixture } from "./projection-fixture";
 import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { setupBridge } from "./helpers/bridge";
 
-const snapshot: RuntimeV2TrajectorySnapshot = {
+const snapshot: RuntimeTrajectorySnapshot = {
   kind: "trajectory",
   schemaVersion: 1,
   sessionId: "session-1",
@@ -85,7 +85,7 @@ describe("TrajectoryView", () => {
 
   it("provides the toolbar, timeline, search, and event details", async () => {
     const user = userEvent.setup();
-    const richSnapshot: RuntimeV2TrajectorySnapshot = {
+    const richSnapshot: RuntimeTrajectorySnapshot = {
       ...snapshot,
       nodes: [
         { ...snapshot.nodes[0], data: { turnId: "turn-1", stepId: "step-1" } },

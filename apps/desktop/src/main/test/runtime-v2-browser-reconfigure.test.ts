@@ -2,10 +2,10 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-const { bootDesktopRuntimeV2 } = vi.hoisted(() => ({ bootDesktopRuntimeV2: vi.fn() }));
-vi.mock("../runtime-v2/desktop-host-adapter", () => ({ bootDesktopRuntimeV2 }));
+const { bootDesktopRuntime } = vi.hoisted(() => ({ bootDesktopRuntime: vi.fn() }));
+vi.mock("../runtime-v2/desktop-host-adapter", () => ({ bootDesktopRuntime }));
 import { PendingApprovalRegistry } from "../approval-registry";
-import { DesktopRuntimeV2Registry, type DesktopRuntimeV2RegistryOptions } from "../runtime-v2/runtime-registry";
+import { DesktopRuntimeRegistry, type DesktopRuntimeRegistryOptions } from "../runtime-v2/runtime-registry";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -15,7 +15,7 @@ function deferred<T>() {
 
 describe("Browser Runtime restart admission", () => {
   const rootsToRemove: string[] = [];
-  const registries: DesktopRuntimeV2Registry[] = [];
+  const registries: DesktopRuntimeRegistry[] = [];
   afterEach(async () => {
     await Promise.all(registries.splice(0).map((registry) => registry.dispose()));
     await Promise.all(rootsToRemove.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -41,11 +41,11 @@ describe("Browser Runtime restart admission", () => {
     };
     const learning = { getState: vi.fn(() => ({ enabled: true, targetSessionId: "session" })), subscribe: vi.fn(() => vi.fn()), dispose: vi.fn(async () => {}), enableSession: vi.fn(async () => {}) };
     const shutdown = vi.fn(async () => {});
-    bootDesktopRuntimeV2.mockImplementation(async () => ({ browserReady: bridgeReady, profile: {
+    bootDesktopRuntime.mockImplementation(async () => ({ browserReady: bridgeReady, profile: {
       context: { get: (name: string) => name === "desktop.app" ? app : name === "english-learning" ? learning : name === "tools.browser" ? { available: bridgeReady, registrations: [1], definitions: [1] } : undefined },
       getState: () => ({ state: "ready", runtimeInstanceId: "test" }), shutdown,
     } }));
-    const registry = new DesktopRuntimeV2Registry({ roots: { dataRoot, workspaceRoot: join(dataRoot, "workspace"), defaultWorkspaceRoot: join(dataRoot, "workspace") }, ...(omitBrowser ? {} : { browser }), approvals, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
+    const registry = new DesktopRuntimeRegistry({ roots: { dataRoot, workspaceRoot: join(dataRoot, "workspace"), defaultWorkspaceRoot: join(dataRoot, "workspace") }, ...(omitBrowser ? {} : { browser }), approvals, loadModule: async () => ({}) } as unknown as DesktopRuntimeRegistryOptions);
     registries.push(registry);
     await registry.boot();
     return { registry, app, browser, approvals, learning, shutdown, connect: () => { bridgeReady = true; } };
@@ -116,10 +116,10 @@ describe("Browser Runtime restart admission", () => {
     await entered.promise;
     await expect(fixture.registry.submitTask("session", "submission", "blocked")).rejects.toThrow("reconnecting Chrome");
     expect(fixture.app.submitTask).not.toHaveBeenCalled();
-    expect(bootDesktopRuntimeV2).toHaveBeenCalledTimes(1);
+    expect(bootDesktopRuntime).toHaveBeenCalledTimes(1);
     release.resolve();
     expect(await switching).toBe(true);
-    expect(bootDesktopRuntimeV2).toHaveBeenCalledTimes(2);
+    expect(bootDesktopRuntime).toHaveBeenCalledTimes(2);
     expect(fixture.learning.enableSession).toHaveBeenCalledWith("session");
     expect(fixture.learning.subscribe).toHaveBeenCalledTimes(2);
     expect(fixture.browser.setRuntimeReady).toHaveBeenLastCalledWith(true);
@@ -129,7 +129,7 @@ describe("Browser Runtime restart admission", () => {
 
   it("boots and refreshes without a browser port when the plugin is off", async () => {
     const fixture = await setup(false, true);
-    expect(bootDesktopRuntimeV2.mock.calls[0][0].browser).toBeUndefined();
+    expect(bootDesktopRuntime.mock.calls[0][0].browser).toBeUndefined();
     expect(await fixture.registry.refreshBrowser()).toBe(false);
     expect(fixture.browser.getStatus).not.toHaveBeenCalled();
     expect(fixture.shutdown).not.toHaveBeenCalled();

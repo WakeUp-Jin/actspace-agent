@@ -8,16 +8,16 @@ import type { HarnessStatsData, HarnessStatsQueryInput, HarnessStatsQueryResult,
 import { Worker } from "node:worker_threads";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import type { RuntimeV2GlobalSessionSummary } from "@actspace/shared/runtime-v2";
+import type { RuntimeGlobalSessionSummary } from "@actspace/shared/runtime-v2";
 
 type QuerySource = import("@actspace/session-storage").SessionQuerySource;
-type Summary = Omit<RuntimeV2GlobalSessionSummary, "usage"> & { querySource?: QuerySource };
+type Summary = Omit<RuntimeGlobalSessionSummary, "usage"> & { querySource?: QuerySource };
 type Reader = {
   sessionQuerySource?(sessionId: string): Promise<QuerySource | null>;
   sessionQuerySources?(): Promise<import("@actspace/session-storage").SessionQueryCatalog | null>;
-  globalSessionSummaries(): Promise<readonly RuntimeV2GlobalSessionSummary[]>;
+  globalSessionSummaries(): Promise<readonly RuntimeGlobalSessionSummary[]>;
   readSessionEventBatch?(id: string, input: { cursor?: string; throughSeq: number }): Promise<{ events: readonly import("@actspace/session-journal").SessionEventEnvelopeV1[]; cursor: string; done: boolean }>;
-  inspectSession(id: string): Promise<import("@actspace/shared/runtime-v2").RuntimeV2SessionSnapshot>;
+  inspectSession(id: string): Promise<import("@actspace/shared/runtime-v2").RuntimeSessionSnapshot>;
   inspectSessionEvents(id: string): Promise<readonly import("@actspace/session-journal").SessionEventEnvelopeV1[]>;
 };
 

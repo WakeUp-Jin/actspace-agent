@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { Context } from "./types.js";
 import { contextValue, freezeContextView } from "./context-snapshot.js";
 
@@ -33,7 +33,7 @@ export class ContextSourceRegistry {
 
   async apply(base: Context, extensions: readonly ContextSource[] = []): Promise<Context> {
     let current = immutable(base);
-    const diagnostics: RuntimeV2JsonValue[] = [];
+    const diagnostics: RuntimeJsonValue[] = [];
     let toolsProvided = false;
     const all = [...this.sources.values(), ...extensions];
     for (const id of this.requiredIds) if (!all.some(source => source.id === id)) throw new Error(`Required context source ${id} is unavailable.`);

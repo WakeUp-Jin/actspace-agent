@@ -3083,7 +3083,7 @@ sessionId: input.sessionId,
     const a = createEmptySessionRecord('page-a'); a.meta.title = 'Page A';
     const b = createEmptySessionRecord('page-b'); b.meta.title = 'Page B';
     b.events = [{ id: 'v2-1', sessionId: 'page-b', agentRunId: 'rb', schemaVersion: 2, timestamp: b.meta.createdAt, type: 'user_message', payload: { content: 'B visible question' } }];
-    let resolveA!: (page: import('@actspace/shared/runtime-v2').RuntimeV2DesktopSessionProjection) => void;
+    let resolveA!: (page: import('@actspace/shared/runtime-v2').RuntimeDesktopSessionProjection) => void;
     setupBridge(taskHostFixture({
       "app.getBootstrapState": async () => bootstrapState, "workspaces.list": async () => createWorkspaceRegistryFixture(a.meta.createdAt),
       "sessions.listPage": async () => ({ items: [a, b].map(record => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0, workspaceRoot: "/tmp/workspace" })), groups: [], indexing: false, failed: 0 }),

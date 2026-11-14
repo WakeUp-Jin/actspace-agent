@@ -1,16 +1,16 @@
-import type { RuntimeV2LiveEvent } from "@actspace/shared/runtime-v2";
+import type { RuntimeLiveEvent } from "@actspace/shared/runtime-v2";
 
 export type ClientLiveOverlay = {
   readonly runtimeInstanceId: string;
   readonly liveSeq: number;
   readonly throughJournalSeq: number;
-  readonly kind: RuntimeV2LiveEvent["kind"];
+  readonly kind: RuntimeLiveEvent["kind"];
   readonly message: string | null;
   readonly callId: string | null;
-  readonly phase: RuntimeV2LiveEvent["phase"] | null;
+  readonly phase: RuntimeLiveEvent["phase"] | null;
 };
 
-export function liveOverlayFromEvent(event: RuntimeV2LiveEvent): ClientLiveOverlay {
+export function liveOverlayFromEvent(event: RuntimeLiveEvent): ClientLiveOverlay {
   return Object.freeze({
     runtimeInstanceId: event.runtimeInstanceId,
     liveSeq: event.liveSeq,

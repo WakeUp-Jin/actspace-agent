@@ -1,13 +1,13 @@
-import type { RuntimeV2JsonValue } from "./host-dto";
+import type { RuntimeJsonValue } from "./host-dto";
 export type TaskState = "pending" | "claimed" | "completed" | "failed" | "cancelled" | "interrupted";
 export type RunOutcome = "completed" | "failed" | "cancelled" | "interrupted";
 export type HarnessIdentity = { readonly harnessId: string; readonly generationId: string; readonly revision: number };
 export type TaskRecord = {
   readonly taskId: string;
   readonly submissionId: string;
-  readonly content: RuntimeV2JsonValue;
+  readonly content: RuntimeJsonValue;
   /** Durable result of a scheduling operation; ordinary Run results live on RunRecord. */
-  readonly result?: RuntimeV2JsonValue;
+  readonly result?: RuntimeJsonValue;
   readonly acceptedSeq: number;
   readonly state: TaskState;
   readonly targetRunId: string | null;
@@ -18,9 +18,9 @@ export type RunRecord = {
   readonly runId: string;
   readonly taskId: string;
   readonly harness: HarnessIdentity;
-  readonly configuration: RuntimeV2JsonValue;
+  readonly configuration: RuntimeJsonValue;
   readonly state: "running" | RunOutcome;
-  readonly result: RuntimeV2JsonValue;
+  readonly result: RuntimeJsonValue;
 };
 export type TaskSnapshot = {
   readonly sessionId: string;
@@ -79,14 +79,14 @@ export function rewindErrorMessage(error: unknown): string | undefined {
   const key = typeof code === "string" && code in REWIND_ERROR_MESSAGES ? code : fromMessage && fromMessage in REWIND_ERROR_MESSAGES ? fromMessage : undefined;
   return key ? REWIND_ERROR_MESSAGES[key] : undefined;
 }
-export type TaskContentEnvelope = { readonly kind: "composer-task"; readonly original: RuntimeV2JsonValue; readonly prepared: RuntimeV2JsonValue };
+export type TaskContentEnvelope = { readonly kind: "composer-task"; readonly original: RuntimeJsonValue; readonly prepared: RuntimeJsonValue };
 
 /** A rejected preparation is distinct from an unacknowledged network submission. */
 export type TaskSubmissionFailure = { readonly status: "submission-failed"; readonly acknowledgement: "rejected" | "unknown"; readonly message: string; readonly attachmentIssue?: import("../chat-attachments").ChatAttachmentIssue; readonly referenceIssue?: import("../composer-content").ComposerReferenceIssue };
 export type TaskSubmissionResult = TaskReceipt | TaskSubmissionFailure;
 
 /** One command interpretation for local, remote, queue and supplement admission. */
-export function taskOperation(content: RuntimeV2JsonValue): "compact" | undefined {
+export function taskOperation(content: RuntimeJsonValue): "compact" | undefined {
   let text: unknown = content;
   if (content && typeof content === "object" && !Array.isArray(content) && "kind" in content && content.kind === "composer-task") {
     const original = "original" in content ? content.original : null;
@@ -99,7 +99,7 @@ export function taskOperation(content: RuntimeV2JsonValue): "compact" | undefine
 export const BACKGROUND_WAKE_KIND = "background-wake";
 export type BackgroundWakeContent = { readonly kind: typeof BACKGROUND_WAKE_KIND };
 
-export function isBackgroundWake(content: RuntimeV2JsonValue | undefined): boolean {
+export function isBackgroundWake(content: RuntimeJsonValue | undefined): boolean {
   return !!content && typeof content === "object" && !Array.isArray(content) && "kind" in content && content.kind === BACKGROUND_WAKE_KIND;
 }
 

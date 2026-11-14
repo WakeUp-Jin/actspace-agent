@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { expect, it } from 'vitest';
 import { paginateSessionSummaries } from '@actspace/shared/session-list-page';
-import type { RuntimeV2BrowseList } from '@actspace/shared/runtime-v2';
+import type { RuntimeBrowseList } from '@actspace/shared/runtime-v2';
 it('keeps forks and unknown historical origins visible, excluding delegation before pagination', () => {
   const items = Array.from({ length: 12 }, (_, i) => ({ sessionId: `s${i}`, createdAt: '', updatedAt: String(i).padStart(2, '0'), workspaceRoot: '/a', profileId: 'test', accessState: 'read-write' as const, metadata: { title: 'test', pinned: false, archived: false }, lineage: { origin: i === 11 ? 'delegation' : i === 10 ? 'fork' : 'historical' } }));
   const first = paginateSessionSummaries({ items, indexing: false, failed: 0 }, {});
@@ -13,7 +13,7 @@ it('keeps forks and unknown historical origins visible, excluding delegation bef
   expect(last.groups[0]?.hasMore).toBe(false);
 });
 it('returns ten summaries per workspace and loads only the requested next page', () => {
-  const result: RuntimeV2BrowseList = { indexing: false, failed: 0, items: Array.from({ length: 46 }, (_, i) => ({ sessionId: `s${i}`, createdAt: '', updatedAt: new Date(2026, 0, 1, 0, i).toISOString(), workspaceRoot: i < 23 ? '/a' : '/b', profileId: 'test', accessState: 'read-write', metadata: { title: `Session ${i}`, pinned: false, archived: false }, lineage: null, completedTurnCount: i })) };
+  const result: RuntimeBrowseList = { indexing: false, failed: 0, items: Array.from({ length: 46 }, (_, i) => ({ sessionId: `s${i}`, createdAt: '', updatedAt: new Date(2026, 0, 1, 0, i).toISOString(), workspaceRoot: i < 23 ? '/a' : '/b', profileId: 'test', accessState: 'read-write', metadata: { title: `Session ${i}`, pinned: false, archived: false }, lineage: null, completedTurnCount: i })) };
   const first = paginateSessionSummaries(result, {});
   expect(first.items).toHaveLength(20); expect(first.groups.every(g => g.hasMore)).toBe(true);
   const after = first.items.filter(s => s.workspaceRoot === '/a').at(-1)!.id;
@@ -27,7 +27,7 @@ it('returns ten summaries per workspace and loads only the requested next page',
 it('hides side chats from the page and counts them on their parent', () => {
   const base = { createdAt: '', workspaceRoot: '/a', profileId: 'test', accessState: 'read-write' as const, completedTurnCount: 1 };
   const side = (id: string, archived = false) => ({ ...base, sessionId: id, updatedAt: '2026-10-21T02:00:00.000Z', metadata: { title: id, pinned: false, archived }, lineage: { parentSessionId: 'main', parentBoundarySeq: 4, origin: 'side-chat', delegationDepth: 0 } });
-  const result: RuntimeV2BrowseList = { indexing: false, failed: 0, items: [
+  const result: RuntimeBrowseList = { indexing: false, failed: 0, items: [
     { ...base, sessionId: 'main', updatedAt: '2026-10-21T01:00:00.000Z', metadata: { title: 'main', pinned: false, archived: false }, lineage: null },
     { ...base, sessionId: 'fork', updatedAt: '2026-10-21T00:00:00.000Z', metadata: { title: 'fork', pinned: false, archived: false }, lineage: { parentSessionId: 'main', parentBoundarySeq: 4, origin: 'fork', delegationDepth: 0 } },
     side('side-1'), side('side-2'), side('side-old', true),

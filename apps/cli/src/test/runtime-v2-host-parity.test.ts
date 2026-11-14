@@ -1,4 +1,4 @@
-import type { RuntimeV2RunTurnResponse } from "@actspace/shared/runtime-v2";
+import type { RuntimeRunTurnResponse } from "@actspace/shared/runtime-v2";
 import { describe, expect, it } from "vitest";
 import { projectCliArtifactResult } from "../runtime-v2/run";
 
@@ -29,7 +29,7 @@ describe("Runtime v2 Host parity", () => {
   });
 });
 
-function response(): RuntimeV2RunTurnResponse {
+function response(): RuntimeRunTurnResponse {
   return Object.freeze({
     sessionId: "session-1",
     agentRunId: "run-1",

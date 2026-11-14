@@ -1,6 +1,6 @@
-import type { RuntimeV2PermissionMode } from "./runtime-v2/types";
-import type { RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
-export type PermissionMode = RuntimeV2PermissionMode;
+import type { RuntimePermissionMode } from "./runtime-v2/types";
+import type { RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
+export type PermissionMode = RuntimePermissionMode;
 
 export type CliOutputFormat = "text" | "json" | "jsonl";
 export type CliExitCode = 0 | 1 | 2 | 3 | 4 | 130 | 143;
@@ -35,7 +35,7 @@ export interface CliArtifactResult {
   reason?: "completed" | "aborted" | "failed" | "step-limit" | "concludes-turn";
   steps?: number;
   finalText: string;
-  snapshot?: RuntimeV2SessionSnapshot;
+  snapshot?: RuntimeSessionSnapshot;
   model?: string;
   provider?: string;
   stopReason?: string;

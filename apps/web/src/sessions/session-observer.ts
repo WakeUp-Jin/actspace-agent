@@ -2,7 +2,7 @@ import { FixedRendererStreamAdapter, createEmptyStreamingState, createLiveRunSto
 import { ClientSessionStore, selectChatSession, type ClientSessionCell } from "@actspace/client/sessions";
 import type { MessageBlock, RuntimeStreamEvent, SessionRecord } from "@actspace/shared";
 import { isRecord } from "@actspace/shared/host-protocol";
-import { mergePieces, type AgentLiveEvent, type ApprovalRequest, type LiveOutputPage, type LiveOutputPiece, type RuntimeV2DesktopSessionProjection, type RuntimeV2SessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
+import { mergePieces, type AgentLiveEvent, type ApprovalRequest, type LiveOutputPage, type LiveOutputPiece, type RuntimeDesktopSessionProjection, type RuntimeSessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
 import type { HostConnection } from "../connection/connection-store";
 import { buildTranscript, type TranscriptItem } from "./transcript-model";
 
@@ -43,11 +43,11 @@ export type ObserverOptions = {
   readonly now?: () => number;
 };
 
-type ObserveResult = { subscriptionId: string; cursor: number; snapshot: { observation: RuntimeV2SessionObservation; tasks: TaskSnapshot; approvals: ApprovalRequest[]; output: { runId: string; revision: number } | null } };
+type ObserveResult = { subscriptionId: string; cursor: number; snapshot: { observation: RuntimeSessionObservation; tasks: TaskSnapshot; approvals: ApprovalRequest[]; output: { runId: string; revision: number } | null } };
 const noop = () => undefined;
 const TERMINAL: ReadonlySet<string> = new Set(["agent_run_finished", "agent_run_aborted", "agent_run_failed"]);
 
-export function toEnvelope(observation: RuntimeV2SessionObservation): RuntimeV2DesktopSessionProjection {
+export function toEnvelope(observation: RuntimeSessionObservation): RuntimeDesktopSessionProjection {
   if (!observation.window) throw new Error("Host omitted session history window");
   return {
     kind: "session-projection", schemaVersion: 1, sessionId: observation.sessionId, throughJournalSeq: observation.projection.throughJournalSeq,
@@ -136,7 +136,7 @@ export class SessionObserver {
     const revision = this.#approvalRevision;
     const refreshRevision = ++this.#refreshRevision;
     const [observation, approvals] = await Promise.all([
-      this.connection.client.call("sessions.page", { sessionId: this.sessionId }) as Promise<RuntimeV2SessionObservation>,
+      this.connection.client.call("sessions.page", { sessionId: this.sessionId }) as Promise<RuntimeSessionObservation>,
       this.connection.client.call("approvals.list", { sessionId: this.sessionId }) as Promise<ApprovalRequest[]>,
     ]);
     if (!this.#disposed && refreshRevision === this.#refreshRevision) {
@@ -151,7 +151,7 @@ export class SessionObserver {
     if (this.#loadingOlder || this.#disposed || beforeSeq === null || beforeSeq === undefined) return;
     this.#loadingOlder = true; this.#publish();
     try {
-      const observation = await this.connection.client.call("sessions.page", { sessionId: this.sessionId, beforeSeq }) as RuntimeV2SessionObservation;
+      const observation = await this.connection.client.call("sessions.page", { sessionId: this.sessionId, beforeSeq }) as RuntimeSessionObservation;
       if (!this.#disposed) this.store.applyEnvelope(toEnvelope(observation));
     } catch (error) {
       this.options.onError?.(error);

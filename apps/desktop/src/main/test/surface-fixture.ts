@@ -6,11 +6,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect } from "vitest";
 import { SessionJournal, createCoreCodecRegistry, type EventCodec, type SessionEventEnvelopeV1, type SessionHeaderV1 } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 
 export const SURFACE_FIXTURES = join(__dirname, "fixtures", "surface-derived");
 
-export type OldEvent = Omit<SessionEventEnvelopeV1, "surface" | "data"> & { data: Record<string, RuntimeV2JsonValue>; surface: (Record<string, RuntimeV2JsonValue> & { node?: Record<string, RuntimeV2JsonValue> }) | null };
+export type OldEvent = Omit<SessionEventEnvelopeV1, "surface" | "data"> & { data: Record<string, RuntimeJsonValue>; surface: (Record<string, RuntimeJsonValue> & { node?: Record<string, RuntimeJsonValue> }) | null };
 
 /** 旧格式 → 新格式：节点内容搬进 data 对应字段，surface 只留标记（与 T6 转换脚本同一套规则）。 */
 export function convert(event: OldEvent): SessionEventEnvelopeV1 {

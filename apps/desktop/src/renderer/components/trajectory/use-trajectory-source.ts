@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { selectTrajectory, type ClientSessionCell, type ClientSessionStore } from '@actspace/client/sessions';
-import type { RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
+import type { RuntimeTrajectorySnapshot } from '@actspace/shared/runtime-v2';
 import type { RequestLiveOutput } from '@actspace/client/live';
 import { useOptionalSessionProjection } from '../../session';
 
@@ -37,7 +37,7 @@ export function useFrameCoalesced<T>(value: T, immediate: (committed: T, next: T
  * With `sessionId` (a child agent shown in the right panel) it watches that Session through the bridge
  * instead, without changing the selected conversation, and never loads fixtures.
  */
-export function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | undefined, sessionId?: string) {
+export function useTrajectorySource(input: RuntimeTrajectorySnapshot | null | undefined, sessionId?: string) {
   const projection = useOptionalSessionProjection();
   const bridge = projection?.bridge;
   useEffect(() => sessionId && bridge ? bridge.watch(sessionId) : undefined, [sessionId, bridge]);
@@ -46,7 +46,7 @@ export function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | 
   const target = sessionId === undefined ? projection?.cell ?? null : watched;
   const cell = useFrameCoalesced(target, (committed, next) => committed === null || next === null || committed.sessionId !== next.sessionId);
   const projected = cell ? selectTrajectory(cell) : null;
-  const [fixture, setFixture] = useState<RuntimeV2TrajectorySnapshot | null>(null);
+  const [fixture, setFixture] = useState<RuntimeTrajectorySnapshot | null>(null);
   const [fixtureLive, setFixtureLive] = useState<ReadonlyMap<string, RequestLiveOutput> | null>(null);
   useEffect(() => {
     if (sessionId !== undefined) return;

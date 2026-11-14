@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDesktopSessionBridge } from "../session/desktop-session-bridge";
 import { projectionFixture } from "./projection-fixture";
-import type { RuntimeV2DesktopSessionProjection, RuntimeV2LiveEvent, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import type { RuntimeDesktopSessionProjection, RuntimeLiveEvent, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 
 function event(seq: number): SessionEventEnvelopeV1 {
   return { recordKind: "event", seq, type: "session/title-set", eventVersion: 1, criticality: "ignorable", time: "2026-09-21T00:00:00Z", source: { ownerPluginId: "@actspace/core" }, data: { title: "new" }, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
 }
-function update(seq: number, liveSeq = seq + 1): RuntimeV2LiveEvent {
+function update(seq: number, liveSeq = seq + 1): RuntimeLiveEvent {
   return { kind: "journal-update", schemaVersion: 1, runtimeInstanceId: "r1", liveSeq, sessionId: "s", throughJournalSeq: seq,
     update: { sessionId: "s", throughJournalSeq: seq, event: event(seq), values: { metadata: { title: "new", pinned: false, archived: false } } } };
 }
 describe("Desktop Session event transport", () => {
   it("applies Host values and raw events without re-reading; process-wide live gaps are not Session gaps", async () => {
-    let emit!: (event: RuntimeV2LiveEvent) => void; let reads = 0;
+    let emit!: (event: RuntimeLiveEvent) => void; let reads = 0;
     const bridge = createDesktopSessionBridge({
       getSessionProjectionSnapshot: async () => { reads++; return projectionFixture("s", 0, [event(0)]); },
       onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => {}; },
@@ -26,7 +26,7 @@ describe("Desktop Session event transport", () => {
   });
 
   it("repairs a missing Journal event with one baseline read", async () => {
-    let emit!: (event: RuntimeV2LiveEvent) => void; let reads = 0;
+    let emit!: (event: RuntimeLiveEvent) => void; let reads = 0;
     const bridge = createDesktopSessionBridge({
       getSessionProjectionSnapshot: async () => { const seq = reads++ ? 2 : 0; return projectionFixture("s", seq, Array.from({ length: seq + 1 }, (_, seq) => event(seq))); },
       onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => {}; },
@@ -38,7 +38,7 @@ describe("Desktop Session event transport", () => {
   });
 
   it("prepends old pages without rolling back newer Host facts or reloading the expanded tail", async () => {
-    let resolve!: (value: RuntimeV2DesktopSessionProjection) => void;
+    let resolve!: (value: RuntimeDesktopSessionProjection) => void;
     const tail = projectionFixture("s", 2, [event(2)]);
     const bridge = createDesktopSessionBridge({
       getSessionProjectionSnapshot: async input => input.beforeSeq === undefined ? { ...tail, window: { ...tail.window, fromSeq: 2, beforeSeq: 2 } } : new Promise(done => { resolve = done; }),
@@ -57,7 +57,7 @@ describe("Desktop Session event transport", () => {
   it("rejects mixed identity and does not apply responses after disposal", async () => {
     const bridge = createDesktopSessionBridge({ getSessionProjectionSnapshot: async () => projectionFixture("other"), onSessionLiveEvent: () => () => {} });
     await expect(bridge.open("s")).rejects.toThrow("identity mismatch");
-    let resolve!: (value: RuntimeV2DesktopSessionProjection) => void;
+    let resolve!: (value: RuntimeDesktopSessionProjection) => void;
     const pending = createDesktopSessionBridge({ getSessionProjectionSnapshot: () => new Promise(done => { resolve = done; }), onSessionLiveEvent: () => () => {} });
     const loading = pending.open("s"); pending.dispose(); resolve(projectionFixture("s")); await loading;
     expect(pending.store.get("s").snapshot).toBeNull();
@@ -68,13 +68,13 @@ describe("Desktop Session event transport", () => {
 describe("Desktop Session refresh retries", () => {
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
-  function gapBridge(read: (attempt: number) => Promise<RuntimeV2DesktopSessionProjection>) {
-    let emit!: (event: RuntimeV2LiveEvent) => void; let reads = 0;
+  function gapBridge(read: (attempt: number) => Promise<RuntimeDesktopSessionProjection>) {
+    let emit!: (event: RuntimeLiveEvent) => void; let reads = 0;
     const bridge = createDesktopSessionBridge({
       getSessionProjectionSnapshot: () => read(reads++),
       onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => {}; },
     });
-    return { bridge, emit: (event: RuntimeV2LiveEvent) => emit(event), reads: () => reads };
+    return { bridge, emit: (event: RuntimeLiveEvent) => emit(event), reads: () => reads };
   }
   const baseline = () => Promise.resolve(projectionFixture("s", 0, [event(0)]));
   const repaired = () => Promise.resolve(projectionFixture("s", 2, [event(0), event(1), event(2)]));
@@ -131,7 +131,7 @@ describe("Desktop Session refresh retries", () => {
 });
 
 it('observes related sessions without selecting them and stops repairing after release', async () => {
-  let emit!: (event: RuntimeV2LiveEvent) => void;
+  let emit!: (event: RuntimeLiveEvent) => void;
   const read = vi.fn(async ({ sessionId }: { sessionId: string }) => projectionFixture(sessionId, 0, [event(0)]));
   const bridge = createDesktopSessionBridge({ getSessionProjectionSnapshot: read, onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => {}; } });
   bridge.start(); await bridge.open('parent');

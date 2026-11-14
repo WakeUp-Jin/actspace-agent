@@ -1,14 +1,14 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { RuntimeV2JsonValue, RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
+import type { RuntimeJsonValue, RuntimeTrajectorySnapshot } from '@actspace/shared/runtime-v2';
 import { DetailPanel, type DetailSelection } from '../components/trajectory/details/DetailPanel';
 import { buildTrajectorySnapshot, deriveLayout, detailTabs, type DetailTab, type TrajectoryCell } from '../trajectory';
 
 const tool = (description: string) => ({ name: 'bash', description, parameters: { type: 'object', properties: { command: { type: 'string', description: 'The command to execute.' } } } });
-const prompt = (requestId: string, content: string): [string, Record<string, RuntimeV2JsonValue>] => ['request/system-prompt', { requestId, digest: content, sections: [{ id: 'model-prompt', owner: 'actspace.context-system', order: 0, content }], modelFacts: [], contributorProvenance: [] }];
-const context = (requestId: string): [string, Record<string, RuntimeV2JsonValue>] => ['request/context', { requestId, snapshot: { schemaVersion: 3 } }];
-const events: [string, Record<string, RuntimeV2JsonValue>][] = [
+const prompt = (requestId: string, content: string): [string, Record<string, RuntimeJsonValue>] => ['request/system-prompt', { requestId, digest: content, sections: [{ id: 'model-prompt', owner: 'actspace.context-system', order: 0, content }], modelFacts: [], contributorProvenance: [] }];
+const context = (requestId: string): [string, Record<string, RuntimeJsonValue>] => ['request/context', { requestId, snapshot: { schemaVersion: 3 } }];
+const events: [string, Record<string, RuntimeJsonValue>][] = [
   ['turn/start', { turnId: 't' }],
   ['user/message', { content: '**Inspect** files', source: { kind: 'user' } }],
   ['step/start', { stepId: 's' }],
@@ -35,7 +35,7 @@ const events: [string, Record<string, RuntimeV2JsonValue>][] = [
   ['assistant/message', { requestId: 'r2b', messageId: 'm2', content: '完成' }],
 ];
 let step = 's';
-const snapshot: RuntimeV2TrajectorySnapshot = {
+const snapshot: RuntimeTrajectorySnapshot = {
   kind: 'trajectory', schemaVersion: 1, sessionId: 'details', throughJournalSeq: events.length - 1,
   nodes: events.map(([eventType, data], eventSeq) => {
     if (eventType === 'step/start') step = String(data.stepId);
@@ -43,7 +43,7 @@ const snapshot: RuntimeV2TrajectorySnapshot = {
       key: `details:${eventSeq}`, sessionId: 'details', eventSeq, eventType, time: new Date(1_700_000_000_000 + eventSeq * 1000).toISOString(), kind: 'other', state: 'observed',
       callId: typeof data.callId === 'string' ? data.callId : null, data: { turnId: 't', stepId: step, ...data },
     };
-  }) as unknown as RuntimeV2TrajectorySnapshot['nodes'],
+  }) as unknown as RuntimeTrajectorySnapshot['nodes'],
 };
 const layout = deriveLayout(buildTrajectorySnapshot(snapshot));
 const cellOf = (pick: (cell: TrajectoryCell) => boolean) => layout.cells.find(pick)!;

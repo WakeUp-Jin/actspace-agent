@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import type { RuntimeSessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { projectChatSession, projectSubagentTranscript, subagentChildrenWithoutModel } from "../sessions/chat.js";
 import { projectSubagentItems, subagentStatusByAgent } from "../sessions/subagent-list.js";
 import { FixedRendererStreamAdapter } from "../live/stream-adapter.js";
 
 // S3 第 7 步：agent 卡片读 subagent/* 新事件；五个管理工具的行名；收件箱两种新来源转成 BackgroundNotice。
-function snapshot(toolCallIds: readonly string[] = []): RuntimeV2SessionSnapshot {
+function snapshot(toolCallIds: readonly string[] = []): RuntimeSessionSnapshot {
   return {
     kind: "session-snapshot", schemaVersion: 1, sessionId: "s", createdAt: "2026-11-04T00:00:00.000Z", updatedAt: "2026-11-04T00:00:00.000Z", workspaceRoot: null, throughJournalSeq: 20, permissionMode: "default", accessState: "read-write",
     agentForm: "agent", metadata: { title: null, pinned: false, archived: false },
-    messages: toolCallIds.map(callId => ({ kind: "tool-result", messageId: `result-${callId}`, callId, content: "" })) as RuntimeV2SessionSnapshot["messages"], tools: [], pendingInbox: [], todos: [], delegations: [], usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
+    messages: toolCallIds.map(callId => ({ kind: "tool-result", messageId: `result-${callId}`, callId, content: "" })) as RuntimeSessionSnapshot["messages"], tools: [], pendingInbox: [], todos: [], delegations: [], usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
     activity: { turnCount: 1, completedTurnCount: 1, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } }, lineage: null,
   };
 }
@@ -106,8 +106,8 @@ describe("subagent cards from subagent/* events", () => {
   it("shows a forked subagent only what it did after the fork", () => {
     const message = (seq: number, messageId: string, content: string) => ({ ...envelope(seq, "user/message", { agentRunId: "run-1", messageId, content }), surface: { kind: "append" } }) as SessionEventEnvelopeV1;
     const child = [message(2, "u-1", "Parent question"), message(3, "u-2", "Fork task")];
-    const forked = { ...snapshot(), messages: ["u-1", "u-2"].map(messageId => ({ kind: "user", messageId, content: "" })) as RuntimeV2SessionSnapshot["messages"] };
-    const texts = (lineage: RuntimeV2SessionSnapshot["lineage"]) => projectSubagentTranscript({ ...forked, lineage }, child).flatMap(event => event.type === "user_message" ? [JSON.stringify(event.payload)] : []);
+    const forked = { ...snapshot(), messages: ["u-1", "u-2"].map(messageId => ({ kind: "user", messageId, content: "" })) as RuntimeSessionSnapshot["messages"] };
+    const texts = (lineage: RuntimeSessionSnapshot["lineage"]) => projectSubagentTranscript({ ...forked, lineage }, child).flatMap(event => event.type === "user_message" ? [JSON.stringify(event.payload)] : []);
     expect(texts(null)).toHaveLength(2);
     const after = texts({ origin: "delegation", parentSessionId: "s", parentBoundarySeq: 2, delegationDepth: 1, inheritedThroughSeq: 2 });
     expect(after).toHaveLength(1);
@@ -188,7 +188,7 @@ describe("inbox notices from subagents", () => {
       ...envelope(seq, "agent/inbox/spliced", { operation: "claim", agentRunId: "run-1", messageId, source: "subagent_notification", notice: { taskId: messageId, kind: "subagent", title: "Map the repo", status: "completed" }, ...(opensTurn === undefined ? {} : { opensTurn }), content: "<subagent_notification />" }),
       surface: { kind: "append" },
     }) as SessionEventEnvelopeV1;
-    const saved = { ...snapshot(), messages: ["m1", "m2"].map(messageId => ({ kind: "user", messageId, content: "" })) as RuntimeV2SessionSnapshot["messages"] };
+    const saved = { ...snapshot(), messages: ["m1", "m2"].map(messageId => ({ kind: "user", messageId, content: "" })) as RuntimeSessionSnapshot["messages"] };
     const notices = projectChatSession(saved, [claim(1, "m1", true), claim(2, "m2")], "/w").events
       .flatMap(event => event.type === "user_message" ? [event.payload.backgroundNotice] : []);
     expect(notices).toEqual([

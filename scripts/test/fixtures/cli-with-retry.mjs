@@ -7,7 +7,7 @@ const entry = fileURLToPath(new URL("../../../apps/cli/dist/cli.js", import.meta
 const require = createRequire(entry);
 const runtime = await require("@actspace/runtime/loader").loadRuntime();
 const delay = Number(process.env.FIXTURE_RETRY_DELAY_MS ?? 10);
-require("./runtime-v2/loader.js").setRuntimeV2LoaderForTest(async () => ({
+require("./runtime-v2/loader.js").setRuntimeLoaderForTest(async () => ({
   ...runtime,
   createRuntimeHostServices(input) {
     const port = input.services[runtime.LLM_HOST_PORT_ID];

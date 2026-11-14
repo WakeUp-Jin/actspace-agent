@@ -27,7 +27,7 @@ export function registerBrowserTools(runtime: ToolRuntimeContract, browser: Brow
 function browserPermission(name: string) {
   return Object.freeze({
     extractResources: () => [],
-    evaluate: (args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>, _resources: readonly unknown[], context: { readonly mode: string }) => {
+    evaluate: (args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>, _resources: readonly unknown[], context: { readonly mode: string }) => {
       if (name === "browser_help") return { kind: "allow" as const };
       const commands = name === "browser_run" ? batchCommands(args.actions) : [singleCommand(name, args.action)];
       if (commands.some((command) => command === undefined)) return { kind: "deny" as const, code: "BROWSER_COMMAND_UNKNOWN", reason: "Browser command is not present in the canonical registry." };
@@ -39,21 +39,21 @@ function browserPermission(name: string) {
   });
 }
 
-function singleCommand(localName: string, action: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue | undefined): (typeof browserCommandMetadata)[number] | undefined {
+function singleCommand(localName: string, action: import("@actspace/shared/runtime-v2").RuntimeJsonValue | undefined): (typeof browserCommandMetadata)[number] | undefined {
   const category = localName.replace(/^browser_/, "");
   return typeof action === "string" ? browserCommandMetadata.find((command) => command.category === category && command.action === action) : undefined;
 }
 
-function batchCommands(value: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue | undefined): readonly ((typeof browserCommandMetadata)[number] | undefined)[] {
+function batchCommands(value: import("@actspace/shared/runtime-v2").RuntimeJsonValue | undefined): readonly ((typeof browserCommandMetadata)[number] | undefined)[] {
   if (!Array.isArray(value) || value.length === 0) return [undefined];
   return value.map((item) => {
     if (item === null || typeof item !== "object" || Array.isArray(item)) return undefined;
-    const record = item as Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>;
+    const record = item as Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>;
     return typeof record.category === "string" && typeof record.action === "string" ? browserCommandMetadata.find((command) => command.category === record.category && command.action === record.action) : undefined;
   });
 }
 
-type BrowserToolHandler = (args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
+type BrowserToolHandler = (args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 
 function commandExecutor(name: string, browser: BrowserCapability): BrowserToolHandler {
   return async (args, context) => {

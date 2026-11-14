@@ -3,9 +3,9 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { ToolRuntime, type ToolPreparedEnvironment, type ToolBodyResult, type ToolExecutionContext, type ToolDefinition } from "@actspace/tool-runtime";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 
-const args: Readonly<Record<string, Record<string, RuntimeV2JsonValue>>> = {
+const args: Readonly<Record<string, Record<string, RuntimeJsonValue>>> = {
   read_file: { path: "file.txt" }, list_directory: { path: "." }, present: { files: [{ path: "file.txt" }] }, grep: { pattern: "x" }, glob: { pattern: "*" },
   edit_file: { path: "file.txt", old_string: "x", new_string: "y" }, write_file: { path: "file.txt", content: "x" }, delete_file: { path: "file.txt" },
   bash: { command: "printf x", intent: "test" },
@@ -17,7 +17,7 @@ it.each(["tool-fs-read", "tool-fs-search", "tool-fs-write", "tool-shell", "tool-
   "%s enforces schema, capability and scope before Host invocation and contains executor failure", async slug => {
     const plugin = await import(`@actspace/${slug}`) as {
       TOOL_DEFINITIONS: readonly { localName: string; definition: ToolDefinition }[];
-      registerTools(runtime: ToolRuntime, ports: Record<string, (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>>): readonly { handle: { dispose(): Promise<void> } }[];
+      registerTools(runtime: ToolRuntime, ports: Record<string, (args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>>): readonly { handle: { dispose(): Promise<void> } }[];
     };
     const root = await mkdtemp(join(tmpdir(), "tool-contract-"));
     await writeFile(join(root, "file.txt"), "x");

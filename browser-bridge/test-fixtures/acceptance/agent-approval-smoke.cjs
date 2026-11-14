@@ -1,6 +1,6 @@
 const path = require("node:path");
 
-const { loadRuntimeV2 } = require("./runtime-v2-client.cjs");
+const { loadRuntimeModule } = require("./runtime-v2-client.cjs");
 
 const socketPath = path.join(
   process.env.HOME,
@@ -79,7 +79,7 @@ function executionResult(result) {
 }
 
 async function main() {
-  const { ToolRuntime, createNodeBrowserCapability, registerBrowserTools } = await loadRuntimeV2();
+  const { ToolRuntime, createNodeBrowserCapability, registerBrowserTools } = await loadRuntimeModule();
   runtime = new ToolRuntime();
   registrations = registerBrowserTools(runtime, createNodeBrowserCapability({ ready: true, socketPath }));
 

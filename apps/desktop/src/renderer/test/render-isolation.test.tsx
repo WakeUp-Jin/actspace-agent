@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeStreamEvent, SessionListItem, SessionRecord } from "@actspace/shared";
-import type { RuntimeV2LiveEvent } from "@actspace/shared/runtime-v2";
+import type { RuntimeLiveEvent } from "@actspace/shared/runtime-v2";
 import { App } from "../App";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { setupBridge } from "./helpers/bridge";
@@ -53,14 +53,14 @@ function record(id: string, title: string): SessionRecord {
   } as unknown as SessionRecord;
 }
 
-function chunkEvent(sessionId: string, seq: number, content: string): RuntimeV2LiveEvent {
+function chunkEvent(sessionId: string, seq: number, content: string): RuntimeLiveEvent {
   return {
     kind: "journal-update", schemaVersion: 1, runtimeInstanceId: "r1", liveSeq: seq + 1, sessionId, throughJournalSeq: seq,
     update: {
       sessionId, throughJournalSeq: seq, values: {},
       event: { recordKind: "event", seq, type: "assistant/chunk", eventVersion: 1, criticality: "ignorable", time: NOW, source: { ownerPluginId: "@actspace/core" }, data: { agentRunId: "run-live", messageId: "a-live", kind: "assistant-delta", content }, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } },
     },
-  } as unknown as RuntimeV2LiveEvent;
+  } as unknown as RuntimeLiveEvent;
 }
 
 function frame(): Promise<void> {
@@ -85,7 +85,7 @@ function mount() {
   } as never);
   return {
     stream: (event: RuntimeStreamEvent) => { for (const listener of stream) listener(event); },
-    live: (event: RuntimeV2LiveEvent) => { for (const listener of live) listener({ event }); },
+    live: (event: RuntimeLiveEvent) => { for (const listener of live) listener({ event }); },
   };
 }
 

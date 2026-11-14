@@ -1,4 +1,4 @@
-export type DesktopRuntimeV2Roots = {
+export type DesktopRuntimeRoots = {
   readonly dataRoot: string;
   readonly sessionRoot: string;
   readonly logRoot: string;
@@ -7,7 +7,7 @@ export type DesktopRuntimeV2Roots = {
   readonly workspaceRoot: string;
 };
 
-export type DesktopRuntimeV2ApprovalRequest = {
+export type DesktopRuntimeApprovalRequest = {
   readonly id: string;
   readonly toolCallId?: string;
   readonly toolName: string;
@@ -24,21 +24,21 @@ export type DesktopRuntimeV2ApprovalRequest = {
   readonly supportedLifetimes?: readonly import("@actspace/shared/runtime-v2").GrantLifetime[];
 };
 
-export type DesktopRuntimeV2ApprovalDecision = {
+export type DesktopRuntimeApprovalDecision = {
   readonly requestId: string;
   readonly decision: "once" | "session" | "deny" | "timeout" | "abort";
   readonly suggestionId?: string;
   readonly decidedAt: number;
 };
 
-export interface DesktopRuntimeV2ApprovalPort {
-  waitForDecision(request: DesktopRuntimeV2ApprovalRequest): Promise<DesktopRuntimeV2ApprovalDecision>;
-  onApprovalRequired(request: DesktopRuntimeV2ApprovalRequest): void;
+export interface DesktopRuntimeApprovalPort {
+  waitForDecision(request: DesktopRuntimeApprovalRequest): Promise<DesktopRuntimeApprovalDecision>;
+  onApprovalRequired(request: DesktopRuntimeApprovalRequest): void;
   abortRequest?(requestId: string): void;
   abortAgentRun?(sessionId: string, agentRunId: string): number;
 }
 
-export interface DesktopRuntimeV2BrowserPort {
+export interface DesktopRuntimeBrowserPort {
   readonly socketPath: string;
   getStatus(): Promise<{ readonly runState: string; readonly bridgeReady?: boolean }>;
   setRuntimeReady?(ready: boolean): void;

@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type {
   TrajectoryApproval,
   TrajectoryCell,
@@ -14,8 +14,8 @@ import { parseTimestamp } from "./format";
 import { deriveRequests, requestKeyOf } from "./requests";
 import { T, stepLabel, stepsSummary, toolCallsSummary } from "./strings";
 
-type Data = Readonly<Record<string, RuntimeV2JsonValue>>;
-const asData = (value: RuntimeV2JsonValue | undefined): Data =>
+type Data = Readonly<Record<string, RuntimeJsonValue>>;
+const asData = (value: RuntimeJsonValue | undefined): Data =>
   value !== null && typeof value === "object" && !Array.isArray(value) ? value as Data : {};
 const firstSeq = (record: TrajectoryRecord) => record.sourceSequences[0] ?? 0;
 

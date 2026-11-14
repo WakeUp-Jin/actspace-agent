@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import type { RuntimeV2LiveEvent, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import type { RuntimeLiveEvent, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { createDesktopSessionBridge } from "../session/desktop-session-bridge";
 import { createFrameScheduler } from "../session/frame-batch";
 import { createLiveRunStore } from "../session/live-runs/live-run-store";
@@ -20,9 +20,9 @@ function journalEvent(seq: number, type: string, data: Record<string, string> = 
   return { recordKind: "event", seq, type, eventVersion: 1, criticality: "ignorable", time: "2026-10-19T00:00:00Z", source: { ownerPluginId: "@actspace/core" }, data, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
 }
 
-function journalUpdate(seq: number, type: string, values: Record<string, unknown> = {}): RuntimeV2LiveEvent {
+function journalUpdate(seq: number, type: string, values: Record<string, unknown> = {}): RuntimeLiveEvent {
   return { kind: "journal-update", schemaVersion: 1, runtimeInstanceId: "r1", liveSeq: seq + 1, sessionId: "s", throughJournalSeq: seq,
-    update: { sessionId: "s", throughJournalSeq: seq, event: journalEvent(seq, type, { delta: "x" }), values } } as RuntimeV2LiveEvent;
+    update: { sessionId: "s", throughJournalSeq: seq, event: journalEvent(seq, type, { delta: "x" }), values } } as RuntimeLiveEvent;
 }
 
 describe("frame scheduler", () => {
@@ -65,7 +65,7 @@ describe("live run store frame batching", () => {
 
 describe("chat projection without journaled chunks", () => {
   it("never shows assistant chunks from the Journal and keeps the record stable across them", async () => {
-    let emit!: (event: RuntimeV2LiveEvent) => void;
+    let emit!: (event: RuntimeLiveEvent) => void;
     const chunk = (seq: number, content: string) => journalEvent(seq, "assistant/chunk", {
       agentRunId: "run-1", messageId: "a-1", kind: "assistant-delta", content,
     });

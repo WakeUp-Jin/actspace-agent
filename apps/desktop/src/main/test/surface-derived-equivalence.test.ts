@@ -20,7 +20,7 @@ import { ContextEngine } from "@actspace/context-engine";
 import type { SessionEventEnvelopeV1, SessionHeaderV1 } from "@actspace/session-journal";
 import { foldTranscript, renderTranscript } from "@actspace/session-transcript";
 import { foldContextEstimate, viewContextEstimate } from "@actspace/shared";
-import type { RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
 import { projectChatSession } from "@actspace/client/sessions";
 import { SURFACE_FIXTURES as FIXTURES, convert, readOldFixture, seedJournal } from "./surface-fixture";
 
@@ -59,7 +59,7 @@ it("derives the same conversation, model request, transcript, estimate and chat 
   const snapshot = { kind: "session-snapshot", schemaVersion: 1, sessionId: header.sessionId, createdAt: header.createdAt, updatedAt: header.createdAt, workspaceRoot: "/w", throughJournalSeq: journal.lastSeq,
     permissionMode: "default", sessionGrants: [], accessState: "read-write", agentForm: "agent", metadata: { title: null, pinned: false, archived: false }, messages, tools: [], pendingInbox: [], todos: [], delegations: [],
     usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
-    activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } }, lineage: null } as unknown as RuntimeV2SessionSnapshot;
+    activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } }, lineage: null } as unknown as RuntimeSessionSnapshot;
   const chat = projectChatSession(snapshot, journal.events, "/w");
   expect(JSON.parse(JSON.stringify(chat.events))).toEqual(expected.chatEvents);
   expect(JSON.parse(JSON.stringify(chat.messageBlocks))).toEqual(expected.chatBlocks);

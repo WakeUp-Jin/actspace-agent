@@ -23,7 +23,7 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
 ## 2. 契约约定
 
 - 成员按业务域分组：`app`、`sessions`、`workspaces`、`hosts`、`settings`……事件统一放在 `events` 域。
-- channel 字符串只来自 shared 的常量表（`RUNTIME_V2_FIXED_RENDERER_CHANNELS`、`RESOURCE_MONITOR_CHANNELS`、`ENGLISH_LEARNING_CHANNELS`、`HOST_IPC`），契约里不写字面量。
+- channel 字符串只来自 shared 的常量表（`RUNTIME_FIXED_RENDERER_CHANNELS`、`RESOURCE_MONITOR_CHANNELS`、`ENGLISH_LEARNING_CHANNELS`、`HOST_IPC`），契约里不写字面量。
 - 五种 spec：
 
 | 构造函数 | 方向 | 生成的方法 | 说明 |
@@ -102,7 +102,7 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
   - send 调 handler；
   - local 成员取 handler 里的同名实现。
 - handler 按三层合并：默认实现（`mock/handlers.ts`）← 场景覆盖 ← 调用方覆盖。没有实现的成员调用时 reject，不静默返回空值。
-- 数据放在 `mock-db.ts` 的内存表。会话按消息列表保存，读取时投影成和 Electron 同形的 `RuntimeV2DesktopSessionProjection` / `Observation`；远端会话 id 与 main 的 `remoteSessionKey` 同格式。
+- 数据放在 `mock-db.ts` 的内存表。会话按消息列表保存，读取时投影成和 Electron 同形的 `RuntimeDesktopSessionProjection` / `Observation`；远端会话 id 与 main 的 `remoteSessionKey` 同格式。
 - `MockClock` 提供 `db`、`bridge`（合并覆盖后的 bridge，一个 handler 需要调另一个成员时经它调用）、`emit`、`schedule`。`dispose()` 清理计时器和订阅。
 - **场景**（`mock/scenarios/`）：
   - 场景只写种子数据，必要时覆盖少量 handler，例如流式场景在首次 `getPage` 时开始回放；

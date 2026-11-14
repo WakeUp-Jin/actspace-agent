@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { getLeasedService, serviceKey } from "@actspace/cordis-adapter";
 import { snapshotSessionJson } from "@actspace/session-journal";
-import { BACKGROUND_WAKE_KIND, isBackgroundWake, type RuntimeV2JsonValue, type RuntimeV2AgentMode } from "@actspace/shared/runtime-v2";
+import { BACKGROUND_WAKE_KIND, isBackgroundWake, type RuntimeJsonValue, type RuntimeAgentMode } from "@actspace/shared/runtime-v2";
 import { TaskError, type HarnessIdentity, type RunOutcome, type TaskRecord, type TaskReceipt } from "./contracts.js";
 import { RunBudget } from "./execution-budget.js";
 import type { TaskLedger } from "./task-ledger.js";
 
 export const RUN_FACTORY_SERVICE = "agent.run-factory";
-export type ExecutionConfiguration = { readonly durationMs?: number; readonly deadline?: number; readonly mode: RuntimeV2AgentMode; readonly model?: string; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly selectedSkillIds?: readonly string[] };
-export type RunExecutionResult = { readonly outcome: RunOutcome; readonly value: RuntimeV2JsonValue };
+export type ExecutionConfiguration = { readonly durationMs?: number; readonly deadline?: number; readonly mode: RuntimeAgentMode; readonly model?: string; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly selectedSkillIds?: readonly string[] };
+export type RunExecutionResult = { readonly outcome: RunOutcome; readonly value: RuntimeJsonValue };
 /** Structural port: factory implementations do not depend on the concrete default Loop. */
 export interface RunInstance {
   /** Return cancelled for normal interruption; thrown errors remain failures even after abort. */
@@ -44,7 +44,7 @@ export type RunManagerOptions = {
   readonly canStart?: () => boolean;
   readonly ledger: TaskLedger;
   readonly harnessId: string | (() => string);
-  readonly operationForTask?: (task: TaskRecord) => ((signal: AbortSignal) => Promise<RuntimeV2JsonValue | void>) | undefined;
+  readonly operationForTask?: (task: TaskRecord) => ((signal: AbortSignal) => Promise<RuntimeJsonValue | void>) | undefined;
   readonly runIdForTask?: (task: TaskRecord) => string | undefined;
   readonly acquire: (harnessId: string, signal?: AbortSignal) => RunLease | Promise<RunLease>;
   readonly readConfiguration: () => ExecutionConfiguration | Promise<ExecutionConfiguration>;
@@ -82,7 +82,7 @@ export class SessionRunManager {
     return snapshot.queue.length === 0 && !snapshot.runs.some(run => run.state === "running") && !snapshot.tasks.some(task => task.state === "claimed");
   }
 
-  async submit(submissionId: string, content: RuntimeV2JsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
+  async submit(submissionId: string, content: RuntimeJsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
     this.#assertOpen();
     const userMessage = !isBackgroundWake(content);
     if (userMessage) this.#wakeSuspended = false;
@@ -174,7 +174,7 @@ export class SessionRunManager {
     this.#active = { runId, taskId: task.taskId, controller, done };
   }
 
-  async #executeOperation(task: TaskRecord, operation: (signal: AbortSignal) => Promise<RuntimeV2JsonValue | void>, signal: AbortSignal): Promise<void> {
+  async #executeOperation(task: TaskRecord, operation: (signal: AbortSignal) => Promise<RuntimeJsonValue | void>, signal: AbortSignal): Promise<void> {
     let started = false;
     try {
       signal.throwIfAborted();
@@ -222,7 +222,7 @@ export class SessionRunManager {
       }
       const factory = getLeasedService(lease, RUN_FACTORY);
       if (!factory) throw new Error(`Harness ${lease.harnessId} does not provide ${RUN_FACTORY_SERVICE}`);
-      const initial = await this.ledger.start(task.taskId, runId, { harnessId: lease.harnessId, generationId: lease.generationId, revision: lease.revision }, { ...configuration, ...(lease.executionDigest ? { harnessExecutionDigest: lease.executionDigest } : {}) } as RuntimeV2JsonValue);
+      const initial = await this.ledger.start(task.taskId, runId, { harnessId: lease.harnessId, generationId: lease.generationId, revision: lease.revision }, { ...configuration, ...(lease.executionDigest ? { harnessExecutionDigest: lease.executionDigest } : {}) } as RuntimeJsonValue);
       started = true;
       signal.throwIfAborted();
       if (configuration.durationMs !== undefined || configuration.deadline !== undefined) budget = new RunBudget(configuration.durationMs ?? Number.MAX_SAFE_INTEGER, configuration.deadline ?? null, () => controller.abort("execution-budget"));

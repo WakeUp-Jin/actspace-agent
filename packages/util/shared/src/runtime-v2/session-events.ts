@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "./host-dto";
+import type { RuntimeJsonValue } from "./host-dto";
 export type SessionEventCriticality = "required" | "ignorable";
 
 export type SessionEventSourceV1 = {
@@ -18,18 +18,18 @@ export type SessionSurfaceNodeV1 =
   | {
       readonly kind: "user";
       readonly messageId: string;
-      readonly content: RuntimeV2JsonValue;
+      readonly content: RuntimeJsonValue;
     }
   | {
       readonly kind: "assistant";
       readonly messageId: string;
-      readonly content: RuntimeV2JsonValue;
+      readonly content: RuntimeJsonValue;
     }
   | {
       readonly kind: "tool-result";
       readonly messageId: string;
       readonly callId: string;
-      readonly content: RuntimeV2JsonValue;
+      readonly content: RuntimeJsonValue;
       readonly isError: boolean;
     };
 
@@ -54,7 +54,7 @@ export type SessionEventEnvelopeV1 = {
   readonly criticality: SessionEventCriticality;
   readonly time: string;
   readonly source: SessionEventSourceV1;
-  readonly data: RuntimeV2JsonValue;
+  readonly data: RuntimeJsonValue;
   readonly surface: SessionSurfaceOperationV1 | null;
   readonly provenance: SessionEventProvenanceV1;
 };
@@ -67,7 +67,7 @@ export type SessionEventCandidateV1 = Omit<
 /** `surfaceNode` 只需要这三个字段，client 和渲染进程里的事件形状也能直接用。 */
 export type SurfaceNodeSource = {
   readonly type: string;
-  readonly data: RuntimeV2JsonValue;
+  readonly data: RuntimeJsonValue;
   readonly surface: SessionSurfaceOperationV1 | null;
 };
 
@@ -91,7 +91,7 @@ export function surfaceNode(event: SurfaceNodeSource): SessionSurfaceNodeV1 | nu
 }
 
 function deriveSurfaceNode(event: SurfaceNodeSource): SessionSurfaceNodeV1 | null {
-  const data = event.data !== null && typeof event.data === "object" && !Array.isArray(event.data) ? event.data as Readonly<Record<string, RuntimeV2JsonValue>> : null;
+  const data = event.data !== null && typeof event.data === "object" && !Array.isArray(event.data) ? event.data as Readonly<Record<string, RuntimeJsonValue>> : null;
   if (data === null) return null;
   const messageId = nonEmpty(data.messageId);
   switch (event.type) {
@@ -117,12 +117,12 @@ function deriveSurfaceNode(event: SurfaceNodeSource): SessionSurfaceNodeV1 | nul
 }
 
 /** 压缩摘要节点（`surface/replaced` 的 `data.node`）的形状检查，codec 校验也用它。 */
-export function isSurfaceNode(value: RuntimeV2JsonValue | undefined): value is SessionSurfaceNodeV1 & RuntimeV2JsonValue {
+export function isSurfaceNode(value: RuntimeJsonValue | undefined): value is SessionSurfaceNodeV1 & RuntimeJsonValue {
   if (value === null || value === undefined || typeof value !== "object" || Array.isArray(value)) return false;
-  const node = value as Readonly<Record<string, RuntimeV2JsonValue>>;
+  const node = value as Readonly<Record<string, RuntimeJsonValue>>;
   if (!nonEmpty(node.messageId) || node.content === undefined) return false;
   if (node.kind === "user" || node.kind === "assistant") return true;
   return node.kind === "tool-result" && nonEmpty(node.callId) !== null && typeof node.isError === "boolean";
 }
 
-function nonEmpty(value: RuntimeV2JsonValue | undefined): string | null { return typeof value === "string" && value.length > 0 ? value : null; }
+function nonEmpty(value: RuntimeJsonValue | undefined): string | null { return typeof value === "string" && value.length > 0 ? value : null; }

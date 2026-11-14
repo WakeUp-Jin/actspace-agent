@@ -1,5 +1,5 @@
 import { applyContextEstimate, initialContextEstimate, viewContextEstimate, type ContextEstimateState } from "@actspace/shared";
-import { mainAgentFormFromPresetId, type RuntimeV2AgentMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
+import { mainAgentFormFromPresetId, type RuntimeAgentMode, type RuntimeJsonValue, type RuntimeSessionSnapshot, type RuntimeToolView } from "@actspace/shared/runtime-v2";
 import { SessionSurface, type SessionSurfaceView, type EventCodecRegistry, type SessionEventEnvelopeV1, type SessionHeaderV1 } from "@actspace/session-journal";
 import { registerSessionFacts, sessionFacts, SessionProjectionRegistry, type SessionProjectionService } from "@actspace/session-projection";
 import { createRunningToolView, completeToolView, projectRendererHint, type RendererAllowlist } from "./tool-dto.js";
@@ -10,7 +10,7 @@ export class SessionReadModel {
   constructor(readonly header: SessionHeaderV1, readonly codecs: EventCodecRegistry, readonly rendererAllowlist?: RendererAllowlist, readonly projectionService?: SessionProjectionService) {
     this.projections = projectionService?.createRegistry(event => codecs.resolve(event).kind === "known") ?? new SessionProjectionRegistry(event => codecs.resolve(event).kind === "known");
     registerSessionFacts(this.projections, redactProjectionText);
-    this.projections.register<{ readonly mode: RuntimeV2AgentMode; readonly revision: number }>({
+    this.projections.register<{ readonly mode: RuntimeAgentMode; readonly revision: number }>({
       key: "agentMode", stateVersion: 1,
       init: () => ({ mode: header.createdWith.initialAgentMode ?? (header.createdWith.presetId === "actspace.chat" ? "chat" : "agent"), revision: 0 }),
       view: state => state,
@@ -37,7 +37,7 @@ export class SessionReadModel {
         return surface.view;
       },
     });
-    this.projections.register<readonly RuntimeV2ToolView[]>({
+    this.projections.register<readonly RuntimeToolView[]>({
       key: "tools", stateVersion: 1, init: () => [], view: state => state,
       apply: (state, event) => applyTool(state, header.sessionId, event, rendererAllowlist),
     });
@@ -54,7 +54,7 @@ export class SessionReadModel {
     this.projections.register<ContextEstimateState>({
       key: "contextEstimate", stateVersion: 1, init: initialContextEstimate,
       apply: (state, event) => applyContextEstimate(state, event),
-      view: state => viewContextEstimate(state) as unknown as RuntimeV2JsonValue,
+      view: state => viewContextEstimate(state) as unknown as RuntimeJsonValue,
     });
     this.projections.seal();
     this.projections.ensureSession(header.sessionId);
@@ -63,23 +63,23 @@ export class SessionReadModel {
   replay(events: readonly SessionEventEnvelopeV1[]): this { this.projections.sync(this.header.sessionId, events); return this; }
   apply(event: SessionEventEnvelopeV1) { return this.projections.apply(this.header.sessionId, event); }
 
-  snapshot(accessState: RuntimeV2SessionSnapshot["accessState"] = "read-write"): RuntimeV2SessionSnapshot {
+  snapshot(accessState: RuntimeSessionSnapshot["accessState"] = "read-write"): RuntimeSessionSnapshot {
     const projection = this.projections.snapshot(this.header.sessionId);
     const values = projection.values;
     const surface = values.surface as SessionSurfaceView;
-    const agentMode = values.agentMode as { readonly mode: RuntimeV2AgentMode; readonly revision: number };
+    const agentMode = values.agentMode as { readonly mode: RuntimeAgentMode; readonly revision: number };
     return {
       kind: "session-snapshot", schemaVersion: 1, sessionId: this.header.sessionId,
       createdAt: this.header.createdAt, updatedAt: values.updatedAt as string,
       workspaceRoot: values.workspaceRoot as string | null, ...(this.header.worktree ? { worktree: this.header.worktree } : {}), agentForm: this.header.lineage?.origin === "delegation" ? "agent" : mainAgentFormFromPresetId(this.header.createdWith.presetId), agentFormId: "actspace.main", agentMode: agentMode.mode, agentModeRevision: agentMode.revision, throughJournalSeq: projection.throughJournalSeq, accessState,
       ...sessionFacts(this.projections, this.header.sessionId),
       messages: surface.entries.map(entry => ({ kind: entry.node.kind, messageId: entry.node.messageId, content: entry.node.content, ...(entry.node.kind === "tool-result" ? { callId: entry.node.callId } : {}) })),
-      tools: values.tools as readonly RuntimeV2ToolView[], lineage: this.header.lineage as RuntimeV2JsonValue | null,
+      tools: values.tools as readonly RuntimeToolView[], lineage: this.header.lineage as RuntimeJsonValue | null,
     };
   }
 }
 
-function applyTool(state: readonly RuntimeV2ToolView[], sessionId: string, event: SessionEventEnvelopeV1, allowlist: RendererAllowlist | undefined): readonly RuntimeV2ToolView[] {
+function applyTool(state: readonly RuntimeToolView[], sessionId: string, event: SessionEventEnvelopeV1, allowlist: RendererAllowlist | undefined): readonly RuntimeToolView[] {
   if (!isRecord(event.data)) return state;
   const data = event.data; const callId = stringValue(data.callId);
   if (!callId) return state;
@@ -95,7 +95,7 @@ function applyTool(state: readonly RuntimeV2ToolView[], sessionId: string, event
   return next === previous ? state : state.map(item => item.callId === callId ? next : item);
 }
 
-function completeFromEvent(previous: RuntimeV2ToolView, event: SessionEventEnvelopeV1, rendererAllowlist: RendererAllowlist | undefined): RuntimeV2ToolView {
+function completeFromEvent(previous: RuntimeToolView, event: SessionEventEnvelopeV1, rendererAllowlist: RendererAllowlist | undefined): RuntimeToolView {
   const data = isRecord(event.data) ? event.data : {};
   const rawStatus = stringValue(data.status);
   const status = rawStatus === "failed" || rawStatus === "denied" || rawStatus === "aborted" || rawStatus === "outcome-unknown" || rawStatus === "completed"
@@ -127,10 +127,10 @@ function completeFromEvent(previous: RuntimeV2ToolView, event: SessionEventEnvel
   return completeToolView(previous, result, event.time, projectRendererHint(data.renderer, rendererAllowlist));
 }
 
-function isRecord(value: RuntimeV2JsonValue | undefined): value is Readonly<Record<string, RuntimeV2JsonValue>> {
+function isRecord(value: RuntimeJsonValue | undefined): value is Readonly<Record<string, RuntimeJsonValue>> {
   return value !== undefined && value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function stringValue(value: RuntimeV2JsonValue | undefined): string | null {
+function stringValue(value: RuntimeJsonValue | undefined): string | null {
   return typeof value === "string" && value.length > 0 ? redactProjectionText(value, 240) : null;
 }

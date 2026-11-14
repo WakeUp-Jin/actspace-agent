@@ -1,13 +1,13 @@
 import { fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RuntimeV2TrajectoryNode, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeTrajectoryNode, RuntimeTrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { TrajectoryTimeline } from "../components/trajectory/TrajectoryTimeline";
 import { buildTrajectorySnapshot, deriveLayout, deriveTimeline } from "../trajectory";
 
 let seq = 0;
-const node = (eventType: string, time: string, data: Record<string, unknown>, callId: string | null = null): RuntimeV2TrajectoryNode => {
+const node = (eventType: string, time: string, data: Record<string, unknown>, callId: string | null = null): RuntimeTrajectoryNode => {
   seq += 1;
-  return { key: `s:${seq}`, sessionId: "s", eventSeq: seq, eventType, time: `2026-10-14T00:00:${time}Z`, kind: "other", state: "observed", callId, data } as RuntimeV2TrajectoryNode;
+  return { key: `s:${seq}`, sessionId: "s", eventSeq: seq, eventType, time: `2026-10-14T00:00:${time}Z`, kind: "other", state: "observed", callId, data } as RuntimeTrajectoryNode;
 };
 const t1 = { turnId: "t1" };
 const nodes = [
@@ -24,7 +24,7 @@ const nodes = [
   node("step/end", "01.500", { ...t1, stepId: "st1" }),
   node("turn/end", "01.500", t1),
 ];
-const snapshot: RuntimeV2TrajectorySnapshot = { kind: "trajectory", schemaVersion: 1, sessionId: "s", throughJournalSeq: seq, nodes };
+const snapshot: RuntimeTrajectorySnapshot = { kind: "trajectory", schemaVersion: 1, sessionId: "s", throughJournalSeq: seq, nodes };
 const model = deriveTimeline(deriveLayout(buildTrajectorySnapshot(snapshot)).turns)!;
 
 const WIDTH = 700;

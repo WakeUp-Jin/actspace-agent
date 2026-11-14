@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { DesktopRuntimeV2Roots } from "./runtime-v2/host-ports";
-export type AppDataRoots = DesktopRuntimeV2Roots;
+import type { DesktopRuntimeRoots } from "./runtime-v2/host-ports";
+export type AppDataRoots = DesktopRuntimeRoots;
 
 type ReadText = (path: string) => Promise<string>;
 

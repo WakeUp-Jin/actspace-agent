@@ -1,7 +1,7 @@
 import { Database, Gauge, type LucideIcon } from "lucide-react";
 import { Fragment, useState } from "react";
 import { STAT_DIALOG_CONTENT_CLASS, StatDialogBody, type StatDialog, type StatRow } from "../stats/StatDialog";
-import type { RuntimeV2UsageSummary } from "@actspace/shared/runtime-v2/projection";
+import type { RuntimeUsageSummary } from "@actspace/shared/runtime-v2/projection";
 import { useProjectionSelect } from "../../session";
 import { jsonEqual } from "../../json-equal";
 import type { ClientSessionCell } from "@actspace/client/sessions";
@@ -72,7 +72,7 @@ export function activityPillModel(stats: ComposerSessionStats): PillModel | null
  * @param usage - 全会话累计用量。
  * @returns 胶囊模型；不显示时为 null。
  */
-export function usagePillModel(usage: RuntimeV2UsageSummary | null | undefined): PillModel | null {
+export function usagePillModel(usage: RuntimeUsageSummary | null | undefined): PillModel | null {
   if (!usage) return null;
   const billedInput = billedInputTokens(usage);
   if (billedInput === 0 && usage.outputTokens === 0) return null;

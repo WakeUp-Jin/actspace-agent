@@ -31,10 +31,10 @@ import {
   type ContextEstimateView,
 } from "@actspace/shared";
 import {
-  RUNTIME_V2_FIXED_RENDERER_CHANNELS,
-  type RuntimeV2JsonValue,
-  type RuntimeV2SessionListItem,
-  type RuntimeV2SessionSnapshot,
+  RUNTIME_FIXED_RENDERER_CHANNELS,
+  type RuntimeJsonValue,
+  type RuntimeSessionListItem,
+  type RuntimeSessionSnapshot,
   type TaskSubmissionResult,
   rewindErrorMessage,
 } from "@actspace/shared/runtime-v2";
@@ -61,7 +61,7 @@ import { openWorkspaceInIde } from "../workspace-ide-service";
 import { commitAndPushWorkspaceChanges, commitWorkspaceChanges, createWorkspaceBranch, getWorkspaceEnvironment, pushWorkspaceBranch, switchWorkspaceBranch } from "../workspace-environment-service";
 import { listWorkspaceOpenTools, openWorkspaceInTool } from "../workspace-open-service";
 import type { ProviderNetworkService } from "./provider-network-service";
-import { ChatAttachmentValidationError, type DesktopRuntimeV2Registry } from "./runtime-registry";
+import { ChatAttachmentValidationError, type DesktopRuntimeRegistry } from "./runtime-registry";
 import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRendererSkill } from "./fixed-renderer-skills";
 import {
   projectSubagentTranscript,
@@ -75,7 +75,7 @@ import {
 } from "@actspace/client/sessions";
 
 export type FixedRendererIpcOptions = {
-  readonly registry: DesktopRuntimeV2Registry;
+  readonly registry: DesktopRuntimeRegistry;
   readonly remote?: RemoteDesktopAdapter;
   readonly roots: AppDataRoots;
   readonly settings: SettingsService;
@@ -161,7 +161,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       sourceWorkspaceRoot: workspaceRoot, runLocation: input.runLocation, branch: input.branch,
     }, options.roots) : { ok: true as const, workspaceRoot };
     if (prepared.ok === false) throw new Error(prepared.message);
-    let snapshot: RuntimeV2SessionSnapshot;
+    let snapshot: RuntimeSessionSnapshot;
     try {
       snapshot = await options.registry.createSession(undefined, prepared.workspaceRoot, input.agentForm, "worktree" in prepared ? prepared.worktree : undefined);
     } catch (error) {
@@ -323,12 +323,12 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     options.registry.flushRendererStream();
     const target = options.getMainWindow();
     if (target === undefined || target.isDestroyed()) return;
-    target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.sessionLiveEvent, envelope);
+    target.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.sessionLiveEvent, envelope);
   });
 
   const unsubscribeRendererStream = options.registry.subscribeRendererStream((event) => {
     const target = options.getMainWindow();
-    if (target !== undefined && !target.isDestroyed()) target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.agentStream, event);
+    if (target !== undefined && !target.isDestroyed()) target.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.agentStream, event);
   });
 
   registerFixedRendererSettings(options, ipc);
@@ -336,7 +336,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   unsubscribeSettingsV4 = options.settings.subscribeV4Changes((notification: SettingsV4ChangedNotification) => {
     const target = options.getMainWindow();
     if (target !== undefined && !target.isDestroyed()) {
-      target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.settingsChangedV4, notification);
+      target.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.settingsChangedV4, notification);
     }
   });
   registerFixedRendererHostCapabilities(options, ipc, contextPanel);
@@ -377,7 +377,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       pendingQuickOpen = true;
       const target = options.getMainWindow();
       if (target !== undefined && !target.isDestroyed()) {
-        target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.quickOpenRequested);
+        target.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.quickOpenRequested);
       }
     },
   };
@@ -609,13 +609,13 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
         ? await options.registry.browseToolDetail(request.sessionId, request.toolCallId).catch(() => undefined)
         : undefined;
       const call = detail?.journal.find(event => event.type === "tool/call" && (event.data as Record<string, unknown>).callId === request.toolCallId);
-      const callData = call?.data as Record<string, RuntimeV2JsonValue> | undefined;
+      const callData = call?.data as Record<string, RuntimeJsonValue> | undefined;
       return {
         requestId: request.id,
         ...(request.sessionId && request.agentRunId && request.toolCallId ? { recovery: {
           agentRunId: request.agentRunId,
           toolCallId: request.toolCallId,
-          preview: toolPreview(request.toolName, undefined, { summary: request.summary }, callData ?? { args: request.args as Record<string, RuntimeV2JsonValue> }, undefined, request.sessionId, request.agentRunId, "running", detail?.snapshot.workspaceRoot ?? undefined),
+          preview: toolPreview(request.toolName, undefined, { summary: request.summary }, callData ?? { args: request.args as Record<string, RuntimeJsonValue> }, undefined, request.sessionId, request.agentRunId, "running", detail?.snapshot.workspaceRoot ?? undefined),
           approvalScope: request.approvalScope,
         } } : {}),
         toolName: request.toolName,
@@ -723,7 +723,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
  */
 const subagentLists = new Map<string, { throughSeq: number; state: SubagentListState }>();
 const SUBAGENT_LIST_CACHE_LIMIT = 16;
-async function subagentListFor(registry: Pick<DesktopRuntimeV2Registry, "inspectSessionEventsAfter">, sessionId: string): Promise<SubagentListState> {
+async function subagentListFor(registry: Pick<DesktopRuntimeRegistry, "inspectSessionEventsAfter">, sessionId: string): Promise<SubagentListState> {
   const cached = subagentLists.get(sessionId);
   let fold = cached ?? { throughSeq: -1, state: createSubagentListState() };
   let read = await registry.inspectSessionEventsAfter(sessionId, fold.throughSeq);
@@ -747,7 +747,7 @@ function rememberFinished<T>(cache: Map<string, T>, childSessionId: string, valu
   cache.set(childSessionId, value);
 }
 
-async function toSessionListItem(item: RuntimeV2SessionListItem, registry: DesktopRuntimeV2Registry): Promise<SessionListItem> {
+async function toSessionListItem(item: RuntimeSessionListItem, registry: DesktopRuntimeRegistry): Promise<SessionListItem> {
   const agentRunCount = item.completedTurnCount ?? 0;
   return {
     id: item.sessionId,
@@ -768,7 +768,7 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
 }
 
 /** Shared ownership validation; filesystem resolution remains a Node Host port. */
-async function validateRunReferences(registry: DesktopRuntimeV2Registry, input: Pick<import("@actspace/shared/runtime-v2").SubmitTaskInput, "sessionId" | "fileReferences" | "responseAnnotations">) {
+async function validateRunReferences(registry: DesktopRuntimeRegistry, input: Pick<import("@actspace/shared/runtime-v2").SubmitTaskInput, "sessionId" | "fileReferences" | "responseAnnotations">) {
   return validateSharedRunReferences({
     inspectSession: id => registry.inspectSession(id),
     readSessionProjection: input => registry.readSessionProjection(input),
@@ -777,7 +777,7 @@ async function validateRunReferences(registry: DesktopRuntimeV2Registry, input: 
 }
 
 async function toRunContent(
-  registry: DesktopRuntimeV2Registry,
+  registry: DesktopRuntimeRegistry,
   sessionId: string,
   input: {
     readonly userInput: string;
@@ -785,12 +785,12 @@ async function toRunContent(
     readonly fileReferences: readonly FileReference[];
     readonly responseAnnotations: readonly ResponseAnnotationReference[];
   },
-): Promise<{ readonly content: RuntimeV2JsonValue; readonly importedArtifactIds: readonly string[] }> {
+): Promise<{ readonly content: RuntimeJsonValue; readonly importedArtifactIds: readonly string[] }> {
   const { userInput, attachments } = input;
-  const referenceBlocks: RuntimeV2JsonValue[] = [...fileReferenceBlocks(input.fileReferences), ...responseExcerptBlocks(input.responseAnnotations)];
+  const referenceBlocks: RuntimeJsonValue[] = [...fileReferenceBlocks(input.fileReferences), ...responseExcerptBlocks(input.responseAnnotations)];
   if (attachments.length === 0 && referenceBlocks.length === 0) return { content: userInput, importedArtifactIds: [] };
   // 块顺序：正文 → 文件引用 → 回复批注 → 附件。
-  const blocks: RuntimeV2JsonValue[] = userInput ? [{ type: "text", text: userInput }, ...referenceBlocks] : [...referenceBlocks];
+  const blocks: RuntimeJsonValue[] = userInput ? [{ type: "text", text: userInput }, ...referenceBlocks] : [...referenceBlocks];
   if (attachments.length === 0) return { content: blocks, importedArtifactIds: [] };
   const snapshot = await registry.inspectSession(sessionId);
   const usableAttachments = attachments.filter((attachment) => Boolean(attachment.path));
@@ -831,15 +831,15 @@ async function toRunContent(
   return { content: blocks, importedArtifactIds };
 }
 
-const usageReadModels = new WeakMap<DesktopRuntimeV2Registry, UsageReadModelService>();
+const usageReadModels = new WeakMap<DesktopRuntimeRegistry, UsageReadModelService>();
 
-function usageReadModelFor(registry: DesktopRuntimeV2Registry, dataRoot: string): UsageReadModelService {
+function usageReadModelFor(registry: DesktopRuntimeRegistry, dataRoot: string): UsageReadModelService {
   const service = usageReadModels.get(registry) ?? new UsageReadModelService(registry, dataRoot);
   usageReadModels.set(registry, service);
   return service;
 }
 
-async function createUsageActivity(registry: DesktopRuntimeV2Registry, dataRoot: string, input: UsageStatisticsGetInput): Promise<UsageActivitySnapshot | null> {
+async function createUsageActivity(registry: DesktopRuntimeRegistry, dataRoot: string, input: UsageStatisticsGetInput): Promise<UsageActivitySnapshot | null> {
   const service = usageReadModels.get(registry) ?? new UsageReadModelService(registry, dataRoot);
   usageReadModels.set(registry, service);
   return service.getActivity({ ...input, search: input.search?.slice(0, 300) });

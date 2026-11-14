@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCoreCodecRegistry, SessionJournal, type SessionEventCandidateV1 } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { resolveRewindCut } from "../rewind-cut.js";
 import { taskCodecs, TASK_EVENT, RUN_EVENT, eventCandidate } from "../task-events.js";
 
@@ -8,7 +8,7 @@ const SESSION = "s";
 const harness = { harnessId: "main", generationId: "generation-1", revision: 1 };
 const at = "2026-11-07T00:00:00.000Z";
 function registry() { const codecs = createCoreCodecRegistry(); for (const codec of taskCodecs) codecs.register(codec); return codecs; }
-function core(type: string, data: Record<string, RuntimeV2JsonValue>, surface: SessionEventCandidateV1["surface"] = null): SessionEventCandidateV1 {
+function core(type: string, data: Record<string, RuntimeJsonValue>, surface: SessionEventCandidateV1["surface"] = null): SessionEventCandidateV1 {
   return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface };
 }
 

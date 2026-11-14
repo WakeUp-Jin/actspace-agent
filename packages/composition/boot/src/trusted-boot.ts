@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { RuntimeV2BootManifest, RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
+import type { RuntimeBootManifest, RuntimeHostDescriptor } from "@actspace/shared/runtime-v2";
 import type { CordisAdmissionReport, CordisRootHandle, EventCodec } from "@actspace/cordis-adapter";
 import { createBootConfigDump, type ResolvedComposition } from "@actspace/composition";
 import { BootDiagnostics } from "@actspace/diagnostics";
@@ -12,7 +12,7 @@ import type { TrustedBootCandidate } from "./types.js";
  * The existing composition remains the metadata source until every runtime
  * service has moved into a Cordis Behavior.
  */
-export async function createDshBootCandidate(options: { readonly host: RuntimeV2HostDescriptor; readonly composition: ResolvedComposition; readonly cordisAdmission: CordisAdmissionReport; readonly root: CordisRootHandle; readonly discoveredCodecs?: readonly EventCodec[] }): Promise<TrustedBootCandidate> {
+export async function createDshBootCandidate(options: { readonly host: RuntimeHostDescriptor; readonly composition: ResolvedComposition; readonly cordisAdmission: CordisAdmissionReport; readonly root: CordisRootHandle; readonly discoveredCodecs?: readonly EventCodec[] }): Promise<TrustedBootCandidate> {
   const diagnostics = new BootDiagnostics();
   if (options.cordisAdmission.status !== "passed") throw new Error(`Cordis admission failed: ${options.cordisAdmission.failures.join("; ")}`);
   const settlement = await options.root.awaitSettlement();
@@ -25,4 +25,4 @@ export async function createDshBootCandidate(options: { readonly host: RuntimeV2
   let disposing: Promise<void> | undefined;
   return Object.freeze({ manifest, composition: options.composition, diagnostics: diagnostics.snapshot(), codecCount: options.discoveredCodecs?.length ?? 0, disposeCandidate: () => { if (disposed) return Promise.resolve(); return disposing ??= Promise.resolve().then(() => options.root.dispose()).then(() => { disposed = true; }).finally(() => { disposing = undefined; }); } });
 }
-function toManifest(host: RuntimeV2HostDescriptor, composition: ResolvedComposition): RuntimeV2BootManifest { return Object.freeze({ schemaVersion: 1, runtimeContract: "actspace.runtime.v2", profileId: composition.profileId, hostKind: host.hostKind, manifestDigest: composition.digest, configRevision: createHash("sha256").update(JSON.stringify(composition.config)).digest("hex"), capabilities: composition.hostCapabilities as RuntimeV2BootManifest["capabilities"], entries: Object.freeze(composition.entries.map((entry) => Object.freeze({ entryId: entry.entryId, pluginId: entry.pluginId, version: entry.pluginVersion, required: entry.required, state: entry.state === "active" || entry.state === "candidate" ? "active" as const : entry.state === "failed" ? "failed" as const : "skipped" as const, capabilities: entry.requiredCapabilities as RuntimeV2BootManifest["entries"][number]["capabilities"] }))), config: composition.config as RuntimeV2BootManifest["config"] }); }
+function toManifest(host: RuntimeHostDescriptor, composition: ResolvedComposition): RuntimeBootManifest { return Object.freeze({ schemaVersion: 1, runtimeContract: "actspace.runtime.v2", profileId: composition.profileId, hostKind: host.hostKind, manifestDigest: composition.digest, configRevision: createHash("sha256").update(JSON.stringify(composition.config)).digest("hex"), capabilities: composition.hostCapabilities as RuntimeBootManifest["capabilities"], entries: Object.freeze(composition.entries.map((entry) => Object.freeze({ entryId: entry.entryId, pluginId: entry.pluginId, version: entry.pluginVersion, required: entry.required, state: entry.state === "active" || entry.state === "candidate" ? "active" as const : entry.state === "failed" ? "failed" as const : "skipped" as const, capabilities: entry.requiredCapabilities as RuntimeBootManifest["entries"][number]["capabilities"] }))), config: composition.config as RuntimeBootManifest["config"] }); }

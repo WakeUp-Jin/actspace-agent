@@ -53,9 +53,9 @@ export async function runToolStreamFixture(options: {
   permission?: ToolPermissionContract;
   beforeFinalText?: () => Promise<void>;
   context?: CordisContext;
-  mode?: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode;
+  mode?: import("@actspace/shared/runtime-v2").RuntimeAgentMode;
   terminalOnly?: boolean;
-  content?: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue;
+  content?: import("@actspace/shared/runtime-v2").RuntimeJsonValue;
   compaction?: import("@actspace/context-compaction").CompactionPlugin;
   usage?: import("@actspace/llm-service").LlmUsage;
   contextWindow?: number;

@@ -1,7 +1,7 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 
-type AnthropicParams = Record<string, RuntimeV2JsonValue>;
-type JsonRecord = Record<string, RuntimeV2JsonValue>;
+type AnthropicParams = Record<string, RuntimeJsonValue>;
+type JsonRecord = Record<string, RuntimeJsonValue>;
 
 export function anthropicCacheControl(retention: "short" | "long" | "none" | undefined) {
   return retention === "none" ? undefined : { type: "ephemeral", ttl: retention === "long" ? "1h" : "5m" } as const;
@@ -45,7 +45,7 @@ export function applyAnthropicPromptCache(
   return next;
 }
 
-function markLastEligibleBlock(blocks: RuntimeV2JsonValue[], cacheControl: NonNullable<ReturnType<typeof anthropicCacheControl>>): RuntimeV2JsonValue[] {
+function markLastEligibleBlock(blocks: RuntimeJsonValue[], cacheControl: NonNullable<ReturnType<typeof anthropicCacheControl>>): RuntimeJsonValue[] {
   const next = blocks.map((block) => isRecord(block) ? { ...block } : block);
   for (let index = next.length - 1; index >= 0; index -= 1) {
     const block = next[index];
@@ -56,6 +56,6 @@ function markLastEligibleBlock(blocks: RuntimeV2JsonValue[], cacheControl: NonNu
   return next;
 }
 
-function isRecord(value: RuntimeV2JsonValue): value is JsonRecord {
+function isRecord(value: RuntimeJsonValue): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

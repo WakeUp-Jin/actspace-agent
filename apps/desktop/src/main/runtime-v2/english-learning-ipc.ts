@@ -2,10 +2,10 @@ import type { BrowserWindow } from "electron";
 import { ENGLISH_LEARNING_CHANNELS, type EnglishLearningTargetInput } from "@actspace/shared";
 import { desktopBridgeContract as contract } from "@actspace/shared/desktop-bridge";
 import type { SettingsService } from "../settings-service";
-import type { DesktopRuntimeV2Registry } from "./runtime-registry";
+import type { DesktopRuntimeRegistry } from "./runtime-registry";
 import { createIpcRegistrar } from "../ipc/registry";
 
-export function registerEnglishLearningIpc(options: { registry: DesktopRuntimeV2Registry; settings: SettingsService; getMainWindow: () => BrowserWindow | null }): () => void {
+export function registerEnglishLearningIpc(options: { registry: DesktopRuntimeRegistry; settings: SettingsService; getMainWindow: () => BrowserWindow | null }): () => void {
   const { registry, settings } = options;
   const ipc = createIpcRegistrar({
     getWindow: options.getMainWindow,

@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { RuntimeV2JsonValue, RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
+import type { RuntimeJsonValue, RuntimeTrajectorySnapshot } from '@actspace/shared/runtime-v2';
 import { buildTrajectorySnapshot } from '../trajectory';
 import { TrajectoryView } from '../components/TrajectoryView';
 import { loadTrajectoryFixture } from '../trajectory/fixtures';
 
-const events: [string, RuntimeV2JsonValue][] = [
+const events: [string, RuntimeJsonValue][] = [
   ['turn/start', { turnId: 't' }],
   ['user/message', { content: '**Inspect** files', source: { kind: 'user' } }],
   ['step/start', { stepId: 's' }],
@@ -31,10 +31,10 @@ const events: [string, RuntimeV2JsonValue][] = [
   ['request/tools', { requestId: 'later', digest: 't2', tools: [{ name: 'bash', description: 'New definition.', parameters: {} }] }],
   ['request/context', { requestId: 'later', snapshot: { schemaVersion: 3 } }],
 ];
-const snapshot: RuntimeV2TrajectorySnapshot = {
+const snapshot: RuntimeTrajectorySnapshot = {
   kind: 'trajectory', schemaVersion: 1, sessionId: 'relations', throughJournalSeq: events.length - 1,
   nodes: events.map(([eventType, value], eventSeq) => {
-    const data = value as Record<string, RuntimeV2JsonValue>;
+    const data = value as Record<string, RuntimeJsonValue>;
     return { key: `relations:${eventSeq}`, sessionId: 'relations', eventSeq, eventType, time: new Date(1_700_000_000_000 + eventSeq * 1000).toISOString(), kind: 'other', state: 'observed', callId: typeof data.callId === 'string' ? data.callId : null, data: { turnId: 't', stepId: 's', ...data } };
   }),
 };
@@ -107,7 +107,7 @@ describe('trajectory content and call relations', () => {
     const user = userEvent.setup();
     const long = loadTrajectoryFixture('long');
     const changed = { ...long, nodes: long.nodes.map(node => {
-      const data = node.data as Record<string, RuntimeV2JsonValue>;
+      const data = node.data as Record<string, RuntimeJsonValue>;
       return data.messageId === 'batch-24:assistant-5-1' ? { ...node, data: { ...data, content: [{ type: 'tool-call', callId: 'batch-1:call-1-1-1', name: 'read_file', arguments: {} }] } } : node;
     }) };
     render(<TrajectoryView snapshot={changed} />);

@@ -5,7 +5,7 @@ import { calculateUsageCost } from "@actspace/llm-service";
 import { withReasoningPayload, withoutReasoningPayload } from "./reasoning-options.js";
 import { builtinChatModel, builtinProviderForBaseUrl, loadBuiltinProvider, type PiAiBuiltinLoader, type PiAiBuiltinProvider } from "./builtin-providers.js";
 import { ProviderProxyError, type ProviderProxyPool } from "@actspace/llm-service";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { LlmRuntimeError, providerCodeFromUnknown, retryAfterMsFromUnknown, type LlmFailure, type LlmFailureKind } from "@actspace/llm-service";
 import type { LlmContentBlock, LlmMessage, LlmReplayEnvelope } from "@actspace/llm-service";
@@ -36,17 +36,17 @@ type ProviderFetch = Awaited<ReturnType<ProviderProxyPool["getFetch"]>>;
 type PiAiPublicLoader = (route: PiAiWireRoute) => Promise<{ readonly core: PiAiCoreModule; readonly api: PiAiApiModule }>;
 type PiAiCoreModule = {
   createModels(): PiAiModels;
-  createProvider(input: RuntimeV2JsonValue): PiAiProvider;
+  createProvider(input: RuntimeJsonValue): PiAiProvider;
 };
 type PiAiApiModule = { readonly stream: Function; readonly streamSimple: Function };
 type PiAiProvider = { readonly id: string };
-type PiAiModels = { setProvider(provider: PiAiProvider): void; getModel(provider: string, model: string): PiAiModel | undefined; streamSimple(model: PiAiModel, context: PiAiContext, options: RuntimeV2JsonValue): AsyncIterable<PiAiEvent> };
+type PiAiModels = { setProvider(provider: PiAiProvider): void; getModel(provider: string, model: string): PiAiModel | undefined; streamSimple(model: PiAiModel, context: PiAiContext, options: RuntimeJsonValue): AsyncIterable<PiAiEvent> };
 type PiAiModel = { readonly id: string; readonly provider: string };
-type PiAiContext = { readonly systemPrompt?: string; readonly messages: readonly RuntimeV2JsonValue[]; readonly tools?: readonly RuntimeV2JsonValue[] };
+type PiAiContext = { readonly systemPrompt?: string; readonly messages: readonly RuntimeJsonValue[]; readonly tools?: readonly RuntimeJsonValue[] };
 type PiAiWireUsage = { readonly version: 1; readonly input: number | null; readonly output: number | null; readonly cacheRead: number | null; readonly cacheWrite: number | null; readonly reasoning: number | null };
 type PiAiUsage = { readonly actspaceWireUsage?: PiAiWireUsage };
-type PiAiAssistant = { readonly content: readonly RuntimeV2JsonValue[]; readonly stopReason: string; readonly errorMessage?: string; readonly usage?: PiAiUsage; readonly status?: number; readonly code?: string; readonly retryAfterMs?: number };
-type PiAiEvent = { readonly type: string; readonly contentIndex?: number; readonly delta?: string; readonly content?: string; readonly toolCall?: { readonly id: string; readonly name: string; readonly arguments: RuntimeV2JsonValue }; readonly partial?: PiAiAssistant; readonly message?: PiAiAssistant; readonly error?: PiAiAssistant };
+type PiAiAssistant = { readonly content: readonly RuntimeJsonValue[]; readonly stopReason: string; readonly errorMessage?: string; readonly usage?: PiAiUsage; readonly status?: number; readonly code?: string; readonly retryAfterMs?: number };
+type PiAiEvent = { readonly type: string; readonly contentIndex?: number; readonly delta?: string; readonly content?: string; readonly toolCall?: { readonly id: string; readonly name: string; readonly arguments: RuntimeJsonValue }; readonly partial?: PiAiAssistant; readonly message?: PiAiAssistant; readonly error?: PiAiAssistant };
 
 /** Private protocol implementation; backend selection belongs to PiAiAdapter. */
 export async function streamPiAi(options: PiAiConnectionOptions, input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
@@ -113,11 +113,11 @@ export async function streamPiAi(options: PiAiConnectionOptions, input: LlmAdapt
  * with pi-ai's address-based compat detection.
  * Capacity facts prefer ActSpace settings; pricing never comes from pi-ai.
  */
-function builtinTarget(builtin: PiAiBuiltinProvider, options: PiAiConnectionOptions, modelId: string, baseUrl: string): { providerId: string; model: RuntimeV2JsonValue; api: PiAiWireRoute; input: readonly string[]; known: boolean } {
+function builtinTarget(builtin: PiAiBuiltinProvider, options: PiAiConnectionOptions, modelId: string, baseUrl: string): { providerId: string; model: RuntimeJsonValue; api: PiAiWireRoute; input: readonly string[]; known: boolean } {
   const known = builtinChatModel(builtin, modelId);
   const facts = options.modelFacts;
   if (known === undefined) {
-    const model = { ...(createModel(options, modelId, baseUrl, false) as Record<string, RuntimeV2JsonValue>), provider: builtin.id };
+    const model = { ...(createModel(options, modelId, baseUrl, false) as Record<string, RuntimeJsonValue>), provider: builtin.id };
     return { providerId: builtin.id, model, api: options.route, input: facts?.input ?? ["text", "image"], known: false };
   }
   const input = facts?.input ?? known.input ?? ["text", "image"];
@@ -131,7 +131,7 @@ function builtinTarget(builtin: PiAiBuiltinProvider, options: PiAiConnectionOpti
     contextWindow: facts?.contextWindow ?? known.contextWindow ?? 262_144,
     maxTokens: facts?.maxTokens ?? known.maxTokens ?? 32_768,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  } as unknown as RuntimeV2JsonValue;
+  } as unknown as RuntimeJsonValue;
   return { providerId: builtin.id, model, api: known.api, input, known: true };
 }
 
@@ -157,13 +157,13 @@ async function loadPiAiPublicModules(route: PiAiWireRoute): Promise<{ readonly c
   return { core: core as unknown as PiAiCoreModule, api: api as unknown as PiAiApiModule };
 }
 
-function createModel(options: PiAiConnectionOptions, model: string, baseUrl: string, withCompat = true): RuntimeV2JsonValue {
+function createModel(options: PiAiConnectionOptions, model: string, baseUrl: string, withCompat = true): RuntimeJsonValue {
   return { id: model, name: model, api: options.route, provider: options.providerId, baseUrl, ...(withCompat && options.providerId === "deepseek" && options.route === "openai-completions" ? { compat: { maxTokensField: "max_tokens" } } : {}), reasoning: options.modelFacts?.reasoning ?? true, input: options.modelFacts ? [...options.modelFacts.input] : ["text", "image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: options.modelFacts?.contextWindow ?? 262_144, maxTokens: options.modelFacts?.maxTokens ?? 32_768 };
 }
 
-async function toPiAiContext(messages: readonly LlmMessage[], tools: readonly { readonly name: string; readonly description: string; readonly inputSchema: RuntimeV2JsonValue }[], sessionId?: string, readArtifact?: PiAiArtifactReader, replay?: { api: string; provider: string; model: string }, replayIdentity?: { provider: string; protocol: string; model: string }): Promise<PiAiContext> {
+async function toPiAiContext(messages: readonly LlmMessage[], tools: readonly { readonly name: string; readonly description: string; readonly inputSchema: RuntimeJsonValue }[], sessionId?: string, readArtifact?: PiAiArtifactReader, replay?: { api: string; provider: string; model: string }, replayIdentity?: { provider: string; protocol: string; model: string }): Promise<PiAiContext> {
   const systemPrompt = messages.filter((message) => message.role === "system").map(messageText).join("\n\n");
-  const names = new Map<string, string>(); const output: RuntimeV2JsonValue[] = [];
+  const names = new Map<string, string>(); const output: RuntimeJsonValue[] = [];
   for (const message of messages) {
     if (message.role === "system") continue;
     if (message.role === "assistant") {
@@ -180,7 +180,7 @@ async function toPiAiContext(messages: readonly LlmMessage[], tools: readonly { 
   return { ...(systemPrompt ? { systemPrompt } : {}), messages: output, ...(tools.length > 0 ? { tools: tools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.inputSchema })) } : {}) };
 }
 
-function toPiAssistantBlock(block: LlmContentBlock, names: Map<string, string>, deepseek = false, replayIdentity?: { provider: string; protocol: string; model: string }): RuntimeV2JsonValue {
+function toPiAssistantBlock(block: LlmContentBlock, names: Map<string, string>, deepseek = false, replayIdentity?: { provider: string; protocol: string; model: string }): RuntimeJsonValue {
   if (block.type === "text") return { type: "text", text: block.text };
   if (block.type === "reasoning") {
     const replayCompatible = replayIdentity !== undefined && block.replay?.schemaVersion === 1 && block.replay.adapterFamily === "pi-ai" && block.replay.providerId === replayIdentity.provider && block.replay.protocol === replayIdentity.protocol && block.replay.modelId === replayIdentity.model;
@@ -194,9 +194,9 @@ function toPiAssistantBlock(block: LlmContentBlock, names: Map<string, string>, 
   return { type: "text", text: block.alt ?? `[image:${block.artifactId}]` };
 }
 
-async function toPiUserContent(message: LlmMessage, sessionId?: string, readArtifact?: PiAiArtifactReader): Promise<RuntimeV2JsonValue> {
+async function toPiUserContent(message: LlmMessage, sessionId?: string, readArtifact?: PiAiArtifactReader): Promise<RuntimeJsonValue> {
   if (typeof message.content === "string") return message.content;
-  const content: RuntimeV2JsonValue[] = [];
+  const content: RuntimeJsonValue[] = [];
   for (const block of message.content) {
     if (block.type === "text") content.push({ type: "text", text: block.text });
     else if (block.type === "image") { if (readArtifact === undefined || sessionId === undefined) throw failure("unsupported-capability", "Image input requires a Session-bound ActSpace artifact reader."); const artifact = await readArtifact(sessionId, block.artifactId); content.push({ type: "image", data: Buffer.from(artifact.data).toString("base64"), mimeType: artifact.mimeType }); }
@@ -218,7 +218,7 @@ async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: stri
   yield { type: "error", failure: { kind: "malformed-stream", message: "pi-ai stream ended without a terminal event.", retryable: false, attempt: 1 } };
 }
 
-function toActSpaceContent(content: readonly RuntimeV2JsonValue[], identity: { readonly providerId: string; readonly protocol: string; readonly modelId: string }): readonly LlmContentBlock[] { return content.flatMap((raw): LlmContentBlock[] => { const block = raw as { type?: string; text?: string; thinking?: string; thinkingSignature?: string; id?: string; name?: string; arguments?: RuntimeV2JsonValue }; if (block.type === "text") return [{ type: "text", text: block.text ?? "" }]; if (block.type === "thinking") { const replay: LlmReplayEnvelope | undefined = block.thinkingSignature === undefined ? undefined : { schemaVersion: 1, adapterFamily: "pi-ai", providerId: identity.providerId, protocol: identity.protocol, modelId: identity.modelId, payload: { thinkingSignature: block.thinkingSignature } }; return [{ type: "reasoning", text: block.thinking ?? "", ...(block.thinkingSignature ? { signature: block.thinkingSignature } : {}), ...(replay === undefined ? {} : { replay }) }]; } if (block.type === "toolCall") return [{ type: "tool-call", callId: block.id ?? "unknown", name: block.name ?? "unknown", arguments: JSON.stringify(block.arguments ?? {}) }]; return []; }); }
+function toActSpaceContent(content: readonly RuntimeJsonValue[], identity: { readonly providerId: string; readonly protocol: string; readonly modelId: string }): readonly LlmContentBlock[] { return content.flatMap((raw): LlmContentBlock[] => { const block = raw as { type?: string; text?: string; thinking?: string; thinkingSignature?: string; id?: string; name?: string; arguments?: RuntimeJsonValue }; if (block.type === "text") return [{ type: "text", text: block.text ?? "" }]; if (block.type === "thinking") { const replay: LlmReplayEnvelope | undefined = block.thinkingSignature === undefined ? undefined : { schemaVersion: 1, adapterFamily: "pi-ai", providerId: identity.providerId, protocol: identity.protocol, modelId: identity.modelId, payload: { thinkingSignature: block.thinkingSignature } }; return [{ type: "reasoning", text: block.thinking ?? "", ...(block.thinkingSignature ? { signature: block.thinkingSignature } : {}), ...(replay === undefined ? {} : { replay }) }]; } if (block.type === "toolCall") return [{ type: "tool-call", callId: block.id ?? "unknown", name: block.name ?? "unknown", arguments: JSON.stringify(block.arguments ?? {}) }]; return []; }); }
 function mapUsage(usage: PiAiUsage | undefined, protocol: string): LlmUsage {
   // Only the pinned wire patch can distinguish provider facts from SDK defaults.
   // An unpatched/unsupported SDK must stay unknown rather than fabricate zeroes.
@@ -239,7 +239,7 @@ function mapUsage(usage: PiAiUsage | undefined, protocol: string): LlmUsage {
 function zeroUsage() { return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }; }
 function mapStopReason(reason: string): string { return reason === "toolUse" ? "tool-calls" : reason === "length" ? "max-tokens" : reason; }
 function messageText(message: LlmMessage): string { if (typeof message.content === "string") return message.content; return message.content.map((block) => block.type === "text" ? block.text : block.type === "reasoning" ? block.text : block.type === "tool-result" ? block.content : "").join(""); }
-function parseArguments(value: string): RuntimeV2JsonValue { try { return JSON.parse(value) as RuntimeV2JsonValue; } catch { return { $raw: value }; } }
+function parseArguments(value: string): RuntimeJsonValue { try { return JSON.parse(value) as RuntimeJsonValue; } catch { return { $raw: value }; } }
 function failure(kind: LlmFailureKind, message: string): LlmRuntimeError { return new LlmRuntimeError({ kind, message, retryable: false, attempt: 1 }); }
 function classifyFailure(error: unknown, endpoint?: string, proxyFailed = false): LlmFailure {
   const rawMessage = error instanceof Error

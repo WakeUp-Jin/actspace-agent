@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
-import type { GrantSuggestion, RuntimeV2ApprovalDecisionInput } from "@actspace/shared/runtime-v2";
+import type { GrantSuggestion, RuntimeApprovalDecisionInput } from "@actspace/shared/runtime-v2";
 import { Button } from "../ui/Button";
 import { approvalsApi } from "../../api/approvals";
 import { useHostDirectory } from "../../target/host-directory";
@@ -59,7 +59,7 @@ export function compactApprovalDir(dir: string): string {
   return `${leading}${segments.slice(0, 2).join(separator)}${separator}…${separator}${segments[segments.length - 1]}${separator}`;
 }
 
-export async function submitApprovalDecision(input: RuntimeV2ApprovalDecisionInput): Promise<boolean> {
+export async function submitApprovalDecision(input: RuntimeApprovalDecisionInput): Promise<boolean> {
   try {
     const result = await approvalsApi.submit(input);
     if (!result?.ok) {
@@ -98,7 +98,7 @@ export function useApprovalDecision(requestId: string | undefined): ApprovalDeci
     busy.current = true;
     setSubmitting(choice);
     const host = remoteHost ? { hostId: remoteHost } : {};
-    const input: RuntimeV2ApprovalDecisionInput = choice === "session" && suggestionId
+    const input: RuntimeApprovalDecisionInput = choice === "session" && suggestionId
       ? { requestId, ...host, decision: "session", suggestionId }
       : { requestId, ...host, decision: choice === "deny" ? "deny" : "once" };
     const accepted = await submitApprovalDecision(input);

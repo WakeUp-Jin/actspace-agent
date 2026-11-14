@@ -1,4 +1,4 @@
-import { surfaceNode, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { surfaceNode, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { relationContext, type EventCodecRegistry } from "./codec-registry.js";
 import { validateEventEnvelopeShape, type SessionEventEnvelopeV1 } from "./event-envelope.js";
 import { SessionError } from "./errors.js";
@@ -32,7 +32,7 @@ type MutableRelations = {
   openTurnId: string | null;
   openStepId: string | null;
   openAgentRunId: string | null;
-  auxiliary: Map<string, Readonly<Record<string, RuntimeV2JsonValue>>>;
+  auxiliary: Map<string, Readonly<Record<string, RuntimeJsonValue>>>;
   auxiliaryIds: Set<string>;
   requests: Map<string, { header: boolean; context: boolean; terminal: boolean; systemPrompt?: boolean; tools?: boolean }>;
   tools: Map<string, { terminal: boolean; order: number }>;
@@ -50,7 +50,7 @@ export class SessionEventValidator {
   private readonly diagnostics: SessionValidationDiagnostic[] = [];
   private accessState: SessionAccessState = "read-write";
   private nextSeq = 0;
-  private pending: Array<{ event: SessionEventEnvelopeV1; data: RuntimeV2JsonValue }> = [];
+  private pending: Array<{ event: SessionEventEnvelopeV1; data: RuntimeJsonValue }> = [];
   private kind: "recovery" | "compaction" | null = null;
   private transactionId: string | null = null;
 
@@ -61,7 +61,7 @@ export class SessionEventValidator {
     const checkpoint = { nextSeq: this.nextSeq, accessState: this.accessState, diagnostics: this.diagnostics.length, pending: this.pending, pendingLength: this.pending.length, kind: this.kind, transactionId: this.transactionId };
     const undo: Array<() => void> = [];
     const effective: SessionEventEnvelopeV1[] = [];
-    const apply = (event: SessionEventEnvelopeV1, data: RuntimeV2JsonValue) => {
+    const apply = (event: SessionEventEnvelopeV1, data: RuntimeJsonValue) => {
       undo.push(relationUndo(this.relations, data));
       applyRelations(this.relations, event, data);
       effective.push(event);
@@ -129,7 +129,7 @@ export function validateSessionEvents(events: readonly SessionEventEnvelopeV1[],
 }
 
 /** Preserve duplicate-ID checks without retaining settled request/tool payloads. */
-function relationUndo(state: MutableRelations, dataValue: RuntimeV2JsonValue): () => void {
+function relationUndo(state: MutableRelations, dataValue: RuntimeJsonValue): () => void {
   const data = asRecord(dataValue, "relation");
   const turn = state.openTurnId, step = state.openStepId, repair = state.activeRepairId, run = state.openAgentRunId;
   const restores: Array<() => void> = [];
@@ -180,7 +180,7 @@ function createRelations(): MutableRelations {
   return { openTurnId: null, openStepId: null, openAgentRunId: null, auxiliary: new Map(), auxiliaryIds: new Set(), requests: new Map(), tools: new Map(), inbox: new Map(), requestIds: new Set(), toolIds: new Set(), inboxIds: new Set(), activeRepairId: null, committedRepairIds: new Set() };
 }
 
-function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, dataValue: RuntimeV2JsonValue): void {
+function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, dataValue: RuntimeJsonValue): void {
   const data = asRecord(dataValue, event.type);
   // 进入对话的事件必须能从 data 推出节点（agent-spec-surface-derived.md §4.3）：缺 content / modelOutput / node 的直接拒绝。
   if (event.surface !== null && surfaceNode(event) === null) invalid(`Event ${event.type} enters Surface but its data cannot derive a node.`);
@@ -346,29 +346,29 @@ function validateReferences(event: SessionEventEnvelopeV1): void {
   if (event.provenance.runtimeSelectionSeq !== null && event.provenance.runtimeSelectionSeq >= event.seq) invalid(`Event ${event.seq} runtime selection must reference a prior event.`);
 }
 
-function requireOpenStep(state: MutableRelations, data: Readonly<Record<string, RuntimeV2JsonValue>>, type: string): void {
+function requireOpenStep(state: MutableRelations, data: Readonly<Record<string, RuntimeJsonValue>>, type: string): void {
   if (state.openTurnId !== id(data.turnId, type) || state.openStepId === null) invalid(`${type} does not belong to the open Turn and Step.`);
 }
 
-function asRecord(value: RuntimeV2JsonValue, type: string): Readonly<Record<string, RuntimeV2JsonValue>> {
+function asRecord(value: RuntimeJsonValue, type: string): Readonly<Record<string, RuntimeJsonValue>> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) invalid(`${type} data must be an object.`);
-  return value as Readonly<Record<string, RuntimeV2JsonValue>>;
+  return value as Readonly<Record<string, RuntimeJsonValue>>;
 }
 
-function id(value: RuntimeV2JsonValue | undefined, type: string): string {
+function id(value: RuntimeJsonValue | undefined, type: string): string {
   if (typeof value !== "string" || value.length === 0) invalid(`${type} is missing an identity field.`);
   return value;
 }
 
-function inboxTarget(value: RuntimeV2JsonValue | undefined, type: string): "next-step" | "next-turn" {
+function inboxTarget(value: RuntimeJsonValue | undefined, type: string): "next-step" | "next-turn" {
   if (value !== "next-step" && value !== "next-turn") invalid(`${type} has an invalid Inbox target.`);
   return value;
 }
 
-function transactionIdOf(value: RuntimeV2JsonValue, kind: "recovery" | "compaction"): string | null {
+function transactionIdOf(value: RuntimeJsonValue, kind: "recovery" | "compaction"): string | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
   const field = kind === "recovery" ? "repairId" : "compactionId";
-  const valueId = (value as Readonly<Record<string, RuntimeV2JsonValue>>)[field];
+  const valueId = (value as Readonly<Record<string, RuntimeJsonValue>>)[field];
   return typeof valueId === "string" && valueId.length > 0 ? valueId : null;
 }
 

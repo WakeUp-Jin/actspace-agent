@@ -1,6 +1,6 @@
 const path = require("node:path");
 
-const { RuntimeV2BridgeClient } = require("./runtime-v2-client.cjs");
+const { RuntimeBridgeClient } = require("./runtime-v2-client.cjs");
 
 const socketPath = path.join(
   process.env.HOME,
@@ -11,7 +11,7 @@ const clipboardProbe = "ABB_PLAN5_CLIPBOARD_20260711";
 const options = new Set(process.argv.slice(2));
 const runDownload = !options.has("--clipboard-only");
 const runClipboard = !options.has("--download-only");
-const client = new RuntimeV2BridgeClient({
+const client = new RuntimeBridgeClient({
   socketPath,
   sessionId: `acceptance-io-${Date.now()}`,
   turnId: "fixture-io-smoke",

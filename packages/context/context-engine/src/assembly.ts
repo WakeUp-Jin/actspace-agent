@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { Service } from "@actspace/cordis-adapter";
 import type { CordisServiceContext } from "@actspace/cordis-adapter";
 
@@ -7,20 +7,20 @@ export type ContextContribution = {
   readonly ownerPluginId: string;
   readonly order: number;
   readonly criticality: "required" | "optional";
-  readonly resolve: (input: ContextAssemblyInput) => RuntimeV2JsonValue | Promise<RuntimeV2JsonValue>;
+  readonly resolve: (input: ContextAssemblyInput) => RuntimeJsonValue | Promise<RuntimeJsonValue>;
 };
 
 export type ContextAssemblyInput = {
   readonly sessionId: string;
   readonly turnId: string;
   readonly stepId: string;
-  readonly surface: readonly RuntimeV2JsonValue[];
-  readonly hostFacts: RuntimeV2JsonValue;
+  readonly surface: readonly RuntimeJsonValue[];
+  readonly hostFacts: RuntimeJsonValue;
 };
 
 export type ContextAssemblyResult = {
-  readonly values: readonly RuntimeV2JsonValue[];
-  readonly provenance: readonly RuntimeV2JsonValue[];
+  readonly values: readonly RuntimeJsonValue[];
+  readonly provenance: readonly RuntimeJsonValue[];
 };
 
 export class ContextAssembler {
@@ -39,8 +39,8 @@ export class ContextAssembler {
   }
 
   async assemble(input: ContextAssemblyInput): Promise<ContextAssemblyResult> {
-    const values: RuntimeV2JsonValue[] = [];
-    const provenance: RuntimeV2JsonValue[] = [];
+    const values: RuntimeJsonValue[] = [];
+    const provenance: RuntimeJsonValue[] = [];
     for (const contribution of this.#contributors) {
       try {
         values.push(await contribution.resolve(input));

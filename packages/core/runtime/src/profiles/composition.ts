@@ -1,4 +1,4 @@
-import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
+import type { RuntimeHostDescriptor } from "@actspace/shared/runtime-v2";
 import { composeRuntime, type ResolvedComposition } from "@actspace/composition";
 import type { Bundle, Patch, Profile } from "@actspace/bundle";
 import { entryId, pluginId, serviceId } from "@actspace/cordis-adapter";
@@ -108,7 +108,7 @@ export function resolveRuntimeProfile(profileId: RuntimeProfileId): Profile {
   return profile;
 }
 
-export function createProfileComposition(profileId: RuntimeProfileId, host: RuntimeV2HostDescriptor, options: {
+export function createProfileComposition(profileId: RuntimeProfileId, host: RuntimeHostDescriptor, options: {
   readonly plugins?: readonly PluginManifest[];
   readonly homePatch?: Patch;
   readonly invocationPatch?: Patch;

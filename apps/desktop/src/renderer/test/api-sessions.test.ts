@@ -2,19 +2,19 @@ import { describe, expect, it, vi } from "vitest";
 import { projectChatEvents, projectChatWindow } from "@actspace/client/sessions";
 import { createMessageBlocks, type SessionRecord } from "@actspace/shared";
 import type { DesktopToolDetailPage } from "@actspace/shared/desktop-bridge";
-import type { RuntimeV2DesktopSessionProjection } from "@actspace/shared/runtime-v2";
+import type { RuntimeDesktopSessionProjection } from "@actspace/shared/runtime-v2";
 import { createSession, forkSession, getSession, getSessionToolDetail } from "../api/sessions";
 import { projectionFixture, recordProjectionFixture } from "./projection-fixture";
 import { overrideBridge } from "./helpers/bridge";
 
 /** 迁移前 preload 的实现（`apps/desktop/src/preload/index.ts`，desktop-fe-13 T4 之前），原样保留做对照。 */
 const legacyPreload = {
-  createSession: (projection: RuntimeV2DesktopSessionProjection) => projectChatWindow(projection),
-  getSession: (projection: RuntimeV2DesktopSessionProjection | null) => projection ? projectChatWindow(projection) : null,
+  createSession: (projection: RuntimeDesktopSessionProjection) => projectChatWindow(projection),
+  getSession: (projection: RuntimeDesktopSessionProjection | null) => projection ? projectChatWindow(projection) : null,
   getSessionToolDetail: (page: DesktopToolDetailPage) => createMessageBlocks(projectChatEvents(page.snapshot, page.journal)),
 };
 
-function conversation(): RuntimeV2DesktopSessionProjection {
+function conversation(): RuntimeDesktopSessionProjection {
   const at = "2026-09-21T00:00:00Z";
   const record: SessionRecord = {
     meta: { schemaVersion: 2, id: "s1", title: "Projected", createdAt: at, updatedAt: at, agentRunCount: 1, workspaceRoot: "/tmp/workspace" },

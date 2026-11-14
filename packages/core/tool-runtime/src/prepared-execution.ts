@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { ApprovalReason, ApprovalResourceSummary, CoreEventDataMap, GrantAudience, GrantSuggestion, PermissionMode, RuntimeV2JsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
+import type { ApprovalReason, ApprovalResourceSummary, CoreEventDataMap, GrantAudience, GrantSuggestion, PermissionMode, RuntimeJsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
 import type { ToolActivationLease } from "./activation-lease.js";
 import { materializeToolArguments } from "./argument-validator.js";
 import type { ApprovalBroker, ApprovalRequest } from "@actspace/approval";
@@ -98,7 +98,7 @@ export type ToolPreparedEnvironment = {
     readonly pluginId: string;
     readonly name: string;
   }) => void;
-  readonly notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>;
+  readonly notifyAgent?: (content: RuntimeJsonValue) => Promise<void>;
   /** Cordis scope carrier shared with the owning Agent Loop. */
   readonly eventCarrier?: object;
   readonly createArtifact: (input: {
@@ -130,7 +130,7 @@ export class PreparedToolExecution {
   readonly #controller = new AbortController();
   readonly #onCallerAbort = (): void => { this.#controller.abort(this.input.signal?.reason); };
   readonly #lease: ToolActivationLease;
-  #args: Readonly<Record<string, RuntimeV2JsonValue>> | undefined;
+  #args: Readonly<Record<string, RuntimeJsonValue>> | undefined;
   #finalizers: Array<() => Promise<void>> = [];
   #stage: PreparedDispatch | undefined;
   #body: ToolBodyResult | undefined;

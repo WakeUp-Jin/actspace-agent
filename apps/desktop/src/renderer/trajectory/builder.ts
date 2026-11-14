@@ -1,7 +1,7 @@
 import { contextCategory, contextSectionRecords, fixedSystemText } from "./context-sections";
 import { indexRequestRecords, isRequestRecordEvent, renderSystemPrompt, sortSystemSections, type EffectiveRequestRecord } from "@actspace/shared";
 import { surfaceNode as deriveSurfaceNode, type SessionSurfaceOperationV1 } from "@actspace/shared/runtime-v2";
-import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue, RuntimeTrajectoryNode, RuntimeTrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import type {
   TrajectoryAssistantMetrics,
   TrajectoryCompactionFacts,
@@ -21,14 +21,14 @@ import { asRecord, type Data, dataOf, json, pick, sourceBlocks, text, valueText 
 
 type RequestFact = {
   id: string;
-  header: RuntimeV2TrajectoryNode | null;
-  context: RuntimeV2TrajectoryNode | null;
+  header: RuntimeTrajectoryNode | null;
+  context: RuntimeTrajectoryNode | null;
   sequences: number[];
   turnId: string | null;
   stepId: string | null;
   provider: string | null;
   model: string | null;
-  options: RuntimeV2JsonValue | null;
+  options: RuntimeJsonValue | null;
   prompt: TrajectoryPromptDetail | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -39,7 +39,7 @@ type Boundary = { start: string | null; end: string | null };
 type TurnBoundary = Boundary & { state: TrajectoryRecordState };
 type EventContext = { turnId: string | null; stepId: string | null };
 
-const numberValue = (value: RuntimeV2JsonValue | undefined): number | null =>
+const numberValue = (value: RuntimeJsonValue | undefined): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 const parseTime = (value: string | null): number | null => {
   if (!value) return null;
@@ -89,7 +89,7 @@ function associateCalls(records: readonly TrajectoryRecord[]): TrajectoryRecord[
   });
 }
 
-function recordKind(node: RuntimeV2TrajectoryNode): TrajectoryRecordKind {
+function recordKind(node: RuntimeTrajectoryNode): TrajectoryRecordKind {
   const type = node.eventType;
   if (type === "user/message" || type === "agent/inbox/spliced") return "user";
   if (type.startsWith("system/") || type.startsWith("prompt/")) return "system";
@@ -106,7 +106,7 @@ function recordKind(node: RuntimeV2TrajectoryNode): TrajectoryRecordKind {
   return "raw";
 }
 
-function recordState(node: RuntimeV2TrajectoryNode): TrajectoryRecordState {
+function recordState(node: RuntimeTrajectoryNode): TrajectoryRecordState {
   const data = dataOf(node);
   if (node.state === "failed" || data.status === "failed" || data.status === "denied" || data.finishReason === "failed") return "failed";
   if (node.state === "aborted" || data.status === "aborted" || data.reason === "aborted" || data.finishReason === "aborted") return "aborted";
@@ -138,11 +138,11 @@ function requestPromptDetail(record: EffectiveRequestRecord): TrajectoryPromptDe
   return {
     ...(prompt ? {
       systemPrompt: renderSystemPrompt(sections.map(section => section.content), prompt.modelFacts.map(fact => fact.content)),
-      contextSections: sections as unknown as RuntimeV2JsonValue,
-      contextModelFacts: prompt.modelFacts as unknown as RuntimeV2JsonValue,
+      contextSections: sections as unknown as RuntimeJsonValue,
+      contextModelFacts: prompt.modelFacts as unknown as RuntimeJsonValue,
     } : {}),
-    ...(tools ? { tools: tools.tools as unknown as RuntimeV2JsonValue } : {}),
-    raw: { ...(prompt ? { systemPrompt: prompt } : {}), ...(tools ? { tools } : {}) } as unknown as RuntimeV2JsonValue,
+    ...(tools ? { tools: tools.tools as unknown as RuntimeJsonValue } : {}),
+    raw: { ...(prompt ? { systemPrompt: prompt } : {}), ...(tools ? { tools } : {}) } as unknown as RuntimeJsonValue,
   };
 }
 
@@ -164,7 +164,7 @@ function changeKind(previous: SystemSignature | null, current: SystemSignature):
   return systemChanged ? "prompt-updated" : null;
 }
 
-function eventRecordId(node: RuntimeV2TrajectoryNode, index: number): string {
+function eventRecordId(node: RuntimeTrajectoryNode, index: number): string {
   const data = dataOf(node);
   const messageId = pick(data, ["messageId"]);
   const callId = node.callId ?? pick(data, ["callId", "toolCallId"]);
@@ -174,7 +174,7 @@ function eventRecordId(node: RuntimeV2TrajectoryNode, index: number): string {
   return `${node.sessionId}:record:${node.eventType}:${node.eventSeq}:${index}`;
 }
 
-function summaryFor(node: RuntimeV2TrajectoryNode, result: string | null = null): string {
+function summaryFor(node: RuntimeTrajectoryNode, result: string | null = null): string {
   const data = dataOf(node);
   if (node.eventType === "assistant/chunk") return "";
   if (node.eventType === "assistant/message") return valueText(data.content ?? data.message ?? data.summary);
@@ -188,7 +188,7 @@ function summaryFor(node: RuntimeV2TrajectoryNode, result: string | null = null)
 }
 
 function baseRecord(
-  node: RuntimeV2TrajectoryNode,
+  node: RuntimeTrajectoryNode,
   index: number,
   sourceSequences: readonly number[] = [node.eventSeq],
   overrides: Partial<TrajectoryRecord> = {},
@@ -264,7 +264,7 @@ function assistantMetrics(
   };
 }
 
-function buildEventContexts(nodes: readonly RuntimeV2TrajectoryNode[]): Map<number, EventContext> {
+function buildEventContexts(nodes: readonly RuntimeTrajectoryNode[]): Map<number, EventContext> {
   const contexts = new Map<number, EventContext>();
   let activeTurn: string | null = null;
   let activeStep: string | null = null;
@@ -288,7 +288,7 @@ function buildEventContexts(nodes: readonly RuntimeV2TrajectoryNode[]): Map<numb
   return contexts;
 }
 
-function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], effective: (atSeq?: number) => EffectiveRequestRecord, liveMessageIds?: ReadonlyMap<string, string>): {
+function mergeNodes(nodes: readonly RuntimeTrajectoryNode[], effective: (atSeq?: number) => EffectiveRequestRecord, liveMessageIds?: ReadonlyMap<string, string>): {
   records: TrajectoryRecord[];
   rawRecords: TrajectoryRecord[];
   partial: TrajectoryRecord | null;
@@ -304,10 +304,10 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], effective: (atSeq
   }));
   const records: TrajectoryRecord[] = [];
   const calls = new Map<string, { index: number; record: TrajectoryRecord }>();
-  const chunks = new Map<string, RuntimeV2TrajectoryNode[]>();
+  const chunks = new Map<string, RuntimeTrajectoryNode[]>();
   /** Requests a reply, a retry or (old Sessions) a chunk already accounts for; the rest still stream. */
   const answered = new Set<string>();
-  const pendingApprovals = new Map<string, RuntimeV2TrajectoryNode[]>();
+  const pendingApprovals = new Map<string, RuntimeTrajectoryNode[]>();
   const requests = new Map<string, RequestFact>();
   const requestByStep = new Map<string, RequestFact>();
   const stepBoundaries = new Map<string, Boundary>();
@@ -491,7 +491,7 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], effective: (atSeq
     }
     const kind = recordKind(node);
     // 轨迹节点带着原事件的 type/data/surface，按同一规则推出对话节点（agent-spec-surface-derived.md §4.2）。
-    const surfaceNode = asRecord((deriveSurfaceNode({ type: node.eventType, data: node.data, surface: (node.surface ?? null) as SessionSurfaceOperationV1 | null }) ?? undefined) as RuntimeV2JsonValue | undefined);
+    const surfaceNode = asRecord((deriveSurfaceNode({ type: node.eventType, data: node.data, surface: (node.surface ?? null) as SessionSurfaceOperationV1 | null }) ?? undefined) as RuntimeJsonValue | undefined);
     if (node.eventType === "agent/inbox/spliced" && (data.operation !== "claim" || surfaceNode.kind !== "user")) continue;
     // Background task notifications and Context supplements reach the model as user content but are CONTEXT rows.
     const notice = node.eventType === "agent/inbox/spliced" && data.source === "task_notification";
@@ -618,8 +618,8 @@ function assignGroups(
     eventSeq: record.sourceSequences[0],
     eventType: record.eventType,
     time: record.startedAt ?? record.completedAt ?? "",
-    kind: record.kind as RuntimeV2TrajectoryNode["kind"],
-    state: record.state as RuntimeV2TrajectoryNode["state"],
+    kind: record.kind as RuntimeTrajectoryNode["kind"],
+    state: record.state as RuntimeTrajectoryNode["state"],
     callId: record.callId,
     data: record.raw,
   })));
@@ -693,7 +693,7 @@ function assignGroups(
  * 系统行：相邻两次请求生效的提示词或工具记录换了一条，就出一行（agent-spec-request-record.md §4.3）。
  * 行挂在该请求的 `request/context` 上，所以随请求归到对应的轮次与步骤。
  */
-function systemRecords(nodes: readonly RuntimeV2TrajectoryNode[], effective: (atSeq?: number) => EffectiveRequestRecord, fromSeq: number): TrajectoryRecord[] {
+function systemRecords(nodes: readonly RuntimeTrajectoryNode[], effective: (atSeq?: number) => EffectiveRequestRecord, fromSeq: number): TrajectoryRecord[] {
   const output: TrajectoryRecord[] = [];
   let previous: { record: EffectiveRequestRecord; signature: SystemSignature; detail: TrajectoryPromptDetail } | null = null;
   for (const [index, node] of nodes.entries()) {
@@ -732,7 +732,7 @@ export function placeholderRecordId(sessionId: string, requestId: string, messag
 }
 
 /** `liveMessageIds`: request id → message id the live run streams for it, so the placeholder keeps its row when it settles. */
-export function buildTrajectorySnapshot(snapshot: RuntimeV2TrajectorySnapshot, options: { readonly liveMessageIds?: ReadonlyMap<string, string> } = {}): TrajectoryRuntimeSnapshot {
+export function buildTrajectorySnapshot(snapshot: RuntimeTrajectorySnapshot, options: { readonly liveMessageIds?: ReadonlyMap<string, string> } = {}): TrajectoryRuntimeSnapshot {
   const ordered = [...snapshot.nodes].sort((a, b) => a.eventSeq - b.eventSeq);
   const effective = indexRequestRecords(ordered.map(node => ({ seq: node.eventSeq, type: node.eventType, data: node.data })));
   // 窗口起点之前补进来的提示词 / 工具记录（session-controller 历史窗口）只供按 seq 查找，不进轮次与原始记录。
@@ -758,7 +758,7 @@ export function buildTrajectorySnapshot(snapshot: RuntimeV2TrajectorySnapshot, o
 
 /** Merges the facts each compaction event carries: span on `compaction/start`, trigger and tokens on `compaction/end`. */
 function compactionFacts(previous: TrajectoryCompactionFacts | undefined, eventType: string, data: Data, compactionId: string | null): TrajectoryCompactionFacts {
-  const count = (value: RuntimeV2JsonValue | undefined) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+  const count = (value: RuntimeJsonValue | undefined) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
   const start = count(data.start);
   const end = count(data.end);
   const ended = eventType === "compaction/end";
@@ -776,16 +776,16 @@ export function buildTrajectoryDetail(snapshot: TrajectoryRuntimeSnapshot, recor
   const record = snapshot.records.find(item => item.id === recordId) ?? snapshot.rawRecords?.find(item => item.id === recordId);
   if (!record) return null;
   const sourceNodes = snapshot.nodes.filter(node => record.sourceSequences.includes(node.eventSeq));
-  const sections: { key: string; value: RuntimeV2JsonValue }[] = [
+  const sections: { key: string; value: RuntimeJsonValue }[] = [
     { key: "raw", value: record.raw },
-    { key: "sourceSequences", value: record.sourceSequences as unknown as RuntimeV2JsonValue },
-    { key: "timing", value: { startedAt: record.startedAt, completedAt: record.completedAt, durationMs: record.durationMs, assistantMetrics: record.assistantMetrics ?? null, timingSource: record.timingSource ?? null } as unknown as RuntimeV2JsonValue },
+    { key: "sourceSequences", value: record.sourceSequences as unknown as RuntimeJsonValue },
+    { key: "timing", value: { startedAt: record.startedAt, completedAt: record.completedAt, durationMs: record.durationMs, assistantMetrics: record.assistantMetrics ?? null, timingSource: record.timingSource ?? null } as unknown as RuntimeJsonValue },
   ];
-  if (record.usage !== null) sections.push({ key: "usage", value: record.usage as unknown as RuntimeV2JsonValue });
-  if (record.requestDetail !== null && record.requestDetail !== undefined) sections.push({ key: "request", value: record.requestDetail as unknown as RuntimeV2JsonValue });
+  if (record.usage !== null) sections.push({ key: "usage", value: record.usage as unknown as RuntimeJsonValue });
+  if (record.requestDetail !== null && record.requestDetail !== undefined) sections.push({ key: "request", value: record.requestDetail as unknown as RuntimeJsonValue });
   if (record.inputDetail !== null && record.inputDetail !== undefined) sections.push({ key: "payload", value: record.inputDetail });
   if (record.outputDetail !== null && record.outputDetail !== undefined) sections.push({ key: "result", value: record.outputDetail });
   if (record.schemaDetail !== null && record.schemaDetail !== undefined) sections.push({ key: "schema", value: record.schemaDetail });
-  if (record.promptDetail !== null && record.promptDetail !== undefined) sections.push({ key: "prompt", value: record.promptDetail as unknown as RuntimeV2JsonValue });
+  if (record.promptDetail !== null && record.promptDetail !== undefined) sections.push({ key: "prompt", value: record.promptDetail as unknown as RuntimeJsonValue });
   return { record, sourceNodes, sections };
 }

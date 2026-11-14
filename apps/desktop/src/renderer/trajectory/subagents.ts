@@ -1,5 +1,5 @@
 import { subagentKindLabel } from '@actspace/shared';
-import { foldSubagentTree, type RuntimeV2TrajectorySnapshot, type SubagentKind } from '@actspace/shared/runtime-v2';
+import { foldSubagentTree, type RuntimeTrajectorySnapshot, type SubagentKind } from '@actspace/shared/runtime-v2';
 
 /**
  * 父调用到子智能体的关联。新会话来自 `subagent/spawned` + `subagent/activation`（含 `send_message` 续发的那次激活），
@@ -17,7 +17,7 @@ export type TrajectoryDelegation = {
 
 const EXTERNAL_KINDS: readonly SubagentKind[] = ['codex', 'claude-code'];
 
-export function trajectoryDelegations(snapshot: RuntimeV2TrajectorySnapshot | null): TrajectoryDelegation[] {
+export function trajectoryDelegations(snapshot: RuntimeTrajectorySnapshot | null): TrajectoryDelegation[] {
   const sessionId = snapshot?.sessionId;
   const tree = foldSubagentTree((snapshot?.nodes ?? []).map(node => ({ type: node.eventType, time: node.time, data: node.data })));
   const result = new Map<string, TrajectoryDelegation>();
@@ -42,9 +42,9 @@ export function trajectoryDelegations(snapshot: RuntimeV2TrajectorySnapshot | nu
  * Fork 子智能体的轨迹只显示分出之后的部分（设计 05 §2）：去掉 seq ≤ `inheritedThroughSeq` 的复制前缀，
  * 但留下分出时还开着的那个 `turn/start`（fork 在父会话的轮次中途复制，由自己结束这一轮），更早的历史也不再分页加载。
  */
-export function trajectoryAfterSeq(snapshot: RuntimeV2TrajectorySnapshot | null, afterSeq: number | undefined): RuntimeV2TrajectorySnapshot | null {
+export function trajectoryAfterSeq(snapshot: RuntimeTrajectorySnapshot | null, afterSeq: number | undefined): RuntimeTrajectorySnapshot | null {
   if (!snapshot || afterSeq === undefined || afterSeq < 0) return snapshot;
-  let openTurn: RuntimeV2TrajectorySnapshot['nodes'][number] | undefined;
+  let openTurn: RuntimeTrajectorySnapshot['nodes'][number] | undefined;
   for (const node of snapshot.nodes) {
     if (node.eventSeq > afterSeq) break;
     if (node.eventType === 'turn/start') openTurn = node;

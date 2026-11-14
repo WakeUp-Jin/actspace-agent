@@ -1,7 +1,7 @@
-import type { RuntimeV2DesktopLiveEnvelope } from "@actspace/shared/runtime-v2";
+import type { RuntimeDesktopLiveEnvelope } from "@actspace/shared/runtime-v2";
 import { eventsApi } from "./events";
 
-type LiveListener = (envelope: RuntimeV2DesktopLiveEnvelope) => void;
+type LiveListener = (envelope: RuntimeDesktopLiveEnvelope) => void;
 type LiveSource = (listener: LiveListener) => () => void;
 
 export interface LiveEventHub {

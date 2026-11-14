@@ -1,30 +1,30 @@
 import { readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { PinnedHarness } from "@actspace/runtime";
-import type { RuntimeV2LiveEvent, RuntimeV2RunTurnResponse, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import type { RuntimeLiveEvent, RuntimeRunTurnResponse, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { writeArtifacts } from "../artifacts";
 import { CliError, CliUsageError } from "../errors";
-import { bootCliV2 } from "./host-adapter";
-import { resolveRuntimeV2DataRoot } from "./data-root";
+import { bootCli } from "./host-adapter";
+import { resolveRuntimeDataRoot } from "./data-root";
 import { profileService } from "./profile-service";
-import type { RuntimeV2CliArtifactResult, RuntimeV2RunCommandControl, RuntimeV2RunCommandOptions } from "./types";
+import type { RuntimeCliArtifactResult, RuntimeRunCommandControl, RuntimeRunCommandOptions } from "./types";
 
-export type RunV2Io = {
+export type RunIo = {
   readonly interruptionExitCode?: () => 130 | 143 | undefined;
   readonly onForceCleanup?: (cleanup: () => void) => void;
   readonly stdinIsTTY?: boolean; readonly readStdin?: () => Promise<string>; readonly isInterrupted?: () => boolean;
-  readonly onDiagnostic?: (code: string, message: string) => void; readonly onLiveEvent?: (event: RuntimeV2LiveEvent) => void; readonly env?: NodeJS.ProcessEnv; readonly cwd?: () => string; readonly now?: () => Date;
-  readonly onControl?: (control: RuntimeV2RunCommandControl) => void;
+  readonly onDiagnostic?: (code: string, message: string) => void; readonly onLiveEvent?: (event: RuntimeLiveEvent) => void; readonly env?: NodeJS.ProcessEnv; readonly cwd?: () => string; readonly now?: () => Date;
+  readonly onControl?: (control: RuntimeRunCommandControl) => void;
 };
 
-export async function runV2Command(options: RuntimeV2RunCommandOptions, io: RunV2Io = {}): Promise<RuntimeV2CliArtifactResult> {
+export async function runCommand(options: RuntimeRunCommandOptions, io: RunIo = {}): Promise<RuntimeCliArtifactResult> {
   const workspace = await resolveWorkspace(options.workspace, io.cwd?.() ?? process.cwd()); const input = await resolveInput(options, io); const persistent = options.persist === true || options.resume !== undefined;
-  const dataRoot = resolveRuntimeV2DataRoot(options.dataDir, io.env); const startedAt = (io.now?.() ?? new Date()).toISOString();
+  const dataRoot = resolveRuntimeDataRoot(options.dataDir, io.env); const startedAt = (io.now?.() ?? new Date()).toISOString();
   const pinnedHarness = options.harness === undefined ? undefined : await readPinnedHarness(options.harness, dataRoot);
   let liveSeq = 0; let runtimeInstanceId = "booting"; let throughJournalSeq = -1;
   let activeSessionId: string | undefined;
   let activeAbort: (() => boolean) | undefined;
-  const booted = await bootCliV2({ onForceCleanup: io.onForceCleanup, kind: "cli-run", workspace, dataRoot, persistentArtifacts: persistent, permissionMode: options.permissionMode, permissionModeExplicit: options.permissionModeExplicit, sandboxInherited: options.sandboxInherited, pinnedHarness, mock: options.mock, model: options.model, headlessInput: input, headlessSessionId: options.resume, env: io.env, onHeadlessSession: (sessionId, abort) => { activeSessionId = sessionId; activeAbort = abort; io.onControl?.({ sessionId, agentRunId: sessionId, abort }); }, onLiveEvent: (event) => io.onLiveEvent?.({ ...event, schemaVersion: 1, runtimeInstanceId, liveSeq: liveSeq++, throughJournalSeq }) }).catch((error: unknown) => {
+  const booted = await bootCli({ onForceCleanup: io.onForceCleanup, kind: "cli-run", workspace, dataRoot, persistentArtifacts: persistent, permissionMode: options.permissionMode, permissionModeExplicit: options.permissionModeExplicit, sandboxInherited: options.sandboxInherited, pinnedHarness, mock: options.mock, model: options.model, headlessInput: input, headlessSessionId: options.resume, env: io.env, onHeadlessSession: (sessionId, abort) => { activeSessionId = sessionId; activeAbort = abort; io.onControl?.({ sessionId, agentRunId: sessionId, abort }); }, onLiveEvent: (event) => io.onLiveEvent?.({ ...event, schemaVersion: 1, runtimeInstanceId, liveSeq: liveSeq++, throughJournalSeq }) }).catch((error: unknown) => {
     // Cordis startup wraps plugin failures; a pinned selection that cannot run keeps its own code.
     for (let cause = error; cause instanceof Error; cause = cause.cause)
       if ((cause as { code?: unknown }).code === "HARNESS_SELECTION_INVALID") throw new CliError(cause.message, "HARNESS_SELECTION_INVALID", 3);
@@ -60,7 +60,7 @@ export async function runV2Command(options: RuntimeV2RunCommandOptions, io: RunV
   }
 }
 
-export function projectCliArtifactResult(result: RuntimeV2RunTurnResponse, context: {
+export function projectCliArtifactResult(result: RuntimeRunTurnResponse, context: {
   readonly workspace: string;
   readonly startedAt: string;
   readonly endedAt: string;
@@ -69,8 +69,8 @@ export function projectCliArtifactResult(result: RuntimeV2RunTurnResponse, conte
   readonly interruptionExitCode?: 130 | 143;
   readonly approvalName?: string;
   readonly failure?: { readonly code: string; readonly message: string };
-  readonly harness?: RuntimeV2CliArtifactResult["harness"];
-}): RuntimeV2CliArtifactResult {
+  readonly harness?: RuntimeCliArtifactResult["harness"];
+}): RuntimeCliArtifactResult {
   const exitCode = context.interrupted ? context.interruptionExitCode ?? 130 : context.approvalName !== undefined ? 4 : result.outcome === "completed" ? 0 : result.outcome === "cancelled" ? 130 : 1;
   return Object.freeze({
     schemaVersion: 1,
@@ -115,12 +115,12 @@ async function readPinnedHarness(path: string, dataRoot: string): Promise<Pinned
   const { executionDigest, ...description } = value;
   return { description: description as unknown as PinnedHarness["description"], ...(typeof executionDigest === "string" ? { executionDigest } : {}) };
 }
-function mountedHarness(profile: Parameters<typeof profileService>[0]): RuntimeV2CliArtifactResult["harness"] {
+function mountedHarness(profile: Parameters<typeof profileService>[0]): RuntimeCliArtifactResult["harness"] {
   const current = profileService(profile, "harness.control")?.inspect("main").current;
   return current ? { harnessId: current.harnessId, revision: current.revision, executionDigest: current.executionDigest } : undefined;
 }
 
-async function resolveInput(options: RuntimeV2RunCommandOptions, io: RunV2Io): Promise<string> { if (options.input && options.inputFile) throw new CliUsageError("Use only one of --input, --input-file, or stdin"); if (options.input !== undefined) return requireInput(options.input); if (options.inputFile) { const { readFile } = await import("node:fs/promises"); return requireInput(await readFile(resolve(options.inputFile), "utf8")); } if (io.stdinIsTTY === false && io.readStdin) return requireInput(await io.readStdin()); throw new CliUsageError("Missing input: use --input, --input-file, or non-TTY stdin"); }
+async function resolveInput(options: RuntimeRunCommandOptions, io: RunIo): Promise<string> { if (options.input && options.inputFile) throw new CliUsageError("Use only one of --input, --input-file, or stdin"); if (options.input !== undefined) return requireInput(options.input); if (options.inputFile) { const { readFile } = await import("node:fs/promises"); return requireInput(await readFile(resolve(options.inputFile), "utf8")); } if (io.stdinIsTTY === false && io.readStdin) return requireInput(await io.readStdin()); throw new CliUsageError("Missing input: use --input, --input-file, or non-TTY stdin"); }
 function requireInput(value: string): string { if (!value.trim()) throw new CliUsageError("Agent input must not be empty"); return value; }
 async function resolveWorkspace(value: string | undefined, cwd: string): Promise<string> { const workspace = resolve(value ?? cwd); try { if (!(await stat(workspace)).isDirectory()) throw new Error("not a directory"); } catch { throw new CliUsageError(`Workspace is not an accessible directory: ${workspace}`, "INVALID_WORKSPACE"); } return workspace; }
 

@@ -1,4 +1,4 @@
-export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
+export const RUNTIME_FIXED_RENDERER_CHANNELS = Object.freeze({
   bootstrapState: "runtime-v2:fixed-renderer:bootstrap-state",
   taskCommand: "runtime-v2:fixed-renderer:task-command",
   listBackgroundTasks: "runtime-v2:fixed-renderer:list-background-tasks",

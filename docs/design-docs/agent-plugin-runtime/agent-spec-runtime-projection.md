@@ -734,7 +734,7 @@ type GlobalSessionSummary = {
   pinned: boolean
   archived: boolean
   completedTurnCount: number
-  usage: RuntimeV2UsageSummary
+  usage: RuntimeUsageSummary
   accessState: SessionAccessState
 }
 ```
@@ -825,7 +825,7 @@ type SessionObservation = {
 }
 ```
 
-`RuntimeV2DesktopSessionProjection` 由同一次 observation 生成，供固定 UI 使用；renderer 不得再自行组合完整 snapshot 与独立事件读取。
+`RuntimeDesktopSessionProjection` 由同一次 observation 生成，供固定 UI 使用；renderer 不得再自行组合完整 snapshot 与独立事件读取。
 
 Projection 和 window 必须来自同一读取切面。并发 append 时整体重试或明确进入下一次 observation。
 

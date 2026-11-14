@@ -1,8 +1,8 @@
-import type { RuntimeV2ArtifactRef } from "@actspace/shared/runtime-v2/projection";
+import type { RuntimeArtifactRef } from "@actspace/shared/runtime-v2/projection";
 import type { ToolArtifactRef } from "@actspace/tool-runtime";
 import { redactProjectionText } from "./redaction.js";
 
-export function projectArtifactRef(input: ToolArtifactRef & { readonly label?: string }): RuntimeV2ArtifactRef {
+export function projectArtifactRef(input: ToolArtifactRef & { readonly label?: string }): RuntimeArtifactRef {
   return Object.freeze({
     artifactId: input.artifactId,
     kind: kindForMediaType(input.mediaType),
@@ -14,7 +14,7 @@ export function projectArtifactRef(input: ToolArtifactRef & { readonly label?: s
   });
 }
 
-export function projectUnknownArtifact(input: unknown): RuntimeV2ArtifactRef | null {
+export function projectUnknownArtifact(input: unknown): RuntimeArtifactRef | null {
   if (input === null || typeof input !== "object" || Array.isArray(input)) return null;
   const value = input as Record<string, unknown>;
   if (typeof value.artifactId !== "string" || typeof value.mediaType !== "string") return null;
@@ -27,7 +27,7 @@ export function projectUnknownArtifact(input: unknown): RuntimeV2ArtifactRef | n
   });
 }
 
-function kindForMediaType(mediaType: string): RuntimeV2ArtifactRef["kind"] {
+function kindForMediaType(mediaType: string): RuntimeArtifactRef["kind"] {
   if (mediaType.startsWith("image/")) return "image";
   if (mediaType.includes("json")) return "json";
   if (mediaType.includes("diff")) return "diff";
