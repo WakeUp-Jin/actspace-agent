@@ -11,9 +11,11 @@
 ## 派生索引与边界
 
 Runtime 的 projection-cache 先问 storage `refresh(id, base)`，按后端 identity、codec 和 projection 版本判断复用：
-- `unchanged`：直接返回上一次的读取结果，不读文件、不重放。
+- `unchanged`：直接返回上一次的读取结果，不重读整份文件、不重放。JSONL 后端在文件身份、大小、时间戳都没变时，还会重读末尾 4KiB 和上次读到的内容比对：时间戳按时钟刻度前进（Linux 上几毫秒），上次读取所在刻度内的等长改写不会改变时间戳，只看时间戳会把它当成没变。
 - `appended`：JSONL 后端从上次读到的字节位置续读（文件身份 dev/ino/birthtime、末尾 4KiB 重叠校验和滚动 sha256 都对上才续读），只校验、重放和索引新增事件；结果与冷读逐项相等。
 - `replaced`：文件被改写、截断或修复，按新快照完整重建。
+
+末尾 4KiB 之前的内容按「只追加」信任：那里的原地改写，只有在文件大小不变而时间戳变了的时候才会被发现。Journal 只由持有写入租约的 writer 追加，修复走换文件（文件身份会变），所以这条路径不为它付整份重读的代价。
 
 缓存最多保留最近使用的 3 个会话，并以 96MB Journal 字节为上限淘汰较旧的；最新的一个即使超限也保留。已经交出去的读取结果不会被后续追加改变。存储后端已验证过当前 codec 集的快照，`SessionStore.inspect` 不再重复整份校验。Turn/Request/call 索引在内存中派生，不读取磁盘 checkpoint。
 

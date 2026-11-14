@@ -18,11 +18,20 @@
 | # | 进程 | 热点 | run8 分配 | 状态 | 方案 / 下一步 |
 |---|---|---|---|---|---|
 | P10 | 主进程 | **工具参数流式片段整段重解析**：pi-ai 每收到一个工具参数片段，就对已收到的全部参数做一次 `parseStreamingJson`（含 `repairJson`），参数越长越慢，是 O(n²)（`openai-completions.js`；`anthropic-messages.js`、`openai-responses-shared.js` 同样如此）。我们的适配层（`packages/llm/llm-pi-ai/src/pi-ai-stream.ts`）只用 `delta`，不用这份中间结果 | 约 1.9 GB（2026-11-07 用 `analyze.mjs` 复查 run8 时发现） | 待拍板 | 建议在现有 `patches/@earendil-works__pi-ai@1.5.0.patch` 里去掉片段时的解析，只在工具调用结束时解析一次；要先确认 pi-ai 自己的 `partial` 消息有没有别的读者 |
-| P5 | 主进程 | `inspect` / `readModel` | 约 350 MB | 待查 | 第三轮做完重跑后，用 `callers.mjs` 查调用方 |
+| P5 | 主进程 | `inspect` / `readModel` | 约 350 MB | 待查 | 第三轮做完重跑后，用 `callers.mjs` 查调用方。2026-11-10 的线索见下面「P5、P6 的线索」 |
 | P6 | 主进程 | `sharedView` / `assertJson` | 约 295 MB | 待查 | 同上 |
 | P7 | 渲染进程 | 每个实时事件都重算整份聊天投影：`selectChatSession` / `projectChatWindow` / `applyLiveEvent` | 约 175 MB | 待查 | 查是否能只更新受影响的消息 |
 | P8 | 渲染进程 | `toolPreview` | 约 91 MB | 待查 | 查是否每帧重算 |
 | P9 | 主进程 | `usage-source-cache.ts` 对每个会话调 `inspectSessionEvents` 后再过滤 | 未单独测 | 待查 | 低频（统计页），先确认触发频率 |
+
+### P5、P6 的线索（2026-11-10）
+
+做「打开中的会话读一屏」（见已完成表最后一行）时顺带量的。单机、合成会话、归档在内存里、不含文件解析，时间只看量级。这两处那一次没有改。
+
+- **每次读都把整份会话快照校验一遍（P6）。** `SessionController` 每次读都调 `SessionReadModel.snapshot()`，`sharedView` 对整份 surface 和工具视图走一遍 `assertJson`。10k 事件约 12.8 毫秒，20k 约 24.7 毫秒（每轮 30 次工具调用时约 59 毫秒），40k 约 125 毫秒，其中约 90% 是 `assertJson`。和读的窗口多大无关。
+- **打开后第一次读要回放读模型（P5）。** 10k 事件 / 1,668 次工具调用约 0.41 秒，20k / 3,334 次约 1.26 秒，20k / 8,850 次约 7.6 秒，40k / 17,670 次约 35 秒，按工具调用次数是平方增长。CPU 采样：`applyTool`（`durable-session.ts`，每个 `tool/call` 对全部工具过滤再排序）约 36–39%，投影注册表的 `immutableState`（每次得到新数组都把全部子项走一遍）约 26–36%，排序的比较函数约 12–14%。
+- **可以试的方向：** 按状态对象缓存已经校验过的视图，状态没变时重复读直接返回；`assertJson` 跳过已经校验并冻结的子树；工具状态按顺序追加时不重新排序；surface 和工具状态换成追加时不复制整个数组的结构（要动投影状态的版本和检查点）。
+- **还没有规模测试的整份读：** `SessionController` 的 `inspectEvents`、冷会话的读模型、`export`、打开中的会话第一次建读模型。这几处没有登记到 `scripts/scale-test-coverage.json`，各自的触发频率还没有逐个确认。
 
 ## 已完成
 
@@ -39,3 +48,4 @@
 | 第三轮 | P3 子 Agent 面板：按会话常驻折叠状态，只折叠 `inspectSessionEventsAfter(throughSeq)` 的新增事件 | 规模测试：连续轮询 10 次，第二次起归档读取为 0（旧实现 4392 / 85428）；实机待重跑 | `8f1e6d4b` |
 | 第三轮 | P4 读旧事件：只校验、深冻结，不再 `snapshotSessionJson` 深拷贝 | 规模测试：读 1k / 10k 条 `snapshotSessionJson` 调用 0 次；实机待重跑 | `45b675b1` |
 | 第三轮 | 配套：`pnpm check:scale-tests` 规模测试覆盖检查，hot-path-reads 基线收紧 | — | `d8fe2499`、`24910abc` |
+| 审查修复（2026-11-10） | 打开中的会话读一屏、翻页、展开工具详情：会话控制器给每个打开中的会话就地维护轮次、请求、工具调用的位置索引（`history-index.ts`），只读窗口内的事件；子 Agent 一次运行收尾不再从头遍历日志 | 规模测试：1k / 10k 事件的会话，读一屏、翻页、展开工具详情从归档读的事件数相同。旧实现第一次读把归档过两遍（多读 944 / 9,944 条），展开工具详情读 944 / 9,944 条而不是 2 条。合成的 10k 事件会话上每页序列化 320 次 / 141 KB → 240 次 / 102 KB | `2229a9b7`、`06ffe517`、`2831bf67` |

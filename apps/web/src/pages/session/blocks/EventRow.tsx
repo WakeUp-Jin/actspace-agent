@@ -5,7 +5,7 @@ import { cx } from "../../../ui/cx";
 // 共享选择器里的英文状态文案（desktop 原样显示），这里换成中文。
 const STATUS_TEXT: Readonly<Record<string, string>> = { Stopped: "已停止", "Operating Space · Expanding": "思考中…" };
 
-const NOTICE_STATUS: Readonly<Record<string, string>> = { completed: "已完成", failed: "失败", stopped: "已停止", lost: "已失联", output_match: "输出匹配" };
+const NOTICE_STATUS: Readonly<Record<string, string>> = { completed: "已完成", failed: "失败", stopped: "已停止", lost: "已失联", output_match: "输出匹配", subscription_stopped: "输出订阅已停止" };
 
 function noticeText(block: { readonly taskKind: string; readonly title: string; readonly status: string }): string {
   if (block.taskKind === "subagent") return `子智能体 ${block.title} ${subagentActivationStatusLabel(block.status)}`;

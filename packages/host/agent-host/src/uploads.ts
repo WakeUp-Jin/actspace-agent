@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { HOST_LIMITS, HostError } from "@actspace/shared/host-protocol";
+import { HOST_LIMITS, HostError, HostRequestError } from "@actspace/shared/host-protocol";
 import { SerialGate, writeDurableJson } from "./storage.js";
+import { VerifiedContent } from "./verified-content.js";
 
 type Upload = {
   version: 1; id: string; deviceId: string; sessionId: string; name: string;
@@ -11,13 +12,21 @@ type Upload = {
 };
 export type UploadReference = Pick<Upload, "id" | "name" | "size" | "sha256" | "offset" | "complete">;
 const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+const UPLOAD_ID = /^[0-9a-f-]{36}$/;
 /** One writer per Host data root. Metadata is the acknowledged offset authority. */
 export class HostUploads {
   readonly #gate = new SerialGate();
+  readonly #verified = new VerifiedContent();
+  /**
+   * Uploads no task has pinned yet: what a device's staging quota counts. Uploads are kept for as long
+   * as their Session, so reading every upload's state on each begin grows with everything ever attached.
+   * This instance is the only writer, so it keeps the set in step itself; undefined means "not read yet".
+   */
+  #staged: Map<string, { readonly deviceId: string; readonly size: number }> | undefined;
   #failed = false;
   constructor(private readonly root: string, private readonly now = Date.now) {}
   #directory(id: string) {
-    if (!/^[0-9a-f-]{36}$/.test(id)) throw new HostError("NOT_FOUND", "Upload not found");
+    if (!UPLOAD_ID.test(id)) throw new HostError("NOT_FOUND", "Upload not found");
     return join(this.root, id);
   }
   async #read(id: string): Promise<Upload> {
@@ -41,15 +50,11 @@ export class HostUploads {
   }
   begin(input: { deviceId: string; sessionId: string; name: string; size: number; sha256: string }): Promise<UploadReference> {
     return this.#gate.run(async () => {
-      if (!Number.isSafeInteger(input.size) || input.size < 0 || input.size > HOST_LIMITS.fileBytes || !/^[a-f0-9]{64}$/.test(input.sha256) || !input.name.trim() || input.name.length > 255 || /[\x00-\x1f/\\]/.test(input.name)) throw new TypeError("Invalid upload metadata");
+      if (!Number.isSafeInteger(input.size) || input.size < 0 || input.size > HOST_LIMITS.fileBytes || !/^[a-f0-9]{64}$/.test(input.sha256) || !input.name.trim() || input.name.length > 255 || /[\x00-\x1f/\\]/.test(input.name)) throw new HostRequestError("Invalid upload metadata");
       await mkdir(this.root, { recursive: true, mode: 0o700 });
+      const staged = this.#staged ??= await this.#scan();
       let reserved = 0;
-      for (const id of await readdir(this.root)) {
-        let item: Upload;
-        try { item = await this.#read(id); }
-        catch (error) { if (error instanceof HostError && error.kind === "NOT_FOUND") continue; throw error; }
-        if (item.deviceId === input.deviceId && item.pins.length === 0) reserved += item.size;
-      }
+      for (const item of staged.values()) if (item.deviceId === input.deviceId) reserved += item.size;
       if (reserved + input.size > 200 * 1024 * 1024) throw new HostError("LIMIT_EXCEEDED", "Device staging quota exceeded");
       const value: Upload = { ...input, version: 1, id: randomUUID(), offset: 0, createdAt: this.now(), complete: false, pins: [] };
       const directory = this.#directory(value.id);
@@ -57,8 +62,23 @@ export class HostUploads {
       const file = await open(join(directory, "content"), "wx", 0o600);
       try { await file.sync(); } finally { await file.close(); }
       await this.#save(value);
+      staged.set(value.id, { deviceId: value.deviceId, size: value.size });
       return this.#reference(value);
     });
+  }
+  /** Reads every upload's state. Removes what `expired` selects and returns the uploads still unpinned. */
+  async #scan(expired?: (id: string, value: Upload | undefined) => Promise<boolean>) {
+    const staged = new Map<string, { deviceId: string; size: number }>();
+    for (const id of await readdir(this.root)) {
+      // Not an upload: something else put it here (a file manager's `.DS_Store`), and it is not ours to judge or remove.
+      if (!UPLOAD_ID.test(id)) continue;
+      let value: Upload | undefined;
+      try { value = await this.#read(id); }
+      catch (error) { if (!(error instanceof HostError) || error.kind !== "NOT_FOUND") throw error; }
+      if (await expired?.(id, value)) await rm(this.#directory(id), { recursive: true });
+      else if (value && !value.pins.length) staged.set(id, { deviceId: value.deviceId, size: value.size });
+    }
+    return staged;
   }
   status(deviceId: string, sessionId: string, id: string): Promise<UploadReference> {
     return this.#gate.run(async () => {
@@ -68,9 +88,9 @@ export class HostUploads {
   }
   write(deviceId: string, sessionId: string, id: string, offset: number, encoded: string, sha256: string): Promise<UploadReference> {
     return this.#gate.run(async () => {
-      if (!Number.isSafeInteger(offset) || offset < 0 || encoded.length > Math.ceil(HOST_LIMITS.chunkBytes / 3) * 4) throw new TypeError("Invalid upload chunk");
+      if (!Number.isSafeInteger(offset) || offset < 0 || encoded.length > Math.ceil(HOST_LIMITS.chunkBytes / 3) * 4) throw new HostRequestError("Invalid upload chunk");
       const bytes = Buffer.from(encoded, "base64");
-      if (!bytes.length || bytes.length > HOST_LIMITS.chunkBytes || bytes.toString("base64") !== encoded || digest(bytes) !== sha256) throw new TypeError("Invalid upload chunk digest or encoding");
+      if (!bytes.length || bytes.length > HOST_LIMITS.chunkBytes || bytes.toString("base64") !== encoded || digest(bytes) !== sha256) throw new HostRequestError("Invalid upload chunk digest or encoding");
       const value = await this.#read(id); this.#check(value, deviceId, sessionId);
       if (offset + bytes.length > value.size || offset > value.offset) throw new HostError("CONFLICT", "Upload offset mismatch");
       const file = await open(join(this.#directory(id), "content"), "r+");
@@ -116,7 +136,7 @@ export class HostUploads {
       const values = await Promise.all(ids.map(id => this.#read(id)));
       for (const value of values) { this.#check(value, deviceId, sessionId); if (!value.complete) throw new HostError("CONFLICT", "Attachment incomplete"); }
       if (values.reduce((sum, value) => sum + value.size, 0) > HOST_LIMITS.messageBytes) throw new HostError("LIMIT_EXCEEDED", "Attachments exceed message limit");
-      for (const value of values) if (!value.pins.includes(submissionId)) await this.#save({ ...value, pins: [...value.pins, submissionId] });
+      for (const value of values) if (!value.pins.includes(submissionId)) { await this.#save({ ...value, pins: [...value.pins, submissionId] }); this.#staged?.delete(value.id); }
       return values.map(value => this.#reference(value));
     });
   }
@@ -124,7 +144,9 @@ export class HostUploads {
     return this.#gate.run(async () => {
       const value = await this.#read(id); this.#check(value, deviceId, sessionId);
       if (value.pins.length) throw new HostError("CONFLICT", "Task attachment cannot be deleted");
-      await rm(this.#directory(id), { recursive: true });
+      // A removal that fails part-way may or may not have taken the state file with it.
+      try { await rm(this.#directory(id), { recursive: true }); } catch (error) { this.#staged = undefined; throw error; }
+      this.#staged?.delete(id);
     });
   }
   describe(sessionId: string, id: string): Promise<UploadReference> {
@@ -139,9 +161,12 @@ export class HostUploads {
       const value = await this.#read(id);
       if (value.sessionId !== sessionId || !value.complete || !value.pins.length) throw new HostError("NOT_FOUND", "Session artifact not found");
       const path = join(this.#directory(id), "content");
-      const bytes = await readFile(path);
-      if (bytes.length !== value.size || digest(bytes) !== value.sha256) throw new HostError("RECOVERY_BLOCKED", "Artifact integrity check failed");
-      return { path, mediaType: detectMediaType(bytes) };
+      const file = await open(path, "r");
+      try {
+        if (!await this.#verified.matches(id, file, value)) throw new HostError("RECOVERY_BLOCKED", "Artifact integrity check failed");
+        const head = Buffer.alloc(12);
+        return { path, mediaType: detectMediaType(head.subarray(0, (await file.read(head, 0, head.length, 0)).bytesRead)) };
+      } finally { await file.close(); }
     });
   }
   async readForSession(sessionId: string, id: string): Promise<{ bytes: Uint8Array; mediaType: string }> {
@@ -153,9 +178,10 @@ export class HostUploads {
     return this.#gate.run(async () => {
       const value = await this.#read(id);
       if (value.sessionId !== sessionId || !value.complete || !value.pins.length) throw new HostError("NOT_FOUND", "Session artifact not found");
-      if (!Number.isSafeInteger(offset) || offset < 0 || offset > value.size || !Number.isSafeInteger(length) || length < 1 || length > HOST_LIMITS.chunkBytes) throw new TypeError("Invalid artifact range");
+      if (!Number.isSafeInteger(offset) || offset < 0 || offset > value.size || !Number.isSafeInteger(length) || length < 1 || length > HOST_LIMITS.chunkBytes) throw new HostRequestError("Invalid artifact range");
       const file = await open(join(this.#directory(id), "content"), "r");
       try {
+        if (!await this.#verified.matches(id, file, value)) throw new HostError("RECOVERY_BLOCKED", "Artifact integrity check failed");
         const bytes = Buffer.alloc(Math.min(length, value.size - offset));
         const result = await file.read(bytes, 0, bytes.length, offset);
         if (result.bytesRead !== bytes.length) throw new HostError("RECOVERY_BLOCKED", "Artifact content missing");
@@ -166,6 +192,8 @@ export class HostUploads {
   reconcilePins(exists: (sessionId: string, submissionId: string) => Promise<boolean>): Promise<void> {
     return this.#gate.run(async () => {
       await mkdir(this.root, { recursive: true, mode: 0o700 });
+      // Dropping an upload's last pin stages it again.
+      this.#staged = undefined;
       for (const id of await readdir(this.root)) {
         let value: Upload;
         try { value = await this.#read(id); } catch (error) { if (error instanceof HostError && error.kind === "NOT_FOUND") continue; throw error; }
@@ -178,17 +206,12 @@ export class HostUploads {
   cleanup(): Promise<void> {
     return this.#gate.run(async () => {
       await mkdir(this.root, { recursive: true, mode: 0o700 });
-      for (const id of await readdir(this.root)) {
+      this.#staged = undefined;
+      this.#staged = await this.#scan(async (id, value) => {
         // An interrupted begin can leave a directory without metadata.
-        let value: Upload;
-        try { value = await this.#read(id); }
-        catch (error) {
-          if (!(error instanceof HostError) || error.kind !== "NOT_FOUND") throw error;
-          if (this.now() - (await stat(this.#directory(id))).mtimeMs > 86_400_000) await rm(this.#directory(id), { recursive: true });
-          continue;
-        }
-        if (!value.pins.length && this.now() - value.createdAt > 86_400_000) await rm(this.#directory(id), { recursive: true });
-      }
+        if (!value) return this.now() - (await stat(this.#directory(id))).mtimeMs > 86_400_000;
+        return !value.pins.length && this.now() - value.createdAt > 86_400_000;
+      });
     });
   }
 }

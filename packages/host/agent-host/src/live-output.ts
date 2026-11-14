@@ -1,4 +1,4 @@
-import { HostError } from "@actspace/shared/host-protocol";
+import { HostError, HostRequestError } from "@actspace/shared/host-protocol";
 import { LiveOutputBuffer, type LiveOutputPage } from "@actspace/shared/runtime-v2";
 /**
  * Transient text until the journal records the completed message (agent-spec-live-assistant-stream §5).
@@ -11,7 +11,7 @@ export class HostLiveOutput {
   settle(sessionId: string, messageId: string): void { this.#buffer.settle(sessionId, messageId); }
   describe(sessionId: string) { return this.#buffer.describe(sessionId); }
   page(sessionId: string, runId: string, afterRevision: number): LiveOutputPage {
-    if (!Number.isSafeInteger(afterRevision) || afterRevision < 0) throw new TypeError("Invalid output revision");
+    if (!Number.isSafeInteger(afterRevision) || afterRevision < 0) throw new HostRequestError("Invalid output revision");
     const page = this.#buffer.page(sessionId, runId, afterRevision);
     if (!page) throw new HostError("CONFLICT", "Output belongs to another Run; refresh snapshot", true);
     return page;

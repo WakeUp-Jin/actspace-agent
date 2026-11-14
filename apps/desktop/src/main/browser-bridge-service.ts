@@ -212,7 +212,7 @@ export class BrowserBridgeService {
    * 只接受 main 自己（系统目录对话框）拿到的绝对路径；保存前解析成真实路径，避免之后编译时符号链接指向别处。
    * 传 null 切回随包扩展。
    */
-  async useSourceExtension(repoRoot: string | null): Promise<BrowserBridgeActionResult> {
+  async setSourceExtension(repoRoot: string | null): Promise<BrowserBridgeActionResult> {
     let resolvedRoot: string | undefined;
     if (repoRoot !== null) {
       if (!isAbsolute(repoRoot)) return { ok: false, error: "请选择绝对源码目录。" };
@@ -480,7 +480,7 @@ export class BrowserBridgeService {
   async buildAndInstall(): Promise<BrowserBridgeInstallResult> {
     const repoRoot = (await this.connectionConfig()).sourceRoot;
     if (repoRoot === undefined) return { ok: false, error: "请先选择源码扩展目录，再从源码编译。" };
-    const sourceValidation = await this.useSourceExtension(repoRoot);
+    const sourceValidation = await this.setSourceExtension(repoRoot);
     if (!sourceValidation.ok) return { ok: false, error: sourceValidation.error };
     const pluginDir = resolvePluginDir(repoRoot);
     const buildScript = join(pluginDir, "build.sh");
@@ -507,7 +507,7 @@ export class BrowserBridgeService {
 
     const installed = await this.installFromFile(sourceBinary);
     if (!installed.ok) return installed;
-    const selected = await this.useSourceExtension(repoRoot);
+    const selected = await this.setSourceExtension(repoRoot);
     if (!selected.ok) return { ok: false, error: selected.error };
     const registered = await this.installNativeHost();
     if (!registered.ok) return { ok: false, error: registered.error };

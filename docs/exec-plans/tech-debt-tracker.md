@@ -38,7 +38,7 @@
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
-| 2026-10-06 | main / 子进程环境（C1） | ~~`applyToEnv` 把搜索服务 Key 写进 `process.env`，bash / `rg` / git / ssh / Browser Bridge / 更新脚本子进程继承完整环境。~~ 已解决：Desktop 不再把任何凭据写进 env（工具端口早已直接从 `getToolEnvironment()` 拿 Key）；子进程 env 由 `@actspace/shared` 的 `toolChildEnv`（继承 + 剥离凭据模式变量，用于 bash / `rg` / Browser Bridge 编译 / 更新脚本）与 `hostChildEnv`（基础白名单，用于 git / ssh）构造。 | 已完成。`toolChildEnv` 是模式过滤，不是穷举：用户 shell 里名字不像凭据的敏感变量仍会被 Agent bash 看到，这是沿用「Agent 可以用用户工具链」的产品取舍。 |
+| 2026-10-06 | main / 子进程环境（C1） | ~~`applyToEnv` 把搜索服务 Key 写进 `process.env`，bash / `rg` / git / ssh / Browser Bridge / 更新脚本子进程继承完整环境。~~ 已解决：Desktop 不再把任何凭据写进 env（工具端口早已直接从 `getToolEnvironment()` 拿 Key）；子进程 env 由 `@actspace/shared` 的 `toolChildEnv`（继承 + 剥离凭据模式变量，用于 bash / `rg` / Browser Bridge 编译 / 更新脚本）与 `hostChildEnv`（基础白名单，用于 git / ssh）构造。 | 已完成。`toolChildEnv` 是模式过滤，不是穷举：用户 shell 里名字不像凭据的敏感变量仍会被 Agent bash 看到，这是沿用「Agent 可以用用户工具链」的产品取舍。2026-11-10 补了几类：名字是 `DATABASE_URL`、以 `_PWD` 或 `_DSN` 结尾的，以及值里带 `://用户名:密码@` 的（代理变量除外）。 |
 | 2026-10-06 | main / Browser Bridge 安装 | ~~`browserBridge.installFromRepo` 接受 renderer 传来的 `repoRoot`，只校验扩展 manifest 就在该目录执行 `build.sh`。~~ 已解决：`selectSourceExtension` 由 main 弹系统目录对话框并校验，`installFromRepo` 不带参数只编译已保存的目录；保存前 `realpath`，`build.sh` 必须是目录内普通文件。 | 已完成。 |
 | 2026-10-06 | scripts / IPC 审计 | ~~`check:ipc-channels` 不检查注册是否经过 `assertTrustedSender`。~~ 13 之后注册器强制 sender 校验与 guard，审计以契约为来源并区分方向；2026-11-09 再加一条：main 在 `ipc/registry.ts` 之外直接调用 `ipcMain.handle / handleOnce / on / once` 即失败。 | 已完成。 |
 | 2026-10-06 | renderer / 主文档 CSP | ~~主文档没有 CSP。~~ 已解决：main 用 `onHeadersReceived` 下发 CSP，`script-src 'self'`、`connect-src 'self'`、frame / object / worker / base-uri / form-action 全 `'none'`，dev 只放开 Vite 需要的内联脚本和 ws。 | 已完成。残余见下一行。 |
@@ -77,7 +77,7 @@
 | 2026-11-08 | Desktop main / git | `runGitCommand` 用 `execFile` 跑 git 并等 stdio 关闭；用户全局 `core.fsmonitor=true` 时，git 会为仓库拉起 fsmonitor 守护进程并继承管道，一次 `git status` 要等 20–30 秒才返回。测试侧已用 `GIT_CONFIG_GLOBAL=/dev/null` 隔离，产品侧没动。 | 在产品的 git 调用里加 `-c core.fsmonitor=false`（或改为 `spawn` + 只等 exit），用开启 fsmonitor 的真实仓库复验。 |
 | 2026-11-08 | 依赖 | ~~`katex` 钉在 0.16.x，`pnpm audit` 报一条 low；0.x minor 可能有破坏性改动，没随本轮升。~~ 已解决：desktop 直依赖升到 0.18.2，并用 `pnpm.overrides` 把 `rehype-katex` / `mermaid` 的间接 katex 一起拉到同版，公式渲染测试通过。 | 已完成。 |
 | 2026-11-08 | 测试环境 | `runtime-v2-output-reference-flow.test.ts` 对 `bash -lc` 的输出按行数断言；shell 启动时若有 nvm 等打印告警（如 `npm_config_prefix`），多出的行会让它失败。GitHub runner 上没这个问题，只在装了 nvm 的开发机上出现。 | 断言改成只看目标行，或给测试用的 shell 传 `--noprofile --norc`。 |
-| 2026-11-08 | 测试环境 | `packages/core/tool-runtime` 的 `runtime.test.ts` 用 `/workspace/...` 当假的资源路径；机器上真有 `/workspace` 目录（如某些容器）时 3 个用例变成 `denied`。GitHub runner 上没这个问题。 | 测试用例改用 `mkdtemp` 出来的真实工作区路径，而不是硬编码的绝对路径。 |
+| 2026-11-08 | 测试环境 | ~~`packages/core/tool-runtime` 的 `runtime.test.ts` 用 `/workspace/...` 当假的资源路径；机器上真有 `/workspace` 目录（如某些容器）时 3 个用例变成 `denied`。GitHub runner 上没这个问题。~~ 已解决（2026-11-10）：用例改用 `mkdtemp` 出来的真实工作区路径。 | 已完成。 |
 | 2026-11-08 | Release | ~~`release.yml` 还是手动触发、单平台，且没装 Go。~~ 已在 P4 解决：`v*` tag 触发四平台矩阵 + `actions/setup-go` + 草稿 Release。 | 已完成。 |
 | 2026-11-08 | Release / Windows | Windows 产物是 portable zip：`electron.exe` 只是改名，没换图标和版本资源（任务管理器、属性里仍显示 Electron），也没有 Authenticode 签名，首次运行会被 SmartScreen 拦。 | 接 `rcedit`（或 electron-builder / Forge）替换图标与版本信息；签名需要证书，视发行需求再立项。 |
 | 2026-11-08 | Electron | `safeStorage.isEncryptionAvailable` / `encryptString` / `decryptString` 在 Electron 45 弃用、46 移除；`apps/desktop/src/main/index.ts` 的 `SecretCrypto` 和 `remote-hosts/credentials.ts` 都在用同步版。 | 在 46 成为 stable 前把 `SecretCrypto` 接口及其调用链（settings store、model-connections、HostCredentials）改为 `isAsyncEncryptionAvailable` / `encryptStringAsync` / `decryptStringAsync`。 |
@@ -85,6 +85,18 @@
 | 2026-11-08 | Release / Windows | Windows 包只在 CI 上打出、校验过文件结构，没有人实机启动过；沙盒缺位（nono 只有 darwin / linux）没验证。浏览器桥 CLI 在 Windows 上只是能编译（`ownedByCurrentUser` 的 Windows 实现恒为 `false`，实例注册表用 Unix socket 与 POSIX 权限位），`browser-tools` 插件在 Windows 上不可用。 | 第一个 tag 的草稿 Release 出来后，用 Windows 机器解压运行 `ActSpace.exe` 走一遍聊天、工具调用、浏览器桥。 |
 | 2026-11-08 | Release | 四个平台的完整产物经 Actions artifact 中转到 Release（每次 tag 约 700 MB，保留 1 天）；若将来 artifact 配额紧张，改成在各 job 内直接 `gh release upload` 到草稿。 | 观察 Settings › Billing 的 Actions storage，超过一半再改。 |
 | 2026-11-09 | CI / `build` job | `ci.yml` 的 `build` job 和 `release-package.sh` 仍走逐包 `pnpm --filter ... build`，没有接 `setup-workspace` 的 `tsc -b` 缓存（`completed/20261109-ci-speedup.md` 决策记录）。`build` 不是最长的 job，而且 release 链需要确认 `tsc -b` 产物与逐包 build 完全等价（esbuild 包、prompts 拷贝、默认 harness）才能换。 | `build` 成为 `ci.yml` 关键路径时，让它也用 `setup-workspace` + `pnpm build:deps`，再比对两种方式的 `dist/` 目录差异后替换 release 链。 |
+
+## 代码库审查修复遗留
+
+2026-11-10 代码库审查修复（`active/20261110-codebase-review-fixes.md`）里看到、但没有在那一批处理的事项：
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-11-10 | 图片生成 / 下载地址检查 | `packages/image/tool-image-generation/src/node-ports.ts` 的 `downloadImage` 自己有一份公网地址检查，是 `web_fetch` 修之前的写法：检查时解析一次域名、`fetch` 再解析一次；带方括号的 IPv6 主机名被当成域名；域名解析出 `::ffff:7f00:1` 这种写法的回环地址时判成公网。网址来自用户配置的图片服务商的响应，不是模型给的。 | 把 `packages/web/tool-web/src/public-request.ts` 的地址检查和固定地址的请求抽到两个包都能用的位置，`downloadImage` 改用它。 |
+| 2026-11-10 | `web_fetch` / 环境代理 | 设置了 `NODE_USE_ENV_PROXY=1` 时 `web_fetch` 仍然走 `fetch`：连的是代理，目标域名由代理解析，固定不了地址，检查的地址和代理实际连的地址可以不同。 | 需要时改成自己向代理发 `CONNECT` 到检查过的地址；先确认有没有用户在这种配置下使用。 |
+| 2026-11-10 | Agent Host / 上传清理 | 上传的定时清理每 60 秒把所有上传的 `state.json` 读一遍。被任务引用的上传跟着会话一直留着，所以这一遍随附件总数增长。它是后台任务，不在请求路径上。 | 上传数量大到这一遍明显占用磁盘读取时，改成只扫还没被引用的上传（内存里已经有这份集合）。 |
+| 2026-11-10 | Agent Host / 产物错误 | `NodeArtifactStore` 在产物不存在、产物不属于这个会话时抛普通 `Error`，设备收到的是 -32603 `Host operation failed`，看不出是哪种情况（Host 日志里有）。 | 这两种情况改抛 `HostError`（`NOT_FOUND`、`FORBIDDEN`）。 |
+| 2026-11-10 | 子进程输出解码 | `apps/desktop/src/main/browser-bridge-service.ts` 收集编译日志、`packages/subagent/subagent/src/external-cli.ts` 的 `OutputTail` 都按块 `toString`，一个多字节字符落在两块之间时显示成乱码。两处都只在失败时给出诊断信息。 | 换成 `setEncoding("utf8")` 或 `StringDecoder`，和 `tool-fs-search` 读 ripgrep 输出的写法一致。 |
 
 ## Web / PWA 客户端遗留
 

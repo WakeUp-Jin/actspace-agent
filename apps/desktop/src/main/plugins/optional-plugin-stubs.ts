@@ -34,7 +34,7 @@ export function registerDisabledBrowserBridgeIpc(ipc: IpcRegistrar): void {
   ipc.handle(bridge.getStatus, () => disabledBrowserBridgeStatus());
   ipc.handle(bridge.connect, reject);
   ipc.handle(bridge.selectSourceExtension, reject);
-  ipc.handle(bridge.useBundledExtension, reject);
+  ipc.handle(bridge.switchToBundledExtension, reject);
   ipc.handle(bridge.prepareUpdate, reject);
   ipc.handle(bridge.disconnect, reject);
   ipc.handle(bridge.selectInstance, reject);

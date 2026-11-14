@@ -53,7 +53,7 @@
     "structured-clone": 2
   },
   "packages/core/runtime/src/session/session-controller.ts": {
-    "full-read": 4,
+    "full-read": 3,
     "per-entry-read": 1
   },
   "packages/english-learning/english-learning/src/service.ts": {
@@ -95,7 +95,6 @@
     "structured-clone": 2
   },
   "packages/subagent/subagent/src/manager.ts": {
-    "full-iterate": 2,
     "full-read": 1
   }
 }

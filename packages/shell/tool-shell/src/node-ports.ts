@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { sessionScratchDirectory } from "./scratch.js";
 export { sessionScratchDirectory } from "./scratch.js";
 import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
+import { Worker } from "node:worker_threads";
 import { toolChildEnv } from "@actspace/shared";
 import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { spawnHostProcess } from "@actspace/sandbox/node-ports";
@@ -29,6 +30,9 @@ const KILL_GRACE_MS = 500;
 const MAX_SUBSCRIPTION_PATTERN_LENGTH = 500;
 const MIN_SUBSCRIPTION_DEBOUNCE_MS = 5_000;
 const MAX_MONITOR_LINE_CHARS = 4_000;
+/** An ordinary pattern answers a batch in well under a millisecond per line; this only has to be far above that. */
+const SUBSCRIPTION_MATCH_TIMEOUT_MS = 5_000;
+const MAX_UNCHECKED_LINES = 10_000;
 const NOTIFICATION_TAIL_CHARS = 2_000;
 /** Measured on macOS (nono, Seatbelt): a blocked write reports EPERM. A command's own EACCES ("Permission denied") is not one. */
 const SANDBOX_DENIAL_SIGNATURES = ["operation not permitted", "eperm"] as const;
@@ -56,6 +60,8 @@ type BashOptions = {
   readonly sessionLogCapBytes?: number;
   /** Tests only: how long a subagent's command may run. */
   readonly subagentTimeoutMs?: number;
+  /** Tests only: how long one batch of output lines may take to match before the subscription is dropped. */
+  readonly subscriptionMatchTimeoutMs?: number;
   /** The Python the app ships, when it does; absent in development without `pnpm python-runtime:prepare`. */
   readonly python?: BashPythonRuntime;
   /** Whose `scripts/<sessionId>/` a Session's commands use; a forked subagent uses its parent's. Defaults to its own. */
@@ -124,9 +130,11 @@ async function executeBash(
         ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env, scratchDir: scratchRoot }
         : await sandboxedRequest(argv, realCwd, workspaceRoot, scratchRoot, env));
     const sandboxed = !noSandbox;
-    const monitor = new OutputMonitor(subscription);
+    const monitor = new OutputMonitor(subscription, options.subscriptionMatchTimeoutMs);
     const processHandle = new ProcessHandle(run, log.path, monitor.handleChunk);
     registry.own(processHandle);
+    // The monitor owns a thread once output arrives; whichever way this call ends, the thread ends with the process.
+    void processHandle.wait.then(() => monitor.dispose());
     const abort = () => processHandle.kill();
     context.signal.addEventListener("abort", abort, { once: true });
     const blockMs = clampInteger(args.blockMs, DEFAULT_BLOCK_MS, 0, MAX_BLOCK_MS);
@@ -332,10 +340,16 @@ class BashTaskRegistry {
     task.timer = setTimeout(() => { if (task.status === "running") { task.status = "killed"; task.timedOut = true; task.process.kill(); } }, MAX_RUNTIME_MS);
     task.timer.unref?.();
     this.#tasks.set(task.taskId, task);
-    task.monitor.attach((line) => {
-      const reason = task.subscription?.reason ?? "requested output";
-      task.reportProgress({ message: `Background Bash output matched: ${reason}` });
-      void this.background?.notifyOutputMatch(task.taskId, `Background command output matched the subscription (${reason}).`, redactToolText(line)).catch(() => undefined);
+    const reason = task.subscription?.reason ?? "requested output";
+    task.monitor.attach({
+      matched: (line) => {
+        task.reportProgress({ message: `Background Bash output matched: ${reason}` });
+        void this.background?.notifyOutputMatch(task.taskId, `Background command output matched the subscription (${reason}).`, redactToolText(line)).catch(() => undefined);
+      },
+      stopped: () => {
+        task.reportProgress({ message: `Background Bash output subscription stopped: ${reason}` });
+        void this.background?.notifySubscriptionStopped(task.taskId, `Stopped watching this command's output for the subscription (${reason}): its pattern could not be matched in time. The command is still running and no more output matches will be reported. Read its output with task_output.`).catch(() => undefined);
+      },
     });
     task.completion = task.process.wait.then(async (status) => {
       clearTimeout(task.timer);
@@ -476,25 +490,112 @@ function environmentDetail(sandboxed: boolean) {
 
 type OutputSubscription = { readonly pattern: string; readonly reason: string; readonly debounceMs: number };
 
+type OutputListener = { readonly matched: (line: string) => void; readonly stopped: () => void };
+
 class OutputMonitor {
-  readonly #regex: RegExp | undefined;
+  readonly #matcher: LineMatcher | undefined;
   readonly #pending: string[] = [];
-  #listener: ((line: string) => void) | undefined;
+  #listener: OutputListener | undefined;
   #lineBuffer = "";
   #lastNotifiedAt = 0;
   #disposed = false;
-  constructor(private readonly subscription?: OutputSubscription) { this.#regex = subscription === undefined ? undefined : new RegExp(subscription.pattern); }
+  #stopped = false;
+  constructor(private readonly subscription?: OutputSubscription, matchTimeoutMs = SUBSCRIPTION_MATCH_TIMEOUT_MS) {
+    if (subscription !== undefined) this.#matcher = new LineMatcher(subscription.pattern, matchTimeoutMs, (line) => this.#matched(line), () => { this.#stopped = true; this.#listener?.stopped(); });
+  }
   handleChunk = (text: string): void => {
-    if (this.#disposed || this.#regex === undefined) return;
+    if (this.#disposed || this.#stopped || this.#matcher === undefined) return;
     this.#lineBuffer += text;
     const lines = this.#lineBuffer.split("\n"); this.#lineBuffer = lines.pop() ?? "";
-    for (const line of lines) this.#scan(line);
-    if (this.#lineBuffer.length > MAX_MONITOR_LINE_CHARS) { this.#scan(this.#lineBuffer.slice(0, MAX_MONITOR_LINE_CHARS)); this.#lineBuffer = ""; }
+    for (const line of lines) this.#matcher.push(line.slice(0, MAX_MONITOR_LINE_CHARS));
+    if (this.#lineBuffer.length > MAX_MONITOR_LINE_CHARS) { this.#matcher.push(this.#lineBuffer.slice(0, MAX_MONITOR_LINE_CHARS)); this.#lineBuffer = ""; }
   };
-  attach(listener: (line: string) => void): void { if (this.#disposed) return; this.#listener = listener; for (const line of this.#pending.splice(0)) this.#emit(line); }
-  dispose(): void { this.#disposed = true; this.#listener = undefined; this.#pending.splice(0); }
-  #scan(line: string): void { const value = line.slice(0, MAX_MONITOR_LINE_CHARS); this.#regex!.lastIndex = 0; if (!this.#regex!.test(value)) return; if (this.#listener === undefined) { if (this.#pending.length < 8) this.#pending.push(value); } else this.#emit(value); }
-  #emit(line: string): void { const now = Date.now(); if (now - this.#lastNotifiedAt < (this.subscription?.debounceMs ?? MIN_SUBSCRIPTION_DEBOUNCE_MS)) return; this.#lastNotifiedAt = now; this.#listener?.(line); }
+  /** Matches found, or a stop that happened, before the command went to the background are delivered now. */
+  attach(listener: OutputListener): void { if (this.#disposed) return; this.#listener = listener; for (const line of this.#pending.splice(0)) this.#emit(line); if (this.#stopped) listener.stopped(); }
+  /** Lines still waiting to be matched are dropped; the command's end is reported with its output tail anyway. */
+  dispose(): void { this.#disposed = true; this.#listener = undefined; this.#pending.splice(0); this.#matcher?.close(); }
+  #matched(line: string): void { if (this.#listener === undefined) { if (this.#pending.length < 8) this.#pending.push(line); } else this.#emit(line); }
+  #emit(line: string): void { const now = Date.now(); if (now - this.#lastNotifiedAt < (this.subscription?.debounceMs ?? MIN_SUBSCRIPTION_DEBOUNCE_MS)) return; this.#lastNotifiedAt = now; this.#listener?.matched(line); }
+}
+
+/** The worker's whole program: test each line of a batch, answer with the indexes of the lines that matched. */
+const LINE_MATCHER_WORKER = `
+const { parentPort, workerData } = require("node:worker_threads");
+const pattern = new RegExp(workerData);
+parentPort.on("message", (lines) => {
+  const matched = [];
+  for (let index = 0; index < lines.length; index += 1) if (pattern.test(lines[index])) matched.push(index);
+  parentPort.postMessage(matched);
+});`;
+
+/**
+ * Tests output lines against the model's pattern on another thread.
+ *
+ * The pattern is the model's and a line can be 4,000 characters, so one test can take seconds or never end:
+ * `(a+)+$` needs about three seconds for 28 characters and twice that for each character more. Run on this
+ * thread, that stops every Session the process serves. Here a batch that is not answered within `timeoutMs`
+ * ends the worker and, through `onStop`, the subscription. So does a worker that cannot start or dies.
+ */
+class LineMatcher {
+  #worker: Worker | undefined;
+  #online = false;
+  #closed = false;
+  #waiting: string[] = [];
+  #sent: readonly string[] | undefined;
+  #timer: ReturnType<typeof setTimeout> | undefined;
+  constructor(private readonly pattern: string, private readonly timeoutMs: number, private readonly onMatch: (line: string) => void, private readonly onStop: () => void) {}
+
+  push(line: string): void {
+    if (this.#closed) return;
+    // Output arriving faster than it is matched: the oldest unchecked lines go, the newest are the ones worth checking.
+    if (this.#waiting.length >= MAX_UNCHECKED_LINES) this.#waiting = [];
+    this.#waiting.push(line);
+    try { this.#worker ??= this.#start(); } catch { this.#fail(); return; }
+    this.#send();
+  }
+
+  close(): void {
+    if (this.#closed) return;
+    this.#closed = true;
+    clearTimeout(this.#timer);
+    this.#waiting = [];
+    this.#sent = undefined;
+    void this.#worker?.terminate();
+  }
+
+  #start(): Worker {
+    const worker = new Worker(LINE_MATCHER_WORKER, { eval: true, workerData: this.pattern });
+    worker.unref();
+    worker.once("online", () => { this.#online = true; this.#send(); });
+    worker.on("message", (matched: readonly number[]) => {
+      const sent = this.#sent;
+      if (sent === undefined) return;
+      clearTimeout(this.#timer);
+      this.#sent = undefined;
+      for (const index of matched) { const line = sent[index]; if (line !== undefined && !this.#closed) this.onMatch(line); }
+      this.#send();
+    });
+    // A worker that failed or exited on its own cannot answer either.
+    worker.once("error", () => this.#fail());
+    worker.once("exit", () => this.#fail());
+    return worker;
+  }
+
+  /** One batch at a time, so the timer measures the pattern and not a queue. */
+  #send(): void {
+    if (this.#closed || !this.#online || this.#sent !== undefined || this.#waiting.length === 0) return;
+    this.#sent = this.#waiting;
+    this.#waiting = [];
+    this.#timer = setTimeout(() => this.#fail(), this.timeoutMs);
+    this.#timer.unref?.();
+    this.#worker?.postMessage(this.#sent);
+  }
+
+  #fail(): void {
+    if (this.#closed) return;
+    this.close();
+    this.onStop();
+  }
 }
 
 function parseOutputSubscription(value: RuntimeV2JsonValue | undefined): OutputSubscription | string | undefined {

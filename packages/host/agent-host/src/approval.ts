@@ -1,5 +1,5 @@
 import type { ApprovalDecision, ApprovalRequest } from "@actspace/shared/runtime-v2";
-import { HostError } from "@actspace/shared/host-protocol";
+import { HostError, HostRequestError } from "@actspace/shared/host-protocol";
 type Settled = { request: ApprovalRequest; decision: ApprovalDecision };
 type Pending = { request: ApprovalRequest; settle: (decision: ApprovalDecision) => void };
 /** Host owns approval waits; a device disconnect never settles them. */
@@ -36,8 +36,8 @@ export class HostApprovalBroker {
       settle({ requestId, kind: "deny", code: "timeout", decidedAt: new Date().toISOString() });
       throw new HostError("CONFLICT", "Approval expired");
     }
-    if (kind === "session" && (!suggestionId || !request.grantSuggestions.some(item => item.suggestionId === suggestionId))) throw new TypeError("Invalid grant suggestion");
-    if (kind !== "deny" && !request.supportedLifetimes.includes(kind)) throw new TypeError("Unsupported approval lifetime");
+    if (kind === "session" && (!suggestionId || !request.grantSuggestions.some(item => item.suggestionId === suggestionId))) throw new HostRequestError("Invalid grant suggestion");
+    if (kind !== "deny" && !request.supportedLifetimes.includes(kind)) throw new HostRequestError("Unsupported approval lifetime");
     const decidedAt = new Date().toISOString();
     settle(kind === "deny" ? { requestId, kind, code: "user-denied", decidedAt } : kind === "session" ? { requestId, kind, suggestionId: suggestionId!, decidedAt } : { requestId, kind, decidedAt });
   }
