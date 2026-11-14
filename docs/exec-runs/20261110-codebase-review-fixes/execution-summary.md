@@ -13,6 +13,8 @@
 
 想一次合完：把编号最大的那个 PR 的 base 改成 `main` 再合并，它包含前面全部提交。其余 PR 的提交这时已经都在 `main` 里，GitHub 没有自动标成已合并的手动关闭即可。
 
+PR 8 用 **Create a merge commit** 还有一个原因：`.git-blame-ignore-revs` 里记着格式化提交和 PR 7 的改名提交的哈希。用 squash 或 rebase 合并 PR 8，这两个哈希就不在 `main` 的历史里，`main` 和之后每个 PR 的「仓库基础检查」会失败，直到把那两行删掉（rebase 合并的话改成新的哈希）。
+
 ## 核心变更清单
 
 | 变更 | 影响文件 | 说明 |
@@ -47,6 +49,10 @@
 | 防止旧名字回来的检查（PR 7） | `scripts/check-transitional-names.mjs`、`scripts/check-current-docs.mjs`、`package.json` | `pnpm check:transitional-names` 随 `pnpm test:scripts` 在 CI 里跑；`pnpm check:docs` 多一条规则，设计文档和当前事实文档里出现旧名字会报。别的分支带进旧名字时，同一个脚本加 `--write` 就改掉。 |
 | `DesktopLlmAdapter`（PR 7，L6） | `apps/desktop/src/main/runtime-v2/llm-adapter.ts`（原来叫 `legacy-llm-adapter.ts`）、`desktop-host-adapter.ts` | 桌面端现在唯一的 LLM 适配器，类名和文件名里的 `Legacy` 去掉。 |
 | 删掉没有人读的字段（PR 7） | `apps/desktop/src/main/model-runtime-service.ts` | `ResolvedRuntimeModel.llmConfig` 和它的类型，11 行。 |
+| 读源码的检查和测试不再依赖排版（PR 8） | `scripts/check-ipc-channels.mjs`、`scripts/check-hot-path-reads.mjs`、`scripts/check-path-containment.mjs`、`apps/desktop/src/renderer/test/markdown-editor-shell.test.tsx` | 这四处原来一行一行地认，一条语句折成几行就认不出来。改成按记号或对整份源码匹配；IPC 契约里读不懂的写法从跳过改成报错。对现在的代码，检查结果不变。排在格式化之前，各自单独一个提交。 |
+| 全仓库按 Biome 配置格式化（PR 8，L1） | 1,953 个文件：`apps/desktop` 871 个、`packages/` 842 个、`apps/web` 104 个、`scripts` 86 个、`apps/cli` 21 个、`apps/site` 18 个、`browser-bridge` 6 个、`apps/promo-video` 5 个 | 双引号、分号、2 空格缩进、行宽 120。配置一直在 `biome.jsonc` 里，原来不强制。一个提交（`d26331ad`），完全是工具的输出，+142,815 / −39,439 行，代码含义不变。Markdown、CSS、JSON 和两个由脚本生成的文件不格式化。 |
+| 格式检查进 CI（PR 8） | `package.json`、`.github/workflows/ci.yml`、`biome.jsonc`、`docs/coding-standards/lint-conventions.md` | `pnpm format:check` 在 `Lint 与类型检查` 里跑，有文件不符合配置 CI 就失败。提交前跑 `pnpm format`：全库写两遍再检查一遍，本机约 2 秒。 |
+| `.git-blame-ignore-revs`（PR 8） | `.git-blame-ignore-revs`、`scripts/check-blame-ignore-revs.mjs`、`.github/workflows/base-checks.yml`、`scripts/check-repo-hygiene.sh` | 记下格式化和 PR 7 的改名两个提交，`git blame` 跳过它们。配一个检查：里面的哈希必须是完整的，并且在当前分支的历史里。 |
 
 ## 人工验证指引
 
@@ -81,6 +87,11 @@
    - 验证方式：在桌面端的一个会话里发两三条消息，等回复结束。点前面某一条自己的提问（鼠标移上去提示「点击编辑并重新发送」），改几个字后发送。
    - 预期结果：这条提问和它之后的内容被替换，新的提问得到回复。原来每次都在输入框的提示行显示「这条提问不能再编辑。」，这个会话正在运行的子智能体和后台任务还会被停掉。
    - 这一项云端验证不了的部分：界面到 Runtime 之间的那一段。新增的用例按真实方式启动 Runtime，建会话、写三条消息、回退到第二条，确认记录只剩前面的部分；没有在真实的桌面窗口里点过。这个功能当时的执行记录（`docs/exec-runs/20261107-edit-resend-rewind/execution-process.md`）里就写着「Electron 实机待验收」。
+
+7. **PR 8 合并之后，看一眼 `main` 的「仓库基础检查」（PR 8）**
+   - 验证方式：PR 8 合并后，打开仓库的 Actions 页，看 `main` 上最新一次「仓库基础检查」。
+   - 预期结果：通过。`Blame ignore revs` 那一步的输出是「2 个提交，都在当前分支的历史里」。
+   - 失败时：说明合并方式不是 Create a merge commit。把 `.git-blame-ignore-revs` 里报出来的那几行哈希删掉（rebase 合并的话换成 `main` 上对应的新哈希）再提交，别的改动不受影响。在修好之前，每个 PR 的「仓库基础检查」都会是红的。
 
 ### 建议验证
 
@@ -117,6 +128,15 @@
     - 验证方式：启动桌面端，打开一个已有的会话，再开一个新会话发一条消息。平时用浏览器验收脚本的话，按 `browser-bridge/test-fixtures/acceptance/README.md` 连好扩展和 Native Host，跑一次 `node browser-bridge/test-fixtures/acceptance/smoke.cjs`。
     - 预期结果：和原来一样。
     - 为什么列在这里：改名改到 292 个文件。依据是改名前后的构建产物对照（除了 26 个 `.js` 里的函数名、类名、常量名和模块导出名跟着改了，其余运行时代码逐字节相同）和全量测试；云端没有真实的桌面窗口。`browser-bridge` 的 7 个验收脚本要连真实的浏览器，只做了语法检查，核对了导出的名字和引用方一致，没有运行。
+11. **几处界面文字里的空格（PR 8）**
+    - 验证方式：启动桌面端，打开一个已有对话的会话。看三处：点输入框下方状态行里的上下文用量，浮层里「已用量 / 上限 Token」那一行；右侧面板的「上下文」里展开任意一条，看「≈… tokens · 占本类 … · 占全部 …」那一行；扩展 › Skills 里每个 Skill 名字后面的标签（「用户 · …」「项目 · …」）。
+    - 预期结果：和原来一样。斜杠和圆点两边各有一个空格，「占本类」「占全部」和后面的百分比之间有一个空格，没有多出来或者粘在一起。
+    - 为什么列在这里：格式化前后的代码逐个文件对过语法树，页面内容上的差别只有 JSX 里的空格：一共 19 处，显示的文字逐字相同，其中 11 处把紧挨着表达式或标签的空格拆成了单独的一小段，页面上原来的一个文本节点变成相邻的两个。依据是打包文件的对照和渲染进程的测试；云端没有真实的桌面窗口。
+12. **本地配置一次 `git blame`（PR 8）**
+    - 验证方式：PR 8 合并后，在本机的克隆里运行 `git config blame.ignoreRevsFile .git-blame-ignore-revs`，然后 `git blame apps/desktop/src/renderer/App.tsx`；再在 GitHub 上打开同一个文件的 blame 页面。
+    - 预期结果：绝大多数行记在格式化之前真正改动它的提交上，不是格式化的那个提交。本地量过：这个文件 2,358 行里，记在格式化提交上的从 1,479 行降到 57 行（剩下的是 git 对不回上一个提交的行）。GitHub 的 blame 页面按它的文档会自动读这个文件。
+    - 这一项云端验证不了的部分：GitHub 的 blame 页面，Agent 打不开它来核对。
+    - 注意：配置之后检出还没有这个文件的旧提交时，`git blame` 会报 `could not open object name list`，先运行 `git config --unset blame.ignoreRevsFile`。
 
 ## Agent 已完成的验证
 
@@ -130,6 +150,7 @@
 - PR 5：共享实现在 POSIX 和 Windows 两套路径规则下各有一张用例表，并和一个写法独立的逐段比较实现穷举对照（posix 22,800 组、win32 66,822 组），结果一致；把实现改成原来那三种错的写法，测试都失败。有行为变化的每一处新增的用例，都回到改之前的代码上确认过失败；行为不变的几处补了用例，改之前同样通过。新加的检查在改之前的代码上报出 22 个文件 28 处，现在通过。清单见执行过程步骤 6。
 - PR 6：三组改动都说「运行时行为不变」，各自核对过。事件：改动前后构造事件的地方用语法树逐处比较，71 处对 69 处，67 处逐字相同，其余两个文件逐处看过。服务：每个文件取用和注册的 id 前后比较，255 处、69 个文件全部一致；原来断言成「一定在」的 16 处逐处对过现在服务不在时的表现；非测试代码的改动整份读过。这一步找出三处那次提交的说明没有列的差别，一处改了回去，更正写在 history 里。干预点：9 处分发逐处对过。类型上，每组都有必须编译不过的反例（6、8、14 个）。三个检查里，前两个在改之前的代码上报出的就是这次改掉的那些，三个脚本都逐处改错再跑过用例（55、144、78 种改法，只有 1 种改了结果一样）。两处顺带的修复，新增的用例都回到改之前的代码上确认过失败。清单见执行过程步骤 7。
 - PR 7：改名说的是「行为不变」，用三种办法核对。源码：另写一个脚本用 TypeScript 解析器逐 token 对照，292 个文件改名前后 token 的数量和种类相同，不同的只有 2,144 处标识符、1 处字符串和 3 处注释。位置：生产代码里的旧名字没有一处是对象的键或属性访问，也就是没有一个名字会跟着对象被序列化。产物：改名前后各从零构建一次，2,727 个产物文件名字相同，2,400 个逐字节相同，150 个把改名前的产物按同一张表改名后逐字节相同，其余 177 个是 source map、增量构建缓存和一个带构建时间的文件。新加的检查在改名之前的代码上报出 2,148 处，和解析器另外数的一致；脚本逐处改错再跑用例，36 处加文档规则的 7 处，每一处都有用例失败。全量验证 14 步通过，包测试的通过数和 PR 6 相同。清单见执行过程步骤 8。
+- PR 8：格式化说的是「代码含义不变」，用四种办法核对。源码：另写一个脚本用 TypeScript 解析器，不依赖 Biome，1,953 个文件逐个比较格式化前后的语法树、记号和注释，不等价的文件 0 个；空白以外的改动（括号、引号、尾逗号、JSX 里的 19 处空格）逐类计数。注释指令：只管下一行的指令一共 53 条，逐条比较它管住的那一行。折行后管不到出错位置的 3 条 `@ts-expect-error` 在格式化之前挪了位置；挪完之后 49 条那一行上的记号一个没少，另外 4 条有记号折到后面的行，3 条核对过仍然管得到，1 条（`v8 ignore`）没有覆盖率工具可以测。产物：格式化前后各从零构建一次，两边各 21,813 个文件，逐类对照。差别是产物里保留下来的源码排版、JSX 的那几个位置，以及跟着内容变的文件名哈希和一个带构建时间的文件。读源码的检查和测试：19 个脚本在两棵树上各跑一遍，比较退出码、输出和每条正则的命中次数，不同的 5 个逐个看过；读源码文本的测试逐个看过否定的断言。格式化提交在临时克隆里按提交说明的命令重新生成过，目录树完全相同。格式检查试过拦得住；`.git-blame-ignore-revs` 的检查逐处改错再跑用例，16 处每一处都有用例失败。别的分支的对齐步骤在当时开着的另外 5 个 PR 上各试过一遍。全量验证 18 步通过，包测试的通过数和 PR 7 相同。清单见 `docs/histories/2026-11/20261114-1610-biome-format-all.md` 的 Verification。
 
 ## 已知风险和遗留事项
 
@@ -167,6 +188,16 @@
 - PR 7 合并之后，从它之前的 `main` 拉出去的分支如果新写了旧名字，合并 `main` 之后类型检查和 `pnpm check:transitional-names` 会报。在那个分支上跑 `node scripts/check-transitional-names.mjs --write` 再跑 `pnpm typecheck` 就对齐了。2026-11-14 核对过当时开着的另外 5 个 PR，新增的行里都没有旧名字。
 - `pnpm check:transitional-names` 只认含 `RuntimeV2` 的标识符和表里逐个列出的 7 个名字。新起一个别的带版本后缀的名字（例如 `FooV2`）不会报：设置和 Session 事件的格式版本也是这种写法，脚本区分不开，还要靠评审。文档那条规则只查设计文档和当前事实文档。
 - PR 7 让 `@actspace/shared/runtime-v2` 入口文件的内容变了，Host 契约摘要跟着变。只用内置 Harness 的数据目录启动时自动换到新版本；有自定义 Harness 选择的数据目录，那个选择会被拒绝并要求重新准备。这不是 PR 7 才有的：PR 5、PR 6 已经改过 7 个入口文件里的 5 个。被拒绝的这条路径没有实际走一遍，依据是读 `harness-control` 的代码。摘要只看入口文件字节这一点记在 `docs/exec-plans/tech-debt-tracker.md`。
+- PR 8 没有用户能感知的变化，所以没有写发布记录。
+- PR 8 合并之后，从它之前的 `main` 拉出去的分支直接合并 `main` 会在自己改过、又被重排的地方冲突。对齐步骤写在 `docs/coding-standards/lint-conventions.md` 的「格式化提交之前拉出去的分支」，一共四步，格式化这一步不产生冲突。在当时开着的另外 5 个 PR 上各试过一遍（结果见 history 的表）；试的时候合并的是这条栈的栈顶，`main` 在那之后再有改动的话，最后一步可能有新的内容冲突。
+- PR 8 之后格式是强制的：有文件不符合配置，CI 的 `Lint 与类型检查` 会红，提交前要跑 `pnpm format`。Biome 2.6.6 对两类写法要写两遍才稳定，`pnpm format` 已经是两遍。只写一遍的做法（直接调 `biome format --write`，或者编辑器保存时格式化一次）遇到那两类写法时，可能留下 CI 会报的文件；编辑器里的表现没有试过。
+- 行宽 120 把长行折开之后，renderer 的源码从 96,791 行变成 125,576 行，代码没有变多。超过「单个文件 500 行就要拆」这条线的非测试文件从 7 个变成 20 个，`App.tsx` 从 1,670 行变成 2,358 行。阈值没有动，也没有拆文件；新超标的 13 个记在 `docs/exec-plans/tech-debt-tracker.md`。阈值按新排版重新定，还是把这 13 个排进拆分，需要你来定；`App.tsx` 拆分计划里的「300 行以内」同理。
+- `.git-blame-ignore-revs` 的检查要看完整的提交历史，「仓库基础检查」的检出因此从浅克隆改成取全部提交（文件内容仍然只取检出要用的）。量过一次：多取 858 个提交对象、约 0.6 MB，约 3.1 秒对 2.4 秒；历史越长取得越多。不想付这个代价的话，去掉 `base-checks.yml` 里 `Blame ignore revs` 那一步和检出的两行配置：之后 CI 上这个检查只看文件的写法（完整的 40 位哈希、不重复、有注释），不再核对哈希在不在历史里。`.git-blame-ignore-revs` 本身不依赖这个检查。
+- PR 8 改到了发布工作流盯着的 6 个打包脚本（只改排版），所以它的 CI 会在四个平台各打一次包，不发布。本地只跑了 Linux 的打包；macOS 和 Windows 要看这个 PR 的 CI，写这一条时还没有跑。
+- PR 8 让 `@actspace/session-journal` 的入口文件多了一个尾逗号，Host 契约摘要跟着变，效果同上面 PR 7 的那一条。默认 Harness 的打包文件保留一部分源码排版，13 个 chunk 的内容和文件名跟着变。
+- 三个检查脚本（`check:service-access`、`check:core-events`、`check:path-containment`）共用一条「整行是注释就跳过」的正则，它把以 `*` 开头的代码行也当成注释。现在全仓库有 4 行这样的代码，格式化前后是同样的 4 行，都不是这三个检查要找的写法。记在 `docs/exec-plans/tech-debt-tracker.md`。
+- 格式化的范围是 JS、TS 和 YAML。CSS、JSON、Markdown 没有格式化，也不检查；Markdown 仍然由 markdownlint 管。
+- PR 8 没有验证的：GitHub 的 blame 页面读不读 `.git-blame-ignore-revs`（GitHub 文档写的行为）；真实桌面窗口里 JSX 的那几个位置；`v8 ignore` 那一条指令折行之后还管不管得到（仓库没有装覆盖率工具）。
 
 ## 后续建议
 

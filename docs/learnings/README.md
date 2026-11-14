@@ -216,7 +216,7 @@ Session Journal 的事实与视图、事件平面、投影一致性、派生索�
 - 2026-06 [用 request id guard 防止旧请求覆盖新 UI 状态](2026-06/request-id-guard-for-ui-refresh.md)
 - 2026-07 [断言类名不等于断言行为：单测全绿也能全坏](2026-07/green-unit-tests-do-not-prove-rendered-behavior.md)
 - 2026-07 [可恢复隐藏必须是持久状态，而不是列表过滤](2026-07/recoverable-visibility-needs-persistent-state.md)
-- 2026-07 [让验证能失败：回显假阳性、故障注入未生效、搬家式重构的变异检查](2026-07/testing-assertion-poisoned-by-command-echo.md)
+- 2026-07 [让验证能失败：回显假阳性、故障注入未生效、搬家式重构的变异检查、读源码文本的检查](2026-07/testing-assertion-poisoned-by-command-echo.md)
 - 2026-07 [UI 展开状态不是后台请求计划](2026-07/ui-state-is-not-a-data-request-plan.md)
 - 2026-07 [可视反馈必须与真实输入共享顺序契约](2026-07/visual-feedback-must-share-the-input-ordering-contract.md)
 - 2026-07-05 [用 grid-template-areas 切换布局，避免 React remount 丢焦点](2026-07/20260705-grid-areas-layout-switch-no-remount.md)
