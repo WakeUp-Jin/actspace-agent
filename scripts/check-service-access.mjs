@@ -219,7 +219,7 @@ export function resolveId(expression, tables) {
   if (literal) return literal[2];
   const entry = /^ACTSPACE_SERVICE_(IDS|DEFINITIONS)\.(\w+)$/.exec(expression);
   if (entry) return tables.catalog.get(entry[1] === "IDS" ? entry[2] : tables.definitions.get(entry[2]));
-  const values = /^[A-Z][A-Z0-9_]*$/.test(expression) ? tables.constants.get(expression) : undefined;
+  const values = tables.constants.get(expression);
   return values?.size === 1 ? [...values][0] : undefined;
 }
 
@@ -227,7 +227,7 @@ export function resolveId(expression, tables) {
  * @param {{ path: string, text: string }[]} sources `path` 相对仓库根目录，用 `/` 分隔
  * @param {{ file: string, rule: string, count: number }[]} allowed
  */
-export function auditServiceAccess(sources, allowed = ALLOWED) {
+export function auditServiceAccess(sources, allowed) {
   const tables = collectIdTables(sources);
   const errors = [];
   const typedIds = new Set();
