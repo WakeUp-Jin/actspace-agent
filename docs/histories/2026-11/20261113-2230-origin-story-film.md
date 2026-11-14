@@ -44,3 +44,46 @@
 - `apps/promo-video/src/origin/{film,cues,soundtrack,data,shared}.js`、`src/origin/scenes/{opening,firstdays,growth,rewrite,discipline,ending}.js`、`src/origin/styles/{shared,scenes}.css`（新增）
 - `apps/promo-video/scripts/render.mjs`、`scripts/origin-stats.mjs`（新增）、`scripts/lib/soundtrack.mjs`、`scripts/test/{origin,soundtrack,tween}.test.mjs`
 - `apps/README.md`、`docs/ARCHITECTURE.md`
+
+---
+
+## [2026-11-14 10:30] | Task: 按反馈换掉《诞生记》的配乐，定下封面
+
+### 🤖 Execution Context
+
+- **Agent ID**: `cursor-cloud-agent`
+- **Base Model**: `Claude Fable 5.2`
+- **Runtime**: `Cursor Cloud Agent`
+
+### 📥 User Query
+
+> 配乐感觉不太好，这张白色的封面我觉得很好，+多少，-多少，全面前面一百多天
+
+### 🛠 Changes Overview
+
+**Scope:** `apps/promo-video`（《诞生记》的配乐、分镜时长、片尾，混音的淡入）；`docs/ARCHITECTURE.md`
+
+**Key Actions:**
+
+- **配乐**：换成 HoliznaCC0《Blue Skies》（专辑《Lazy Summer Lofi》，CC0 1.0，Free Music Archive），和宣传片的配乐是同一位作者。成片从曲子的第 0 秒用到最后一个音，不剪接，开头不淡入。片尾的署名行改成曲名和作者。
+- **分镜按小节重排**：`src/origin/soundtrack.js` 负责把「第几小节」换成秒（82 拍/分，一小节 2.927 秒，画面比小节线早一帧），`src/origin/cues.js` 里每个分镜的长度改写成小节数，成片 174.1 秒。片名对鼓进来，「越长越多」对多出来的一层高音，曲线断崖对鼓和贝斯停下，「再长一遍」对鼓回来，「较真」的第三句话对那层高音回来，片尾对尾奏；这几处由 `scripts/test/origin.test.mjs` 守着。分镜里逐条出现的内容改成一小节进来一条；片尾卡的地址和那句话对着尾奏里的音进来。
+- **混音**：淡入时长为 0 时不再带淡入滤镜。ffmpeg 把 `afade` 的 `d=0` 当成没写，会按默认淡入 1 秒。
+- **封面**：定为冷开场的最后一帧（白底，写下 / 删掉两行大数字）。
+- **文档**：ORIGIN_STORY.md 的分镜表、配乐、发布三节按新曲重写；宣传片 README、`docs/ARCHITECTURE.md` 的时长和授权同步。
+
+### 🧠 Design Intent (Why)
+
+反馈只说配乐不太好，没说哪里不好。第一版是一首钢琴加弦乐的电影配乐，按「过程不容易」的情绪选的；而宣传片那首 lo-fi 是被接受过的。所以这次没有在同一类里再换一首，而是换到已经被接受的那一类、同一位作者，两部片子听起来是一家。
+
+选曲不靠听（我听不到），靠量：把这位作者时长合适的 160 首 CC0 器乐都量了拍速、鼓的进出和段落长度，再看 Free Music Archive 上的播放和下载数。《Blue Skies》的段落是 4 小节前奏、24 小节、停 4 小节、24 小节、尾奏，刚好对上故事的几次转折，所以一个音都不用剪；它的小节线就在整拍网格上，从第 0 秒起算。这些是在波形上量的，成片的音轨也和原曲对过位，但仍然没有经过人耳试听，文档里照实写了。
+
+仍然只出一版。同一位作者有三首骨架相同的曲子，列在文档里当备选，换它们只要改曲目信息和片尾那一镜的长度。
+
+画面内容没有改，只是每个分镜的长短跟着小节走，成片比上一版长 1.4 秒。新曲一小节比旧曲一个和弦短，有四个分镜各多给了两小节。「推倒重来」和「较真」多出来的那两小节，第一遍只是让最后一句多停，量出来有三处画面一动不动超过 5 秒（上一版除了片尾，最长 3 秒出头）。所以改成每小节都有一样东西进来：没带过来的两个名字晚一小节才划掉，第三句话在省略号处断开、后半句单独占一小节，两条检查的命令比那句结论晚一小节。封面按反馈定下来，不再给两个选项。反馈的后半句按「在描述那张封面上有什么」来理解（写下多少、删掉多少、头一百多天），没有当成新的修改要求。
+
+### 📁 Files Modified
+
+- `apps/promo-video/src/origin/{soundtrack,cues,shared,film}.js`、`src/origin/scenes/{firstdays,growth,rewrite,discipline,ending}.js`、`src/origin/styles/scenes.css`
+- `apps/promo-video/scripts/lib/soundtrack.mjs`、`scripts/test/{origin,soundtrack}.test.mjs`
+- `apps/promo-video/ORIGIN_STORY.md`、`apps/promo-video/README.md`
+- `docs/ARCHITECTURE.md`
