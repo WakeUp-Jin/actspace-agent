@@ -445,7 +445,8 @@ it("hides the trajectory composer without losing the draft and keeps Stop availa
   fireEvent.change(input, { target: { value: "keep this draft" } });
   rendered.rerender(view("trajectory"));
   expect(rendered.container.querySelector(".composer-zone")).toHaveStyle({ display: "none" });
-  fireEvent.click(await screen.findByRole("button", { name: "停止" }));
+  // 「停止」在 React.lazy 的 TrajectoryView 里：一次测试运行里第一个切到轨迹视图的用例要等 vite 转译它，在慢的 CI runner 上可能超过 findBy 默认的 1 s；谁是第一个由分片决定。
+  fireEvent.click(await screen.findByRole("button", { name: "停止" }, { timeout: 10_000 }));
   expect(abort).toHaveBeenCalledTimes(1);
   rendered.rerender(view("chat"));
   expect(rendered.container.querySelector("textarea")).toBe(input);

@@ -69,6 +69,15 @@ jobs:
             platform: windows
             arch: x64
     steps:
+      # macOS runner 上 Spotlight 的索引开着，会跟着索引这个 job 写出来的文件。Intel runner 上实测：安装依赖期间
+      # 它平均占 0.7–1.1 个核（一共 4 个），装完后的第一次 desktop 构建 144–163 秒，先关掉索引是 110–122 秒；
+      # arm64 runner 上关不关测不出差别，所以只在 Intel 上关。这一步只是为了快，失败或卡住都不该挡住打包。
+      - name: 关闭 Spotlight 索引
+        if: runner.os == 'macOS' && runner.arch == 'X64'
+        continue-on-error: true
+        timeout-minutes: 1
+        run: sudo mdutil -a -i off
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -85,15 +94,22 @@ jobs:
 
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
+      # 缓存只开读得到、读了也省时间的那部分。一次运行只读得到本分支和 main 存的缓存：
+      # - Linux：pnpm store 和 Go 编译缓存 ci.yml 都在 main 上存过（key 相同），这里直接命中。
+      # - macOS / Windows：没有任何 job 在 main 上存。发版（tag）时必然读不到，存下来也只落在别的运行读不到的
+      #   tag 作用域里，两样都不开。PR 上同一个 PR 的后续推送读得到：Go 编译缓存每个平台 14 MB，命中后少编
+      #   7–18 秒，开；pnpm store 每个平台近 200 MB，恢复后再安装和直接下载安装用时相当（在同一台 runner 上
+      #   交替测过），第一次还要花 10–50 秒压缩上传，不开。
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-          cache: pnpm
+          cache: ${{ matrix.platform == 'linux' && 'pnpm' || '' }}
 
       # release-package.sh 会 go build 浏览器桥 CLI；runner 预装的 Go 可能低于 go.mod 要求。
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: browser-bridge/apps/cli/go.mod
+          cache: ${{ matrix.platform == 'linux' || github.event_name == 'pull_request' }}
           cache-dependency-path: |
             browser-bridge/apps/cli/go.mod
             browser-bridge/packages/protocol/go.mod

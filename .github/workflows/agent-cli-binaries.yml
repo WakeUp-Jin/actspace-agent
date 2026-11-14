@@ -7,11 +7,18 @@ on:
       - apps/cli/**
       - packages/**
       - scripts/package-agent-cli.mjs
+      - scripts/check-provider-proxy-package.mjs
       - scripts/test-agent-cli-package.mjs
       - scripts/test/agent-cli-process.test.mjs
+      - scripts/test/agent-cli-safety.test.mjs
+      - scripts/test/fixtures/agent-provider.mjs
       - package.json
       - pnpm-lock.yaml
+      - tsconfig*.json
       - .github/workflows/agent-cli-binaries.yml
+      # 各目录的 README 只是说明，没有测试读它，改了也不影响打出来的包能不能用。
+      # 别的 Markdown（prompt、内置 skill）是运行时会读的内容，照常触发。
+      - '!**/README.md'
 
 permissions:
   contents: read
@@ -20,6 +27,9 @@ concurrency:
   group: agent-cli-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# 两个 job 互不依赖，并排跑，总时长取较长的那个：进程级测试跑的是 workspace 里的
+# apps/cli/dist/cli.js，不读打出来的包，不用排在打包后面。
+# 两边都固定在 CLI 支持的最低 Node 大版本上。
 jobs:
   managed-esm:
     name: managed ESM package
@@ -29,14 +39,12 @@ jobs:
         with:
           persist-credentials: false
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-      # 固定在 CLI 支持的最低 Node 大版本上验证 managed package。
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22.22.2
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm package:agent-cli
-      - run: pnpm test:agent-cli:process
       - run: pnpm test:agent-cli:package
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -45,3 +53,22 @@ jobs:
           if-no-files-found: error
           # 只是给评审下载看一眼；正式产物走 release，不占 Actions 存储额度。
           retention-days: 3
+
+  process-tests:
+    name: process tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.22.2
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # 和 ci.yml 的「仓库脚本与进程级测试」一样：tsc -b 一次编出 CLI 依赖的全部包，再单独编 CLI。
+      # 编出来的 JS 和打包脚本里逐包 tsc -p 的结果相同，耗时只有它的几分之一。
+      - run: pnpm build:deps
+      - run: pnpm --filter @actspace/agent-cli build
+      - run: pnpm test:agent-cli:process
