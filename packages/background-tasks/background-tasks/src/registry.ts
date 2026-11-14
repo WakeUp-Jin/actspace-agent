@@ -1,4 +1,5 @@
 import { MainAgentInbox } from "@actspace/agent";
+import { serviceKey } from "@actspace/cordis-adapter";
 import { coreEvent, type CoreEventDataMap, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { renderLostNotification, renderOutputMatchNotification, renderTaskNotification, userStoppedSummary, type NotifiedTask } from "./notification.js";
@@ -236,6 +237,7 @@ function record(entry: Entry): BackgroundTaskRecord {
 /** The surface Harness plugins use through `actspace.host.background-tasks`. */
 export type BackgroundTaskHost = Pick<BackgroundTaskRegistry, "register" | "list" | "get" | "output" | "stop" | "notifyOutputMatch" | "notifySubscriptionStopped" | "markPruned" | "hasRunning" | "runningCount">;
 export const BACKGROUND_TASK_HOST_SERVICE = "actspace.host.background-tasks" as const;
+export const BACKGROUND_TASK_HOST_PORT = serviceKey<BackgroundTaskHost>(BACKGROUND_TASK_HOST_SERVICE);
 
 /** Late-bound Host service: the registry exists only after the Agent runtime starts. */
 export function createBackgroundTaskHost(resolve: () => BackgroundTaskRegistry): BackgroundTaskHost {

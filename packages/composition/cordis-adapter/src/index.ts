@@ -14,6 +14,7 @@ export * from "./cordis-admission.js";
 export * from "./cordis-root.js";
 export * from "./source-loader.js";
 export * from "./service-contract.js";
+export * from "./service-access.js";
 
 export * from "./plugin-artifact.js";
 export * from "./cordis-tree.js";

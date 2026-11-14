@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { EMPTY_LLM_USAGE, LlmRuntimeError, normalizeRetryPolicy, retryDelay, type AuxiliaryRequestRecorder, type LlmFailure, type LlmRetryPolicy, type LlmService, type LlmUsage } from "@actspace/llm-service";
+import { EMPTY_LLM_USAGE, LlmRuntimeError, normalizeRetryPolicy, retryDelay, type AuxiliaryRequestRecorder, type LlmFailure, type LlmRetryPolicy, type LlmServiceContract, type LlmUsage } from "@actspace/llm-service";
 
 export type ImageInspectorInput = {
   readonly sessionId: string;
@@ -15,7 +15,7 @@ export type ImageInspectorInput = {
 };
 export type ImageInspector = (input: ImageInspectorInput) => Promise<string>;
 export type LlmImageInspectorOptions = {
-  readonly llm: LlmService;
+  readonly llm: LlmServiceContract;
   readonly recorder: AuxiliaryRequestRecorder;
   readonly routeId: string;
   readonly model: string;

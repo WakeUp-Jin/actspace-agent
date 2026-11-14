@@ -1,6 +1,6 @@
-import { SessionError, createSessionForkSeed, validateSessionEvents, type EventCodecRegistry, type CreateSessionHeaderInput, type SessionValidationResult, type SessionLineageOrigin } from "@actspace/session-journal";
-import type { SessionStorage, SessionStorageHandle, SessionStorageSnapshot } from "@actspace/session-storage";
-import { Service, type CordisServiceContext } from "@actspace/cordis-adapter";
+import { SESSION_JOURNAL_SERVICE, SessionError, createSessionForkSeed, validateSessionEvents, type EventCodecRegistry, type CreateSessionHeaderInput, type SessionValidationResult, type SessionLineageOrigin } from "@actspace/session-journal";
+import { SESSION_STORAGE_SERVICE, type SessionStorage, type SessionStorageHandle, type SessionStorageSnapshot } from "@actspace/session-storage";
+import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType, getService, requireService, Service, serviceKey, type CordisServiceContext } from "@actspace/cordis-adapter";
 import { SessionHandle } from "./session.js";
 import { SessionPersistenceCoordinator } from "./coordinator.js";
 import { createPersistedSessionHeader, type SessionForkArtifactPort, type SessionPersistenceCreateOptions, type SessionPersistenceOpenOptions } from "./session-persistence.js";
@@ -107,6 +107,11 @@ export class SessionStore {
   }
 }
 
+/** Host 提供的产物存储里，fork 会话时要用到的那部分；Host 不提供时 fork 不复制产物。 */
+export const SESSION_FORK_ARTIFACTS_HOST_PORT = serviceKey<SessionForkArtifactPort>("host.artifacts");
+
+export const SESSION_STORE_SERVICE = bindServiceType<SessionStoreService>(ACTSPACE_SERVICE_DEFINITIONS.sessionStore);
+
 /** Cordis-owned live-log service. The concrete persistence backend is injected. */
 export class SessionStoreService extends Service {
   static inject = Object.freeze(["session.journal", "session.storage"]);
@@ -124,11 +129,9 @@ export class SessionStoreService extends Service {
   readonly store: SessionStore;
 
   constructor(ctx: CordisServiceContext, _config: Record<string, unknown> = {}) {
-    super(ctx, "session.store");
-    const journal = ctx.get("session.journal") as { readonly registry: EventCodecRegistry } | undefined;
-    const persistence = ctx.get("session.storage") as SessionStorage | undefined;
-    if (journal === undefined) throw new Error("Session Store Service requires session.journal.");
-    if (persistence === undefined) throw new Error("Session Store Service requires session.storage.");
-    this.store = new SessionStore({ registry: journal.registry, forkArtifacts: ctx.get("host.artifacts") as SessionForkArtifactPort | undefined }, persistence);
+    super(ctx, SESSION_STORE_SERVICE.id);
+    const journal = requireService(ctx, SESSION_JOURNAL_SERVICE, "Session Store Service");
+    const persistence = requireService(ctx, SESSION_STORAGE_SERVICE, "Session Store Service");
+    this.store = new SessionStore({ registry: journal.registry, forkArtifacts: getService(ctx, SESSION_FORK_ARTIFACTS_HOST_PORT) }, persistence);
   }
 }

@@ -1,3 +1,4 @@
+import { serviceKey } from "@actspace/cordis-adapter";
 import type { SelectionDescription } from "@actspace/harness-control";
 import type { SandboxResult } from "@actspace/sandbox/types";
 
@@ -21,6 +22,7 @@ export interface HarnessEvaluationHostPort {
   readonly artifactRoot: string;
   modelEnvironment(model: string | undefined): Promise<HarnessModelEnvironment>;
 }
+export const HARNESS_EVALUATION_HOST_PORT = serviceKey<HarnessEvaluationHostPort>(HARNESS_EVALUATION_HOST_PORT_ID);
 
 export type HarnessEvaluationRequest = {
   readonly selection: SelectionDescription;
@@ -56,3 +58,4 @@ export interface HarnessEvaluationService {
   status(): Promise<{ readonly available: boolean; readonly reasons: readonly string[] }>;
   run(request: HarnessEvaluationRequest, signal?: AbortSignal): Promise<HarnessEvaluationResult>;
 }
+export const HARNESS_EVALUATION_SERVICE = serviceKey<HarnessEvaluationService>(HARNESS_EVALUATION_SERVICE_ID);

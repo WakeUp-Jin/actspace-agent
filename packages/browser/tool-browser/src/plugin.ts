@@ -1,13 +1,22 @@
-import type { ToolRuntime } from "@actspace/tool-runtime";
+import { TOOL_RUNTIME_SERVICE, type ToolRuntimeContract } from "@actspace/tool-runtime";
 import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tool-runtime";
 import { BROWSER_TOOL_DEFINITIONS } from "./definitions.js";
 import { browserCommandMetadata } from "./generated-actions.js";
 import type { BrowserCapability } from "./host-port.js";
-import type { CordisContext } from "@actspace/cordis-adapter";
+import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType, getService, provideService, serviceKey, type CordisContext } from "@actspace/cordis-adapter";
 
 export const BROWSER_TOOLS_HOST_PORT_ID = "actspace.host.tools.browser" as const;
+export const BROWSER_TOOLS_HOST_PORT = serviceKey<BrowserCapability>(BROWSER_TOOLS_HOST_PORT_ID);
 
-export function registerBrowserTools(runtime: ToolRuntime, browser: BrowserCapability): readonly ReturnType<ToolRuntime["register"]>[] {
+/** `tools.browser` 下发布的内容：Browser Bridge 当前能不能用，以及这次注册了哪些工具。 */
+export type BrowserToolsService = {
+  readonly available: boolean;
+  readonly registrations: readonly ReturnType<ToolRuntimeContract["register"]>[];
+  readonly definitions: typeof BROWSER_TOOL_DEFINITIONS;
+};
+export const BROWSER_TOOLS_SERVICE = bindServiceType<BrowserToolsService>(ACTSPACE_SERVICE_DEFINITIONS.browserTools);
+
+export function registerBrowserTools(runtime: ToolRuntimeContract, browser: BrowserCapability): readonly ReturnType<ToolRuntimeContract["register"]>[] {
   return Object.freeze(BROWSER_TOOL_DEFINITIONS.map((definition) => runtime.register({
     definition,
     executor: { concurrencySafe: definition.concurrency === "read-only", execute: commandExecutor(definition.name, browser) },
@@ -54,11 +63,11 @@ function commandExecutor(name: string, browser: BrowserCapability): BrowserToolH
 }
 
 export function apply(ctx: CordisContext, config: { readonly disposeHost?: boolean } = {}): void {
-  const runtime = ctx.get?.("tools.runtime") as ToolRuntime | undefined;
-  const browser = ctx.get?.(BROWSER_TOOLS_HOST_PORT_ID) as BrowserCapability | undefined;
+  const runtime = getService(ctx, TOOL_RUNTIME_SERVICE);
+  const browser = getService(ctx, BROWSER_TOOLS_HOST_PORT);
   if (runtime === undefined) throw new Error("Browser Tools plugin requires tools.runtime.");
   const registrations = browser?.ready ? registerBrowserTools(runtime, browser) : [];
-  ctx.provide?.("tools.browser", Object.freeze({ available: browser?.ready === true, registrations, definitions: BROWSER_TOOL_DEFINITIONS }));
+  provideService(ctx, BROWSER_TOOLS_SERVICE, Object.freeze({ available: browser?.ready === true, registrations, definitions: BROWSER_TOOL_DEFINITIONS }));
   ctx.effect?.(() => async () => {
     const results = await Promise.allSettled([...registrations].reverse().map((registration) => registration.dispose()));
     if (config.disposeHost !== false) await browser?.dispose?.();

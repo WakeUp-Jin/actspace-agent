@@ -17,5 +17,6 @@ export * from "./registry.js";
 export * from "./result.js";
 export * from "./runtime.js";
 export * from "./scheduler.js";
+export * from "./service-keys.js";
 
 export type { AutoReviewInput } from "./prepared-execution.js";

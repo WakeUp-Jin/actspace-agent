@@ -4,7 +4,7 @@ import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
 import { ContextEngine, surfaceMessage, requestRecords, describeContextContent, type RequestRecords, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context-engine";
 import { estimateMessage, estimateRequestInput } from "@actspace/shared";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
-import type { LlmService, PreparedLlmCall } from "@actspace/llm-service";
+import type { LlmServiceContract, PreparedLlmCall } from "@actspace/llm-service";
 import type { LlmStreamEvent } from "@actspace/llm-service";
 import { LlmRuntimeError, redactLlmText, type LlmFailure } from "@actspace/llm-service";
 import { DEFAULT_LLM_RETRY_POLICY, retryDelay, retryPolicySnapshot } from "@actspace/llm-service";
@@ -12,14 +12,14 @@ import type { PreparedRequestMetadata } from "@actspace/prompt";
 import type { AgentScope } from "@actspace/scope";
 import { settleOpenTurnWork, type SessionHandle } from "@actspace/session-persistence";
 import type { ToolCallInput, ToolPreparedEnvironment } from "@actspace/tool-runtime";
-import type { ToolRuntime } from "@actspace/tool-runtime";
+import type { ToolRuntimeContract } from "@actspace/tool-runtime";
 import type { ToolExecutionResult } from "@actspace/tool-runtime";
 import { allowedAgentModeTools, createAgentEventDispatcher, defaultAgentSubject, type AgentDescriptor, type AgentSubject, type AgentEventDispatcher } from "@actspace/agent";
 import type { ContextCompactor } from "@actspace/context-engine";
 import { AgentRuntimeError } from "@actspace/agent";
 import type { MainAgentInbox } from "@actspace/agent";
 import type { RunTurnResult } from "@actspace/agent";
-import type { CordisContext, AgentLoopIntervention, AgentNotification } from "@actspace/cordis-adapter";
+import { ACTSPACE_SERVICE_IDS, getService, serviceView, type CordisContext, type AgentLoopIntervention, type AgentNotification } from "@actspace/cordis-adapter";
 import { toolBatchOutputChars } from "./tool-output-budget.js";
 
 export type RunTurnInput = { readonly content: RuntimeV2JsonValue; readonly messageId?: string; readonly agentRunId?: string; readonly model?: string; readonly mode?: RuntimeV2AgentMode; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly keepPendingOnAbort?: boolean; readonly selectedSkillIds?: readonly string[];
@@ -84,6 +84,8 @@ export interface LoopInputSource {
   hasPending(agentRunId: string): boolean;
 }
 
+/** Loop 用到的 `session.checkpoint`：只要 flush。 */
+export const LOOP_CHECKPOINT_VIEW = serviceView<{ flush(input: { readonly sessionId: string; readonly throughSeq: number; readonly reason: string }): Promise<void> }>(ACTSPACE_SERVICE_IDS.sessionCheckpoint);
 export type AgentLoopOptions = {
   readonly descriptor: AgentDescriptor;
   readonly scope: AgentScope;
@@ -95,8 +97,8 @@ export type AgentLoopOptions = {
   readonly contextExtensions?: () => readonly ContextSource[];
   readonly createContextEngine?: (options: ContextEngineOptions) => ContextEngine;
   readonly modeRuntime?: (mode: RuntimeV2AgentMode) => Promise<{ readonly compaction?: ContextCompactor }>;
-  readonly llm: LlmService;
-  readonly tools: ToolRuntime;
+  readonly llm: LlmServiceContract;
+  readonly tools: ToolRuntimeContract;
   readonly toolEnvironment: (session: SessionHandle) => Omit<ToolPreparedEnvironment, "journal">;
   readonly compositionDigest: string;
   readonly hostCapabilityDigest: string;
@@ -472,7 +474,7 @@ export class AgentLoop {
       await this.options.session.flush(this.options.session.lastSeq);
       return;
     }
-    const checkpoint = this.options.context.get?.("session.checkpoint") as { flush(input: { sessionId: string; throughSeq: number; reason: string }): Promise<void> } | undefined;
+    const checkpoint = getService(this.options.context, LOOP_CHECKPOINT_VIEW);
     if (!checkpoint) throw new Error("Required service session.checkpoint is missing.");
     await checkpoint.flush({ sessionId: this.options.session.header.sessionId, throughSeq: this.options.session.lastSeq, reason });
   }

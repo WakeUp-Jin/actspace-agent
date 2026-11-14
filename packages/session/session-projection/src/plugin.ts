@@ -1,6 +1,6 @@
 import { SessionProjectionRegistry } from "./registry.js";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import type { CordisContext } from "@actspace/cordis-adapter";
+import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType, provideService, type CordisContext } from "@actspace/cordis-adapter";
 
 export type ProjectionContributor = {
   readonly id: string;
@@ -12,6 +12,8 @@ export type SessionProjectionService = {
   readonly registerContributor: (contributor: ProjectionContributor) => () => void;
   readonly applyContributors: (registry: SessionProjectionRegistry, redact: (text: string, limit?: number) => string) => void;
 };
+
+export const SESSION_PROJECTION_SERVICE = bindServiceType<SessionProjectionService>(ACTSPACE_SERVICE_DEFINITIONS.sessionProjection);
 
 export function createSessionProjectionService(): SessionProjectionService {
   const contributors = new Map<string, ProjectionContributor>();
@@ -33,5 +35,5 @@ export function createSessionProjectionService(): SessionProjectionService {
 
 export function apply(ctx: CordisContext): void {
   const service = createSessionProjectionService();
-  ctx.provide?.("session.projection", service);
+  provideService(ctx, SESSION_PROJECTION_SERVICE, service);
 }

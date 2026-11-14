@@ -1,8 +1,12 @@
-import { Service, type CordisContext, type CordisServiceContext } from "@actspace/cordis-adapter";
-import type { EventCodecRegistry } from "@actspace/session-journal";
+import { ACTSPACE_SERVICE_IDS, getService, Service, serviceView, type CordisContext, type CordisServiceContext } from "@actspace/cordis-adapter";
+import { SESSION_JOURNAL_SERVICE } from "@actspace/session-journal";
+import { SESSION_STORAGE_SERVICE, type SessionStorage } from "@actspace/session-storage";
 import { JsonlSessionStorage } from "./storage.js";
 
 export const inject = Object.freeze(["actspace.host.session", "session.journal"]);
+
+/** 这个包用到的 Host 会话配置：数据目录和这次运行的 id。 */
+export const JSONL_STORAGE_HOST_VIEW = serviceView<{ readonly dataRoot: string; readonly runtimeId: string }>(ACTSPACE_SERVICE_IDS.hostSession);
 
 /**
  * 消费方拿到的是这个包装对象，不是 `JsonlSessionStorage` 本身。`refresh`、`rewritePrefix` 这类可选能力
@@ -11,13 +15,13 @@ export const inject = Object.freeze(["actspace.host.session", "session.journal"]
  */
 type ForwardedStorage = Pick<JsonlSessionStorage, Exclude<keyof JsonlSessionStorage, "options">>;
 
-export class JsonlSessionStorageService extends Service implements ForwardedStorage {
+export class JsonlSessionStorageService extends Service implements ForwardedStorage, SessionStorage {
   static inject = inject;
   readonly storage: JsonlSessionStorage;
   constructor(ctx: CordisServiceContext) {
-    super(ctx, "session.storage");
-    const host = ctx.get("actspace.host.session") as { dataRoot: string; runtimeId: string } | undefined;
-    const journal = ctx.get("session.journal") as { registry: EventCodecRegistry } | undefined;
+    super(ctx, SESSION_STORAGE_SERVICE.id);
+    const host = getService(ctx, JSONL_STORAGE_HOST_VIEW);
+    const journal = getService(ctx, SESSION_JOURNAL_SERVICE);
     if (!host || !journal) throw new Error("JSONL storage requires Host session configuration and codecs.");
     this.storage = new JsonlSessionStorage({ ...host, registry: journal.registry });
     ctx.effect(() => () => this.storage.close(), "session.storage");

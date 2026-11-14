@@ -1,3 +1,4 @@
+import { serviceKey } from "@actspace/cordis-adapter";
 import type { SessionArtifactResolver } from "./executor.js";
 
 /**
@@ -13,6 +14,7 @@ export type FilesystemHostGrant = {
   /** Explicit ripgrep binary; tools fall back to `rg` on PATH. */
   readonly ripgrepPath?: string;
 };
+export const FILESYSTEM_HOST_PORT = serviceKey<FilesystemHostGrant>(FILESYSTEM_HOST_PORT_ID);
 
 export const PROCESS_HOST_PORT_ID = "actspace.host.process" as const;
 export type ProcessHostGrant = {
@@ -23,6 +25,7 @@ export type ProcessHostGrant = {
   /** The Python the app ships; absent when it does not, and then the prompt tells the model to use the system one. */
   readonly python?: BundledPythonGrant;
 };
+export const PROCESS_HOST_PORT = serviceKey<ProcessHostGrant>(PROCESS_HOST_PORT_ID);
 /**
  * What Bash and the prompt need to know about the bundled Python: the shim directory goes in front of `PATH` so
  * the model's `actspace-python` resolves, `shim` becomes `ACTSPACE_PYTHON`, and the extension layer (read per

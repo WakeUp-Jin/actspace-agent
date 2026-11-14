@@ -1,8 +1,8 @@
 import { existsSync } from "node:fs";
 import { mkdir, open, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { containNotification, type CordisContext } from "@actspace/cordis-adapter";
-import type { PromptHostPort } from "@actspace/prompt";
+import { ACTSPACE_SERVICE_IDS, containNotification, getService, provideService, serviceKey, serviceView, type CordisContext } from "@actspace/cordis-adapter";
+import { PROMPT_HOST_PORT } from "@actspace/prompt";
 import { runtimeInfo } from "@actspace/prompt/source-support";
 import type { SessionEventEnvelopeV1, SessionHeaderV1 } from "@actspace/session-journal";
 import { sessionsRoot, transcriptPath } from "./paths.js";
@@ -19,6 +19,10 @@ type SessionStorage = {
   listSessionIds(): Promise<readonly string[]>;
 };
 type HostSession = { readonly dataRoot: string };
+/** 这个包用到的三个服务各取一小块：打开着的会话、落盘的会话、数据目录。 */
+export const TRANSCRIPT_SESSIONS_VIEW = serviceView<SessionRuntime>(ACTSPACE_SERVICE_IDS.sessionRuntime);
+export const TRANSCRIPT_STORAGE_VIEW = serviceView<SessionStorage>(ACTSPACE_SERVICE_IDS.sessionStorage);
+export const TRANSCRIPT_HOST_VIEW = serviceView<HostSession>(ACTSPACE_SERVICE_IDS.hostSession);
 
 export const inject = Object.freeze(["actspace.host.session", "session.runtime", "session.storage"]);
 
@@ -114,7 +118,7 @@ export class SessionTranscriptService {
   }
 
   async #load(sessionId: string): Promise<{ header: SessionHeaderV1; state: TranscriptState } | undefined> {
-    const live = (this.ctx.get?.("session.runtime") as SessionRuntime | undefined)?.getOpen(sessionId);
+    const live = getService(this.ctx, TRANSCRIPT_SESSIONS_VIEW)?.getOpen(sessionId);
     if (live) {
       const inherited = inheritedThroughSeq(live.header);
       return { header: live.header, state: live.journal.project(PROJECTION, () => EMPTY_TRANSCRIPT, (state, event) => reduceTranscript(state, event, inherited)) };
@@ -128,7 +132,7 @@ export class SessionTranscriptService {
   async #subagentFacts(header: SessionHeaderV1): Promise<TranscriptSubagentFacts | undefined> {
     const lineage = header.lineage;
     if (lineage?.origin !== "delegation") return undefined;
-    const live = (this.ctx.get?.("session.runtime") as SessionRuntime | undefined)?.getOpen(lineage.parentSessionId);
+    const live = getService(this.ctx, TRANSCRIPT_SESSIONS_VIEW)?.getOpen(lineage.parentSessionId);
     if (live) return live.journal.project(SUBAGENT_FACTS, () => NO_SUBAGENTS, reduceSubagentFacts)[header.sessionId];
     const parent = await this.#storage().inspect(lineage.parentSessionId).catch(() => undefined);
     let facts = NO_SUBAGENTS;
@@ -145,7 +149,7 @@ export class SessionTranscriptService {
   }
 
   async #created(sessionId: string): Promise<void> {
-    const session = (this.ctx.get?.("session.runtime") as SessionRuntime | undefined)?.getOpen(sessionId);
+    const session = getService(this.ctx, TRANSCRIPT_SESSIONS_VIEW)?.getOpen(sessionId);
     if (!session) return;
     const lineage = session.header.lineage;
     if (lineage?.origin !== "delegation") this.#attachPrompt(sessionId);
@@ -158,7 +162,7 @@ export class SessionTranscriptService {
 
   #attachPrompt(sessionId: string): void {
     if (this.#prompts.has(sessionId) || this.#closed) return;
-    const extensions = (this.ctx.get?.("actspace.host.prompt") as PromptHostPort | undefined)?.extensions;
+    const extensions = getService(this.ctx, PROMPT_HOST_PORT)?.extensions;
     if (!extensions) return;
     const section = sessionHistorySection(this.root);
     this.#prompts.set(sessionId, extensions.registerMainSession(sessionId, {
@@ -204,7 +208,7 @@ export class SessionTranscriptService {
   }
 
   #storage(): SessionStorage {
-    const storage = this.ctx.get?.("session.storage") as SessionStorage | undefined;
+    const storage = getService(this.ctx, TRANSCRIPT_STORAGE_VIEW);
     if (!storage) throw new Error("Session transcripts require session.storage.");
     return storage;
   }
@@ -218,6 +222,8 @@ export class SessionTranscriptService {
     await Promise.allSettled([...this.#running.values()]);
   }
 }
+
+export const SESSION_TRANSCRIPT_SERVICE = serviceKey<SessionTranscriptService>("session.transcript");
 
 async function writeAtomic(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
@@ -249,9 +255,9 @@ async function readHeader(path: string): Promise<SessionHeaderV1 | undefined> {
 }
 
 export function apply(ctx: CordisContext): void {
-  const host = ctx.get?.("actspace.host.session") as HostSession | undefined;
+  const host = getService(ctx, TRANSCRIPT_HOST_VIEW);
   if (!host?.dataRoot) throw new Error("Session transcripts require actspace.host.session.dataRoot.");
   const service = new SessionTranscriptService(ctx, host.dataRoot);
-  ctx.provide?.("session.transcript", service);
+  provideService(ctx, SESSION_TRANSCRIPT_SERVICE, service);
   ctx.effect?.(() => () => service.dispose(), "session-transcript");
 }

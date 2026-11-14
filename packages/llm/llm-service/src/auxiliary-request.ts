@@ -1,3 +1,4 @@
+import { serviceKey } from "@actspace/cordis-adapter";
 import type { LlmUsage } from "./usage.js";
 
 /** Request facts belong to the Session owner. Tools never write Journal events. */
@@ -36,3 +37,5 @@ export type AuxiliaryRequestRecorder = {
   /** Resolves only after the start fact is durable. A rejection prohibits dispatch. */
   readonly start: (input: AuxiliaryRequestStart) => Promise<AuxiliaryRequestAttempt>;
 };
+/** 由 Session 的所有者提供（`@actspace/runtime` 的 session 插件），用模型的辅助功能从这里登记请求。 */
+export const LLM_AUXILIARY_REQUESTS_SERVICE = serviceKey<AuxiliaryRequestRecorder>("llm.auxiliary-requests");

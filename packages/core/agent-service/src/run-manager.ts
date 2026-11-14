@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { getLeasedService, serviceKey } from "@actspace/cordis-adapter";
 import { snapshotSessionJson } from "@actspace/session-journal";
 import { BACKGROUND_WAKE_KIND, isBackgroundWake, type RuntimeV2JsonValue, type RuntimeV2AgentMode } from "@actspace/shared/runtime-v2";
 import { TaskError, type HarnessIdentity, type RunOutcome, type TaskRecord, type TaskReceipt } from "./contracts.js";
@@ -29,6 +30,8 @@ export interface RunFactory {
     readonly claimSupplements: () => Promise<{ readonly tasks: readonly TaskRecord[]; readonly configuration: ExecutionConfiguration }>;
   }): Promise<RunInstance>;
 }
+/** 每个 Harness 都要提供的 Run 工厂；`RunManager` 在租约内按它取。 */
+export const RUN_FACTORY = serviceKey<RunFactory>(RUN_FACTORY_SERVICE);
 export interface RunLease extends HarnessIdentity {
   readonly executionDigest?: string;
   readonly scope: import("@actspace/scope").AgentScope;
@@ -217,7 +220,7 @@ export class SessionRunManager {
         await this.ledger.finishOperation(task.taskId, "cancelled");
         return;
       }
-      const factory = lease.getService<RunFactory>(RUN_FACTORY_SERVICE);
+      const factory = getLeasedService(lease, RUN_FACTORY);
       if (!factory) throw new Error(`Harness ${lease.harnessId} does not provide ${RUN_FACTORY_SERVICE}`);
       const initial = await this.ledger.start(task.taskId, runId, { harnessId: lease.harnessId, generationId: lease.generationId, revision: lease.revision }, { ...configuration, ...(lease.executionDigest ? { harnessExecutionDigest: lease.executionDigest } : {}) } as RuntimeV2JsonValue);
       started = true;

@@ -1,7 +1,7 @@
 # Agent Contract Matrix
 
 > Generated artifact; edit source declarations instead. Do not hand-edit this file.
-> Generator 1.0.0; source digest `7a06c53fc501a6bab0c10d3e64af3044a16fe6f7e3673c52fd00f2328eb5ee05`.
+> Generator 1.0.0; source digest `980accd25cdc5ebdff83c7d01f065af359d0e1f9d9cff904dc10112ba912a6ce`.
 
 This document is an audit view of the current ActSpace v2 declarations. It never activates Runtime services, plugins, Session persistence, tools or Cordis entries.
 
@@ -262,7 +262,7 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | @actspace/agent-service | domain | active | .<br>./codec<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/scope<br>@actspace/session-journal<br>@actspace/session-persistence<br>@actspace/session-storage<br>@actspace/shared<br>@actspace/side-chat | packages/core/agent-service/package.json#package.json | composition/admission-contract |
 | @actspace/approval | domain | active | .<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/shared | packages/approval/approval/package.json#package.json | composition/admission-contract |
 | @actspace/auto-review | domain | active | .<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/llm-service<br>@actspace/session-journal<br>@actspace/shared | packages/approval/auto-review/package.json#package.json | composition/admission-contract |
-| @actspace/background-tasks | domain | active | . | @actspace/agent<br>@actspace/session-persistence<br>@actspace/shared | packages/background-tasks/background-tasks/package.json#package.json | composition/admission-contract |
+| @actspace/background-tasks | domain | active | . | @actspace/agent<br>@actspace/cordis-adapter<br>@actspace/session-persistence<br>@actspace/shared | packages/background-tasks/background-tasks/package.json#package.json | composition/admission-contract |
 | @actspace/boot | domain | active | . | @actspace/composition<br>@actspace/cordis-adapter<br>@actspace/diagnostics<br>@actspace/scope<br>@actspace/shared | packages/composition/boot/package.json#package.json | composition/admission-contract |
 | @actspace/bundle | domain | active | . | @actspace/cordis-adapter | packages/composition/bundle/package.json#package.json | composition/admission-contract |
 | @actspace/client | domain | active | .<br>./host<br>./live<br>./sessions | @actspace/shared<br>pathe | packages/client/client/package.json#package.json | composition/admission-contract |
@@ -306,7 +306,7 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | @actspace/session-persistence-jsonl | domain | active | .<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/session-journal<br>@actspace/session-storage | packages/session/session-persistence-jsonl/package.json#package.json | composition/admission-contract |
 | @actspace/session-projection | domain | active | .<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/session-journal<br>@actspace/shared | packages/session/session-projection/package.json#package.json | composition/admission-contract |
 | @actspace/session-projection-cache | domain | active | . | @actspace/session-journal<br>@actspace/session-projection<br>@actspace/session-storage<br>@actspace/shared | packages/session/session-projection-cache/package.json#package.json | composition/admission-contract |
-| @actspace/session-storage | domain | active | .<br>./testing | @actspace/session-journal | packages/session/session-storage/package.json#package.json | composition/admission-contract |
+| @actspace/session-storage | domain | active | .<br>./testing | @actspace/cordis-adapter<br>@actspace/session-journal | packages/session/session-storage/package.json#package.json | composition/admission-contract |
 | @actspace/session-transcript | domain | active | .<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/prompt<br>@actspace/session-journal<br>@actspace/shared | packages/session/session-transcript/package.json#package.json | composition/admission-contract |
 | @actspace/shared | domain | active | .<br>./composer-reference-validation<br>./desktop-bridge<br>./host-protocol<br>./model-catalog-data<br>./runtime-v2<br>./runtime-v2/desktop-ipc<br>./runtime-v2/projection<br>./runtime-v2/runtime<br>./session-list-page<br>./session-locator<br>./session-selectors | - | packages/util/shared/package.json#package.json | composition/admission-contract |
 | @actspace/side-chat | domain | active | .<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/prompt<br>@actspace/session-journal | packages/side-chat/side-chat/package.json#package.json | composition/admission-contract |
