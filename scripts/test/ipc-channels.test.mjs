@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { auditIpcChannels, parseChannelConstant, parseContract, runCheck } from "../check-ipc-channels.mjs";
 
@@ -70,6 +73,48 @@ test("rejects a contract member that points at an unknown constant key", () => {
     () => parseContract(contractSource.replace("CH.theme", "CH.missing"), constants),
     /demo\.setTheme 引用了未知的 channel 常量 DEMO_CHANNELS\.missing/,
   );
+});
+
+test("reads the same contract however its members are wrapped or indented", () => {
+  // 格式化工具把超过行宽的成员折成几行；类型参数里有对象、函数、字符串和 `=>` 也不影响。
+  const wrapped = `
+import { DEMO_CHANNELS as CH } from "./demo";
+/** desktopBridgeContract = { 这一行在注释里，不算 } */
+export const desktopBridgeContract = {
+	demo: {
+		/** 说明里的 { 括号 ) 和 "引号 不算。 */
+		ping: invokeWithDefault<
+			{ id: string; filter: (value: Array<Record<string, number>>) => boolean },
+			string
+		>(
+			CH.ping, // 行尾注释
+			{},
+		),
+		setTheme:
+			send<"light>" | 'dark)'>(CH.theme),
+		pick: local<
+			(file: Handle) => string
+		>(),
+	},
+	events: { changed: event<void>(CH.changed, { reason: pick("normal") }) }
+} as const;
+export const later = { other: { ping: invoke<void>(CH.ping) } };
+`;
+  assert.deepEqual([...parseContract(wrapped, constants)], [...contract]);
+});
+
+test("rejects contract shapes it cannot read instead of skipping them", () => {
+  const cases = [
+    [contractSource.replace("send<", "sendLater<"), /第 6 行的 sendLater 认不出来：demo\.setTheme 用了本检查不认识的构造函数/],
+    [contractSource.replace("changed: event<void>(CH.changed, { reason: \"normal\" }),", "changed: { nested: event<void>(CH.changed) },"), /第 10 行的 \{ 认不出来：这里应该是构造函数/],
+    [contractSource.replace("(CH.theme)", "()"), /第 6 行的 \) 认不出来：这里应该是常量名/],
+    [contractSource.replace("(CH.theme)", '("demo:theme")'), /第 6 行的 "demo:theme" 认不出来：这里应该是常量名/],
+    [contractSource.replace("setTheme: ", '"set-theme": '), /第 6 行的 "set-theme" 认不出来：这里应该是成员的名字/],
+    [contractSource.replace("  events: {", "  ...shared,\n  events: {"), /第 9 行的 \. 认不出来：这里应该是域的名字/],
+    [contractSource.replace("} as const;", ""), /末尾 认不出来/],
+    [contractSource.replace("desktopBridgeContract = {", "desktopBridgeContract: Contract = {"), /没有找到 desktopBridgeContract = \{ … \}/],
+  ];
+  for (const [source, message] of cases) assert.throws(() => parseContract(source, constants), message);
 });
 
 test("passes when main registers every invoke / send member and sends every event", () => {
@@ -148,6 +193,57 @@ test("fails when preload does not build the bridge from the contract or referenc
     'preload 绕过契约直接引用了 channel "demo:ping"（preload.ts）',
     'preload 绕过契约直接引用了 channel "demo:changed"（preload.ts）',
   ]);
+});
+
+test("runCheck audits the tree it is given, with paths relative to that tree", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ipc-channels-"));
+  try {
+    const write = (relative, content) => {
+      fs.mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
+      fs.writeFileSync(path.join(root, relative), content);
+    };
+    const shared = "packages/util/shared/src";
+    write(`${shared}/runtime-v2/fixed-renderer.ts`, 'export const RUNTIME_FIXED_RENDERER_CHANNELS = { ping: "fixed:ping" } as const;');
+    write(`${shared}/resource-monitor.ts`, 'export const RESOURCE_MONITOR_CHANNELS = { watch: "monitor:watch" } as const;');
+    write(`${shared}/english-learning.ts`, 'export const ENGLISH_LEARNING_CHANNELS = { lookup: "english:lookup" } as const;');
+    write(`${shared}/host-protocol/connections.ts`, 'export const HOST_IPC = { changed: "host:changed" } as const;');
+    write(
+      `${shared}/desktop-bridge/contract.ts`,
+      [
+        "export const desktopBridgeContract = {",
+        "  demo: {",
+        "    ping: invoke<void, string>(RUNTIME_FIXED_RENDERER_CHANNELS.ping),",
+        "    watch: invoke<boolean, void>(RESOURCE_MONITOR_CHANNELS.watch),",
+        "    lookup: invoke<string, string>(ENGLISH_LEARNING_CHANNELS.lookup),",
+        "  },",
+        "  events: { changed: event<void>(HOST_IPC.changed) },",
+        "} as const;",
+      ].join("\n"),
+    );
+    // 注册器自己可以碰 ipcMain；它的路径要按传进来的根目录算，才认得出是注册器。
+    write("apps/desktop/src/main/ipc/registry.ts", "export const ipc = { handle: (spec, fn) => ipcMain.handle(spec.channel, fn) };");
+    write(
+      "apps/desktop/src/main/index.ts",
+      [
+        'import { desktopBridgeContract as contract } from "@actspace/shared/desktop-bridge";',
+        "ipc.handle(contract.demo.ping, ping);",
+        "ipc.handle(contract.demo.watch, watch);",
+        "ipc.handle(contract.demo.lookup, lookup);",
+        "win.webContents.send(HOST_IPC.changed);",
+      ].join("\n"),
+    );
+    write("apps/desktop/src/preload/index.ts", "const bridge = buildBridge(desktopBridgeContract, transport, locals);");
+    const { contract: found, errors } = runCheck(root);
+    assert.deepEqual(errors, []);
+    assert.deepEqual([...found.keys()], ["demo.ping", "demo.watch", "demo.lookup", "events.changed"]);
+
+    write("apps/desktop/src/main/windows/extra.ts", 'ipcMain.on("fixed:ping", () => undefined);');
+    assert.deepEqual(runCheck(root).errors, [
+      "main 绕过统一注册器直接调用了 ipcMain.on（apps/desktop/src/main/windows/extra.ts），请改用 ipc.on(contract.…)",
+    ]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("the repository passes the audit", () => {

@@ -28,6 +28,7 @@ const PRELOAD_ROOT = "apps/desktop/src/preload";
 
 /** 契约成员的构造函数 → 类别。`local` 成员没有 channel，不参与审计。 */
 const SPEC_KINDS = { invoke: "invoke", invokeWithDefault: "invoke", send: "send", event: "event" };
+const LOCAL_FACTORY = "local";
 
 /** 从源码中取出 `export const NAME = [Object.freeze(]{ key: "value", ... }` 的键值。 */
 export function parseChannelConstant(source, constant) {
@@ -43,28 +44,118 @@ export function parseChannelConstant(source, constant) {
   return channels;
 }
 
+const IDENTIFIER = /[A-Za-z_$][\w$]*/y;
+
+/** 把源码切成记号：名字、字符串（整个算一个）、`=>` 和单个标点；空白和注释丢掉。每个记号带行号。 */
+function tokenize(source) {
+  const tokens = [];
+  let line = 1;
+  let at = 0;
+  while (at < source.length) {
+    const ch = source[at];
+    if (ch === "\n") { line += 1; at += 1; continue; }
+    if (/\s/.test(ch)) { at += 1; continue; }
+    if (ch === "/" && (source[at + 1] === "/" || source[at + 1] === "*")) {
+      const found = source[at + 1] === "/" ? source.indexOf("\n", at) : source.indexOf("*/", at + 2);
+      const end = found === -1 ? source.length : found + (source[at + 1] === "/" ? 0 : 2);
+      for (let index = at; index < end; index += 1) if (source[index] === "\n") line += 1;
+      at = end;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const startLine = line;
+      let end = at + 1;
+      while (end < source.length && source[end] !== ch) {
+        if (source[end] === "\\") end += 1;
+        if (source[end] === "\n") line += 1;
+        end += 1;
+      }
+      tokens.push({ text: source.slice(at, end + 1), line: startLine, name: false });
+      at = end + 1;
+      continue;
+    }
+    IDENTIFIER.lastIndex = at;
+    const word = IDENTIFIER.exec(source)?.[0];
+    const text = word ?? (ch === "=" && source[at + 1] === ">" ? "=>" : ch);
+    tokens.push({ text, line, name: word !== undefined });
+    at += text.length;
+  }
+  return tokens;
+}
+
 /**
- * 从契约源码取出「域.成员」→ `{ channel, kind }`。成员行形如 `member: invoke<…>(CH.key)`，
+ * 从契约源码取出「域.成员」→ `{ channel, kind }`。成员形如 `member: invoke<…>(CH.key)`，
  * 其中 `CH` 可以是 import 时起的别名（`RUNTIME_FIXED_RENDERER_CHANNELS as CH`）。
- * 引用了常量表里不存在的 key 时抛错，避免契约成员被静默跳过。
+ * 按记号读，不看缩进和换行：一个成员写成一行还是被格式化工具折成几行，读出来一样。
+ * 认不出来的写法、引用了常量表里不存在的 key，都抛错，避免契约成员被静默跳过。
  */
 export function parseContract(source, constants) {
   const aliases = new Map(constants.map(({ constant }) => [constant, constant]));
   for (const match of source.matchAll(/\b([A-Z][A-Z0-9_]*)\s+as\s+([A-Za-z_$][\w$]*)/g)) aliases.set(match[2], match[1]);
   const byConstant = new Map(constants.map(({ constant, channels }) => [constant, channels]));
+  const tokens = tokenize(source);
+  const start = tokens.findIndex((token, index) => token.text === CONTRACT_SOURCE.constant && tokens[index + 1]?.text === "=" && tokens[index + 2]?.text === "{");
+  if (start === -1) throw new Error(`契约源码里没有找到 ${CONTRACT_SOURCE.constant} = { … }`);
+  let at = start + 3;
+  const fail = (what) => {
+    const token = tokens[at];
+    throw new Error(`契约源码${token ? `第 ${token.line} 行的 ${token.text}` : "末尾"} 认不出来：${what}。成员要写成 域: { 成员: 构造函数<类型>(常量.key) }`);
+  };
+  const expect = (text) => {
+    if (tokens[at]?.text !== text) fail(`这里应该是 ${text}`);
+    at += 1;
+  };
+  const name = (what) => {
+    if (!tokens[at]?.name) fail(`这里应该是${what}`);
+    at += 1;
+    return tokens[at - 1].text;
+  };
+  /** 当前记号是 `open`，跳到和它配对的 `close` 后面。 */
+  const skipGroup = (open, close) => {
+    let depth = 0;
+    for (; at < tokens.length; at += 1) {
+      if (tokens[at].text === open) depth += 1;
+      else if (tokens[at].text === close) depth -= 1;
+      if (depth === 0) {
+        at += 1;
+        return;
+      }
+    }
+    fail(`${open} 没有配对的 ${close}`);
+  };
+
   const members = new Map();
-  let domain = null;
-  for (const line of source.split("\n")) {
-    const domainMatch = line.match(/^ {2}([A-Za-z_$][\w$]*):\s*\{\s*$/);
-    if (domainMatch) { domain = domainMatch[1]; continue; }
-    const memberMatch = domain && line.match(/^ {4}([A-Za-z_$][\w$]*):\s*([A-Za-z]+)<.*>\(\s*([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)/);
-    if (!memberMatch) continue;
-    const [, member, factory, constantName, key] = memberMatch;
-    const kind = SPEC_KINDS[factory];
-    if (!kind) continue;
-    const channel = byConstant.get(aliases.get(constantName))?.get(key);
-    if (!channel) throw new Error(`契约成员 ${domain}.${member} 引用了未知的 channel 常量 ${aliases.get(constantName) ?? constantName}.${key}`);
-    members.set(`${domain}.${member}`, { channel, kind });
+  while (tokens[at]?.text !== "}") {
+    const domain = name("域的名字");
+    expect(":");
+    expect("{");
+    while (tokens[at]?.text !== "}") {
+      const member = name("成员的名字");
+      expect(":");
+      const factory = name("构造函数");
+      const kind = Object.hasOwn(SPEC_KINDS, factory) ? SPEC_KINDS[factory] : undefined;
+      if (!kind && factory !== LOCAL_FACTORY) {
+        at -= 1;
+        fail(`${domain}.${member} 用了本检查不认识的构造函数`);
+      }
+      if (tokens[at]?.text === "<") skipGroup("<", ">");
+      if (tokens[at]?.text !== "(") fail("这里应该是 (");
+      const open = at;
+      if (kind) {
+        at += 1;
+        const constantName = name("常量名");
+        expect(".");
+        const key = name("常量的 key");
+        const channel = byConstant.get(aliases.get(constantName))?.get(key);
+        if (!channel) throw new Error(`契约成员 ${domain}.${member} 引用了未知的 channel 常量 ${aliases.get(constantName) ?? constantName}.${key}`);
+        members.set(`${domain}.${member}`, { channel, kind });
+      }
+      at = open;
+      skipGroup("(", ")");
+      if (tokens[at]?.text === ",") at += 1;
+    }
+    at += 1;
+    if (tokens[at]?.text === ",") at += 1;
   }
   return members;
 }
@@ -202,7 +293,8 @@ export function auditIpcChannels({ constants, contract, mainSources, preloadSour
   return errors;
 }
 
-function readTree(root) {
+/** 读出 `dir` 下的源码；`path` 相对 `root`，用 `/` 分隔。 */
+function readTree(root, dir) {
   const out = [];
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -210,11 +302,11 @@ function readTree(root) {
       if (entry.isDirectory()) {
         if (entry.name !== "test" && entry.name !== "node_modules") walk(full);
       } else if (/\.(ts|tsx|mts|cts)$/.test(entry.name) && !/\.test\./.test(entry.name)) {
-        out.push({ path: path.relative(repoRoot, full), text: fs.readFileSync(full, "utf8") });
+        out.push({ path: path.relative(root, full).split(path.sep).join("/"), text: fs.readFileSync(full, "utf8") });
       }
     }
   };
-  walk(root);
+  walk(path.join(root, dir));
   return out;
 }
 
@@ -230,8 +322,8 @@ export function runCheck(root = repoRoot) {
     errors: auditIpcChannels({
       constants,
       contract,
-      mainSources: readTree(path.join(root, MAIN_ROOT)),
-      preloadSources: readTree(path.join(root, PRELOAD_ROOT)),
+      mainSources: readTree(root, MAIN_ROOT),
+      preloadSources: readTree(root, PRELOAD_ROOT),
     }),
   };
 }
