@@ -14,6 +14,8 @@
 
 `ContextProjection` 是 `Context` 给 Host 和界面的只读投影。
 
+本文的 Context 专指模型请求的上下文。别和两样东西混起来：管插件生命周期的 Cordis Context（见[插件 Runtime ABI](../agent-plugin-runtime/agent-spec-plugin-runtime-abi.md)），管 Agent 身份、父子关系和注册可见性的 Agent Scope（见 [Agent Scope 模型](../agent-plugin-runtime/agent-spec-agent-scope-model.md)）。
+
 Context 不是新的存储格式：对话直接用 Session 的 Surface 视图，消息、工具、图片的类型沿用 LLM 层。引擎往 Session 写的只有「事件与兼容」里的两种插件事件。
 
 ## 身份与寿命
@@ -51,7 +53,7 @@ Context 不是新的存储格式：对话直接用 Session 的 Surface 视图，
 
 规则：
 
-- **只写自己声明的片，只署自己的名。** 来源声明能写哪几片，写别的片、冒用别人的 owner、结束后再写都会被拒绝。
+- **只写自己声明的片，只署自己的名。** 来源声明能写哪几片，写别的片、冒用别人的 owner、结束后再写都会被拒绝。提示段、模型事实和补充只能追加，来源删不掉也改不了别的来源写的内容。
 - **顺序确定。** 按顺序号再按 id 执行；id 重复直接报错。系统提示词里各段的先后由段自己的序号决定（层 × 1000 + 段内序号，层依次是 core、profile、host、agent、plugin），和来源顺序无关；模型事实合成一个 `<runtime_facts>` 块放在最后。
 - **必需与可选。** 必需来源失败，这次请求失败；可选来源失败只记一条诊断，它已经写的部分全部丢弃。`system` 和 `conversation` 两个种类缺一不可（`context-assembly` manifest 的 `config.required`），缺了在建 Agent 时报错。上表里只有 `background-tasks` 是可选的；Host 按会话追加的来源也都是可选的。
 - **声明了依赖才复用。** 来源给出 `cacheKey` 时，key 不变就复用上次的贡献；不给就每次重算。
@@ -113,7 +115,7 @@ Context 不是新的存储格式：对话直接用 Session 的 Surface 视图，
 - **用版本号判断变没变。** 已信任视图的版本号是 `替换代数:条数:最后一条的最大事件序号`。对话只能经日志追加或替换，版本号相同内容就相同。对话来源的 `cacheKey` 和实例的内容摘要都用它。不是已信任视图时退回整份 JSON 比较。
 - **不能原地修改。** 想换一份对话，只能交出日志的视图，或者交出一个新的普通对象（走检查路径）。
 - **`toLlmInput` 浅冻结。** 对话已检查时，引擎只冻结自己新建的消息外壳，里面引用的是已冻结的节点；对话没经过检查时，整份消息照旧检查、复制、冻结。Provider adapter 只能读消息，不能改。
-- 请求记录仍然整份检查并算摘要，不走这条捷径。
+- 请求记录（系统提示词、工具和一份小快照）仍然整份检查并算摘要；它们不含对话。
 
 不做：把类型全改成深度只读；增量组装或消息缓存。
 
