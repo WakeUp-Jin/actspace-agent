@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>深度搜索与文档解析 · 前端 demo</title>
+<style>
+  /* 颜色、字号、圆角按 apps/desktop/src/renderer/styles/tokens.css 手抄，只为看方向；实现时用 token。 */
+  :root {
+    color-scheme: light;
+    --page: #efefed; --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --hover: #eaeae7;
+    --line: #deded9; --line-strong: #8c8c85;
+    --text: #20201e; --muted: #676762; --faint: #72726b; --subtle: #85857e;
+    --operational: #087a4b; --info: #3978b8; --warning: #91600e; --danger: #c74747;
+    --toggle-off: #d3d3ce; --quote-border: rgba(77, 77, 72, 0.42);
+    --code-text: #343430; --code-bg: rgba(241, 241, 239, 0.92); --code-border: rgba(140, 140, 133, 0.4);
+    --composer-border: rgb(0 0 0 / 0.07);
+    --shadow-composer: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px -4px rgb(0 0 0 / 0.06);
+    --shadow-thumb: 0 4px 12px rgba(20, 21, 18, 0.08);
+    --shadow-pop: 0 24px 64px rgba(20, 21, 18, 0.14);
+    --ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    --mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #1e1f1c; --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --hover: #2a2b27;
+    --line: #353630; --line-strong: #787870;
+    --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #787870;
+    --operational: #36c783; --info: #6ca6da; --warning: #d2a14d; --danger: #e06b6b;
+    --toggle-off: #4a4b45; --quote-border: rgba(200, 200, 192, 0.4);
+    --code-text: #d4d4cd; --code-bg: rgba(255, 255, 255, 0.06); --code-border: rgba(255, 255, 255, 0.1);
+    --composer-border: rgb(255 255 255 / 0.07);
+    --shadow-composer: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px -6px rgb(0 0 0 / 0.4);
+    --shadow-thumb: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-pop: 0 24px 64px rgba(0, 0, 0, 0.55);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.55 var(--ui); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; }
+  svg { flex-shrink: 0; }
+
+  /* ── demo 外壳 ── */
+  .bar { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 10px 24px; background: color-mix(in srgb, var(--page) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .bar h1 { margin: 0; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .bar nav { display: flex; flex-wrap: wrap; gap: 2px 12px; flex: 1 1 380px; min-width: 0; }
+  .bar nav a { color: var(--muted); text-decoration: none; font-size: 12px; white-space: nowrap; }
+  .bar nav a:hover { color: var(--text); }
+  .bar .theme { display: flex; align-items: center; gap: 8px; }
+  .seg { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-subtle); }
+  .seg button { height: 24px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; white-space: nowrap; }
+  .seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-thumb); }
+  .pbtn { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font-size: 12px; cursor: pointer; }
+  .pbtn:hover { background: var(--hover); }
+  .lbl { font-size: 12px; color: var(--faint); white-space: nowrap; }
+
+  .page { max-width: 1560px; margin: 0 auto; padding: 22px 24px 90px; }
+  .intro { max-width: 900px; margin: 0; color: var(--muted); }
+  .sec { margin-top: 46px; }
+  .sec > h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .sec > .lead { max-width: 900px; margin: 6px 0 0; color: var(--muted); }
+  .ctrl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; }
+  .scrub { flex: 1; min-width: 160px; max-width: 520px; accent-color: var(--text); }
+  .clock { min-width: 84px; font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
+
+  .grid { display: grid; gap: 16px; margin-top: 14px; grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); }
+  .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .panel { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  .panel > header { padding: 11px 14px 10px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  .panel > header b { font-size: 13px; font-weight: 600; }
+  .panel > header p { margin: 3px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+  .tag { display: inline-flex; align-items: center; height: 18px; margin-left: 6px; padding: 0 6px; border: 1px solid color-mix(in srgb, var(--line) 60%, transparent); border-radius: 4px; background: var(--surface-subtle); color: var(--muted); font-size: 11px; font-weight: 500; vertical-align: 1px; }
+  .tag.pick { border-color: var(--text); background: var(--text); color: var(--bg); }
+  .anno { display: inline-flex; align-items: center; height: 17px; margin-left: 8px; padding: 0 5px; border: 1px dashed var(--info); border-radius: 4px; color: var(--info); font-size: 11px; font-style: normal; font-weight: 500; vertical-align: 1px; white-space: nowrap; }
+
+  /* ── 对话区（以下按产品里的真实尺寸） ── */
+  .conv { flex: 1; min-width: 0; padding: 14px 14px 18px; background: var(--bg); }
+  .conv.live { flex: none; height: 316px; overflow-y: auto; }
+  .u { padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-size: 15px; line-height: 1.625; }
+  .u .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip-msg { display: inline-flex; align-items: center; gap: 8px; height: 36px; max-width: 280px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); font-size: 13px; line-height: 20px; font-weight: 500; }
+  .chip-msg span, .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip-msg svg, .chip svg.ico { color: var(--faint); }
+
+  .flow { display: flex; flex-direction: column; margin-top: 14px; }
+  .flow > .it { min-width: 0; margin-top: 9px; }
+  .flow > .it:first-child { margin-top: 0; }
+  .flow > .proc + .proc { margin-top: 5px; }
+  .flow > .final { margin-top: 18px; }
+  .flow > .proc.open { padding-bottom: 8px; }
+
+  .row { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0 17px; font-size: 13px; line-height: 20px; color: var(--muted); }
+  .row .act { flex-shrink: 0; }
+  .row .tgt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); }
+  .row .meta { flex-shrink: 0; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row.can { cursor: pointer; }
+  .row.can:hover, .row.can:hover .tgt, .row.can:hover .meta { color: var(--text); }
+  .row.can:focus-visible, .wk:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; border-radius: 6px; }
+  .row .chev { color: var(--faint); opacity: 0; transition: transform 120ms ease; }
+  .row.can:hover .chev, .row.can:focus-visible .chev, .row.open .chev { opacity: 1; }
+  .row.open .chev, .wk.open .chev { transform: rotate(90deg); }
+  .row.err, .row.err .tgt, .row.err .meta, .row.err .chev { color: var(--danger); }
+  .row.think { color: var(--faint); }
+  .child .row { padding-left: 33px; }
+
+  /* 运行态扫光：底色次要文字，一道主文字色的光每 1.1 秒从左扫到右。 */
+  .shim { display: flex; min-width: 0; max-width: 100%; color: transparent; background: linear-gradient(90deg, var(--faint) 0%, var(--faint) 40%, var(--text) 50%, var(--faint) 60%, var(--faint) 100%) 100% 0 / 300% 100% no-repeat; -webkit-background-clip: text; background-clip: text; animation: shim 1.1s ease-in-out infinite; }
+  .shim .t1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .shim .t2 { flex-shrink: 0; white-space: pre; }
+  @keyframes shim { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+
+  .wk { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 2px 17px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 13px; line-height: 20px; cursor: pointer; }
+  .wk:hover { color: var(--text); }
+  .wk .chev { transition: transform 120ms ease; }
+
+  .detail { margin: 7px 17px 0; padding: 8px 12px; max-height: 280px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); font-size: 13px; line-height: 1.65; color: var(--muted); }
+  .detail .gl { padding: 6px 0 2px; font-size: 11px; font-weight: 600; line-height: 16px; color: var(--faint); }
+  .detail .gl:first-child { padding-top: 0; }
+  .detail .li { display: flex; gap: 8px; min-width: 0; padding: 2px 0; }
+  .detail .li > span, .detail .li > a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .detail .n { flex: none; width: 16px; color: var(--faint); font-variant-numeric: tabular-nums; text-align: right; }
+  .detail .sa { flex: none; width: 46px; color: var(--faint); }
+  .detail .site { flex: none; max-width: 46%; color: var(--faint); }
+  .detail a { min-width: 0; color: var(--muted); text-decoration: none; cursor: pointer; }
+  .detail a:hover { color: var(--text); text-decoration: underline; }
+  .detail .bad, .detail.err { color: var(--danger); }
+  .detail .warn { color: var(--warning); }
+  .detail.err { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .detail.pre { font-family: var(--mono); line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+  .detail .ln { padding: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* 最终回复的 Markdown 正文 */
+  .md { display: grid; gap: 12px; padding: 0 17px; font-size: 15px; line-height: 1.7; color: var(--text); animation: fade 220ms ease both; }
+  .md > * { margin: 0; min-width: 0; }
+  .md table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .md th, .md td { padding: 8px 16px 8px 0; border-bottom: 1px solid var(--line); text-align: left; }
+  .md th { border-bottom-color: var(--line-strong); color: var(--faint); font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .md tr:last-child td { border-bottom: 0; }
+  .md a { border-bottom: 1px solid var(--quote-border); color: var(--info); text-decoration: none; cursor: pointer; }
+  .md a:hover { border-bottom-color: var(--info); }
+  .md code { padding: 1px 5px; border: 1px solid var(--code-border); border-radius: 4px; background: var(--code-bg); color: var(--code-text); font: 0.86em var(--mono); }
+  .md sup { font-size: 0.72em; line-height: 0; }
+  .md sup a { border-bottom: 0; }
+  .md ul, .md ol { display: grid; gap: 6px; padding-left: 1.6em; }
+  .md li::marker { color: var(--faint); }
+  .md .back { border-bottom: 0; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+  /* 输入框 */
+  .composer { position: relative; border: 1px solid var(--composer-border); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow-composer); }
+  .strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 56px; padding: 12px 12px 4px; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; height: 36px; max-width: 280px; padding: 0 6px 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow-thumb); font-size: 13px; line-height: 20px; font-weight: 500; }
+  .chip .x { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; color: var(--faint); opacity: 0; }
+  .chip:hover .x { opacity: 1; background: var(--hover); }
+  .cbody { padding: 10px 8px 8px; }
+  .cinput { padding: 6px; font-size: 15px; line-height: 22px; }
+  .cbar { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+  .rbtn { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); }
+  .rbtn.send { background: var(--text); color: var(--bg); }
+  .pal { margin-bottom: 8px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-pop); }
+  .pal-row { display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 0 8px; border-radius: 8px; color: var(--muted); font-size: 13px; line-height: 20px; }
+  .pal-row.sel { background: var(--hover); color: var(--text); }
+  .pal-row b { flex: none; font-weight: 500; }
+  .pal-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--faint); }
+  .pal-row svg { color: var(--faint); }
+  .cap { margin: 12px 2px 6px; font-size: 12px; color: var(--faint); }
+  .cap:first-child { margin-top: 0; }
+
+  /* 设置页 */
+  .set { flex: 1; padding: 20px 22px 24px; background: var(--bg); }
+  .set h3 { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -0.015em; }
+  .grp { margin-top: 26px; }
+  .grp-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .grp-h b { font-size: 13px; font-weight: 600; }
+  .grp-h span { font-size: 12px; color: var(--faint); white-space: nowrap; }
+  .box { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+  .srow { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 52px; padding: 10px 16px; }
+  .srow.tight { min-height: 44px; padding: 8px 16px; }
+  .srow + .srow { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  .srow .t { font-size: 13px; font-weight: 500; line-height: 1.375; }
+  .srow .d { margin-top: 2px; font-size: 12px; line-height: 1.625; color: var(--muted); }
+  .srow .d.warn { display: flex; align-items: center; gap: 5px; color: var(--warning); }
+  .srow.off .txt { opacity: 0.45; }
+  .srow .ctl { display: flex; flex: none; align-items: center; gap: 10px; }
+  .tog { position: relative; flex: none; width: 32px; height: 18px; padding: 0; border: 0; border-radius: 999px; background: var(--toggle-off); cursor: pointer; transition: background 120ms ease; }
+  .tog::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(20, 21, 18, 0.24); transition: transform 120ms ease; }
+  .tog.on { background: var(--operational); }
+  .tog.on::after { transform: translateX(14px); }
+  .tog:disabled { opacity: 0.5; cursor: default; }
+  .dot { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--operational); }
+  .ghost { height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; font-size: 13px; color: var(--muted); }
+  .ghost.out { border-color: var(--line); background: var(--surface); color: var(--text); }
+  .more { padding: 8px 16px; border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); font-size: 12px; color: var(--faint); }
+
+  /* 说明卡片 */
+  .notes { display: grid; gap: 16px; margin-top: 14px; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+  .note { padding: 14px 16px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  .note b.h { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+  .note ol, .note ul { display: grid; gap: 7px; margin: 0; padding-left: 1.4em; color: var(--muted); }
+  .note li::marker { color: var(--faint); }
+  .note strong { color: var(--text); font-weight: 600; }
+  .note code, .lead code, .panel p code { padding: 0 4px; border-radius: 4px; background: var(--surface-subtle); font: 0.92em var(--mono); }
+
+  @media (max-width: 960px) {
+    .grid.two { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .bar, .page { padding-left: 14px; padding-right: 14px; }
+    .grid, .notes { grid-template-columns: 1fr; }
+    .set { padding: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .shim { animation: none; color: var(--faint); background: none; }
+    .md { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <h1>深度搜索与文档解析 · 前端 demo</h1>
+  <nav>
+    <a href="#s1">1 运行时</a>
+    <a href="#s2">2 完成与展开</a>
+    <a href="#s3">3 回复里的出处</a>
+    <a href="#s4">4 文档解析</a>
+    <a href="#s5">5 设置</a>
+    <a href="#s6">6 待确认</a>
+  </nav>
+  <div class="theme">
+    <span class="lbl">主题</span>
+    <div class="seg" id="seg-theme"><button data-v="light" class="on">浅色</button><button data-v="dark">深色</button></div>
+  </div>
+</header>
+
+<main class="page">
+  <p class="intro">DeepSeek 新 API 的两项能力落到界面上会变的地方：深度搜索的工具行、回复里怎么标出处、文档解析、设置里的两个开关。示例内容取自 2026-11-14 用真实 Key 跑的几次调用，只用来看样式，不代表结论正确。蓝色虚线标签是 demo 的说明，不是产品界面。</p>
+
+  <section class="sec" id="s1">
+    <h2>1 运行时：深度搜索这一行怎么显示</h2>
+    <p class="lead">一次深度搜索实测 13–23 秒：内部搜 2–7 次、读几个网页，再写一段带出处的结论交给主模型。下面四种显示方式走同一条时间线（取自 13.3 秒的那一次）；「现状」的行数和节奏是示意，没有做新旧耗时对比。播完后点 <code>Worked for</code> 展开过程，再点工具行看详情。</p>
+    <div class="ctrl">
+      <button class="pbtn" id="btn-replay">重播</button>
+      <button class="pbtn" id="btn-pause">暂停</button>
+      <span class="lbl">速度</span>
+      <div class="seg" id="seg-speed"><button data-v="1" class="on">1×</button><button data-v="2">2×</button></div>
+      <input class="scrub" id="scrub" type="range" min="0" max="20.4" step="0.1" value="0" aria-label="时间线">
+      <span class="clock" id="clock">0.0s / 20.4s</span>
+    </div>
+    <div class="grid two" id="live"></div>
+  </section>
+
+  <section class="sec" id="s2">
+    <h2>2 完成之后：行尾统计与展开内容</h2>
+    <p class="lead">完成后的行是「动作、问题、计费搜索次数、引用来源数」，和其他工具行一样没有图标，箭头悬停才出现。展开内容有三种密度，展开框和现有工具详情一样最高 280px，超出在框内滚动。后面是有网页打不开、失败、中止几种状态。带箭头的行都可以点。</p>
+    <div class="grid" id="spec2"></div>
+  </section>
+
+  <section class="sec" id="s3">
+    <h2>3 最终回复里怎么标出处</h2>
+    <p class="lead">工具把「结论 + 编号来源」交给主模型，最终回复由主模型写。下面三种都是现有 Markdown 渲染器已经支持的写法（已在真实渲染器里核对，脚注区固定排在整条回复最后），不用改渲染器；选哪种只影响写给模型的提示词。</p>
+    <div class="grid" id="spec3"></div>
+  </section>
+
+  <section class="sec" id="s4">
+    <h2>4 文档解析</h2>
+    <p class="lead">打开开关并连接 DeepSeek 时，PDF、Word、PPT 和扫描件交给 DeepSeek OCR，拿回 Markdown；工具行沿用 <code>Read</code>，行尾是页数。实测 2 页约 3 秒、15 页约 12 秒、124 页约 16 秒。开关关闭或没有 Key 时不变，仍由模型按 pdf、office-docx 这些 Skill 写 Python 提取。</p>
+    <div class="grid two" id="spec4"></div>
+  </section>
+
+  <section class="sec" id="s5">
+    <h2>5 设置里的两个开关</h2>
+    <p class="lead">深度搜索的开关放在「搜索与网页读取」页，写法照搬现有的「使用 DeepSeek 抓取网页」：说明只写外发和价格，没有 Key 时写「请先连接 DeepSeek」并置灰。文档解析的开关有两个候选位置，只留一处。开关可以点，上面可以切换 DeepSeek 的连接状态。</p>
+    <div class="ctrl">
+      <span class="lbl">DeepSeek</span>
+      <div class="seg" id="seg-key"><button data-v="1" class="on">已连接</button><button data-v="0">未连接</button></div>
+    </div>
+    <div class="grid two" id="spec5"></div>
+  </section>
+
+  <section class="sec" id="s6">
+    <h2>6 需要你确认的点</h2>
+    <div class="notes">
+      <div class="note">
+        <b class="h">要你定的</b>
+        <ol>
+          <li><strong>运行时的行</strong>：A、B、C 选一个。建议 B。</li>
+          <li><strong>展开内容</strong>：a 只列来源、b 搜索词加来源、c 全部步骤。建议 b。</li>
+          <li><strong>回复里的出处</strong>：行内链接、脚注、文末来源。建议行内链接。</li>
+          <li><strong>文档开关的位置</strong>：① 搜索与网页读取页新增「文档解析」组，② 工具页「多媒体」组。建议 ②：它是一个工具的开关，其他工具的开关都在那一页，服务没接上时的提示也有现成写法；「搜索与网页读取」这个页名不包含文档。</li>
+          <li><strong>默认值</strong>：深度搜索建议默认关。现有的 DeepSeek 搜索通道和「使用 DeepSeek 抓取网页」都默认关，深度搜索一次约 ¥0.03–0.08。文档解析按你说的「有 Key 就直接走 OCR」是默认开；代价是升级后已经填过 DeepSeek Key 的人，文档会从本机提取变成发给 DeepSeek。默认开还是关由你定。</li>
+          <li><strong>Chat 模式</strong>：深度搜索建议进 Chat，做成现有 <code>web</code> 工具的第三种动作，Chat 仍然只有两个工具。文档解析第一版不进 Chat：Chat 没有文件工具，要另做发送时解析。</li>
+          <li><strong>附件入口</strong>：本机 Agent / Plan 的「+」现在只收图片。要不要放开到 PDF、Word、PPT（第 4 节的输入框）；不放开也能用，只是只能读工作区里已有的文件。</li>
+          <li><strong>大文档</strong>：按页计费，124 页约 ¥0.19。要不要设一个页数上限，超过先问。</li>
+        </ol>
+      </div>
+      <div class="note">
+        <b class="h">和现行规范的出入</b>
+        <ul>
+          <li>工具预览规范要新增两节：<code>Deep Search</code> 行和文档的 <code>Read</code> 行。<code>Web Search</code> 一节不动。</li>
+          <li>现在 <code>Web Search</code> 展开后是输出原文的前 2000 个字符（等宽）。深度搜索展开后改成整理过的搜索词和来源列表，是新样式。</li>
+          <li>来源只写标题和站点，都来自 DeepSeek 的返回，原样显示。聊天区不加载远程图片，所以没有站点图标；发布日期实测有明显错的（一条是 2004 年），不显示；个别标题也不准（tauri.app/blog 返回的是「On this page」）。</li>
+          <li>B 行尾的当前动作走现有的进度消息，不用改协议；它属于工具执行状态，按文案规范用英文。C 要新增结构化进度，子行的缩进也和中间消息区规范的「过程行共用同一左边缘、没有子分组」冲突。</li>
+          <li>聊天输入框规范里「本机 Agent / Plan 的 + 面板显示图片」要改；设置页规范第 6、7 节要加行。</li>
+        </ul>
+      </div>
+      <div class="note">
+        <b class="h">对标</b>
+        <ul>
+          <li>DeepSeek 官方 chat-demo：思考和工具步骤排成一条可折叠的时间线，标题随阶段变（正在思考、正在搜索、正在浏览网页），步骤写「搜索到 N 个网页」「浏览 N 个页面」，点开是搜索结果面板；正文里的引用带悬浮卡片和站点图标。</li>
+          <li>ChatGPT、Claude 这类对话产品：运行时一行当前动作，结束后收成一行，展开是来源列表；句末跟来源标记。</li>
+          <li>取：一行加当前动作；展开看搜索词和来源；回复里用普通链接。</li>
+          <li>不取：站点图标、来源卡片和侧栏面板、常驻的步骤时间线。ActSpace 的过程行是安静的单行，回复结束后整体收进 <code>Worked for</code>。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (sel) => document.querySelector(sel);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const params = new URLSearchParams(location.search);
+  const svg = (body, size = 14) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  const CHEV = (size = 14) => svg('<path d="m9 18 6-6-6-6"/>', size).replace("<svg", '<svg class="chev"');
+  const ICON = {
+    file: (size) => svg('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>', size).replace("<svg", '<svg class="ico"'),
+    clip: svg('<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>'),
+    book: svg('<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>'),
+    plus: svg('<path d="M5 12h14"/><path d="M12 5v14"/>', 18),
+    up: svg('<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>', 16),
+    x: svg('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>', 11),
+    alert: svg('<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>', 13),
+  };
+
+  /* ── 示例数据：一次真实调用（13.3 秒，搜索 6 次，引用 11 个来源） ── */
+  const Q = "Electron 和 Tauri 现在的最新稳定版分别是多少？最近一个大版本各改了什么？";
+  const QUERIES = ["Electron 最新稳定版 版本号 发布日期 2026", "Tauri 最新稳定版 版本号 发布日期 2026", "Electron 最近大版本 主要变化 更新日志", "Tauri 最近大版本 主要变化 更新日志", "Electron 44 主要变化 新特性", "Tauri 2.12 主要变化 新特性"];
+  const PAGES = [["Tauri - 维基百科，自由的百科全书", "zh.wikipedia.org"], ["Schedule | Electron Releases", "releases.electronjs.org"], ["Electron 40.0 | Electron", "electronjs.org"], ["tauri full changelog", "tauri.app"]];
+  const SOURCES = [
+    ["Tauri - 维基百科，自由的百科全书", "zh.wikipedia.org", "https://zh.wikipedia.org/wiki/Tauri"],
+    ["Schedule | Electron Releases", "releases.electronjs.org", "https://releases.electronjs.org/schedule"],
+    ["Electron 44 | Electron", "electronjs.org", "https://www.electronjs.org/blog/electron-44-0"],
+    ["v44.0.0-alpha.4", "releases.electronjs.org", "https://releases.electronjs.org/release/v44.0.0-alpha.4"],
+    ["Electron: v44.0.0-alpha.1 Release", "gitclear.com", "https://www.gitclear.com/open_repos/electron/electron/release/v44.0.0-alpha.1"],
+    ["Electron Releases", "releases.electronjs.org", "https://releases.electronjs.org/release/v44.0.0"],
+    ["Announcing Tauri 2.12", "github.com", "https://github.com/tauri-apps/tauri-docs"],
+    ["Announcing Tauri 2.12 | daily.dev", "daily.dev", "https://daily.dev/posts/announcing-tauri-2-12-zlxuqeyka"],
+    ["Best Tauri posts — September 2026 | daily.dev", "daily.dev", "https://daily.dev/tags/tauri/best-of/2026/09"],
+    ["宣布发布 Tauri 2.12", "tauri.org.cn", "https://tauri.org.cn/blog/tauri-2.12/"],
+    ["tauri full changelog", "tauri.app", "https://tauri.app/release/tauri/all-versions/"],
+  ];
+  const STATS = "6 searches · 11 sources";
+
+  /* ── 行与详情 ── */
+  const OPEN = new Set(["d-a", "d-b", "d-c", "d-partial", "d-fail1", "d-fail2", "d-fail3", "doc-open", "doc-trunc", "doc-fail1", "doc-fail2"]);
+  if (params.get("open") === "1") ["wk-now", "wk-a", "wk-b", "wk-c", "ds-a", "ds-b", "ds-c"].forEach((id) => OPEN.add(id));
+
+  function running(text, status) {
+    return `<div class="row"><span class="shim"><span class="t1">${esc(text)}</span>${status ? `<span class="t2"> · ${esc(status)}</span>` : ""}</span></div>`;
+  }
+  function row({ id, act, tgt, meta, state, detail }) {
+    const tail = state ? `<span class="meta">${state}</span>` : meta ? `<span class="meta">${esc(meta)}</span>` : "";
+    const inner = `<span class="act">${esc(act)}</span><span class="tgt">${esc(tgt)}</span>${tail}`;
+    if (!detail) return `<div class="row${state ? " err" : ""}">${inner}</div>`;
+    const open = OPEN.has(id);
+    return `<div class="row can${state ? " err" : ""}${open ? " open" : ""}" data-x="${id}" role="button" tabindex="0" aria-expanded="${open}">${inner}${CHEV()}</div>${open ? detail : ""}`;
+  }
+  const link = ([title, , url]) => `<a title="${esc(url)}">${esc(title)}</a>`;
+  const sourceLines = (list) => `<div class="gl">引用来源</div>` + list.map((s, i) => `<div class="li"><span class="n">${i + 1}</span>${link(s)}<span class="site">${esc(s[1])}</span></div>`).join("");
+  const queryLines = (list) => `<div class="gl">搜索词</div>` + list.map((q) => `<div class="li"><span>${esc(q)}</span></div>`).join("");
+  const stepLine = (act, text, site, bad) => `<div class="li${bad ? " bad" : ""}"><span class="sa">${act}</span><span>${esc(text)}</span>${site ? `<span class="site">${esc(site)}</span>` : ""}</div>`;
+  const detailA = () => `<div class="detail">${sourceLines(SOURCES)}</div>`;
+  const detailB = () => `<div class="detail">${queryLines(QUERIES)}${sourceLines(SOURCES)}</div>`;
+  const detailC = () => `<div class="detail"><div class="gl">步骤</div>${QUERIES.slice(0, 4).map((q) => stepLine("Search", q)).join("")}${PAGES.map(([title, site]) => stepLine("Read", title, site)).join("")}${QUERIES.slice(4).map((q) => stepLine("Search", q)).join("")}${sourceLines(SOURCES)}</div>`;
+  const deepDone = (id, detail) => row({ id, act: "Deep Search", tgt: Q, meta: STATS, detail });
+
+  /* ── 1 运行时：四种方式共用一条时间线 ── */
+  const DS0 = 2.5, DS1 = 15.8, REPLY0 = 16.4, FOLD = 19.4, END = 20.4, WORKED = "Worked for 19s";
+  const VARIANTS = [
+    { id: "now", name: "现状（对照）", desc: "今天没有深度搜索：主模型自己一轮一轮调 Web Search，每次一行，展开是输出原文。" },
+    { id: "a", name: "A · 只有一行", desc: "运行时只有扫光，十几秒里看不出在做什么。完成后补上统计。" },
+    { id: "b", name: "B · 一行 + 当前动作", tag: "建议", desc: "行尾跟一个当前动作，随内部步骤更新，高度不变。用现有的进度消息就能做。" },
+    { id: "c", name: "C · 步骤逐行", desc: "内部每次搜索、每个网页各占一行，完成后收回一行。最接近官方 demo，也最吵。" },
+  ];
+  /* 现状各行：类型、开始、结束、目标、展开后列出的来源（SOURCES 的下标）。 */
+  const NOW = [
+    ["web", 2.5, 4.3, "Electron 最新稳定版 2026", [1, 5, 2]],
+    ["web", 4.3, 5.9, "Tauri 最新稳定版 2026", [10, 0, 9]],
+    ["think", 5.9, 7.1, "打开官方发布页核对"],
+    ["web", 7.1, 9.2, "https://releases.electronjs.org/schedule"],
+    ["web", 9.2, 11.2, "https://tauri.app/release/tauri/all-versions/"],
+    ["web", 11.2, 12.8, "Electron 44 主要变化", [2, 3, 4]],
+    ["web", 12.8, 14.3, "Tauri 2.12 主要变化", [9, 6, 7]],
+    ["think", 14.3, 15.8, "信息够了，整理回答"],
+  ];
+  const rawOutput = (query, picks) => `Query: ${query}\nProviders: deepseek\nSearched at: 2026-11-14T01:32:10.512Z\n\n` + picks.map((i, n) => `${n + 1}. ${SOURCES[i][0]}\n   URL: ${SOURCES[i][2]}\n   Sources: deepseek`).join("\n");
+  const C_CALLS = [
+    [4.2, 4.7, "Search", "Electron 最新稳定版 版本号 发布日期 2026 +3"],
+    [7.5, 8.4, "Read", "zh.wikipedia.org/wiki/Tauri"],
+    [7.5, 8.4, "Read", "releases.electronjs.org/schedule"],
+    [7.5, 8.4, "Read", "electronjs.org/blog/electron-40-0"],
+    [7.5, 8.5, "Read", "tauri.app/release/tauri/all-versions"],
+    [7.6, 8.5, "Search", "Electron 44 主要变化 新特性 +1"],
+  ];
+  const statusB = (t) => (t < 4.2 ? "" : t < 7.5 ? "searching 4 queries" : t < 10.3 ? "reading 4 pages" : "summarizing");
+  const TABLE = `<table><thead><tr><th>框架</th><th>最新稳定版</th><th>发布日期</th></tr></thead><tbody><tr><td>Electron</td><td>44.4.5</td><td>2026-09-23</td></tr><tr><td>Tauri</td><td>2.12.5</td><td>2026-10-21</td></tr></tbody></table>`;
+  const P_ELECTRON = `<p><strong>Electron 44</strong>（2026-08-24 发布）升级到 Chromium 152 和 Node 24.18，新增窗口状态保存与恢复 API、<code>net.WebSocket</code>（<a>Electron 44 发布说明</a>）；移除 32 位构建，不再支持 macOS 12。</p>`;
+  const P_TAURI = `<p><strong>Tauri 2.12</strong>（2026-09-26 发布）最低 Rust 版本提到 1.90，不再支持 Windows 7（<a>宣布发布 Tauri 2.12</a>）。</p>`;
+  /* 第 1 节只看过程行，回复用短版；带出处的完整写法在第 3 节。 */
+  const REPLY = [
+    [0, `<p>两者目前的最新稳定版和最近一个大版本：</p>`],
+    [1.2, `<table><thead><tr><th>框架</th><th>最新稳定版</th><th>发布日期</th><th>最近大版本</th></tr></thead><tbody><tr><td>Electron</td><td>44.4.5</td><td>2026-09-23</td><td>44：Chromium 152、Node 24.18，移除 32 位构建</td></tr><tr><td>Tauri</td><td>2.12.5</td><td>2026-10-21</td><td>2.12：最低 Rust 1.90，不再支持 Windows 7</td></tr></tbody></table>`],
+  ];
+
+  function think(k, start, end, text, t) {
+    if (t < start) return null;
+    const h = t < end ? running(`Thinking ${Math.max(1, Math.floor(t - start))}s · ${text}`) : `<div class="row think">Thought for ${Math.round(end - start)}s</div>`;
+    return { k, c: "it proc", h };
+  }
+  function processRows(v, t) {
+    const rows = [think("th1", 0.5, 2.5, "先确认两边最新的版本号", t)];
+    if (v === "now") {
+      NOW.forEach(([kind, start, end, text, picks], i) => {
+        if (kind === "think") return rows.push(think(`n${i}`, start, end, text, t));
+        if (t < start) return;
+        const id = `now-${i}`;
+        const detail = `<div class="detail pre">${picks ? esc(rawOutput(text, picks)) : "（网页正文的前 2000 个字符）"}</div>`;
+        rows.push({ k: id, c: `it proc${t >= end && OPEN.has(id) ? " open" : ""}`, h: t < end ? running(`Web Search ${text}`) : row({ id, act: "Web Search", tgt: text, detail }) });
+      });
+    } else if (t >= DS0) {
+      const id = `ds-${v}`;
+      if (t < DS1) {
+        rows.push({ k: id, c: "it proc", h: running(`Deep Search ${Q}`, v === "b" ? statusB(t) : "") });
+        if (v === "c") C_CALLS.forEach(([start, end, act, text], i) => { if (t >= start) rows.push({ k: `c${i}`, c: "it proc child", h: t < end ? running(`${act} ${text}`) : row({ act, tgt: text }) }); });
+      } else {
+        rows.push({ k: id, c: `it proc${OPEN.has(id) ? " open" : ""}`, h: deepDone(id, v === "c" ? detailC() : detailB()) });
+      }
+    }
+    return rows.filter(Boolean);
+  }
+  function liveRows(v, t) {
+    const proc = processRows(v, t);
+    const reply = REPLY.filter(([at]) => t >= REPLY0 + at).map(([, html]) => html).join("");
+    const final = reply ? [{ k: "reply", c: "it final", h: `<div class="md">${reply}</div>` }] : [];
+    if (t < FOLD) return [...proc, ...final];
+    const id = `wk-${v}`, open = OPEN.has(id);
+    const toggle = { k: id, c: "it", h: `<button class="wk${open ? " open" : ""}" data-x="${id}" aria-expanded="${open}"><span>${WORKED}</span>${CHEV(15)}</button>` };
+    return [toggle, ...(open ? proc : []), ...final];
+  }
+  function reconcile(host, rows) {
+    const old = new Map([...host.children].map((el) => [el.dataset.k, el]));
+    let prev = null;
+    for (const r of rows) {
+      let el = old.get(r.k);
+      if (el) old.delete(r.k); else { el = document.createElement("div"); el.dataset.k = r.k; }
+      if (el.className !== r.c) el.className = r.c;
+      if (el._h !== r.h) { el.innerHTML = r.h; el._h = r.h; }
+      const ref = prev ? prev.nextSibling : host.firstChild;
+      if (ref !== el) host.insertBefore(el, ref);
+      prev = el;
+    }
+    old.forEach((el) => el.remove());
+  }
+
+  $("#live").innerHTML = VARIANTS.map((v) => `<div class="panel"><header><b>${v.name}</b>${v.tag ? `<span class="tag pick">${v.tag}</span>` : ""}<p>${v.desc}</p></header><div class="conv live" id="conv-${v.id}"><div class="u">${esc(Q)}</div><div class="flow" id="flow-${v.id}"></div></div></div>`).join("");
+
+  let t = params.has("t") ? Math.min(END, Number(params.get("t")) || 0) : 0;
+  let playing = !params.has("t"), speed = 1, last = performance.now();
+  const scrub = $("#scrub"), clock = $("#clock"), pauseBtn = $("#btn-pause");
+  function renderLive(follow) {
+    for (const v of VARIANTS) {
+      reconcile($(`#flow-${v.id}`), liveRows(v.id, t));
+      if (follow) { const conv = $(`#conv-${v.id}`); conv.scrollTop = conv.scrollHeight; }
+    }
+    scrub.value = t;
+    clock.textContent = `${t.toFixed(1)}s / ${END.toFixed(1)}s`;
+    pauseBtn.textContent = playing ? "暂停" : t >= END ? "已播完" : "继续";
+  }
+  function tick(now) {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (playing) { t = Math.min(END, t + dt * speed); if (t >= END) playing = false; renderLive(true); }
+    requestAnimationFrame(tick);
+  }
+  $("#btn-replay").onclick = () => { ["now", "a", "b", "c"].forEach((v) => { OPEN.delete(`wk-${v}`); OPEN.delete(`ds-${v}`); }); t = 0; playing = true; renderLive(true); };
+  pauseBtn.onclick = () => { if (t >= END) return; playing = !playing; renderLive(false); };
+  scrub.oninput = () => { t = Number(scrub.value); playing = false; renderLive(true); };
+
+  /* ── 2 完成与展开 ── */
+  const card = ({ name, tag, pick, desc, body, cls = "conv" }) => `<div class="panel"><header><b>${name}</b>${tag ? `<span class="tag${pick ? " pick" : ""}">${tag}</span>` : ""}${desc ? `<p>${desc}</p>` : ""}</header><div class="${cls}">${body}</div></div>`;
+  const flow = (...items) => `<div class="flow" style="margin-top:0">${items.map((h) => `<div class="it proc">${h}</div>`).join("")}</div>`;
+  const Q2 = "读一下 tauri.app/blog 和 this-domain-does-not-exist-xyz123.com/page：最近一篇博客是什么？第二个页面讲了什么？";
+  const partial = () => `<div class="detail">${queryLines(["Tauri 2.12 release date", "Announcing Tauri 2.12 发布日期"])}${sourceLines([["On this page", "tauri.app", "https://tauri.app/blog/"], ["Announcing Tauri 2.12", "github.com", "https://github.com/tauri-apps/tauri-docs"], ["Fabian-Lars", "tauri.org.cn", "https://tauri.org.cn/blog/authors/fabian-lars/"]])}<div class="gl">未能打开</div><div class="li bad"><span>this-domain-does-not-exist-xyz123.com/page</span></div></div>`;
+  function renderSpec2() {
+    $("#spec2").innerHTML = [
+      card({ name: "完成 · 收起", desc: "搜索次数是 DeepSeek 实际计费的次数（¥0.005 / 次）；来源数是结论里引用到的网页，去重后计数。", body: flow(deepDone("d-0", detailB())) }),
+      card({ name: "展开 a · 只列引用来源", desc: "只回答「依据是哪些网页」。标题可点，在系统浏览器打开。", body: flow(deepDone("d-a", detailA())) }),
+      card({ name: "展开 b · 搜索词 + 引用来源", tag: "建议", pick: true, desc: "多一组搜索词，能看出它是从哪些角度查的。读过但没引用的网页不列。", body: flow(deepDone("d-b", detailB())) }),
+      card({ name: "展开 c · 全部步骤 + 引用来源", desc: "搜索和打开网页按发生顺序全列出来，包括读过但没引用的网页。最完整，也最长。", body: flow(deepDone("d-c", detailC())) }),
+      card({ name: "有网页打不开", desc: "其余步骤正常时整体仍算完成，行不变红；打不开的网页在展开内容里单列，模型的结论里也会说明。", body: flow(row({ id: "d-partial", act: "Deep Search", tgt: Q2, meta: "2 searches · 3 sources", detail: partial() })) }),
+      card({ name: "失败与中止", desc: "保留动作和问题，行尾是终态词，原因在展开内容里。和其他工具行的失败写法一致。", body: flow(
+        row({ id: "d-fail1", act: "Deep Search", tgt: Q, state: "failed", detail: `<div class="detail err">40 秒没有收到新数据，已停止本次深度搜索。</div>` }),
+        row({ id: "d-fail2", act: "Deep Search", tgt: Q, state: "failed", detail: `<div class="detail err">DeepSeek 账户余额不足，深度搜索没有执行。</div>` }),
+        row({ id: "d-fail3", act: "Deep Search", tgt: Q, state: "failed", detail: `<div class="detail err">DeepSeek API Key 无效或已被删除。</div>` }),
+        row({ act: "Deep Search", tgt: Q, state: "aborted" }),
+      ) }),
+    ].join("");
+  }
+
+  /* ── 3 回复里的出处 ── */
+  function renderSpec3() {
+    const inline = `<div class="md"><p>两者目前的最新稳定版：</p>${TABLE}${P_ELECTRON.replace("不再支持 macOS 12。", "不再支持 macOS 12（<a>Electron Releases</a>）。")}${P_TAURI}</div>`;
+    const ref = (n) => `<sup><a>${n}</a></sup>`;
+    const foot = `<div class="md"><p>两者目前的最新稳定版：</p>${TABLE}<p><strong>Electron 44</strong>（2026-08-24 发布）升级到 Chromium 152 和 Node 24.18${ref(1)}，新增窗口状态保存与恢复 API、<code>net.WebSocket</code>${ref(1)}；移除 32 位构建，不再支持 macOS 12${ref(2)}。</p><p><strong>Tauri 2.12</strong>（2026-09-26 发布）最低 Rust 版本提到 1.90，不再支持 Windows 7${ref(3)}。</p><ol><li><a>Electron 44 | Electron</a> · electronjs.org <a class="back">↩</a></li><li><a>Electron Releases</a> · releases.electronjs.org <a class="back">↩</a></li><li><a>宣布发布 Tauri 2.12</a> · tauri.org.cn <a class="back">↩</a></li></ol></div>`;
+    const tail = `<div class="md"><p>两者目前的最新稳定版：</p>${TABLE}<p><strong>Electron 44</strong>（2026-08-24 发布）升级到 Chromium 152 和 Node 24.18，新增窗口状态保存与恢复 API、<code>net.WebSocket</code>；移除 32 位构建，不再支持 macOS 12。</p><p><strong>Tauri 2.12</strong>（2026-09-26 发布）最低 Rust 版本提到 1.90，不再支持 Windows 7。</p><p>来源：</p><ul><li><a>Electron 44 | Electron</a></li><li><a>Electron Releases</a></li><li><a>宣布发布 Tauri 2.12</a></li></ul></div>`;
+    $("#spec3").innerHTML = [
+      card({ name: "行内链接", tag: "建议", pick: true, desc: "出处跟在对应的那句话后面，点一下就到。模型最容易写对，不依赖特殊语法。", body: inline }),
+      card({ name: "脚注", desc: "句子里只有一个小编号，来源集中在回复最后。出处多时正文更干净，但要上下跳着看，模型也更容易写错编号。", body: foot }),
+      card({ name: "文末来源", desc: "正文不标，最后列一组链接。最安静，但看不出哪句话对应哪个来源。", body: tail }),
+    ].join("");
+  }
+
+  /* ── 4 文档解析 ── */
+  const DOC = "2026-Q3 经营分析报告.pdf";
+  const PREVIEW = ["# 青岚科技有限公司 2026 年第三季度经营分析报告", "文档编号：QL-FIN-2026-Q3-017", "编制部门：财务分析部", "日期：2026 年 10 月 21 日", "## 一、 摘要", "2026 年第三季度，公司实现营业收入 4,827.6 万元，同比增长 18.4%，环比增长 6.2%；归属于母公司的净利润为 612.3 万元，净利率 12.7%。", "## 二、 分业务线收入", "<table><tr><td>业务线</td><td>Q3 收入（万元）</td><td>同比</td><td>占比</td><td>备注</td></tr><tr><td>企业版订阅</td><td>2,915.4</td>…"];
+  const lines = (list) => list.map((l) => `<div class="ln">${esc(l)}</div>`).join("");
+  const chipMsg = (name) => `<span class="chip-msg">${ICON.file(16)}<span>${esc(name)}</span></span>`;
+  function renderSpec4() {
+    const composer = `
+      <div class="cap">「+」面板里的入口：本机 Agent / Plan 今天是「图片」，改成和 Chat 一样的「图片与文件」</div>
+      <div class="pal">
+        <div class="pal-row sel">${ICON.clip}<b>图片与文件</b><span>PNG、JPEG、WEBP、GIF、PDF、Word、PPT</span><i class="anno" style="margin-left:auto">改</i></div>
+        <div class="pal-row">${ICON.book}<b>Skills</b><span>为本轮加载技能说明</span></div>
+      </div>
+      <div class="composer">
+        <div class="strip"><span class="chip">${ICON.file(17)}<span>${DOC}</span><span class="x">${ICON.x}</span></span></div>
+        <div class="cbody"><div class="cinput">总结一下这份报告的主要风险</div><div class="cbar"><span class="rbtn">${ICON.plus}</span><span class="rbtn send">${ICON.up}</span></div></div>
+      </div>
+      <div class="cap">文件附件和现在一样只显示文件名，移除按钮悬停才出现；输入框只画了和附件有关的部分。</div>`;
+    const talk = `<div class="u">总结一下这份报告的主要风险<div class="chips">${chipMsg(DOC)}</div></div>
+      <div class="cap" style="margin-top:14px">解析中（实测 2 页约 3 秒）</div>${flow(running(`Read ${DOC}`))}
+      <div class="cap">完成</div>${flow(row({ id: "doc-0", act: "Read", tgt: DOC, meta: "2 pages", detail: `<div class="detail">${lines(PREVIEW)}</div>` }))}
+      <div class="cap">展开：解析出的 Markdown 开头几行，和读普通文件一样</div>${flow(row({ id: "doc-open", act: "Read", tgt: DOC, meta: "2 pages", detail: `<div class="detail">${lines(PREVIEW)}</div>` }))}`;
+    const long = `<div class="cap">第一次读：整份解析一次，按页缓存，先把开头几页交给模型</div>${flow(row({ act: "Read", tgt: "llm-survey.pdf", meta: "124 pages" }))}
+      <div class="cap">之后按页读：直接取缓存，不再计费</div>${flow(row({ act: "Read", tgt: "llm-survey.pdf", meta: "pages 31-45" }), row({ act: "Read", tgt: "llm-survey.pdf", meta: "pages 46-60" }))}
+      <div class="cap">个别页没识别完整（实测一篇 15 页论文的图表页）：仍算完成，展开内容第一行用警示色说明</div>${flow(row({ id: "doc-trunc", act: "Read", tgt: "attention-is-all-you-need.pdf", meta: "15 pages", detail: `<div class="detail"><div class="ln warn">第 13 页识别不完整，内容已截断。</div>${lines(["arXiv:1706.03762v7 [cs.CL] 2 Aug 2023", "Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or scholarly works.", "# Attention Is All You Need", "Ashish Vaswani $^{*}$"])}</div>` }))}`;
+    const fail = `<div class="cap">DeepSeek 明确拒绝的情况：有打开密码、超过 1,000 页或 100 MiB、识别超时</div>${flow(
+        row({ id: "doc-fail1", act: "Read", tgt: "采购合同-签署版.pdf", state: "failed", detail: `<div class="detail err">文件设有打开密码，无法解析。去掉密码后再试。</div>` }),
+        row({ id: "doc-fail2", act: "Read", tgt: "历年年报合集.pdf", state: "failed", detail: `<div class="detail err">文档超过 1,000 页，DeepSeek 不接受。</div>` }),
+      )}
+      <div class="cap">开关关闭或没有 Key：和今天一样，模型按 pdf Skill 写脚本提取（可能先出现脚本审批卡；扫描件读不出文字）</div>${flow(row({ act: "Ran", tgt: "Python 脚本（12 行）" }))}`;
+    $("#spec4").innerHTML = [
+      card({ name: "输入框", tag: "待确认", desc: "本机 Agent / Plan 现在只收图片；要读工作区以外的文档，需要放开这个入口。", body: composer }),
+      card({ name: "对话里", desc: "用户消息带文件名；模型调用文档读取，行的写法和读普通文件相同，行尾是页数。", body: talk }),
+      card({ name: "长文档与按页读取", desc: "124 页实测 16 秒、约 74 万字，不能一次塞给模型。按页计费只发生在第一次。", body: long }),
+      card({ name: "失败，以及不走 DeepSeek 的时候", desc: "失败保留动作和文件名，原因在展开内容里。表格（xlsx）和纯文本不走这条路。", body: fail }),
+    ].join("");
+  }
+
+  /* ── 5 设置 ── */
+  const SET = { key: params.get("key") !== "0", search: true, deep: true, fetch: false, doc: true, docTool: true };
+  const toggle = (name, on, disabled) => `<button class="tog${on ? " on" : ""}" data-set="${name}" role="switch" aria-checked="${on}"${disabled ? " disabled" : ""}></button>`;
+  const srow = ({ t, d, ctl, off, tight, note, warn }) => `<div class="srow${tight ? " tight" : ""}${off ? " off" : ""}"><div class="txt"><div class="t">${t}${note ? `<i class="anno">${note}</i>` : ""}</div>${d ? `<div class="d${warn ? " warn" : ""}">${warn ? ICON.alert : ""}${d}</div>` : ""}</div><div class="ctl">${ctl}</div></div>`;
+  function renderSpec5() {
+    const k = SET.key;
+    const deepOff = !k || !SET.search;
+    const page1 = `<h3>搜索与网页读取</h3>
+      <div class="grp" style="margin-top:20px"><div class="box">
+        ${srow({ t: "允许联网搜索", ctl: toggle("search", SET.search) })}
+        ${srow({ t: "使用 DeepSeek 深度搜索", note: "新增", d: k ? "问题将发送至 DeepSeek · 搜索 ¥0.005 / 次，另计模型用量" : "请先连接 DeepSeek", off: deepOff, ctl: toggle("deep", k && SET.search && SET.deep, deepOff) })}
+      </div></div>
+      <div class="grp"><div class="grp-h"><b>搜索通道</b><span>${k ? 1 : 0} / 5 已连接</span></div><div class="box">
+        ${srow({ t: "DeepSeek", d: "¥0.005 / 次", ctl: k ? `${toggle("", true)}<span class="dot">已连接</span><button class="ghost">管理</button>` : `<button class="ghost out">连接</button>` })}
+        ${srow({ t: "智谱 Web Search", d: "search_pro ¥0.03 / 次", ctl: `<button class="ghost out">连接</button>` })}
+        <div class="more">Tavily、TinyFish、Exa 三行不变，这里省略</div>
+      </div></div>
+      <div class="grp"><div class="grp-h"><b>网页读取</b></div><div class="box">
+        ${srow({ t: "使用 DeepSeek 抓取网页", d: k ? "网址将发送至 DeepSeek · ¥0.005 / 次" : "请先连接 DeepSeek", off: !k, ctl: toggle("fetch", k && SET.fetch, !k) })}
+      </div></div>
+      <div class="grp"><div class="grp-h"><b>文档解析<i class="anno">新增 · 位置 ①</i></b></div><div class="box">
+        ${srow({ t: "使用 DeepSeek 解析文档", d: k ? "文档将发送至 DeepSeek · ¥0.0015 / 页" : "请先连接 DeepSeek", off: !k, ctl: toggle("doc", k && SET.doc, !k) })}
+      </div></div>`;
+    const page2 = `<h3>工具</h3>
+      <div class="cap" style="margin-top:20px">代码库、终端、浏览器三组不变，这里省略。</div>
+      <div class="grp" style="margin-top:14px"><div class="grp-h"><b>多媒体</b></div><div class="box">
+        ${srow({ tight: true, t: "图片生成", d: "图片生成服务尚未配置，工具不会出现。", warn: true, ctl: toggle("", true) })}
+        ${srow({ tight: true, t: "图片分析", ctl: toggle("", true) })}
+        ${srow({ tight: true, t: "文档解析", note: "新增 · 位置 ②", d: k ? "文档将发送至 DeepSeek · ¥0.0015 / 页" : "尚未连接 DeepSeek，文档由本机 Python 提取。", warn: !k, ctl: toggle("docTool", SET.docTool) })}
+      </div></div>
+      <div class="grp"><div class="grp-h"><b>显示</b></div><div class="box">
+        ${srow({ tight: true, t: "显示写入变动", ctl: toggle("", true) })}
+      </div></div>`;
+    $("#spec5").innerHTML = [
+      card({ name: "搜索与网页读取", desc: "深度搜索的开关在「允许联网搜索」下面，关掉联网搜索时一起置灰。位置 ① 是把文档开关也放这页，单独一组，写法和「使用 DeepSeek 抓取网页」相同。", body: page1, cls: "set" }),
+      card({ name: "工具", tag: "位置 ② · 建议", pick: true, desc: "文档开关放这里时和「图片分析」并排，关掉就是不给模型这个工具。没接 DeepSeek 时不置灰，沿用「图片生成」那一行的警示写法。", body: page2, cls: "set" }),
+    ].join("");
+  }
+
+  function renderStatic() { renderSpec2(); renderSpec3(); renderSpec4(); renderSpec5(); }
+
+  /* ── 交互 ── */
+  document.addEventListener("click", (event) => {
+    const x = event.target.closest("[data-x]");
+    if (x) { const id = x.dataset.x; OPEN.has(id) ? OPEN.delete(id) : OPEN.add(id); renderLive(false); renderStatic(); return; }
+    const s = event.target.closest("[data-set]");
+    if (s && s.dataset.set && !s.disabled) { SET[s.dataset.set] = !SET[s.dataset.set]; renderSpec5(); }
+  });
+  document.addEventListener("keydown", (event) => {
+    if ((event.key === "Enter" || event.key === " ") && event.target.matches?.(".row.can")) { event.preventDefault(); event.target.click(); }
+  });
+  function seg(id, apply, initial) {
+    const el = $(id);
+    const set = (value) => { el.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === value)); apply(value); };
+    el.addEventListener("click", (event) => { const b = event.target.closest("button"); if (b) set(b.dataset.v); });
+    if (initial) set(initial);
+  }
+  seg("#seg-theme", (v) => { document.documentElement.dataset.theme = v; }, params.get("theme") === "dark" ? "dark" : null);
+  seg("#seg-speed", (v) => { speed = Number(v); });
+  seg("#seg-key", (v) => { SET.key = v === "1"; renderSpec5(); }, params.get("key") === "0" ? "0" : null);
+
+  renderStatic();
+  renderLive(params.get("open") !== "1");
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

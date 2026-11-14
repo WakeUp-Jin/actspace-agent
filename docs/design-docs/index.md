@@ -58,6 +58,7 @@
 - [会话记录 Markdown](agent-runtime/agent-session-transcript.md)：每个会话派生一份精简 `transcript.md`，Agent 据此读取历史会话，读取不弹审批。
 - [编辑提问重发](agent-runtime/agent-edit-resend-rewind.md)：从某一轮重来，日志截到它之前（旧日志存档），停掉在跑的后台任务和子 Agent。
 - [Skill 加载](tool-system/agent-skill-loading.md)、[Web 工具](tool-system/agent-web-tools.md)、[工具输出、文件引用与图片输入](tool-system/agent-tool-output-references.md)、[受控子进程](tool-system/agent-subprocess-runner-guidelines.md)、[图片检查工具](tool-system/agent-image-inspection-tool.md)、[图片生成工具](tool-system/agent-image-generation-tool.md)、[工具预览契约](tool-system/agent-tool-preview-design-guidelines.md)、[脚本执行](tool-system/agent-script-execution.md)。
+- [DeepSeek 深度搜索与文档解析工具](tool-system/agent-deep-search-and-document-parsing.md)：`deep_search`、`read_document` 两个工具的目标设计，尚未实现；实现步骤见[执行计划](../exec-plans/active/20261114-deepseek-deep-search-document-parsing/README.md)。
 
 ## Browser Use
 
