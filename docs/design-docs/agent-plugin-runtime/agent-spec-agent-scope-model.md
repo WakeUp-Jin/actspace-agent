@@ -4,7 +4,7 @@
 >
 > 本文只定义 Agent Scope 的身份、父子关系、注册可见性、事件准入、资源所有权和 Agent subject 绑定。它不重新定义 Agent Loop 的 9 个事件、Session 的 14 个核心事件，也不重新定义工具执行本体；这些契约分别由 Agent Loop、Session 和 Tool Runtime 专题拥有。
 >
-> 本文是对 [Agent 与一次性 Subagent 规范](./agent-spec-agent-and-subagent.md) 中 Scope 小节的细化。实现应先通过本文的契约评审，再进入 execution plan。
+> 子智能体怎么用 Scope（子会话、工具列表、取消）见[子智能体运行规范](../collaboration/agent-subagent-runtime.md)。实现应先通过本文的契约评审，再进入 execution plan。
 
 ## 1. 目标
 
