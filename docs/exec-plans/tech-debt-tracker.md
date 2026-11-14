@@ -131,6 +131,18 @@
 | 2026-11-12 | 插件页说明 | `packages/subagent/subagent/src/manifest.ts` 的 `display.description` 还是「子智能体的创建、续派、插话、中断与完成通知」，显示在 扩展 › 插件 里；续派和中断工具都没有了。 | 改成现在的能力（创建、消息、停止、完成通知）。 |
 | 2026-11-07 | 对话里的通知行 | 子智能体完成通知在 `groupMessagesIntoTurns` 里被跳过，来信走 `SubagentMessageCard`，所以 `BackgroundNoticeRow.tsx` 里 `taskKind` 为 `subagent`、`agent_message` 的分支（标题、展开内容、「打开子智能体」按钮）在桌面端对话里走不到，只有 `background-notice-row.test.tsx` 在用。 | 确认 Web 端也不用之后，把这些分支和对应用例删掉，组件只留 Bash 通知。 |
 
+## 上下文引擎遗留
+
+2026-11-14 把上下文规范对着代码合并时发现的。生产里建 Loop 时总是带 Context 来源（`packages/core/runtime/src/harness/agent-factory-plugin.ts` 两处 `new AgentLoop` 都传 `contextSources`），下面几样是来源接入之前的做法留下的：
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-11-14 | Loop / 旧请求路径 | `packages/core/agent-loop/src/loop.ts` 里 `!this.options.contextSources` 的分支（`appendRuntimeContext`、把预算提示拼成 user 消息、`assembler.assembleCandidate`、`contextFromCandidate`）生产不会走，只有 `packages/core/agent-loop/src/testing.ts` 的测试帮助函数不传来源时走，所以这些测试覆盖的不是生产那条路径。连带留着 `packages/context/prompt/src/` 的 `assembler.ts`（`RequestAssembler`）、`registry.ts`（`ContributorRegistry`）、`context-bridge.ts`、`request-snapshot.ts`，以及 `agent-factory-plugin.ts` 里只有自己的测试在用的 `createModeContributorActivation`。 | 让 `testing.ts` 默认带一张来源表，`english-learning` 的两个测试改用来源；然后删 Loop 里的分支、上面这些文件和 `ContributorKind` 的 `request-fact`。 |
+| 2026-11-14 | `context-engine` / 旧组装器 | `packages/context/context-engine/src/assembly.ts` 的 `ContextAssembler`、`ContextAssemblerService` 只有 `src/test/assembly.test.ts` 在用，却从包入口导出，还用着服务名 `context.assembly`（生产里这个服务由 `@actspace/context-assembly` 提供）。 | 删文件、测试和导出。 |
+| 2026-11-14 | `context-engine` / reducer | `ContextReducerRegistry`（`packages/context/context-engine/src/reducers.ts`）接在 `context.engine` 上，`reconcile` 对每条新事件都调用它，但没有任何插件注册 reducer，只有测试注册，等于空转。 | 披露和压缩确认不用之后，删注册表和 `reconcile` 里的调用；要用就先写进[上下文引擎规范](../design-docs/上下文管理引擎设计/agent-context-engine.md)。 |
+| 2026-11-14 | `context-engine` / 包清单 | `packages/context/context-engine/src/modules.ts` 的 `CONTEXT_PLUGIN_PACKAGES`、`contextPluginPackage` 只有 `src/test/modules.test.ts` 在用；包表已经由 `packages/context/README.md` 和 `pnpm check:docs` 管。 | 删文件和测试。 |
+| 2026-11-14 | 插件页说明 | `packages/context/context-disclosure/src/manifest.ts` 的 `display.description` 写「按需把工作区路径和文件摘要告诉 Agent」，显示在 扩展 › 插件 里；披露只列路径和工具给的简短说明，不生成文件摘要。同一句还在 `apps/desktop/src/renderer/mock/plugins-fixture.ts` 和 `docs/design-docs/架构优化/02-插件结构设计.md`。 | 三处一起改成「把读过和产生的文件路径列给 Agent」。 |
+
 ## 没有实机验证记录的功能
 
 下面这些功能交付时只有自动化测试和浏览器 mock，没有在 Electron 里验过的记录（日常使用可能已经覆盖了一部分）。验过一项就删掉一行，发现问题另行登记。
