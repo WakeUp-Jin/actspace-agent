@@ -23,6 +23,9 @@
   // 格式化只配置、不强制：CI 只跑 lint；`pnpm format` 只格式化相对 main 改过的文件。
   "formatter": {
     "enabled": true,
+    // 下面两个文件由脚本生成，检查时和重新生成的结果逐字节比较，排版由生成脚本决定：
+    // generated-actions.ts 来自 scripts/check-browser-command-registry.mjs，cordis.yml 来自 scripts/generate-plugin-loader.mjs。
+    "includes": ["**", "!packages/browser/tool-browser/src/generated-actions.ts", "!packages/core/runtime/cordis.yml"],
     "indentStyle": "space",
     "lineWidth": 120
   },
@@ -38,6 +41,11 @@
     "formatter": { "enabled": false }
   },
   "json": {
+    "formatter": { "enabled": false }
+  },
+  "markdown": {
+    // Markdown 由 markdownlint 管。这些目录下的 .md 还包括随包发给模型的技能说明和测试用的样本，内容不该被改写；
+    // Biome 的格式化会把表格按列宽补空格对齐，还会在 frontmatter 的第一行后面插入空行。
     "formatter": { "enabled": false }
   },
   "linter": {
