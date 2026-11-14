@@ -69,6 +69,15 @@ jobs:
             platform: windows
             arch: x64
     steps:
+      # macOS runner 上 Spotlight 的索引开着，会跟着索引这个 job 写出来的文件。Intel runner 上实测：安装依赖期间
+      # 它平均占 0.7–1.1 个核（一共 4 个），装完后的第一次 desktop 构建 144–163 秒，先关掉索引是 110–122 秒；
+      # arm64 runner 上关不关测不出差别，所以只在 Intel 上关。这一步只是为了快，失败或卡住都不该挡住打包。
+      - name: 关闭 Spotlight 索引
+        if: runner.os == 'macOS' && runner.arch == 'X64'
+        continue-on-error: true
+        timeout-minutes: 1
+        run: sudo mdutil -a -i off
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
