@@ -46,7 +46,21 @@ dangerouslySetInnerHTML={{ __html: html }}
 - JSX 里紧挨着表达式或标签的行尾空格会被写成 `{" "}`，显示的文字不变。
 - 按源码字节记摘要的生成文件。格式化改到它们覆盖的源码时要重新生成：`pnpm gen:contract-matrix`（Agent 契约矩阵）、`pnpm build:browser-locator`（Browser Bridge 定位运行时）。
 
-**改格式化选项或升级 Biome。** 两者都会重排存量代码。重排单独放一个提交，整个提交只有 `pnpm format` 的输出，提交说明里写明怎么复现。
+**改格式化选项或升级 Biome。** 两者都会重排存量代码。重排单独放一个提交，整个提交只有 `pnpm format` 的输出，提交说明里写明怎么复现，再把这个提交的完整哈希记进根目录的 `.git-blame-ignore-revs`。
+
+### `.git-blame-ignore-revs`
+
+列出只改排版、或只做机械改名的提交，`git blame` 会跳过它们。GitHub 的 blame 页面自动读这个文件；本地每个克隆配置一次：
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
+- 配置之后，检出还没有这个文件的旧提交时，`git blame` 会报 `could not open object name list`。这时先 `git config --unset blame.ignoreRevsFile`。
+- 文件里只能写完整的 40 位哈希，缩写会让 `git blame` 直接报错。
+- 哈希要留在 `main` 的历史里才有效，所以带这类提交的 PR 只能用 **Create a merge commit** 合并；squash 或 rebase 会换掉哈希。git 对历史里没有的哈希不报错，只是不再跳过那个提交。
+
+`pnpm check:blame-ignore-revs` 查这个文件：每个哈希都是完整的 40 位、不重复、上一行有注释、是当前分支历史里的提交。它在 `scripts/ci.sh` 的仓库卫生检查里；CI 的 `repository-checks` 另外带 `--require-history` 再跑一遍。浅克隆里看不到历史，最后一项默认跳过，并在输出里说明。检查报「不在当前分支的历史里」时，把那一行改成新的哈希，或者删掉。
 
 ### 格式化提交之前拉出去的分支
 

@@ -25,12 +25,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # .git-blame-ignore-revs 的检查要核对提交是不是在历史里：提交全取，
+          # 树和文件只取检出要用的（tree:0），下载量和浅克隆差不多。
+          fetch-depth: 0
+          filter: tree:0
 
       # scripts/check-secrets.sh 依赖 rg；ubuntu-latest 镜像不预装。
       - uses: ./.github/actions/install-ripgrep
 
       - name: Run base CI checks
         run: ./scripts/ci.sh
+
+      # scripts/ci.sh 里已经跑过一遍，历史不完整时它只说明、不失败。这里要求能核对：
+      # 上面的检出配置被改回浅克隆的话，在这一步失败，而不是从此悄悄不查。
+      - name: Blame ignore revs
+        run: node scripts/check-blame-ignore-revs.mjs --require-history
 
       - name: Markdown lint
         uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0

@@ -84,10 +84,10 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
 
 - `scripts/ci.sh` 当前只做仓库级基础检查：
   - docs 骨架、active/completed 生命周期与 current truth zone 校验；current truth zone 会拒绝已删除 v1 路径、已丢弃 active 入口和相对 Markdown 断链
-  - repo hygiene
+  - repo hygiene（含 `.git-blame-ignore-revs` 检查，见 `docs/coding-standards/lint-conventions.md` 的「格式化」）
   - GitHub Actions pinning
   - shell 脚本语法检查
-- `.github/workflows/base-checks.yml` 的 `repository-checks` 不需要 pnpm，只装 ripgrep 后跑 `scripts/ci.sh` 与 markdownlint。
+- `.github/workflows/base-checks.yml` 的 `repository-checks` 不需要 pnpm，只装 ripgrep 后跑 `scripts/ci.sh` 与 markdownlint。它检出时取全部提交，树和文件只取检出要用的（`fetch-depth: 0` + `filter: tree:0`，比浅克隆多下载不到 1 MB）：`.git-blame-ignore-revs` 的检查要核对里面的提交是不是在历史里。`scripts/ci.sh` 之后单独有一步带 `--require-history` 再跑这个检查，检出配置被改回浅克隆时在这一步失败。
 - 需要 `rg` 的 job（`repository-checks`、`test-process`、`test-packages`、`test-desktop`）统一用仓库内 composite action `.github/actions/install-ripgrep`：从 ripgrep GitHub Release 下载固定版本的 Linux musl 静态包、校验 sha256 后装到 `/usr/local/bin`。不走 apt，因为 runner 上 `archive.ubuntu.com` 会偶发 DNS 解析失败；升级版本时同时改 action 里的 `RG_VERSION` 与 `RG_SHA256`。
 - `.github/workflows/ci.yml` 中的工程 job 都从 `pnpm install --frozen-lockfile` 开始，然后各自执行：
   - `lint-typecheck`：`pnpm check:desktop-build-graph`（必须排在 `build:deps` 之前，因为后者会重新生成 `tsconfig.build.json`）、`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm format:check`、`pnpm typecheck`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。`pnpm typecheck` = `build:deps`（`tsc -b` 本身就是对全部 packages 的类型检查）+ 只对 apps 跑 `tsc --noEmit`（`packages/` 下每个包都在 `tsconfig.desktop-deps.json` 的引用图里；新增图外的包时要把它加进这条 filter）。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。

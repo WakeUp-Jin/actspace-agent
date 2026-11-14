@@ -1,0 +1,16 @@
+# 只改排版、或只做机械改名的提交。git blame 跳过它们，把每一行记到上一次真正改动它的提交上。
+#
+# GitHub 的 blame 页面自动读这个文件。本地每个克隆配置一次：
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# 往这里加提交的条件：整个提交都是一条命令的输出，没有手改，提交说明里写了怎么复现。
+# 只能写完整的 40 位哈希，每个哈希的上一行写注释。带这类提交的 PR 只能用
+# Create a merge commit 合并：squash 或 rebase 之后哈希会变，这里的记录就失效了。
+# pnpm check:blame-ignore-revs 检查这个文件。
+# 说明见 docs/coding-standards/lint-conventions.md 的「格式化」。
+
+# 全仓库按 Biome 配置格式化（2026-11-14）。复现：在它的上一个提交上连跑两遍 pnpm exec biome format --write .
+d26331adc3e1c66665a511becd4ccd15584c4239
+
+# 标识符去掉 RuntimeV2 后缀（2026-11-14）。复现：在它的上一个提交上跑 node scripts/check-transitional-names.mjs --write
+e2c9f059c6202148072407b1d0b340d29c401c11
