@@ -208,6 +208,12 @@ case "${platform}" in
     "${packaged_nono}" --version | grep -qx "nono $(node -p "require('${repo_root}/scripts/sandbox/nono-version.json').version")" \
       || { echo "Packaged nono does not report the pinned version." >&2; exit 1; }
     node "${repo_root}/scripts/verify-python-runtime.mjs" "${packaged_python}"
+    # The checks above run code inside the signed bundle; anything they wrote (a stray .pyc) breaks the seal.
+    if [[ -n "${mac_codesign_identity}" ]]; then
+      codesign --verify --deep --strict --verbose=2 "${packaged_app}"
+    elif is_truthy "${mac_ad_hoc_sign}"; then
+      codesign --verify --no-strict --verbose=2 "${packaged_app}"
+    fi
     if is_truthy "${mac_notarize}"; then
       if [[ "${signed}" != "true" ]]; then
         echo "ACTSPACE_MAC_NOTARIZE=true requires ACTSPACE_MAC_CODESIGN_IDENTITY." >&2
