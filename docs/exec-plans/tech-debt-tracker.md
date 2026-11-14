@@ -34,15 +34,10 @@
 
 ## Desktop 安全遗留
 
-2026-10-06 Desktop 前端重构 11（安全与 IPC）之后登记的四条，2026-11-09 的「Desktop 安全遗留清零」已收口；没划掉的是那一轮留下的：
+2026-11-09「Desktop 安全遗留清零」那一轮留下的：
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
-| 2026-10-06 | main / 子进程环境（C1） | ~~`applyToEnv` 把搜索服务 Key 写进 `process.env`，bash / `rg` / git / ssh / Browser Bridge / 更新脚本子进程继承完整环境。~~ 已解决：Desktop 不再把任何凭据写进 env（工具端口早已直接从 `getToolEnvironment()` 拿 Key）；子进程 env 由 `@actspace/shared` 的 `toolChildEnv`（继承 + 剥离凭据模式变量，用于 bash / `rg` / Browser Bridge 编译 / 更新脚本）与 `hostChildEnv`（基础白名单，用于 git / ssh）构造。 | 已完成。`toolChildEnv` 是模式过滤，不是穷举：用户 shell 里名字不像凭据的敏感变量仍会被 Agent bash 看到，这是沿用「Agent 可以用用户工具链」的产品取舍。 |
-| 2026-10-06 | main / Browser Bridge 安装 | ~~`browserBridge.installFromRepo` 接受 renderer 传来的 `repoRoot`，只校验扩展 manifest 就在该目录执行 `build.sh`。~~ 已解决：`selectSourceExtension` 由 main 弹系统目录对话框并校验，`installFromRepo` 不带参数只编译已保存的目录；保存前 `realpath`，`build.sh` 必须是目录内普通文件。 | 已完成。 |
-| 2026-10-06 | scripts / IPC 审计 | ~~`check:ipc-channels` 不检查注册是否经过 `assertTrustedSender`。~~ 13 之后注册器强制 sender 校验与 guard，审计以契约为来源并区分方向；2026-11-09 再加一条：main 在 `ipc/registry.ts` 之外直接调用 `ipcMain.handle / handleOnce / on / once` 即失败。 | 已完成。 |
-| 2026-10-06 | renderer / 主文档 CSP | ~~主文档没有 CSP。~~ 已解决：main 用 `onHeadersReceived` 下发 CSP，`script-src 'self'`、`connect-src 'self'`、frame / object / worker / base-uri / form-action 全 `'none'`，dev 只放开 Vite 需要的内联脚本和 ws。 | 已完成。残余见下一行。 |
-| 2026-11-09 | main / safeStorage | ~~`SecretCrypto`（secrets v1 迁移）与 `remote-hosts/credentials.ts` 调用 `safeStorage.encryptString / decryptString / isEncryptionAvailable`，Electron 45 弃用、46 移除，此前未登记。~~ 已解决：全部改为 `isAsyncEncryptionAvailable / encryptStringAsync / decryptStringAsync`，`HostCredentials` 读到 `shouldReEncrypt` 时顺手重写。 | 已完成。升级 Electron 46 时不再被这条挡住。 |
 | 2026-11-09 | renderer / CSP `style-src` | `style-src` 仍含 `'unsafe-inline'`。headless Chrome 实测：`style-src 'self'` 下 innerHTML 的 `<style>` 和 `style` 属性都被拦，DOMParser + `importNode` 的 `style` 属性能活、`<style>` 不行，`adoptedStyleSheets` / `el.style.cssText` 可用；但 CodeMirror 的 style-mod 用 `<style>` 标签注入、Vite dev 也注入 `<style>`，要去掉 `'unsafe-inline'` 需三处同时改。 | mermaid 改 DOM 挂载 + `<style>` 转 `adoptedStyleSheets`；CodeMirror 传 `EditorView.cspNonce`，nonce 由 main 每次启动生成并随 CSP 头与 preload 下发；Vite dev 配 `html.cspNonce`。做完后 `style-src 'self' 'nonce-…'`。 |
 | 2026-11-09 | main / 偏好 env | `settings/env.ts` 仍把 `IMAGE_GENERATION_BASE_URL` / `IMAGE_GENERATION_MODEL` / `ACTSPACE_DISABLED_TOOLS` / `ACTSPACE_BASH_ALWAYS_ASK` / `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` 写进 main 自己的 `process.env`（不含凭据）。 | 找出 Desktop 内还在读这些 env 的路径，改走 settings 读模型后删掉 `applyToEnv` 与 `reloadEnv`。 |
 | 2026-11-09 | main / git、ssh 子进程环境 | `hostChildEnv` 是白名单（基础变量加 `LC_` / `XDG_` 前缀），不传 `GIT_*`、`GIT_SSH_COMMAND` 这类自定义 git 变量；依赖它们的用户，Desktop 自己发起的 git / ssh 会和终端里的行为不一样。 | 有反馈再在 `HOST_ENV_PREFIXES` 加 `GIT_`，加之前评估 `GIT_CONFIG_*` 的注入面。 |
@@ -77,14 +72,12 @@
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
 | 2026-11-08 | Desktop main / git | `runGitCommand` 用 `execFile` 跑 git 并等 stdio 关闭；用户全局 `core.fsmonitor=true` 时，git 会为仓库拉起 fsmonitor 守护进程并继承管道，一次 `git status` 要等 20–30 秒才返回。测试侧已用 `GIT_CONFIG_GLOBAL=/dev/null` 隔离，产品侧没动。 | 在产品的 git 调用里加 `-c core.fsmonitor=false`（或改为 `spawn` + 只等 exit），用开启 fsmonitor 的真实仓库复验。 |
-| 2026-11-08 | 依赖 | ~~`katex` 钉在 0.16.x，`pnpm audit` 报一条 low；0.x minor 可能有破坏性改动，没随本轮升。~~ 已解决：desktop 直依赖升到 0.18.2，并用 `pnpm.overrides` 把 `rehype-katex` / `mermaid` 的间接 katex 一起拉到同版，公式渲染测试通过。 | 已完成。 |
 | 2026-11-08 | 测试环境 | `runtime-v2-output-reference-flow.test.ts` 对 `bash -lc` 的输出按行数断言；shell 启动时若有 nvm 等打印告警（如 `npm_config_prefix`），多出的行会让它失败。GitHub runner 上没这个问题，只在装了 nvm 的开发机上出现。 | 断言改成只看目标行，或给测试用的 shell 传 `--noprofile --norc`。 |
 | 2026-11-08 | 测试环境 | `packages/core/tool-runtime` 的 `runtime.test.ts` 用 `/workspace/...` 当假的资源路径；机器上真有 `/workspace` 目录（如某些容器）时 3 个用例变成 `denied`。GitHub runner 上没这个问题。 | 测试用例改用 `mkdtemp` 出来的真实工作区路径，而不是硬编码的绝对路径。 |
-| 2026-11-08 | Release | ~~`release.yml` 还是手动触发、单平台，且没装 Go。~~ 已在 P4 解决：`v*` tag 触发四平台矩阵 + `actions/setup-go` + 草稿 Release。 | 已完成。 |
 | 2026-11-08 | Release / Windows | Windows 产物是 portable zip：`electron.exe` 只是改名，没换图标和版本资源（任务管理器、属性里仍显示 Electron），也没有 Authenticode 签名，首次运行会被 SmartScreen 拦。 | 接 `rcedit`（或 electron-builder / Forge）替换图标与版本信息；签名需要证书，视发行需求再立项。 |
-| 2026-11-08 | Electron | `safeStorage.isEncryptionAvailable` / `encryptString` / `decryptString` 在 Electron 45 弃用、46 移除；`apps/desktop/src/main/index.ts` 的 `SecretCrypto` 和 `remote-hosts/credentials.ts` 都在用同步版。 | 在 46 成为 stable 前把 `SecretCrypto` 接口及其调用链（settings store、model-connections、HostCredentials）改为 `isAsyncEncryptionAvailable` / `encryptStringAsync` / `decryptStringAsync`。 |
-| 2026-11-08 | 供应链安全 | ~~`supply-chain-security.yml` 的 `osv-scan` 对整个 lockfile（含 devDependencies）扫描，当前报 93 条已知漏洞（axios、vite 5、vitest 3、devalue、fast-uri、joi 等），所以每个改到 `pnpm-lock.yaml` 的 PR 这个 job 都是红的，和改动本身无关；`pnpm audit --prod` 只剩 `katex` 一条 low。~~ 已解决：vite 7 / vitest 4 / esbuild 0.28 / astro 7.4 / wait-on 9 / katex 0.18 升级并重新生成 lockfile 后，osv-scanner 本地与 CI 扫描都是 0 条；工作流的路径过滤还排除了 `docs/**` 下的原型 `package.json`。 | 已完成。`osv-scan` 仍不是必需检查，后续新漏洞由每周定时扫描和 Dependabot 分组 PR 兜底。 |
 | 2026-11-08 | Release / Windows | Windows 包只在 CI 上打出、校验过文件结构，没有人实机启动过；沙盒缺位（nono 只有 darwin / linux）没验证。浏览器桥 CLI 在 Windows 上只是能编译（`ownedByCurrentUser` 的 Windows 实现恒为 `false`，实例注册表用 Unix socket 与 POSIX 权限位），`browser-tools` 插件在 Windows 上不可用。 | 第一个 tag 的草稿 Release 出来后，用 Windows 机器解压运行 `ActSpace.exe` 走一遍聊天、工具调用、浏览器桥。 |
+| 2026-11-10 | 脚本执行 / Windows | Windows 包里带了随包 `python.exe` 和 shim，`release.yml` 的 windows-latest 上 `verify-python-runtime.mjs` 也通过了，但 `bash` 工具在 Windows 上没有可用的 shell：`packages/shell/tool-shell/src/node-ports.ts` 在 macOS 以外一律启动 `/bin/bash -lc`。用 Git Bash 还是 PowerShell、shim 在选定的 shell 里能不能按 `actspace-python` 叫到、没有 nono 时怎么隔离，都没有设计（[脚本执行](../design-docs/tool-system/agent-script-execution.md) §3 只写了「另立设计」）。 | 单独写 Windows 设计；定下 shell 后在 Windows 机器上让模型跑一次 `actspace-python`。 |
+| 2026-11-10 | Release / macOS 签名 | 配了 `ACTSPACE_MAC_CODESIGN_IDENTITY` 时，`release-package.sh` 会给随包 Python 逐个签名（`.so` / `.dylib`，解释器带 `scripts/python-runtime/entitlements.plist`），签完再跑 `verify-python-runtime.mjs` 和 `codesign --verify`。这一段没执行过：`release.yml` 至今只在 PR 上跑过，每次这个变量都是空的，macOS 包的 manifest 是 `signed: false`。 | 第一次配 Developer ID 证书打包时，看签名之后的 `verify-python-runtime.mjs` 这一步过不过；不过就按报错调 entitlements 或签名顺序。 |
 | 2026-11-08 | Release | 四个平台的完整产物经 Actions artifact 中转到 Release（每次 tag 约 700 MB，保留 1 天）；若将来 artifact 配额紧张，改成在各 job 内直接 `gh release upload` 到草稿。 | 观察 Settings › Billing 的 Actions storage，超过一半再改。 |
 | 2026-11-09 | CI / `build` job | `ci.yml` 的 `build` job 和 `release-package.sh` 仍走逐包 `pnpm --filter ... build`，没有接 `setup-workspace` 的 `tsc -b` 缓存（原因见 [CI 提速计划](active/20261109-ci-speedup.md)的决策记录）。`build` 不是最长的 job，而且 release 链需要确认 `tsc -b` 产物与逐包 build 完全等价（esbuild 包、prompts 拷贝、默认 harness）才能换。 | `build` 成为 `ci.yml` 关键路径时，让它也用 `setup-workspace` + `pnpm build:deps`，再比对两种方式的 `dist/` 目录差异后替换 release 链。 |
 | 2026-11-08 | Release / 首次实发 | `v*` tag 触发的四平台发布合入后还没有真的打过 tag（仓库里只有 2026-07 的 `v0.1.0`）：草稿 Release 的产物、attestation、`release-manifest.json`、`sbom.spdx.json` 只在 PR 的打包验证里跑过。 | 发第一个版本时按 `docs/CICD.md` 核对草稿 Release 的附件，再点 Publish。 |
@@ -141,6 +134,7 @@
 | 2026-11-08 | 内置服务商改用 pi-ai | DeepSeek、Kimi、Anthropic、OpenAI、OpenRouter、自定义中转各发一条带工具调用的消息（开、关思考各一次）；代理可用和代理地址写错两种情况。 |
 | 2026-11-08 | 模型目录价格锁定 | 启动后设置页的价格、回复尾部的花费显示正常。 |
 | 2026-11-09 | 内置工具插件拆分 | Chat / Plan / Agent 三种模式各自的工具集合；自进化工具只在 Agent 模式可见；旧数据目录升级后自动换到新内置产物；子智能体的上下文里没有后台任务清单；压缩后披露状态恢复；`--mock` 下文件与 Bash 工具报不可用。 |
+| 2026-11-10 | 脚本执行 | default 模式下内联 `python3 -c` 出单次审批卡、`echo $(id)` 被拒绝且文案给出改法；批准 `python3 scripts/a.py` 并勾选会话复用后 `scripts/b.py` 不再问、`python3 ../outside.py` 仍然问；打包版里对一份 PDF 说「把第 3 页的表格导出成 xlsx」：用 `actspace-python` 完成、不弹 `pip install`，临时脚本在会话临时目录、关闭应用后消失，设置 › 扩展 › 插件 › 命令行 里有「脚本运行时」面板；「下载数据扩展」前后的 `import pandas`；Bash 卡片的脚本形态（超过 12 行折叠、`# script:` 后的文件名打开右侧面板、审批卡标题），浅色深色各一遍。 |
 | 2026-11-11 | 简化思考过程 | 真实模型下思考行保持一行、点标题看全文、多段思考、回复完成后收进 Worked、关闭开关后回到原样。 |
 | 2026-11-11 | 三层字号 | 浅色、深色下的历史会话；用户消息、正文、输入框字号一致；展开 `Worked for`；界面字号调到 12 和 18。 |
 | 2026-11-12 | 子智能体简化 | 同步子智能体、后台子智能体与通知、面板停止与 `task_stop`、结束后 `send_message`、改动前的老会话。Codex 子智能体的成功链路从 2026-11-03 起就没验过（当时本机 Codex CLI 不能用）。 |
