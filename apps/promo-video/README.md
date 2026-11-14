@@ -5,7 +5,7 @@
 | 片子 | 时长 | 讲什么 | 渲染 |
 | --- | --- | --- | --- |
 | 产品宣传片（默认） | 71 秒 | 它是什么、核心特点、怎么用、接下来 | `render` |
-| 《ActSpace 诞生记》 | 2 分 53 秒 | 头 176 天是怎么做出来的：第一夜、后端重写、做减法、较真 | `render --film origin` |
+| 《ActSpace 诞生记》 | 2 分 54 秒 | 头 176 天是怎么做出来的：第一夜、后端重写、做减法、较真 | `render --film origin` |
 
 片子清单在 `src/films.js`。成片和配乐都不入库（`out/`、`.cache/`），需要时在本机重新生成。
 
@@ -19,7 +19,7 @@ pnpm --filter @actspace/promo-video render                  # 产品宣传片，
 pnpm --filter @actspace/promo-video render --film origin    # 《诞生记》，约 10 分钟，输出 apps/promo-video/out/actspace-origin.mp4
 ```
 
-第一次渲染会把配乐下载到 `.cache/music/`（5 – 11 MB）。调画面时不用每次都整片渲染。下面的命令默认对产品宣传片；加 `--film origin` 就换成《诞生记》，预览页相应是 `?film=origin`，单帧导出到 `out/stills-origin/`：
+第一次渲染会把配乐下载到 `.cache/music/`（5 – 7 MB）。调画面时不用每次都整片渲染。下面的命令默认对产品宣传片；加 `--film origin` 就换成《诞生记》，预览页相应是 `?film=origin`，单帧导出到 `out/stills-origin/`：
 
 ```bash
 pnpm --filter @actspace/promo-video music                           # 只下载配乐，预览页要用
@@ -85,22 +85,18 @@ pnpm --filter @actspace/promo-video render --music ~/Downloads/another.mp3 --mus
 | 位置 | 内容 |
 | --- | --- |
 | `src/origin/film.js` | 分镜顺序 |
-| `src/origin/cues.js` | 每个分镜占配乐的几个和弦；长度只在这里写一次 |
-| `src/origin/soundtrack.js` | 配乐的地址、署名、分段，以及成片从曲子的哪里切入 |
+| `src/origin/cues.js` | 每个分镜占配乐的几小节；长度只在这里写一次 |
+| `src/origin/soundtrack.js` | 配乐的地址、拍速、分段，以及小节换成秒的算法 |
 | `src/origin/data.js` | 画面上的所有数字和代码量曲线 |
 | `src/origin/scenes/` | 各分镜的文案和版式 |
 | `src/origin/shared.js`、`src/origin/styles/` | 贯穿全片的时间轴、代码量曲线，和这部片子自己的样式 |
 | `scripts/origin-stats.mjs` | 对着截止提交把 `data.js` 里的数重新数一遍 |
 
-配乐是 Scott Buckley 的《Chasing Daylight》，[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)，可商用，**必须署名**。片尾已经带上；发布时简介里也要贴这一行：
-
-```text
-'Chasing Daylight' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
-```
+配乐是 HoliznaCC0 的《Blue Skies》（专辑《Lazy Summer Lofi》），[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)，可商用，不要求署名，和宣传片的配乐是同一位作者。来源：<https://freemusicarchive.org/music/holiznacc0/lazy-summer-lofi-1/blue-skiesmp3/>。
 
 和宣传片不同的两点：
 
-- **长度按和弦写，不按拍。** 这首曲子每个和弦 3.375 秒，分镜长度一律是和弦的整数倍，换章节对着曲子换段落；这个对应关系由 `scripts/test/origin.test.mjs` 守着。
+- **长度按小节写，不按拍。** 这首曲子 82 拍/分，一小节 2.927 秒；成片把它从第 0 秒用到最后一个音，不剪接。分镜长度一律写成小节数，换章节对着曲子换段落（鼓进来、鼓停下、鼓回来、尾奏）；这个对应关系由 `scripts/test/origin.test.mjs` 守着。
 - **数字来自仓库自己。** `node scripts/origin-stats.mjs` 读的是 git 历史和 `docs/histories/`，需要完整的克隆。它只在更新数字时手动跑，渲染和预览都不依赖它。
 
 ## 它是怎么做出来的
