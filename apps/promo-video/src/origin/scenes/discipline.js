@@ -41,7 +41,7 @@ export const subtraction = {
     </div>
     <div class="o-less-side">
       <p class="o-less-day rise" style="${at(less.beat(1))}">这一天，删掉了三个功能。</p>
-      <blockquote class="o-less-quote rise" style="${at(less.beat(2))}">
+      <blockquote class="o-less-quote rise" style="${at(less.beat(1.5))}">
         终端只给人看，Agent 不需要读它；<br>每台电脑都自带终端。
         <cite>摘自《功能减法设计》里删除内置终端的理由</cite>
       </blockquote>
@@ -51,16 +51,17 @@ export const subtraction = {
 };
 
 // 三句话都摘自 docs/histories/2026-11/ 对应记录的「User Query」，省略处用省略号标出。
-// 六小节，一小节进来一样：三句话、第三句的后半句、回答、两条检查。
+// 七小节。前三小节还在曲子最轻的间奏里，放前两句，一句一小节半；第 3 小节曲子进全曲最响的一句，第三句在这里进来。
+// 之后一小节进来一样：第三句的后半句、回答、两条检查。
 // 第一句晚一点：上一个分镜这时还没淡完，同一块位置叠两行字会糊。
-const REST = crisis.beat(3);
-const ANSWER = crisis.beat(4);
-const CHECKS = crisis.beat(5);
+const REST = crisis.beat(4);
+const ANSWER = crisis.beat(5);
+const CHECKS = crisis.beat(6);
 const said = [
   ["11-05 00:03", "桌面端内存到 600 左右，用起来卡。"],
   ["11-07 06:00", "之前出现的 bug，为什么又出现了，没有写测试代码吗？"],
   ["11-07 19:00", "这次因为代码规范不到位，写出了近 3G 的内存占用……", "确保下次不再出现。"],
-].map(([time, text, rest], index) => ({ time, text, rest, start: crisis.beat(index, index === 0 ? 0.56 : 0) }));
+].map(([time, text, rest], index) => ({ time, text, rest, start: crisis.beat(index * 1.5, index === 0 ? 0.56 : 0) }));
 
 const quotes = said
   .map(({ time, text, rest, start }, index) => {

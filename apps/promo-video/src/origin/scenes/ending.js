@@ -33,7 +33,10 @@ const hours = Array.from({ length: 24 }, (_, index) => (index + 6) % 24)
   })
   .join("");
 
-const whoTrip = journey("who", [[0, 171], [who.beat(3, -0.2), 171], [who.beat(3, 0.3), 173], [who.duration, 173]]);
+// 右栏的柱子在第 1 小节排开，半小节后排完，出夜里那一句；最后一句再晚一小节，后面留一小节半给它。
+const NIGHT = who.beat(1.5);
+const OUTSIDE = who.beat(2.5);
+const whoTrip = journey("who", [[0, 171], [OUTSIDE - 0.2, 171], [OUTSIDE + 0.3, 173], [who.duration, 173]]);
 
 export const authors = {
   id: "who",
@@ -51,9 +54,9 @@ export const authors = {
       <h2 class="display-s">${lines(["开发者，只有一个。"], who.beat(1))}</h2>
       <p class="o-who-note rise" style="${at(who.beat(1, 0.2))}">本人的 ${ownerCommits} 次提交，按小时排开</p>
       <div class="o-hours fade" style="${at(who.beat(1, 0.2))}">${hours}</div>
-      <p class="o-who-night rise" style="${at(who.beat(2))}">其中 <b>${nightCommits}</b> 次，在晚上 8 点到早上 6 点之间。</p>
+      <p class="o-who-night rise" style="${at(NIGHT)}">其中 <b>${nightCommits}</b> 次，在晚上 8 点到早上 6 点之间。</p>
     </div>
-    <p class="o-who-last rise" style="${at(who.beat(3))}"><time>11-09 · 第 173 天</time>第一个外部贡献者的 PR 合入。</p>
+    <p class="o-who-last rise" style="${at(OUTSIDE)}"><time>11-09 · 第 173 天</time>第一个外部贡献者的 PR 合入。</p>
     ${axis(whoTrip)}`,
 };
 
@@ -104,11 +107,12 @@ export const lookingBack = {
     ${axis(tallyTrip)}`,
 };
 
-// 尾奏只有零星几个音：第 0.75 小节有一个，然后空大半小节，从第 1.5 小节起是最后一句。
-// 链接对前面那个音，那句话对最后一句的头一个音，配乐署名再晚半小节。
-const LINKS = closing.beat(0.75);
-const MOTTO = closing.beat(1.5);
-const CREDIT = closing.beat(2);
+// 曲子最后几下扫弦渐慢，不在小节线上，位置是按波形量的（从这张卡开始算）：第 0.33、0.76、0.9 小节各一下，
+// 第 1.2 小节是最后一个和弦，之后只剩余音。那句话对第一下，两行链接对后两下，最后一个和弦落下时出那句古话，配乐署名等余音里再出。
+const LINE = closing.beat(0.33);
+const LINKS = [closing.beat(0.76), closing.beat(0.9)];
+const MOTTO = closing.beat(1.2);
+const CREDIT = closing.beat(1.6);
 
 export const closingCard = {
   id: "closing",
@@ -118,13 +122,13 @@ export const closingCard = {
   html: `
     <div class="stage stage-peach stage-full"></div>
     <div class="o-closing">
-      <img class="o-closing-mark pop" style="${at(0.6)}" src="${markUrl}" alt="">
-      <h1 class="display o-closing-line">${lines(["它不是一次做对的，", "是一遍一遍<em>改</em>出来的。"], 0.9, { step: 0.22 })}</h1>
+      <img class="o-closing-mark pop" style="${at(0.4)}" src="${markUrl}" alt="">
+      <h1 class="display o-closing-line">${lines(["它不是一次做对的，", "是一遍一遍<em>改</em>出来的。"], LINE, { step: 0.22 })}</h1>
       <div class="o-closing-links">
-        <p class="rise" style="${at(LINKS)}"><span>开源</span><b>github.com/WakeUp-Jin/actspace-agent</b></p>
-        <p class="rise" style="${at(LINKS + 0.25)}"><span>官网</span><b>actspace.top</b></p>
+        <p class="rise" style="${at(LINKS[0])}"><span>开源</span><b>github.com/WakeUp-Jin/actspace-agent</b></p>
+        <p class="rise" style="${at(LINKS[1])}"><span>官网</span><b>actspace.top</b></p>
       </div>
       <p class="o-closing-motto fade" style="${at(MOTTO)}">「不诱于誉，不恐于诽，率道而行，端然正己。」</p>
-      <p class="o-closing-credit fade" style="${at(CREDIT)}">配乐：《${soundtrack.title}》 ${soundtrack.artist}（${soundtrack.license}）</p>
+      <p class="o-closing-credit fade" style="${at(CREDIT)}">配乐：《${soundtrack.title}》 ${soundtrack.artist} · ${soundtrack.site} · ${soundtrack.license}</p>
     </div>`,
 };

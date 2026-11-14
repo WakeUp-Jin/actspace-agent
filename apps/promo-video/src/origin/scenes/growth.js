@@ -6,9 +6,9 @@ const CHART = 360;
 const grow = timing("grow");
 const again = timing("again");
 
-// 头两周东西落得最密，所以前三小节只走到第 17 天，后面四小节走完剩下两个月，最后一小节留给那句结论。
-const TOTAL = grow.beat(7);
-const growTrip = journey("grow", [[0.5, 3], [grow.beat(3), 17], [TOTAL - 0.4, 83], [grow.duration, 83]]);
+// 曲子在这个分镜的第 4.5 小节换到第二段。头两周东西落得最密，前一段只走到第 17 天；后一段走完剩下两个月，最后一小节留给那句结论。
+const TOTAL = grow.beat(7.5);
+const growTrip = journey("grow", [[0.5, 3], [grow.beat(4.5), 17], [TOTAL - 0.4, 83], [grow.duration, 83]]);
 
 // [日期, 第几天, 做出了什么]。日期取自 docs/roadmap.md 的里程碑和 docs/histories/ 里对应的记录。
 const built = [
@@ -47,12 +47,15 @@ export const growing = {
     ${axis(growTrip, { chartHeight: CHART })}`,
 };
 
-// 头两小节走到第 116 天，钉住「它开始写自己」；第 140 天重新越过重写前的高度，落在第 4 小节上。
+// 四小节半。第 1 小节走到第 116 天，钉住「它开始写自己」；第 2.5 小节曲子这一句收住（按波形估，和弦回到主和弦，力度落下来），走到第 140 天，重新越过重写前的高度；
+// 剩下的日子走到第 4 小节，最后半小节停住。
+const SELF = again.beat(1);
+const OVER = again.beat(2.5);
 const againTrip = journey("again", [
   [0.4, 102],
-  [again.beat(2), 116],
-  [again.beat(4), 140],
-  [again.beat(5, 1.2), 164],
+  [SELF, 116],
+  [OVER, 140],
+  [again.beat(4), 164],
   [again.duration, 164],
 ]);
 
@@ -73,13 +76,13 @@ const rebuilt = [
 ];
 
 const oldPeak = `
-  <i class="o-chart-mark fade" style="${level(rewrite.codeBefore, CHART)}${at(again.beat(3))}">
+  <i class="o-chart-mark fade" style="${level(rewrite.codeBefore, CHART)}${at(again.beat(2))}">
     <span>重写前 ${rewrite.codeBefore.toLocaleString("en-US")} 行</span>
   </i>`;
 
 // 第 116 天钉在曲线上的一条标注，出现后一直留到分镜结束。出处：docs/histories/2026-09/20260913-1540-tool-result-interaction-fixes.md。
 const selfHosted = `
-  <div class="o-chart-pin pop" style="${point(116, CHART)}${at(again.beat(2))}">
+  <div class="o-chart-pin pop" style="${point(116, CHART)}${at(SELF)}">
     <div class="o-chart-note">
       <p class="o-chart-note-field"><span>Runtime</span><b>ActSpace desktop v2</b></p>
       <p class="o-chart-note-text"><time>09-13 · 第 116 天</time>开发记录的 Runtime 一栏，第一次写着 ActSpace 自己。</p>
@@ -93,9 +96,9 @@ export const growingAgain = {
   html: `
     <div class="grain"></div>
     ${chapter("05", "再长一遍")}
-    <h2 class="display-m o-growth-title">${lines(["然后，再长一遍。"], 0.2, { out: again.beat(4, -0.5) })}</h2>
-    <p class="o-growth-lead rise" style="${at(1.1, again.beat(4, -0.5))}"><b>${rewrite.packagesBefore} 个包 → ${rewrite.packagesAfter} 个包</b>这一次，后端是一组可以替换的插件。</p>
-    <h2 class="display-m o-growth-title">${lines(["38 天后，代码比重写前<em>还多</em>。"], again.beat(4))}</h2>
+    <h2 class="display-m o-growth-title">${lines(["然后，再长一遍。"], 0.2, { out: OVER - 0.5 })}</h2>
+    <p class="o-growth-lead rise" style="${at(1.1, OVER - 0.5)}"><b>${rewrite.packagesBefore} 个包 → ${rewrite.packagesAfter} 个包</b>这一次，后端是一组可以替换的插件。</p>
+    <h2 class="display-m o-growth-title">${lines(["38 天后，代码比重写前<em>还多</em>。"], OVER)}</h2>
     ${counter(againTrip.codeKeys)}
     <ul class="o-chips">${chips(againTrip, rebuilt)}</ul>
     ${chart(againTrip, { height: CHART, extra: oldPeak + selfHosted })}

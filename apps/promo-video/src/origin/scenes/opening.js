@@ -53,7 +53,7 @@ export const titleCard = {
       <img class="o-title-mark pop" style="${at(0.3)}" src="${markUrl}" alt="">
       <p class="o-title-dates rise" style="${at(0.45)}">2026-05-21<i></i>2026-11-12</p>
       <h1 class="o-title-word">${lines(["ActSpace 诞生记"], 0.55)}</h1>
-      <p class="o-title-sub">${lines([`一个开发者，和一群 Agent 的 ${totals.days} 天。`], title.beat(1))}</p>
-      <p class="o-title-foot fade" style="${at(title.beat(1, 0.9))}">根据仓库里的 ${totals.records} 篇开发记录和 git 提交历史整理</p>
+      <p class="o-title-sub">${lines([`一个开发者，和一群 Agent 的 ${totals.days} 天。`], title.beat(0.5))}</p>
+      <p class="o-title-foot fade" style="${at(title.beat(1))}">根据仓库里的 ${totals.records} 篇开发记录和 git 提交历史整理</p>
     </div>`,
 };

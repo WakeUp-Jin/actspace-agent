@@ -82,7 +82,7 @@ export const firstWords = {
     <div class="o-first-copy">
       <p class="eyebrow rise" style="${at(0.1)}"><b>2026-05-23 23:46</b><i></i>第 3 天</p>
       <h2 class="display">${lines(["第 3 天深夜，", "它<em>开口说话</em>了。"], 0.1)}</h2>
-      <p class="lead rise" style="${at(first.beat(1))}">接上真实模型，回复在窗口里一个字一个字流出来。</p>
+      <p class="lead rise" style="${at(first.beat(0.5))}">接上真实模型，回复在窗口里一个字一个字流出来。</p>
     </div>
     <div class="stage stage-mint o-first-stage">
       <div class="o-window o-first-window">
