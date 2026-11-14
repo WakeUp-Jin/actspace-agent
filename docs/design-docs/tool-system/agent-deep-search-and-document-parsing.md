@@ -238,6 +238,8 @@ Pages that could not be opened:
 
 用户中止时状态是 `aborted`，没有明细。超时和中止都不返回已经收到的部分结果。工具自己不重试。
 
+主 Agent 里，调用发出后工具被隐藏（第 5 节表格第三行），运行时在执行前就拒绝，失败码是 `TOOL_SCOPE_DENIED`，不是 `DEEP_SEARCH_UNAVAILABLE`。界面把这两个码显示成同一句话。`read_document` 同理。
+
 ### 7.7 Chat 模式
 
 `deep_search` 的定义声明 Chat、Plan、Agent 三个模式，Chat 里和 `web`、`generate_image` 并列出现。不可用时不出现，Chat 仍然是原来两个工具。

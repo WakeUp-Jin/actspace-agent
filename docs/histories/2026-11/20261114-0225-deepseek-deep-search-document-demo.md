@@ -30,3 +30,45 @@
 
 - `docs/design-docs/frontend/deep-search-and-document-demo.html`
 - `docs/design-docs/frontend/README.md`
+
+---
+
+## [2026-11-14 15:10] | 续：目标设计与执行计划
+
+### 📥 User Query
+
+> 六个待确认的点都按建议来；继续执行。
+
+按此前约定的流程（先梳理计划，审核后再执行），这一轮只写设计文档和执行计划，不写功能代码。
+
+### 🛠 Changes Overview
+
+**Scope:** `docs/`
+
+**Key Actions:**
+
+- **设计文档**：新增 `agent-deep-search-and-document-parsing.md`（目标设计，未实现）：接口事实与实测记录、两个工具的契约、对模型隐藏的机制、界面契约、数据外发与费用、否决的方案、已知限制。
+- **执行计划**：新增 `20261114-deepseek-deep-search-document-parsing/`，一份总览加三份子计划：P0 共享契约与两个空插件、PA 深度搜索、PB 文档解析。
+- **登记**：`design-docs/index.md`、`exec-plans/README.md` 各加一行；`frontend/README.md` 的 demo 清单把这份 demo 改成「已选定方向，功能尚未实现」。
+
+### 🧠 Design Intent (Why)
+
+- **不可用时从工具列表里消失，而不是留着报错。** 两个工具默认关、按量付费；留在列表里模型会去调，每次白白失败一轮，文档那边模型也不会改走本机 Python。做法是工具登记带一个同步的可见性判断，不动态注册、注销（注销会让已经发出的调用找不到工具，整个 Run 失败）。
+- **两处和用户确认时的表述有出入，没有擅自定。** Chat 里深度搜索写成独立工具而不是 `web` 的第三种动作；文档解析默认关。理由、代价和「如果坚持原表述要改什么」都写在计划总览里，等审核时定；两项各只影响一个任务。
+- **先落共享部分再拆两条线。** 两个工具互不依赖，但共用隐藏机制、设置字段和插件登记方式，所以拆成 P0 加两份可以单独验收的子计划。
+- **写计划时对着代码核对出来的几件事**（读代码不容易一眼看出，执行时会踩）：
+  - 历史里结果较大的工具行，调用事件的参数会被裁掉，只剩摘要和参数摘要。所以两种行在折叠状态下只能靠这两样显示，摘要的写法成了界面契约的一部分。
+  - `pnpm check:hot-path-reads` 查不出「在高频路径上取设置快照」，可用性读取要靠单元测试守住。
+  - 工具包的契约测试要求 `{}` 得到 `INVALID_ARGUMENTS` 且不调用 Host 端口；`read_document` 的参数结构没有必填项，「`path` 和 `artifact_id` 恰好一个」必须在插件里、调用端口之前检查。
+  - 一个可选插件只要有工具「部分在、部分不在」，Run 就启动失败，所以用了隐藏机制的插件只能贡献一个工具。
+
+### 📁 Files Modified
+
+- `docs/design-docs/tool-system/agent-deep-search-and-document-parsing.md`
+- `docs/exec-plans/active/20261114-deepseek-deep-search-document-parsing/README.md`
+- `docs/exec-plans/active/20261114-deepseek-deep-search-document-parsing/p0-foundation-and-settings.md`
+- `docs/exec-plans/active/20261114-deepseek-deep-search-document-parsing/pa-deep-search.md`
+- `docs/exec-plans/active/20261114-deepseek-deep-search-document-parsing/pb-document-parsing.md`
+- `docs/design-docs/index.md`
+- `docs/exec-plans/README.md`
+- `docs/design-docs/frontend/README.md`

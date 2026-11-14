@@ -27,7 +27,7 @@
 | 2 | [PA 深度搜索](pa-deep-search.md) | DeepSeek 流式请求与解析、Host 接线、设置开关、`Deep Search` 工具行、Chat 模式 | P0 | 设置里多一个开关；打开后模型能用深度搜索 |
 | 3 | [PB 文档解析](pb-document-parsing.md) | OCR 请求、本机类型检查、按页缓存、Host 接线、附件文件名、设置开关、输入框「+」、文档的 `Read` 行、提示词 | P0 | 设置里多一个开关；打开后模型能读文档，「+」能选文档 |
 
-PA 和 PB 只依赖 P0。两者都会改的文件只有四个：工具行投影 `tool-card.ts`、共享的预览类型和消息块类型、两处 Host 接线文件、同一个 mock 场景文件。默认串行：P0 → PA → PB。先做 PA 是因为它不碰附件和输入框，范围更小。
+PA 和 PB 只依赖 P0。两者都会改的文件只有这几个：工具行投影 `tool-card.ts`（各加一行分发）、失败文字 `tool-failure-text.ts`、共享的预览类型和消息块类型、两处 Host 接线文件、同一个 mock 场景文件。默认串行：P0 → PA → PB。先做 PA 是因为它不碰附件和输入框，范围更小。
 
 ## 已确认的决策（2026-11-14）
 
@@ -150,6 +150,7 @@ pnpm typecheck
 pnpm --filter @actspace/tool-runtime test
 pnpm --filter @actspace/agent test
 pnpm --filter @actspace/runtime test
+pnpm --filter @actspace/harness-control test
 pnpm --filter @actspace/tool-deep-search test
 pnpm --filter @actspace/tool-document test
 pnpm --filter @actspace/agent-host test
@@ -221,6 +222,7 @@ pnpm check:ipc-channels
 | `docs/design-docs/frontend/front-聊天输入框规范.md` | 「+」面板入口和「附件」一节 | PB |
 | `docs/design-docs/tool-system/agent-script-execution.md` | Office / PDF 提取那几行 | PB |
 | `docs/design-docs/execution-safety/agent-tool-permission-model.md` | 授权范围表加 `read_document` | PB |
+| `docs/design-docs/tool-system/agent-tool-output-references.md` | 附件元数据多了可选的文件名 | PB |
 | `docs/SECURITY.md` | 「不依赖服务商原生联网搜索」「不写 provider tool result 原文」两句 | PA、PB |
 | `docs/FRONTEND_VERIFICATION.md` | mock 场景表加一行 | PA |
 | 设计文档本身 | 实现的那一半改写成当前事实；全部完成后去掉标题里的「未实现」 | PA、PB |
