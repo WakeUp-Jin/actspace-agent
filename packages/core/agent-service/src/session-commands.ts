@@ -1,5 +1,5 @@
 import type { SessionHandle } from "@actspace/session-persistence";
-import { coreEvent, type RuntimeV2AgentMode, type RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import { coreEvent, type RuntimeAgentMode, type RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
 
 /** Shared durable mutations; callers reserve the Session scheduling slot first. */
 export class SessionModeWriter {
@@ -7,7 +7,7 @@ export class SessionModeWriter {
   assertAvailable(sessionId: string): void {
     if (this.#blocked.has(sessionId)) throw new Error("AGENT_MODE_RECOVERY_REQUIRED");
   }
-  async change(session: SessionHandle, mode: RuntimeV2AgentMode, snapshot: (session: SessionHandle) => RuntimeV2SessionSnapshot, source: string): Promise<RuntimeV2SessionSnapshot> {
+  async change(session: SessionHandle, mode: RuntimeAgentMode, snapshot: (session: SessionHandle) => RuntimeSessionSnapshot, source: string): Promise<RuntimeSessionSnapshot> {
     this.assertAvailable(session.header.sessionId);
     if (mode !== "chat" && mode !== "plan" && mode !== "agent") throw new Error("INVALID_AGENT_MODE");
     const before = snapshot(session);

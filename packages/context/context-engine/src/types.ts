@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionSurfaceView } from "@actspace/session-journal";
 import type { LlmMessage, LlmRequestOptions, LlmToolDefinition } from "@actspace/llm-service";
 
@@ -13,8 +13,8 @@ export type ContextRequest = {
   readonly model: string;
   readonly options: LlmRequestOptions;
 };
-export type SystemSection = { readonly id: string; readonly owner: string; readonly order: number; readonly content: RuntimeV2JsonValue; readonly provenance?: RuntimeV2JsonValue };
-export type SystemContext = { readonly sections: readonly SystemSection[]; readonly modelFacts: readonly RuntimeV2JsonValue[]; readonly modelFactSources?: readonly { readonly id: string; readonly owner: string }[] };
+export type SystemSection = { readonly id: string; readonly owner: string; readonly order: number; readonly content: RuntimeJsonValue; readonly provenance?: RuntimeJsonValue };
+export type SystemContext = { readonly sections: readonly SystemSection[]; readonly modelFacts: readonly RuntimeJsonValue[]; readonly modelFactSources?: readonly { readonly id: string; readonly owner: string }[] };
 export type ContextSupplement = { readonly id: string; readonly owner: string; readonly sourceEventSeq: number; readonly afterEventSeq: number; readonly text: string };
 export type ContextPathState = {
   readonly id: string;
@@ -38,8 +38,8 @@ export type ContextStatus = {
   readonly cycle: number;
   readonly paths: readonly ContextPathState[];
   readonly sleepingDirectory?: { readonly artifactId: string; readonly mediaType: string; readonly path: string };
-  readonly facts: readonly RuntimeV2JsonValue[];
-  readonly plugins: Readonly<Record<string, RuntimeV2JsonValue>>;
+  readonly facts: readonly RuntimeJsonValue[];
+  readonly plugins: Readonly<Record<string, RuntimeJsonValue>>;
 };
 /**
  * The current state view of a managed Context. The engine owns the long-lived

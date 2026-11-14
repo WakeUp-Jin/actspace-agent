@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 export const CHANNEL_SOURCES = [
-  { file: "packages/util/shared/src/runtime-v2/fixed-renderer.ts", constant: "RUNTIME_V2_FIXED_RENDERER_CHANNELS" },
+  { file: "packages/util/shared/src/runtime-v2/fixed-renderer.ts", constant: "RUNTIME_FIXED_RENDERER_CHANNELS" },
   { file: "packages/util/shared/src/resource-monitor.ts", constant: "RESOURCE_MONITOR_CHANNELS" },
   { file: "packages/util/shared/src/english-learning.ts", constant: "ENGLISH_LEARNING_CHANNELS" },
   { file: "packages/util/shared/src/host-protocol/connections.ts", constant: "HOST_IPC" },
@@ -45,7 +45,7 @@ export function parseChannelConstant(source, constant) {
 
 /**
  * 从契约源码取出「域.成员」→ `{ channel, kind }`。成员行形如 `member: invoke<…>(CH.key)`，
- * 其中 `CH` 可以是 import 时起的别名（`RUNTIME_V2_FIXED_RENDERER_CHANNELS as CH`）。
+ * 其中 `CH` 可以是 import 时起的别名（`RUNTIME_FIXED_RENDERER_CHANNELS as CH`）。
  * 引用了常量表里不存在的 key 时抛错，避免契约成员被静默跳过。
  */
 export function parseContract(source, constants) {

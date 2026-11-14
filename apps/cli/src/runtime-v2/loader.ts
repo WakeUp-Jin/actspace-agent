@@ -1,18 +1,18 @@
 import { createRequire } from "node:module";
 
-export type RuntimeV2Module = typeof import("@actspace/runtime");
+export type RuntimeModule = typeof import("@actspace/runtime");
 
-let loaded: Promise<RuntimeV2Module> | undefined;
-let override: (() => Promise<RuntimeV2Module>) | undefined;
+let loaded: Promise<RuntimeModule> | undefined;
+let override: (() => Promise<RuntimeModule>) | undefined;
 
-export function loadRuntimeV2(): Promise<RuntimeV2Module> {
+export function loadRuntimeModule(): Promise<RuntimeModule> {
   if (override) return override();
   loaded ??= Promise.resolve().then(() => {
-    const loader = createRequire(__filename)("@actspace/runtime/loader") as { loadRuntime?: () => Promise<RuntimeV2Module> };
+    const loader = createRequire(__filename)("@actspace/runtime/loader") as { loadRuntime?: () => Promise<RuntimeModule> };
     if (typeof loader.loadRuntime !== "function") throw new Error("@actspace/runtime/loader is unavailable.");
     return loader.loadRuntime();
   });
   return loaded;
 }
 
-export function setRuntimeV2LoaderForTest(loader?: () => Promise<RuntimeV2Module>): void { override = loader; loaded = undefined; }
+export function setRuntimeLoaderForTest(loader?: () => Promise<RuntimeModule>): void { override = loader; loaded = undefined; }

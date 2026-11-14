@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { isTrustedSurfaceView } from "@actspace/session-journal";
 import { freezeRequest } from "./request-snapshot.js";
 import type { Context } from "./types.js";
@@ -17,7 +17,7 @@ export function contextValue<T>(value: T): T {
   // 日志交出的对话视图入日志时已校验、深度冻结，直接引用（agent-spec-context-trusted-surface.md §3.2）。
   if (isTrustedSurfaceView(value)) return value;
   if (isPlainObject(value) && Object.values(value).some(isTrustedSurfaceView)) return withTrustedChildren(value) as T;
-  const frozen = freezeRequest(value as RuntimeV2JsonValue) as T;
+  const frozen = freezeRequest(value as RuntimeJsonValue) as T;
   remember(frozen);
   return frozen;
 }
@@ -28,7 +28,7 @@ export function contextValue<T>(value: T): T {
  */
 function withTrustedChildren(value: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
   const probe = Object.fromEntries(Object.entries(value).map(([key, child]) => [key, isTrustedSurfaceView(child) ? null : child]));
-  const checked = freezeRequest(probe as RuntimeV2JsonValue) as Readonly<Record<string, RuntimeV2JsonValue>>;
+  const checked = freezeRequest(probe as RuntimeJsonValue) as Readonly<Record<string, RuntimeJsonValue>>;
   const result = Object.freeze(Object.fromEntries(Object.keys(checked).map(key => [key, isTrustedSurfaceView(value[key]) ? value[key] : checked[key]])));
   remember(result);
   return result;

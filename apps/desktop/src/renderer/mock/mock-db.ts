@@ -12,10 +12,10 @@ import { encodeSessionLocator } from "@actspace/shared/session-locator";
 import { surfaceNode } from "@actspace/shared/runtime-v2";
 import { foldContextEstimate, viewContextEstimate } from "@actspace/shared";
 import type {
-  RuntimeV2DesktopSessionProjection,
-  RuntimeV2JsonValue,
-  RuntimeV2SessionObservation,
-  RuntimeV2SessionSnapshot,
+  RuntimeDesktopSessionProjection,
+  RuntimeJsonValue,
+  RuntimeSessionObservation,
+  RuntimeSessionSnapshot,
   SessionEventEnvelopeV1,
   TaskSnapshot,
 } from "@actspace/shared/runtime-v2";
@@ -23,7 +23,7 @@ import { MOCK_WORKSPACE_ROOT, mockAppSettings, mockBootstrapState, mockSettingsV
 
 /**
  * 浏览器 mock 的内存表。会话以「消息列表」保存，读取时投影成和 Electron 相同的
- * `RuntimeV2DesktopSessionProjection`，App 走的是同一条 `sessions.getPage` 路径。
+ * `RuntimeDesktopSessionProjection`，App 走的是同一条 `sessions.getPage` 路径。
  */
 
 export type MockMessage = {
@@ -35,18 +35,18 @@ export type MockMessage = {
   /** role 为 tool 时：一次已完成的工具调用，投影成 tool/call + tool/result 两条事件。 */
   readonly tool?: MockToolCall;
   /** role 为 assistant 时：这次请求的用量，紧跟着投影成一条带 usage 的 step/end。 */
-  readonly usage?: Readonly<Record<string, RuntimeV2JsonValue>>;
+  readonly usage?: Readonly<Record<string, RuntimeJsonValue>>;
   /** 原样写入的 journal 事件（如 background/task、delegation/*、收件箱领取），排在本条消息的事件之前。 */
   readonly events?: readonly MockRawEvent[];
 };
 
-export type MockRawEvent = { readonly type: string; readonly data: Readonly<Record<string, RuntimeV2JsonValue>>; readonly surface?: SessionEventEnvelopeV1["surface"] };
+export type MockRawEvent = { readonly type: string; readonly data: Readonly<Record<string, RuntimeJsonValue>>; readonly surface?: SessionEventEnvelopeV1["surface"] };
 
 export type MockToolCall = {
   readonly name: string;
-  readonly args: Readonly<Record<string, RuntimeV2JsonValue>>;
+  readonly args: Readonly<Record<string, RuntimeJsonValue>>;
   /** tool/result 的 data（除 callId 外），例如 status、summary、modelOutput、detail。 */
-  readonly result: Readonly<Record<string, RuntimeV2JsonValue>>;
+  readonly result: Readonly<Record<string, RuntimeJsonValue>>;
   /** 写在 tool/call 与 tool/result 之间的事件（如 `subagent/spawned`、`subagent/activation`），拿到这次调用的 callId。 */
   readonly during?: (callId: string) => readonly MockRawEvent[];
 };
@@ -267,7 +267,7 @@ export function journal(session: MockSession): SessionEventEnvelopeV1[] {
   return events;
 }
 
-export function snapshot(session: MockSession, throughJournalSeq: number): RuntimeV2SessionSnapshot {
+export function snapshot(session: MockSession, throughJournalSeq: number): RuntimeSessionSnapshot {
   const runs = new Set(session.messages.map((message) => message.agentRunId)).size;
   return {
     kind: "session-snapshot",
@@ -311,7 +311,7 @@ export function snapshot(session: MockSession, throughJournalSeq: number): Runti
   };
 }
 
-export function sessionProjection(session: MockSession): RuntimeV2DesktopSessionProjection {
+export function sessionProjection(session: MockSession): RuntimeDesktopSessionProjection {
   const events = journal(session);
   const throughJournalSeq = events.length - 1;
   const snap = snapshot(session, throughJournalSeq);
@@ -328,13 +328,13 @@ export function sessionProjection(session: MockSession): RuntimeV2DesktopSession
       providerUsage: snap.usage,
       sessionStats: snap.activity,
       // 和真实投影同一个折叠：mock 日志里的对话、压缩都会反映在估算上。
-      contextEstimate: viewContextEstimate(foldContextEstimate(events)) as unknown as RuntimeV2JsonValue,
+      contextEstimate: viewContextEstimate(foldContextEstimate(events)) as unknown as RuntimeJsonValue,
     },
     window: { events, fromSeq: 0, throughJournalSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0 },
   };
 }
 
-export function sessionObservation(session: MockSession): RuntimeV2SessionObservation {
+export function sessionObservation(session: MockSession): RuntimeSessionObservation {
   const projection = sessionProjection(session);
   const seq = projection.throughJournalSeq;
   return {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { projectTrajectoryWindow } from "@actspace/client/sessions";
-import type { RuntimeV2EventWindow, RuntimeV2TrajectoryNode, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import type { RuntimeEventWindow, RuntimeTrajectoryNode, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { buildTrajectorySnapshot, deriveLayout, flattenLayout, liveMessageIds, streamingCells } from "../trajectory";
 import { streamingLongFixture } from "../trajectory/fixtures";
 
@@ -10,7 +10,7 @@ const RUNS = 30;
 const WARMUP = 3;
 const ms = (value: { p50: number; p95: number }) => `p50 ${value.p50.toFixed(3)}ms / p95 ${value.p95.toFixed(3)}ms`;
 
-const toEvent = (node: RuntimeV2TrajectoryNode) => ({
+const toEvent = (node: RuntimeTrajectoryNode) => ({
   recordKind: "event", seq: node.eventSeq, type: node.eventType, eventVersion: 1, criticality: "required",
   time: node.time, source: node.source ?? { ownerPluginId: "fixture" }, data: node.data, surface: node.surface ?? null, provenance: {},
 }) as unknown as SessionEventEnvelopeV1;
@@ -30,7 +30,7 @@ function measure(run: () => void): { p50: number; p95: number } {
   return { p50: percentile(samples, 0.5), p95: percentile(samples, 0.95) };
 }
 
-const windowOf = (nodes: readonly RuntimeV2TrajectoryNode[]): RuntimeV2EventWindow => ({
+const windowOf = (nodes: readonly RuntimeTrajectoryNode[]): RuntimeEventWindow => ({
   events: nodes.map(toEvent), fromSeq: 0, throughJournalSeq: nodes.at(-1)!.eventSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0,
 });
 

@@ -1,6 +1,6 @@
 import { usableModelSummary, type ModelApi, type ModelsHostPort, type resolveModelPricing } from "@actspace/shared";
 
-export type DesktopRuntimeV2ResolvedModel = {
+export type DesktopRuntimeResolvedModel = {
   readonly key: string;
   readonly connectionId?: string;
   readonly pricingSnapshot?: import("@actspace/shared").ModelPricingSnapshot | null;
@@ -27,22 +27,22 @@ export type DesktopRuntimeV2ResolvedModel = {
   };
 };
 
-export type DesktopRuntimeV2ModelResolution =
-  | { readonly ok: true; readonly model: DesktopRuntimeV2ResolvedModel }
+export type DesktopRuntimeModelResolution =
+  | { readonly ok: true; readonly model: DesktopRuntimeResolvedModel }
   | { readonly ok: false; readonly message: string };
 
-export interface DesktopRuntimeV2ModelPort {
-  resolveAutoReviewModel?(requestedMain?: string | null): DesktopRuntimeV2ModelResolution;
-  resolveUtilityTaskModel?(requestedMain?: string | null): DesktopRuntimeV2ModelResolution;
+export interface DesktopRuntimeModelPort {
+  resolveAutoReviewModel?(requestedMain?: string | null): DesktopRuntimeModelResolution;
+  resolveUtilityTaskModel?(requestedMain?: string | null): DesktopRuntimeModelResolution;
   /** 用途表里的思考档位；null = 模型默认。 */
   purposeThinking?(purpose: "utility" | "autoReview" | "vision"): import("@actspace/shared").ThinkingLevel | null;
-  resolvePricing?(model: DesktopRuntimeV2ResolvedModel, apiModel: string): import("@actspace/shared").ModelPricingSnapshot | null;
-  resolveMainModel(requested?: string | null): DesktopRuntimeV2ModelResolution;
+  resolvePricing?(model: DesktopRuntimeResolvedModel, apiModel: string): import("@actspace/shared").ModelPricingSnapshot | null;
+  resolveMainModel(requested?: string | null): DesktopRuntimeModelResolution;
   /** 设置 › 模型 里能用的模型（`ModelStoreService.listUsableModels`）。 */
   listUsableModels?(purpose: "chat"): readonly import("@actspace/shared").UsableModelView[];
   /** 设置里的子智能体默认模型（ModelKey）；null = 跟随父会话。 */
   subagentDefaultModel?(): string | null;
-  resolveImageInspectionModel(): DesktopRuntimeV2ModelResolution;
+  resolveImageInspectionModel(): DesktopRuntimeModelResolution;
   getToolEnvironment(): {
     readonly deepseekFetchApiKey?: string;
     readonly searchCredentials: Partial<Record<"zhipu" | "tavily" | "tinyfish" | "exa" | "deepseek", string>>;
@@ -51,7 +51,7 @@ export interface DesktopRuntimeV2ModelPort {
 }
 
 /** 运行时和 legacy 兜底共用的计价参数。definition.pricing 是快照里算好的最终价（参考价已乘倍率）。 */
-export function customConnectionPricingInput(model: DesktopRuntimeV2ResolvedModel, apiModel: string): Parameters<typeof resolveModelPricing>[1] {
+export function customConnectionPricingInput(model: DesktopRuntimeResolvedModel, apiModel: string): Parameters<typeof resolveModelPricing>[1] {
   return {
     providerId: model.definition.provider,
     apiModel,
@@ -69,7 +69,7 @@ export function customConnectionPricingInput(model: DesktopRuntimeV2ResolvedMode
  * `actspace.host.models` for Desktop: the models usable for chat right now.
  * `subagentDefaultModel` reads the 子智能体默认模型 setting on every call (null = follow the parent session).
  */
-export function createDesktopModelsHostPort(models: Pick<DesktopRuntimeV2ModelPort, "listUsableModels" | "subagentDefaultModel">): ModelsHostPort {
+export function createDesktopModelsHostPort(models: Pick<DesktopRuntimeModelPort, "listUsableModels" | "subagentDefaultModel">): ModelsHostPort {
   return Object.freeze({
     listUsableModels: () => Object.freeze((models.listUsableModels?.("chat") ?? []).map(usableModelSummary)),
     subagentDefaultModel: () => models.subagentDefaultModel?.() ?? null,

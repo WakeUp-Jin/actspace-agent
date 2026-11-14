@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as C } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS as C } from "@actspace/shared/runtime-v2";
 import { encodeSessionLocator } from "@actspace/shared/session-locator";
 import { RemoteDesktopAdapter } from "../remote-hosts/desktop-adapter";
 import { createSessionGateway } from "../session-gateway";

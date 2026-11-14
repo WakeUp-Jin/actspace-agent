@@ -1,6 +1,6 @@
 import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
 import { resolveModelPricing, type ModelCatalogSnapshot } from "@actspace/shared";
-import { customConnectionPricingInput, type DesktopRuntimeV2ResolvedModel } from "./runtime-v2/model-port";
+import { customConnectionPricingInput, type DesktopRuntimeResolvedModel } from "./runtime-v2/model-port";
 import {
   DEFAULT_MODEL_KEY,
   listUsableModels,
@@ -53,7 +53,7 @@ export class ModelRuntimeService {
     private readonly catalog: () => ModelCatalogSnapshot = () => BUILTIN_MODEL_CATALOG,
   ) {}
 
-  resolvePricing(model: DesktopRuntimeV2ResolvedModel, apiModel: string) {
+  resolvePricing(model: DesktopRuntimeResolvedModel, apiModel: string) {
     return resolveModelPricing(this.catalog(), customConnectionPricingInput(model, apiModel));
   }
 

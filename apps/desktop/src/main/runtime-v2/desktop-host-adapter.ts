@@ -1,26 +1,26 @@
 import { createDesktopToolHostServices } from "./tool-host-services";
 import type { SpeechHostPort } from "@actspace/english-learning";
 import { join } from "node:path";
-import type { RuntimeV2HostCapability, RuntimeV2HostDescriptor, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeHostCapability, RuntimeHostDescriptor, RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { DesktopApprovalBroker } from "./approval-broker";
 import { DesktopArtifactStore } from "./artifact-store";
 import { BROWSER_TOOLS_HOST_PORT_ID } from "@actspace/tool-browser";
 import { createDesktopBrowserCapability } from "./browser-capability";
 import { DEFAULT_CREDENTIAL_REF, DesktopCredentialResolver } from "./credential-resolver";
 import { DesktopLegacyLlmAdapter } from "./legacy-llm-adapter";
-import type { RuntimeV2Module } from "./runtime-loader";
-import { createDesktopModelsHostPort, type DesktopRuntimeV2ModelPort } from "./model-port";
+import type { RuntimeModule } from "./runtime-loader";
+import { createDesktopModelsHostPort, type DesktopRuntimeModelPort } from "./model-port";
 import { MODELS_HOST_PORT_ID } from "@actspace/shared";
-import type { DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2BrowserPort, DesktopRuntimeV2Roots } from "./host-ports";
+import type { DesktopRuntimeApprovalPort, DesktopRuntimeBrowserPort, DesktopRuntimeRoots } from "./host-ports";
 
-export type DesktopRuntimeV2BootOptions = {
+export type DesktopRuntimeBootOptions = {
   readonly speech?: SpeechHostPort;
-  readonly module: RuntimeV2Module;
-  readonly roots: DesktopRuntimeV2Roots;
-  readonly models: DesktopRuntimeV2ModelPort;
-  readonly approvals: DesktopRuntimeV2ApprovalPort;
+  readonly module: RuntimeModule;
+  readonly roots: DesktopRuntimeRoots;
+  readonly models: DesktopRuntimeModelPort;
+  readonly approvals: DesktopRuntimeApprovalPort;
   /** Absent when the 操控浏览器 plugin is switched off: the Host reports no `browser` capability. */
-  readonly browser?: DesktopRuntimeV2BrowserPort;
+  readonly browser?: DesktopRuntimeBrowserPort;
   /** Plugin ids switched off for this process; global ones become an invocation `disable` patch, session ones skip the Harness entry. */
   readonly disabledPlugins?: readonly string[];
   /** Per plugin Entry id settings, passed to `bootProfileRuntime` as `pluginConfig` (merged over each manifest `config`). */
@@ -49,9 +49,9 @@ export type DesktopRuntimeV2BootOptions = {
   /** Optional forensic/legacy plugin config; default boot never reads plugins.json. */
 };
 
-export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions) {
+export async function bootDesktopRuntime(options: DesktopRuntimeBootOptions) {
   const browser = options.browser === undefined ? undefined : await createDesktopBrowserCapability(options.browser);
-  const capabilities: RuntimeV2HostCapability[] = [
+  const capabilities: RuntimeHostCapability[] = [
     "filesystem.read",
     "filesystem.write",
     "network",
@@ -61,7 +61,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
     "process",
     ...(browser?.ready ? ["browser" as const] : []),
   ];
-  const host: RuntimeV2HostDescriptor = Object.freeze({
+  const host: RuntimeHostDescriptor = Object.freeze({
     hostKind: "desktop",
     capabilityCeiling: Object.freeze(capabilities),
     runtimeContract: "actspace.runtime.v2",
@@ -167,11 +167,11 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
 }
 
 const DESKTOP_RENDERER_ALLOWLIST = new Map([
-  ["actspace.image-gallery", Object.freeze({ id: "actspace.image-gallery", schemaVersion: 1, validate: (props: RuntimeV2JsonValue) => isImageGalleryProps(props) })],
+  ["actspace.image-gallery", Object.freeze({ id: "actspace.image-gallery", schemaVersion: 1, validate: (props: RuntimeJsonValue) => isImageGalleryProps(props) })],
 ]);
 
-function isImageGalleryProps(value: RuntimeV2JsonValue): boolean {
+function isImageGalleryProps(value: RuntimeJsonValue): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const artifactIds = (value as Readonly<Record<string, RuntimeV2JsonValue>>).artifactIds;
+  const artifactIds = (value as Readonly<Record<string, RuntimeJsonValue>>).artifactIds;
   return Array.isArray(artifactIds) && artifactIds.length > 0 && artifactIds.length <= 10 && artifactIds.every((id) => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id));
 }

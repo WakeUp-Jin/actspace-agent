@@ -1,17 +1,17 @@
-import type { PermissionMode, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { PermissionMode, RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
 
-export type RuntimeV2PermissionMode = PermissionMode;
+export type RuntimePermissionMode = PermissionMode;
 
-export type RuntimeV2CliExitCode = 0 | 1 | 2 | 3 | 4 | 130 | 143;
-export type RuntimeV2CliOutputFormat = "text" | "json" | "jsonl";
+export type RuntimeCliExitCode = 0 | 1 | 2 | 3 | 4 | 130 | 143;
+export type RuntimeCliOutputFormat = "text" | "json" | "jsonl";
 
-export type RuntimeV2RunCommandOptions = {
+export type RuntimeRunCommandOptions = {
   readonly input?: string;
   readonly inputFile?: string;
   readonly workspace?: string;
-  readonly permissionMode: RuntimeV2PermissionMode;
+  readonly permissionMode: RuntimePermissionMode;
   readonly permissionModeExplicit?: boolean;
-  readonly outputFormat: RuntimeV2CliOutputFormat;
+  readonly outputFormat: RuntimeCliOutputFormat;
   readonly out?: string;
   readonly mock: boolean;
   readonly model?: string;
@@ -22,25 +22,25 @@ export type RuntimeV2RunCommandOptions = {
   readonly harness?: string;
 };
 
-export type RuntimeV2CliArtifactResult = {
+export type RuntimeCliArtifactResult = {
   readonly schemaVersion: 1;
   readonly ok: boolean;
   readonly status: "completed" | "failed" | "aborted" | "approval_required";
-  readonly exitCode: RuntimeV2CliExitCode;
+  readonly exitCode: RuntimeCliExitCode;
   readonly sessionId: string;
   readonly agentRunId: string;
   readonly taskId?: string;
   readonly outcome?: import("@actspace/shared/runtime-v2").RunOutcome;
-  readonly value?: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue;
+  readonly value?: import("@actspace/shared/runtime-v2").RuntimeJsonValue;
   readonly finalText: string;
-  readonly snapshot?: RuntimeV2SessionSnapshot;
+  readonly snapshot?: RuntimeSessionSnapshot;
   readonly model?: string;
   readonly provider?: string;
   readonly stopReason?: string;
   readonly totalUsage?: unknown;
   readonly messageCount: number;
   readonly eventCount: number;
-  readonly permissionMode: RuntimeV2PermissionMode;
+  readonly permissionMode: RuntimePermissionMode;
   readonly workspace: string;
   readonly startedAt: string;
   readonly endedAt: string;
@@ -50,7 +50,7 @@ export type RuntimeV2CliArtifactResult = {
   readonly harness?: { readonly harnessId: string; readonly revision: number; readonly executionDigest: string };
 };
 
-export type RuntimeV2RunCommandControl = {
+export type RuntimeRunCommandControl = {
   readonly sessionId: string;
   readonly agentRunId: string;
   readonly abort: () => boolean;

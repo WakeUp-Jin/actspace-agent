@@ -1,4 +1,4 @@
-import type { RuntimeV2SessionListItem } from "@actspace/shared/runtime-v2";
+import type { RuntimeSessionListItem } from "@actspace/shared/runtime-v2";
 import { ArrowUp, Folder } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { openNewSession } from "../../app/new-session";
@@ -15,7 +15,7 @@ import { ArchivedToggle } from "./ArchivedToggle";
 import { ListHeader } from "./ListHeader";
 import { SessionRow } from "./SessionRow";
 
-type Item = RuntimeV2SessionListItem;
+type Item = RuntimeSessionListItem;
 
 /** 首页：玻璃顶栏 + 分组会话列表（「需要处理」置顶，其余按时间）+ 底部新建入口。 */
 export function SessionListPane({ selectedSessionId }: { readonly selectedSessionId: string | null }) {

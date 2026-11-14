@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createMessageBlocks } from "@actspace/shared";
-import type { RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import type { RuntimeSessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { projectChatEvents } from "../sessions/chat.js";
 
-function snapshot(): RuntimeV2SessionSnapshot {
+function snapshot(): RuntimeSessionSnapshot {
   return {
     kind: "session-snapshot", schemaVersion: 1, sessionId: "s", createdAt: "2026-10-15T00:00:00.000Z", updatedAt: "2026-10-15T00:00:00.000Z", workspaceRoot: null, throughJournalSeq: 9, permissionMode: "default", accessState: "read-write",
     agentForm: "agent", metadata: { title: null, pinned: false, archived: false },

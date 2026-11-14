@@ -7,7 +7,7 @@ import { FixedRendererStreamAdapter } from "../runtime-v2/fixed-renderer-stream-
 import { executionEnvironment } from "../runtime-v2/approval-broker";
 import { randomUUID } from "node:crypto";
 import type { BrowserWindow } from "electron";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as C, mergePieces, rewindErrorMessage, type LiveOutputPage, type LiveOutputPiece, type RuntimeV2SessionListItem, type RuntimeV2SessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS as C, mergePieces, rewindErrorMessage, type LiveOutputPage, type LiveOutputPiece, type RuntimeSessionListItem, type RuntimeSessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
 import type { SessionListItem, SessionListPage, SessionListPageInput } from "@actspace/shared";
 import { HOST_IPC, isRecord, type SessionRef } from "@actspace/shared/host-protocol";
 import { RemoteSessionRouter, attachmentUploadSources, parseRemoteSessionKey, remoteSessionKey } from "./session-router";
@@ -123,7 +123,7 @@ export class RemoteDesktopAdapter {
     this.#subscribed.set(key, "");
     const sessionId = remoteSessionKey(ref), buffered: (() => void)[] = []; this.#replaying.set(sessionId, buffered);
     try {
-      const value = await this.#router.call(ref, "sessions.observe") as { subscriptionId: string; cursor: number; snapshot: { observation: RuntimeV2SessionObservation; tasks: TaskSnapshot; approvals: import("@actspace/shared/runtime-v2").ApprovalRequest[]; output: { runId: string; revision: number } | null } };
+      const value = await this.#router.call(ref, "sessions.observe") as { subscriptionId: string; cursor: number; snapshot: { observation: RuntimeSessionObservation; tasks: TaskSnapshot; approvals: import("@actspace/shared/runtime-v2").ApprovalRequest[]; output: { runId: string; revision: number } | null } };
       if (this.#activeKey !== key) {
         await this.hosts.call(ref.hostId, "sessions.unobserve", { subscriptionId: value.subscriptionId });
         this.#subscribed.delete(key); return;
@@ -174,7 +174,7 @@ export class RemoteDesktopAdapter {
     await this.#cacheReady;
     const connections = this.hosts.list();
     await Promise.all(connections.filter(host => host.state === "connected").map(async host => {
-      try { await this.#cache.setList(host.hostId, await this.hosts.call(host.hostId, "sessions.list", {}) as RuntimeV2SessionListItem[]); }
+      try { await this.#cache.setList(host.hostId, await this.hosts.call(host.hostId, "sessions.list", {}) as RuntimeSessionListItem[]); }
       catch { /* preserve last known list on connection failure */ }
     }));
     return this.#cache.list(connections).filter(({ session }) => session.metadata.archived === archived && !isDelegatedSession(session.lineage)).map(({ hostId, hostName, connectionState, session }) => ({
@@ -222,7 +222,7 @@ export class RemoteDesktopAdapter {
       const connected = this.hosts.list().find(host => host.hostId === ref.hostId)?.state === "connected";
       if (!connected) { const cached = await this.#cache.readObservation(ref); if (!cached) throw new Error("Host is offline; no cached history"); return cached; }
       if (this.#activeKey === JSON.stringify([ref.hostId, ref.sessionId])) await this.#observe(ref);
-      const value = await call("sessions.page", input.beforeSeq === undefined ? {} : { beforeSeq: input.beforeSeq }) as RuntimeV2SessionObservation;
+      const value = await call("sessions.page", input.beforeSeq === undefined ? {} : { beforeSeq: input.beforeSeq }) as RuntimeSessionObservation;
       if (input.beforeSeq === undefined) await this.#cache.setObservation(ref, value); return value;
     };
     switch (channel) {

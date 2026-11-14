@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { coreEvent, INBOX_WAKE_SOURCES, isInboxSource, type CoreInboxNotice, type CoreInboxTarget, type InboxSourceId, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { coreEvent, INBOX_WAKE_SOURCES, isInboxSource, type CoreInboxNotice, type CoreInboxTarget, type InboxSourceId, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionHandle } from "@actspace/session-persistence";
 
 export type InboxTarget = CoreInboxTarget;
@@ -9,13 +9,13 @@ export type InboxSource = InboxSourceId;
 export type InboxEnqueueOptions = { readonly source?: Exclude<InboxSource, "steer">; readonly senderId?: string };
 /** Display metadata for a background task notification; the model reads only `content`. */
 export type InboxNotice = CoreInboxNotice;
-export type InboxItem = { readonly messageId: string; readonly target: InboxTarget; readonly content: RuntimeV2JsonValue; readonly enqueuedSeq: number; readonly source?: InboxSource; readonly senderId?: string; readonly notice?: InboxNotice };
+export type InboxItem = { readonly messageId: string; readonly target: InboxTarget; readonly content: RuntimeJsonValue; readonly enqueuedSeq: number; readonly source?: InboxSource; readonly senderId?: string; readonly notice?: InboxNotice };
 
 const INBOX_STATE = Symbol("inbox-state");
 
 export class MainAgentInbox {
   constructor(private readonly session: SessionHandle) {}
-  async enqueue(content: RuntimeV2JsonValue, notice?: InboxNotice, options: InboxEnqueueOptions = {}): Promise<InboxItem> {
+  async enqueue(content: RuntimeJsonValue, notice?: InboxNotice, options: InboxEnqueueOptions = {}): Promise<InboxItem> {
     const messageId = randomUUID();
     const target = "next-step";
     const source = options.source ?? "task_notification";
@@ -61,9 +61,9 @@ export class MainAgentInbox {
   async discardAll(reason: string): Promise<void> { for (const item of this.pending()) if (!isWakeSource(item.source)) await this.discard(item.messageId, reason); }
 }
 
-function record(value: RuntimeV2JsonValue): Readonly<Record<string, RuntimeV2JsonValue>> { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {}; }
-function text(value: RuntimeV2JsonValue | undefined): string | null { return typeof value === "string" ? value : null; }
-function inboxNotice(value: RuntimeV2JsonValue | undefined): InboxNotice | undefined {
+function record(value: RuntimeJsonValue): Readonly<Record<string, RuntimeJsonValue>> { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : {}; }
+function text(value: RuntimeJsonValue | undefined): string | null { return typeof value === "string" ? value : null; }
+function inboxNotice(value: RuntimeJsonValue | undefined): InboxNotice | undefined {
   const data = record(value ?? null), taskId = text(data.taskId), kind = text(data.kind), title = text(data.title), status = text(data.status);
   return taskId === null || kind === null || title === null || status === null ? undefined : { taskId, kind, title, status };
 }

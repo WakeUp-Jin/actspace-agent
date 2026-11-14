@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RuntimeV2TrajectoryNode, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeTrajectoryNode, RuntimeTrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import {
   buildTrajectorySnapshot,
   cellStatus,
@@ -16,9 +16,9 @@ import {
 } from "../trajectory";
 
 let seq = 0;
-const node = (eventType: string, time: string, data: Record<string, unknown>, callId: string | null = null): RuntimeV2TrajectoryNode => {
+const node = (eventType: string, time: string, data: Record<string, unknown>, callId: string | null = null): RuntimeTrajectoryNode => {
   seq += 1;
-  return { key: `s:${seq}`, sessionId: "s", eventSeq: seq, eventType, time: `2026-10-14T00:00:${time}Z`, kind: "other", state: "observed", callId, data } as RuntimeV2TrajectoryNode;
+  return { key: `s:${seq}`, sessionId: "s", eventSeq: seq, eventType, time: `2026-10-14T00:00:${time}Z`, kind: "other", state: "observed", callId, data } as RuntimeTrajectoryNode;
 };
 const t1 = { turnId: "t1" };
 const nodes = [
@@ -47,7 +47,7 @@ const nodes = [
   node("step/start", "10.200", { turnId: "t2", stepId: "st3" }),
   node("request/header", "10.200", { turnId: "t2", stepId: "st3", requestId: "r3" }),
 ];
-const snapshot: RuntimeV2TrajectorySnapshot = { kind: "trajectory", schemaVersion: 1, sessionId: "s", throughJournalSeq: seq, nodes };
+const snapshot: RuntimeTrajectorySnapshot = { kind: "trajectory", schemaVersion: 1, sessionId: "s", throughJournalSeq: seq, nodes };
 const layout = () => deriveLayout(buildTrajectorySnapshot(snapshot));
 
 describe("trajectory layout", () => {

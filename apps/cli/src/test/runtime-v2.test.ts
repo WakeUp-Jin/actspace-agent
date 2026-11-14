@@ -2,16 +2,16 @@ import { mkdtemp, readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { setRuntimeV2LoaderForTest } from "../runtime-v2/loader";
-import { runV2Command } from "../runtime-v2/run";
+import { setRuntimeLoaderForTest } from "../runtime-v2/loader";
+import { runCommand } from "../runtime-v2/run";
 
-beforeEach(() => { setRuntimeV2LoaderForTest(() => import("@actspace/runtime")); });
-afterEach(() => { setRuntimeV2LoaderForTest(); });
+beforeEach(() => { setRuntimeLoaderForTest(() => import("@actspace/runtime")); });
+afterEach(() => { setRuntimeLoaderForTest(); });
 
 describe("Runtime v2 CLI candidate", () => {
   it("keeps default run ephemeral and persists only when requested", async () => {
     const workspace = await mkdtemp(join(tmpdir(), "actspace-v2-cli-work-")); const dataDir = await mkdtemp(join(tmpdir(), "actspace-v2-cli-data-"));
-    const ephemeral = await runV2Command({ input: "hello", workspace, dataDir, permissionMode: "default", outputFormat: "json", mock: true });
+    const ephemeral = await runCommand({ input: "hello", workspace, dataDir, permissionMode: "default", outputFormat: "json", mock: true });
     expect(ephemeral).toMatchObject({ ok: true, persistent: false, finalText: "Mock ActSpace Agent response." });
     expect(ephemeral).toMatchObject({
       outcome: "completed",
@@ -29,7 +29,7 @@ describe("Runtime v2 CLI candidate", () => {
     expect(ephemeral.messageCount).toBe(ephemeral.snapshot?.messages.length);
     // Host Harness code and selection persist independently of ephemeral conversation data.
     expect(await readdir(dataDir)).toEqual(["harness-artifacts", "harness-state"]);
-    const persistent = await runV2Command({ input: "first", workspace, dataDir, permissionMode: "full-access", permissionModeExplicit: true, outputFormat: "json", mock: true, persist: true });
+    const persistent = await runCommand({ input: "first", workspace, dataDir, permissionMode: "full-access", permissionModeExplicit: true, outputFormat: "json", mock: true, persist: true });
     expect(persistent.persistent).toBe(true);
     expect(persistent.permissionMode).toBe("full-access");
     const journal = await readFile(join(dataDir, "sessions-v2", persistent.sessionId, "journal.jsonl"), "utf8");
@@ -47,7 +47,7 @@ describe("Runtime v2 CLI candidate", () => {
     expect(eventTypes).toContain("user/message");
     expect(eventTypes.indexOf("user/message")).toBeLessThan(eventTypes.indexOf("turn/start"));
     expect(eventTypes).toContain("plugin/actspace.agent-service/run");
-    const resumed = await runV2Command({ input: "second", workspace, dataDir, permissionMode: "default", outputFormat: "json", mock: true, resume: persistent.sessionId });
+    const resumed = await runCommand({ input: "second", workspace, dataDir, permissionMode: "default", outputFormat: "json", mock: true, resume: persistent.sessionId });
     expect(resumed.sessionId).toBe(persistent.sessionId);
     expect(resumed.permissionMode).toBe("full-access");
     expect(resumed.messageCount).toBeGreaterThan(persistent.messageCount);

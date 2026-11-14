@@ -1,5 +1,5 @@
 import type { SessionListItem, SessionListPage, SessionListPageInput } from './ipc';
-import type { RuntimeV2BrowseList } from './runtime-v2';
+import type { RuntimeBrowseList } from './runtime-v2';
 
 /** Only explicit delegation creates a child session. Forks and legacy origins stay accessible. */
 export function isDelegatedSession(lineage: unknown): boolean {
@@ -29,7 +29,7 @@ export function sideChatParentId(lineage: unknown): string | undefined {
 }
 
 /** Side chats stay out of the page and only show up as their parent's count. */
-export function paginateSessionSummaries(result: RuntimeV2BrowseList, input: SessionListPageInput): SessionListPage {
+export function paginateSessionSummaries(result: RuntimeBrowseList, input: SessionListPageInput): SessionListPage {
   const grouped = new Map<string, SessionListItem[]>();
   const sideChatCounts = new Map<string, number>();
   for (const item of result.items) {

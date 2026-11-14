@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCoreCodecRegistry, createSessionHeader, SessionJournal } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { SessionReadModel } from "./durable-session.js";
 
 describe("durable usage summary", () => {
@@ -8,7 +8,7 @@ describe("durable usage summary", () => {
     const codecs = createCoreCodecRegistry();
     const header = createSessionHeader({ sessionId: "context", createdAt: "2026-09-07T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: codecs.digest } });
     const journal = new SessionJournal({ registry: codecs });
-    const append = (type: string, data: RuntimeV2JsonValue) => journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
+    const append = (type: string, data: RuntimeJsonValue) => journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
     append("turn/start", { turnId: "t" });
     append("step/start", { turnId: "t", stepId: "s" });
     journal.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "u", content: "hello" }, surface: { kind: "append" } });
@@ -32,7 +32,7 @@ describe("durable usage summary", () => {
     const header = createSessionHeader({ sessionId: "context-changes", createdAt: "2026-09-07T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: codecs.digest } });
     const journal = new SessionJournal({ registry: codecs });
     const model = new SessionReadModel(header, codecs);
-    const append = (type: string, data: RuntimeV2JsonValue) => model.apply(journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null }));
+    const append = (type: string, data: RuntimeJsonValue) => model.apply(journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null }));
     expect(Object.keys(append("turn/start", { turnId: "t" })?.values ?? {})).not.toContain("contextEstimate");
     expect(Object.keys(append("step/start", { turnId: "t", stepId: "s" })?.values ?? {})).not.toContain("contextEstimate");
     const header1 = append("request/header", { requestId: "r", turnId: "t", stepId: "s", contextWindow: 1000 });
@@ -48,7 +48,7 @@ describe("durable usage summary", () => {
     const registry = createCoreCodecRegistry();
     const header = createSessionHeader({ sessionId: "usage", createdAt: "2026-09-07T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: registry.digest } });
     const journal = new SessionJournal({ registry });
-    const append = (type: string, data: RuntimeV2JsonValue) => journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
+    const append = (type: string, data: RuntimeJsonValue) => journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
     const usage = { inputTokens: 100, outputTokens: 20, cacheReadTokens: 50, cacheWriteTokens: 0, reasoningTokens: 10, cost: 0, costCurrency: "USD" };
     append("turn/start", { turnId: "t" }); append("step/start", { turnId: "t", stepId: "s" });
     append("request/header", { requestId: "r", turnId: "t", stepId: "s" });
@@ -87,7 +87,7 @@ it.each([undefined, "auto", "manual", "session"] as const)("replays tool audit w
   const registry = createCoreCodecRegistry();
   const header = createSessionHeader({ sessionId: "audit", createdAt: "2026-10-18T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: registry.digest } });
   const journal = new SessionJournal({ registry });
-  const append = (type: string, data: RuntimeV2JsonValue) => journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
+  const append = (type: string, data: RuntimeJsonValue) => journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
   append("turn/start", { turnId: "t" });
   append("step/start", { turnId: "t", stepId: "s" });
   append("tool/call", { callId: "c", name: "bash", args: { command: "ls" } });

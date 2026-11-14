@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { MockClock } from "../clock";
 import type { MockHandlers } from "../handlers";
 import { appendMockMessage, type MockDb, type MockSession } from "../mock-db";
@@ -34,7 +34,7 @@ function appendTool(
   db: MockDb,
   session: MockSession,
   runId: string,
-  args: Record<string, RuntimeV2JsonValue>,
+  args: Record<string, RuntimeJsonValue>,
   stdout: string,
   durationMs: number,
 ): void {

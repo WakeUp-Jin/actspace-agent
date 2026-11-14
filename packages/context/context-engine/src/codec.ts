@@ -1,5 +1,5 @@
 import type { EventCodec } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 
 export const CONTEXT_OWNER = "actspace.context";
 export const SUPPLEMENT_EVENT = "plugin/actspace.context/supplement";
@@ -10,7 +10,7 @@ export type SupplementOperation =
   | { readonly op: "remove"; readonly id: string; readonly owner: string }
   | { readonly op: "bind"; readonly id: string; readonly owner: string; readonly requestId: string; readonly stepId: string };
 
-function validateSupplement(data: RuntimeV2JsonValue): void {
+function validateSupplement(data: RuntimeJsonValue): void {
   const value = record(data);
   string(value.id); string(value.owner);
   if (value.op === "remove") return;
@@ -19,10 +19,10 @@ function validateSupplement(data: RuntimeV2JsonValue): void {
   if (!["persistent", "turn", "request"].includes(String(value.lifetime))) throw new Error("Invalid supplement lifetime.");
   if (value.lifetime !== "persistent") string(value.turnId);
 }
-function validateState(data: RuntimeV2JsonValue): void {
+function validateState(data: RuntimeJsonValue): void {
   const value = record(data);
   if (value.op === "initialize") { integer(value.throughSeq, -1); string(value.sessionId); return; }
-  if (value.op === "fact") { integer(value.sourceSeq); string(value.callId); string(value.time); paths(value.paths); for (const path of value.paths as readonly RuntimeV2JsonValue[]) if (typeof record(path).read !== "boolean") throw new Error("Invalid read fact."); return; }
+  if (value.op === "fact") { integer(value.sourceSeq); string(value.callId); string(value.time); paths(value.paths); for (const path of value.paths as readonly RuntimeJsonValue[]) if (typeof record(path).read !== "boolean") throw new Error("Invalid read fact."); return; }
   if (value.op === "candidate") {
     string(value.compactionId); integer(value.cycle); integer(value.batch); integer(value.total, 1); paths(value.paths);
     if (Number(value.batch) >= Number(value.total) || Buffer.byteLength(JSON.stringify(value), "utf8") > 256 * 1024) throw new Error("Invalid Context candidate batch size.");
@@ -45,9 +45,9 @@ export const codecs: readonly EventCodec[] = [
   { type: SUPPLEMENT_EVENT, ownerPluginId: CONTEXT_OWNER, currentVersion: 1, criticality: "required", validate: validateSupplement, validateRelations: noSurface },
   { type: STATE_EVENT, ownerPluginId: CONTEXT_OWNER, currentVersion: 1, criticality: "required", validate: validateState, validateRelations: noSurface },
 ];
-function record(value: RuntimeV2JsonValue): Readonly<Record<string, RuntimeV2JsonValue>> {
+function record(value: RuntimeJsonValue): Readonly<Record<string, RuntimeJsonValue>> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error("Context event data must be an object.");
-  return value as Readonly<Record<string, RuntimeV2JsonValue>>;
+  return value as Readonly<Record<string, RuntimeJsonValue>>;
 }
 function string(value: unknown): void { if (typeof value !== "string" || !value) throw new Error("Context event identity must be non-empty."); }
 
@@ -56,5 +56,5 @@ function paths(value: unknown): void {
   if (!Array.isArray(value)) throw new Error("Context paths must be an array.");
   for (const item of value) { const path = record(item); string(path.path); string(path.owner); if (path.history !== undefined) history(path.history); }
 }
-function history(value: unknown): void { const item = record(value as RuntimeV2JsonValue); string(item.sessionId); if (!Array.isArray(item.sourceEventSeqs)) throw new Error("Invalid history source seqs."); item.sourceEventSeqs.forEach(seq => { integer(seq); }); }
+function history(value: unknown): void { const item = record(value as RuntimeJsonValue); string(item.sessionId); if (!Array.isArray(item.sourceEventSeqs)) throw new Error("Invalid history source seqs."); item.sourceEventSeqs.forEach(seq => { integer(seq); }); }
 function noSurface({ candidate }: import("@actspace/session-journal").EventCodecRelationContext): void { if (candidate.surface !== null) throw new Error("Context events cannot change Session Surface."); }

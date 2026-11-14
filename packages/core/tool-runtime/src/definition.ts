@@ -1,10 +1,10 @@
-import type { RuntimeV2AgentMode } from "@actspace/shared/runtime-v2";
+import type { RuntimeAgentMode } from "@actspace/shared/runtime-v2";
 import { createHash } from "node:crypto";
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
 /** Agent modes a tool declares itself visible in; a mode it leaves out never sees it (fail closed). */
-export type ToolMode = RuntimeV2AgentMode;
+export type ToolMode = RuntimeAgentMode;
 const TOOL_MODES: ReadonlySet<string> = new Set<ToolMode>(["chat", "plan", "agent"]);
 
 export type ToolEffect = {

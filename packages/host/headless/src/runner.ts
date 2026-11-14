@@ -1,8 +1,8 @@
 import { SessionModeWriter, setInitialSessionTitle } from "@actspace/agent-service";
-import type { RuntimeV2AgentMode, RuntimeV2JsonValue, RuntimeV2RunTurnResponse, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeAgentMode, RuntimeJsonValue, RuntimeRunTurnResponse, RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
 type HeadlessRunService = {
   initialize(sessionId: string): Promise<void>;
-  run(sessionId: string, input: { content: RuntimeV2JsonValue; model?: string }, signal?: AbortSignal): Promise<RuntimeV2RunTurnResponse>;
+  run(sessionId: string, input: { content: RuntimeJsonValue; model?: string }, signal?: AbortSignal): Promise<RuntimeRunTurnResponse>;
   service: Pick<import("@actspace/agent-service").AgentService, "exclusive" | "snapshot" | "resume">;
 };
 import type { SessionHandle } from "@actspace/session-persistence";
@@ -14,19 +14,19 @@ export type HeadlessSessionService = {
   readonly create: (sessionId?: string, cwd?: string) => Promise<SessionHandle>;
   readonly createEphemeral: (sessionId?: string, cwd?: string) => Promise<SessionHandle>;
   readonly resume: (sessionId: string) => Promise<SessionHandle>;
-  readonly snapshot: (session: SessionHandle) => RuntimeV2SessionSnapshot;
+  readonly snapshot: (session: SessionHandle) => RuntimeSessionSnapshot;
 };
 
 export type HeadlessHostPort = {
   readonly enabled?: true;
-  readonly content: RuntimeV2JsonValue;
+  readonly content: RuntimeJsonValue;
   readonly persistent: boolean;
   readonly workspaceRoot?: string;
   readonly sessionId?: string;
   readonly title?: string;
   readonly model?: string;
   /** Optional API mode; CLI leaves this unset and resumes the saved mode. */
-  readonly mode?: RuntimeV2AgentMode;
+  readonly mode?: RuntimeAgentMode;
   readonly signal?: AbortSignal;
   readonly onSessionCreated?: (sessionId: string, abort: () => boolean) => void;
   /** DSH-style bounded exit request; the launcher decides when to terminate. */
@@ -39,7 +39,7 @@ export const HEADLESS_HOST_PORT = serviceKey<HeadlessHostPort | DisabledHeadless
 export const HEADLESS_SESSIONS_VIEW = serviceView<HeadlessSessionService>(ACTSPACE_SERVICE_IDS.sessionRuntime);
 export const HEADLESS_AGENT_RUNTIME_VIEW = serviceView<{ readonly runs: HeadlessRunService }>(ACTSPACE_SERVICE_IDS.agentRuntime);
 
-export type HeadlessRunResult = RuntimeV2RunTurnResponse & { readonly session: SessionHandle };
+export type HeadlessRunResult = RuntimeRunTurnResponse & { readonly session: SessionHandle };
 
 export class HeadlessRunner {
   readonly #modeWriter = new SessionModeWriter();

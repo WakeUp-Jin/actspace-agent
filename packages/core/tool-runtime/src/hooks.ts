@@ -1,16 +1,16 @@
 import type { WaterfallHook } from "@actspace/cordis-adapter";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext } from "./executor.js";
 
 /** `tools/pre-execute` 的 payload：参数已按工具的 schema 物化。 */
 export type ToolPreExecutePayload = {
   readonly callId: string;
   readonly name: string;
-  readonly args: Readonly<Record<string, RuntimeV2JsonValue>>;
+  readonly args: Readonly<Record<string, RuntimeJsonValue>>;
   readonly definitionDigest: string;
 };
 /** `tools/pre-execute` 的结果。给了 `args` 就换掉参数；新参数重新过 schema 校验，再走权限和审批。 */
-export type ToolArgumentsPatch = { readonly args?: Readonly<Record<string, RuntimeV2JsonValue>> };
+export type ToolArgumentsPatch = { readonly args?: Readonly<Record<string, RuntimeJsonValue>> };
 
 /** `tools/execute` 的 payload：`execute` 是工具体的执行入口，监听器可以包住它。 */
 export type ToolExecutePayload = { readonly context: ToolExecutionContext; readonly execute: () => Promise<ToolBodyResult> };

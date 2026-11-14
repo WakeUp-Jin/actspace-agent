@@ -1,13 +1,13 @@
-import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue, RuntimeTrajectoryNode } from "@actspace/shared/runtime-v2";
 import type { TrajectorySourceBlock } from "./contract";
 
 /** Field readers shared by the builder and the live split. */
-export type Data = Readonly<Record<string, RuntimeV2JsonValue>>;
+export type Data = Readonly<Record<string, RuntimeJsonValue>>;
 
-export const asRecord = (value: RuntimeV2JsonValue | undefined): Data =>
+export const asRecord = (value: RuntimeJsonValue | undefined): Data =>
   value !== null && typeof value === "object" && !Array.isArray(value) ? value as Data : {};
-export const dataOf = (node: RuntimeV2TrajectoryNode): Data => asRecord(node.data);
-export const text = (value: RuntimeV2JsonValue | undefined): string | null => {
+export const dataOf = (node: RuntimeTrajectoryNode): Data => asRecord(node.data);
+export const text = (value: RuntimeJsonValue | undefined): string | null => {
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   return null;
@@ -19,7 +19,7 @@ export const pick = (data: Data, keys: readonly string[]): string | null => {
   }
   return null;
 };
-export const json = (value: RuntimeV2JsonValue | undefined, max = 240): string => {
+export const json = (value: RuntimeJsonValue | undefined, max = 240): string => {
   if (value === undefined || value === null) return "";
   if (typeof value === "string") return value;
   try {
@@ -30,7 +30,7 @@ export const json = (value: RuntimeV2JsonValue | undefined, max = 240): string =
   }
 };
 
-export function valueText(value: RuntimeV2JsonValue | undefined): string {
+export function valueText(value: RuntimeJsonValue | undefined): string {
   if (typeof value === "string") return value;
   if (value === undefined || value === null) return "";
   if (Array.isArray(value)) return value.map(item => valueText(item)).filter(Boolean).join("\n\n");
@@ -38,7 +38,7 @@ export function valueText(value: RuntimeV2JsonValue | undefined): string {
   return pick(data, ["text", "content", "message", "summary", "delta"]) ?? json(value);
 }
 
-export function sourceBlocks(value: RuntimeV2JsonValue | undefined, fallbackType = "text"): readonly TrajectorySourceBlock[] {
+export function sourceBlocks(value: RuntimeJsonValue | undefined, fallbackType = "text"): readonly TrajectorySourceBlock[] {
   if (typeof value === "string") return value === "" ? [] : [{ type: fallbackType, content: value, raw: value }];
   if (!Array.isArray(value)) {
     const content = valueText(value);

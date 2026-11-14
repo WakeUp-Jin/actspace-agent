@@ -1,7 +1,7 @@
 import { renderSystemPrompt } from "@actspace/context-engine";
 export { renderSystemPrompt } from "@actspace/context-engine";
 import { createHash } from "node:crypto";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { ContributorRegistry } from "./registry.js";
 import type { AssemblyInput, PromptContributor } from "./contributor.js";
 import { freezeRequest, type LogicalRequestCandidate, type LogicalRequestSnapshot, type PreparedRequestMetadata } from "./request-snapshot.js";
@@ -15,15 +15,15 @@ export class RequestAssembler {
   readonly #registry: ContributorRegistry;
   constructor(private readonly options: RequestAssemblerOptions) { this.#registry = options.registry ?? new ContributorRegistry(); }
 
-  async assemble(input: AssemblyInput, tools: readonly RuntimeV2JsonValue[], requestOptions: RuntimeV2JsonValue, compositionDigest: string, hostCapabilityDigest: string): Promise<LogicalRequestSnapshot> {
+  async assemble(input: AssemblyInput, tools: readonly RuntimeJsonValue[], requestOptions: RuntimeJsonValue, compositionDigest: string, hostCapabilityDigest: string): Promise<LogicalRequestSnapshot> {
     const candidate = await this.assembleCandidate(input, tools, requestOptions);
     const prepared = await this.options.prepare(candidate);
     return this.finalize(candidate, prepared, compositionDigest, hostCapabilityDigest);
   }
 
-  async assembleCandidate(input: AssemblyInput, tools: readonly RuntimeV2JsonValue[], requestOptions: RuntimeV2JsonValue): Promise<LogicalRequestCandidate> {
+  async assembleCandidate(input: AssemblyInput, tools: readonly RuntimeJsonValue[], requestOptions: RuntimeJsonValue): Promise<LogicalRequestCandidate> {
     input.scope.assertActive();
-    const outputs: Array<{ readonly contributor: PromptContributor; readonly output?: RuntimeV2JsonValue; readonly provenance: RuntimeV2JsonValue }> = [];
+    const outputs: Array<{ readonly contributor: PromptContributor; readonly output?: RuntimeJsonValue; readonly provenance: RuntimeJsonValue }> = [];
     for (const contributor of this.#registry.visible(input.scope)) {
       try {
         const resolved = await contributor.resolve(input);
@@ -62,6 +62,6 @@ export class RequestAssembler {
   }
 }
 
-export function digestJson(value: RuntimeV2JsonValue): string {
+export function digestJson(value: RuntimeJsonValue): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }

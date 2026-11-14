@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { RuntimeV2DesktopLiveEnvelope } from "@actspace/shared/runtime-v2";
+import type { RuntimeDesktopLiveEnvelope } from "@actspace/shared/runtime-v2";
 import { createLiveEventHub } from "../api/live-events";
 
 // 14 T17：sessionLive 全局只订阅一次，按 message 分发。
-function envelope(message: string | null, sessionId = "s1"): RuntimeV2DesktopLiveEnvelope {
+function envelope(message: string | null, sessionId = "s1"): RuntimeDesktopLiveEnvelope {
   return {
     event: { kind: "runtime-live", schemaVersion: 1, runtimeInstanceId: "rt", liveSeq: 1, throughJournalSeq: 0, sessionId, message },
     emittedAt: "2026-10-06T00:00:00.000Z",
@@ -11,13 +11,13 @@ function envelope(message: string | null, sessionId = "s1"): RuntimeV2DesktopLiv
 }
 
 function fakeSource() {
-  const listeners = new Set<(envelope: RuntimeV2DesktopLiveEnvelope) => void>();
+  const listeners = new Set<(envelope: RuntimeDesktopLiveEnvelope) => void>();
   const release = vi.fn();
-  const source = vi.fn((listener: (envelope: RuntimeV2DesktopLiveEnvelope) => void) => {
+  const source = vi.fn((listener: (envelope: RuntimeDesktopLiveEnvelope) => void) => {
     listeners.add(listener);
     return () => { listeners.delete(listener); release(); };
   });
-  const emit = (value: RuntimeV2DesktopLiveEnvelope) => { for (const listener of [...listeners]) listener(value); };
+  const emit = (value: RuntimeDesktopLiveEnvelope) => { for (const listener of [...listeners]) listener(value); };
   return { source, release, emit, size: () => listeners.size };
 }
 

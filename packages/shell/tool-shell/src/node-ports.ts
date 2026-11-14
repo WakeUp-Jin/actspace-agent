@@ -8,7 +8,7 @@ import * as nodePath from "node:path";
 import { delimiter, join, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
 import { isLexicallyInside, toolChildEnv } from "@actspace/shared";
-import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { spawnHostProcess } from "@actspace/sandbox/node-ports";
 import type { HostProcessSpec, SandboxExecution, SandboxRequest, SandboxResult, SandboxService } from "@actspace/sandbox/types";
 import type { BackgroundTaskHost, BackgroundTaskTerminal } from "@actspace/background-tasks";
@@ -92,7 +92,7 @@ export function createNodeBashToolPorts(options: BashOptions): NodeBashToolPorts
 }
 
 async function executeBash(
-  args: Readonly<Record<string, RuntimeV2JsonValue>>,
+  args: Readonly<Record<string, RuntimeJsonValue>>,
   context: ToolExecutionContext,
   options: BashOptions,
   registry: BashTaskRegistry,
@@ -287,7 +287,7 @@ function canonicalScratchRoot(path: string): string {
 }
 
 /** The admitted process resource is what the user approved; direct callers without one only get an explicit request. */
-function admittedNoSandbox(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext): boolean {
+function admittedNoSandbox(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext): boolean {
   const resource = context.admittedResources?.find((item) => item.kind === "process");
   return resource?.kind === "process" ? resource.noSandbox === true : args.sandbox_permissions === "require_escalated";
 }
@@ -599,10 +599,10 @@ class LineMatcher {
   }
 }
 
-function parseOutputSubscription(value: RuntimeV2JsonValue | undefined): OutputSubscription | string | undefined {
+function parseOutputSubscription(value: RuntimeJsonValue | undefined): OutputSubscription | string | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "object" || Array.isArray(value)) return "notifyOnOutput must be an object.";
-  const record = value as Readonly<Record<string, RuntimeV2JsonValue>>;
+  const record = value as Readonly<Record<string, RuntimeJsonValue>>;
   const pattern = typeof record.pattern === "string" ? record.pattern : "";
   const reason = typeof record.reason === "string" ? record.reason.trim() : "";
   if (!pattern || pattern.length > MAX_SUBSCRIPTION_PATTERN_LENGTH) return `notifyOnOutput.pattern must contain 1-${MAX_SUBSCRIPTION_PATTERN_LENGTH} characters.`;
@@ -623,8 +623,8 @@ function backgroundBoundary(blockMs: number): { readonly promise: Promise<false>
 }
 
 function within(root: string, candidate: string): boolean { return isLexicallyInside(nodePath, root, candidate, { includeRoot: true }); }
-function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, name: string): string { return typeof args[name] === "string" ? args[name] : ""; }
-function clampInteger(value: RuntimeV2JsonValue | undefined, fallback: number, min: number, max: number): number { return typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.trunc(value))) : fallback; }
+function stringArg(args: Readonly<Record<string, RuntimeJsonValue>>, name: string): string { return typeof args[name] === "string" ? args[name] : ""; }
+function clampInteger(value: RuntimeJsonValue | undefined, fallback: number, min: number, max: number): number { return typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.trunc(value))) : fallback; }
 function dataImage(output: string): { readonly mediaType: string; readonly data: string } | undefined { const match = output.trim().match(/^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\r\n]+)$/i); return match?.[1] && match[2] ? { mediaType: match[1].toLowerCase(), data: match[2].replace(/\s/g, "") } : undefined; }
 function completed(text: string, summary: string): ToolBodyResult { return { status: "completed", summary, modelOutput: [{ type: "text", text }] }; }
 function failed(code: string, message: string, retryable: boolean): ToolBodyResult { return { status: "failed", summary: message, modelOutput: [{ type: "text", text: message }], failure: { code, message, retryable } }; }

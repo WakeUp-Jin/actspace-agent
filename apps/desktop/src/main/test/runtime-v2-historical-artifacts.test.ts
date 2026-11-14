@@ -3,12 +3,12 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-const { bootDesktopRuntimeV2 } = vi.hoisted(() => ({ bootDesktopRuntimeV2: vi.fn() }));
-vi.mock("../runtime-v2/desktop-host-adapter", () => ({ bootDesktopRuntimeV2 }));
+const { bootDesktopRuntime } = vi.hoisted(() => ({ bootDesktopRuntime: vi.fn() }));
+vi.mock("../runtime-v2/desktop-host-adapter", () => ({ bootDesktopRuntime }));
 import { DesktopArtifactStore } from "../runtime-v2/artifact-store";
-import { DesktopRuntimeV2Registry, type DesktopRuntimeV2RegistryOptions } from "../runtime-v2/runtime-registry";
+import { DesktopRuntimeRegistry, type DesktopRuntimeRegistryOptions } from "../runtime-v2/runtime-registry";
 
-const fixtures: Array<{ root: string; registry: DesktopRuntimeV2Registry }> = [];
+const fixtures: Array<{ root: string; registry: DesktopRuntimeRegistry }> = [];
 afterEach(async () => {
   for (const { root, registry } of fixtures.splice(0)) {
     await registry.dispose();
@@ -30,11 +30,11 @@ async function fixture() {
     listSessions: vi.fn(async () => []),
     subscribeSessionProjection: () => () => {},
   };
-  bootDesktopRuntimeV2.mockResolvedValue({ artifacts: store, browserReady: false, profile: {
+  bootDesktopRuntime.mockResolvedValue({ artifacts: store, browserReady: false, profile: {
     context: { get: (name: string) => name === "desktop.app" ? app : undefined },
     getState: () => ({ runtimeInstanceId: "test" }), shutdown: vi.fn(),
   } });
-  const registry = new DesktopRuntimeV2Registry({ roots: { dataRoot: root, workspaceRoot: root, defaultWorkspaceRoot: root }, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
+  const registry = new DesktopRuntimeRegistry({ roots: { dataRoot: root, workspaceRoot: root, defaultWorkspaceRoot: root }, loadModule: async () => ({}) } as unknown as DesktopRuntimeRegistryOptions);
   fixtures.push({ root, registry });
   await registry.boot();
   return { root, store, ref, content, journal, snapshot, app, registry };

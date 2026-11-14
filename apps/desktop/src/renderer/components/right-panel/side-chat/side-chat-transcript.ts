@@ -1,5 +1,5 @@
 import type { MessageBlock, SessionListItem } from "@actspace/shared";
-import type { RuntimeV2JsonValue, RuntimeV2EventWindow } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue, RuntimeEventWindow } from "@actspace/shared/runtime-v2";
 
 /** 侧边对话 tab 的稳定 id；renderer 各处必须用它生成，去重才不会失效。 */
 export function sideChatTabId(sessionId: string): string {
@@ -7,9 +7,9 @@ export function sideChatTabId(sessionId: string): string {
 }
 
 /** 会话 lineage 里的分叉点；不是侧边对话时为 null。 */
-export function sideChatBoundarySeq(lineage: RuntimeV2JsonValue | null | undefined): number | null {
+export function sideChatBoundarySeq(lineage: RuntimeJsonValue | null | undefined): number | null {
   if (!lineage || typeof lineage !== "object" || Array.isArray(lineage)) return null;
-  const { origin, parentBoundarySeq } = lineage as Record<string, RuntimeV2JsonValue>;
+  const { origin, parentBoundarySeq } = lineage as Record<string, RuntimeJsonValue>;
   return origin === "side-chat" && typeof parentBoundarySeq === "number" ? parentBoundarySeq : null;
 }
 
@@ -30,7 +30,7 @@ export function hideInheritedMessages(messages: readonly MessageBlock[], boundar
  * 从侧边对话自己的事件窗口数出继承了几轮：窗口之前的轮数加上窗口里分叉点之前开始的轮。
  * 窗口已经不含分叉点（侧边对话自己聊了很久）时数不出来，返回 null。
  */
-export function countInheritedTurns(window: RuntimeV2EventWindow | null | undefined, boundarySeq: number | null): number | null {
+export function countInheritedTurns(window: RuntimeEventWindow | null | undefined, boundarySeq: number | null): number | null {
   if (!window || boundarySeq === null || window.fromSeq > boundarySeq + 1) return null;
   return window.turnOffset + window.events.filter((event) => event.type === "turn/start" && event.seq <= boundarySeq).length;
 }

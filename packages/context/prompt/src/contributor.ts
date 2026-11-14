@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { AgentScope } from "@actspace/scope";
 
 export type ContributorLayer = "core" | "profile" | "host" | "agent" | "plugin";
@@ -10,14 +10,14 @@ export type AssemblyInput = {
   readonly turnId: string;
   readonly stepId: string;
   readonly scope: AgentScope;
-  readonly surface: readonly RuntimeV2JsonValue[];
-  readonly hostFacts: RuntimeV2JsonValue;
+  readonly surface: readonly RuntimeJsonValue[];
+  readonly hostFacts: RuntimeJsonValue;
   readonly selectedSkillIds: readonly string[];
 };
 
 export type ContributorOutput = {
-  readonly value: RuntimeV2JsonValue;
-  readonly provenance?: RuntimeV2JsonValue;
+  readonly value: RuntimeJsonValue;
+  readonly provenance?: RuntimeJsonValue;
 };
 
 export type PromptContributor = {

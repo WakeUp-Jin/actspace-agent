@@ -6,7 +6,7 @@ import { getLeasedService, type ServiceKey } from "@actspace/cordis-adapter";
 import { CONTEXT_ENGINE_SERVICE } from "@actspace/context-engine";
 import { MainAgentInbox } from "@actspace/agent";
 import type { SessionHandle } from "@actspace/session-persistence";
-import type { RuntimeV2RunTurnRequest, RuntimeV2RunTurnResponse } from "@actspace/shared/runtime-v2";
+import type { RuntimeRunTurnRequest, RuntimeRunTurnResponse } from "@actspace/shared/runtime-v2";
 import type { RuntimeSessionController } from "../session/session-controller.js";
 
 /** Binds Host configuration and Harness capabilities to the shared task scheduler. */
@@ -87,7 +87,7 @@ export class ManagedRuns {
   async initialize(sessionId: string): Promise<void> {
     this.#states.set(sessionId, await this.service.snapshot(sessionId));
   }
-  async run(sessionId: string, input: Omit<RuntimeV2RunTurnRequest, "sessionId">, signal?: AbortSignal): Promise<RuntimeV2RunTurnResponse> {
+  async run(sessionId: string, input: Omit<RuntimeRunTurnRequest, "sessionId">, signal?: AbortSignal): Promise<RuntimeRunTurnResponse> {
     const session = this.sessions.getOpen(sessionId) ?? await this.sessions.resume(sessionId);
     await this.initialize(sessionId);
     this.configure(sessionId, { ...(input.model === undefined ? {} : { model: input.model }), ...(input.thinkingEnabled === undefined ? {} : { thinkingEnabled: input.thinkingEnabled }), ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }), ...(input.selectedSkillIds === undefined ? {} : { selectedSkillIds: input.selectedSkillIds }) });

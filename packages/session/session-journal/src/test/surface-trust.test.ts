@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { createCoreCodecRegistry } from "../core-codecs.js";
 import type { SessionEventCandidateV1 } from "../event-envelope.js";
 import { SessionJournal } from "../journal.js";
@@ -9,7 +9,7 @@ import { isTrustedSurfaceView, surfaceViewVersion } from "../index.js";
 
 const source = { ownerPluginId: "@actspace/core" } as const;
 
-function candidate(type: string, data: RuntimeV2JsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
+function candidate(type: string, data: RuntimeJsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
   return { type, eventVersion: 1, source, data, surface: null, ...extra };
 }
 

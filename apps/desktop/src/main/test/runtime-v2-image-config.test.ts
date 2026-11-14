@@ -3,16 +3,16 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { ToolExecutionContext } from "@actspace/tool-runtime";
 import { createDesktopToolHostServices } from "../runtime-v2/tool-host-services";
 import { IMAGE_GENERATION_HOST_PORT_ID } from "@actspace/tool-image-generation";
-import type { DesktopRuntimeV2ModelPort } from "../runtime-v2/model-port";
+import type { DesktopRuntimeModelPort } from "../runtime-v2/model-port";
 
 afterEach(() => vi.unstubAllGlobals());
 
 it("uses current image configuration for each call, including removal and reconfiguration", async () => {
-  let generation: ReturnType<DesktopRuntimeV2ModelPort["getToolEnvironment"]>["imageGeneration"];
+  let generation: ReturnType<DesktopRuntimeModelPort["getToolEnvironment"]>["imageGeneration"];
   const modelRuntime = {
     getToolEnvironment: () => ({ searchCredentials: {}, imageGeneration: generation }),
     resolveImageInspectionModel: () => ({ ok: false, message: "not configured" }),
-  } as DesktopRuntimeV2ModelPort;
+  } as DesktopRuntimeModelPort;
   const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ data: [{ b64_json: Buffer.from([137,80,78,71,13,10,26,10,0]).toString("base64") }] }), { headers: { "content-type": "application/json" } }));
   vi.stubGlobal("fetch", fetchImpl);
   const ports = await createDesktopToolHostServices({ workspaceRoot: "/workspace", tmpRoot: "/tmp", modelRuntime, readArtifact: async () => { throw new Error("unused"); } })[IMAGE_GENERATION_HOST_PORT_ID].createPorts();

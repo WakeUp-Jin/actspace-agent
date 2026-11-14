@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { RuntimeV2HostDescriptor, RuntimeV2BootManifest, RuntimeV2RuntimeState, RuntimeV2DiagnosticsSnapshot, RuntimeV2ShutdownResult } from "@actspace/shared/runtime-v2";
+import type { RuntimeHostDescriptor, RuntimeBootManifest, RuntimeStateView, RuntimeDiagnosticsSnapshot, RuntimeShutdownResult } from "@actspace/shared/runtime-v2";
 import type { AgentLoopLiveEvent } from "@actspace/agent-loop";
 import { PromptExtensionRegistry, emptyRuntimePromptSource, type RuntimePromptSource } from "@actspace/prompt";
 import { DiagnosticsCollector } from "../projection/diagnostics.js";
@@ -40,7 +40,7 @@ let runtimeClaimed = false;
 export type BootRuntimeOptions = {
   /** Trusted Host-only hook; absent in production defaults. Never supplied by renderer input. */
   readonly authorizeHarness?: import("@actspace/harness-control").HarnessAuthorizer;
-  readonly host: RuntimeV2HostDescriptor;
+  readonly host: RuntimeHostDescriptor;
   readonly dataRoot: string;
   readonly toolEnvironment: Omit<ToolPreparedEnvironment, "journal">;
   readonly promptSource?: RuntimePromptSource | ((workspaceRoot: string) => Promise<RuntimePromptSource>);
@@ -63,7 +63,7 @@ export type BootRuntimeOptions = {
    */
   readonly disabledPlugins?: readonly string[];
   /** Plugin settings by plugin Entry id, over the manifest's `config` defaults (e.g. the external subagents' permission settings). */
-  readonly pluginConfig?: Readonly<Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>>>;
+  readonly pluginConfig?: Readonly<Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>>>;
   /** Record Harness runtime stats under `<dataRoot>/harness-stats` (default true). Ephemeral runs pass false so they leave no stats behind. */
   readonly harnessStats?: boolean;
 };
@@ -71,12 +71,12 @@ export type BootRuntimeOptions = {
 export type BootedRuntimeProfile = {
   readonly context: CordisContext;
   readonly root: CordisRootHandle;
-  readonly manifest: RuntimeV2BootManifest;
-  readonly getState: () => RuntimeV2RuntimeState;
-  readonly getDiagnostics: () => RuntimeV2DiagnosticsSnapshot;
+  readonly manifest: RuntimeBootManifest;
+  readonly getState: () => RuntimeStateView;
+  readonly getDiagnostics: () => RuntimeDiagnosticsSnapshot;
   readonly recordDiagnostic: (input: DiagnosticInput) => void;
   readonly requestRestart: (reason: string, source: string, candidateDigest?: string) => void;
-  readonly shutdown: () => Promise<RuntimeV2ShutdownResult>;
+  readonly shutdown: () => Promise<RuntimeShutdownResult>;
 };
 
 export async function bootProfileRuntime(options: BootRuntimeOptions): Promise<BootedRuntimeProfile> {
@@ -228,7 +228,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
 async function missingCodecLoader(specifier: string): Promise<never> { throw new Error(`No trusted Codec loader is configured for ${specifier}.`); }
 function createBootedProfile(input: {
   readonly state: RuntimeStateController;
-  readonly manifest: RuntimeV2BootManifest;
+  readonly manifest: RuntimeBootManifest;
   readonly diagnostics: DiagnosticsCollector;
   readonly context: CordisContext;
   readonly root: CordisRootHandle;
@@ -237,7 +237,7 @@ function createBootedProfile(input: {
   readonly options: BootRuntimeOptions;
   readonly harnessStats?: HarnessStats;
 }): BootedRuntimeProfile {
-  let shutdownPromise: Promise<RuntimeV2ShutdownResult> | undefined;
+  let shutdownPromise: Promise<RuntimeShutdownResult> | undefined;
   let cleanupPromise: Promise<void> | undefined;
   const cleanup = (): Promise<void> => {
     if (cleanupPromise) return cleanupPromise;
@@ -265,7 +265,7 @@ function createBootedProfile(input: {
     cleanupPromise = attempt;
     return attempt;
   };
-  const shutdown = (): Promise<RuntimeV2ShutdownResult> => {
+  const shutdown = (): Promise<RuntimeShutdownResult> => {
     if (shutdownPromise !== undefined) return shutdownPromise;
     const attempt = shutdownBootedProfile(input, cleanup).catch((error: unknown) => {
       if (shutdownPromise === attempt) shutdownPromise = undefined;
@@ -292,7 +292,7 @@ async function shutdownBootedProfile(input: {
   readonly agentRuntime: AgentRuntimeService;
   readonly candidate: Awaited<ReturnType<typeof createDshBootCandidate>>;
   readonly options: BootRuntimeOptions;
-}, cleanupResources: () => Promise<void>): Promise<RuntimeV2ShutdownResult> {
+}, cleanupResources: () => Promise<void>): Promise<RuntimeShutdownResult> {
   input.state.quiesce();
   input.agentRuntime.runs.quiesce();
   // A timeout stops waiting, not disposal. Retries observe the same ongoing cleanup.

@@ -26,7 +26,7 @@ function fixture(initialTitle: string | null = null) {
   const complete = vi.fn((_input: Parameters<typeof app.completeText>[0]) => completion as ReturnType<typeof app.completeText>);
   vi.spyOn(textUtility, "completeText").mockImplementation((_llm, input) => complete(input));
   let sequence = 0;
-  const submit = (input: { sessionId: string; content: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue }) => app.submitTask(input.sessionId, `submission-${sequence++}`, input.content);
+  const submit = (input: { sessionId: string; content: import("@actspace/shared/runtime-v2").RuntimeJsonValue }) => app.submitTask(input.sessionId, `submission-${sequence++}`, input.content);
   return { submit, app, run, complete, resolve, reject, snapshot, session, events };
 }
 afterEach(() => vi.restoreAllMocks());

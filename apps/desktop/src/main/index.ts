@@ -9,7 +9,7 @@ import { registerPluginsIpc } from "./plugins/plugins-ipc";
 import { registerPythonRuntimeIpc } from "./python-runtime/python-runtime-ipc";
 import { PythonRuntimeService, resolveDesktopPythonRuntime } from "./python-runtime/python-runtime-service";
 import { registerDisabledEnglishLearningIpc } from "./plugins/optional-plugin-stubs";
-import { loadRuntimeV2Module } from "./runtime-v2/runtime-loader";
+import { loadRuntimeModule } from "./runtime-v2/runtime-loader";
 import { app, BrowserWindow, globalShortcut, safeStorage, screen, session } from "electron";
 import { presentQuickOpenWindow } from "./quick-open-window";
 import { appendFile, mkdir } from "node:fs/promises";
@@ -17,7 +17,7 @@ import { join } from "node:path";
 import type { AppDataRoots } from "./app-paths";
 import { homedir } from "node:os";
 import { resolveActSpaceDataRoot } from "@actspace/shared";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 import type { RuntimeStreamEvent } from "@actspace/shared";
 import { resolveAppDataRoots } from "./app-paths";
 import { PendingApprovalRegistry } from "./approval-registry";
@@ -26,8 +26,8 @@ import { resolveDesktopNonoPath } from "./sandbox-resources";
 import { SettingsService, type SecretCrypto } from "./settings-service";
 import { ModelStoreService } from "./model-store-service";
 import { ModelRuntimeService } from "./model-runtime-service";
-import { DesktopRuntimeV2Registry } from "./runtime-v2/runtime-registry";
-import { registerRuntimeV2DesktopShell } from "./runtime-v2/desktop-shell-ipc";
+import { DesktopRuntimeRegistry } from "./runtime-v2/runtime-registry";
+import { registerRuntimeDesktopShell } from "./runtime-v2/desktop-shell-ipc";
 import { ProviderNetworkService } from "./runtime-v2/provider-network-service";
 import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
 import { registerFixedRendererIpc, type FixedRendererIpcRegistration } from "./runtime-v2/fixed-renderer-ipc";
@@ -41,14 +41,14 @@ const APP_DISPLAY_NAME = process.env.ACTSPACE_DEV_APP_NAME?.trim() || "ActSpace"
 
 let startupLogPath: string | undefined;
 let mainWindow: BrowserWindow | undefined;
-let runtimeV2Registry: DesktopRuntimeV2Registry | undefined;
+let runtimeRegistry: DesktopRuntimeRegistry | undefined;
 let resourceMonitor: ResourceMonitorController | undefined;
 let disposeEnglishLearningIpc: (() => void) | undefined;
 let disposePluginsIpc: (() => void) | undefined;
 let disposePythonRuntimeIpc: (() => void) | undefined;
 let pythonRuntimeService: PythonRuntimeService | undefined;
 let speechPlayback: DesktopSpeechPlayback | undefined;
-let disposeRuntimeV2DesktopShell: (() => void) | undefined;
+let disposeRuntimeDesktopShell: (() => void) | undefined;
 let remoteDesktop: RemoteDesktopAdapter | undefined;
 let remoteHosts: RemoteHostRegistry | undefined;
 let disposeRemoteHostIpc: (() => void) | undefined;
@@ -88,7 +88,7 @@ const approvalRegistry = new PendingApprovalRegistry({
         executionEnvironment: request.executionEnvironment,
       };
       fixedRendererIpc?.flushLive();
-      mainWindow.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.agentStream, event);
+      mainWindow.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.agentStream, event);
     }
   },
   onApprovalResolved: (request, decision, sessionId, agentRunId) => {
@@ -103,7 +103,7 @@ const approvalRegistry = new PendingApprovalRegistry({
       approvalScope: request.approvalScope,
     };
     fixedRendererIpc?.flushLive();
-    mainWindow.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.agentStream, event);
+    mainWindow.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.agentStream, event);
   },
 });
 
@@ -192,7 +192,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   await logMain("v2 quick open initialized", quickOpenShortcutController.activate(quickOpenSettings));
   // Startup switches: fixed for this process. A switched-off plugin is not created, polled or installed;
   // changing the setting only takes effect after a restart (see plugin-switches.ts).
-  const runtimeModule = await loadRuntimeV2Module();
+  const runtimeModule = await loadRuntimeModule();
   const startupSwitches = resolvePluginSwitches(settingsService.getV4().settings, runtimeModule.PLUGIN_CATALOG);
   const startupPluginSettings = resolvePluginSettings(settingsService.getV4().settings);
   const browserEnabled = startupSwitches.get(BROWSER_PLUGIN_ID) === true;
@@ -219,7 +219,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   pythonRuntimeService = new PythonRuntimeService({ runtime: pythonRuntime, dataRoot: roots.dataRoot, log: (message, details) => void logMain(message, details) });
   const speech = englishLearningEnabled ? new DesktopSpeechPlayback(roots.tmpRoot, settingsService) : undefined;
   speechPlayback = speech;
-  runtimeV2Registry = new DesktopRuntimeV2Registry({
+  runtimeRegistry = new DesktopRuntimeRegistry({
     speech,
     disabledPlugins: disabledPluginIds(startupSwitches),
     pluginConfig: startupPluginSettings,
@@ -233,16 +233,16 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     chatCompactionTriggerRatio: () => settingsService?.getV4().settings.general.taskDefaults.chatCompactionTriggerRatio ?? 0.8,
     log: (message, details) => void logMain(message, details),
   });
-  disposeRuntimeV2DesktopShell = registerRuntimeV2DesktopShell({
+  disposeRuntimeDesktopShell = registerRuntimeDesktopShell({
     roots,
     getMainWindow,
-    listSessions: async () => runtimeV2Registry?.listSessions() ?? [],
+    listSessions: async () => runtimeRegistry?.listSessions() ?? [],
   }).dispose;
-  await runtimeV2Registry.boot();
+  await runtimeRegistry.boot();
   const syncBrowser = async () => {
-    if (!browserBridgeService || !runtimeV2Registry || shuttingDown) return;
+    if (!browserBridgeService || !runtimeRegistry || shuttingDown) return;
     const status = await browserBridgeService.getStatus();
-    await runtimeV2Registry.refreshBrowser();
+    await runtimeRegistry.refreshBrowser();
     if (status.runState === "error") throw new Error(status.lastError ?? "Chrome connection status probe failed");
   };
   let browserFailures = 0;
@@ -275,7 +275,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     log: (message, details) => void logMain(message, details),
   });
   disposeEnglishLearningIpc = englishLearningEnabled
-    ? registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow: getMainWindowOrNull })
+    ? registerEnglishLearningIpc({ registry: runtimeRegistry, settings: settingsService, getMainWindow: getMainWindowOrNull })
     : registerDisabledEnglishLearningIpc({ getMainWindow: getMainWindowOrNull });
   disposePluginsIpc = registerPluginsIpc({ getMainWindow, catalog: runtimeModule.PLUGIN_CATALOG, startupSwitches, startupPluginSettings, settings: settingsService });
   disposePythonRuntimeIpc = registerPythonRuntimeIpc({ getMainWindow, service: pythonRuntimeService });
@@ -285,7 +285,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   remoteDesktop = new RemoteDesktopAdapter(remoteHosts, getMainWindow, roots.dataRoot);
   fixedRendererIpc = registerFixedRendererIpc({
     remote: remoteDesktop,
-    registry: runtimeV2Registry,
+    registry: runtimeRegistry,
     roots,
     settings: settingsService,
     models: modelStore,
@@ -334,11 +334,11 @@ app.on("before-quit", (event) => {
     // 每一步单独兜错：任何一步抛错（比如窗口已销毁时解绑监听）都只记日志，后面的步骤照常执行，
     // 最后一定走到 app.exit(0)，不会卡在「正在安全关闭」直到 35 秒兜底。
     await runShutdownSteps([
-      ["notify renderer", () => getMainWindow()?.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.appShuttingDown, { reason: "normal" })],
+      ["notify renderer", () => getMainWindow()?.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.appShuttingDown, { reason: "normal" })],
       ["remote desktop", () => remoteDesktop?.dispose()],
       ["remote hosts", () => remoteHosts?.dispose()],
       ["remote host ipc", () => disposeRemoteHostIpc?.()],
-      ["runtime", () => runtimeV2Registry?.dispose()],
+      ["runtime", () => runtimeRegistry?.dispose()],
       ["provider network", () => providerNetworkService?.dispose()],
       ["quick open", () => quickOpenShortcutController?.dispose()],
       ["browser bridge", () => browserBridgeService?.dispose()],
@@ -348,7 +348,7 @@ app.on("before-quit", (event) => {
       ["plugins ipc", () => disposePluginsIpc?.()],
       ["python runtime ipc", () => disposePythonRuntimeIpc?.()],
       ["speech playback", () => speechPlayback?.dispose()],
-      ["desktop shell", () => disposeRuntimeV2DesktopShell?.()],
+      ["desktop shell", () => disposeRuntimeDesktopShell?.()],
       ["fixed renderer ipc", () => fixedRendererIpc?.dispose()],
     ], (message, details) => void logMain(message, details));
     clearTimeout(timeout);

@@ -1,6 +1,6 @@
 const path = require("node:path");
 
-const { RuntimeV2BridgeClient } = require("./runtime-v2-client.cjs");
+const { RuntimeBridgeClient } = require("./runtime-v2-client.cjs");
 
 const socketPath = path.join(
   process.env.HOME,
@@ -9,7 +9,7 @@ const socketPath = path.join(
 const runId = Date.now();
 
 function createClient(label) {
-  return new RuntimeV2BridgeClient({
+  return new RuntimeBridgeClient({
     socketPath,
     sessionId: `acceptance-isolation-${label}-${runId}`,
     turnId: `fixture-isolation-${label}`,

@@ -1,10 +1,10 @@
 import { getService, type CordisContext } from "@actspace/cordis-adapter";
-import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
+import type { RuntimeHostDescriptor } from "@actspace/shared/runtime-v2";
 import { RUNTIME_CORDIS_HOST_PORT } from "../service-keys.js";
 
 export type RuntimeCordisHost = {
   readonly hostKind?: string;
-  readonly descriptor?: RuntimeV2HostDescriptor;
+  readonly descriptor?: RuntimeHostDescriptor;
   readonly services?: Readonly<Record<string, unknown>>;
   readonly onReady?: (context: CordisContext) => void | Promise<void>;
 };

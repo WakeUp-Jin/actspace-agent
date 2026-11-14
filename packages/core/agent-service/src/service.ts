@@ -12,7 +12,7 @@ declare module "@actspace/cordis-adapter" {
 
 import type { SessionHandle } from "@actspace/session-persistence";
 import { SessionError, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { TaskError, type TaskReceipt, type TaskSnapshot, type RunRecord, type TaskRecord } from "./contracts.js";
 import { SessionRunManager, type ExecutionConfiguration, type RunLease } from "./run-manager.js";
 import { TaskLedger } from "./task-ledger.js";
@@ -20,7 +20,7 @@ import { projectTasks } from "./task-projection.js";
 
 export interface AgentServicePorts {
   openSession(sessionId: string): Promise<SessionHandle>;
-  operationForTask?(session: SessionHandle, task: TaskRecord): ((signal: AbortSignal) => Promise<RuntimeV2JsonValue | void>) | undefined;
+  operationForTask?(session: SessionHandle, task: TaskRecord): ((signal: AbortSignal) => Promise<RuntimeJsonValue | void>) | undefined;
   runIdForTask?(sessionId: string, task: TaskRecord): string | undefined;
   harnessId(session: SessionHandle): string;
   acquire(harnessId: string, signal?: AbortSignal): RunLease | Promise<RunLease>;
@@ -49,7 +49,7 @@ export class AgentService {
   #closing: Promise<void> | undefined;
   constructor(private readonly ports: AgentServicePorts) {}
 
-  async submit(sessionId: string, submissionId: string, content: RuntimeV2JsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
+  async submit(sessionId: string, submissionId: string, content: RuntimeJsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
     const manager = await this.#manager(sessionId);
     if (this.#draining) throw new Error("HOST_DRAINING");
     return manager.submit(submissionId, content, continuationOf);

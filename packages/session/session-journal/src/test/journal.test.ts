@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { codecReadsHistory, EventCodecRegistry, type EventCodec } from "../codec-registry.js";
 import { CORE_EVENT_TYPES, createCoreCodecRegistry } from "../core-codecs.js";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "../event-envelope.js";
@@ -6,11 +6,11 @@ import { SessionJournal } from "../journal.js";
 
 const source = { ownerPluginId: "@actspace/core" } as const;
 
-function omit<T extends Record<string, RuntimeV2JsonValue>>(value: T, ...keys: string[]): Record<string, RuntimeV2JsonValue> {
+function omit<T extends Record<string, RuntimeJsonValue>>(value: T, ...keys: string[]): Record<string, RuntimeJsonValue> {
   return Object.fromEntries(Object.entries(value).filter(([key]) => !keys.includes(key)));
 }
 
-function candidate(type: string, data: RuntimeV2JsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
+function candidate(type: string, data: RuntimeJsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
   return { type, eventVersion: 1, source, data, surface: null, ...extra };
 }
 

@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
+import type { RuntimeTrajectorySnapshot } from '@actspace/shared/runtime-v2';
 import type { RequestLiveOutput } from '@actspace/client/live';
 import { useRequestOutputs } from '../session/live-runs/live-runs-context';
 import {
@@ -46,7 +46,7 @@ const toggled = <T,>(set: ReadonlySet<T>, value: T) => {
 const without = <T,>(set: ReadonlySet<T>, value: T) => set.has(value) ? new Set([...set].filter(item => item !== value)) : set;
 
 export type TrajectoryViewProps = {
-  readonly snapshot?: RuntimeV2TrajectorySnapshot | null;
+  readonly snapshot?: RuntimeTrajectorySnapshot | null;
   /** Present while the session runs; the toolbar shows 停止 at its right edge. */
   readonly onAbort?: () => void;
   readonly isAborting?: boolean;

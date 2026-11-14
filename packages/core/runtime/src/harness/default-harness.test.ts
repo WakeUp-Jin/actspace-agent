@@ -90,7 +90,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     const parentLease = await harnesses.acquire("main");
     // Mode policy is assembled from the tool definitions the Harness registered (agent-forms-and-modes.md §5).
     const definitions = parentLease.getService<import("@actspace/tool-runtime").ToolRuntime>("tools.runtime")!.registry.listDefinitions();
-    const visible = (mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode) => [...allowedAgentModeTools(mode, definitions)].sort();
+    const visible = (mode: import("@actspace/shared/runtime-v2").RuntimeAgentMode) => [...allowedAgentModeTools(mode, definitions)].sort();
     expect(visible("chat")).toEqual(["generate_image", "web"]);
     expect(visible("plan")).toEqual(["agent", "agent_fork", "glob", "grep", "inspect_image", "list_directory", "list_subagent_models", "read_file", "send_message", "task_list", "task_output", "task_stop", "todo_read", "todo_write", "web_fetch", "web_search"]);
     expect(visible("agent")).toEqual(expect.arrayContaining(["bash", "edit_file", "present", "generate_image", "plugin_manager", "harness_inspect"]));

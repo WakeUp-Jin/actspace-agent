@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { RuntimeV2TrajectorySnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import type { RuntimeTrajectorySnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { TrajectoryView } from "../components/TrajectoryView";
 import { TrajectoryNavigationProvider, useTrajectoryNavigation } from "../components/trajectory/TrajectoryNavigation";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -62,7 +62,7 @@ describe("TrajectoryView with an explicit session", () => {
   });
 
   it("leaves Context-panel jumps to the main trajectory", async () => {
-    const snapshot: RuntimeV2TrajectorySnapshot = {
+    const snapshot: RuntimeTrajectorySnapshot = {
       kind: "trajectory", schemaVersion: 1, sessionId: "child", throughJournalSeq: 1,
       nodes: [
         { key: "child:0", sessionId: "child", eventSeq: 0, eventType: "turn/start", time: "2026-10-21T00:00:00.000Z", kind: "turn", state: "started", callId: null, data: {} },

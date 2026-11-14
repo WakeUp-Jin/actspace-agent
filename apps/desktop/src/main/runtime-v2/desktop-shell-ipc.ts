@@ -2,7 +2,7 @@ import type { BrowserWindow } from "electron";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import type { ReviewWorkspaceInput } from "@actspace/shared";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 import { desktopBridgeContract as contract } from "@actspace/shared/desktop-bridge";
 import { hasSessionLocatorPrefix } from "@actspace/shared/session-locator";
 import type { AppDataRoots } from "../app-paths";
@@ -22,7 +22,7 @@ type ShellOptions = {
   readonly listSessions: () => Promise<readonly { readonly workspaceRoot?: string | null }[]>;
 };
 
-export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(): void } {
+export function registerRuntimeDesktopShell(options: ShellOptions): { dispose(): void } {
   const registryOptions = workspaceRegistryOptions(options.roots);
   const workspaceAccess = createWorkspaceAccessDeps(registryOptions, options.listSessions);
   const withWorkspaceAccess = async <T extends { workspaceRoot?: string }>(input: T): Promise<T> => ({
@@ -46,7 +46,7 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   const unsubscribeReview = review.subscribe((notification) => {
     const target = options.getMainWindow();
     if (target && !target.isDestroyed()) {
-      target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.reviewChanged, notification);
+      target.webContents.send(RUNTIME_FIXED_RENDERER_CHANNELS.reviewChanged, notification);
     }
   });
 

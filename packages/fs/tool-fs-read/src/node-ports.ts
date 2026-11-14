@@ -2,7 +2,7 @@ import { lstat, open, stat, readdir, realpath } from "node:fs/promises";
 import * as nodePath from "node:path";
 import { basename, extname, isAbsolute, resolve } from "node:path";
 import { isLexicallyInside, relativePathInside } from "@actspace/shared";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { canonicalizeFileResource, TOOL_OUTPUT_LINE_CHARS, TOOL_OUTPUT_TEXT_CHARS, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
 import { PRESENT_MAX_FILES } from "./manifest.js";
@@ -29,7 +29,7 @@ function contextWorkspaceRoot(context: ToolExecutionContext, fallback: string): 
 }
 
 async function readFileTool(
-  args: Readonly<Record<string, RuntimeV2JsonValue>>,
+  args: Readonly<Record<string, RuntimeJsonValue>>,
   context: ToolExecutionContext,
   workspaceRoot: string,
   cache: Map<string, { readonly size: number; readonly mtimeMs: number }>,
@@ -86,7 +86,7 @@ function numberedText(range: NumberedLines, offset: number, size: number): strin
   return notes.length === 0 ? range.text : `${range.text}\n\n${notes.join("\n")}`;
 }
 
-async function listDirectoryTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
+async function listDirectoryTool(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
   const pathArg = stringArg(args, "path");
   if (!pathArg) return failure("INVALID_ARGUMENTS", "path is required");
   try {
@@ -114,7 +114,7 @@ async function listDirectoryTool(args: Readonly<Record<string, RuntimeV2JsonValu
 }
 
 /** Declared deliverables stay at their workspace paths; the result records them for the turn-tail cards. */
-async function presentTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, workspaceRoot: string): Promise<ToolBodyResult> {
+async function presentTool(args: Readonly<Record<string, RuntimeJsonValue>>, workspaceRoot: string): Promise<ToolBodyResult> {
   const entries = Array.isArray(args.files) ? args.files : [];
   if (entries.length === 0 || entries.length > PRESENT_MAX_FILES) return failure("INVALID_ARGUMENTS", `present accepts 1 to ${PRESENT_MAX_FILES} files`);
   const files: { path: string; description?: string }[] = [];
@@ -176,7 +176,7 @@ function isWithin(root: string, candidate: string): boolean {
   return isLexicallyInside(nodePath, root, candidate, { includeRoot: true });
 }
 
-function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeV2JsonValue): ToolBodyResult {
+function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeJsonValue): ToolBodyResult {
   return { status: "completed", modelOutput: [{ type: "text", text }], summary, ...(detail === undefined ? {} : { detail: [{ label: "actspace.context.file", value: detail }] }) };
 }
 
@@ -191,6 +191,6 @@ function ioFailure(action: string, path: string, error: unknown): ToolBodyResult
   return failure("IO_ERROR", `Failed to ${action}: ${message}`);
 }
 
-function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
-function integerArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string, fallback: number): number { const value = args[key]; return typeof value === "number" && Number.isInteger(value) ? Math.max(1, value) : fallback; }
+function stringArg(args: Readonly<Record<string, RuntimeJsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
+function integerArg(args: Readonly<Record<string, RuntimeJsonValue>>, key: string, fallback: number): number { const value = args[key]; return typeof value === "number" && Number.isInteger(value) ? Math.max(1, value) : fallback; }
 function displayPath(path: string, workspaceRoot: string): string { return relativePathInside(nodePath, workspaceRoot, path) || path; }

@@ -4,7 +4,7 @@ import { JsonlSessionStorage } from "@actspace/session-persistence-jsonl";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { createCompactionTransaction, createCoreCodecRegistry } from "@actspace/session-journal";
 import type { SessionEventCandidateV1 } from "@actspace/session-journal";
 import { applySessionRecovery, classifySessionRecoveryAccess, planSessionRecovery, settleOpenTurnWork } from "../recovery.js";
@@ -21,7 +21,7 @@ async function temporaryRoot(): Promise<string> {
   return root;
 }
 
-function candidate(type: string, data: RuntimeV2JsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
+function candidate(type: string, data: RuntimeJsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
   return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null, ...extra };
 }
 

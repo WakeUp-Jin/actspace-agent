@@ -1,12 +1,12 @@
 import type { AgentLiveEvent } from "@actspace/shared/runtime-v2";
 import type { RuntimeStreamEvent } from "@actspace/shared";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { FileGenerationCounter } from "./file-generation-counter.js";
 import { toolPreview } from "../sessions/tool-card.js";
 import { SubagentActivity } from "./subagent-activity.js";
 
 type Identity = { sessionId: string; agentRunId: string; turnId: string; llmCallId: string; toolCallId: string; toolName: string };
-type Entry = { identity: Identity; args: RuntimeV2JsonValue; phase: "streaming" | "prepared" | "running" | "finished"; counter?: FileGenerationCounter; timer?: ReturnType<typeof setTimeout>; message?: string; additions?: number; deletions?: number; childSessionId?: string; activity?: SubagentActivity };
+type Entry = { identity: Identity; args: RuntimeJsonValue; phase: "streaming" | "prepared" | "running" | "finished"; counter?: FileGenerationCounter; timer?: ReturnType<typeof setTimeout>; message?: string; additions?: number; deletions?: number; childSessionId?: string; activity?: SubagentActivity };
 
 /** Transient presentation state. Journal and tool execution remain the source of truth. */
 export class FixedRendererStreamAdapter {
@@ -188,7 +188,7 @@ export class FixedRendererStreamAdapter {
       this.#clearTimer(entry);
       entry.counter = undefined;
       entry.phase = "finished";
-      const preview = toolPreview(event.name, undefined, event.result as unknown as Record<string, RuntimeV2JsonValue>, { args: entry.args }, undefined, event.sessionId, event.agentRunId, "finished", this.workspaceFor(event.sessionId));
+      const preview = toolPreview(event.name, undefined, event.result as unknown as Record<string, RuntimeJsonValue>, { args: entry.args }, undefined, event.sessionId, event.agentRunId, "finished", this.workspaceFor(event.sessionId));
       this.#emit({ type: "tool_finished", ...entry.identity, resultEventId: event.resultEventId, isError: event.result.status !== "completed", status: event.result.status, preview });
       entry.args = {};
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RuntimeV2TrajectoryNode, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeTrajectoryNode, RuntimeTrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import type { RequestLiveOutput } from "@actspace/client/live";
 import { buildTrajectorySnapshot, deriveLayout, liveMessageIds, liveMessageIdsKey, streamingCells } from "../trajectory";
 import { STREAMING_FRAMES, loadTrajectoryFixture, streamingFixture, streamingLongFixture } from "../trajectory/fixtures";
@@ -7,21 +7,21 @@ import { STREAMING_FRAMES, loadTrajectoryFixture, streamingFixture, streamingLon
 // 规范 agent-spec-live-assistant-stream §6：定稿层由日志构建，没有结算的请求留一个空占位；
 // 流式层把界面进程实时运行里该请求的输出放进占位。旧会话的 chunk 仍由 builder 合并。
 
-const node = (eventSeq: number, eventType: string, data: Record<string, string>, callId: string | null = null): RuntimeV2TrajectoryNode => ({
+const node = (eventSeq: number, eventType: string, data: Record<string, string>, callId: string | null = null): RuntimeTrajectoryNode => ({
   key: `s:${eventSeq}`, sessionId: "s", eventSeq, eventType, time: new Date(1_700_000_000_000 + eventSeq * 100).toISOString(),
   kind: "other", state: "observed", callId, data: { turnId: "t1", stepId: "st1", ...data },
 });
-const snap = (nodes: RuntimeV2TrajectoryNode[]): RuntimeV2TrajectorySnapshot => ({
+const snap = (nodes: RuntimeTrajectoryNode[]): RuntimeTrajectorySnapshot => ({
   kind: "trajectory", schemaVersion: 1, sessionId: "s", throughJournalSeq: nodes.at(-1)?.eventSeq ?? -1, nodes,
   history: { fromSeq: 0, previousFromSeq: null, turnOffset: 0, requestOffset: 0 },
 });
 const head = [node(0, "turn/start", {}), node(1, "user/message", { content: "hi" }), node(2, "step/start", {}), node(3, "request/header", { requestId: "r1" })];
 const output = (text: string, extra: Partial<RequestLiveOutput> = {}): RequestLiveOutput => ({ messageId: "m1", text, thinking: "", calls: new Map(), ...extra });
-const placeholders = (nodes: RuntimeV2TrajectoryNode[], ids?: ReadonlyMap<string, string>) =>
+const placeholders = (nodes: RuntimeTrajectoryNode[], ids?: ReadonlyMap<string, string>) =>
   buildTrajectorySnapshot(snap(nodes), ids ? { liveMessageIds: ids } : {}).records.filter(record => record.placeholder === true);
 
 /** The view's path: the settled layer from the Journal and live message ids, live output merged on top. */
-function frame(nodes: RuntimeV2TrajectoryNode[] | RuntimeV2TrajectorySnapshot, live: ReadonlyMap<string, RequestLiveOutput>) {
+function frame(nodes: RuntimeTrajectoryNode[] | RuntimeTrajectorySnapshot, live: ReadonlyMap<string, RequestLiveOutput>) {
   const layout = deriveLayout(buildTrajectorySnapshot(Array.isArray(nodes) ? snap(nodes) : nodes, { liveMessageIds: liveMessageIds(live) }));
   const cells = streamingCells(layout.cells, live);
   return { layout, live: cells, cells: layout.cells.map(cell => cells.get(cell.recordId) ?? cell) };

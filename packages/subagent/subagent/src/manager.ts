@@ -9,7 +9,7 @@ import type { AgentScope } from "@actspace/scope";
 import type { ModelsHostPort } from "@actspace/shared";
 import {
   coreEvent, EMPTY_SUBAGENT_TREE, CONTEXT_TRACE_DETAIL_LABEL, listedSubagents, reduceSubagentTree, runningActivation,
-  type CoreEventDataMap, type PermissionMode, type RuntimeV2AgentMode, type RuntimeV2JsonValue, type SubagentActivationStatus, type SubagentDelivery, type SubagentKind, type SubagentPreset, type SubagentTree,
+  type CoreEventDataMap, type PermissionMode, type RuntimeAgentMode, type RuntimeJsonValue, type SubagentActivationStatus, type SubagentDelivery, type SubagentKind, type SubagentPreset, type SubagentTree,
 } from "@actspace/shared/runtime-v2";
 import { FORKED_SUBAGENT_PRESET_ID, resolveSessionWorkspaceRoot, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHandle, SessionStore } from "@actspace/session-persistence";
@@ -42,9 +42,9 @@ export type ChildLoopInput = {
 /** One Harness lease holding a child Run: the TaskLedger entry and the Loop factory of the caller's generation. */
 export type ChildRunLease = {
   readonly scope: AgentScope;
-  start(session: SessionHandle, content: RuntimeV2JsonValue, runId: string): Promise<{ readonly messageId: string }>;
+  start(session: SessionHandle, content: RuntimeJsonValue, runId: string): Promise<{ readonly messageId: string }>;
   createLoop(input: ChildLoopInput): Promise<ChildLoop>;
-  finish(outcome: "completed" | "cancelled" | "failed", value: RuntimeV2JsonValue): Promise<void>;
+  finish(outcome: "completed" | "cancelled" | "failed", value: RuntimeJsonValue): Promise<void>;
   release(): Promise<void>;
 };
 
@@ -606,7 +606,7 @@ function turnOutcome(reason: string): { readonly status: SubagentActivationStatu
 }
 
 type ResolvedCaller = { readonly root: SessionHandle; readonly rootId: string; readonly isRoot: boolean; readonly scope?: AgentScope };
-type SubagentDetail = readonly { readonly label: string; readonly value: RuntimeV2JsonValue }[];
+type SubagentDetail = readonly { readonly label: string; readonly value: RuntimeJsonValue }[];
 
 /** Serialize message delivery and settlement per child (DSH `ChildLock`). */
 class ChildLock {
@@ -704,7 +704,7 @@ async function waitForFile(path: string, settled: Promise<unknown>, timeoutMs: n
 }
 
 /** The Agent mode of the Session's latest `turn/start`. */
-function latestTurnMode(session: SessionHandle): RuntimeV2AgentMode | undefined {
+function latestTurnMode(session: SessionHandle): RuntimeAgentMode | undefined {
   const mode = record(session.journal.latestEvent("turn/start")?.data).mode;
   return mode === "agent" || mode === "plan" || mode === "chat" ? mode : undefined;
 }

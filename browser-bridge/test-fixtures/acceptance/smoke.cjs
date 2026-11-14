@@ -1,6 +1,6 @@
 const path = require("node:path");
 
-const { RuntimeV2BridgeClient } = require("./runtime-v2-client.cjs");
+const { RuntimeBridgeClient } = require("./runtime-v2-client.cjs");
 
 const socketPath = path.join(
   process.env.HOME,
@@ -9,7 +9,7 @@ const socketPath = path.join(
 const fixtureURL = process.env.ABB_ACCEPTANCE_URL ?? "http://127.0.0.1:4173/index.html";
 const uploadPath = path.resolve(__dirname, "sample.txt");
 
-const client = new RuntimeV2BridgeClient({
+const client = new RuntimeBridgeClient({
   socketPath,
   sessionId: `acceptance-${Date.now()}`,
   turnId: "fixture-smoke",
