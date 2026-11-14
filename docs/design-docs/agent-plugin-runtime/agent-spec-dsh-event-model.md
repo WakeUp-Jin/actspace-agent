@@ -9,7 +9,7 @@
 
 ## 1. 依据与边界
 
-当前事件词汇与 envelope 以 ActSpace `packages/session/session-journal/src/core-codecs.ts`、默认 Agent Loop 和 [Session Format v1](agent-spec-session-format-v1.md)为准。以下保留设计时的参考资料顺序，不覆盖当前实现：
+当前事件词汇与 envelope 以 ActSpace `packages/session/session-journal/src/core-codecs.ts`、默认 Agent Loop 和 [Session Format v1](agent-spec-session-format-v1.md)为准；归 core 所有的事件每种 `data` 的 TypeScript 形状在 `packages/util/shared/src/runtime-v2/core-events.ts` 的 `CoreEventDataMap`，写入只经 `coreEvent()`（`pnpm check:core-events` 检查）。以下保留设计时的参考资料顺序，不覆盖当前实现：
 
 1. DSH 外部参考快照中 session `types.ts` 与 agent-loop `agent.ts` 的源码行为（外部仓库路径，不在本仓库）；
 2. `tmp/deepseek-harness/docs/persistence-catalog.md` 的持久化目录；

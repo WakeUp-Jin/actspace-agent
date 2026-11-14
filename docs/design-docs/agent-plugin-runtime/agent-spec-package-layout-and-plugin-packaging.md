@@ -138,6 +138,8 @@ flowchart LR
 
 `ACTSPACE_SERVICE_IDS` / `ACTSPACE_SERVICE_DEFINITIONS`（`packages/composition/cordis-adapter/src/service-contract.ts`）是稳定名称及审计目录，不能据此宣称服务已激活；实际 required-service 校验和 Cordis settlement 才决定就绪。元数据与 manifest 不一致应修正来源，不能把目录当作第二套能力系统。
 
+服务的 TypeScript 类型也跟着定义走。类型所属的包把定义和类型绑在一起导出一次，提供方用 `provideService(ctx, 定义, value)` 注册，取用方用 `getService` / `requireService` / `getLeasedService` 取；取用方不再按字符串 id 取出后自己断言类型，提供方改了类型，两边都由编译器提醒。下层包取上层包注册的服务时不能依赖对方，用只写自己用到的成员的视图（`serviceView`），视图和真实服务对不对得上由 `@actspace/runtime` 的 `src/startup/service-views.ts` 逐行核对。写法见 [cordis-adapter 的 README](../../../packages/composition/cordis-adapter/README.md#按定义取用服务)，`pnpm check:service-access` 拦住旧写法。这只约束类型，不改变上一段的结论：服务有没有激活仍然看 required-service 校验和 Cordis settlement。
+
 存储是具体例子：`SessionStorage` 定义 inspect/list/create/open/flush 等语义；JSONL Provider 负责锁、编码、fsync 和物理修复；SessionStore 负责接纳、恢复、fork 和水位；调用方不读取 journal.jsonl 路径。内存 Provider 独立验证接口，不承诺数据库事务和持久性。相关边界见[存储规范](agent-spec-session-core-persistence-separation.md)和[启动链](agent-spec-dsh-plugin-assembly-and-agent-startup.md)。
 
 卸载意味着资源停止并释放，而不只是删掉服务名称。只读观察 emit 不阻塞提交；持久化屏障直接 await 能力方法，不能靠通知完成。
