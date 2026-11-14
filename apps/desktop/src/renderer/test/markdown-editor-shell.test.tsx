@@ -177,7 +177,12 @@ describe("MarkdownEditor 外壳：生命周期", () => {
   });
 
   it("不静态引用编辑器：DocsReader 只经懒加载入口使用它", () => {
-    const staticImports = (source: string) => source.split("\n").filter((line) => /^import (?!type)/.test(line) && line.includes("markdown-editor"));
+    // 按语句认 import，不按行：名字多了格式化工具会把一条 import 折成几行，按行找会漏掉。
+    const staticImports = (source: string) =>
+      [...source.matchAll(/^import\s+(?!type\b)(?:[^;"']*\sfrom\s+)?["'][^"']*markdown-editor[^"']*["'];?/gm)].map((match) => match[0].replace(/\s+/g, " "));
+    expect(staticImports('import {\n  parseOutline,\n  renderPreview,\n} from "../../markdown-editor/core";\nimport type {\n  OutlineItem,\n} from "../../markdown-editor";\n')).toEqual([
+      'import { parseOutline, renderPreview, } from "../../markdown-editor/core";',
+    ]);
     expect(staticImports(readerSource)).toEqual(['import { MarkdownEditor, type MarkdownEditorHandle } from "../../markdown-editor";']);
     expect(staticImports(outlineSource)).toEqual([]);
     expect(entrySource).toMatch(/lazy\(\(\) => import\("\.\/MarkdownEditor"\)/);
