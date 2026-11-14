@@ -43,6 +43,10 @@
 | 防止再写回去的三个检查（PR 6） | `scripts/check-core-event-writes.mjs`、`scripts/check-service-access.mjs`、`scripts/check-harness-event-contracts.mjs`、`package.json` | `pnpm check:core-events`、`pnpm check:service-access`，以及 `pnpm check:harness-events` 新增的一条规则，随 `pnpm test:scripts` 在 CI 里跑。 |
 | 「编辑提问再发送」不可用（PR 6，新发现） | `packages/session/session-persistence-jsonl/src/plugin.ts` | 存储的包装服务漏转发三个方法。编辑之前的提问再发送，每次都提示「这条提问不能再编辑。」，还会把这个会话正在运行的子智能体和后台任务停掉；查看已经释放的空闲会话，每次都把整份记录重读一遍。不在审查的 24 项里。 |
 | `llm/stream` 的监听器不派发时归还路由（PR 6，新发现） | `packages/core/agent-loop/src/loop.ts` | 监听器直接给出流、不调 `next()` 时，准备好的那次调用占着的路由原来不归还，这条路由之后注销会等到超时。目前没有生产插件注册这个干预点。 |
+| 标识符去掉 `RuntimeV2`（PR 7，L6） | 292 个文件：`apps/desktop` 97 个、`apps/cli` 14 个、`apps/web` 5 个、`packages/` 167 个、`browser-bridge/test-fixtures` 7 个、`scripts` 2 个 | 113 个名字、2,144 处，例如 `RuntimeV2SessionSnapshot` 改成 `RuntimeSessionSnapshot`。改名由 `node scripts/check-transitional-names.mjs --write` 完成，没有手改。只改代码里的标识符：目录名、文件名和引入路径里的 `runtime-v2`，IPC channel、设置键、落盘内容、界面文字都没有动。`SettingsV4` 这一类和 `LegacyProxyWireEngine` 核对之后没有改，原因见「已知风险和遗留事项」。 |
+| 防止旧名字回来的检查（PR 7） | `scripts/check-transitional-names.mjs`、`scripts/check-current-docs.mjs`、`package.json` | `pnpm check:transitional-names` 随 `pnpm test:scripts` 在 CI 里跑；`pnpm check:docs` 多一条规则，设计文档和当前事实文档里出现旧名字会报。别的分支带进旧名字时，同一个脚本加 `--write` 就改掉。 |
+| `DesktopLlmAdapter`（PR 7，L6） | `apps/desktop/src/main/runtime-v2/llm-adapter.ts`（原来叫 `legacy-llm-adapter.ts`）、`desktop-host-adapter.ts` | 桌面端现在唯一的 LLM 适配器，类名和文件名里的 `Legacy` 去掉。 |
+| 删掉没有人读的字段（PR 7） | `apps/desktop/src/main/model-runtime-service.ts` | `ResolvedRuntimeModel.llmConfig` 和它的类型，11 行。 |
 
 ## 人工验证指引
 
@@ -109,6 +113,10 @@
    - 验证方式：启动桌面端，开一个新会话，让模型读一个文件、跑一条命令、再让它起一个子智能体做一件小事；等会话标题自动生成。扩展 › 插件 里开着「英语学习」或「操控浏览器」的话，各用一次。
    - 预期结果：和原来一样，启动和使用中都不出现 `… requires …` 这样的报错。
    - 为什么列在这里：PR 6 改了 122 个非测试文件里取用和注册服务的写法，其中五个插件（英语学习、会话标题、三个子智能体插件）在服务不在时从「之后用到时出错」改成「取用的地方直接报错」。逐个文件对过取用和注册的 id 前后一致，默认 Harness 的启动和各插件的用例都通过；云端没有真实的 Electron 窗口和真实的 Provider 连接。
+10. **改名之后启动一次，浏览器验收脚本跑一次（PR 7）**
+    - 验证方式：启动桌面端，打开一个已有的会话，再开一个新会话发一条消息。平时用浏览器验收脚本的话，按 `browser-bridge/test-fixtures/acceptance/README.md` 连好扩展和 Native Host，跑一次 `node browser-bridge/test-fixtures/acceptance/smoke.cjs`。
+    - 预期结果：和原来一样。
+    - 为什么列在这里：改名改到 292 个文件。依据是改名前后的构建产物对照（除了 26 个 `.js` 里的函数名、类名、常量名和模块导出名跟着改了，其余运行时代码逐字节相同）和全量测试；云端没有真实的桌面窗口。`browser-bridge` 的 7 个验收脚本要连真实的浏览器，只做了语法检查，核对了导出的名字和引用方一致，没有运行。
 
 ## Agent 已完成的验证
 
@@ -121,6 +129,7 @@
 - PR 4：M2 不改行为的那一步，重构前后把同一个场景的会话日志、实时事件、适配器收到的内容导出来逐字节对拍，一致。后两步和 M1 新增的用例都回到改之前的代码上确认过会失败（哪几条失败、报什么，见执行过程步骤 5），原有行为由「不带钩子时对拍仍然一致」守着。M1 另外量过内存，数字和量法见执行过程步骤 5。
 - PR 5：共享实现在 POSIX 和 Windows 两套路径规则下各有一张用例表，并和一个写法独立的逐段比较实现穷举对照（posix 22,800 组、win32 66,822 组），结果一致；把实现改成原来那三种错的写法，测试都失败。有行为变化的每一处新增的用例，都回到改之前的代码上确认过失败；行为不变的几处补了用例，改之前同样通过。新加的检查在改之前的代码上报出 22 个文件 28 处，现在通过。清单见执行过程步骤 6。
 - PR 6：三组改动都说「运行时行为不变」，各自核对过。事件：改动前后构造事件的地方用语法树逐处比较，71 处对 69 处，67 处逐字相同，其余两个文件逐处看过。服务：每个文件取用和注册的 id 前后比较，255 处、69 个文件全部一致；原来断言成「一定在」的 16 处逐处对过现在服务不在时的表现；非测试代码的改动整份读过。这一步找出三处那次提交的说明没有列的差别，一处改了回去，更正写在 history 里。干预点：9 处分发逐处对过。类型上，每组都有必须编译不过的反例（6、8、14 个）。三个检查里，前两个在改之前的代码上报出的就是这次改掉的那些，三个脚本都逐处改错再跑过用例（55、144、78 种改法，只有 1 种改了结果一样）。两处顺带的修复，新增的用例都回到改之前的代码上确认过失败。清单见执行过程步骤 7。
+- PR 7：改名说的是「行为不变」，用三种办法核对。源码：另写一个脚本用 TypeScript 解析器逐 token 对照，292 个文件改名前后 token 的数量和种类相同，不同的只有 2,144 处标识符、1 处字符串和 3 处注释。位置：生产代码里的旧名字没有一处是对象的键或属性访问，也就是没有一个名字会跟着对象被序列化。产物：改名前后各从零构建一次，2,727 个产物文件名字相同，2,400 个逐字节相同，150 个把改名前的产物按同一张表改名后逐字节相同，其余 177 个是 source map、增量构建缓存和一个带构建时间的文件。新加的检查在改名之前的代码上报出 2,148 处，和解析器另外数的一致；脚本逐处改错再跑用例，36 处加文档规则的 7 处，每一处都有用例失败。全量验证 14 步通过，包测试的通过数和 PR 6 相同。清单见执行过程步骤 8。
 
 ## 已知风险和遗留事项
 
@@ -150,6 +159,14 @@
 - PR 6 里五个插件（英语学习、会话标题、三个子智能体插件）多了 12 处「服务不在就报错」的判断，那次提交的说明没有列。这些插件的 `inject` 都列了这些服务，正常挂载时走不到；走到时报的是 `<取用方> requires <id>.`，原来是之后用到时的 TypeError。
 - PR 6 让 CLI 的 Agent Host 在 Profile 里没有 `agent.runtime` 时启动就报 `Agent runtime unavailable`，原来是之后第一次用到时出错。正常安装里走不到；报错的这个分支没有用例，正常启动由进程级测试覆盖。
 - `tsconfig.base.json` 的 `"baseUrl": "."` 让声明文件里出现以仓库根目录为起点的路径，两个 app 解析不到时那个类型会悄悄变成 `any`，类型检查不报错。强制重建后 634 个声明文件里有 4 处，都是原有的。PR 6 只绕开了自己碰到的那一处并加了编译期检查；根因计划放在栈顶单独一个 PR（PR 9），可以不合。
+- PR 7 没有用户能感知的变化，所以没有写发布记录。运行时的差别只有调用栈里的函数名和类名。
+- PR 7 只做了审查条目 L6 的一部分，另外两部分核对之后撤回，审查时看错了：
+  - `SettingsV4`、`getV4`、`updateV4` 这一类里的 `V4` 是设置落盘格式的版本号，不是过渡期的后缀。旧格式的类型和迁移代码还在，新旧两套读写接口并存，去掉 `V4` 之后两套名字分不开。
+  - `LegacyProxyWireEngine` 是 LLM 设计文档定义的 legacy transport，名字和设计一致。名字里的 `Proxy` 只对一半，设计文档也有两处没跟上，记在 `docs/exec-plans/tech-debt-tracker.md`；要不要连设计文档的用词一起按职责改名，需要你来定。
+- PR 7 只改标识符。`runtime-v2` 这个目录名、文件名和引入路径（`@actspace/shared/runtime-v2`，303 个文件 394 处）没有改：别的分支新写的 import 在改名之后会解析不到，也没有一条命令能对齐。要改的话单独一个 PR。
+- PR 7 合并之后，从它之前的 `main` 拉出去的分支如果新写了旧名字，合并 `main` 之后类型检查和 `pnpm check:transitional-names` 会报。在那个分支上跑 `node scripts/check-transitional-names.mjs --write` 再跑 `pnpm typecheck` 就对齐了。2026-11-14 核对过当时开着的另外 5 个 PR，新增的行里都没有旧名字。
+- `pnpm check:transitional-names` 只认含 `RuntimeV2` 的标识符和表里逐个列出的 7 个名字。新起一个别的带版本后缀的名字（例如 `FooV2`）不会报：设置和 Session 事件的格式版本也是这种写法，脚本区分不开，还要靠评审。文档那条规则只查设计文档和当前事实文档。
+- PR 7 让 `@actspace/shared/runtime-v2` 入口文件的内容变了，Host 契约摘要跟着变。只用内置 Harness 的数据目录启动时自动换到新版本；有自定义 Harness 选择的数据目录，那个选择会被拒绝并要求重新准备。这不是 PR 7 才有的：PR 5、PR 6 已经改过 7 个入口文件里的 5 个。被拒绝的这条路径没有实际走一遍，依据是读 `harness-control` 的代码。摘要只看入口文件字节这一点记在 `docs/exec-plans/tech-debt-tracker.md`。
 
 ## 后续建议
 
