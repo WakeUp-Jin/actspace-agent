@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { coreEvent, type CoreEventDataMap, type CoreEventType, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionInspection } from "./session-store.js";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHandle } from "./session.js";
@@ -95,12 +95,12 @@ export function planSessionRecovery(events: readonly SessionEventEnvelopeV1[], o
   if (committed.has(repairId)) return null;
   const candidates: SessionEventCandidateV1[] = [];
   if (activeRepairId === null) {
-    candidates.push(coreCandidate("recovery/start", { repairId, sourceBoundarySeq }));
+    candidates.push(recoveryEvent("recovery/start", { repairId, sourceBoundarySeq }));
   }
   for (const [requestId, request] of openRequests) {
     // 只写了 header 的请求（context 那条没写进去）先补一条只有 id 的 context：assistant/message 只能了结有 context 的请求。
-    if (!request.context) candidates.push(coreCandidate("request/context", { requestId, turnId: request.turnId, stepId: request.stepId, repairId }, [request.headerSeq]));
-    candidates.push(coreCandidate("assistant/message", {
+    if (!request.context) candidates.push(recoveryEvent("request/context", { requestId, turnId: request.turnId, stepId: request.stepId, repairId }, [request.headerSeq]));
+    candidates.push(recoveryEvent("assistant/message", {
       requestId,
       messageId: `recovery-${repairId}-${requestId}`,
       content: "",
@@ -116,11 +116,11 @@ export function planSessionRecovery(events: readonly SessionEventEnvelopeV1[], o
       ? "The tool body was not started. Retry only if it is still needed."
       : "The tool body may have run, but no result was durable. Verify external state before retrying.";
     // 节点 recovery-${repairId}-${callId}、isError: true 由 surfaceNode 推出（agent-spec-surface-derived.md §4.2）。
-    candidates.push(coreCandidate("tool/recovery-outcome", { callId, repairId, outcome, retryAllowed: outcome === "not-started", content }, sources, { kind: "append" }));
+    candidates.push(recoveryEvent("tool/recovery-outcome", { callId, repairId, outcome, retryAllowed: outcome === "not-started", content }, sources, { kind: "append" }));
   }
-  if (closeTurn && openStepId !== null && openTurnId !== null) candidates.push(coreCandidate("step/end", { turnId: openTurnId, stepId: openStepId, reason: "interrupted", repairId }));
-  if (closeTurn && openTurnId !== null) candidates.push(coreCandidate("turn/end", { turnId: openTurnId, reason: "interrupted", repairId }));
-  candidates.push(coreCandidate("recovery/committed", { repairId, sourceBoundarySeq }));
+  if (closeTurn && openStepId !== null && openTurnId !== null) candidates.push(recoveryEvent("step/end", { turnId: openTurnId, stepId: openStepId, reason: "interrupted", repairId }));
+  if (closeTurn && openTurnId !== null) candidates.push(recoveryEvent("turn/end", { turnId: openTurnId, reason: "interrupted", repairId }));
+  candidates.push(recoveryEvent("recovery/committed", { repairId, sourceBoundarySeq }));
   return Object.freeze({ repairId, sourceBoundarySeq, candidates: Object.freeze(candidates), resumedTransaction: activeRepairId !== null });
 }
 
@@ -148,20 +148,14 @@ export async function settleOpenTurnWork(session: SessionHandle, turnStartSeq: n
 }
 
 
-function coreCandidate(
-  type: string,
-  data: Record<string, RuntimeV2JsonValue>,
+/** 恢复事务写的每条记录都记同一个贡献者，`sourceEventSeqs` 指向它要了结的那条记录。 */
+function recoveryEvent<T extends CoreEventType>(
+  type: T,
+  data: CoreEventDataMap[T],
   sourceEventSeqs: readonly number[] = [],
   surface: SessionEventCandidateV1["surface"] = null,
 ): SessionEventCandidateV1 {
-  return {
-    type,
-    eventVersion: 1,
-    source: { ownerPluginId: "@actspace/core" },
-    data,
-    surface,
-    provenance: { sourceEventSeqs, contributorIds: ["@actspace/core/recovery"], runtimeSelectionSeq: null },
-  };
+  return coreEvent(type, data, { surface, provenance: { sourceEventSeqs, contributorIds: ["@actspace/core/recovery"], runtimeSelectionSeq: null } });
 }
 
 function stableRepairId(events: readonly SessionEventEnvelopeV1[]): string {

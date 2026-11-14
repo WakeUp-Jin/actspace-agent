@@ -1,4 +1,4 @@
-import { isBackgroundWake, taskOperation, type BackgroundBashTaskView } from "@actspace/shared/runtime-v2";
+import { coreEvent, isBackgroundWake, taskOperation, type BackgroundBashTaskView } from "@actspace/shared/runtime-v2";
 
 import { SessionModeWriter } from "./session-commands.js";
 import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
@@ -236,7 +236,7 @@ export class AgentApplication implements AgentApplicationContract {
         await this.#runs.initialize(sessionId);
       } finally {
         // Clients, transcript and other observers learn of the rewind from this ordinary Journal fact.
-        await session.append(core("session/rewound", { cutSeq: cut.cutSeq, droppedThroughSeq: cut.droppedThroughSeq, runId: rewind.runId, archive: result.archive, rewoundAt: new Date().toISOString() }));
+        await session.append(coreEvent("session/rewound", { cutSeq: cut.cutSeq, droppedThroughSeq: cut.droppedThroughSeq, runId: rewind.runId, archive: result.archive, rewoundAt: new Date().toISOString() }));
         await session.flush();
       }
       receipt = await this.#submit(sessionId, submissionId, content, agentRunId);
@@ -419,9 +419,9 @@ export class AgentApplication implements AgentApplicationContract {
     if (patch.title !== undefined) emitNotification(this.ctx, "application/title-changing", { sessionId });
     const session = await this.#sessions.resume(sessionId);
     const events: SessionEventCandidateV1[] = [];
-    if (patch.title !== undefined) events.push(core("session/title-set", { title: patch.title === null ? null : patch.title.trim().slice(0, 160) || null }));
-    if (patch.pinned !== undefined) events.push(core("session/pinned-set", { pinned: patch.pinned }));
-    if (patch.archived !== undefined) events.push(core("session/archived-set", { archived: patch.archived }));
+    if (patch.title !== undefined) events.push(coreEvent("session/title-set", { title: patch.title === null ? null : patch.title.trim().slice(0, 160) || null }));
+    if (patch.pinned !== undefined) events.push(coreEvent("session/pinned-set", { pinned: patch.pinned }));
+    if (patch.archived !== undefined) events.push(coreEvent("session/archived-set", { archived: patch.archived }));
     if (events.length > 0) { await session.appendMany(events); await session.flush(); }
     return this.#sessions.snapshot(session);
   }
@@ -436,10 +436,10 @@ export class AgentApplication implements AgentApplicationContract {
       const events: SessionEventCandidateV1[] = [];
       if (snapshot.workspaceRoot !== next) {
         for (const grant of snapshot.sessionGrants) {
-          if (grant.selector.kind === "command_prefix") events.push(core("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: new Date().toISOString(), reason: "workspace-changed" }));
+          if (grant.selector.kind === "command_prefix") events.push(coreEvent("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: new Date().toISOString(), reason: "workspace-changed" }));
         }
       }
-      events.push(core("session/workspace-set", { workspaceRoot: next }));
+      events.push(coreEvent("session/workspace-set", { workspaceRoot: next }));
       await session.appendMany(events);
       await session.flush();
       return this.#sessions.snapshot(session);
@@ -457,10 +457,10 @@ export class AgentApplication implements AgentApplicationContract {
       for (const grant of snapshot.sessionGrants) {
         if (grant.selector.kind === "command_prefix") continue;
         const path = grant.selector.kind === "exact" ? grant.selector.canonicalPath : grant.selector.canonicalRoot;
-        if (snapshot.workspaceRoot === null || !isLexicallyInside(nodePath, snapshot.workspaceRoot, path, { includeRoot: true })) events.push(core("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: changedAt, reason: "permission-mode-downgrade" }));
+        if (snapshot.workspaceRoot === null || !isLexicallyInside(nodePath, snapshot.workspaceRoot, path, { includeRoot: true })) events.push(coreEvent("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: changedAt, reason: "permission-mode-downgrade" }));
       }
     }
-    events.push(core("permission/mode-set", { mode, changedAt, source: this.source }));
+    events.push(coreEvent("permission/mode-set", { mode, changedAt, source: this.source }));
     await session.appendMany(events);
     await session.flush();
     return this.#sessions.snapshot(session);
@@ -472,7 +472,7 @@ export class AgentApplication implements AgentApplicationContract {
     const snapshot = this.#sessions.snapshot(session);
     const grant = snapshot.sessionGrants.find((candidate) => candidate.grantId === grantId);
     if (grant === undefined || grant.sessionId !== sessionId || grant.agentId !== `main:${sessionId}`) throw new Error("Session Grant is not active for this main Agent.");
-    await session.append(core("permission/grant-revoked", { schemaVersion: 1, grantId, sessionId, agentId: grant.agentId, revokedAt: new Date().toISOString(), reason: "user-revoked" }));
+    await session.append(coreEvent("permission/grant-revoked", { schemaVersion: 1, grantId, sessionId, agentId: grant.agentId, revokedAt: new Date().toISOString(), reason: "user-revoked" }));
     await session.flush();
     return this.#sessions.snapshot(session);
   }
@@ -485,7 +485,6 @@ function required<T>(ctx: CordisContext, id: string): T {
   return value;
 }
 
-function core(type: string, data: RuntimeV2JsonValue): SessionEventCandidateV1 { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
 
 export type DesktopBrowsePage = { deferredToolCalls?: string[]; snapshot: RuntimeV2SessionSnapshot; journal: readonly SessionEventEnvelopeV1[]; history: { before: number | null; throughJournalSeq: number } };
 

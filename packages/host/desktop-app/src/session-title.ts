@@ -1,7 +1,6 @@
 import { containNotification, type CordisContext } from "@actspace/cordis-adapter";
 import type { SessionHandle } from "@actspace/session-persistence";
-import type { RuntimeV2JsonValue, RuntimeV2RunTurnRequest, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
-import type { SessionEventCandidateV1 } from "@actspace/session-journal";
+import { coreEvent, type RuntimeV2JsonValue, type RuntimeV2RunTurnRequest, type RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 import type { LlmService } from "@actspace/llm-service";
 import { completeText } from "./complete-text.js";
 
@@ -47,7 +46,7 @@ export class SessionTitleBehavior {
     // Rename cancels synchronously, before its first await. Append queues before
     // any later rename, so an explicit user title always wins.
     if (!signal.aborted && !this.#disposed && this.#snapshot(session).metadata.title === null) {
-      await session.append(core("session/title-set", { title }));
+      await session.append(coreEvent("session/title-set", { title }));
       await session.flush();
     }
   }
@@ -85,4 +84,3 @@ function textFromContent(value: RuntimeV2JsonValue): string {
   return typeof value === "string" ? value : Array.isArray(value) ? value.flatMap((item) => item !== null && typeof item === "object" && !Array.isArray(item) && item.type === "text" && typeof item.text === "string" ? [item.text] : []).join(" ") : "";
 }
 
-function core(type: string, data: RuntimeV2JsonValue): SessionEventCandidateV1 { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }

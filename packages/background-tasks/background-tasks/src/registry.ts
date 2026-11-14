@@ -1,5 +1,5 @@
 import { MainAgentInbox } from "@actspace/agent";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { coreEvent, type CoreEventDataMap, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { renderLostNotification, renderOutputMatchNotification, renderTaskNotification, userStoppedSummary, type NotifiedTask } from "./notification.js";
 import { BackgroundTaskError, type BackgroundTaskDelivery, type BackgroundTaskKind, type BackgroundTaskOutput, type BackgroundTaskOutputOptions, type BackgroundTaskRecord, type BackgroundTaskSource, type BackgroundTaskStatus, type BackgroundTaskTerminal } from "./types.js";
@@ -82,7 +82,7 @@ export class BackgroundTaskRegistry {
     });
     if (entry) entry.pruned = true;
     if (known.get(taskId) !== false) return;
-    await session.append(core({ op: "prune", taskId, prunedAt: new Date(this.#now()).toISOString(), reason: "session-cap" }));
+    await session.append(coreEvent("background/task", { op: "prune", taskId, prunedAt: new Date(this.#now()).toISOString(), reason: "session-cap" }));
   }
 
   /** The stop result is the delivery; a stopped task never sends a notification. */
@@ -144,7 +144,7 @@ export class BackgroundTaskRegistry {
     });
     for (const [taskId, task] of open) {
       if (this.#entries.has(taskId)) continue;
-      await session.append(core({ op: "settle", taskId, status: "lost", endedAt: new Date(this.#now()).toISOString(), delivery: "lost" }));
+      await session.append(coreEvent("background/task", { op: "settle", taskId, status: "lost", endedAt: new Date(this.#now()).toISOString(), delivery: "lost" }));
       await new MainAgentInbox(session).enqueue(renderLostNotification({ taskId, ...task }), { taskId, kind: noticeKind(task.kind), title: task.description, status: "lost" });
     }
   }
@@ -199,8 +199,8 @@ export class BackgroundTaskRegistry {
   async #enqueue(sessionId: string, text: string, notice: { readonly taskId: string; readonly kind: BackgroundTaskKind; readonly title: string; readonly status: string }) {
     return new MainAgentInbox(await this.options.openSession(sessionId)).enqueue(text, { ...notice, kind: noticeKind(notice.kind) });
   }
-  async #append(sessionId: string, data: RuntimeV2JsonValue): Promise<void> {
-    await (await this.options.openSession(sessionId)).append(core(data));
+  async #append(sessionId: string, data: CoreEventDataMap["background/task"]): Promise<void> {
+    await (await this.options.openSession(sessionId)).append(coreEvent("background/task", data));
   }
   #owned(sessionId: string): Entry[] { return [...this.#entries.values()].filter(entry => entry.source.sessionId === sessionId); }
   #require(sessionId: string, taskId: string): Entry {
@@ -232,8 +232,6 @@ function record(entry: Entry): BackgroundTaskRecord {
     ...(source.bash === undefined ? {} : { bash: source.bash }),
     ...(source.agent === undefined ? {} : { agent: source.agent }) });
 }
-
-function core(data: RuntimeV2JsonValue) { return { type: "background/task", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
 
 /** The surface Harness plugins use through `actspace.host.background-tasks`. */
 export type BackgroundTaskHost = Pick<BackgroundTaskRegistry, "register" | "list" | "get" | "output" | "stop" | "notifyOutputMatch" | "notifySubscriptionStopped" | "markPruned" | "hasRunning" | "runningCount">;

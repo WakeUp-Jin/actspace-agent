@@ -1,4 +1,5 @@
 export * from "./session-events";
+export * from "./core-events";
 export {
   freezeRuntimeV2Json,
   isRuntimeV2JsonValue,

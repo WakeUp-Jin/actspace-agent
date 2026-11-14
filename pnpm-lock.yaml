@@ -1717,9 +1717,6 @@ importers:
       '@actspace/llm-service':
         specifier: workspace:*
         version: link:../../llm/llm-service
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../../session/session-journal
       '@actspace/session-persistence':
         specifier: workspace:*
         version: link:../../session/session-persistence
