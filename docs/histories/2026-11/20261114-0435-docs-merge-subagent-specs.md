@@ -21,7 +21,7 @@
 - **不抄代码里的文字**：工具描述、参数说明、返回与错误文字只在 `packages/subagent/subagent/src/messages.ts`，通知版式只在 `packages/background-tasks/background-tasks/src/notification.ts`，规范里不再有副本。
 - **包 README**：`packages/subagent/README.md`、`packages/subagent/subagent/README.md`、`packages/background-tasks/README.md` 只留包表、包之间怎么连、入口与测试、怎么扩展，规则改成链接。
 - **代码注释**：31 个代码文件里的「设计 02 / 04 / 05 §N」改指现状规范的章节，只动注释。
-- **顺带修正**：核对引用时发现 7 份其他规范里的子智能体描述和代码对不上，各改一两句：`agent-forms-and-modes.md` 与 `front-聊天输入框规范.md`（Plan 的工具表还列着 `explore`）、`front-轨迹视图规范.md` 与 `agent-spec-runtime-projection.md`（父轨迹从 `subagent/spawned` 找子会话）、`11-Harness统计设计.md`（统计读 `subagent/*`）、`agent-task-run-lifecycle.md`（子 Run 沿调用方的 Scope 取同一 generation）、`agent-session-transcript.md`（消息只在父子之间）。
+- **顺带修正**：核对引用时发现 8 份其他规范里的子智能体描述和代码对不上，各改一两句：`agent-forms-and-modes.md` 与 `front-聊天输入框规范.md`（Plan 的工具表还列着 `explore`）、`front-轨迹视图规范.md` 与 `agent-spec-runtime-projection.md`（父轨迹从 `subagent/spawned` 找子会话）、`11-Harness统计设计.md`（统计读 `subagent/*`）、`agent-task-run-lifecycle.md`（子 Run 沿调用方的 Scope 取同一 generation）、`agent-session-transcript.md`（消息只在父子之间）、`多智能体协作/README.md`（对这一组的一句话介绍还写着默认后台、可续聊）。
 - **检查**：`check-current-docs.mjs` 的 `currentTruthFiles` 去掉已删除的契约，55 → 54。
 
 ### 🧠 Design Intent (Why)
@@ -54,5 +54,6 @@
 - `docs/design-docs/子智能体和后台任务设计规范/`、`docs/design-docs/agent-plugin-runtime/agent-spec-agent-and-subagent.md`（删除）
 - `packages/subagent/README.md`、`packages/subagent/subagent/README.md`、`packages/background-tasks/README.md`
 - `docs/design-docs/index.md`、`docs/design-docs/agent-plugin-runtime/README.md`、`scripts/check-current-docs.mjs`
+- `docs/design-docs/frontend/front-轨迹视图规范.md`、`docs/design-docs/frontend/front-聊天输入框规范.md`、`docs/design-docs/agent-plugin-runtime/agent-spec-runtime-projection.md`、`docs/design-docs/agent-plugin-runtime/agent-spec-agent-scope-model.md`、`docs/design-docs/agent-plugin-runtime/agent-spec-prompt-context-contributors.md`、`docs/design-docs/agent-plugin-runtime/agent-task-run-lifecycle.md`、`docs/design-docs/agent-runtime/agent-forms-and-modes.md`、`docs/design-docs/agent-runtime/agent-session-transcript.md`、`docs/design-docs/自进化的方案设计/11-Harness统计设计.md`、`docs/design-docs/多智能体协作/README.md`
 - `docs/exec-plans/tech-debt-tracker.md`
 - `packages/subagent/**`、`packages/util/shared/**`、`packages/client/**`、`apps/desktop/src/renderer/**` 等 31 个文件的注释
