@@ -243,12 +243,6 @@ test("--write with paths renames only those, Markdown included, and still skips 
     "packages/a/src/value.ts": BAD,
     "packages/a/src/other.ts": BAD,
   });
-  assert.throws(() => runWrite(root, [], ["docs/design-docs", "docs/missing"]), /找不到 docs\/missing/);
-  for (const outside of ["..", "../elsewhere", path.dirname(root)]) {
-    assert.throws(() => runWrite(root, [], ["docs/design-docs", outside]), /不在仓库里/, outside);
-  }
-  for (const whole of [".", root, "docs/.."]) assert.throws(() => runWrite(root, [], [whole]), /不能整个仓库一起改/, whole);
-  assert.equal(fs.readFileSync(path.join(root, "docs/design-docs/a.md"), "utf8"), "`RuntimeV2JsonValue` 和 `RuntimeV2RuntimeState`\n");
   assert.deepEqual(runWrite(root, [], ["docs/design-docs", path.join(root, "packages/a/src/value.ts"), "docs/design-docs/a.md"]), [
     "docs/design-docs/a.md",
     "docs/design-docs/nested/b.md",
@@ -260,6 +254,21 @@ test("--write with paths renames only those, Markdown included, and still skips 
   assert.equal(fs.readFileSync(path.join(root, "docs/design-docs/dist/c.md"), "utf8"), "`RuntimeV2JsonValue`\n");
   assert.equal(fs.readFileSync(path.join(root, "docs/histories/old.md"), "utf8"), "`RuntimeV2JsonValue`\n");
   assert.equal(fs.readFileSync(path.join(root, "packages/a/src/other.ts"), "utf8"), BAD);
+});
+
+test("--write refuses a missing path, a path outside the repository and the repository as a whole, and writes nothing", (t) => {
+  // 「仓库」是临时目录里的一个子目录，越界的路径都指向这个临时目录里面：
+  // 这道拦截要是坏了，被改掉的也只是下面这几个文件，不会是系统临时目录里别人的东西。
+  const OLD = "`RuntimeV2JsonValue`\n";
+  const files = ["repo/docs/design-docs/a.md", "repo/packages/a/src/value.ts", "elsewhere/notes.md", "notes.md"];
+  const sandbox = tempRepo(t, Object.fromEntries(files.map((file) => [file, OLD])));
+  const root = path.join(sandbox, "repo");
+  assert.throws(() => runWrite(root, [], ["docs/design-docs", "docs/missing"]), /找不到 docs\/missing/);
+  for (const outside of ["..", "../elsewhere", "../notes.md", "docs/../../notes.md", sandbox, path.join(sandbox, "elsewhere")]) {
+    assert.throws(() => runWrite(root, [], ["docs/design-docs", outside]), /不在仓库里/, outside);
+  }
+  for (const whole of [".", root, "docs/.."]) assert.throws(() => runWrite(root, [], [whole]), /不能整个仓库一起改/, whole);
+  for (const file of files) assert.equal(fs.readFileSync(path.join(sandbox, file), "utf8"), OLD, file);
 });
 
 test("--write leaves listed names in their file and the check agrees with the result", (t) => {
