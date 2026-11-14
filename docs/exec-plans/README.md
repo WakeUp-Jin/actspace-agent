@@ -16,8 +16,8 @@
 | 计划 | 当前状态与下一步 |
 |---|---|
 | [App 装配层拆分](active/20261110-app-assembly-split.md) | 2026-11-10 立项，未开始。`App.tsx` 1670 行按 8 个职责拆成 `use-*` hook，App 只留装配（目标 ≤ 300 行），Context 字段与 `WorkbenchLayout` prop 不变。下一步：M1 侧边对话 + evict。 |
-| [`@actspace/shared` 契约分层](active/20261109-shared-contract-split.md) | P1 已完成待合入：`ipc.ts` / `session.ts` 按主题拆成 `src/ipc/`、`src/session/`，`check:packages` 新增「后端包不得引用桌面 IPC 契约」规则；对外 API 不变。P2 / P3（子入口、按归属拆包）等 P1 与 #66 / #67 / #68 合入后评估。 |
-| [CI 提速：拆 job 并行 + tsc -b 增量缓存](active/20261109-ci-speedup.md) | P1 `exclude` 修正与根脚本切 `tsc -b` 已落地；下一步拆 `ci.yml` 四个 job 加缓存，再做 desktop 分片。 |
+| [`@actspace/shared` 契约分层](active/20261109-shared-contract-split.md) | P1 已合入（#75）：`ipc.ts` / `session.ts` 按主题拆成 `src/ipc/`、`src/session/`，`check:packages` 新增「后端包不得引用桌面 IPC 契约」规则；对外 API 不变。下一步：评估 P2（子入口与引用迁移）和 P3（按归属拆包）做不做；当初要等的 #66 / #67 / #68 已合入，评估还没开始。 |
+| [CI 提速：拆 job 并行 + tsc -b 增量缓存](active/20261109-ci-speedup.md) | P1–P3 已合入：根脚本切 `tsc -b`、`ci.yml` 拆 job 加缓存、desktop 两分片。剩下的收尾（记录各 job 时长、删除本计划）和第二轮提速都在 #92，未合并。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 待拍板：2026-10-07 立项（来源：Desktop 前端重构 17 的特征测试），D1–D4 一直未决定；再不推进就降级回 [技术债](tech-debt-tracker.md)。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB（编辑器内 `@` 文件引用）待实施。 |
 | [前端基础组件](active/20260926-frontend-ui-components-foundation.md) | Button / IconButton / Tooltip / Menu / Popover / Dialog / Select 等已落地；只剩 Switch、Textarea、Tabs 三个基础组件及对应迁移。 |
