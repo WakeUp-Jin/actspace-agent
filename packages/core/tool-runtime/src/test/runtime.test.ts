@@ -2,7 +2,7 @@ import { getEventListeners } from "node:events";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createCordisRoot } from "@actspace/cordis-adapter";
+import { createCordisRoot, onHook } from "@actspace/cordis-adapter";
 import type { RuntimeV2JsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
 import type { ApprovalBroker } from "@actspace/approval";
 import type { ToolDefinition } from "../definition.js";
@@ -228,7 +228,7 @@ describe("Tool Runtime execution contract", () => {
         ctx.defer(async () => { trace.push("finalized"); });
         return { status: "failed", summary: "failed", modelOutput: [], failure: { code: "BODY_FAILED", message: "original", retryable: false } };
       } } });
-      root.context.on?.("tools/post-execute", (body) => {
+      onHook(root.context, "tools/post-execute", (body) => {
         Object.assign(body, { status: "completed", failure: undefined });
         if (throws) throw new Error("observer failed");
         return body;
@@ -249,7 +249,7 @@ describe("Tool Runtime execution contract", () => {
     const trace: string[] = [];
     const runtime = new ToolRuntime();
     runtime.register({ definition: definition(), executor: { execute: async () => { trace.push("body"); return success(); } } });
-    const remove = root.context.on?.("tools/pre-execute", () => ({ args: { value: 42 } })) as () => void;
+    const remove = onHook(root.context, "tools/pre-execute", () => ({ args: { value: 42 } }));
     try {
       const [rejected] = await runtime.executeBatch([call("bad")], { ...environment(trace), context: root.context });
       expect(rejected.status).toBe("failed");
@@ -264,8 +264,8 @@ describe("Tool Runtime execution contract", () => {
   it("runs the complete safety pipeline in the fixed order", async () => {
     const root = await createCordisRoot();
     const trace: string[] = [];
-    root.context.on?.("tools/pre-execute", async (_payload, next) => { trace.push("before"); return await next(); });
-    root.context.on?.("tools/post-execute", async (_payload, next) => { trace.push("after"); return await next(); });
+    onHook(root.context, "tools/pre-execute", async (_payload, next) => { trace.push("before"); return await next(); });
+    onHook(root.context, "tools/post-execute", async (_payload, next) => { trace.push("after"); return await next(); });
     const runtime = new ToolRuntime();
     runtime.register({
       definition: definition(),

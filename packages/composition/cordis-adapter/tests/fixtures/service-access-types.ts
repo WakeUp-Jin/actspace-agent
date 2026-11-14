@@ -1,8 +1,4 @@
-/**
- * 只给类型检查看的样例，不执行。`service-access.spec.ts` 用 TypeScript 编译它两遍：
- * 原样编译必须没有任何报错（每个 `@ts-expect-error` 都压住了一个真实的错误）；
- * 去掉 `@ts-expect-error` 再编译，报错必须正好落在这些行上、错误码和 spec 里写的一致。
- */
+// 只给类型检查看的样例，不执行。`service-access.spec.ts` 编译它两遍，做法见 `../support/type-fixture.ts`。
 import { bindServiceType, getLeasedService, getService, provideService, requireService, serviceKey, serviceView, type ServiceOf } from "../../src/service-access.js";
 import { ACTSPACE_SERVICE_DEFINITIONS } from "../../src/service-contract.js";
 

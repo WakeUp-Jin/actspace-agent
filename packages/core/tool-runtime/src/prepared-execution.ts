@@ -5,6 +5,7 @@ import { materializeToolArguments } from "./argument-validator.js";
 import type { ApprovalBroker, ApprovalRequest } from "@actspace/approval";
 import { canonicalJson } from "./definition.js";
 import type { ToolArtifactOwner, ToolArtifactRef, ToolBodyResult, ToolCapabilitySet, ToolExecutionContext, ToolProgressUpdate } from "./executor.js";
+import type { ToolArgumentsPatch, ToolExecutePatch } from "./hooks.js";
 import { enforceCoreToolGuards } from "./core-guards.js";
 import { ToolRuntimeError, type ToolFailure } from "./errors.js";
 import type { OrderedCommitSlot } from "./ordered-commit.js";
@@ -677,7 +678,7 @@ function normalizeRenderer(renderer: ToolBodyResult["renderer"]): NonNullable<To
   return Object.freeze({ id: redactToolText(renderer.id), schemaVersion: renderer.schemaVersion, props: redactToolValue(renderer.props) });
 }
 
-function isArgsPatch(value: unknown): value is { readonly args: Readonly<Record<string, RuntimeV2JsonValue>> } {
+function isArgsPatch(value: unknown): value is Required<ToolArgumentsPatch> {
   return value !== null && typeof value === "object" && !Array.isArray(value) && "args" in value && value.args !== null && typeof value.args === "object" && !Array.isArray(value.args);
 }
 
@@ -685,7 +686,7 @@ function isToolBodyResult(value: unknown): value is ToolBodyResult {
   return value !== null && typeof value === "object" && !Array.isArray(value) && (value as { status?: unknown }).status !== undefined && Array.isArray((value as { modelOutput?: unknown }).modelOutput);
 }
 
-function isExecutePatch(value: unknown): value is { readonly execute: () => Promise<ToolBodyResult> } {
+function isExecutePatch(value: unknown): value is Required<ToolExecutePatch> {
   return value !== null && typeof value === "object" && !Array.isArray(value) && typeof (value as { execute?: unknown }).execute === "function";
 }
 

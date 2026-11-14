@@ -155,6 +155,8 @@ Executor 只能获得 admission 后缩窄过的 capability handles。凭据由�
 
 扩展只用 Cordis 的 `tools/pre-execute`、`tools/execute`、`tools/post-execute`；不再有 registration.middleware、ToolMiddleware 或单独排序链。参数干预后再次校验，安全检查仍属于 Tool Runtime。
 
+三个干预点的 payload 和结果类型声明在 `packages/core/tool-runtime/src/hooks.ts`，监听器用 `onHook` 注册，写法见 [Cordis 事件 ABI 的「干预点的类型契约」](agent-spec-cordis-event-abi-and-eventhub-retirement.md#干预点的类型契约)。
+
 一个 Tool contribution 必须原子提交 definition、executor 和随 registration 固定的 permission contract。禁止先发布 definition、稍后再补 executor，也禁止 executor 在静态全局变量中自行注册。
 
 Registry 必须满足：

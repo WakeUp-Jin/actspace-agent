@@ -1,7 +1,4 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import {
   ACTSPACE_SERVICE_DEFINITIONS,
@@ -14,6 +11,7 @@ import {
   serviceKey,
   serviceView,
 } from "../src/index.js";
+import { typeFixture } from "./support/type-fixture.js";
 
 type Clock = { now(): number };
 const CLOCK = serviceKey<Clock>("fixture.clock");
@@ -78,45 +76,15 @@ describe("service access by definition", () => {
 });
 
 describe("service access types", () => {
-  const fixturePath = fileURLToPath(new URL("./fixtures/service-access-types.ts", import.meta.url));
-  const fixture = readFileSync(fixturePath, "utf8");
-  const directive = /\/\/ @ts-expect-error \[/gu;
-
-  /** 用和各包相同的严格选项编译样例，返回样例文件里的报错：错误码和它上一行注释里的标签。 */
-  function diagnose(source: string): readonly { readonly label: string; readonly code: number }[] {
-    const options: ts.CompilerOptions = {
-      module: ts.ModuleKind.NodeNext,
-      moduleResolution: ts.ModuleResolutionKind.NodeNext,
-      target: ts.ScriptTarget.ES2022,
-      lib: ["lib.es2022.d.ts"],
-      types: ["node"],
-      strict: true,
-      noEmit: true,
-      skipLibCheck: true,
-    };
-    const host = ts.createCompilerHost(options);
-    const getSourceFile = host.getSourceFile.bind(host);
-    host.getSourceFile = (fileName, languageVersionOrOptions, ...rest) => resolve(fileName) === fixturePath
-      ? ts.createSourceFile(fileName, source, languageVersionOrOptions, true)
-      : getSourceFile(fileName, languageVersionOrOptions, ...rest);
-    const program = ts.createProgram([fixturePath], options, host);
-    const file = program.getSourceFile(fixturePath);
-    if (file === undefined) throw new Error("fixture was not loaded");
-    const lines = source.split("\n");
-    return [...program.getSyntacticDiagnostics(file), ...program.getSemanticDiagnostics(file)].map((diagnostic) => {
-      const line = file.getLineAndCharacterOfPosition(diagnostic.start ?? 0).line;
-      const label = /\[([a-z-]+)\]/u.exec(lines[line - 1] ?? "")?.[1];
-      return { label: label ?? `line ${line + 1}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")}`, code: diagnostic.code };
-    });
-  }
+  const fixture = typeFixture(fileURLToPath(new URL("./fixtures/service-access-types.ts", import.meta.url)));
 
   it("compiles the fixture cleanly: every expected error is a real one", () => {
-    expect(fixture.match(directive)).toHaveLength(8);
-    expect(diagnose(fixture)).toEqual([]);
+    expect(fixture.expectedErrors).toBe(8);
+    expect(fixture.asWritten()).toEqual([]);
   }, 60_000);
 
   it("rejects each misuse for the intended reason", () => {
-    const errors = diagnose(fixture.replace(directive, "// ["));
+    const errors = fixture.withoutDirectives();
     expect(Object.fromEntries(errors.map((error) => [error.label, error.code]))).toEqual({
       "unknown-member": 2339,
       "maybe-missing": 2532,
