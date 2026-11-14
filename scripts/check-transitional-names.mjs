@@ -152,6 +152,14 @@ function walk(root, dir, accept, out) {
   }
 }
 
+/**
+ * `relative(root, target)` 的结果是不是指到了 `root` 外面。`..notes.md` 是根目录里的合法名字；Windows 上另一个盘符的结果是绝对路径。
+ * 和 packages/util/shared/src/path-containment.ts 写法相同的判断：脚本不引用工作区的包。
+ */
+export function isOutsideRoot(relative, rules = path) {
+  return relative === ".." || relative.startsWith(`..${rules.sep}`) || rules.isAbsolute(relative);
+}
+
 /** `targets` 为空时列出四个根目录下的源码；否则列出这些文件和目录里的源码和 Markdown，路径相对 `root`。 */
 function listFiles(root, targets) {
   const out = [];
@@ -159,7 +167,7 @@ function listFiles(root, targets) {
   for (const target of targets) {
     const start = path.relative(root, path.resolve(root, target));
     if (start === "") throw new Error("不能整个仓库一起改：历史记录里的旧名字要保留。请给出具体的文件或目录");
-    if (start.startsWith("..") || path.isAbsolute(start)) throw new Error(`${target} 不在仓库里`);
+    if (isOutsideRoot(start)) throw new Error(`${target} 不在仓库里`);
     const stat = fs.statSync(path.join(root, start), { throwIfNoEntry: false });
     if (stat === undefined) throw new Error(`找不到 ${target}`);
     if (stat.isDirectory()) walk(root, start, isTextFile, out);

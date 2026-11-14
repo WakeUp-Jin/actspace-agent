@@ -8,6 +8,7 @@ import {
   RENAMES,
   auditTransitionalNames,
   findTransitionalNames,
+  isOutsideRoot,
   renameTransitionalNames,
   replacementFor,
   runCheck,
@@ -257,6 +258,33 @@ test("--write with paths renames only those, Markdown included, and still skips 
   assert.equal(fs.readFileSync(path.join(root, "docs/design-docs/dist/c.md"), "utf8"), "`RuntimeV2JsonValue`\n");
   assert.equal(fs.readFileSync(path.join(root, "docs/histories/old.md"), "utf8"), "`RuntimeV2JsonValue`\n");
   assert.equal(fs.readFileSync(path.join(root, "packages/a/src/other.ts"), "utf8"), BAD);
+});
+
+test("--write accepts a path inside the repository whose name starts with two dots", (t) => {
+  const root = tempRepo(t, { "..notes.md": "`RuntimeV2JsonValue`\n", "..drafts/a.md": "`runV2Command`\n", "docs/..b.md": "`RunV2Io`\n" });
+  assert.deepEqual(runWrite(root, [], ["..notes.md", "..drafts", path.join(root, "docs/..b.md")]), ["..drafts/a.md", "..notes.md", "docs/..b.md"]);
+  assert.equal(fs.readFileSync(path.join(root, "..notes.md"), "utf8"), "`RuntimeJsonValue`\n");
+  assert.equal(fs.readFileSync(path.join(root, "..drafts/a.md"), "utf8"), "`runCommand`\n");
+  assert.equal(fs.readFileSync(path.join(root, "docs/..b.md"), "utf8"), "`RunIo`\n");
+});
+
+test("a target is outside the repository when it climbs out of it or sits on another drive, on both path flavours", () => {
+  // 另一个盘符的情况在 Linux 上走不到（relative 的结果不会是绝对路径），所以判断接受一套路径规则，这里两套都跑。
+  for (const [rules, root, target, outside] of [
+    [path.posix, "/repo", "/repo/docs/a.md", false],
+    [path.posix, "/repo", "/repo/..notes.md", false],
+    [path.posix, "/repo", "/repo/..drafts/a.md", false],
+    [path.posix, "/repo", "/", true],
+    [path.posix, "/repo", "/elsewhere/a.md", true],
+    [path.posix, "/repo", "/repo-old/a.md", true],
+    [path.win32, "C:\\repo", "C:\\repo\\docs\\a.md", false],
+    [path.win32, "C:\\repo", "C:\\repo\\..notes.md", false],
+    [path.win32, "C:\\repo", "C:\\repo\\..drafts\\a.md", false],
+    [path.win32, "C:\\repo", "C:\\", true],
+    [path.win32, "C:\\repo", "C:\\elsewhere\\a.md", true],
+    [path.win32, "C:\\repo", "D:\\repo\\docs\\a.md", true],
+    [path.win32, "C:\\repo", "\\\\server\\share\\a.md", true],
+  ]) assert.equal(isOutsideRoot(rules.relative(root, target), rules), outside, `${root} → ${target}`);
 });
 
 test("--write refuses a missing path, a path outside the repository and the repository as a whole, and writes nothing", (t) => {
