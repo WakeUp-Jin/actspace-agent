@@ -19,6 +19,23 @@ test("finds every way of prefix-checking a relative path against ..", () => {
   assert.deepEqual(findPrefixChecks(source), [1, 2, 3, 4, 5, 6, 6, 7]);
 });
 
+test("finds a check that the formatter wrapped over several lines, reported at the startsWith line", () => {
+  const source = [
+    "const outside = path",
+    "  .relative(workspaceRootDirectory, candidateTargetPath)",
+    "  .startsWith(",
+    '    "..",',
+    "  );",
+    "if (",
+    "  nested.startsWith(",
+    "    // 说明写在参数前面",
+    "    `..$" + "{sep}`,",
+    "  )",
+    ") return false;",
+  ].join("\n");
+  assert.deepEqual(findPrefixChecks(source), [3, 7]);
+});
+
 test("ignores other dot prefixes, segment comparisons and comment lines", () => {
   const source = [
     'if (text.startsWith("...")) return "ellipsis";',
@@ -30,6 +47,13 @@ test("ignores other dot prefixes, segment comparisons and comment lines", () => 
     ' * 不要写 nested.startsWith("../")。',
     " */",
     '  /* nested.startsWith("..") */',
+    "name.startsWith(",
+    '  "...",',
+    ");",
+    "name.startsWith(",
+    '  // "..",',
+    '  ".",',
+    ");",
   ].join("\n");
   assert.deepEqual(findPrefixChecks(source), []);
 });

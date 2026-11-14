@@ -5,6 +5,7 @@
 // 扫描 packages/、apps/、scripts/ 的 JS / TS 源码（不含测试和构建产物），找对「..」开头做前缀判断的写法：
 //   startsWith("..")   startsWith("../")   startsWith("..\\")   startsWith(`..${sep}`)
 // 只认 `startsWith` 这一种写法，按字面匹配，整行都是注释的不算；用正则或 `slice` 比较的认不出来。
+// 按整份源码匹配，不按行：调用被格式化工具折成几行（括号后换行）照样认得出来，行号取 `startsWith` 所在的那一行。
 // 可以保留的文件和处数记在下面的 ALLOWED 里，每条写明理由。处数对不上就失败：
 // 多了说明新增了手写判断；少了说明清单过期，要同步改掉，免得空出来的名额被新的手写判断占用。
 import fs from "node:fs";
@@ -54,13 +55,9 @@ const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*)/;
 
 /** 返回源码里对「..」开头做前缀判断的行号，一处一个，同一行出现几次就有几个。 */
 export function findPrefixChecks(text) {
-  const found = [];
-  text.split("\n").forEach((line, index) => {
-    if (COMMENT_LINE.test(line)) return;
-    const hits = line.match(PREFIX_CHECK)?.length ?? 0;
-    for (let hit = 0; hit < hits; hit += 1) found.push(index + 1);
-  });
-  return found;
+  // 整行注释换成空行，行号不变。
+  const code = text.split("\n").map((line) => (COMMENT_LINE.test(line) ? "" : line)).join("\n");
+  return [...code.matchAll(PREFIX_CHECK)].map((match) => code.slice(0, match.index).split("\n").length);
 }
 
 /**
