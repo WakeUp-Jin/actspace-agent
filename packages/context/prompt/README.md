@@ -1,11 +1,19 @@
-# Prompt domain group
+# @actspace/prompt
 
-为 Context 提供四个独立来源：系统提示词、AGENTS 规则、Skill、动态运行信息。会话与工具来源由 Context 包提供。Prompt 只贡献内容，Context 负责组织和转换，LLM 服务负责真实请求。
+提示段与模型事实的正文、规则与 Skill 的加载、来源包用的转换支持；提供 `prompt.runtime`。Prompt 只贡献内容，引擎负责组织和转换。行为规则见[上下文引擎规范](../../../docs/design-docs/上下文管理引擎设计/agent-context-engine.md)「来源」，脚本提示段见[脚本执行](../../../docs/design-docs/tool-system/agent-script-execution.md)，这里只说代码在哪。
 
-`core-contributors.ts` 的 `CoreContributorOptions.scripting`（`ScriptingFacts`，由 `core/runtime` 的 agent-factory 从 `tools.shell-tools` 服务构造）存在时，Agent/Plan 多一个 `core/scripting` 提示段（内联 `-c` 与写 `$ACTSPACE_SCRATCH` 脚本两种执行方式、随包 `actspace-python` 的用法、不许 `pip install`）和一个 `host/scripting-facts` model-fact（本会话 scratch 路径、解释器版本、核心包与数据扩展是否已装）；Chat 不带。
+公开入口：`.`、`./manifest`、`./plugin`、`./source-support`。
 
-`prompt.runtime` 按 Turn 加载规则与 Skill；Agent/Plan 使用用户及工作区 AGENTS，Chat 保留用户规则与自身工具边界。系统 Prompt 可通过 Host `selectSystem` 按模型选择，默认仍使用现有 Agent/Chat 模板。动态信息作为带标记的消息尾部补充，不写入用户 Surface 气泡。
+| 文件 | 内容 |
+| --- | --- |
+| `plugin.ts` | `prompt.runtime`（`SystemPromptService`）：按 Turn 缓存规则与 Skill 的加载结果，转交 Host 的 `selectSystem`；Host 端口 `actspace.host.prompt` 的类型 |
+| `host-context.ts` | 读用户和工作区两处 `AGENTS.md`、发现 Skill（`prepareRuntimePromptSource`、`prepareUserPromptSource`） |
+| `core-contributors.ts` | 内置提示段和模型事实的正文与取舍（Agent / Chat、是否带脚本说明）。改措辞只改这里 |
+| `skills/contributor.ts` | Skill 目录和选中的 Skill 正文 |
+| `context-source-support.ts` | `./source-support`：来源包用它把 contributor 转成 Context 内容（`contribute`、`promptSourceKey`、`runtimeInfo`、`SourceFactory`） |
+| `extensions.ts` | `PromptExtensionRegistry`：Host 按会话或按 Agent scope 追加来源 |
+| `contributor.ts` | contributor 的类型：层、种类、必需与可选 |
+| `request-snapshot.ts` | `LogicalRequestCandidate`、`PreparedRequestMetadata`：Loop 拼请求、写请求记录时用的类型。`LogicalRequestSnapshot` 只有下一行的旧路径在用 |
+| `assembler.ts`、`registry.ts`、`context-bridge.ts` | 旧的 `RequestAssembler` 路径：Loop 没配 Context 来源时的回退，只有测试在用；退役见[技术债表](../../../docs/exec-plans/tech-debt-tracker.md)「上下文引擎遗留」 |
 
-Host `PromptExtensionRegistry` 支持精确 Session/Agent scope 注册，以及明确限定 main Agent 的 Session 注册。英语学习使用后者，跨 Run 保留目标，取消注册即停止新贡献；未声明 Agent kind 的调用不会获得 Session 注册项。生产不再调用 `system-prompt/assemble`，也不发布 `prompt.assembly`。旧 RequestAssembler/contextFromCandidate 只保留库调用及测试兼容，生产 Factory 直接配置 Context sources。
-
-退役条件：只有在 Agent Loop fallback、测试和英语学习 fixture 都直接消费 Context sources，且动态入口与契约矩阵扫描不再出现 `prompt.assembly` 或 assembler import 后，才能删除兼容表面。
+测试：`pnpm --filter @actspace/prompt test`。

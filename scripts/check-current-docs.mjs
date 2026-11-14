@@ -37,7 +37,7 @@ export const currentTruthFiles = [
   "docs/design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md",
   "docs/design-docs/agent-plugin-runtime/agent-target-agent-core.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-profile-bundle-patch-layering.md",
-  "docs/design-docs/agent-plugin-runtime/agent-spec-prompt-context-contributors.md",
+  "docs/design-docs/上下文管理引擎设计/agent-context-engine.md",
   "docs/design-docs/frontend/README.md",
   "docs/design-docs/frontend/front-新功能开发清单.md",
   "docs/design-docs/frontend/front-右侧面板与文件渲染规范.md",

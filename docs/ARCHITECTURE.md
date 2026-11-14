@@ -99,4 +99,4 @@ runtime --(Host capability)--> browser-bridge
 
 ## Context 请求组织
 
-`context.engine` 统一六类来源，经 `Context → toLlmInput → LlmInput` 进入 LLM。压缩协调器与渐进式披露策略复用原 Session Journal，补充和状态是纯插件事件，不改变 Surface。详细边界见[Context 规范](design-docs/上下文管理引擎设计/Context数据结构和模型输入数据结构的设计规范.md)。
+`context.engine` 把各个来源（系统提示、运行环境、规则、Skill、对话、工具、后台任务、路径导航）组织成 `Context`，经 `toLlmInput` 转成 `LlmInput` 进入 LLM。压缩协调器与渐进式披露复用 Session Journal，补充和状态是纯插件事件，不改变 Surface。详细边界见[上下文引擎规范](design-docs/上下文管理引擎设计/agent-context-engine.md)。

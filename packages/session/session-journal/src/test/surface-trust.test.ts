@@ -5,7 +5,7 @@ import { SessionJournal } from "../journal.js";
 import { SessionSurface } from "../surface.js";
 import { isTrustedSurfaceView, surfaceViewVersion } from "../index.js";
 
-// agent-spec-context-trusted-surface.md §3.1 / §3.3：日志交出的对话视图已信任、按状态复用，版本号随追加和替换变化。
+// agent-context-engine.md「已信任的对话视图」：日志交出的对话视图已信任、按状态复用，版本号随追加和替换变化。
 
 const source = { ownerPluginId: "@actspace/core" } as const;
 

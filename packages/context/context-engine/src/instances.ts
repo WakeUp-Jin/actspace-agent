@@ -112,7 +112,7 @@ function identityKey(identity: ContextIdentity): string { return `${identity.ses
 function stateDigest(context: Context): string {
   const { request: _request, status, content } = context;
   const { contextRevision: _revision, instanceGeneration: _generation, logicalAgentScopeId: _scope, ...stableStatus } = status;
-  // 对话用版本号代替整段转字符串（agent-spec-context-trusted-surface.md §3.3）：已信任视图版本号相同即内容相同；
+  // 对话用版本号代替整段转字符串（agent-context-engine.md「已信任的对话视图」）：已信任视图版本号相同即内容相同；
   // 普通对象的版本号就是它的 JSON，判断结果和改前一致。
   const { conversation, ...rest } = content;
   return JSON.stringify({ content: { ...rest, conversation: surfaceViewVersion(conversation) }, status: stableStatus });

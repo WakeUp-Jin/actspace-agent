@@ -14,7 +14,7 @@ function remember(value: unknown): void {
 }
 export function contextValue<T>(value: T): T {
   if (value !== null && typeof value === "object" && trusted.has(value)) return value;
-  // 日志交出的对话视图入日志时已校验、深度冻结，直接引用（agent-spec-context-trusted-surface.md §3.2）。
+  // 日志交出的对话视图入日志时已校验、深度冻结，直接引用（agent-context-engine.md「已信任的对话视图」）。
   if (isTrustedSurfaceView(value)) return value;
   if (isPlainObject(value) && Object.values(value).some(isTrustedSurfaceView)) return withTrustedChildren(value) as T;
   const frozen = freezeRequest(value as RuntimeV2JsonValue) as T;
