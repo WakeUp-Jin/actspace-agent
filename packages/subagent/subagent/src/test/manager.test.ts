@@ -143,7 +143,8 @@ describe("SubagentManager", () => {
     hold.open();
     const view = await f.settled(agentId);
     expect(view).toMatchObject({ status: "closed", activations: [{ trigger: "spawn", background: true, model: "conn/fast", settle: { status: "completed", delivery: "notified", result: "Auth looks fine." } }] });
-    await until(() => pendingTexts(f.root).length === 1);
+    // The registry wakes the parent last, after the notice is in the inbox and the settle record is written.
+    await until(() => pendingTexts(f.root).length === 1 && f.woken.length > 0);
     expect(pendingTexts(f.root)).toEqual([[
       "<task_notification>", `<task_id>${agentId}</task_id>`, "<kind>agent</kind>", "<description>review auth</description>", "<status>completed</status>",
       `<summary>Subagent ${agentId} finished.</summary>`, `<transcript>${transcript}</transcript>`,
