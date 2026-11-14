@@ -71,7 +71,7 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
 ## 当前现状说明
 
 - `scripts/ci.sh` 当前只做仓库级基础检查：
-  - docs 骨架、active/completed 生命周期与 current truth zone 校验；current truth zone 会拒绝已删除 v1 路径、已丢弃 active 入口和相对 Markdown 断链
+  - docs 骨架、active 计划登记（完成的计划要删除，不留 `completed/` 归档）与 current truth zone 校验；current truth zone 会拒绝已删除 v1 路径、已丢弃 active 入口和相对 Markdown 断链
   - repo hygiene
   - GitHub Actions pinning
   - shell 脚本语法检查
@@ -169,7 +169,7 @@ SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 
 1. 继续保留 `repository-checks`（`base-checks.yml`）与各工程 job（`ci.yml`）的分层，避免仓库卫生与工程构建互相遮蔽失败原因；`base-checks.yml` 不要加路径过滤，否则 required check 会失效。
 2. 新增 action 时必须继续 pin 到 commit SHA；`scripts/check-action-pinning.sh` 会拦截浮动 tag。
-3. 如果后续接 installer（dmg 之外的 pkg、Windows 安装器、Linux AppImage / deb）、Developer ID 签名、notarization、Windows Authenticode、远程自动更新，再在现有 release 流水线上扩展；Electron 大版本升级见 `docs/exec-plans/completed/20261108-ci-pipelines.md` P5。
+3. 如果后续接 installer（dmg 之外的 pkg、Windows 安装器、Linux AppImage / deb）、Developer ID 签名、notarization、Windows Authenticode、远程自动更新，再在现有 release 流水线上扩展。Electron 大版本升级单独开一个 PR，跑完整 desktop 测试并在 Electron 里实机走查（上一次是 #58 的 39 → 45）。
 
 ## 供应链安全
 

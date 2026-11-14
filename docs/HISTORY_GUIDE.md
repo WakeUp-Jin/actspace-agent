@@ -28,9 +28,10 @@ docs/histories/
 - 用户诉求原文，或者压缩后的脱敏版本。
 - 本次主要代码与文档改动。
 - 设计动机，以及为什么这么做。
+- 没验证的范围和遗留：哪些只跑了自动化测试、没在真实环境里验过，哪些事没做完；没有就写「无」。需要后续处理的同时登记到 `docs/exec-plans/tech-debt-tracker.md`。计划完成后会被删除，这一节是它们唯一留在仓库里的地方。
 - 最关键的受影响文件。
 
 ## 链接与事后维护
 
-- history 里的链接和路径是写作当时的快照。被链接的 learnings、exec-runs 文件后来按规则合并或清理、包路径后来迁移，都不回头改 history；`pnpm check:current-docs` 也不检查 `docs/histories/`。读到断链时去 git 历史找，不要为了修链接改 history 正文。
+- history 里的链接和路径是写作当时的快照。被链接的计划、执行记录后来按规则删除，learnings 后来合并，包路径后来迁移，都不回头改 history；`pnpm check:current-docs` 也不检查 `docs/histories/`。读到断链时去 git 历史找，不要为了修链接改 history 正文。
 - 唯一例外：history 还在描述的任务本身又推进了（同一任务跨多轮），这时继续在同一份 history 里补写。

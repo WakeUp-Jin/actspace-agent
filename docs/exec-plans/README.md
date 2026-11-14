@@ -1,11 +1,10 @@
 # 执行计划
 
-这个目录保存需要跨多轮推进、具有明确依赖或需要验收留痕的执行计划。`active/` 必须只反映当前仍可继续执行的工作，不承担历史归档职责。
+这个目录保存需要跨多轮推进、具有明确依赖的执行计划。`active/` 只反映当前仍可继续执行的工作；计划完成就删除，仓库里不保留已完成计划的归档。
 
-## 生命周期
+## 目录
 
 - `active/`：仍有明确下一步、责任边界和验证方式的计划。
-- `completed/`：实现已经完成；尚未执行的人工验收边界可以保留在计划中，但不能因此长期占用 `active/`。索引见 [completed/README.md](completed/README.md)。
 - `templates/`：新计划模板。
 - `tech-debt-tracker.md`：暂不立项、但需要持续跟踪的技术债。
 - `perf-backlog.md`：性能与内存优化任务总表，实机采样发现的热点先登记在这里。
@@ -24,21 +23,19 @@
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB（编辑器内 `@` 文件引用）待实施。 |
 | [前端基础组件](active/20260926-frontend-ui-components-foundation.md) | Button / IconButton / Tooltip / Menu / Popover / Dialog / Select 等已落地；只剩 Switch、Textarea、Tabs 三个基础组件及对应迁移。 |
 
-计划移入 `completed/` 的记录写在对应的 history 里，本页不保留整理流水。
+## 已完成的计划在哪
 
-## 已完成
+完成的计划和它的执行记录直接删除，收尾步骤见 `docs/PLANS_GUIDE.md`「计划完成时」。做过什么、为什么这么做，查 `docs/histories/`；现在的规则，查设计文档。
 
-全部已完成计划的日期、标题和一句话见 [completed/README.md](completed/README.md)。最近几项：
+要看某份旧计划的原文，从 git 历史里取：
 
-- [子智能体简化：临时上下文窗口 + 并入后台任务](completed/20261112-subagent-simplify.md)：默认同步、不续派，后台子智能体并入后台任务登记表，删四个管理工具和 `context-subagents`；Electron 实机检查未做。见[执行摘要](../exec-runs/20261112-subagent-simplify/execution-summary.md)。
-- [简化思考过程](completed/20261111-thinking-compact.md)：设置「通用 › 对话显示 › 简化思考过程」（缺省开启），思考进行时固定一行 `Thinking 6s · 开头一句`，不展开正文；Electron 走查未做。见[执行摘要](../exec-runs/20261111-thinking-compact/execution-summary.md)。
-- [字号规范落地：三层字号](completed/20261111-typography-scale.md)：界面 13 / 正文 15 / 标题 18，聊天正文去掉衬线，工具行和 Thinking 降到 13px，`check:frontend-tokens` 拦任意行高、非档位字重和样式文件里的字号字面量；Electron 实机检查未做。
-- [后端插件包解耦：让 Harness 自进化不必改 core](completed/20261109-harness-plugin-decoupling.md)：P1–P4 随 #68 完成——工具自声明模式、形态由 manifest 推导、默认 Harness 按插件产出产物、上下文来源注册式（`context-assembly`）、文件 / Shell 实现迁入 Harness 树。
-- [性能第三轮：高频路径不再整份读日志](completed/20261108-perf-round3.md)：自动审查、每次请求查压缩摘要、子 Agent 面板轮询都改成增量；读旧事件不再深拷贝；每项配 1k / 10k 规模测试，新增 `pnpm check:scale-tests`；实机采样对比未做。见[执行摘要](../exec-runs/20261108-perf-round3/execution-summary.md)。
-- [CI 重新上线与桌面发布流水线](completed/20261108-ci-pipelines.md)：P1–P5 随 #48、#57、#58 合入；签名与自动更新留待单独立项。
-- [pi-ai 1.5.0 与复用内置服务商](completed/20261108-pi-ai-builtin-providers.md)：按 Base URL 复用 pi-ai 内置服务商，代理改走请求级 fetch（#41）。
-- [统计页重做（使用统计 + Harness 统计）](completed/20261107-stats-redesign.md)：两页按 demo 第 4 版重做，统计库 Schema 17 → 18（#38）。
-- [编辑提问重发与空闲发送不进队列](completed/20261107-edit-resend-rewind.md)：从某一轮重来，`tasks.submit` 带 `rewind`（#36）。
-- [性能第二轮三项](completed/20261107-surface-derived.md)：对话内容只存一份、[上下文引擎直接用日志视图](completed/20261107-context-trusted-surface.md)、[流式 Markdown 解析降频](completed/20261107-markdown-stream-throttle.md)，随 #35 合入。
+```sh
+# 列出被删掉的计划和执行记录
+git log --diff-filter=D --name-only --format= -- docs/exec-plans docs/exec-runs | sort -u
 
-早期后端计划（六个）已移出执行导航；独有目标与未完成项见[结算](../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)。
+# 读某一份：先找到删除它的提交，再从那个提交的父提交里读
+git log --diff-filter=D --format=%H -1 -- docs/exec-plans/active/<plan>.md
+git show <commit>^:docs/exec-plans/active/<plan>.md
+```
+
+2026-11-14 之前完成的计划当时归档在 `docs/exec-plans/completed/`（已删除），旧执行记录在 `docs/exec-runs/` 下，那天一并删掉了。最后一个带着它们的提交是 `d0ca51c7`，那批文件直接从它读，例如 `git show d0ca51c7:docs/exec-plans/completed/README.md` 是当时的索引。

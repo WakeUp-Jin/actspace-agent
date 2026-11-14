@@ -28,8 +28,8 @@ ActSpace 是一个本地优先的 Agent 工作台：桌面端（Electron）、We
 
 ## 按任务需要选读
 
-- `docs/PLANS_GUIDE.md`：什么时候要写 execution plan，怎么维护，两种执行模式。
-- `docs/exec-runs/README.md`：执行计划时的过程记录和验收文档怎么写。
+- `docs/PLANS_GUIDE.md`：什么时候要写 execution plan，怎么维护，完成后怎么收尾（计划完成即删除，不归档），两种执行模式。
+- `docs/exec-runs/README.md`：夜间模式执行计划时的过程记录和验收文档怎么写；交互模式不写。
 - `docs/design-docs/index.md`：设计文档唯一索引；后端、Runtime、工具、安全等设计从这里进入。
 - `docs/design-docs/agent-plugin-runtime/agent-testing.md`：v2 后端 Agent 测试策略、package lifecycle、Runtime 与 Host 覆盖边界。
 - `docs/RELIABILITY.md`：运行稳定性、观测性和上线前的基本要求。
