@@ -23,6 +23,7 @@
 - **代码注释**：31 个代码文件里的「设计 02 / 04 / 05 §N」改指现状规范的章节，只动注释。
 - **顺带修正**：核对引用时发现 8 份其他规范里的子智能体描述和代码对不上，各改一两句：`agent-forms-and-modes.md` 与 `front-聊天输入框规范.md`（Plan 的工具表还列着 `explore`）、`front-轨迹视图规范.md` 与 `agent-spec-runtime-projection.md`（父轨迹从 `subagent/spawned` 找子会话）、`11-Harness统计设计.md`（统计读 `subagent/*`）、`agent-task-run-lifecycle.md`（子 Run 沿调用方的 Scope 取同一 generation）、`agent-session-transcript.md`（消息只在父子之间）、`多智能体协作/README.md`（对这一组的一句话介绍还写着默认后台、可续聊）。
 - **检查**：`check-current-docs.mjs` 的 `currentTruthFiles` 去掉已删除的契约，55 → 54。
+- **契约矩阵**：改注释的文件里有一个（`packages/core/agent-service/src/application.ts`）在契约矩阵的源清单里。矩阵头部的 digest 按文件全文计算，注释变了也会过期，所以重新生成了 `agent-contract-matrix.generated.md`，只有 digest 一行变化。第一次推送时漏了这一步，是 CI 的 `gen:contract-matrix --check` 报出来的。
 
 ### 🧠 Design Intent (Why)
 
@@ -41,7 +42,12 @@
 
 ### Unverified & Leftovers（未验证与遗留）
 
-- **未验证**：这轮没改运行时代码，代码文件里只动了注释和 `currentTruthFiles` 的一行。`pnpm check:docs`、`./scripts/ci.sh`、`pnpm lint`、markdownlint、`pnpm test:current-docs`、`pnpm test:package-readmes`、`pnpm check:hot-path-reads`、`pnpm check:scale-tests`，以及 `@actspace/subagent`、`@actspace/subagent-codex`、`@actspace/subagent-claude-code`、`@actspace/background-tasks` 四个包的测试都通过。没跑全量包测试，没有实机验证。
+- **未验证**：这轮没改运行时代码，代码文件里只动了注释和 `currentTruthFiles` 的一行。没有实机验证。
+- **本地跑过并通过**：`pnpm check:docs`、`./scripts/ci.sh`、markdownlint、`pnpm check:desktop-build-graph`、`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`、`pnpm test:scripts` 整条。
+- **包测试**：desktop 以外的全部包在本地跑了一遍，有两处失败，都和这次改动无关：
+  - `packages/core/tool-runtime` 的 3 个用例只在云端 Agent 的机器上失败。那台机器的 `/workspace` 是指向仓库的软链接，用例把 `/workspace` 当成一个不存在的假路径来用，路径被解析到仓库目录后落在工作区外，结果是 `denied`。同一个提交在 CI 上 56 个用例全过。
+  - `packages/session/session-persistence-jsonl` 的 `refresh.test.ts > same-size rewrite falls back to a full read` 在全量并行跑时失败一次，单独跑 34 个用例全过。
+- **CI 上还红的一项**：`packages/shell/tool-shell` 的 `node-ports.test.ts > runs subagent commands in the foreground and kills them at the time limit` 在 `main` 上也会失败（时限只有 400ms），本地能过，已在技术债表里。
 - **遗留**：
   - 合并时发现、这次没改的三处已登记到 `tech-debt-tracker.md`「子智能体与后台任务遗留」：官网的子智能体文档还是 2026-11-04 的说法；插件页里「子智能体调度」的说明文字还写着续派、中断；`BackgroundNoticeRow.tsx` 里子智能体通知的分支在桌面端对话里走不到。
   - `model-context/agent-multi-provider-llm.md` 还在讲 `exploreModel` 和探索用途，`core-data-storage-design.md` 的恢复扫描还以 `delegation/requested` 为例。它们属于别的规范组，留到那一组整理时一起改。
@@ -56,4 +62,5 @@
 - `docs/design-docs/index.md`、`docs/design-docs/agent-plugin-runtime/README.md`、`scripts/check-current-docs.mjs`
 - `docs/design-docs/frontend/front-轨迹视图规范.md`、`docs/design-docs/frontend/front-聊天输入框规范.md`、`docs/design-docs/agent-plugin-runtime/agent-spec-runtime-projection.md`、`docs/design-docs/agent-plugin-runtime/agent-spec-agent-scope-model.md`、`docs/design-docs/agent-plugin-runtime/agent-spec-prompt-context-contributors.md`、`docs/design-docs/agent-plugin-runtime/agent-task-run-lifecycle.md`、`docs/design-docs/agent-runtime/agent-forms-and-modes.md`、`docs/design-docs/agent-runtime/agent-session-transcript.md`、`docs/design-docs/自进化的方案设计/11-Harness统计设计.md`、`docs/design-docs/多智能体协作/README.md`
 - `docs/exec-plans/tech-debt-tracker.md`
+- `docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md`（重新生成）
 - `packages/subagent/**`、`packages/util/shared/**`、`packages/client/**`、`apps/desktop/src/renderer/**` 等 31 个文件的注释
