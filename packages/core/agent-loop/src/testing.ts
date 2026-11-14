@@ -47,7 +47,8 @@ export async function runToolStreamFixture(options: {
   compaction?: import("@actspace/context-compaction").CompactionPlugin;
   usage?: import("@actspace/llm-service").LlmUsage;
   contextWindow?: number;
-  onLoop?: (loop: AgentLoop, inbox: MainAgentInbox) => void;
+  /** 在 fixture 自己的回合开始前调用；返回 Promise 时会等它结束，可以用来先跑一个回合。 */
+  onLoop?: (loop: AgentLoop, inbox: MainAgentInbox) => void | Promise<void>;
   wake?: boolean;
 } = {}) {
   const registry = createCoreCodecRegistry();
@@ -96,13 +97,13 @@ export async function runToolStreamFixture(options: {
     assembler: new RequestAssembler({ prepare: () => { throw new Error("not used"); } }),
     llm: new LlmService(routes, { resolve: async () => options.credential ?? ({ apiKey: "fixture" }) }),
     compositionDigest: "test", hostCapabilityDigest: "test", host: { hostKind: "desktop", capabilityCeiling: [], runtimeContract: "actspace.runtime.v2", invocationId: "test", workspaceRef: "/fixture" },
-    toolEnvironment: () => ({ ...options.toolEnvironment, resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: async () => { throw new Error("not used"); } }),
+    toolEnvironment: () => ({ ...options.toolEnvironment, resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: options.toolEnvironment?.createArtifact ?? (async () => { throw new Error("not used"); }) }),
     onLiveEvent: (event) => { events.push(event); options.onLiveEvent?.(event); },
     context: options.context,
     compaction: options.compaction,
   });
-  options.onLoop?.(loop, inbox);
   try {
+    await options.onLoop?.(loop, inbox);
     const result = await loop.runTurn({ content: options.content ?? "Read fixture", mode: options.mode, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test", ...(options.wake ? { wake: true } : {}) });
     if (options.followup) await loop.runTurn({ content: "Continue without tools", mode: options.mode });
     return { result, events, journal: [...session.journal.events], header: session.header, registry };

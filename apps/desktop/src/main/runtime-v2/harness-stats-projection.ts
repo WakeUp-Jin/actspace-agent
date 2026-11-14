@@ -63,7 +63,7 @@ function emptyState(): State {
 }
 
 const MAX_TRACKED = 2_000;
-const TRUNCATION_MARKERS = ["[Output truncated", "[Showing lines", "[Showing first", "[Content truncated", "[Visual report truncated", "...[truncated]"];
+const TRUNCATION_MARKERS = ["[Output truncated", "[Showing lines", "[Showing first", "[Content truncated", "[Visual report truncated", "...[truncated]", "[line truncated"];
 const CONVERSATION_KINDS = new Set(["message", "tool-call", "tool-result", "thinking"]);
 const KIND_OF: Record<string, string> = { tool: "tools", skill: "skills", section: "section", supplement: "supplement", "model-facts": "model-facts" };
 

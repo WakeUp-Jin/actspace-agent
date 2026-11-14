@@ -39,5 +39,5 @@ core 是 Agent 的主干。`agent`、`scope`、`agent-loop` 定义 Agent 是什�
 ## 怎么扩展
 
 - 新增一个插件：见[总地图](../README.md)“新增一个插件”，登记到 `runtime/src/plugin-catalog.ts`。
-- 新增一个工具：在 `ToolDefinition` 里声明 `modes`（漏声明会被 `normalizeToolDefinition` 拒绝），所属插件 manifest 的 `contributions.tools` 列出工具名即可进入主 Agent 形态；不用改 `agent` 包。
+- 新增一个工具：在 `ToolDefinition` 里声明 `modes`（漏声明会被 `normalizeToolDefinition` 拒绝），所属插件 manifest 的 `contributions.tools` 列出工具名即可进入主 Agent 形态；不用改 `agent` 包。可能返回大量文本的工具自己设上限（用 `tool-runtime` 导出的 `TOOL_OUTPUT_TEXT_CHARS`、`TOOL_OUTPUT_LINE_CHARS`），并写明怎么取剩下的部分；`tool-runtime/src/output-limits.ts` 的字节上限和 `agent-loop/src/tool-output-budget.ts` 按窗口给的额度只是兜底，见[工具输出与引用](../../docs/design-docs/tool-system/agent-tool-output-references.md)。
 - 改 Agent 循环：主体在 `agent-loop/src/loop.ts`，会话里的调用边界在 `runtime/src/harness/agent-factory-plugin.ts`。

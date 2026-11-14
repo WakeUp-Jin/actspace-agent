@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext } from "@actspace/tool-runtime";
+import { canonicalizeFileResource, sliceWholeChars, TOOL_OUTPUT_LINE_CHARS, TOOL_OUTPUT_TEXT_CHARS, type ToolBodyResult, type ToolExecutionContext } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
 export type NodeToolPortsOptions = { readonly workspaceRoot: string };
 export function createNodeToolPorts(options: NodeToolPortsOptions): ToolPorts { return Object.freeze({ edit_file: (args, context) => editFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)), write_file: (args, context) => writeFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)), delete_file: (args, context) => deleteFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)) }); }
@@ -22,9 +22,7 @@ async function writeFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>,
     const path = await displayPath(filePath, workspaceRoot);
     context.reportProgress({ message: `${created ? "Creating" : "Updating"} ${path}`, additions: 0, deletions: 0 });
     await writeTextAtomic(filePath, content);
-    const diff = createUnifiedDiff(path, oldContent, content);
-    const additions = countDiff(diff, "+");
-    const deletions = countDiff(diff, "-");
+    const { diff, additions, deletions } = createUnifiedDiff(path, oldContent, content);
     context.reportProgress({ message: `${created ? "Created" : "Updated"} ${path}`, additions, deletions });
     return completed(`${diff}\n\nFile ${created ? "created" : "updated"}: ${path}`, `${created ? "Created" : "Updated"} ${path}`, { type: created ? "create" : "update", path, additions, deletions }, filePath);
   } catch (error) {
@@ -49,9 +47,7 @@ async function editFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, 
     const path = await displayPath(filePath, workspaceRoot);
     context.reportProgress({ message: `${exists ? "Updating" : "Creating"} ${path}`, additions: 0, deletions: 0 });
     await writeTextAtomic(filePath, after);
-    const diff = createUnifiedDiff(path, before, after);
-    const additions = countDiff(diff, "+");
-    const deletions = countDiff(diff, "-");
+    const { diff, additions, deletions } = createUnifiedDiff(path, before, after);
     context.reportProgress({ message: `${exists ? "Updated" : "Created"} ${path}`, additions, deletions });
     return completed(`${diff}\n\nFile ${exists ? "updated" : "created"}: ${path}`, `${exists ? "Updated" : "Created"} ${path}`, { type: exists ? "update" : "create", path, additions, deletions }, filePath);
   } catch (error) {
@@ -155,10 +151,64 @@ function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: stri
 async function displayPath(path: string, workspaceRoot: string): Promise<string> { const nested = relative(await realpath(workspaceRoot), path); return nested && !nested.startsWith("..") && !isAbsolute(nested) ? nested : path; }
 function countOccurrences(text: string, needle: string): number { let count = 0; let offset = 0; while ((offset = text.indexOf(needle, offset)) !== -1) { count += 1; offset += Math.max(needle.length, 1); } return count; }
 function replaceOnePreservingLine(text: string, oldText: string, newText: string): string { const index = text.indexOf(oldText); if (newText !== "" || oldText.includes("\n") || text[index + oldText.length] !== "\n") return text.slice(0, index) + newText + text.slice(index + oldText.length); return text.slice(0, index) + text.slice(index + oldText.length + 1); }
-function createUnifiedDiff(path: string, before: string, after: string): string { const oldLines = before.split("\n"); const newLines = after.split("\n"); let prefix = 0; while (prefix < oldLines.length && prefix < newLines.length && oldLines[prefix] === newLines[prefix]) prefix += 1; let suffix = 0; while (suffix < oldLines.length - prefix && suffix < newLines.length - prefix && oldLines[oldLines.length - 1 - suffix] === newLines[newLines.length - 1 - suffix]) suffix += 1; const contextStart = Math.max(0, prefix - 3); const oldEnd = Math.min(oldLines.length, oldLines.length - suffix + 3); const newEnd = Math.min(newLines.length, newLines.length - suffix + 3); return [`--- a/${path}`, `+++ b/${path}`, `@@ -${contextStart + 1},${oldEnd - contextStart} +${contextStart + 1},${newEnd - contextStart} @@`, ...oldLines.slice(contextStart, prefix).map((line) => ` ${line}`), ...oldLines.slice(prefix, oldLines.length - suffix).map((line) => `-${line}`), ...newLines.slice(prefix, newLines.length - suffix).map((line) => `+${line}`), ...newLines.slice(newLines.length - suffix, newEnd).map((line) => ` ${line}`)].join("\n"); }
-function countDiff(diff: string, marker: "+" | "-"): number {
-  // File headers precede the first hunk; header-like text inside a hunk is content.
-  const lines = diff.split("\n");
-  const firstHunk = lines.findIndex((line) => line.startsWith("@@ "));
-  return firstHunk < 0 ? 0 : lines.slice(firstHunk + 1).filter((line) => line.startsWith(marker)).length;
+/**
+ * 单个 hunk 的统一 diff：公共前缀和后缀之外的行算删除和新增，前后各带 3 行上下文。
+ * 增删行数从行数组直接算，是真实值；给模型的文本受 TOOL_OUTPUT_TEXT_CHARS 约束，超长的行只留开头。
+ * 放不下时删除和新增两边分预算，末尾加一行以 `[` 开头的说明，紧跟最后一行 diff（中间不留空行）：
+ * 界面的 diff 解析把空行当上下文行，`[` 开头的行不算 diff 行。结尾的上下文行照常保留，
+ * 界面靠它（或开头那行空的删除行）认出「这是新建的文件」。
+ */
+function createUnifiedDiff(path: string, before: string, after: string): { readonly diff: string; readonly additions: number; readonly deletions: number } {
+  const oldLines = before.split("\n");
+  const newLines = after.split("\n");
+  let prefix = 0;
+  while (prefix < oldLines.length && prefix < newLines.length && oldLines[prefix] === newLines[prefix]) prefix += 1;
+  let suffix = 0;
+  while (suffix < oldLines.length - prefix && suffix < newLines.length - prefix && oldLines[oldLines.length - 1 - suffix] === newLines[newLines.length - 1 - suffix]) suffix += 1;
+  const contextStart = Math.max(0, prefix - 3);
+  const oldEnd = Math.min(oldLines.length, oldLines.length - suffix + 3);
+  const newEnd = Math.min(newLines.length, newLines.length - suffix + 3);
+  const deletions = oldLines.length - suffix - prefix;
+  const additions = newLines.length - suffix - prefix;
+  const head = [`--- a/${path}`, `+++ b/${path}`, `@@ -${contextStart + 1},${oldEnd - contextStart} +${contextStart + 1},${newEnd - contextStart} @@`, ...oldLines.slice(contextStart, prefix).map((line) => diffLine(" ", line))];
+  const tail = newLines.slice(newLines.length - suffix, newEnd).map((line) => diffLine(" ", line));
+  const budget = Math.max(0, TOOL_OUTPUT_TEXT_CHARS - [...head, ...tail].reduce((total, line) => total + line.length + 1, 0));
+  const removedCost = diffCost(oldLines, prefix, prefix + deletions, budget);
+  const addedCost = diffCost(newLines, prefix, prefix + additions, budget);
+  if (removedCost + addedCost <= budget) {
+    const removed = oldLines.slice(prefix, prefix + deletions).map((line) => diffLine("-", line));
+    const added = newLines.slice(prefix, prefix + additions).map((line) => diffLine("+", line));
+    return { diff: [...head, ...removed, ...added, ...tail].join("\n"), additions, deletions };
+  }
+  // 一边不到一半就全给它，剩下的归另一边；两边都超过一半时各占一半。
+  const half = Math.floor(budget / 2);
+  const removed = takeDiffLines("-", oldLines, prefix, prefix + deletions, addedCost <= half ? budget - addedCost : Math.min(removedCost, half));
+  const added = takeDiffLines("+", newLines, prefix, prefix + additions, budget - removed.reduce((total, line) => total + line.length + 1, 0));
+  const shown = `${added.length} of ${additions} added${removed.length < deletions ? ` and ${removed.length} of ${deletions} removed` : ""} lines`;
+  const note = `[Output truncated at ${TOOL_OUTPUT_TEXT_CHARS.toLocaleString("en-US")} characters: this diff shows ${shown}. The file was written in full.]`;
+  return { diff: [...head, ...removed, ...added, ...tail, note].join("\n"), additions, deletions };
+}
+function diffLine(sign: " " | "-" | "+", line: string): string {
+  return line.length > TOOL_OUTPUT_LINE_CHARS ? `${sign}${sliceWholeChars(line, TOOL_OUTPUT_LINE_CHARS)} ...[line truncated: ${line.length} chars]` : `${sign}${line}`;
+}
+/** 一行渲染后占的字符数，含行首符号和换行。 */
+function diffLineCost(line: string): number {
+  return (line.length > TOOL_OUTPUT_LINE_CHARS ? diffLine(" ", line).length : line.length + 1) + 1;
+}
+/** [start, end) 这些行渲染后的字符数；一超过 cap 就停，这时返回值只保证大于 cap。 */
+function diffCost(lines: readonly string[], start: number, end: number, cap: number): number {
+  let cost = 0;
+  for (let index = start; index < end && cost <= cap; index += 1) cost += diffLineCost(lines[index] ?? "");
+  return cost;
+}
+function takeDiffLines(sign: "-" | "+", lines: readonly string[], start: number, end: number, budget: number): string[] {
+  const taken: string[] = [];
+  let cost = 0;
+  for (let index = start; index < end; index += 1) {
+    const line = lines[index] ?? "";
+    cost += diffLineCost(line);
+    if (cost > budget) break;
+    taken.push(diffLine(sign, line));
+  }
+  return taken;
 }

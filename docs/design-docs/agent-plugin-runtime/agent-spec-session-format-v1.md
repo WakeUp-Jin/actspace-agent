@@ -325,6 +325,8 @@ Repair 是显式、幂等的逻辑事务：
 - repair 只处理可证明的 crash-open tail，不能把非法 payload、未知 required event 或中间文件损坏改写成健康数据；
 - torn final line 不能静默忽略。实现必须先保留 forensic bytes，再通过可恢复的发布流程产生新的规范完整前缀和 repair 证据；精确发布算法由 execution plan 决定。
 
+同一套分类也用在没有崩溃的进程里。运行中的回合有一条记录没写进去时（单条超过 1 MiB、数据里带被禁止的敏感字段名、钩子抛错），已经开始的请求和工具调用同样没有结果。Agent Loop 的失败处理调用 `settleOpenTurnWork`，只对当前回合 `turn/start` 之后的记录做一次 repair 事务，了结没有结果的请求和工具调用；Step 和 Turn 不在事务里关，由 Agent Loop 接着写普通的 `step/end` 和带失败原因的 `turn/end`。只写了 `request/start`、还没写 `request/context` 的请求，事务里先补一条只带标识的 `request/context`，再写了结它的助手消息。
+
 ## 14. Fork
 
 Execution fork 只允许从 `read-write` 或满足所需 codec/能力的 `degraded` Session 中，选择一个平衡、完整且没有 dangling tool call 的边界。

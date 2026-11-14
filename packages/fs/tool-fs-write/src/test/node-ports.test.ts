@@ -69,3 +69,60 @@ it("keeps write/edit/delete result paths workspace-relative through a symlink ro
     { label: "result", value: expect.objectContaining({ path: await realpath(file) }) },
   ]) });
 });
+
+describe("write_file and edit_file diff limits", () => {
+  const textOf = (result: ToolBodyResult): string => result.modelOutput.map((block) => block.type === "text" ? block.text : "").join("");
+  const counts = (result: ToolBodyResult) => result.detail?.find((entry) => entry.label === "result")?.value;
+
+  it("keeps small diffs byte-for-byte as before", async () => {
+    const root = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root });
+    await writeFile(join(root, "small.txt"), "a\nb\nc\nd\ne\nf\ng\nh\n");
+    const result = await invoke(ports.edit_file, { path: "small.txt", old_string: "e", new_string: "E\nE2" });
+    expect(textOf(result)).toBe("--- a/small.txt\n+++ b/small.txt\n@@ -2,7 +2,8 @@\n b\n c\n d\n-e\n+E\n+E2\n f\n g\n h\n\nFile updated: small.txt");
+    expect(counts(result)).toMatchObject({ type: "update", additions: 2, deletions: 1 });
+  });
+  it("cuts long lines in the diff of a 3 MB single-line file and reports real counts", async () => {
+    const root = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root });
+    const long = `${"x".repeat(1_500_000)}MARK${"y".repeat(1_500_000)}`;
+    await writeFile(join(root, "bundle.min.js"), `${long}\nsecond\n`);
+    const tail = await invoke(ports.edit_file, { path: "bundle.min.js", old_string: "second", new_string: "2nd" });
+    expect(textOf(tail)).toBe(`--- a/bundle.min.js\n+++ b/bundle.min.js\n@@ -1,3 +1,3 @@\n ${"x".repeat(2_000)} ...[line truncated: 3000004 chars]\n-second\n+2nd\n \n\nFile updated: bundle.min.js`);
+    const inside = await invoke(ports.edit_file, { path: "bundle.min.js", old_string: "MARK", new_string: "CHANGED" });
+    expect(textOf(inside)).toBe(`--- a/bundle.min.js\n+++ b/bundle.min.js\n@@ -1,3 +1,3 @@\n-${"x".repeat(2_000)} ...[line truncated: 3000004 chars]\n+${"x".repeat(2_000)} ...[line truncated: 3000007 chars]\n 2nd\n \n\nFile updated: bundle.min.js`);
+    expect(counts(inside)).toMatchObject({ additions: 1, deletions: 1 });
+    expect(await readFile(join(root, "bundle.min.js"), "utf8")).toBe(`${long.replace("MARK", "CHANGED")}\n2nd\n`);
+  });
+  it("bounds the diff of a 100,000-line new file and still ends with the status line", async () => {
+    const root = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root });
+    const content = Array.from({ length: 100_000 }, (_, index) => `line-${index + 1}`).join("\n");
+    const result = await invoke(ports.write_file, { path: "big.txt", content });
+    const text = textOf(result);
+    expect(text.length).toBeLessThanOrEqual(64_000 + 400);
+    expect(text.startsWith("--- a/big.txt\n+++ b/big.txt\n@@ -1,1 +1,100000 @@\n-\n+line-1\n+line-2\n")).toBe(true);
+    const note = /\n\+line-(\d+)\n\[Output truncated at 64,000 characters: this diff shows (\d+) of 100000 added lines\. The file was written in full\.\]\n\nFile created: big\.txt$/.exec(text);
+    expect(note).not.toBeNull();
+    expect(note?.[1]).toBe(note?.[2]);
+    expect(Number(note?.[2])).toBeGreaterThan(4_000);
+    expect(counts(result)).toMatchObject({ type: "create", additions: 100_000, deletions: 1 });
+    expect(await readFile(join(root, "big.txt"), "utf8")).toBe(content);
+  });
+  it("keeps the trailing context line of a truncated diff so a new file ending in a newline is still recognisable", async () => {
+    const root = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root });
+    const result = await invoke(ports.write_file, { path: "log.txt", content: "entry\n".repeat(50_000) });
+    const text = textOf(result);
+    expect(text.startsWith("--- a/log.txt\n+++ b/log.txt\n@@ -1,1 +1,50001 @@\n+entry\n")).toBe(true);
+    expect(text).toMatch(/\n\+entry\n \n\[Output truncated at 64,000 characters: this diff shows \d+ of 50000 added lines\. The file was written in full\.\]\n\nFile created: log\.txt$/);
+    expect(counts(result)).toMatchObject({ type: "create", additions: 50_000, deletions: 0 });
+  });
+  it("splits the budget between removed and added lines when both sides are large", async () => {
+    const root = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root });
+    await writeFile(join(root, "both.txt"), Array.from({ length: 50_000 }, (_, index) => `old-${index + 1}`).join("\n"));
+    const result = await invoke(ports.write_file, { path: "both.txt", content: Array.from({ length: 30_000 }, (_, index) => `new-${index + 1}`).join("\n") });
+    const text = textOf(result); const lines = text.split("\n");
+    const removed = lines.filter((line) => line.startsWith("-old-")).length; const added = lines.filter((line) => line.startsWith("+new-")).length;
+    expect(text.length).toBeLessThanOrEqual(64_000 + 400);
+    expect(removed).toBeGreaterThan(2_000); expect(added).toBeGreaterThan(2_000);
+    expect(text).toContain(`\n[Output truncated at 64,000 characters: this diff shows ${added} of 30000 added and ${removed} of 50000 removed lines. The file was written in full.]\n\nFile updated: both.txt`);
+    expect(counts(result)).toMatchObject({ type: "update", additions: 30_000, deletions: 50_000 });
+  });
+});

@@ -176,6 +176,26 @@ describe("Harness 统计投影", () => {
     expect(rows(split)).toEqual(rows(once));
   });
 
+  it("输出被截断按结果里的标记识别：分页尾注、单行截短、运行时兜底；模型自己分段的读取不算", () => {
+    const db = database();
+    let seq = 0;
+    const call = (id: string, args: Record<string, unknown>, output: string) => [
+      ev(seq++, "tool/call", { callId: id, name: "read_file", requestId: "q1", turnId: "t1", stepId: "s1", args }),
+      ev(seq++, "tool/result", { callId: id, status: "completed", modelOutput: [{ type: "text", text: output }] }),
+    ];
+    projectHarnessJournalBatch(db, "s1", [
+      ev(seq++, "turn/start", { turnId: "t1", agentRunId: "run1", mode: "agent" }),
+      ev(seq++, "step/start", { stepId: "s1", turnId: "t1" }),
+      ev(seq++, "request/header", { requestId: "q1", turnId: "t1", stepId: "s1", model: "m1" }),
+      ...call("c1", { path: "a" }, "     1|ok"),
+      ...call("c2", { path: "b" }, "     1|x\n\n[Showing lines 1-200 of 900. Use offset=201 to continue.]"),
+      ...call("c3", { path: "c" }, "     1|xxx ...[line truncated: 3000000 bytes]"),
+      ...call("c4", { path: "d" }, "head\n\n[Output truncated: this tool returned 400000 bytes, more than one result can hold. The first 261120 bytes are shown. The full output was saved as a file.]"),
+      ...call("c5", { path: "e", offset: 201 }, "   201|x\n\n[Showing lines 201-400 of 900. Use offset=401 to continue.]"),
+    ]);
+    expect(query(db, "usage-vs").tools.find(row => row.name === "read_file")).toMatchObject({ calls: 5, truncated: 3 });
+  });
+
   it("删除会话后统计归档，重建统计库时读回", () => {
     const root = tempRoot();
     const db = database();
