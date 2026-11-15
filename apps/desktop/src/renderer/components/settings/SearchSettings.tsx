@@ -88,6 +88,17 @@ export function SearchSettings({
             />
           }
         />
+        <SettingRow
+          title="使用 DeepSeek 深度搜索"
+          description={hasDeepseekKey ? "问题将发送至 DeepSeek · 搜索 ¥0.005 / 次，另计模型用量" : "请先连接 DeepSeek"}
+          control={<Toggle
+            ariaLabel="使用 DeepSeek 深度搜索"
+            checked={hasDeepseekKey && settingsV4?.settings.tools.deepseekDeepSearchEnabled === true}
+            // With web search off the stored choice is kept, only greyed out; turning web search back on restores it.
+            disabled={!settingsV4 || writing || !hasDeepseekKey || !tools.isEnabled(WEB_SEARCH_TOOL)}
+            onChange={(deepseekDeepSearchEnabled) => void saveTools({ deepseekDeepSearchEnabled })}
+          />}
+        />
       </SettingGroup>
 
       <SettingGroup

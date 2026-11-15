@@ -108,3 +108,52 @@ describe("DeepSeek settings opt-in", () => {
     expect(screen.getByRole("switch", { name: "启用 智谱 Web Search 搜索" })).toBeChecked();
   });
 });
+
+describe("DeepSeek deep search switch", () => {
+  const NAME = "使用 DeepSeek 深度搜索";
+  function snapshot(deepseekDeepSearchEnabled: boolean, disabledTools: string[] = []) {
+    return { revision: "test", settings: { tools: { disabledTools, bash: { alwaysAsk: false }, searchProviders: {}, deepseekFetchEnabled: false, deepseekDeepSearchEnabled } } } as unknown as import("@actspace/shared").SettingsV4Snapshot;
+  }
+  function withKey(disabledTools: string[] = []) {
+    const settings = makeSettings(["zhipu"], disabledTools); settings.providers.deepseek.hasApiKey = true;
+    return settings;
+  }
+
+  it("sits under the web search switch and describes cost with a key", () => {
+    renderSearch({ settings: withKey(), settingsV4: snapshot(true) });
+    const switches = screen.getAllByRole("switch").map(item => item.getAttribute("aria-label"));
+    expect(switches.slice(0, 2)).toEqual(["允许联网搜索", NAME]);
+    expect(screen.getByText("问题将发送至 DeepSeek · 搜索 ¥0.005 / 次，另计模型用量")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: NAME })).toBeChecked();
+    expect(screen.getByRole("switch", { name: NAME })).toBeEnabled();
+  });
+
+  it("asks to connect DeepSeek without a key and shows off even when stored on", () => {
+    renderSearch({ settingsV4: snapshot(true) });
+    expect(screen.getAllByText("请先连接 DeepSeek").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("switch", { name: NAME })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: NAME })).toBeDisabled();
+  });
+
+  it("is disabled before settings load", () => {
+    renderSearch({ settings: withKey(), settingsV4: null });
+    expect(screen.getByRole("switch", { name: NAME })).toBeDisabled();
+  });
+
+  it("is disabled while web search is off but still shows the stored value", () => {
+    renderSearch({ settings: withKey(["web_search"]), settingsV4: snapshot(true, ["web_search"]) });
+    expect(screen.getByRole("switch", { name: NAME })).toBeDisabled();
+    expect(screen.getByRole("switch", { name: NAME })).toBeChecked();
+  });
+
+  it("is disabled while a save is in flight and saves only its own field", async () => {
+    let finish!: (value: import("@actspace/shared").SettingsV4Snapshot) => void;
+    const onUpdateNamespace = vi.fn(() => new Promise<import("@actspace/shared").SettingsV4Snapshot>(resolve => { finish = resolve; }));
+    renderSearch({ settings: withKey(), settingsV4: snapshot(false), onUpdateNamespace });
+    await userEvent.click(screen.getByRole("switch", { name: NAME }));
+    expect(onUpdateNamespace).toHaveBeenCalledWith({ namespace: "tools", patch: { deepseekDeepSearchEnabled: true } });
+    expect(screen.getByRole("switch", { name: NAME })).toBeDisabled();
+    finish(snapshot(true));
+    await waitFor(() => expect(screen.getByRole("switch", { name: NAME })).toBeEnabled());
+  });
+});
