@@ -1,6 +1,6 @@
 # DeepSeek 深度搜索与文档解析 — 执行计划总览
 
-状态：执行中（交互模式）。当前进度：审核通过（2026-11-15，两项出入都按计划：独立 `deep_search`、文档解析默认关）；P0 的任务都做完了；PA 执行中。
+状态：执行中（交互模式）。当前进度：审核通过（2026-11-15，两项出入都按计划：独立 `deep_search`、文档解析默认关）；P0 的任务都做完了；PA.1–PA.9 的代码和文档已提交，PA 的真实应用验收待做。
 
 - 分支：`feat/deepseek-deep-search-doc`（2026-11-15 从 `main` 切出；demo 已随设计文档合进 `main`）。
 - 设计真源：[DeepSeek 深度搜索与文档解析工具](../../../design-docs/tool-system/agent-deep-search-and-document-parsing.md)。接口事实、工具契约、界面契约、否决的方案都在那里，本计划不重复。

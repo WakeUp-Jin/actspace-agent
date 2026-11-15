@@ -1,6 +1,6 @@
 # PA：深度搜索
 
-状态：执行中（交互模式），PA.1 实测做完了。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。
+状态：执行中（交互模式）。PA.1–PA.8 和 PA.9 的文档已提交；PA.9 的真实应用验收和 history 待做。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。
 
 ## 目标
 
