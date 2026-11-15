@@ -19,7 +19,7 @@
 | Session 事件 | [Session 业务与存储后端边界](agent-spec-session-core-persistence-separation.md)（接纳、observer、durability barrier、checkpoint）、[Session Format v1](agent-spec-session-format-v1.md)、[DSH 事件模型](agent-spec-dsh-event-model.md)（当前事件词汇的唯一来源） |
 | 请求与流式 | [流式输出只走实时通道](agent-spec-live-assistant-stream.md)、[请求记录与上下文估算](agent-spec-request-record.md)、[对话内容只存一份](agent-spec-surface-derived.md)、[上下文引擎直接用日志视图](agent-spec-context-trusted-surface.md) |
 | 投影与读模型 | [Runtime Projection](agent-spec-runtime-projection.md)（Durable / Live / Diagnostics 三平面、Generic Tool DTO、当前读取实现与水位） |
-| Agent 与 Scope | [Agent Core 所有权](agent-target-agent-core.md)、[Agent 与 Subagent](agent-spec-agent-and-subagent.md)、[Agent Scope 模型](agent-spec-agent-scope-model.md) |
+| Agent 与 Scope | [Agent Core 所有权](agent-target-agent-core.md)、[Agent Scope 模型](agent-spec-agent-scope-model.md)、[子智能体运行规范](../collaboration/agent-subagent-runtime.md) |
 | Tool | [Tool Runtime 内核与外壳](agent-spec-tool-runtime-boundary.md)、[Tool Runtime ABI](agent-spec-tool-runtime-abi.md)、[Tool Name 契约](agent-spec-tool-name-contract.md)、[Tool 插件边界与 Todo 领域事件](agent-tool-plugin-boundaries.md) |
 | Prompt 与上下文贡献 | [Prompt 与 Context Contributor](agent-spec-prompt-context-contributors.md) |
 | LLM | [LLM Adapter 目标](agent-target-llm-adapter.md)、[LLM Core Pi](agent-llm-core-pi.md)（含 pi-ai 内置服务商复用）、[多供应商与模型管理](../model-context/agent-multi-provider-llm.md) |

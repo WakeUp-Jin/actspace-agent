@@ -5,7 +5,7 @@ import {
 } from "./subagents";
 
 /**
- * The subagent tree of one main Session, folded from its own Journal (design 02 §4.1):
+ * The subagent tree of one main Session, folded from its own Journal (agent-subagent-runtime.md「状态与事件」):
  * `subagent/spawned` and `subagent/activation`, plus the read-only `delegation/*` of old Sessions.
  * The Host manager, the background task context source and the UI all read this one fold.
  */

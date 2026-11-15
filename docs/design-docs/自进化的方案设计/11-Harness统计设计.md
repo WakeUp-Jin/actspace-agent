@@ -62,7 +62,7 @@
 | 用户介入 | 中止：`turn/end.reason="aborted"`；排队：`plugin/actspace.agent-service/task` 的 `accept` 发生在有运行中的 run 时；插入引导：`plugin/actspace.agent-service/queue-return` 的 `return-steering` 与旧日志 `agent/inbox/spliced.source="steer"` |
 | 模式切换 | `agent/mode-set` |
 | 辅助模型调用 | `llm/auxiliary-start / end`（`purpose, status`，时间差为耗时） |
-| 子 Agent | `delegation/requested / completed`（父会话）、`delegation/child-terminal`（子会话：`durationMs, toolUseCount, usage, text, status`） |
+| 子 Agent | `subagent/spawned`、`subagent/activation`（父会话，`start` 到 `settle` 的时间差为耗时）；老会话是 `delegation/requested / completed`（父会话）、`delegation/child-terminal`（子会话：`durationMs, toolUseCount, usage, text, status`） |
 | 后台任务 | `background/task`（`start` / `settle`），没人读输出 = 没有任何 `task_output` 调用（老日志还有 `task_wait`）的 `args.taskId` 指向它，且 `settle.delivery` 不是 `wait`（老日志） |
 | 侧边对话 | 会话头 `lineage.origin="side-chat"`（目录已有 `side_chat_parent_id`） |
 | Harness 版本 | `plugin/actspace.agent-service/run` 的 `start.harness.revision`，按 `runId`（= `agentRunId`）关联到 turn；没有 run 事件的会话（子 Agent、侧边对话）取父会话发起调用时的版本，仍取不到记为“未知版本” |
@@ -136,7 +136,7 @@
 | `harness_disclosure_cycle` | 每个披露周期 | 维度、周期号、活跃数、是否碰到 100 上限、活跃路径中下个周期被读的数量 |
 | `harness_disclosure_rollup` | 会话 × 维度 | 误睡次数（睡下后下一个周期就被读）、睡下的路径数、查索引次数、索引转化次数、唤醒前睡眠周期直方图 |
 | `harness_path_reads` | 会话 × 维度 × 路径 | 读取次数、最后读取时间（只给“最常被读的路径”用，取前 50） |
-| `harness_delegation` | 每次子 Agent 调用 | 维度、时间、类型（presetId）、状态、子会话、耗时（终止状态与耗时来自子会话侧事件，查询时按 invocation 合并） |
+| `harness_delegation` | 每次子 Agent 调用 | 维度、时间、类型（presetId）、状态、子会话、耗时（老会话的终止状态与耗时来自子会话侧事件，查询时按 invocation 合并） |
 
 v18 删除的表：`harness_turn`、`harness_session_rollup`、`harness_aux_rollup`、`harness_owner_rollup`、`harness_background_task`、`harness_evolution_op`、`harness_stats_health`。辅助模型调用改由使用统计的 `usage_activity.purpose` 提供。
 

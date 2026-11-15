@@ -7,7 +7,7 @@ import { CODEX_SUBAGENT_PLUGIN_ID } from "./manifest.js";
 
 export const inject = ["tools.runtime", "agent.registry", "actspace.host.subagents"];
 
-/** Registers `agent_codex` only when `codex` is installed; otherwise the plugin reports why (design 04 §1). */
+/** Registers `agent_codex` only when `codex` is installed; otherwise the plugin reports why (agent-subagent-runtime.md「外部子智能体」). */
 export async function apply(ctx: CordisContext, config: Readonly<Record<string, unknown>> = {}): Promise<void> {
   const tools = requireService(ctx, TOOL_RUNTIME_SERVICE, "Codex subagent plugin");
   const registry = requireService(ctx, AGENT_REGISTRY_SERVICE, "Codex subagent plugin");

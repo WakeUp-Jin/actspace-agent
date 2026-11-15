@@ -29,7 +29,7 @@ const toolMessages = body => body.messages.filter(message => message.role === 't
 const call = (id, name, args) => ({ role: 'assistant', tool_calls: [{ index: 0, id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] });
 
 // S4 缓存一致：父会话两步之后在第三步调用 agent_fork；fork 的首个请求与父会话第三步的请求，
-// 系统提示词、工具定义、模型与边界之前的消息逐项相同（设计 02 §8.4、§10）。
+// 系统提示词、工具定义、模型与边界之前的消息逐项相同（agent-subagent-runtime.md「Fork」）。
 test('a forked subagent sends its first request with the parent\'s prompt, tools and message prefix', { timeout: 60000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'host-fork-cache-'));
   await writeFile(join(root, 'a.txt'), 'alpha'); await writeFile(join(root, 'b.txt'), 'beta');

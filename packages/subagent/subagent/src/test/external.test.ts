@@ -15,7 +15,7 @@ import { isExternalRecordPath, SubagentManager, subagentTree } from "../manager.
 import { externalAgentDescription, SUBAGENT_LIMIT_REACHED } from "../messages.js";
 import type { SubagentToolOutcome } from "../types.js";
 
-// 外部子智能体（设计 04）走 SubagentManager 的并发计数、事件，后台时同样登记进后台任务；记录是 CLI 自己的会话日志。
+// 外部子智能体（agent-subagent-runtime.md「外部子智能体」）走 SubagentManager 的并发计数、事件，后台时同样登记进后台任务；记录是 CLI 自己的会话日志。
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
 

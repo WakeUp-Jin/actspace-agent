@@ -7,7 +7,7 @@ import { resolveCommand } from "@actspace/subagent";
 import { CODEX_NOT_FOUND, codexConfig, createCodexBackend, DEFAULT_CODEX_CONFIG } from "../backend.js";
 import { manifest } from "../manifest.js";
 
-// S5：Codex 后端（设计 04 §3.1）。假 `codex app-server` 按 FAKE_MODE 写死 JSON-RPC 输出，不调真实 CLI。
+// S5：Codex 后端（agent-subagent-runtime.md「外部子智能体」）。假 `codex app-server` 按 FAKE_MODE 写死 JSON-RPC 输出，不调真实 CLI。
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
 
