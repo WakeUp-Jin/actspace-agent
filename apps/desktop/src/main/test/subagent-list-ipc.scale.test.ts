@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as CH } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS as CH } from "@actspace/shared/runtime-v2";
 import { syntheticJournal } from "@actspace/session-journal/testing";
 const { handlers } = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => any>() }));
 vi.mock("electron", () => ({ dialog: {}, nativeImage: {}, nativeTheme: {}, shell: {}, ipcMain: {

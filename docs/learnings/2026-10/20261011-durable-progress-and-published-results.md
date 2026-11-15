@@ -1,6 +1,6 @@
 # 索引进度持久化，不等于把半成品展示给用户
 
-从 [Context / SQLite 联合实现](../../exec-runs/20261011-context-sqlite-integration/execution-process.md) 中提炼。
+从 [Context / SQLite 联合实现](../../histories/2026-10/20261011-2059-context-sqlite-joint-plan.md) 中提炼。
 
 重建一份大索引时，有两种看似合理却都不完整的选择：整个会话一个事务，或者每批直接覆盖用户正在查询的表。前者取消就丢掉整个会话的计算；后者会让用户看到新旧结果混合，甚至让统计重复计数。
 

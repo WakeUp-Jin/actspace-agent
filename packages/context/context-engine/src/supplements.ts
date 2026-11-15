@@ -1,5 +1,5 @@
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1, SessionSurfaceView } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ContextRequest, ContextSupplement } from "./types.js";
 import { CONTEXT_OWNER, SUPPLEMENT_EVENT, type SupplementOperation } from "./codec.js";
 
@@ -95,6 +95,6 @@ export class ContextSupplements {
     return last.sourceEventSeqs.reduce((latest, seq) => Math.max(latest, seq), -1);
   }
   private async append(data: SupplementOperation): Promise<void> {
-    await this.session.append({ type: SUPPLEMENT_EVENT, eventVersion: 1, source: { ownerPluginId: CONTEXT_OWNER }, data: data as unknown as RuntimeV2JsonValue, surface: null });
+    await this.session.append({ type: SUPPLEMENT_EVENT, eventVersion: 1, source: { ownerPluginId: CONTEXT_OWNER }, data: data as unknown as RuntimeJsonValue, surface: null });
   }
 }

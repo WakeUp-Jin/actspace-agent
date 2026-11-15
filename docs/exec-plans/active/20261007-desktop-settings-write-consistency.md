@@ -27,7 +27,7 @@
 - 相关文档：
   - `docs/exec-plans/tech-debt-tracker.md`「Desktop settings 遗留」三行。
   - `docs/design-docs/core-storage-and-observability.md`「设置与凭据」：模块划分和回滚、串行的职责。
-  - 17 的执行记录：`docs/exec-runs/20261005-desktop-fe-17-settings-split/execution-process.md`（T1、T6、T7 的特征测试和变异检查）。
+  - 17 期（settings-service 拆分）留下的特征测试：`apps/desktop/src/main/test/settings-characterization.test.ts`，按现状断言了这三个问题的行为；当时做过变异检查，这份测试能抓到写入顺序和回滚的改动。
 - 相关代码路径（2026-10-07 核实，`M/` = `apps/desktop/src/main/`）：
   - **问题 1**
     - `M/settings/facades/general.ts` 的 `update`（:187）、`updateV2`（:221）只改 `store.settings.agent`（v3 结构）。
@@ -128,4 +128,4 @@
 
 ## 执行文档
 
-执行开始时，在 `docs/exec-runs/20261007-desktop-settings-write-consistency/` 创建 `execution-process.md`、`execution-summary.md`（从 `docs/exec-runs/templates/` 复制）。
+交互模式不另写执行文档：进度和决定记在上面两节；完成后没验证的范围写进 history 与 PR 描述，然后删除本计划。

@@ -1,9 +1,9 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { readFileReferenceBlocks, readResponseExcerptBlocks, renderFileReferencesForModel, renderResponseExcerptForModel } from "@actspace/shared";
 import type { LlmMessage, LlmContentBlock } from "@actspace/llm-service";
 import type { ArtifactResolver } from "./types.js";
 
-export async function convertMessages(values: readonly RuntimeV2JsonValue[], sessionId: string, resolveArtifact?: ArtifactResolver): Promise<readonly LlmMessage[]> {
+export async function convertMessages(values: readonly RuntimeJsonValue[], sessionId: string, resolveArtifact?: ArtifactResolver): Promise<readonly LlmMessage[]> {
     const paths = new Map<string, string>();
     for (const value of values) {
       if (!isRecord(value) || !Array.isArray(value.content)) continue;
@@ -44,19 +44,19 @@ export async function convertMessages(values: readonly RuntimeV2JsonValue[], ses
     return repaired;
   }
 
-export function surfaceMessage(node: import("@actspace/session-journal").SessionSurfaceNodeV1): RuntimeV2JsonValue {
+export function surfaceMessage(node: import("@actspace/session-journal").SessionSurfaceNodeV1): RuntimeJsonValue {
   if (node.kind === "user") return { role: "user", content: node.content };
   if (node.kind === "assistant") return { role: "assistant", content: node.content };
   return { role: "tool", callId: node.callId, content: node.content, isError: node.isError };
 }
-function toMessage(value: RuntimeV2JsonValue, paths: ReadonlyMap<string, string>): LlmMessage {
+function toMessage(value: RuntimeJsonValue, paths: ReadonlyMap<string, string>): LlmMessage {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    const record = value as Readonly<Record<string, RuntimeV2JsonValue>>;
+    const record = value as Readonly<Record<string, RuntimeJsonValue>>;
     if (record.role === "user" || record.role === "assistant" || record.role === "tool") return { role: record.role, content: toLlmContent(record.content, paths), ...(record.role === "tool" && typeof record.callId === "string" ? { callId: record.callId } : {}) };
   }
   return { role: "user", content: typeof value === "string" ? value : JSON.stringify(value) ?? "null" };
 }
-function toLlmContent(value: RuntimeV2JsonValue | undefined, paths: ReadonlyMap<string, string>): string | readonly LlmContentBlock[] {
+function toLlmContent(value: RuntimeJsonValue | undefined, paths: ReadonlyMap<string, string>): string | readonly LlmContentBlock[] {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return JSON.stringify(value ?? null) ?? "null";
   // 同一条消息里的文件引用合并成一段，出现在第一个 file-reference 块的位置。
@@ -64,7 +64,7 @@ function toLlmContent(value: RuntimeV2JsonValue | undefined, paths: ReadonlyMap<
   let fileReferencesRendered = false;
   return value.flatMap((item): LlmContentBlock[] => {
     if (item === null || typeof item !== "object" || Array.isArray(item)) return [{ type: "text", text: JSON.stringify(item) ?? "null" }];
-    const block = item as Readonly<Record<string, RuntimeV2JsonValue>>;
+    const block = item as Readonly<Record<string, RuntimeJsonValue>>;
     if (block.type === "text" && typeof block.text === "string") return [{ type: "text", text: block.text }];
     if (block.type === "reasoning" && typeof block.text === "string") return [{ type: "reasoning", text: block.text, ...(typeof block.signature === "string" ? { signature: block.signature } : {}), ...(isRecord(block.replay) ? { replay: block.replay as never } : {}) }];
     if (block.type === "tool-call" && typeof block.callId === "string" && typeof block.name === "string") return [{ type: "tool-call", callId: block.callId, name: block.name, arguments: typeof block.arguments === "string" ? block.arguments : JSON.stringify(block.arguments ?? {}) }];

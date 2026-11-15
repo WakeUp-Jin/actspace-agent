@@ -76,5 +76,4 @@ status    = running | success | error | aborted | unknown
 ## 关联变更
 
 - 设计与执行记录：`docs/histories/2026-08/20260830-1933-settings-center-redesign-spec.md`
-- 执行摘要：`docs/exec-runs/20260830-actspace-settings-center-refactor/execution-summary.md`
 - 当前产品规范：`docs/design-docs/frontend/front-设置页规范.md`（历史：原 `front-设置中心重构规范.md` 已并入该文件）

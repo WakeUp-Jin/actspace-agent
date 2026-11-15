@@ -15,7 +15,7 @@ import { isExternalRecordPath, SubagentManager, subagentTree } from "../manager.
 import { externalAgentDescription, SUBAGENT_LIMIT_REACHED } from "../messages.js";
 import type { SubagentToolOutcome } from "../types.js";
 
-// 外部子智能体（设计 04）走 SubagentManager 的并发计数、事件，后台时同样登记进后台任务；记录是 CLI 自己的会话日志。
+// 外部子智能体（agent-subagent-runtime.md「外部子智能体」）走 SubagentManager 的并发计数、事件，后台时同样登记进后台任务；记录是 CLI 自己的会话日志。
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
 
@@ -110,7 +110,8 @@ describe("external subagents", () => {
     const view = subagentTree(f.root).agents[agentId];
     expect(view.status).toBe("closed");
     expect(view.activations[0].settle).toMatchObject({ status: "completed", delivery: "notified", result: "subagent, subagent-codex, subagent-claude-code", summary: `Subagent ${agentId} finished.` });
-    await until(() => new MainAgentInbox(f.root).pending().length === 1);
+    // The registry wakes the parent last, after the notice is in the inbox and the settle record is written.
+    await until(() => new MainAgentInbox(f.root).pending().length === 1 && f.woken.length > 0);
     const notice = String(new MainAgentInbox(f.root).pending()[0].content);
     expect(notice).toContain(`<transcript>${path}</transcript>`);
     expect(notice).toContain("<closing_message>\nsubagent, subagent-codex, subagent-claude-code\n</closing_message>");

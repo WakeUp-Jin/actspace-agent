@@ -1,15 +1,15 @@
 import { expect, it } from 'vitest';
-import type { RuntimeV2JsonValue, RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
+import type { RuntimeJsonValue, RuntimeTrajectorySnapshot } from '@actspace/shared/runtime-v2';
 import { buildTrajectorySnapshot, deriveLayout } from '../trajectory';
 import { trajectoryDelegations } from '../trajectory/subagents';
 
-function snapshot(events: [string, Record<string, RuntimeV2JsonValue>][], sessionId = 's'): RuntimeV2TrajectorySnapshot {
+function snapshot(events: [string, Record<string, RuntimeJsonValue>][], sessionId = 's'): RuntimeTrajectorySnapshot {
   return { kind: 'trajectory', schemaVersion: 1, sessionId, throughJournalSeq: events.length - 1, nodes: events.map(([eventType, data], eventSeq) => ({ key: `${sessionId}:${eventSeq}`, sessionId, eventSeq, eventType, data, surface: null, source: null, time: new Date(1700000000000 + eventSeq * 1000).toISOString(), kind: 'other', state: 'observed', callId: typeof data.callId === 'string' ? data.callId : null })) };
 }
 const base = { id: 'model-prompt', owner: 'actspace.context-system', order: 0, content: 'fixed' };
 const rule = { id: 'host/workspace-instructions', owner: 'actspace.context-rules', order: 20, content: 'rule-one' };
-const prompt = (id: string, sections: RuntimeV2JsonValue[], facts: RuntimeV2JsonValue[] = []): [string, Record<string, RuntimeV2JsonValue>] => ['request/system-prompt', { turnId: 't', stepId: id, requestId: id, digest: JSON.stringify([sections, facts]), sections, modelFacts: facts, contributorProvenance: [] }];
-const context = (id: string): [string, Record<string, RuntimeV2JsonValue>] => ['request/context', { turnId: 't', stepId: id, requestId: id, snapshot: { schemaVersion: 3 } }];
+const prompt = (id: string, sections: RuntimeJsonValue[], facts: RuntimeJsonValue[] = []): [string, Record<string, RuntimeJsonValue>] => ['request/system-prompt', { turnId: 't', stepId: id, requestId: id, digest: JSON.stringify([sections, facts]), sections, modelFacts: facts, contributorProvenance: [] }];
+const context = (id: string): [string, Record<string, RuntimeJsonValue>] => ['request/context', { turnId: 't', stepId: id, requestId: id, snapshot: { schemaVersion: 3 } }];
 
 it('projects initial, changed and removed context from adjacent prompt records without repeated unchanged rows', () => {
   const view = buildTrajectorySnapshot(snapshot([

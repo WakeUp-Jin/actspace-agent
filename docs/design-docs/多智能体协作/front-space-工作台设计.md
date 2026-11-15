@@ -1,7 +1,6 @@
 # Space 工作台设计（多智能体协作 · 前端）
 
 > **状态：前端演示，只在开发构建出现，数据全部 mock，后端不动。交互以 [space-demo.html](space-demo.html) 为准。**
-> 执行计划：[多智能体协作前端演示](../../exec-plans/completed/20261007-multi-agent-collab-frontend-demo.md)。
 > 界面样式以真实桌面端组件和 token 为准，demo 只定结构和交互。代码在 `apps/desktop/src/renderer/components/space/`，走查步骤见 [FRONTEND_VERIFICATION](../../FRONTEND_VERIFICATION.md)「Space 多 Actor 协作演示」。
 > 本文按 [ActSpace 产品概念](../ActSpace产品概念思路初稿.md) 的 Actor 模型书写；更早的「主会话 + 线程」「协调 Agent + 工作 Agent」两版取舍见 `docs/histories/2026-10/`。
 
@@ -333,7 +332,7 @@ Space ─┬─ 名字、要解决的问题（一句话）、相关目录
 | 协调 Agent 工具 | 交事、发消息、读状态、写记忆，工具 schema 与权限校验另定 |
 | Actor 长成 | 新起的 Actor 如何沉淀场景、能力、记忆，属于产品概念里「在场景中长成」的机制设计 |
 
-前端 mock 的数据形状按上面的实体拆分，方便以后换成真实数据源（见执行计划 T2）。
+前端 mock 的数据形状按上面的实体拆分，方便以后换成真实数据源。
 
 ## 10. 接入桌面端前端
 

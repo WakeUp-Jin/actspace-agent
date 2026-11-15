@@ -1,8 +1,8 @@
 name: 仓库基础检查
 
-# 唯一不带路径过滤的 PR 工作流：每个 PR 都会产生「仓库基础检查」这一个 check，
-# 因此它是 main ruleset 里唯一可以安全设为 required status check 的 job。
-# ci.yml（代码）和其他带 paths 过滤的工作流只在相关文件改动时触发，设为必需会把纯文档 PR 卡死。
+# 不带路径过滤的 PR 工作流：每个 PR 都会产生「仓库基础检查」这一个 check，
+# 因此可以安全设为 main ruleset 的 required status check。ci.yml 的「CI 汇总」同理。
+# 其他带工作流级 paths 过滤的工作流只在相关文件改动时触发，设为必需会把不相关的 PR 卡死。
 on:
   pull_request:
   push:

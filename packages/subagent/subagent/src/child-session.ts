@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHandle, SessionStore } from "@actspace/session-persistence";
 
-/** A new child Session: `agent_id` is its id, its lineage points at the main Session (design 02 §4.2). */
+/** A new child Session: `agent_id` is its id, its lineage points at the main Session (agent-subagent-runtime.md「子会话」). */
 export async function createChildSession(options: {
   readonly store: SessionStore;
   readonly parent: SessionHandle;

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { EventCodec as PluginEventCodec } from "@actspace/cordis-adapter";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "./event-envelope.js";
 import { SessionError } from "./errors.js";
 
@@ -38,12 +38,12 @@ export function relationContext(codec: EventCodec, candidate: SessionEventEnvelo
 
 export type DecodedSessionEvent = {
   readonly event: SessionEventEnvelopeV1;
-  readonly data: RuntimeV2JsonValue;
+  readonly data: RuntimeJsonValue;
   readonly projected: boolean;
 };
 
 export type CodecResolution =
-  | { readonly kind: "known"; readonly codec: EventCodec; readonly data: RuntimeV2JsonValue }
+  | { readonly kind: "known"; readonly codec: EventCodec; readonly data: RuntimeJsonValue }
   | { readonly kind: "unknown-required" }
   | { readonly kind: "unknown-ignorable" }
   | { readonly kind: "unsupported-required"; readonly codec: EventCodec }

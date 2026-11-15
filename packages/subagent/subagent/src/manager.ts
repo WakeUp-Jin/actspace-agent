@@ -8,8 +8,8 @@ import type { AgentLoop } from "@actspace/agent-loop";
 import type { AgentScope } from "@actspace/scope";
 import type { ModelsHostPort } from "@actspace/shared";
 import {
-  EMPTY_SUBAGENT_TREE, CONTEXT_TRACE_DETAIL_LABEL, listedSubagents, reduceSubagentTree, runningActivation,
-  type RuntimeV2AgentMode, type RuntimeV2JsonValue, type SubagentActivationStatus, type SubagentDelivery, type SubagentKind, type SubagentPreset, type SubagentTree,
+  coreEvent, EMPTY_SUBAGENT_TREE, CONTEXT_TRACE_DETAIL_LABEL, listedSubagents, reduceSubagentTree, runningActivation,
+  type CoreEventDataMap, type PermissionMode, type RuntimeAgentMode, type RuntimeJsonValue, type SubagentActivationStatus, type SubagentDelivery, type SubagentKind, type SubagentPreset, type SubagentTree,
 } from "@actspace/shared/runtime-v2";
 import { FORKED_SUBAGENT_PRESET_ID, resolveSessionWorkspaceRoot, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHandle, SessionStore } from "@actspace/session-persistence";
@@ -27,7 +27,7 @@ import type { SpawnForkInput, SpawnSubagentInput, SubagentCaller, SubagentHostPo
 export type ChildLoop = Pick<AgentLoop, "runTurn" | "abort" | "waitForIdle" | "quiesce">;
 /**
  * A `subagent` Loop is assembled like a child (its own prompt, no main-only sources); a `fork`
- * Loop is assembled like its main agent, so its first request reuses the parent's prompt cache (design 02 §8.4).
+ * Loop is assembled like its main agent, so its first request reuses the parent's prompt cache (agent-subagent-runtime.md「Fork」).
  */
 export type ChildLoopInput = {
   readonly session: SessionHandle;
@@ -42,9 +42,9 @@ export type ChildLoopInput = {
 /** One Harness lease holding a child Run: the TaskLedger entry and the Loop factory of the caller's generation. */
 export type ChildRunLease = {
   readonly scope: AgentScope;
-  start(session: SessionHandle, content: RuntimeV2JsonValue, runId: string): Promise<{ readonly messageId: string }>;
+  start(session: SessionHandle, content: RuntimeJsonValue, runId: string): Promise<{ readonly messageId: string }>;
   createLoop(input: ChildLoopInput): Promise<ChildLoop>;
-  finish(outcome: "completed" | "cancelled" | "failed", value: RuntimeV2JsonValue): Promise<void>;
+  finish(outcome: "completed" | "cancelled" | "failed", value: RuntimeJsonValue): Promise<void>;
   release(): Promise<void>;
 };
 
@@ -66,7 +66,7 @@ export type SubagentManagerOptions = {
   readonly models: () => ModelsHostPort;
   /** The main agent's current model settings (not its request headers). */
   readonly parentConfiguration: (sessionId: string) => ParentConfiguration;
-  readonly permissionMode: (session: SessionHandle) => string;
+  readonly permissionMode: (session: SessionHandle) => PermissionMode;
   readonly isSessionRunning: (sessionId: string) => boolean;
   readonly wake: (sessionId: string) => void;
   /**
@@ -131,7 +131,7 @@ const TREE = Symbol("actspace.subagent.tree");
 const OUTPUT_TAIL_BYTES = 32 * 1024;
 
 /**
- * Host-owned scheduler of subagents (design 02). A subagent is a temporary context window: it runs one task,
+ * Host-owned scheduler of subagents (agent-subagent-runtime.md). A subagent is a temporary context window: it runs one task,
  * answers, and is closed. A synchronous call returns its answer; a background one is a task of the background
  * task registry, which notifies the parent and stops it. All state is folded from the main Session's
  * `subagent/*` events; only running subagents live in memory.
@@ -170,7 +170,7 @@ export class SubagentManager implements SubagentHostPort {
       return fail("SUBAGENT_FAILED", errorText(error));
     }
     this.#begin(activation, caller.scope, `${input.prompt}\n\n${taskGuidance(transcriptPath, input.preset)}`);
-    // The transcript must exist with the task message before the path is handed out (design 02 §6.3).
+    // The transcript must exist with the task message before the path is handed out (agent-subagent-runtime.md「留痕与通知」).
     await Promise.race([activation.ready.promise, activation.result.promise]);
     await this.#refresh(agentId);
     const detail = details({ agentId, description: input.description, kind: "local", preset: input.preset, transcriptPath, background: input.background });
@@ -179,7 +179,7 @@ export class SubagentManager implements SubagentHostPort {
   }
 
   /**
-   * `agent_fork` (design 02 §8): copy the main Session up to the last completed step before this
+   * `agent_fork` (agent-subagent-runtime.md「Fork」): copy the main Session up to the last completed step before this
    * call, close the copied Turn, and run the fork like the main agent so its first request hits the cache.
    */
   async spawnFork(input: SpawnForkInput): Promise<SubagentToolOutcome> {
@@ -229,7 +229,7 @@ export class SubagentManager implements SubagentHostPort {
   }
 
   /**
-   * `agent_codex` / `agent_claude_code` (design 04): run the CLI once in the workspace. It shares the limit,
+   * `agent_codex` / `agent_claude_code` (agent-subagent-runtime.md「外部子智能体」): run the CLI once in the workspace. It shares the limit,
    * events and background handling with local subagents; its record is the CLI's own session log.
    */
   async spawnExternal(backend: ExternalSubagentBackend, input: SpawnExternalInput): Promise<SubagentToolOutcome> {
@@ -262,7 +262,7 @@ export class SubagentManager implements SubagentHostPort {
       return fail("SUBAGENT_FAILED", errorText(error));
     }
     this.#track(this.#runExternal(activation, run));
-    // The path joins the active paths only once the CLI has written the file (design 04 §3.3).
+    // The path joins the active paths only once the CLI has written the file (agent-subagent-runtime.md「外部子智能体」).
     const logReady = await waitForFile(transcriptPath, activation.result.promise, this.options.externalLogWaitMs ?? EXTERNAL_LOG_WAIT_MS);
     const detail = details({ agentId, description: input.description, kind, transcriptPath, background: input.background, trace: logReady });
     const text = { external: label, logMissing: !logReady };
@@ -272,7 +272,7 @@ export class SubagentManager implements SubagentHostPort {
 
   /**
    * The main agent writes to a running subagent it started; a subagent writes to its parent, which wakes if idle.
-   * Siblings do not talk, and a finished subagent takes no more messages (design 02 §3).
+   * Siblings do not talk, and a finished subagent takes no more messages (agent-subagent-runtime.md「工具」).
    */
   async sendMessage(input: SubagentCaller & { readonly agentId: string; readonly message: string }): Promise<SubagentToolOutcome> {
     const caller = await this.#caller(input);
@@ -327,7 +327,7 @@ export class SubagentManager implements SubagentHostPort {
   runningCount(rootId: string): number { return this.#running(rootId); }
 
   /**
-   * The 子 Agent panel's 停止 (design 05 §2). A background subagent is stopped through the registry, which tells
+   * The 子 Agent panel's 停止 (front-子Agent与后台任务规范.md §2). A background subagent is stopped through the registry, which tells
    * the model the user stopped it; a synchronous one is interrupted and its waiting tool call returns that.
    */
   async stopByUser(sessionId: string, agentId: string): Promise<{ readonly ok: boolean; readonly message: string }> {
@@ -393,7 +393,7 @@ export class SubagentManager implements SubagentHostPort {
   }
 
   /**
-   * Hand a running subagent to the background task registry (design 02 §6.1): `taskId` is the agent id, its
+   * Hand a running subagent to the background task registry (agent-subagent-runtime.md「后台登记」): `taskId` is the agent id, its
    * transcript is the output, and the registry's stop ends it. Once registered, the registry delivers its result.
    */
   #register(activation: Activation): Promise<void> {
@@ -606,7 +606,7 @@ function turnOutcome(reason: string): { readonly status: SubagentActivationStatu
 }
 
 type ResolvedCaller = { readonly root: SessionHandle; readonly rootId: string; readonly isRoot: boolean; readonly scope?: AgentScope };
-type SubagentDetail = readonly { readonly label: string; readonly value: RuntimeV2JsonValue }[];
+type SubagentDetail = readonly { readonly label: string; readonly value: RuntimeJsonValue }[];
 
 /** Serialize message delivery and settlement per child (DSH `ChildLock`). */
 class ChildLock {
@@ -633,7 +633,7 @@ export function subagentTree(root: SessionHandle): SubagentTree {
 }
 
 /**
- * May an agent of this main Session's tree read this file without approval (design 04 §3.3)? Only the exact
+ * May an agent of this main Session's tree read this file without approval (agent-subagent-runtime.md「外部子智能体」)? Only the exact
  * session log of one of its Codex / Claude Code subagents. The list folds from `subagent/spawned`, so it
  * holds after a restart; a sibling subagent reads it like the parent does.
  */
@@ -669,8 +669,7 @@ async function readTail(path: string, bytes: number): Promise<string> {
 /** True while the child's last tool call of this activation was a message to its parent and no input was claimed since. */
 function closingOmitted(child: SessionHandle, startSeq: number, rootId: string): boolean {
   let omitted = false;
-  for (const event of child.journal.iterateEvents()) {
-    if (event.seq <= startSeq) continue;
+  for (const event of child.journal.iterateEvents(startSeq + 1)) {
     const data = record(event.data);
     if (event.type === "tool/call") omitted = data.name === "send_message" && record(data.args).agent_id === rootId;
     if (event.type === "agent/inbox/spliced" && data.operation === "claim") omitted = false;
@@ -705,9 +704,8 @@ async function waitForFile(path: string, settled: Promise<unknown>, timeoutMs: n
 }
 
 /** The Agent mode of the Session's latest `turn/start`. */
-function latestTurnMode(session: SessionHandle): RuntimeV2AgentMode | undefined {
-  let mode: unknown;
-  for (const event of session.journal.iterateEvents()) if (event.type === "turn/start") mode = record(event.data).mode;
+function latestTurnMode(session: SessionHandle): RuntimeAgentMode | undefined {
+  const mode = record(session.journal.latestEvent("turn/start")?.data).mode;
   return mode === "agent" || mode === "plan" || mode === "chat" ? mode : undefined;
 }
 
@@ -715,7 +713,7 @@ function withStatus(detail: SubagentDetail, status: string): SubagentDetail {
   return detail.map(item => item.label === "delegation" ? { ...item, value: { ...record(item.value), status } } : item);
 }
 
-function startData(activation: Activation, input: { readonly trigger: "spawn"; readonly callId: string; readonly background: boolean; readonly startedAt: string }): Record<string, RuntimeV2JsonValue> {
+function startData(activation: Activation, input: { readonly trigger: "spawn"; readonly callId: string; readonly background: boolean; readonly startedAt: string }): Extract<CoreEventDataMap["subagent/activation"], { readonly op: "start" }> {
   return {
     op: "start", agentId: activation.agentId, activationId: activation.activationId, trigger: input.trigger,
     callId: input.callId, background: input.background, ...(activation.model.model ? { model: activation.model.model } : {}),
@@ -731,8 +729,6 @@ function modelInput(config: SubagentModelConfiguration): { model?: string; think
   };
 }
 
-/** A Journal event owned by `@actspace/core` (core types and the `subagent/*` extensions alike). */
-function coreEvent(type: string, data: Record<string, RuntimeV2JsonValue>) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
 function record(value: unknown): Readonly<Record<string, unknown>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, unknown>> : {}; }
 function ok(text: string, detail?: SubagentDetail): SubagentToolOutcome { return detail ? { ok: true, text, detail } : { ok: true, text }; }
 function fail(code: string, text: string): SubagentToolOutcome { return { ok: false, code, text }; }

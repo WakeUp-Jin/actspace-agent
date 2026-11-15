@@ -1,10 +1,10 @@
 import type { ApprovalRequest } from "@actspace/approval";
 import { describe, expect, it } from "vitest";
-import { CliV2ApprovalBroker } from "../runtime-v2/approval";
+import { CliApprovalBroker } from "../runtime-v2/approval";
 
 describe("Runtime v2 CLI approval broker", () => {
   it("fails closed and records the request so the run result can report APPROVAL_REQUIRED", async () => {
-    const broker = new CliV2ApprovalBroker();
+    const broker = new CliApprovalBroker();
     const decision = await broker.requestApproval(request());
 
     expect(decision).toMatchObject({ requestId: "approval-1", kind: "deny", code: "broker-unavailable" });

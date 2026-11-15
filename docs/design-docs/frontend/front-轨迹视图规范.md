@@ -6,7 +6,7 @@ Trajectory 是会话主视图的一种工作模式，由标题栏的单个按钮
 
 ```text
 Session Journal
-  -> RuntimeV2TrajectorySnapshot（projectTrajectoryWindow，JSON-safe 原始节点）
+  -> RuntimeTrajectorySnapshot（projectTrajectoryWindow，JSON-safe 原始节点）
   定稿层（流式期间 Journal 不变，只在请求报出消息 id 时重算一次）：
     buildTrajectorySnapshot（builder.ts：Journal 节点 -> 语义记录；未结算的请求只留空占位）
     -> deriveLayout（layout.ts + requests.ts：Turn -> Group -> Cell，请求视图与编号）
@@ -19,7 +19,7 @@ Session Journal
 ```
 
 - React 组件不直接猜 Journal 事件关系，只消费 runtime builder 的结果：request、assistant、partial assistant、tool tree、compaction、turn / step location 和 source references 的关联都在 builder 里完成。
-- 适配 ActSpace：DSH 的 Context / SessionEvent / assembler 对应 ActSpace Journal event envelope 与 `RuntimeV2TrajectorySnapshot`；`Map`、类实例和回调不跨 IPC，IPC / preload 只传 JSON-safe DTO，renderer 内再恢复索引；保留 `ConversationLocation` 的 session / turn / step / unresolved 层级，保留 `eventSeq`、`throughJournalSeq`、`sessionId`，cell 上记 `sourceSeq` / `sourceSequences` / `rawRef`，可从可读记录追溯 Journal。
+- 适配 ActSpace：DSH 的 Context / SessionEvent / assembler 对应 ActSpace Journal event envelope 与 `RuntimeTrajectorySnapshot`；`Map`、类实例和回调不跨 IPC，IPC / preload 只传 JSON-safe DTO，renderer 内再恢复索引；保留 `ConversationLocation` 的 session / turn / step / unresolved 层级，保留 `eventSeq`、`throughJournalSeq`、`sessionId`，cell 上记 `sourceSeq` / `sourceSequences` / `rawRef`，可从可读记录追溯 Journal。
 - 窗口：主进程先读 Session snapshot，再把 Journal 截取到 `throughJournalSeq`，所有投影共享同一版本，缺失版本范围直接报错不拼接混合版本。`getSessionProjectionSnapshot` 的 `beforeSeq` / `afterSeq` 驱动事件窗口：初始返回最近 20 个完整 Turn（历史页不带已定稿消息的 chunk；窗口不从头开始时，主进程把窗口起点之前最近一条 `request/system-prompt` 和 `request/tools` 放到窗口最前面，它们不占窗口的事件与字节预算，轨迹只把它们当比较基准），向前读取按 `beforeSeq` 继续，绝对序列、Turn 与 Request 编号保留。本地历史窗口默认约 120 条语义记录，按完整 Turn 对齐，「Load earlier history」扩展，timeline 聚焦早期记录自动展开。展示分页不代表后端增量读取；projection-cache 从 storage 读取完整快照并按后端 identity、revision、codec 和 projection 版本复用。
 - 刷新：Desktop 传 journal-update 的事件与 changed values，accepted 与 durable 水位分离，客户端遇到缺口再读窗口，不把 live 通知当作 fsync 证明。Bridge 刷新时保留已加载窗口、校验会话身份和版本、拒绝失效加载结果；运行中 Assistant 与最终消息保持稳定选择；异常流用同 requestId 关联终止消息。
 
@@ -81,7 +81,7 @@ Session Journal
 
 ## 6. 子智能体
 
-- 父轨迹里，一次委派只占 `agent` 工具调用那一行，不把子会话记录并进来（「子工具」只指同一会话里带 `parentCallId` 的嵌套调用）。`trajectoryDelegations(snapshot)`（`subagents.ts`）从 `delegation/requested` 取出 `parentCallId → childSessionId`，`agent` 行详情的「概述」据此显示「子智能体」一栏和「查看轨迹」按钮。
+- 父轨迹里，一次委派只占 `agent` 工具调用那一行，不把子会话记录并进来（「子工具」只指同一会话里带 `parentCallId` 的嵌套调用）。`trajectoryDelegations(snapshot)`（`subagents.ts`）用 `foldSubagentTree` 从 `subagent/spawned`、`subagent/activation` 取出「调用 → 子智能体」（老会话来自 `delegation/requested`），创建子智能体的那一行详情的「概述」据此显示「子智能体」一栏（种类 · 描述）和「查看轨迹」按钮；Codex / Claude Code 没有子会话，没有按钮。
 - 点「查看轨迹」在右侧「子 Agent」面板打开这个子会话并停在轨迹页，面板顶部栏最右用与主会话相同的 `SessionViewToggle` 切换对话 / 轨迹；子轨迹由 `<TrajectoryView sessionId={child} variant="panel" />` 渲染：只在挂载时 `bridge.watch` 子会话，不处理 Context 面板跳转，详情从下半部分弹出、不能拖宽。
 
 ## 7. 不做

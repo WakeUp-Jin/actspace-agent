@@ -1,10 +1,10 @@
-import type { CordisContext } from "@actspace/cordis-adapter";
-import { CONTEXT_ASSEMBLY_SERVICE_ID, type ContextAssemblyService } from "@actspace/context-assembly";
-import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { ACTSPACE_SERVICE_IDS, getService, serviceView, type CordisContext } from "@actspace/cordis-adapter";
+import { CONTEXT_ASSEMBLY_SERVICE, CONTEXT_ASSEMBLY_SERVICE_ID } from "@actspace/context-assembly";
+import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import type { Context, ContextPathState, ContextSource, CompactionDisclosure, CompactionRegion, CompactionResult, CompactionSession, ContextCompactionCoordinator } from "@actspace/context-engine";
+import type { Context, ContextPathState, ContextSource, CompactionDisclosure, CompactionRegion, CompactionResult, CompactionSession } from "@actspace/context-engine";
 import { CONTEXT_OWNER, STATE_EVENT } from "@actspace/context-engine/codec";
-import { ContextSupplements, contextEvents, latestContextEvent } from "@actspace/context-engine";
+import { CONTEXT_ENGINE_SERVICE, ContextSupplements, contextEvents, latestContextEvent } from "@actspace/context-engine";
 import { applyStateEvent, candidatePaths, emptyDisclosureState, registerPaths, type DisclosureState, type StateOperation } from "@actspace/context-engine/state";
 import { selectActive } from "./policy.js";
 import { collectPathHints, referenceText, type DisclosureHost, type PathReference } from "./paths.js";
@@ -23,7 +23,7 @@ export class ProgressiveDisclosure implements CompactionDisclosure {
     return state;
   }
   private async append(session: CompactionSession, data: StateOperation): Promise<void> {
-    await session.append({ type: STATE_EVENT, eventVersion: 1, source: { ownerPluginId: CONTEXT_OWNER }, data: data as unknown as RuntimeV2JsonValue, surface: null });
+    await session.append({ type: STATE_EVENT, eventVersion: 1, source: { ownerPluginId: CONTEXT_OWNER }, data: data as unknown as RuntimeJsonValue, surface: null });
     this.state(session);
   }
   private async indexPaths(session: CompactionSession): Promise<Set<string>> {
@@ -38,7 +38,7 @@ export class ProgressiveDisclosure implements CompactionDisclosure {
       const path = await this.host.historyPath(session.header.sessionId);
       const replacements = path ? [...state.paths.values()].filter(value => value.history?.sessionId === state.sessionId).map(value => ({ oldId: value.id, path, history: { sessionId: session.header.sessionId, sourceEventSeqs: value.history!.sourceEventSeqs } })) : [];
       // A forked subagent (`agent_fork`) must send its parent's message prefix unchanged so the provider cache still
-      // hits (design 02 §8.4); the navigation list it writes next supersedes the inherited one anyway.
+      // hits (agent-subagent-runtime.md「Fork」); the navigation list it writes next supersedes the inherited one anyway.
       if (session.header.lineage?.origin !== "delegation") await new ContextSupplements(session).remove(DISCLOSURE_OWNER, "navigation");
       await this.append(session, { op: "fork", sessionId: session.header.sessionId, replacements });
     }
@@ -165,23 +165,26 @@ export function createDisclosureSource(): ContextSource {
     write({ supplements: [{ id: "navigation", owner: DISCLOSURE_OWNER, afterEventSeq: -1, sourceEventSeq: -1, text }] });
   } };
 }
+/** 这个包用到的 Agent Host 端口：Host 给了 `contextDisclosure` 才启用。 */
+export const DISCLOSURE_HOST_VIEW = serviceView<{ readonly contextDisclosure?: DisclosureHost }>(ACTSPACE_SERVICE_IDS.hostAgent);
+
 /**
  * Enabled, the strategy joins the engine three ways: compaction hooks and Context hydration through the coordinator,
  * the navigation source and the tool-result observer through `context.assembly`. The loop references none of them.
  */
 export function apply(ctx: CordisContext): void {
-  const host = ctx.get?.("actspace.host.agent") as { contextDisclosure?: DisclosureHost } | undefined;
+  const host = getService(ctx, DISCLOSURE_HOST_VIEW);
   if (!host?.contextDisclosure) { ctx.provide?.("context.disclosure", undefined); return; }
   const disclosure = new ProgressiveDisclosure(host.contextDisclosure);
-  const engine = ctx.get?.("context.engine") as { compaction: ContextCompactionCoordinator } | undefined;
-  const assembly = ctx.get?.(CONTEXT_ASSEMBLY_SERVICE_ID) as ContextAssemblyService | undefined;
+  const engine = getService(ctx, CONTEXT_ENGINE_SERVICE);
+  const assembly = getService(ctx, CONTEXT_ASSEMBLY_SERVICE);
   if (!engine || !assembly) throw new Error(`Context disclosure requires context.engine and ${CONTEXT_ASSEMBLY_SERVICE_ID}.`);
   const remove = engine.compaction.registerDisclosure(disclosure); ctx.effect?.(() => remove);
   ctx.effect?.(() => assembly.register({ kind: "disclosure", create: () => createDisclosureSource() }), "context.source.disclosure");
   ctx.effect?.(() => assembly.registerToolResultObserver((session, event) => disclosure.observe(session, event)), "context.disclosure.observer");
   ctx.provide?.("context.disclosure", disclosure);
 }
-function record(value: unknown): Readonly<Record<string, RuntimeV2JsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {}; }
+function record(value: unknown): Readonly<Record<string, RuntimeJsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : {}; }
 /** 本次请求的提示词是否由 disclosure 参与组装：看 `request/system-prompt` 的 contributorProvenance。 */
 function disclosureEnabled(event: SessionEventEnvelopeV1): boolean {
   const provenance = record(event.data).contributorProvenance;

@@ -1,5 +1,5 @@
 import { validateSessionEvents, type EventCodecRegistry, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import type { RuntimeV2AgentMode } from "@actspace/shared/runtime-v2";
+import type { RuntimeAgentMode } from "@actspace/shared/runtime-v2";
 
 export type ForkBoundary = {
   /** Last parent seq the fork copies (inclusive). */
@@ -7,7 +7,7 @@ export type ForkBoundary = {
   /** The parent's open Turn, which the fork closes with `turn/end` `reason: "forked"`. */
   readonly turnId: string;
   /** The Agent mode of that Turn: the fork runs in it so it sees the same tools and prompt. */
-  readonly mode: RuntimeV2AgentMode;
+  readonly mode: RuntimeAgentMode;
 };
 
 export class ForkBoundaryError extends Error {
@@ -18,7 +18,7 @@ export class ForkBoundaryError extends Error {
 }
 
 /**
- * Where `agent_fork` cuts the parent (design 02 §8.1): in the Turn that holds the call, the last
+ * Where `agent_fork` cuts the parent (agent-subagent-runtime.md「Fork」): in the Turn that holds the call, the last
  * `step/end` before the Step making the call; when that Step is the Turn's first, the event right
  * before its `step/start`. Every tool call up to there has its result, so the copy is a valid context.
  */

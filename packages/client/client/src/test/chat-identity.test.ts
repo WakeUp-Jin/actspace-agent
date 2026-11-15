@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import type { RuntimeSessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { projectChatEvents, projectChatSession, projectSubagentTranscript } from "../sessions/chat.js";
 
 // 14 T12：投影出的事件带来源 envelope 的 seq；由多条 envelope 合成的 subagent 块只带 runId。
-function snapshot(messageIds: string[]): RuntimeV2SessionSnapshot {
+function snapshot(messageIds: string[]): RuntimeSessionSnapshot {
   return {
     kind: "session-snapshot", schemaVersion: 1, sessionId: "s", createdAt: "2026-10-06T00:00:00.000Z", updatedAt: "2026-10-06T00:00:00.000Z", workspaceRoot: null, throughJournalSeq: 3, permissionMode: "default", accessState: "read-write",
     agentForm: "agent", metadata: { title: null, pinned: false, archived: false },
@@ -46,7 +46,7 @@ describe("chat projection identity", () => {
   });
 
   it("restores the complete pending command from durable call facts for a new observer", () => {
-    const pending = { ...snapshot([]), tools: [{ callId: "pending", name: "bash", state: "running", artifacts: [], failure: null }] } as RuntimeV2SessionSnapshot;
+    const pending = { ...snapshot([]), tools: [{ callId: "pending", name: "bash", state: "running", artifacts: [], failure: null }] } as RuntimeSessionSnapshot;
     const command = `printf '%s' '${"long command ".repeat(400)}'`;
     const journal = [envelope(8, "tool/call", { agentRunId: "run-1", callId: "pending", name: "bash", args: { command, cwd: "/w" } })];
     const blocks = projectChatSession(pending, journal, "/w").messageBlocks;

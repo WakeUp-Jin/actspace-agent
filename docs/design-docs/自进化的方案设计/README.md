@@ -1,6 +1,6 @@
 # Harness 自进化方案
 
-V1 已实现；实际 API 与限制见 [10-V1实现与使用说明](10-V1实现与使用说明.md)，验收证据见[执行摘要](../../exec-runs/20261007-harness-evolution-v1/execution-summary.md)。
+V1 已实现；实际 API、限制与验证边界见 [10-V1实现与使用说明](10-V1实现与使用说明.md)。
 
 ## 当前结论
 

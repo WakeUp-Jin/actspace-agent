@@ -1,7 +1,7 @@
-import type { ApprovalRequest, RuntimeV2SessionListItem } from "@actspace/shared/runtime-v2";
+import type { ApprovalRequest, RuntimeSessionListItem } from "@actspace/shared/runtime-v2";
 import { approvalSummary, formatRowTime, groupSessions, rowStatus, sessionTitle, splitSessions, timeBucket, workspaceOf } from "../session-row-model";
 
-const item = (id: string, updatedAt: string, archived = false, title: string | null = null) => ({ sessionId: id, updatedAt, metadata: { title, pinned: false, archived } }) as unknown as RuntimeV2SessionListItem;
+const item = (id: string, updatedAt: string, archived = false, title: string | null = null) => ({ sessionId: id, updatedAt, metadata: { title, pinned: false, archived } }) as unknown as RuntimeSessionListItem;
 
 it("orders status approval > running > unread > idle", () => {
   expect(rowStatus({ approvals: 1, running: true, unread: true })).toBe("approval");

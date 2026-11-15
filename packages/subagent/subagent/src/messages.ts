@@ -2,15 +2,16 @@ import { trimTrailing } from "@actspace/shared";
 import { SUBAGENT_RESULT_LIMIT_BYTES, type SubagentActivationStatus } from "@actspace/shared/runtime-v2";
 
 /**
- * Every model-visible text of local subagents (design 02 §2, §5.2, §6.2, §7, §9), kept verbatim in one place.
- * Tool descriptions, parameter descriptions, results, notices and the task guidance all come from here.
+ * Every model-visible text of local subagents, kept in one place: this file is the only copy.
+ * Tool descriptions, parameter descriptions, results, notices and the task guidance all come from here;
+ * agent-subagent-runtime.md gives the rules behind them, not the wording.
  */
 
 /** Running subagents per main Session, counted across every kind (synchronous and background). */
 export const SUBAGENT_CONCURRENCY_LIMIT = 10;
 /** A synchronous `agent` call returns after this long and the subagent moves to the background. */
 export const SUBAGENT_SYNC_WAIT_MS = 30 * 60 * 1000;
-/** An external subagent's call waits this long for the CLI to write its session log (design 04 §3.3). */
+/** An external subagent's call waits this long for the CLI to write its session log (agent-subagent-runtime.md「外部子智能体」). */
 export const EXTERNAL_LOG_WAIT_MS = 10_000;
 /** One activation runs at most this many steps. */
 export const SUBAGENT_MAX_STEPS = 1000;
@@ -32,7 +33,7 @@ export const AGENT_PARAMETERS = Object.freeze({
 
 export const AGENT_FORK_DESCRIPTION = "Start a subagent that inherits this conversation: it sees everything up to your last completed step in this turn (not the step that contains this call), with your tools and model, so its first request reuses this conversation's prompt cache. Use it for work that builds on the current context, such as trying an alternative, reviewing what was just done, or a side investigation, without spending this conversation's context on it. Choosing a different model loses the cache. It cannot start subagents of its own. Otherwise it behaves like agent: waits for the result by default (background: true returns at once and notifies you), transcript path returned, done once it answers.";
 
-/** `agent_fork` takes `agent`'s parameters without `agent_preset`; `prompt` and `model` read differently (design 02 §2.2). */
+/** `agent_fork` takes `agent`'s parameters without `agent_preset`; `prompt` and `model` read differently (agent-subagent-runtime.md「工具」). */
 export const AGENT_FORK_PARAMETERS = Object.freeze({
   description: AGENT_PARAMETERS.description,
   prompt: "What the forked subagent should do. It already sees this conversation, so state only what is new.",
@@ -41,7 +42,7 @@ export const AGENT_FORK_PARAMETERS = Object.freeze({
   reasoning_effort: AGENT_PARAMETERS.reasoning_effort,
 });
 
-/** `agent_codex` / `agent_claude_code` (design 04 §2): the same text with the CLI's name. */
+/** `agent_codex` / `agent_claude_code` (agent-subagent-runtime.md「外部子智能体」): the same text with the CLI's name. */
 export function externalAgentDescription(label: string): string {
   return `Run a task with the local ${label} CLI as a subagent, in this workspace. It runs once and cannot receive messages. It uses ${label}'s own permissions (no approval prompts) and its own model settings. You get its final message and the path of its native session log (JSONL; long lines). By default the call waits for the result; with background: true it returns at once, you are notified when it finishes, and task_stop stops it.`;
 }
@@ -80,7 +81,7 @@ export function agentFinished(agentId: string): string { return `Subagent ${agen
 export const CANNOT_MESSAGE_SELF = "You cannot send a message to yourself.";
 export const SIBLING_MESSAGE_BLOCKED = "A subagent can only send messages to its parent.";
 
-/** `external`: the CLI label of an external subagent (design 04 §2), which takes no messages. */
+/** `external`: the CLI label of an external subagent (agent-subagent-runtime.md「外部子智能体」), which takes no messages. */
 type StartedText = { readonly agentId: string; readonly description: string; readonly transcriptPath: string; readonly forked?: boolean; readonly external?: string; readonly logMissing?: boolean };
 
 export function backgroundStarted(input: StartedText): string {
@@ -96,7 +97,7 @@ export function movedToBackground(input: Omit<StartedText, "forked">): string {
   ].join("\n");
 }
 
-/** Appended to an external subagent's record path when the CLI has not written the file within the wait (design 04 §3.3). */
+/** Appended to an external subagent's record path when the CLI has not written the file within the wait (agent-subagent-runtime.md「外部子智能体」). */
 export const LOG_FILE_MISSING = "(the log file does not exist yet)";
 
 function transcriptLine(input: { readonly transcriptPath: string; readonly logMissing?: boolean }): string {
@@ -133,7 +134,7 @@ export function syncResult(input: { readonly agentId: string; readonly descripti
   ].join("\n").trimEnd();
 }
 
-/** The `<summary>` line of a completion notice and of a settle record (design 02 §6.2). A finished subagent takes no more work. */
+/** The `<summary>` line of a completion notice and of a settle record (agent-subagent-runtime.md「留痕与通知」). A finished subagent takes no more work. */
 export function settleSummary(input: { readonly agentId: string; readonly description: string; readonly status: SubagentActivationStatus; readonly error?: string }): string {
   const id = input.agentId;
   switch (input.status) {
@@ -162,7 +163,7 @@ export function messageDelivered(agentId: string, recipientRunning: boolean): st
   return recipientRunning ? `Message delivered to ${agentId} (running; it will see it at its next step).` : `Message delivered to ${agentId} (it was idle and will read it now).`;
 }
 
-/** Appended to the first task message of a `local` or fork subagent (design 02 §7); `explore` drops the last line. */
+/** Appended to the first task message of a `local` or fork subagent (agent-subagent-runtime.md「留痕与通知」); `explore` drops the last line. */
 export function taskGuidance(transcriptPath: string, preset: "general" | "explore" | "fork"): string {
   return [
     `Your final answer is delivered to your parent automatically. Your parent can read your transcript file (${transcriptPath}) to see every step you took, so your final answer only needs the conclusion and the key evidence (file paths, line numbers, command results); do not retell the process. If your last action is a message to your parent, your final answer is not delivered; put the result in that message.`,

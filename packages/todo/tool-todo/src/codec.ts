@@ -1,5 +1,5 @@
 import type { EventCodec } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { TODO_EVENT_TYPE, TODO_PLUGIN_ID } from "./manifest.js";
 
 export const codecs: readonly EventCodec[] = [Object.freeze({
@@ -19,6 +19,6 @@ export const codecs: readonly EventCodec[] = [Object.freeze({
   },
 })];
 
-function isRecord(value: RuntimeV2JsonValue): value is Readonly<Record<string, RuntimeV2JsonValue>> {
+function isRecord(value: RuntimeJsonValue): value is Readonly<Record<string, RuntimeJsonValue>> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }

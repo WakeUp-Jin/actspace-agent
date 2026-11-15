@@ -1,5 +1,9 @@
-import { createCordisRoot } from "@actspace/cordis-adapter";
-import type { RuntimeV2JsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
+import { getEventListeners } from "node:events";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createCordisRoot, onHook } from "@actspace/cordis-adapter";
+import type { RuntimeJsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
 import type { ApprovalBroker } from "@actspace/approval";
 import type { ToolDefinition } from "../definition.js";
 import type { ToolBodyResult, ToolCapabilitySet } from "../executor.js";
@@ -19,6 +23,12 @@ class FakeCapabilities implements ToolCapabilitySet {
     return this.values.get(capabilityId) as T;
   }
 }
+
+// 权限检查会对工作区根目录做 realpath。写死的 /workspace 在它恰好是符号链接的机器上
+// （云端 Agent、devcontainer）会被解析到别处，所以每次运行建一个真实目录。
+let workspaceRoot = "";
+beforeAll(async () => { workspaceRoot = await realpath(await mkdtemp(join(tmpdir(), "actspace-tool-runtime-"))); });
+afterAll(async () => { await rm(workspaceRoot, { recursive: true, force: true }); });
 
 function definition(overrides: Partial<ToolDefinition> = {}): ToolDefinition {
   return {
@@ -57,7 +67,7 @@ function environment(
     commits?: ToolExecutionResult[];
     approvalTimeoutMs?: number;
     permissionEvents?: string[];
-    permissionRecords?: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }>;
+    permissionRecords?: Array<{ type: string; data: Readonly<Record<string, RuntimeJsonValue>> }>;
     sessionGrants?: SessionGrant[];
     sessionGrantCapability?: boolean;
     trustedGrantAudiences?: ReadonlySet<string>;
@@ -82,7 +92,7 @@ function environment(
   };
   const capabilitySet = new FakeCapabilities(new Map([["filesystem.read", Object.freeze({ kind: "read" })]]));
   return {
-    workspaceRoot: "/workspace",
+    workspaceRoot,
     hostCapabilities: new Set(["filesystem.read"]),
     capabilitySet,
     approvalBroker: options.approvalBroker,
@@ -168,7 +178,7 @@ describe("Tool Runtime execution contract", () => {
     let requested!: () => void;
     const ready = new Promise<void>(resolve => { requested = resolve; });
     const cleanup = vi.fn(); const execute = vi.fn(async () => success());
-    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeJsonValue>> }> = [];
     const runtime = new ToolRuntime();
     runtime.register({ definition: definition(), executor: { execute }, permission: {
       extractResources: () => [],
@@ -218,7 +228,7 @@ describe("Tool Runtime execution contract", () => {
         ctx.defer(async () => { trace.push("finalized"); });
         return { status: "failed", summary: "failed", modelOutput: [], failure: { code: "BODY_FAILED", message: "original", retryable: false } };
       } } });
-      root.context.on?.("tools/post-execute", (body) => {
+      onHook(root.context, "tools/post-execute", (body) => {
         Object.assign(body, { status: "completed", failure: undefined });
         if (throws) throw new Error("observer failed");
         return body;
@@ -239,7 +249,7 @@ describe("Tool Runtime execution contract", () => {
     const trace: string[] = [];
     const runtime = new ToolRuntime();
     runtime.register({ definition: definition(), executor: { execute: async () => { trace.push("body"); return success(); } } });
-    const remove = root.context.on?.("tools/pre-execute", () => ({ args: { value: 42 } })) as () => void;
+    const remove = onHook(root.context, "tools/pre-execute", () => ({ args: { value: 42 } }));
     try {
       const [rejected] = await runtime.executeBatch([call("bad")], { ...environment(trace), context: root.context });
       expect(rejected.status).toBe("failed");
@@ -254,8 +264,8 @@ describe("Tool Runtime execution contract", () => {
   it("runs the complete safety pipeline in the fixed order", async () => {
     const root = await createCordisRoot();
     const trace: string[] = [];
-    root.context.on?.("tools/pre-execute", async (_payload, next) => { trace.push("before"); return await next(); });
-    root.context.on?.("tools/post-execute", async (_payload, next) => { trace.push("after"); return await next(); });
+    onHook(root.context, "tools/pre-execute", async (_payload, next) => { trace.push("before"); return await next(); });
+    onHook(root.context, "tools/post-execute", async (_payload, next) => { trace.push("after"); return await next(); });
     const runtime = new ToolRuntime();
     runtime.register({
       definition: definition(),
@@ -287,7 +297,7 @@ describe("Tool Runtime execution contract", () => {
     runtime.register({
       definition: definition({ effects: [{ capabilityId: "filesystem.read", mode: "use", resourceScope: "workspace" }] }),
       executor: { concurrencySafe: true, async execute() { return success(); } },
-      permission: { extractResources: (args) => [{ kind: "file", access: "read", canonicalPath: `/workspace/${String(args.value)}`, targetKind: "file" }], evaluate: () => ({ kind: "allow" }) },
+      permission: { extractResources: (args) => [{ kind: "file", access: "read", canonicalPath: join(workspaceRoot, String(args.value)), targetKind: "file" }], evaluate: () => ({ kind: "allow" }) },
     });
     const [result] = await runtime.executeBatch([call("relative", { value: "src/index.ts" })], environment([]));
     expect(result).toMatchObject({ status: "completed" });
@@ -346,7 +356,7 @@ describe("Tool Runtime execution contract", () => {
       },
     });
     const grants: SessionGrant[] = [];
-    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeJsonValue>> }> = [];
     const broker: ApprovalBroker = { async requestApproval(request) {
       expect(request.supportedLifetimes).toEqual(["once", "session"]);
       expect(request.grantSuggestions).toHaveLength(1);
@@ -522,7 +532,7 @@ describe("Tool Runtime execution contract", () => {
           return {
             status: "completed",
             summary: "used token-abcdefgh",
-            modelOutput: [{ type: "json", value: { apiKey: "secret", ok: true } as RuntimeV2JsonValue }],
+            modelOutput: [{ type: "json", value: { apiKey: "secret", ok: true } as RuntimeJsonValue }],
           };
         },
       },
@@ -532,6 +542,85 @@ describe("Tool Runtime execution contract", () => {
     expect(result?.finalizerFailures).toHaveLength(1);
     expect(JSON.stringify(result)).not.toContain("token-abcdefgh");
     expect(JSON.stringify(result)).not.toContain('"secret"');
+  });
+
+  it("bounds an oversized plugin tool result before commit and saves the full, redacted output for the call", async () => {
+    const runtime = new ToolRuntime();
+    const full = `first token-abcdefgh\n${"line of plugin output\n".repeat(20_000)}`;
+    runtime.register({ definition: definition(), executor: { async execute() { return { status: "failed", summary: "Plugin failed", modelOutput: [{ type: "text", text: full }], failure: { code: "PLUGIN_FAILED", message: "boom", retryable: false } }; } } });
+    const stored: Array<{ text: string; mediaType: string; owner: unknown }> = [];
+    const commits: ToolExecutionResult[] = [];
+    const [result] = await runtime.executeBatch([call("big")], {
+      ...environment([], { commits }),
+      createArtifact: async (input) => {
+        stored.push({ text: Buffer.from(input.bytes).toString("utf8"), mediaType: input.mediaType, owner: input.owner });
+        return { artifactId: "full-1", mediaType: input.mediaType, size: input.bytes.byteLength, sha256: "digest" };
+      },
+    });
+    expect(stored).toEqual([{ text: full.replace("token-abcdefgh", "[REDACTED]"), mediaType: "text/plain", owner: { sessionId: "session-1", callId: "big", pluginId: "plugin.test", name: "read" } }]);
+    // 结果是失败还是成功不变；截短的是提交进会话记录的那一份。
+    expect(result).toMatchObject({ status: "failed", failure: { code: "PLUGIN_FAILED", message: "boom" }, artifacts: [{ artifactId: "full-1" }] });
+    expect(commits).toEqual([result]);
+    expect(Buffer.byteLength(JSON.stringify(result?.modelOutput), "utf8")).toBeLessThanOrEqual(256 * 1024);
+    const [text, reference] = result!.modelOutput;
+    expect(text).toMatchObject({ type: "text" });
+    expect((text as { text: string }).text).toMatch(/^first \[REDACTED\]\nline of plugin output\n[\s\S]+\n\n\[Output truncated: this tool returned \d+ bytes, more than one result can hold\. The first \d+ bytes are shown\. The full output was saved as a file\.\]$/);
+    expect(reference).toEqual({ type: "artifact", artifact: { artifactId: "full-1", mediaType: "text/plain", size: Buffer.byteLength(full.replace("token-abcdefgh", "[REDACTED]")), sha256: "digest" }, label: "Full tool output" });
+  });
+
+  it("cuts a batch to the budget the Agent Loop passes for a nearly full context window", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { async execute(args) { return success(String(args.value).repeat(5_000)); } } });
+    const results = await runtime.executeBatch([call("a", { value: "aaaa" }), call("b", { value: "b" })], { ...environment([]), modelOutputBatchChars: 12_000 });
+    const texts = results.map((result) => (result.modelOutput[0] as { text: string }).text);
+    // 两个调用、12,000 字符：先出结果的那个要给另一个留一半。
+    expect(texts[0]).toMatch(/^a{4000,5600}\n\n\[Output truncated: this tool returned 20000 characters and the context window has room for about 6000\. The first \d+ characters are shown\. The full output was saved as a file\.\]$/);
+    expect(texts[0]!.length + 400).toBeLessThanOrEqual(6_000);
+    // 没超额度的那次调用原样返回。
+    expect(texts[1]).toBe("b".repeat(5_000));
+    expect(results.map((result) => result.modelOutput.length)).toEqual([2, 1]);
+  });
+
+  it("lets one large result use what the small results of the same batch do not need", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { async execute(args) { return success("x".repeat(Number(args.value))); } } });
+    // 平分的话每个调用 10,000 字符，20,000 的那个会被截短；合计 22,000 其实放得下。
+    const calls = [call("small-1", { value: "1000" }), call("large", { value: "20000" }), call("small-2", { value: "1000" })];
+    const results = await runtime.executeBatch(calls, { ...environment([]), modelOutputBatchChars: 30_000 });
+    expect(results.map((result) => (result.modelOutput[0] as { text: string }).text.length)).toEqual([1_000, 20_000, 1_000]);
+    expect(results.every((result) => result.artifacts.length === 0)).toBe(true);
+  });
+
+  it("keeps a batch of large results within the budget in total", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition({ concurrency: "exclusive" }), executor: { async execute() { return success("y".repeat(40_000)); } } });
+    const results = await runtime.executeBatch(["a", "b", "c", "d"].map((id) => call(id)), { ...environment([]), modelOutputBatchChars: 60_000 });
+    const sizes = results.map((result) => (result.modelOutput[0] as { text: string }).text.length + (result.modelOutput.length - 1) * 400);
+    expect(sizes.reduce((sum, size) => sum + size, 0)).toBeLessThanOrEqual(60_000);
+    // 第一个调用给后面三个各留 8,000，自己用 36,000；后面三个各拿到留给它的那一份。
+    expect(sizes[0]).toBeGreaterThan(34_000);
+    for (const size of sizes.slice(1)) { expect(size).toBeGreaterThan(6_000); expect(size).toBeLessThanOrEqual(8_000); }
+  });
+
+  it("does not hold budget back for a call that never reached its tool body", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition({ concurrency: "exclusive" }), executor: { async execute() { return success("z".repeat(20_000)); } }, permission: { extractResources: () => [], evaluate: (args) => args.value === "deny" ? { kind: "deny", code: "POLICY_DENIED", reason: "Not allowed." } : { kind: "allow" } } });
+    const results = await runtime.executeBatch([call("denied", { value: "deny" }), call("allowed", { value: "ok" })], { ...environment([]), modelOutputBatchChars: 21_000 });
+    expect(results.map((result) => result.status)).toEqual(["denied", "completed"]);
+    expect((results[1]!.modelOutput[0] as { text: string }).text).toBe("z".repeat(20_000));
+  });
+
+  it("caps the message of a result that never reached the tool body", async () => {
+    const runtime = new ToolRuntime();
+    const execute = vi.fn(async () => success());
+    runtime.register({ definition: definition(), executor: { execute }, permission: { extractResources: () => [], evaluate: () => ({ kind: "deny", code: "POLICY_DENIED", reason: "n".repeat(100_000) }) } });
+    const [result] = await runtime.executeBatch([call("denied")], environment([]));
+    expect(execute).not.toHaveBeenCalled();
+    expect(result?.status).toBe("denied");
+    for (const text of [result!.summary, result!.failure!.message, (result!.modelOutput[0] as { text: string }).text]) {
+      expect(text.endsWith(" ...[truncated]")).toBe(true);
+      expect(text.length).toBeLessThanOrEqual(16 * 1024);
+    }
   });
 
   it("rejects duplicate ids and invalid concurrency declarations", async () => {
@@ -572,6 +661,39 @@ describe("incremental tool completion", () => {
   });
 });
 
+describe("caller abort signal", () => {
+  it("stops listening once each call has finished", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { return success(); } } });
+    // 一个回合里的所有工具调用共用一个 signal：结束的调用不摘监听器，监听器和它抓住的参数、结果就一直留到回合结束。
+    const turn = new AbortController();
+    const listeners: number[] = [];
+    for (let step = 0; step < 3; step += 1) {
+      await runtime.executeBatch([{ ...call(`first-${step}`), signal: turn.signal }, { ...call(`second-${step}`), signal: turn.signal }], environment([]));
+      listeners.push(getEventListeners(turn.signal, "abort").length);
+    }
+    expect(listeners).toEqual([0, 0, 0]);
+    const [unused] = runtime.scheduler.prepareBatch([{ ...call("unused"), signal: turn.signal }], environment([]));
+    await unused?.dispose();
+    expect(getEventListeners(turn.signal, "abort")).toHaveLength(0);
+  });
+
+  it("aborts a tool body that is running when the signal fires", async () => {
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => { started = resolve; });
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { execute: (_args, context) => new Promise<ToolBodyResult>((_resolve, reject) => {
+      context.signal.addEventListener("abort", () => reject(new Error("stopped")), { once: true });
+      started();
+    }) } });
+    const turn = new AbortController();
+    const run = runtime.executeBatch([{ ...call("running"), signal: turn.signal }], environment([]));
+    await running;
+    turn.abort();
+    expect((await run)[0]).toMatchObject({ status: "aborted", failure: { code: "TOOL_ABORTED" } });
+  });
+});
+
 describe("production Agent scope admission", () => {
   it("rejects missing, mismatched, and disallowed tool calls before executor body", async () => {
     const runtime = new ToolRuntime({ requireAgentScope: true });
@@ -609,14 +731,14 @@ describe("process Session Grant execution", () => {
   it("issues, reuses and audits a prefix, but asks for other or complex commands and after revocation", async () => {
     const runtime = new ToolRuntime();
     const grants: SessionGrant[] = [];
-    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeJsonValue>> }> = [];
     let calls = 0;
     runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { calls++; return success(); } }, permission: {
       grantAudience: { pluginId: "plugin.test", permissionDomain: "bash", policyVersion: 1 },
-      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: "/workspace/sub", workspaceRoot: "/workspace", noSandbox: false, dynamic: false,
+      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: join(workspaceRoot, "sub"), workspaceRoot, noSandbox: false, dynamic: false,
         ...(String(args.value).startsWith("pnpm ") && !String(args.value).includes("&&") ? { argv: String(args.value).split(" "), grantPrefix: ["pnpm"] } : {}) }],
       evaluate: args => args.value === "blocked" ? { kind: "deny", code: "POLICY_DENIED", reason: "blocked" } : { kind: "ask", risk: "high", reason: "run", reusable: true },
-      suggestGrants: () => [{ action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["pnpm"], cwdRoot: "/workspace" }, label: "pnpm" }],
+      suggestGrants: () => [{ action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["pnpm"], cwdRoot: workspaceRoot }, label: "pnpm" }],
     } });
     const trustedGrantAudiences = new Set(["plugin.test\u0000bash\u00001"]);
     const options = { sessionGrants: grants, sessionGrantCapability: true, trustedGrantAudiences, permissionRecords: records };
@@ -646,13 +768,13 @@ describe("process Session Grant execution", () => {
     let calls = 0;
     runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { calls++; return success(); } }, permission: {
       grantAudience: audience,
-      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: "/workspace", workspaceRoot: "/workspace", noSandbox: false, dynamic: false, argv: String(args.value).split(" "), grantPrefix: [String(args.value).split(" ")[0]] }],
+      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: workspaceRoot, workspaceRoot, noSandbox: false, dynamic: false, argv: String(args.value).split(" "), grantPrefix: [String(args.value).split(" ")[0]] }],
       evaluate: () => ({ kind: "ask", risk: "high", reason: "run", reusable: true }),
-      suggestGrants: () => [{ action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: "/workspace" }, label: "ls" }],
+      suggestGrants: () => [{ action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: workspaceRoot }, label: "ls" }],
     } });
     const parentGrant: SessionGrant = { schemaVersion: 1, grantId: "grant-1", sessionId: "parent-1", agentId: "main:parent-1", audience, action: "process.execute", access: "execute",
-      selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: "/workspace" }, sourceRequestId: "request-1", sourceCallId: "call-0", sourceToolName: "bash", issuedAt: new Date().toISOString() } as SessionGrant;
-    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+      selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: workspaceRoot }, sourceRequestId: "request-1", sourceCallId: "call-0", sourceToolName: "bash", issuedAt: new Date().toISOString() } as SessionGrant;
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeJsonValue>> }> = [];
     const child = { ...environment([], { sessionGrants: [parentGrant], trustedGrantAudiences: new Set(["plugin.test\u0000bash\u00001"]), permissionRecords: records }),
       sessionGrantCapability: false, sessionGrantOwner: { sessionId: "parent-1", agentId: "main:parent-1" }, approvalUnavailableMessage: "needs approval" };
     const childCall = (id: string, value: string) => ({ ...call(id, { value }), sessionId: "child-1", agentId: "child-1" });

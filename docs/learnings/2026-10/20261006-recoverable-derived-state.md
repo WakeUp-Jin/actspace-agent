@@ -20,4 +20,4 @@
 
 自检：如果进程在索引文件生成后、引用保存前退出，应重做哪一步？如果摘要事务只写了前三条事件，能清零读取计数吗？
 
-参考：[本轮执行过程](../../exec-runs/20261006-context-management-engine/execution-process.md)。
+参考：[上下文引擎第一版 history](../../histories/2026-10/20261006-1051-context-progressive-disclosure-design.md)。

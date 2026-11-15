@@ -1,6 +1,6 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { AgentScope } from "@actspace/scope";
-import type { JsonSchema, ToolBodyResult, ToolDefinition, ToolExecutionContext, ToolRuntime } from "@actspace/tool-runtime";
+import type { JsonSchema, ToolBodyResult, ToolDefinition, ToolExecutionContext, ToolRuntimeContract } from "@actspace/tool-runtime";
 import {
   AGENT_FORK_DESCRIPTION, AGENT_FORK_PARAMETERS, AGENT_PARAMETERS, AGENT_TOOL_DESCRIPTION, LIST_SUBAGENT_MODELS_DESCRIPTION,
   SEND_MESSAGE_DESCRIPTION, SEND_MESSAGE_PARAMETERS, externalAgentDescription, externalAgentParameters,
@@ -16,10 +16,10 @@ export type SubagentToolRegistration = { readonly name: string; readonly dispose
 const AGENT_ID = { type: "string", minLength: 1, description: SEND_MESSAGE_PARAMETERS.agent_id };
 
 /**
- * Register the four subagent tools of `local` and forked subagents (design 02 §2). The Host port does the work;
+ * Register the four subagent tools of `local` and forked subagents (agent-subagent-runtime.md「工具」). The Host port does the work;
  * `mainScope` resolves a main agent's scope (child callers are resolved by the Host).
  */
-export function registerSubagentTools(runtime: ToolRuntime, port: SubagentHostPort, mainScope: (sessionId: string) => AgentScope | undefined): readonly SubagentToolRegistration[] {
+export function registerSubagentTools(runtime: ToolRuntimeContract, port: SubagentHostPort, mainScope: (sessionId: string) => AgentScope | undefined): readonly SubagentToolRegistration[] {
   const caller = (context: ToolExecutionContext): SubagentCaller => {
     const scope = mainScope(context.sessionId);
     return { sessionId: context.sessionId, callId: context.callId, ...(scope ? { scope } : {}) };
@@ -75,7 +75,7 @@ export function registerSubagentTools(runtime: ToolRuntime, port: SubagentHostPo
     register("list_subagent_models", LIST_SUBAGENT_MODELS_DESCRIPTION, {}, [], (_args, context) => port.listModels(caller(context))),
   ]);
 
-  function register(name: string, description: string, properties: Record<string, JsonSchema>, required: readonly string[], run: (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<SubagentToolOutcome>): SubagentToolRegistration {
+  function register(name: string, description: string, properties: Record<string, JsonSchema>, required: readonly string[], run: (args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<SubagentToolOutcome>): SubagentToolRegistration {
     const definition: ToolDefinition = Object.freeze({
       abiVersion: 2, pluginId: SUBAGENT_TOOL_PLUGIN_ID, name, definitionVersion: 2, description,
       inputSchema: { type: "object", properties, required: [...required], additionalProperties: false },
@@ -87,10 +87,10 @@ export function registerSubagentTools(runtime: ToolRuntime, port: SubagentHostPo
 }
 
 /**
- * Register `agent_codex` / `agent_claude_code` for one external backend (design 04 §2). `pluginId` is the
+ * Register `agent_codex` / `agent_claude_code` for one external backend (agent-subagent-runtime.md「外部子智能体」). `pluginId` is the
  * plugin that owns the backend, so the tool is a member of that plugin in the main Agent form.
  */
-export function registerExternalSubagentTool(runtime: ToolRuntime, port: SubagentHostPort, backend: ExternalSubagentBackend, pluginId: string, mainScope: (sessionId: string) => AgentScope | undefined): SubagentToolRegistration {
+export function registerExternalSubagentTool(runtime: ToolRuntimeContract, port: SubagentHostPort, backend: ExternalSubagentBackend, pluginId: string, mainScope: (sessionId: string) => AgentScope | undefined): SubagentToolRegistration {
   const parameters = externalAgentParameters(backend.label);
   const definition: ToolDefinition = Object.freeze({
     abiVersion: 2, pluginId, name: backend.toolName, definitionVersion: 2, description: externalAgentDescription(backend.label),
@@ -124,4 +124,4 @@ function toResult(name: string, outcome: SubagentToolOutcome): ToolBodyResult {
   return { status: "completed", summary: `${name} completed`, modelOutput: [{ type: "text", text: outcome.text }], ...(outcome.detail ? { detail: outcome.detail } : {}) };
 }
 
-function text(value: RuntimeV2JsonValue | undefined): string { return typeof value === "string" ? value.trim() : ""; }
+function text(value: RuntimeJsonValue | undefined): string { return typeof value === "string" ? value.trim() : ""; }

@@ -8,13 +8,13 @@
  * 同时实现 Runtime v2 的 Desktop approval port，由 ApprovalBroker 适配给 Tool Runtime。
  */
 
-import type { DesktopRuntimeV2ApprovalDecision, DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2ApprovalRequest } from "./runtime-v2/host-ports";
+import type { DesktopRuntimeApprovalDecision, DesktopRuntimeApprovalPort, DesktopRuntimeApprovalRequest } from "./runtime-v2/host-ports";
 
 const DEFAULT_TIMEOUT_MS = 3 * 60 * 60 * 1000;
 
 interface PendingEntry {
-  resolve: (decision: DesktopRuntimeV2ApprovalDecision) => void;
-  request: DesktopRuntimeV2ApprovalRequest;
+  resolve: (decision: DesktopRuntimeApprovalDecision) => void;
+  request: DesktopRuntimeApprovalRequest;
   sessionId: string;
   agentRunId: string;
   expiresAt: number;
@@ -23,22 +23,22 @@ interface PendingEntry {
 
 export interface ApprovalRegistryConfig {
   timeoutMs?: number;
-  onApprovalRequired?: (request: DesktopRuntimeV2ApprovalRequest, sessionId: string, agentRunId: string) => void;
+  onApprovalRequired?: (request: DesktopRuntimeApprovalRequest, sessionId: string, agentRunId: string) => void;
   onApprovalResolved?: (
-    request: DesktopRuntimeV2ApprovalRequest,
-    decision: DesktopRuntimeV2ApprovalDecision,
+    request: DesktopRuntimeApprovalRequest,
+    decision: DesktopRuntimeApprovalDecision,
     sessionId: string,
     agentRunId: string,
   ) => void;
 }
 
-export class PendingApprovalRegistry implements DesktopRuntimeV2ApprovalPort {
+export class PendingApprovalRegistry implements DesktopRuntimeApprovalPort {
   private pending = new Map<string, PendingEntry>();
   private timeoutMs: number;
-  private externalOnApprovalRequired?: (request: DesktopRuntimeV2ApprovalRequest, sessionId: string, agentRunId: string) => void;
+  private externalOnApprovalRequired?: (request: DesktopRuntimeApprovalRequest, sessionId: string, agentRunId: string) => void;
   private externalOnApprovalResolved?: (
-    request: DesktopRuntimeV2ApprovalRequest,
-    decision: DesktopRuntimeV2ApprovalDecision,
+    request: DesktopRuntimeApprovalRequest,
+    decision: DesktopRuntimeApprovalDecision,
     sessionId: string,
     agentRunId: string,
   ) => void;
@@ -51,16 +51,16 @@ export class PendingApprovalRegistry implements DesktopRuntimeV2ApprovalPort {
 
   // Runtime v2 Desktop approval port
 
-  waitForDecision(request: DesktopRuntimeV2ApprovalRequest): Promise<DesktopRuntimeV2ApprovalDecision> {
+  waitForDecision(request: DesktopRuntimeApprovalRequest): Promise<DesktopRuntimeApprovalDecision> {
     const sessionId = request.sessionId;
     const agentRunId = request.agentRunId;
 
-    return new Promise<DesktopRuntimeV2ApprovalDecision>((resolve) => {
+    return new Promise<DesktopRuntimeApprovalDecision>((resolve) => {
       const expiresAt = Date.now() + this.timeoutMs;
 
       const timer = setTimeout(() => {
         this.pending.delete(request.id);
-        const decision: DesktopRuntimeV2ApprovalDecision = {
+        const decision: DesktopRuntimeApprovalDecision = {
           requestId: request.id,
           decision: "timeout",
           decidedAt: Date.now(),
@@ -80,7 +80,7 @@ export class PendingApprovalRegistry implements DesktopRuntimeV2ApprovalPort {
     });
   }
 
-  onApprovalRequired(request: DesktopRuntimeV2ApprovalRequest): void {
+  onApprovalRequired(request: DesktopRuntimeApprovalRequest): void {
     const entry = this.pending.get(request.id);
     if (!entry) return;
     this.externalOnApprovalRequired?.(request, entry.sessionId, entry.agentRunId);
@@ -88,7 +88,7 @@ export class PendingApprovalRegistry implements DesktopRuntimeV2ApprovalPort {
 
   // ─── IPC 消费的公共方法 ───
 
-  decide(requestId: string, decision: DesktopRuntimeV2ApprovalDecision["decision"], suggestionId?: string): { ok: true } | { ok: false; reason: string } {
+  decide(requestId: string, decision: DesktopRuntimeApprovalDecision["decision"], suggestionId?: string): { ok: true } | { ok: false; reason: string } {
     const entry = this.pending.get(requestId);
 
     if (!entry) {
@@ -118,8 +118,8 @@ export class PendingApprovalRegistry implements DesktopRuntimeV2ApprovalPort {
     return count;
   }
 
-  listPending(sessionId?: string): Array<DesktopRuntimeV2ApprovalRequest & { readonly expiresAt: number }> {
-    const result: Array<DesktopRuntimeV2ApprovalRequest & { readonly expiresAt: number }> = [];
+  listPending(sessionId?: string): Array<DesktopRuntimeApprovalRequest & { readonly expiresAt: number }> {
+    const result: Array<DesktopRuntimeApprovalRequest & { readonly expiresAt: number }> = [];
     for (const entry of this.pending.values()) {
       if (sessionId && entry.sessionId !== sessionId) continue;
       result.push({
@@ -147,12 +147,12 @@ export class PendingApprovalRegistry implements DesktopRuntimeV2ApprovalPort {
   private resolveEntry(
     requestId: string,
     entry: PendingEntry,
-    decision: DesktopRuntimeV2ApprovalDecision["decision"],
+    decision: DesktopRuntimeApprovalDecision["decision"],
     suggestionId?: string,
   ): void {
     clearTimeout(entry.timer);
     this.pending.delete(requestId);
-    const resolvedDecision: DesktopRuntimeV2ApprovalDecision = {
+    const resolvedDecision: DesktopRuntimeApprovalDecision = {
       requestId,
       decision,
       decidedAt: Date.now(),

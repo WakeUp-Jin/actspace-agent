@@ -37,11 +37,13 @@
 - **生命周期**：退出时 dispose Browser Bridge（终止在途子进程）和本地更新服务（只清定时器，更新脚本必须比应用活得久）；`uncaughtExceptionMonitor` / `unhandledRejection` 写入主进程日志，不改变 Electron 的默认处理。
 - Desktop 的 provider Key 只在 main 进程凭据存储和短生命周期 Runtime credential 中可见，不会泄露到 renderer。CLI 环境变量只属于 CLI Host 进程。
 - 本地更新只通过 main 进程 IPC 暴露结构化操作：选择源码目录、读取状态、启动更新。renderer 不传 shell 命令；main 会验证所选目录是 `name: "actspace"` 且包含 `package:desktop:dmg` 与 `scripts/release-package.sh`，并确认当前进程路径解析出的目标是 `Actspace.app` / `actspace.app` 且不是 `node_modules` 下的 Electron 开发 runtime 后，才写入 helper 脚本。helper 位于 `<userData>/tmp/local-update/`，日志写同目录 `update.log`，阶段状态写 `status.json`；main 只在 helper 报告 `ready_to_replace` / `waiting_for_exit` / `replacing` 后触发 app 退出，避免构建阶段提前关闭当前应用。helper 默认对本地更新构建启用 ad-hoc signing，并在替换前验证新 `.app` 的 bundle 元数据、主可执行文件和 code signature；替换后如果系统无法打开新 app，会尝试恢复旧版本。
+- Browser Bridge 的源码扩展也不让 renderer 传路径：「选择源码扩展」由 main 弹系统目录对话框，把选中的目录解析成真实路径，确认里面是 ActSpace 自己的 Chrome 扩展（名称、manifest v3、由 `key` 算出的扩展 ID）之后才保存；「从源码编译」不带参数，只编译保存下来的那个目录，编译前重新校验一遍，并要求 `build.sh` 是目录内的普通文件，不能是符号链接。
 
 ## 文件系统访问控制
 
+- **路径包含判断只有一份实现**：判断「一个路径在不在某个目录里面」一律用 `@actspace/shared` 的 `isLexicallyInside` / `relativePathInside`（`packages/util/shared/src/path-containment.ts`），不手写 `relative(...).startsWith("..")`：这种写法会把 `..notes.md` 这样的合法名字当成越界，写死 `../` 的在 Windows 上又拦不住。这两个函数只比较字面；要防符号链接指到目录外面，先对两边做 `realpath` 再比。路径就是目录本身时算不算在里面，调用时必须写明（`includeRoot`）：删除、覆盖这类操作的目标填 `false`。`pnpm check:path-containment` 在 CI 里拦手写的写法。
 - **文件工具边界**：v2 Tool Runtime 在审批前 canonicalize file resource，并由 `default/full-access`、敏感分类、Tool Permission 与 Host capability 合并决策；`default` 的 workspace 外读写需要审批，Desktop 可对非敏感核心文件签发当前 Session/当前主 Agent 的 exact 或显式 subtree Grant，CLI 不签发或消费。Grant 仍按 action/access/audience/policyVersion 和当前资源完整覆盖复验；`full-access` 只扩大非敏感文件范围。executor 在 syscall 前重新解析并核对已准入资源，路径、目标类型、Grant 或符号链接状态变化时 fail-closed。
-- **Bash 边界**：Bash 默认要求批准；本地 Desktop 主 Agent 可显式签发当前会话、当前工作区的命令前缀授权，后续符合工具规则的简单命令可复用。硬拒绝优先于授权，复杂语法、排除参数及申请出沙箱（`sandbox_permissions: "require_escalated"`）的命令不复用；`full-access` 不扩大工作目录范围。前缀授权不是只读保证，包含项目脚本，只在命令会进沙箱执行时提供。Bash 经 Harness `sandbox` 服务执行（macOS：nono，其次 Seatbelt），`full-access` 下不进沙箱；其他模式下出沙箱必须附 `justification` 并每次批准；沙箱缺失或不可用时转审批并标为“真实环境”，不会静默在沙箱外执行，详见[沙箱设计](design-docs/execution-safety/agent-沙箱设计.md)。详见 [前缀授权方案](exec-plans/completed/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md)。
+- **Bash 边界**：Bash 默认要求批准；本地 Desktop 主 Agent 可显式签发当前会话、当前工作区的命令前缀授权，后续符合工具规则的简单命令可复用。硬拒绝优先于授权，复杂语法、排除参数及申请出沙箱（`sandbox_permissions: "require_escalated"`）的命令不复用；`full-access` 不扩大工作目录范围。前缀授权不是只读保证，包含项目脚本，只在命令会进沙箱执行时提供。Bash 经 Harness `sandbox` 服务执行（macOS：nono，其次 Seatbelt），`full-access` 下不进沙箱；其他模式下出沙箱必须附 `justification` 并每次批准；沙箱缺失或不可用时转审批并标为“真实环境”，不会静默在沙箱外执行，详见[沙箱设计](design-docs/execution-safety/agent-沙箱设计.md)。前缀授权的规则见 [tool-shell 包说明](../packages/shell/tool-shell/README.md)「Bash 会话前缀授权」。
 - **读类工具边界**：v2 Tool Runtime 由 Host capability、Session permission mode 和 plugin manifest 共同约束读写范围；不得沿用 v1 的任意主 Agent 读边界。
   - **当前取舍**：需要回读 Session artifact、诊断或工具输出时，通过显式 artifact / projection capability 授权，不把整个 `userData` 目录提升为默认 workspace。
   - **v1 guard**：旧 scheduler 双校验属于历史实现，已随 v1 产品路径从 v2 删除。
@@ -49,7 +51,7 @@
 - v2 Session 数据存储在统一的 `<dataRoot>/sessions-v2/<sessionId>/journal.jsonl`；macOS 默认 `<dataRoot>` 为 `~/Library/Application Support/ActSpace`，CLI 与 Electron 共用；旧 lowercase data root 和 `<dataRoot>/sessions/` 仅作为用户历史数据原位保留，v2 不混读或自动迁移。
 - 本地更新源码目录路径存储在 `<userData>/local-update.json`，不存密钥；该路径可暴露用户本机目录结构，日志或截图外发前应按需脱敏。
 - Agent 文件工具的工作区由 `ACTSPACE_WORKSPACE_ROOT` 或当前仓库根目录确定，不使用 `userData` 作为代码文件读取目录，避免把应用数据目录和用户工作区混淆。
-- **子进程环境**：Desktop 不把任何凭据写进 `process.env`（搜索 Key 由 `ModelRuntimeService.getToolEnvironment()` 直接注给工具端口）。子进程 env 由 `@actspace/shared` 的两个构造函数决定：`toolChildEnv` 继承用户 env 但剥离名字像凭据的变量（`API_KEY` / `ACCESS_KEY` / `PRIVATE_KEY` / `SECRET` / `TOKEN` / `PASSWORD` / `CREDENTIAL`），用于 bash、`rg`、Browser Bridge 编译和本地更新脚本这类需要用户工具链的进程；`hostChildEnv` 只放行 `PATH` / `HOME` / 代理 / locale 等基础白名单，用于 main 自己拼参数的 git 与 ssh。这是「不把 Desktop 持有的 Key 交给子进程」的保证，不是对用户 shell 里自带变量的穷举过滤。
+- **子进程环境**：Desktop 不把任何凭据写进 `process.env`（搜索 Key 由 `ModelRuntimeService.getToolEnvironment()` 直接注给工具端口）。子进程 env 由 `@actspace/shared` 的两个构造函数决定：`toolChildEnv` 继承用户 env 但剥离名字像凭据的变量（`API_KEY` / `ACCESS_KEY` / `PRIVATE_KEY` / `SECRET` / `TOKEN` / `PASSWORD` / `PASSWD` / `CREDENTIAL` / `DATABASE_URL`，以及以 `_PWD`、`_DSN` 结尾的），和值里有 `scheme://user:password@host` 这种带账号密码地址的变量（比如 `REDIS_URL`、带凭据的 `PIP_INDEX_URL`），用于 bash、`rg`、Browser Bridge 编译和本地更新脚本这类需要用户工具链的进程。代理变量（`HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY`）即使带账号密码也保留：剥掉以后，必须走代理才能上网的机器上命令全部连不出去；`hostChildEnv` 只放行 `PATH` / `HOME` / 代理 / locale 等基础白名单，用于 main 自己拼参数的 git 与 ssh。这是「不把 Desktop 持有的 Key 交给子进程」的保证，不是对用户 shell 里自带变量的穷举过滤。
 - Bash 大输出和工具 artifact 由 v2 Tool Runtime 按 Session-owned artifact policy 管理，不写进 workspace；具体落盘和回收边界以 `agent-plugin-runtime/agent-spec-tool-runtime-abi.md` 为准。
 - `generate_image` 只允许 Host 注入的 Session artifact root，图片位于 `<userData>/sessions-v2/<sessionId>/artifacts/` 下的受管子树；远程 URL 必须先通过 HTTPS/公网地址检查并下载到本地，不能直接作为 renderer 成功产物。
 - `inspect_image` 只允许读取 workspace 内普通文件、当前轮显式注册的图片附件，或当前 session `artifacts/` 子树；执行器对目标与允许根目录做 `realpath` 复验，拒绝符号链接逃逸、目录、设备、远程 URL 和未登记的工作区外路径。只接受文件签名匹配的 JPEG / PNG / WebP，单张上限 20 MiB。
@@ -59,7 +61,7 @@
 - **工作区访问入口**：renderer 传来的 `workspaceRoot` 一律经 `main/workspace-access.ts` 解析，不再直接 `resolve`。
   - 「MD 文档」面板的文件列表与读取、Git context、Skills 列表、工作区文件右键菜单走 `resolveWorkspaceAccess`：请求路径 realpath 后必须**等于** registry 中某个条目或某个已存在本地会话 `workspaceRoot`（含 worktree）的 realpath，子目录也不行；否则抛 `workspace_not_registered`。后续操作都基于返回的 realpath root。
   - `createSession` 只接受 registry 中的 root；`createWorkspaceFolder` 的父目录必须是用户最近一次在系统对话框中选中的目录（建成功后作废），或者通过上面的校验。
-  - root 内的路径用 `path.relative` 判断包含（合法文件名 `..foo` 不算越界），再对目标或其最近的已存在祖先做 realpath，确认仍在 root 内；指向 root 外的 symlink 返回 `escapes_root`，也不会泄露外部路径是否存在。
+  - root 内的路径用上面的共享实现判断包含（合法文件名 `..foo` 不算越界），再对目标或其最近的已存在祖先做 realpath，确认仍在 root 内；指向 root 外的 symlink 返回 `escapes_root`，也不会泄露外部路径是否存在。
 - 顶部 Environment 的分支创建、Commit、Push，以及“在编辑器中打开”都是 main-owned 本机能力。Renderer 只能传稳定 action / tool id；main 每次都把 `workspaceRoot` 解析回 workspace registry 或已有 session 中登记的路径，再使用固定 Git argv 或固定应用映射执行，不能让 renderer 用任意绝对路径、应用名或 argv 扩大能力边界。
 
 ## 真实模型调用
@@ -134,7 +136,7 @@ git grep -n -I -E '(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{36}|g
 - 数据分级、脱敏与保留策略。
 - 对外 API、Webhook、文件上传和沙箱执行的规则。
 - API Key 轮换与更完整的错误脱敏策略。
-- 主文档 CSP 的 `style-src` 去掉 `'unsafe-inline'`：需要 mermaid SVG 改为 DOM 挂载并把 `<style>` 转成 `adoptedStyleSheets`、CodeMirror 走 `EditorView.cspNonce`、Vite dev 配 `html.cspNonce`。headless Chrome 实测见 `docs/exec-runs/20261109-desktop-security-debt/execution-process.md`。
+- 主文档 CSP 的 `style-src` 去掉 `'unsafe-inline'`：需要 mermaid SVG 改为 DOM 挂载并把 `<style>` 转成 `adoptedStyleSheets`、CodeMirror 走 `EditorView.cspNonce`、Vite dev 配 `html.cspNonce`。实测结论见 `docs/exec-plans/tech-debt-tracker.md`「Desktop 安全遗留」。
 - `hostChildEnv` 白名单之外的非敏感偏好 env（`ACTSPACE_DISABLED_TOOLS` 等）仍由 `settings/env.ts` 写进 main 自己的 `process.env`，退役时机见 `docs/exec-plans/tech-debt-tracker.md`。
 - 读类工具放开 workspace 边界后的「敏感路径 blocklist + 按需读审核」（见 `docs/exec-plans/tech-debt-tracker.md`）。
 
@@ -155,4 +157,4 @@ git grep -n -I -E '(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{36}|g
 - WebSocket 的 Origin：`allowedOrigins` 只接受精确的 https origin；回环 http 来源（`http://127.0.0.1|localhost|[::1]:*`）仅在 Host 未启用 TLS（即只能回环监听）时放行，用于本机开发和同源预览。手机经 `tailscale serve` 访问时必须把 `ts.net` 地址写进 `allowedOrigins`。
 - Service Worker 只缓存导航页面与 `/assets/*`，从不缓存或拦截 `/rpc`。
 
-操作说明与当前验收边界见 [Agent Host](design-docs/agent-plugin-runtime/agent-host-guide.md) 和 [P4 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)。
+操作说明与当前验收边界见 [Agent Host](design-docs/agent-plugin-runtime/agent-host-guide.md)。

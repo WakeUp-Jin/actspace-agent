@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createCompactionTransaction, type SessionEventCandidateV1, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { Context } from "./types.js";
 import { contextEvents, latestContextEvent, type ContextSession } from "./supplements.js";
 import { ESTIMATOR_VERSION, contextSummaryKeys, estimateConversationNode } from "@actspace/shared";
@@ -9,7 +9,7 @@ export interface CompactionSession extends ContextSession {
   appendMany(events: readonly SessionEventCandidateV1[]): Promise<readonly SessionEventEnvelopeV1[]>;
 }
 export type CompactionRegion = { readonly start: number; readonly end: number };
-export type CompactionResult = { readonly content: string; readonly metadata?: RuntimeV2JsonValue; readonly pathlist?: readonly string[] };
+export type CompactionResult = { readonly content: string; readonly metadata?: RuntimeJsonValue; readonly pathlist?: readonly string[] };
 export type CompactionTrigger = "manual" | "auto";
 /**
  * What a committed compaction recorded on `compaction/end`. Tokens are absent when no measured baseline exists yet;
@@ -102,7 +102,7 @@ export class ContextCompactionCoordinator implements ContextCompactor {
       observer?.signal?.throwIfAborted();
       if (!result.content.trim()) throw new Error("Compaction returned an empty summary.");
       if (surface.replaceGeneration !== session.journal.surface.replaceGeneration || JSON.stringify(surface.entries) !== JSON.stringify(session.journal.surface.entries)) return false;
-      const content: RuntimeV2JsonValue = result.metadata === undefined ? result.content : { text: result.content, metadata: result.metadata };
+      const content: RuntimeJsonValue = result.metadata === undefined ? result.content : { text: result.content, metadata: result.metadata };
       const compactionId = randomUUID();
       await this.disclosure?.prepare(session, context, region, result, compactionId);
       if (surface.replaceGeneration !== session.journal.surface.replaceGeneration || JSON.stringify(surface.entries) !== JSON.stringify(session.journal.surface.entries)) return false;
@@ -167,7 +167,7 @@ function replacedEstimate(entries: ContextSession["journal"]["surface"]["entries
  * Before = baseline + estimate of entries appended after it (tool results the model has not seen yet), flagged when
  * any estimate is included. After swaps the replaced estimate for the summary's, so it is available at commit time.
  */
-function compactionTokens(session: ContextSession, entries: ContextSession["journal"]["surface"]["entries"], replaced: { conversation: number; summarizedConversation: number }, summary: { kind: "user"; messageId: string; content: RuntimeV2JsonValue }): { beforeTokens?: number; afterTokens?: number; beforeEstimated?: true } {
+function compactionTokens(session: ContextSession, entries: ContextSession["journal"]["surface"]["entries"], replaced: { conversation: number; summarizedConversation: number }, summary: { kind: "user"; messageId: string; content: RuntimeJsonValue }): { beforeTokens?: number; afterTokens?: number; beforeEstimated?: true } {
   const baseline = tokenBaseline(session);
   if (baseline === null) return {};
   const appended = entries.filter(entry => entry.sourceEventSeqs.some(seq => seq > baseline.seq)).reduce((sum, entry) => sum + estimateConversationNode(entry.node), 0);

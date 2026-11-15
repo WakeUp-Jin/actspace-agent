@@ -7,7 +7,7 @@ Session、Surface 和 request snapshot 的规范分别见：
 - [`agent-spec-request-record.md`](../agent-plugin-runtime/agent-spec-request-record.md)（请求记录与上下文估算，以它为准）
 - [`agent-spec-session-core-persistence-separation.md`](../agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)
 - [`agent-spec-session-format-v1.md`](../agent-plugin-runtime/agent-spec-session-format-v1.md)
-- [`agent-spec-prompt-context-contributors.md`](../agent-plugin-runtime/agent-spec-prompt-context-contributors.md)
+- [`agent-context-engine.md`](../上下文管理引擎设计/agent-context-engine.md)（上下文怎样组装）
 
 ## 目标
 

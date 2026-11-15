@@ -1,4 +1,4 @@
-import type { ApprovalRequest, RuntimeV2SessionListItem } from "@actspace/shared/runtime-v2";
+import type { ApprovalRequest, RuntimeSessionListItem } from "@actspace/shared/runtime-v2";
 import type { HostWorkspace } from "../connection/connection-store";
 
 // 列表行的纯函数模型（front-web-pwa客户端规范 §8.1）。
@@ -6,7 +6,7 @@ export type RowStatus = "approval" | "running" | "unread" | "idle";
 
 export const UNTITLED = "新会话";
 
-export function sessionTitle(item: Pick<RuntimeV2SessionListItem, "metadata">): string {
+export function sessionTitle(item: Pick<RuntimeSessionListItem, "metadata">): string {
   return item.metadata.title?.trim() || UNTITLED;
 }
 
@@ -49,10 +49,10 @@ export function approvalSummary(request: ApprovalRequest): string {
   return request.toolName;
 }
 
-export type SplitSessions<T extends RuntimeV2SessionListItem> = { readonly active: readonly T[]; readonly archived: readonly T[] };
+export type SplitSessions<T extends RuntimeSessionListItem> = { readonly active: readonly T[]; readonly archived: readonly T[] };
 
 /** 按 archived 分组，各自按 updatedAt 倒序。 */
-export function splitSessions<T extends RuntimeV2SessionListItem>(items: readonly T[]): SplitSessions<T> {
+export function splitSessions<T extends RuntimeSessionListItem>(items: readonly T[]): SplitSessions<T> {
   const sorted = [...items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return { active: sorted.filter(item => !item.metadata.archived), archived: sorted.filter(item => item.metadata.archived) };
 }
@@ -76,7 +76,7 @@ export function timeBucket(iso: string, now: Date = new Date()): { readonly key:
  * 首页分组：「需要处理」（等待审批、未读）置顶，其余按时间分组。输入已按 updatedAt 倒序，组内保持顺序。
  * @param attention - 判断一行是否进「需要处理」。
  */
-export function groupSessions<T extends Pick<RuntimeV2SessionListItem, "updatedAt">>(items: readonly T[], attention: (item: T) => boolean, now: Date = new Date()): SessionGroup<T>[] {
+export function groupSessions<T extends Pick<RuntimeSessionListItem, "updatedAt">>(items: readonly T[], attention: (item: T) => boolean, now: Date = new Date()): SessionGroup<T>[] {
   const hot = items.filter(attention);
   const groups: { key: string; label: string; items: T[] }[] = hot.length ? [{ key: "attention", label: "需要处理", items: hot }] : [];
   for (const item of items) {

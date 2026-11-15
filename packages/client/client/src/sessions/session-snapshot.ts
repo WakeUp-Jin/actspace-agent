@@ -1,13 +1,13 @@
-import type { RuntimeV2EventWindow, RuntimeV2JsonValue, RuntimeV2SessionSnapshot, RuntimeV2ReadModelWatermarks } from "@actspace/shared/runtime-v2";
+import type { RuntimeEventWindow, RuntimeJsonValue, RuntimeSessionSnapshot, RuntimeReadModelWatermarks } from "@actspace/shared/runtime-v2";
 
-export type ClientSessionSnapshot = RuntimeV2SessionSnapshot;
+export type ClientSessionSnapshot = RuntimeSessionSnapshot;
 
 export type ClientSessionStatus = "idle" | "loading" | "ready" | "stale" | "error";
 
 export type ClientSessionCell = {
   readonly sessionId: string;
   readonly snapshot: ClientSessionSnapshot | null;
-  readonly window: RuntimeV2EventWindow | null;
+  readonly window: RuntimeEventWindow | null;
   readonly deferredToolCalls: readonly string[];
   readonly status: ClientSessionStatus;
   readonly error: string | null;
@@ -15,9 +15,9 @@ export type ClientSessionCell = {
   readonly runtimeInstanceId: string | null;
   readonly lastLiveSeq: number;
   readonly liveGap: boolean;
-  readonly projectionValues: Readonly<Record<string, RuntimeV2JsonValue>>;
+  readonly projectionValues: Readonly<Record<string, RuntimeJsonValue>>;
   readonly projectionRevisions: Readonly<Record<string, number>>;
-  readonly watermarks: RuntimeV2ReadModelWatermarks | null;
+  readonly watermarks: RuntimeReadModelWatermarks | null;
 };
 
 export function emptyClientSessionCell(sessionId: string): ClientSessionCell {

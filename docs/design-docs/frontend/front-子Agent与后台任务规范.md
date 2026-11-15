@@ -18,18 +18,18 @@
 
 ## 2. 子 Agent 列表
 
-按「运行中」「其他」分两组（「其他」含已中断、失败、已结束；没有「空闲」，老会话里空闲的子智能体显示为已结束）；空组不显示。组标题一行：左边组名，右边数量（`text-act-xs text-text-faint`）。组内没有外框和分隔线（2026-11-07 改，原来的分组卡分隔线顶到边框、悬停底色盖住圆角）：行自带 `rounded-act-md`，悬停才有 `bg-hover-overlay` 底色，与侧边栏会话行一致。
+按「运行中」「其他」分两组（「其他」含已中断、失败、已结束；没有「空闲」，老会话里空闲的子智能体显示为已结束）；空组不显示。组标题一行：左边组名，右边数量（`text-act-xs text-text-faint`）。组内没有外框和分隔线（套分组卡的话，分隔线顶到边框、悬停底色盖住圆角）：行自带 `rounded-act-md`，悬停才有 `bg-hover-overlay` 底色，与侧边栏会话行一致。
 
 每个子 Agent 一行，三列：
 
 - 左：28px 头像（`AgentAvatar`，按 `agentId` 固定）。
-- 中：两行。上面是任务标题（`description`，单行截断，悬停看全文）；下面一句话（2026-11-08 改，见 §2.2）：
+- 中：两行。上面是任务标题（`description`，单行截断，悬停看全文）；下面一句话（见 §2.2）：
   - 运行中：此刻在做什么（`activity`，如「正在读取 · transaction.ts」），没有时写「正在思考」。刚来信时先显示来信摘要，见 §2.2。
   - 结束后：最终回复第一行（去掉 `**`、反引号和标题 / 列表标记，原样显示，不补文案），失败时用 `text-on-danger`；没有回复时不写这一行。
-  - 这一行换内容时旧的上滑淡出、新的从下滑入（与原对话卡片第二行同一动画 `agent-activity.css`）；减少动态效果时直接替换。
+  - 这一行换内容时旧的上滑淡出、新的从下滑入（动画在 `components/messages/agent-activity.css`）；减少动态效果时直接替换。
 - 右：两行，右对齐。上面是子会话累计 token（`18.4K tokens`），没有数据（外部子智能体、旧会话、子会话还没发出请求）时不写；下面是「状态文字 · 耗时」。
 
-运行中的行最右固定一格（28px）：平时是绿色转圈；鼠标移到这一行或键盘聚焦时，转圈换成停止按钮（`IconButton` `variant="danger"` `shape="round"`，可读名称「停止 ‹描述›」，Tooltip「停止」），已转后台的走后台任务登记表的用户停止（模型下一步被告知是用户停的，不唤醒），同步等待中的直接中断。这一格宽度不变，切换时不挤动文字；按钮平时透明但仍在 Tab 顺序里。停止请求发出后只显示转圈；停止失败时列表顶部一行「停止失败：…」。
+运行中的行最右固定一格（28px）：平时是绿色转圈；鼠标移到这一行或键盘聚焦时，转圈换成停止按钮（`IconButton` `variant="danger"` `shape="round"`，可读名称「停止 ‹描述›」，Tooltip「停止」），调用 `sessions.interruptSubagent({ sessionId, agentId })`：已转后台的走后台任务登记表的用户停止（模型下一步被告知是用户停的，不唤醒），同步等待中的直接中断。这一格宽度不变，切换时不挤动文字；按钮平时透明但仍在 Tab 顺序里。停止请求发出后只显示转圈；停止失败时列表顶部一行「停止失败：…」。
 
 不显示类型（通用 / 探索 / Fork / Codex / Claude Code）、模型和「后台」标签，它们只在详情标题的悬停里。空列表写「此会话还没有子智能体。」，加载失败写「无法加载子智能体，请稍后重试。」。
 
@@ -37,18 +37,18 @@
 
 子智能体在主会话里只有一种形象：一张单行卡片。派发时出一张，它发来消息时在消息到达的位置再出一张带正文的（来信卡片）。两种卡片的头部完全一样，状态跟着子智能体走。此刻在做什么只在右侧面板看（§2 第二行），对话里不显示。Demo：`docs/design-docs/frontend/subagent-compact-demo.html`（K1）。
 
-**派发卡片**（`AgentRunBlock`，2026-11-08 改为单行）：
+**派发卡片**（`AgentRunBlock`）：
 
-- 一行，高 34px，整张是按钮，点开右侧「子 Agent」并选中它；外观沿用原卡片（`rounded-act-md border border-line bg-surface-subtle`，悬停 `border-line-strong bg-surface`）。
+- 一行，高 34px，整张是按钮，点开右侧「子 Agent」并选中它；外观 `rounded-act-md border border-line bg-surface-subtle`，悬停 `border-line-strong bg-surface`。
 - 从左到右：20px 头像（`AgentAvatar`）、任务标题（`description`，`flex-1` 单行截断，悬停看全文）、种类（通用 / 探索 / Fork / Codex / Claude Code，`text-act-xs text-text-faint`）、「后台」标签（只有后台运行时）、状态（`AgentStatus`：转圈「运行中」/ ✓「已完成」/ 「失败」/ 「已停止」，固定宽度；子智能体跑完就是终态，没有「空闲」）。
-- 不再显示模型名和最新动态：模型在右侧详情顶栏，动态在右侧列表第二行。失败时卡片的 `title` 悬停给出错误，状态文字为「失败」（`text-danger`）。
+- 不显示模型名和最新动态：模型在右侧详情顶栏，动态在右侧列表第二行。失败时卡片的 `title` 悬停给出错误，状态文字为「失败」（`text-danger`）。
 
 **结束不另出行**：子智能体一次激活结束时，结果只体现在卡片的状态上（转圈停下，变为已完成 / 失败 / 已停止）。这个子智能体在对话里的所有卡片（派发卡片和来信卡片）一起变。
 
 - 收件箱里后台子智能体的完成通知（`task_notification`，通知类型 `taskKind: "subagent"`；老会话的 `subagent_notification` 同样处理）在会话视图里不显示。主会话运行中读到的直接跳过；唤醒空闲主会话的仍然开新的一轮（领取事件 `opensTurn` 不变），只是这一轮没有开头那一行，由 `groupMessagesIntoTurns` / Web `buildTurns` 处理。
-- `list_subagent_models` 只显示标题「查看可选模型」，不带工具结果；失败时带错误。`task_stop` 停的是子智能体时显示「停止 ‹描述›」一行（按任务 ID 认出子智能体）；停 Bash 仍是通用的任务行。
+- `send_message` 是一行工具行「发消息给 ‹描述›」，点描述打开该子智能体，展开看消息原文与结果。`list_subagent_models` 只显示标题「查看可选模型」，不带工具结果；失败时带错误。`task_stop` 停的是子智能体时显示「停止 ‹描述›」一行（按任务 ID 认出子智能体）；停 Bash 仍是通用的任务行。
 
-**来信卡片**（`agent_message`，`SubagentMessageCard`，2026-11-08 起替代 `BackgroundNoticeRow` 分隔行）：
+**来信卡片**（`agent_message`，`SubagentMessageCard`）：
 
 - 外框 `rounded-act-md border border-line bg-surface`，上下两段：
   - 头部（`bg-surface-subtle`，高 32px）：20px 头像、发送方标题（`title`，即子智能体 `description`）、蓝色「来信」（`text-act-xs text-info`）、状态（同派发卡片的 `AgentStatus`）。整条头部是按钮（悬停 `bg-surface`），点开右侧「子 Agent」并选中发送方。
@@ -64,7 +64,7 @@
 - 运行中的子智能体，列表第二行显示它此刻在做什么（`SubagentListItem.activity`），随列表每秒轮询更新。文案来自子智能体的实时事件（`SubagentActivity`：正在思考、正在读取 · 文件名、正在搜索 · 模式、正在分析、正在整理回复等），不显示模型输出的正文。
 - 它刚发来一条消息时（`SubagentListItem.lastMessage`，`at` 在最近 6 秒内），这一行先显示「来信：」（`text-info`）加信的第一行，同时最右那一格的转圈换成 7px 蓝点（`bg-info`）；6 秒后恢复显示动态和转圈。悬停这一行时照常换成停止按钮。
 - 动态只在主进程内存里（不写日志），应用重启后从下一个事件起才有。通用 / 探索 / Fork 没有动态时写「正在思考」；Codex / Claude Code 没有实时事件，运行中不写这一行。
-- Web 端没有右侧面板，不显示动态；来信卡片同样替代分隔行（没有头像，头部是名字、「来信」、状态文字）。
+- Web 端没有右侧面板，不显示动态；来信同样是卡片（没有头像，头部是名字、「来信」、状态文字）。
 
 ## 3. 子 Agent 详情
 

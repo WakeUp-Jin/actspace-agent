@@ -1,4 +1,4 @@
-import type { BackgroundBashTaskView, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { BackgroundBashTaskView, RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { MockClock } from "../clock";
 import type { MockHandlers } from "../handlers";
 import { appendMockMessage, type MockDb, type MockRawEvent, type MockSession } from "../mock-db";
@@ -10,7 +10,7 @@ import { seedSession } from "./seed";
  * 以及右侧「后台任务」面板：dev server 的输出每秒多一行，可以停止。
  */
 
-function appendTool(db: MockDb, session: MockSession, runId: string, name: string, args: Record<string, RuntimeV2JsonValue>, result: Record<string, RuntimeV2JsonValue>, after: (callId: string) => MockRawEvent[] = () => []): string {
+function appendTool(db: MockDb, session: MockSession, runId: string, name: string, args: Record<string, RuntimeJsonValue>, result: Record<string, RuntimeJsonValue>, after: (callId: string) => MockRawEvent[] = () => []): string {
   const message = appendMockMessage(db, session, "tool", "", runId);
   session.messages[session.messages.length - 1] = { ...message, tool: { name, args, result } };
   // background/task 与 subagent/* 写在工具结果之后，挂到下一条消息前面。

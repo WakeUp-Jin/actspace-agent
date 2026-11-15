@@ -6,7 +6,7 @@ export * from "./run-manager.js";
 export * from "./execution-budget.js";
 export * from "./service.js";
 export { manifest } from "./manifest.js";
-export { apply, activate } from "./plugin.js";
+export { apply, activate, AGENT_SERVICE, AGENT_SERVICE_HOST_PORT } from "./plugin.js";
 export * from "./application.js";
 export * from "./session-commands.js";
 export * from "./rewind-cut.js";

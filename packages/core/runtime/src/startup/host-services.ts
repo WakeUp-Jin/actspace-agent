@@ -1,4 +1,4 @@
-import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
+import type { RuntimeHostDescriptor } from "@actspace/shared/runtime-v2";
 import type { ToolCapabilitySet, ToolPreparedEnvironment } from "@actspace/tool-runtime";
 
 /**
@@ -8,7 +8,7 @@ import type { ToolCapabilitySet, ToolPreparedEnvironment } from "@actspace/tool-
  * Behaviors instead.
  */
 export type RuntimeHostServices = {
-  readonly descriptor: RuntimeV2HostDescriptor;
+  readonly descriptor: RuntimeHostDescriptor;
   readonly dataRoot: string;
   readonly workspaceRoot: string;
   readonly capabilityCeiling: ReadonlySet<string>;
@@ -17,7 +17,7 @@ export type RuntimeHostServices = {
 };
 
 export type RuntimeHostServicesInput = {
-  readonly descriptor: RuntimeV2HostDescriptor;
+  readonly descriptor: RuntimeHostDescriptor;
   readonly dataRoot: string;
   readonly workspaceRoot: string;
   readonly toolEnvironment: Pick<ToolPreparedEnvironment, "hostCapabilities" | "capabilitySet">;

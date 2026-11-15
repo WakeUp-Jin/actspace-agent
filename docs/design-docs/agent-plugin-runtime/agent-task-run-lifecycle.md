@@ -1,6 +1,6 @@
 # Task、Run 与 Harness 的生产接线
 
-当前契约包含 P2 统一任务、P3 Harness 控制和 P4 独立 Host/远端传输；阶段背景见 [P2 记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)，最终清理与验收状态见[收尾摘要](../../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。
+当前契约包含 P2 统一任务、P3 Harness 控制和 P4 独立 Host/远端传输。
 
 ## 所有权
 
@@ -57,7 +57,7 @@ Runtime 组装 `HarnessControl` 的可信 Host 端口；控制服务复用 compo
 
 Run 已有 harnessId/generationId/revision 保持不变，跨重启稳定摘要放入 `run.configuration.harnessExecutionDigest`。P2 task codec 对 harness 对象字段严格校验，因此不向该对象追加字段，不升级 codec、不重写历史。configuration 原本是可扩展 JSON，旧读取器继续接受新增摘要。
 
-替换只改变后续获取的组合。旧 Run 持有旧租约，父 Run 和子 Run 可使用不同 revision；同会话下一 Run 可更换 Loop。恢复缺产物、共享契约变化或选择日志损坏时执行 blocked，Host 控制服务仍存在；恢复内置组合需独立授权，成功产生新 revision。生产默认没有授权端口或面向用户的启用入口。普通任务失败不会触发 Harness 回退。
+替换只改变后续获取的组合。旧 Run 持有旧租约，子 Run 沿调用方的 Scope 取同一 generation；同会话下一 Run 可更换 Loop。恢复缺产物、共享契约变化或选择日志损坏时执行 blocked，Host 控制服务仍存在；恢复内置组合需独立授权，成功产生新 revision。生产默认没有授权端口或面向用户的启用入口。普通任务失败不会触发 Harness 回退。
 
 Host 应用升级有一个受限例外：完整选择历史只含 `main` 的 Host 可信 bootstrap / builtin-upgrade，且 Runtime 确认当前组合全为内置插件时，启动可连续升级到随应用发布的内置版本，包括旧 Host 契约不兼容的情况。执行摘要和 Host 契约均未变化时不追加 revision；用户选择或分支历史不走此路径，其他恢复错误继续阻塞。HMR 获取租约时保留 `RECOVERY_BLOCKED` 语义，让任务队列进入可恢复暂停，避免普通异常造成 pending 且未暂停的悬挂状态。
 
@@ -85,4 +85,4 @@ Headless 的 submit-and-wait 返回通用 outcome/value，等待 Run settlement 
 
 直接子智能体的 TaskLedger 由 Subagent lease 创建、完成和释放。接纳任务前通过 AgentService.registerExternalLedger 登记；Host snapshot 只能读取它的已确认状态，不能为这个 Session 再执行 TaskLedger.open/recover。外部持有期间，另一个调度入口必须返回 SESSION_BUSY。lease 释放时解除登记，Host 关闭仍先排空子执行，再释放 Harness；外部 Ledger 不转移给 SessionRunManager。
 
-该约束防止 UI 或 RPC 的只读任务查询将正在运行的子任务误恢复成 interrupted。实现与验证见[修复记录](../../exec-runs/20261018-subagent-durability/execution-summary.md)。
+该约束防止 UI 或 RPC 的只读任务查询将正在运行的子任务误恢复成 interrupted。

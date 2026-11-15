@@ -9,6 +9,6 @@
   "files": ["dist"],
   "exports": {".": {"types":"./dist/index.d.ts","import":"./dist/index.js","default":"./dist/index.js"}},
   "scripts": {"build":"tsc -p tsconfig.json","typecheck":"tsc --noEmit -p tsconfig.json","test":"vitest run --globals --passWithNoTests"},
-  "dependencies": {"@actspace/agent":"workspace:*","@actspace/session-persistence":"workspace:*","@actspace/shared":"workspace:*"},
+  "dependencies": {"@actspace/agent":"workspace:*","@actspace/cordis-adapter":"workspace:*","@actspace/session-persistence":"workspace:*","@actspace/shared":"workspace:*"},
   "devDependencies": {"@actspace/session-journal":"workspace:*","@types/node":"catalog:","typescript":"catalog:","vitest": "catalog:"}
 }
