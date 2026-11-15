@@ -1,15 +1,15 @@
 export type {
-  RuntimeV2DiagnosticCode,
-  RuntimeV2DiagnosticDetails,
-  RuntimeV2DiagnosticSeverity,
-  RuntimeV2HostCapability,
-  RuntimeV2HostCapabilityCeiling,
-  RuntimeV2HostDescriptor,
-  RuntimeV2HostDiagnostic,
-  RuntimeV2HostKind,
-  RuntimeV2HostRequestContext,
-  RuntimeV2JsonPrimitive,
-  RuntimeV2JsonValue,
+  RuntimeDiagnosticCode,
+  RuntimeDiagnosticDetails,
+  RuntimeDiagnosticSeverity,
+  RuntimeHostCapability,
+  RuntimeHostCapabilityCeiling,
+  RuntimeHostDescriptor,
+  RuntimeHostDiagnostic,
+  RuntimeHostKind,
+  RuntimeHostRequestContext,
+  RuntimeJsonPrimitive,
+  RuntimeJsonValue,
 } from "@actspace/shared/runtime-v2";
 export * from "./startup/boot.js";
 export * from "./startup/errors.js";
@@ -26,6 +26,7 @@ export * from "./config-path.js";
 export { SessionReadModel } from "./projection/durable-session.js";
 export { apply as applyCordisRuntimeEntry } from "./startup/cordis-entry.js";
 export type { RuntimeCordisHost } from "./startup/cordis-entry.js";
+export type { ProfileServices } from "./startup/profile-services.js";
 export * from "./profiles/index.js";
 export { PLUGIN_CATALOG, PLUGIN_PACKAGES_OUTSIDE_DEFAULT, pluginCatalogEntry } from "./plugin-catalog.js";
 export type { PluginCatalogEntry, PluginLoader } from "./plugin-catalog.js";

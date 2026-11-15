@@ -162,7 +162,7 @@ export class SessionJournal {
   /** Compatibility for external consumers; new callers use explicit readEvents/ranges. */
   get events(): readonly SessionEventEnvelopeV1[] { return this.readEvents(); }
 
-  /** 事件进日志前都经过 snapshotSessionJson 校验、深度冻结，所以这里交出的视图登记为已信任（agent-spec-context-trusted-surface.md §3.1）。 */
+  /** 事件进日志前都经过 snapshotSessionJson 校验、深度冻结，所以这里交出的视图登记为已信任（agent-context-engine.md「已信任的对话视图」）。 */
   get surface(): TrustedSurfaceView {
     return trustSurfaceView(this.#surface.view);
   }

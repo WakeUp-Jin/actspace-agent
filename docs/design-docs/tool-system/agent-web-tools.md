@@ -16,10 +16,13 @@
 
 ## web_fetch
 
-调用链为 URL 校验 → DNS 公网检查 → 手动重定向与逐跳复验 → 有界读取 → charset 解码 → HTML 清洗与 Turndown 转换。
+调用链为 URL 校验 → DNS 公网检查 → 只连检查过的地址 → 手动重定向与逐跳复验 → 有界读取 → charset 解码 → HTML 清洗与 Turndown 转换。
 
 - 仅接受 HTTP/HTTPS，URL 最长 2,000 字符，禁止内嵌用户名和密码。
 - 拒绝 localhost、`.local`、loopback、link-local 和私网地址；重定向最多 5 次，每个目标都重新检查。
+- 域名只解析一次：检查通过的那组地址直接交给连接用（`public-request.ts` 的 `requestPinned`），不再把 URL 交给 `fetch` 让它自己解析第二次。否则 DNS 可以第一次答公网地址、第二次答内网地址（DNS rebinding），检查就白做了。HTTPS 证书仍按域名校验。
+- 地址判断用 `net.BlockList`，IPv4 网段写在 IPv6 里的几种形式（IPv4-mapped、NAT64、6to4）按里面的 IPv4 判断；URL 里的 IPv6 字面量先去掉方括号。`198.18.0.0/15` 不拦：本机代理的 fake-IP 模式用这个网段回答所有域名，拦了这些用户就全部读不了网页。
+- 例外：进程被要求走环境变量代理时（`NODE_USE_ENV_PROXY=1`，评估沙箱会这样设）仍用 `fetch`。这时域名由代理解析，能连哪些主机由代理决定，本地的地址检查只是多一道提醒。
 - 当前按输入协议请求，不自动升级 HTTPS，也不针对 Cloudflare challenge 更换 UA 重试。固定 UA 为 `actspace-agent`。
 - 每次 fetch 的 timeout 为 30 秒，并响应调用 abort；响应体最多 5 MiB。
 - 接受 text、JSON、XML、JavaScript 及未声明 MIME 的内容；明确二进制类型拒绝。
@@ -76,7 +79,8 @@ Desktop 从 `ModelRuntimeService.getToolEnvironment().searchCredentials` 创建 
 ## 实现与验证入口
 
 - `packages/web/tool-web/src/plugin.ts`：工具定义、permission 和生命周期。
-- `packages/web/tool-web/src/node-ports.ts`：供应商、多通道融合、抓取、SSRF 防线与缓存。
+- `packages/web/tool-web/src/node-ports.ts`：供应商、多通道融合、抓取、重定向复验与缓存。
+- `packages/web/tool-web/src/public-request.ts`：公网地址判断，和只连检查过的地址的请求。
 - `apps/desktop/src/main/runtime-v2/tool-host-services.ts`：Desktop 凭据注入。
 - `packages/core/agent/src/agent-mode-policy.ts`：模式暴露。
 - `packages/web/tool-web/src/test/`：fake fetch、生命周期、重定向、多通道与失败边界。

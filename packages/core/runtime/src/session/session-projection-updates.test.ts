@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createCoreCodecRegistry } from "@actspace/session-journal";
 import { SessionStore } from "@actspace/session-persistence";
 import { MemorySessionStorage } from "@actspace/session-storage/testing";
-import type { RuntimeV2SessionUpdate } from "@actspace/shared/runtime-v2";
+import type { RuntimeSessionUpdate } from "@actspace/shared/runtime-v2";
 import { RuntimeSessionController } from "./session-controller.js";
 
 const registry = createCoreCodecRegistry();
@@ -17,7 +17,7 @@ describe("projection updates sent to observers (journal-update values)", () => {
     try {
       const created = await store.create({ sessionId: "s", createdAt: "2026-11-05T00:00:00.000Z", lineage: null, createdWith });
       await created.flush(); await created.close();
-      const updates: RuntimeV2SessionUpdate[] = [];
+      const updates: RuntimeSessionUpdate[] = [];
       const unsubscribe = controller.subscribeProjection(update => { updates.push(update); });
       const session = await controller.resume("s");
       await session.append({ type: "user/message", eventVersion: 1, source: core, data: { messageId: "u1", content: "hi" }, surface: { kind: "append" } });

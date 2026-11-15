@@ -1,6 +1,6 @@
 # Context 面板与模型能力事实规范
 
-P00/P01 已实现；Electron、真实 Provider 和截图人工验收见执行摘要。
+P00/P01 已实现。
 
 ## 1. 目标
 
@@ -17,7 +17,7 @@ ActSpace 继续使用自己的 v2 Runtime、Session Journal、SettingsService �
 
 ## 3. 实施前问题（2026-09-01）
 
-以下容量与两桶数据源问题是 P00/P01 的修复背景，已完成代码修复；不能再当作当前缺陷。全量回归与人工验收状态见 [执行计划](../../exec-plans/completed/20260901-actspace-context-model-facts/README.md)。
+以下容量与两桶数据源问题是 P00/P01 的修复背景，已完成代码修复；不能再当作当前缺陷。
 
 ### 3.1 Context 容量来源错误
 

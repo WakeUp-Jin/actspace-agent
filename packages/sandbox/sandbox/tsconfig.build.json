@@ -8,6 +8,9 @@
   "references": [
     {
       "path": "./../../composition/cordis-adapter/tsconfig.build.json"
+    },
+    {
+      "path": "./../../util/shared/tsconfig.build.json"
     }
   ]
 }

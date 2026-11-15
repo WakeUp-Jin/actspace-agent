@@ -1,7 +1,7 @@
 import type { SubagentActivationStatus, SubagentKind, SubagentPreset } from "./runtime-v2/subagents";
 
 /**
- * Display words for subagents (design 05 §1–§2), shared by the desktop renderer, the trajectory,
+ * Display words for subagents (front-子Agent与后台任务规范.md §2), shared by the desktop renderer, the trajectory,
  * the Harness stats and the Web client so every surface names a subagent the same way.
  */
 

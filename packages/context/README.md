@@ -7,7 +7,7 @@ kind: "package-group"
 
 `context/` 只管“东西怎么进入模型的上下文”。引擎持有长期的 `Context` 实例，每个来源只更新自己声明的那一片，请求时由引擎转成不可变的 `LlmInput`。后台任务、Skill 这些东西本身住在自己的能力目录里，这里只放把它们告诉模型的那一层。
 
-引擎的 `Context` 按 `Session + logicalAgentScopeId` 管理；面向模型的 `LlmInput` 和面向 Host / IPC 的 Projection 都是从它捕获出的只读值。历史事件继续使用 `actspace.context` owner 和既有 Codec，旧会话仍可读。
+行为规则（来源与顺序、补充、每个 Step 的更新、披露、压缩）只写在[上下文管理引擎设计](../../docs/design-docs/上下文管理引擎设计/README.md)；压缩提示词只在 `context-compaction/src/prompts.ts`。这里只写包怎么分、怎么连。
 
 ## 包
 
@@ -17,14 +17,14 @@ kind: "package-group"
 | `prompt` | 接口 | 会话 | 开 | 提示词模板与渲染、Prompt contributor、来源支持（`./source-support`）、Host 来源加载；提供 `prompt.runtime` |
 | `context-assembly` | 接口 | 会话 | 开 | 上下文装配登记表：来源按种类和 Agent 角色登记、工具结果观察者登记，按角色搭出 `ContextSourceRegistry`；提供 `context.assembly` |
 | `context-system` | 实现 | 会话 | 开 | 来源：ActSpace 的基本系统说明；提供 `context.source.system` |
-| `context-rules` | 实现 | 会话 | 开 | 来源：用户和工作区的 AGENTS.md 等规则；提供 `context.source.rules` |
-| `context-skills` | 实现 | 会话 | 开 | 来源：可用 Skill 的目录；提供 `context.source.skills` |
-| `context-runtime` | 实现 | 会话 | 开 | 来源：时间、系统、工作区等运行环境；提供 `context.source.runtime` |
+| `context-rules` | 实现 | 会话 | 开 | 来源：用户和工作区的 `AGENTS.md` 规则；提供 `context.source.rules` |
+| `context-skills` | 实现 | 会话 | 开 | 来源：可用 Skill 的目录和选中的 Skill 正文；提供 `context.source.skills` |
+| `context-runtime` | 实现 | 会话 | 开 | 来源：模型事实（工作区、Host 能力等）和一条运行状态补充（模式、日期、时区）；提供 `context.source.runtime` |
 | `context-conversation` | 实现 | 会话 | 开 | 来源：之前的对话；提供 `context.source.conversation` |
-| `context-tools` | 实现 | 会话 | 开 | 来源：每个工具怎么用；提供 `context.source.tools` |
+| `context-tools` | 实现 | 会话 | 开 | 来源：工具清单；提供 `context.source.tools` |
 | `context-background-tasks` | 实现 | 会话 | 开 | 来源：正在运行的后台任务（后台 Bash 和后台子智能体，子智能体带 transcript 路径；只给主 Agent）；提供 `context.source.background-tasks` |
-| `context-disclosure` | 实现 | 会话 | 开 | 渐进式披露：按需把工作区路径和文件摘要告诉 Agent，并恢复披露状态；提供 `context.disclosure` |
-| `context-compaction` | 实现 | 会话 | 开 | 压缩策略、摘要器和策略注册；通过 append-only 的 Surface 替换记录摘要，不删原始日志；提供 `compaction.runtime`、`compaction.surface` |
+| `context-disclosure` | 实现 | 会话 | 开 | 渐进式披露：登记读过和产生的文件路径，活跃的列给模型，其余收进睡眠索引，压缩时重排；提供 `context.disclosure` |
+| `context-compaction` | 实现 | 会话 | 开 | 压缩策略：阈值、选段、摘要器和摘要提示词；向引擎的协调器登记；提供 `compaction.runtime`、`compaction.surface` |
 
 ## 包之间怎么连
 
@@ -36,9 +36,9 @@ kind: "package-group"
 
 ## 入口与测试
 
-- 引擎：`context-engine/src/engine.ts`、`registry.ts`、`instances.ts`、`reducers.ts`、`compaction.ts`、`codec.ts`、`projection.ts`；装配：`context-assembly/src/plugin.ts`；提示词：`prompt/src/assembler.ts`、`contributor.ts`、`context-source-support.ts`。
+- 引擎：`context-engine/src/engine.ts`、`registry.ts`、`instances.ts`、`conversion.ts`、`supplements.ts`、`compaction.ts`、`codec.ts`、`projection.ts`；装配：`context-assembly/src/plugin.ts`；提示词：`prompt/src/core-contributors.ts`、`context-source-support.ts`、`host-context.ts`、`extensions.ts`；披露：`context-disclosure/src/plugin.ts`、`policy.ts`；压缩：`context-compaction/src/plugin.ts`、`policy.ts`、`region.ts`、`summarizer.ts`、`prompts.ts`。
 - 测试在各包 `src/test/`：`pnpm --filter @actspace/context-engine test`，其他包同理。
-- 引擎、提示词、压缩各有包 README：[context-engine](context-engine/README.md)、[prompt](prompt/README.md)、[context-compaction](context-compaction/README.md)；设计见[上下文管理引擎设计](../../docs/design-docs/上下文管理引擎设计/上下文管理引擎V2/README.md)。
+- 引擎、提示词、压缩各有包 README（文件 → 内容）：[context-engine](context-engine/README.md)、[prompt](prompt/README.md)、[context-compaction](context-compaction/README.md)。
 
 ## 怎么扩展
 

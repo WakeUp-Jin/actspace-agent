@@ -156,7 +156,7 @@ export const UI_ONLY_RULES = [
 
 // UI_ONLY_RULES 的例外，精确到「文件 + 规则」；每条都要能说清原因。
 export const UI_ONLY_ALLOWLIST = new Map([
-  // 批注胶囊保留 Radix HoverCard（悬停预览），卡片里有可操作的按钮，所以标成 dialog。见 docs/exec-runs/20261005-desktop-fe-00-overall/pauses.md P2。
+  // 批注胶囊保留 Radix HoverCard（悬停预览），卡片里有可操作的按钮，所以标成 dialog。
   ["components/composer/ResponseAnnotationPill.tsx", ["role-dialog-outside-ui"]],
 ]);
 
@@ -182,7 +182,7 @@ export const WEB_PROFILE = {
   literalAllowlist: new Map(),
   uiOnlyAllowlist: new Map(),
   cssBlockRules: [],
-  // web 的样式文件不在本轮字号收敛范围（docs/exec-plans/active/20261111-typography-scale.md）
+  // 字号收敛只做了 desktop，web 的样式文件不检查
   checkCssFontSizes: false,
 };
 export const SCAN_PROFILES = [DESKTOP_PROFILE, WEB_PROFILE];

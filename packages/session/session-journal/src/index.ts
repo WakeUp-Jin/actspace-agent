@@ -1,5 +1,5 @@
 export { manifest } from "./manifest.js";
-export { apply, SESSION_CODEC_HOST_PORT_ID } from "./plugin.js";
+export { apply, SESSION_CODEC_HOST_PORT, SESSION_CODEC_HOST_PORT_ID, SESSION_JOURNAL_SERVICE, type SessionJournalService } from "./plugin.js";
 export { codecs } from "./codec.js";
 export * from "./checkpoint.js";
 export * from "./compaction.js";

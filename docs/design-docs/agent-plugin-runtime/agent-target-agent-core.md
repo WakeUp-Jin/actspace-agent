@@ -136,12 +136,12 @@ Context 仍可以是一个领域概念，但不能再拥有独立、可变且未
 
 Tool Runtime 固定遵循：捕获 registration、参数验证、pre-policy、Host approval、不可绕过 guard、durability checkpoint、body、post/finalizer、按模型顺序提交 Journal。普通 waterfall hook 不能绕过 Session admission、approval outcome、checkpoint 或 invariant validator。
 
-Prompt / Context Contributor 固定按 composition layer、numeric order、stable contributor id 排序；重复 id 失败。Request Assembly 必须保留用户与 workspace instructions、Agent descriptor、Skills、workspace facts、Host sandbox / approval / browser capabilities，并删除 v1 autonomous handoff 与旧 conversation 所有权。
+Context 来源固定按顺序号、再按 id 执行；重复 id 失败。系统提示词各段按层（core、profile、host、agent、plugin）和段内序号排序。请求必须带上用户与工作区规则、Agent descriptor、Skill、工作区事实和 Host 能力清单；不带 v1 的 autonomous handoff，也不另持一份 conversation。
 
 详细契约见：
 
 - [Tool Runtime 公共契约](./agent-spec-tool-runtime-abi.md)；
-- [Prompt 与 Context Contributor 公共契约](./agent-spec-prompt-context-contributors.md)。
+- [上下文引擎规范](../上下文管理引擎设计/agent-context-engine.md)「来源」。
 
 ## 模块导航
 

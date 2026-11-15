@@ -1,6 +1,6 @@
-import { completeAuxiliaryText, type AuxiliaryRequestOwner, type AuxiliaryRequestRecorder, type LlmMessage, type LlmService, type LlmUsage } from "@actspace/llm-service";
+import { completeAuxiliaryText, type AuxiliaryRequestOwner, type AuxiliaryRequestRecorder, type LlmMessage, type LlmServiceContract, type LlmUsage } from "@actspace/llm-service";
 
-export async function completeText(llm: LlmService, input: { readonly messages: readonly LlmMessage[]; readonly model?: string; readonly purpose?: "chat" | "utility"; readonly sessionId?: string; readonly signal?: AbortSignal; readonly auxiliary?: { readonly recorder: AuxiliaryRequestRecorder; readonly owner: AuxiliaryRequestOwner } }) {
+export async function completeText(llm: LlmServiceContract, input: { readonly messages: readonly LlmMessage[]; readonly model?: string; readonly purpose?: "chat" | "utility"; readonly sessionId?: string; readonly signal?: AbortSignal; readonly auxiliary?: { readonly recorder: AuxiliaryRequestRecorder; readonly owner: AuxiliaryRequestOwner } }) {
   const model = input.model ?? "default";
   const routes = llm.routes.list();
   const chatRoute = routes.find(route => route.routeId === "default")

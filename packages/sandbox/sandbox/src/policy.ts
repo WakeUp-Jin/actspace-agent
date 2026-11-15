@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { realpath } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import * as nodePath from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { isLexicallyInside } from "@actspace/shared";
 import type { SandboxCapability, SandboxLimits, SandboxNetwork, SandboxPolicy, SandboxPurpose, SandboxRead, SandboxRequest } from "./types.js";
 
 /** A purpose template. Every field narrows the defaults; a request can only narrow it further. */
@@ -152,7 +154,7 @@ export async function canonicalPath(path: string): Promise<string> {
   }
 }
 async function canonicalAll(paths: readonly string[]): Promise<readonly string[]> { return Object.freeze(unique(await Promise.all(paths.map(canonicalPath))).sort()); }
-export function contains(root: string, candidate: string): boolean { const nested = relative(root, candidate); return nested === "" || (!nested.startsWith("..") && !isAbsolute(nested)); }
+function contains(root: string, candidate: string): boolean { return isLexicallyInside(nodePath, root, candidate, { includeRoot: true }); }
 function unique<T>(values: readonly T[]): T[] { return [...new Set(values)]; }
 function positive(value: unknown): boolean { return Number.isSafeInteger(value) && (value as number) > 0; }
 export function stable(value: unknown): string {

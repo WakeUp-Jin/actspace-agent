@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildMatrix, renderJson, renderMarkdown, validateRows } from "../contract-matrix/generate.mjs";
+import { buildMatrix, interventionContractPaths, renderJson, renderMarkdown, validateRows } from "../contract-matrix/generate.mjs";
 
 test("contract matrix is deterministic and preserves declared event surfaces", async () => {
   const first = await buildMatrix();
@@ -16,6 +16,7 @@ test("contract matrix is deterministic and preserves declared event surfaces", a
   assert.doesNotMatch(renderJson(first), /\/Users\//u);
   assert.doesNotMatch(renderMarkdown(first), /\/Users\//u);
   assert.match(renderMarkdown(first), /Generated artifact; edit source declarations instead/u);
+  assert.equal(renderMarkdown(first).includes(first.sourceDigest), false);
 });
 
 test("contract matrix validator fails closed for duplicate ids and notification veto metadata", async () => {
@@ -31,6 +32,20 @@ test("contract matrix validator fails closed for duplicate ids and notification 
   notification.mode = "waterfall";
   const vetoDiagnostics = validateRows(veto);
   assert.equal(vetoDiagnostics.some((item) => item.code === "NOTIFICATION_VETO"), true);
+});
+
+test("every intervention cites the file that declares its payload contract", async () => {
+  const matrix = await buildMatrix();
+  const loop = "packages/core/agent-loop/src/hooks.ts";
+  const tools = "packages/core/tool-runtime/src/hooks.ts";
+  assert.deepEqual(Object.fromEntries(matrix.events.filter((item) => item.category === "agent-loop").map((item) => [item.eventType, item.sourceRefs.at(-1)])), {
+    "agent/pre-step": loop, "agent/request": loop, "agent/request-error": loop, "agent/turn-stopping": loop, "llm/stream": loop,
+    "tools/execute": tools, "tools/post-execute": tools, "tools/pre-execute": tools,
+  });
+  const declared = [{ path: "a.ts", mode: "waterfall", eventType: "agent/request" }];
+  assert.deepEqual([...interventionContractPaths(["agent/request"], declared)], [["agent/request", "a.ts"]]);
+  assert.throws(() => interventionContractPaths(["agent/request", "llm/stream"], declared), /Intervention llm\/stream has no @mode contract/);
+  assert.throws(() => interventionContractPaths(["agent/request"], [{ ...declared[0], mode: "serial" }]), /Intervention agent\/request is declared as serial in a\.ts, but the matrix metadata says waterfall/);
 });
 
 test("matrix covers workspace packages and plugin manifests without stale sources", async () => {
@@ -62,7 +77,7 @@ test("matrix covers workspace packages and plugin manifests without stale source
   assert.ok(validateRows(invalid).some(row => row.code === "INVALID_DIGEST"));
 });
 
-test("clean checkout checks Markdown without artifacts and rejects source drift", async () => {
+test("clean checkout checks Markdown without artifacts, ignores comment-only edits and rejects declaration drift", async () => {
   const { mkdtemp, mkdir, copyFile, readFile, writeFile, rm, access, realpath } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join, dirname } = await import("node:path");
@@ -85,7 +100,11 @@ test("clean checkout checks Markdown without artifacts and rejects source drift"
     { const result = run("--check"); assert.equal(result.status, 0, result.stdout + result.stderr); }
     await assert.rejects(access(join(root, "artifacts")));
     const manifest = join(root, registry.MANIFEST_PATHS[0]);
-    await writeFile(manifest, (await readFile(manifest, "utf8")) + "\n// source drift fixture\n");
+    await writeFile(manifest, (await readFile(manifest, "utf8")) + "\n// comment-only edit fixture\n");
+    { const result = run("--check"); assert.equal(result.status, 0, result.stdout + result.stderr); }
+    const packageJson = join(root, registry.PACKAGE_PATHS[0]);
+    const declared = JSON.parse(await readFile(packageJson, "utf8"));
+    await writeFile(packageJson, JSON.stringify({ ...declared, exports: { ...declared.exports, "./drift-fixture": "./dist/drift-fixture.js" } }));
     const stale = run("--check");
     assert.equal(stale.status, 1);
     assert.match(stale.stderr, /stale or missing/);

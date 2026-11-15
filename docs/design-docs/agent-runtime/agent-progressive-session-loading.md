@@ -11,9 +11,11 @@
 ## 派生索引与边界
 
 Runtime 的 projection-cache 先问 storage `refresh(id, base)`，按后端 identity、codec 和 projection 版本判断复用：
-- `unchanged`：直接返回上一次的读取结果，不读文件、不重放。
+- `unchanged`：直接返回上一次的读取结果，不重读整份文件、不重放。JSONL 后端在文件身份、大小、时间戳都没变时，还会重读末尾 4KiB 和上次读到的内容比对：时间戳按时钟刻度前进（Linux 上几毫秒），上次读取所在刻度内的等长改写不会改变时间戳，只看时间戳会把它当成没变。
 - `appended`：JSONL 后端从上次读到的字节位置续读（文件身份 dev/ino/birthtime、末尾 4KiB 重叠校验和滚动 sha256 都对上才续读），只校验、重放和索引新增事件；结果与冷读逐项相等。
 - `replaced`：文件被改写、截断或修复，按新快照完整重建。
+
+末尾 4KiB 之前的内容按「只追加」信任：那里的原地改写，只有在文件大小不变而时间戳变了的时候才会被发现。Journal 只由持有写入租约的 writer 追加，修复走换文件（文件身份会变），所以这条路径不为它付整份重读的代价。
 
 缓存最多保留最近使用的 3 个会话，并以 96MB Journal 字节为上限淘汰较旧的；最新的一个即使超限也保留。已经交出去的读取结果不会被后续追加改变。存储后端已验证过当前 codec 集的快照，`SessionStore.inspect` 不再重复整份校验。Turn/Request/call 索引在内存中派生，不读取磁盘 checkpoint。
 
@@ -24,7 +26,3 @@ Journal 仍是恢复、模型上下文和完整导出的唯一事实源。浏览
 冷读（缓存未命中或被淘汰）仍需完整读取与重放；列表逐会话读取摘要，当前不再使用后台 indexing 状态。37MB 的真实 Journal 冷读约 0.3s，命中约 0.3ms，追加后续读 3–11ms（本机基准，不是性能承诺）。
 
 上下文估算先从完整请求计算，浏览页仅保存紧凑的请求预览和估算结果；不以截短后的预览重新估算 Token。完整 Context 详情仍走现有详情入口。
-
-## 验证
-
-旧浏览行为的验收见[原执行摘要](../../exec-runs/20260921-session-projection-cutover/execution-summary.md)，其中磁盘缓存证据不代表当前实现。存储替换后的缓存隔离、revision 失效及当前实机范围见[本轮执行摘要](../../exec-runs/20261004-agent-storage-and-cleanup/execution-summary.md)。

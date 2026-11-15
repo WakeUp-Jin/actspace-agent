@@ -109,6 +109,22 @@ describe("ReviewGitEngine", () => {
     await expect(engine.listBranches(workspace(root))).resolves.toContainEqual({ branch: "feature", upstream: "origin/main", current: true, ahead: 1, behind: 0 });
   });
 
+  it("reviews an untracked file whose name merely starts with two dots", async () => {
+    const root = await makeRepo();
+    if (!gitAvailable) return;
+    await writeFile(join(root, "base.txt"), "base\n", "utf8");
+    await commitAll(root, "base");
+    await writeFile(join(root, "..notes.md"), "one\ntwo\n", "utf8");
+
+    const engine = new ReviewGitEngine();
+    const snapshot = await engine.getSnapshot({ ...workspace(root), selection: { kind: "uncommitted" }, generation: 1 });
+    expect(snapshot.warnings ?? []).toEqual([]);
+    expect(snapshot.files).toMatchObject([{ path: "..notes.md", status: "added", additions: 2, deletions: 0 }]);
+    const diff = await engine.getFileDiff({ ...workspace(root), snapshot, fileId: snapshot.files[0].id, generation: 1 });
+    expect(diff.ok).toBe(true);
+    if (diff.ok) expect(diff.diff.hunks[0]?.lines.filter((line) => line.kind === "addition").map((line) => line.text)).toEqual(["one", "two"]);
+  });
+
   it("keeps quoted and spaced paths and scopes a repository subdirectory", async () => {
     const root = await makeRepo();
     if (!gitAvailable) return;

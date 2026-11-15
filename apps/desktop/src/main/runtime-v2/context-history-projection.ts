@@ -30,10 +30,10 @@ export function contextConnection(db: DatabaseSync, stage: boolean): ProjectionD
   return connection;
 }
 /**
- * Bash 命令统计（存储设计见归档 `docs/exec-plans/completed/design-archive/frontend/front-Context面板Bash命令统计.md` §4，界面口径见 `front-Context面板规范.md` §5）。`program_failed` 让每个失败调用对每个程序只记一次失败：
+ * Bash 命令统计（界面与计数口径见 `docs/design-docs/frontend/front-Context面板规范.md` §5）。`program_failed` 让每个失败调用对每个程序只记一次失败：
  * 记在该程序在这次调用里第一次出现的那一行上。`context_bash_call.occurrences_json` 为 NULL 表示已计入，行保留用来去重；
  * 未计入时它是 `{ occurrences: [程序, 子命令][], command }`（旧格式是只有 occurrences 的数组）。
- * 「值得注意」（归档 §5.1）：`context_bash_command` 按命令原文计数找重复最多的，`context_bash_notable` 记最慢的一条与后台调用数。
+ * 「值得注意」（规范 §5.1）：`context_bash_command` 按命令原文计数找重复最多的，`context_bash_notable` 记最慢的一条与后台调用数。
  */
 const BASH_TABLES_SQL = `
     CREATE TABLE IF NOT EXISTS context_bash_stats(session_id TEXT PRIMARY KEY,calls INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0,duration_ms INTEGER NOT NULL DEFAULT 0) STRICT;

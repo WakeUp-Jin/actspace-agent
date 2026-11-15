@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection, setWorkspaceHidden } from "../workspace-registry-service";
 
-const { bootDesktopRuntimeV2 } = vi.hoisted(() => ({ bootDesktopRuntimeV2: vi.fn() }));
-vi.mock("../runtime-v2/desktop-host-adapter", () => ({ bootDesktopRuntimeV2 }));
-import { DesktopRuntimeV2Registry, type DesktopRuntimeV2RegistryOptions } from "../runtime-v2/runtime-registry";
+const { bootDesktopRuntime } = vi.hoisted(() => ({ bootDesktopRuntime: vi.fn() }));
+vi.mock("../runtime-v2/desktop-host-adapter", () => ({ bootDesktopRuntime }));
+import { DesktopRuntimeRegistry, type DesktopRuntimeRegistryOptions } from "../runtime-v2/runtime-registry";
 
 describe("runtime workspace admission", () => {
   it("binds and restores generated worktrees without adding their directories to Recents", async () => {
@@ -26,10 +26,10 @@ describe("runtime workspace admission", () => {
         sessions = [session]; return session;
       }),
     };
-    bootDesktopRuntimeV2.mockResolvedValue({ profile: { context: { get: (name: string) => name === "desktop.app" ? app : undefined }, getState: () => ({ runtimeInstanceId: "test" }), shutdown: vi.fn() } });
-    const options = { roots, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions;
-    const runtime = new DesktopRuntimeV2Registry(options);
-    const restarted = new DesktopRuntimeV2Registry(options);
+    bootDesktopRuntime.mockResolvedValue({ profile: { context: { get: (name: string) => name === "desktop.app" ? app : undefined }, getState: () => ({ runtimeInstanceId: "test" }), shutdown: vi.fn() } });
+    const options = { roots, loadModule: async () => ({}) } as unknown as DesktopRuntimeRegistryOptions;
+    const runtime = new DesktopRuntimeRegistry(options);
+    const restarted = new DesktopRuntimeRegistry(options);
     try {
       await runtime.boot();
       await runtime.createSession(undefined, workspaceRoot, "agent", worktree);
@@ -46,8 +46,8 @@ describe("runtime workspace admission", () => {
     const roots = { dataRoot, workspaceRoot: dataRoot, defaultWorkspaceRoot: dataRoot };
     let release!: (value: { sources: []; failedSessionIds: [] }) => void;
     const app = { sessionQuerySources: vi.fn(() => new Promise(resolve => { release = resolve; })), listSessions: vi.fn(async () => []), subscribeSessionProjection: () => () => {} };
-    bootDesktopRuntimeV2.mockResolvedValue({ profile: { context: { get: (name: string) => name === "desktop.app" ? app : undefined }, getState: () => ({ runtimeInstanceId: "test" }), shutdown: vi.fn() } });
-    const runtime = new DesktopRuntimeV2Registry({ roots, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
+    bootDesktopRuntime.mockResolvedValue({ profile: { context: { get: (name: string) => name === "desktop.app" ? app : undefined }, getState: () => ({ runtimeInstanceId: "test" }), shutdown: vi.fn() } });
+    const runtime = new DesktopRuntimeRegistry({ roots, loadModule: async () => ({}) } as unknown as DesktopRuntimeRegistryOptions);
     try {
       await runtime.boot();
       await vi.waitFor(() => expect(app.sessionQuerySources).toHaveBeenCalledOnce());
@@ -74,10 +74,10 @@ describe("runtime workspace admission", () => {
         return { sessionId: "new-session", workspaceRoot, throughJournalSeq: 0 };
       }),
     };
-    bootDesktopRuntimeV2.mockResolvedValue({
+    bootDesktopRuntime.mockResolvedValue({
       profile: { context: { get: (name: string) => name === "desktop.app" ? app : undefined }, getState: () => ({ runtimeInstanceId: "test" }), shutdown: vi.fn() },
     });
-    const runtime = new DesktopRuntimeV2Registry({ roots, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
+    const runtime = new DesktopRuntimeRegistry({ roots, loadModule: async () => ({}) } as unknown as DesktopRuntimeRegistryOptions);
     try {
       await runtime.boot();
       if (existing) await vi.waitFor(async () => expect(await resolveRegisteredWorkspaceSelection(registryOptions, { workspaceRoot: oldRoot })).toMatchObject({ ok: true }));
@@ -94,7 +94,7 @@ describe("runtime workspace admission", () => {
       if (!restored.ok) throw new Error(restored.error);
       await setWorkspaceHidden(registryOptions, restored.workspaceId, true);
       await runtime.dispose();
-      const restarted = new DesktopRuntimeV2Registry({ roots, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
+      const restarted = new DesktopRuntimeRegistry({ roots, loadModule: async () => ({}) } as unknown as DesktopRuntimeRegistryOptions);
       await restarted.boot();
       await restarted.dispose();
       const registry = await readWorkspaceRegistry(registryOptions);

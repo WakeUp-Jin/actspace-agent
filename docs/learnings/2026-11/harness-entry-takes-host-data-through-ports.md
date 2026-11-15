@@ -2,7 +2,7 @@
 
 把一段「只有 Host 知道」的数据（插件目录、组合结果、全局配置）交给默认 Harness 里的一个条目时，第一反应往往是在那个条目文件里 `import` 对应模块。这在 `tsc`、单测里都没问题，却会在默认 Harness 打包时被 `packages/core/runtime/scripts/build-default-harness.mjs` 的外部 import 白名单拒绝，错误只在装配测试或启动时以 `Unapproved external import <包名> in <条目>.js` 出现。结论：Harness 条目需要的 Host 数据一律由 Host 算好、放进它已经注入的 Host port（如 `actspace.host.agent`），条目只读端口字段。
 
-关联：`docs/histories/2026-11/20261109-1400-harness-plugin-decoupling-p1.md`、`docs/exec-plans/completed/20261109-harness-plugin-decoupling.md`。
+关联：`docs/histories/2026-11/20261109-1400-harness-plugin-decoupling-p1.md`。
 
 ## 为什么会这样
 

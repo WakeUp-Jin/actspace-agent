@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { encodeSessionLocator, InvalidSessionLocatorError } from "@actspace/shared/session-locator";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as C } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS as C } from "@actspace/shared/runtime-v2";
 import { createSessionGateway, type SessionGatewayRemote } from "../session-gateway";
 
 // 15 T9：fixed-renderer-ipc 的本机 / 远端分流整体搬进 gateway。

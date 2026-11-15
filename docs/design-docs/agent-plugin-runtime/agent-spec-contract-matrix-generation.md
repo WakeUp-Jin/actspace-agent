@@ -6,12 +6,13 @@
 
 `scripts/contract-matrix/source-registry.mjs` 明确列出 package、manifest、Service metadata、组合与验证来源；领域事件的声明文件与 Harness event checker 共用清单。生成器不启动插件、不访问用户数据、不调用 Provider。
 
-`pnpm gen:contract-matrix` 更新 `artifacts/agent-contract-matrix.json` 与本专题的[生成文档](agent-contract-matrix.generated.md)；JSON 位于整体 Git 忽略的 artifacts；`pnpm gen:contract-matrix --check` 校验源码并比较已提交 Markdown 字节，不要求 JSON 存在。禁止手改生成文档。无 artifacts 正例、源码漂移反例及 JSON/Markdown 两次生成一致性由测试覆盖。
+`pnpm gen:contract-matrix` 更新 `artifacts/agent-contract-matrix.json` 与本专题的[生成文档](agent-contract-matrix.generated.md)；JSON 位于整体 Git 忽略的 artifacts；`pnpm gen:contract-matrix --check` 校验源码并比较已提交 Markdown 字节，不要求 JSON 存在。禁止手改生成文档。生成文档只随声明变化：改到矩阵读取的声明（事件、服务、manifest、组合、`package.json` 的 exports 与依赖）才需要重新生成并提交，只改注释或声明以外的代码不用。无 artifacts 正例、只改注释不过期的正例、声明漂移反例及 JSON/Markdown 两次生成一致性由测试覆盖。
 
 - Package/exports/dependencies 来自 package.json。
 - Plugin 身份、提供/注入声明与能力来自 manifest。`agent-service`、`agent-host`、`harness-control`、checkpoint 与英语学习均纳入；存在 manifest 不等于生产以独立插件挂载它。
 - Service 表合并既有领域 metadata 与 manifest 中尚未列出的服务；后者标为 `declared`。人工 consumer/publicSurface metadata 是阅读提示，不是调用图证明。
 - 12 种 Session 核心事件及扩展来自 codecs；Loop 与经典通知来自 event-contract；Task/Application/Harness/Session 生命周期的 `@mode` 来自领域声明。领域通知不虚构持久 codec 或 producer 证据。
+- 八个干预点的名字来自 event-contract，payload 和结果的类型契约来自分发它的包（`packages/core/agent-loop/src/hooks.ts`、`packages/core/tool-runtime/src/hooks.ts`）。每个干预点那一行同时列出这两个来源；找不到契约，或者契约的模式（waterfall / serial）和目录里登记的不一致时，生成失败。
 - Host Profile 配置与默认 Harness 定义分别保留自己的生命周期边界。默认 Harness 固定制品的构建入口直接复用 `default-harness-definition.ts`。
 
 ## 实际检查
@@ -20,8 +21,8 @@
 
 真正的 manifest admission 在 `validatePluginManifest` 内检查贡献的服务与所有 behavior 提供集合一致，支持多 behavior，而不是要求每个 behavior 提供全部服务。实际激活导出仍由 behavior loader 检查。
 
-事件字面量分发与 `@mode` 交叉验证由 `pnpm check:harness-events` 执行；依赖边界/exports 由包守卫与构建检查，Host ceiling 和组合合法性由真实 composition admission 测试承担。
+事件字面量分发与 `@mode` 交叉验证由 `pnpm check:harness-events` 执行，它还检查干预点的监听器是不是经 `onHook` 注册（直接写 `ctx.on("干预点名字", …)` 的报错）；依赖边界/exports 由包守卫与构建检查，Host ceiling 和组合合法性由真实 composition admission 测试承担。
 
-未实现：任意动态调用的完整 producer/consumer 图、sourceRef 的 TypeScript symbol 解析、所有 Profile 的全语义证明。sourceDigest 只检测源内容变化；格式检查不能证明手工修改的 digest 与内容一致，须运行生成检查。测试源存在也不等于该测试本轮运行或真实 Electron/Provider 验收通过。
+未实现：任意动态调用的完整 producer/consumer 图、sourceRef 的 TypeScript symbol 解析、所有 Profile 的全语义证明。`sourceDigest` 只写进本地 JSON，不写进提交的 Markdown：它按全部源文件的全文计算，写进去的话改一行注释也会让生成文档过期；生成文档是否过期只由 `--check` 的整份比对决定。测试源存在也不等于该测试本轮运行或真实 Electron/Provider 验收通过。
 
-旧计划要求的第二套全域语义引擎取消；可定位的具体缺口在[旧计划结算](../../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)记录，不把取消设计写成能力已实现。
+旧计划要求的第二套全域语义引擎取消，不把取消的设计写成能力已实现。

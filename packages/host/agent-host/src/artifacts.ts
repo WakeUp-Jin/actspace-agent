@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { open, realpath, stat } from "node:fs/promises";
-import { basename, isAbsolute, relative, resolve } from "node:path";
-import { HostError } from "@actspace/shared/host-protocol";
+import * as nodePath from "node:path";
+import { basename, resolve } from "node:path";
+import { isLexicallyInside } from "@actspace/shared";
+import { HOST_LIMITS, HostError, HostRequestError } from "@actspace/shared/host-protocol";
 import type { NodeArtifactStore } from "./node-ports/artifact-store.js";
 import type { HostUploads } from "./uploads.js";
 /** Session-owned immutable snapshots; paths never become download capabilities. */
@@ -19,23 +21,18 @@ export class HostArtifacts {
   }
   async #snapshotSource(workspace: string, path: string) {
     const root = await realpath(workspace), target = await realpath(resolve(root, path));
-    const nested = relative(root, target);
-    if (nested === ".." || nested.startsWith("../") || isAbsolute(nested)) throw new HostError("FORBIDDEN", "File is outside the Session workspace");
+    // 工作区根目录本身放过去，下面会因为不是普通文件被拒。
+    if (!isLexicallyInside(nodePath, root, target, { includeRoot: true })) throw new HostError("FORBIDDEN", "File is outside the Session workspace");
     const file = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     try {
       const before = await file.stat();
       const verifiedTarget = await realpath(target), current = await stat(verifiedTarget);
-      const verifiedNested = relative(root, verifiedTarget);
-      if (verifiedNested === ".." || verifiedNested.startsWith("../") || isAbsolute(verifiedNested) || current.ino !== before.ino || current.dev !== before.dev) throw new HostError("FORBIDDEN", "Result path changed during access");
+      if (!isLexicallyInside(nodePath, root, verifiedTarget, { includeRoot: true }) || current.ino !== before.ino || current.dev !== before.dev) throw new HostError("FORBIDDEN", "Result path changed during access");
       if (!before.isFile() || before.size > 20 * 1024 * 1024) throw new HostError("LIMIT_EXCEEDED", "Result must be a regular file up to 20 MiB");
       const bytes = await file.readFile(), after = await file.stat();
       if (bytes.length !== before.size || after.mtimeMs !== before.mtimeMs || after.size !== before.size) throw new HostError("CONFLICT", "Result changed during snapshot; retry", true);
       return { bytes, name: basename(target) };
     } finally { await file.close(); }
-  }
-  async #read(sessionId: string, id: string) {
-    try { return await this.uploads.readForSession(sessionId, id); }
-    catch (error) { if (!(error instanceof HostError) || error.kind !== "NOT_FOUND") throw error; return this.store.readForSession(sessionId, id); }
   }
   async describe(sessionId: string, id: string) {
     try {
@@ -44,11 +41,14 @@ export class HostArtifacts {
     } catch (error) { if (!(error instanceof HostError) || error.kind !== "NOT_FOUND") throw error; }
     return this.store.describeForSession(sessionId, id);
   }
+  /** One chunk of a download. Reads only the requested range: a 20 MiB file is 80 of these calls. */
   async read(sessionId: string, id: string, offset: number, length: number) {
-    const value = await this.#read(sessionId, id);
-    if (offset < 0 || offset > value.bytes.length || length < 1 || length > 262144) throw new TypeError("Invalid artifact range");
-    const bytes = Buffer.from(value.bytes.subarray(offset, offset + length));
-    return { data: bytes.toString("base64"), sha256: hash(bytes), size: value.bytes.length };
+    try { return await this.uploads.read(sessionId, id, offset, length); }
+    catch (error) { if (!(error instanceof HostError) || error.kind !== "NOT_FOUND") throw error; }
+    if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(length) || length < 1 || length > HOST_LIMITS.chunkBytes) throw new HostRequestError("Invalid artifact range");
+    const { bytes, size } = await this.store.readRangeForSession(sessionId, id, offset, length);
+    if (offset > size) throw new HostRequestError("Invalid artifact range");
+    return { data: bytes.toString("base64"), sha256: hash(bytes), size };
   }
 }
 const hash = (value: Uint8Array) => createHash("sha256").update(value).digest("hex");

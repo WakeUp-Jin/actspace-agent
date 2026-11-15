@@ -32,7 +32,7 @@
 
 ## 背景
 
-- 相关文档：`docs/design-docs/frontend/front-会话状态与数据流规范.md`（§1 模块、§8 Context 的"App 里不要用带工厂函数的 `useMemo`"约束）、`front-新功能开发清单.md` §4（文件拆分规则）、`completed/design-archive/desktop-frontend-refactor/02-Renderer状态层与会话数据流.md`（14 期状态层设计）。
+- 相关文档：`docs/design-docs/frontend/front-会话状态与数据流规范.md`（§1 模块、§8 Context 的"App 里不要用带工厂函数的 `useMemo`"约束）、`front-新功能开发清单.md` §4（文件拆分规则）。
 - 相关代码路径：`apps/desktop/src/renderer/App.tsx`、`app/providers.tsx`、`session/*`、`target/use-run-target.ts`（已有的职责 hook 范例）、`hooks/useShallowStable.ts`、`test/helpers/workbench.tsx`。
 - 现状数据（2026-11-10，`main@b0bc9cc4`）：
 
@@ -69,7 +69,7 @@
 4. **M4 任务队列与审批**（约 160 行）：`use-task-queue-actions`；pending-submission 恢复 effect 也进来。特征测试 `app-approval-recovery`、`app-message-queue`。
 5. **M5 发送、中止、流事件**（约 250 行，最大也最核心）：`use-session-send`。依赖 M4 的 `refreshTaskQueue` / `continueQueue`。特征测试 `app-streaming-user-message`、`app-session-errors`、`app-response-annotations`。
 6. **M6 会话动作 + 当前会话读取**（约 380 行）：`use-session-actions`、`use-active-session-page`。特征测试 `app-session-actions`、`app-workbench-context`。
-7. **M7 收尾**：纯函数移出并补单测；`App.tsx` 行数核对（≤ 300）；更新规范 §1 / §8 与 `providers.tsx` 注释；技术债表划掉；计划移到 `completed/`。
+7. **M7 收尾**：纯函数移出并补单测；`App.tsx` 行数核对（≤ 300）；更新规范 §1 / §8 与 `providers.tsx` 注释；技术债表划掉；删除本计划。
 
 ## 验证方式
 
@@ -78,7 +78,7 @@
   - `pnpm --filter @actspace/desktop test -- test/app-` 及该里程碑列出的特征测试；M7 跑全量 `pnpm --filter @actspace/desktop test`
   - `npx biome lint --diagnostic-level=error apps/desktop/src/renderer`（`useExhaustiveDependencies` 不允许新 ignore）
   - `pnpm check:renderer-bridge`、`pnpm check:hot-path-reads`（发送 / 流事件路径是高频路径）
-  - `wc -l apps/desktop/src/renderer/App.tsx` 记进执行过程
+  - `wc -l apps/desktop/src/renderer/App.tsx` 记进「进度记录」
 - 手工检查（M5、M6 之后在 Electron 里过一遍）：新建会话 → 发送 → 中止 → 重发；审批卡出现与通过；切换会话时输入框草稿保留；归档后内存不涨（DevTools Memory 快照里归档会话的 cell 释放）。
 - 观测检查：`test/session-ipc-budget.test.tsx` 的 IPC 调用预算不变。
 
@@ -104,4 +104,4 @@
 
 ## 执行文档
 
-执行开始时在 `docs/exec-runs/20261110-app-assembly-split/` 创建 `execution-process.md` 与 `execution-summary.md`（模板见 `docs/exec-runs/templates/`）。每个里程碑结束时把 `App.tsx` 行数和特征测试结果记进 `execution-process.md`。
+交互模式不另写执行文档。每个里程碑结束时把 `App.tsx` 行数和特征测试结果记进上面的「进度记录」；Electron 里没过的检查项写进该里程碑 PR 的描述和 history。

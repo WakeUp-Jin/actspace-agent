@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolExecutionContext } from "@actspace/tool-runtime";
 import type { ToolBodyResult } from "@actspace/tool-runtime";
 import type { BackgroundTaskHost, BackgroundTaskSource, BackgroundTaskTerminal } from "@actspace/background-tasks";
@@ -20,8 +20,8 @@ afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root,
 async function workspace(): Promise<string> { const root = await mkdtemp(join(tmpdir(), "actspace-v2-node-tools-")); roots.push(root); return root; }
 /** What the permission layer admitted; the executor follows its `noSandbox`. */
 function admitted(noSandbox: boolean): ToolExecutionContext["admittedResources"] { return [{ kind: "process", access: "execute", commandDigest: "digest", cwd: "", dynamic: false, noSandbox }]; }
-function context(sessionId = "session", notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>, workspaceRoot = "", noSandbox = true): ToolExecutionContext { return { admittedResources: admitted(noSandbox), pluginId: "actspace.shell-tools", name: "test", callId: "call", sessionId, workspaceRoot, agentRunId: "run", turnId: "turn", stepId: "step", signal: new AbortController().signal, capabilities: { ids: [], has: () => false, get: () => { throw new Error("missing"); } }, reportProgress: () => undefined, createArtifact: async ({ bytes, mediaType }) => ({ artifactId: "artifact", mediaType, size: bytes.byteLength, sha256: "sha" }), defer: () => undefined, ...(notifyAgent === undefined ? {} : { notifyAgent }) }; }
-async function invoke(handler: ((args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>) | undefined, args: Readonly<Record<string, RuntimeV2JsonValue>>, sessionId = "session", notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>, workspaceRoot = "", noSandbox = true) { if (!handler) throw new Error("handler unavailable"); return handler(args, context(sessionId, notifyAgent, workspaceRoot, noSandbox)); }
+function context(sessionId = "session", notifyAgent?: (content: RuntimeJsonValue) => Promise<void>, workspaceRoot = "", noSandbox = true): ToolExecutionContext { return { admittedResources: admitted(noSandbox), pluginId: "actspace.shell-tools", name: "test", callId: "call", sessionId, workspaceRoot, agentRunId: "run", turnId: "turn", stepId: "step", signal: new AbortController().signal, capabilities: { ids: [], has: () => false, get: () => { throw new Error("missing"); } }, reportProgress: () => undefined, createArtifact: async ({ bytes, mediaType }) => ({ artifactId: "artifact", mediaType, size: bytes.byteLength, sha256: "sha" }), defer: () => undefined, ...(notifyAgent === undefined ? {} : { notifyAgent }) }; }
+async function invoke(handler: ((args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>) | undefined, args: Readonly<Record<string, RuntimeJsonValue>>, sessionId = "session", notifyAgent?: (content: RuntimeJsonValue) => Promise<void>, workspaceRoot = "", noSandbox = true) { if (!handler) throw new Error("handler unavailable"); return handler(args, context(sessionId, notifyAgent, workspaceRoot, noSandbox)); }
 
 /** The real manager over a backend that records the resolved policy and runs the command unchanged. */
 function recordingSandbox(options: { readonly probe?: Awaited<ReturnType<SandboxBackend["probe"]>>; readonly prepareError?: string } = {}) {
@@ -49,13 +49,14 @@ import { createNodeBashToolPorts, readLog, sandboxDenial } from "../node-ports.j
 
 /** Records what Bash hands to the Host registry. */
 function fakeHost() {
-  const sources = new Map<string, BackgroundTaskSource>(); const terminals = new Map<string, BackgroundTaskTerminal>(); const matches: { taskId: string; summary: string; line: string }[] = []; const pruned: { sessionId: string; taskId: string }[] = [];
+  const sources = new Map<string, BackgroundTaskSource>(); const terminals = new Map<string, BackgroundTaskTerminal>(); const matches: { taskId: string; summary: string; line: string }[] = []; const stops: { taskId: string; summary: string }[] = []; const pruned: { sessionId: string; taskId: string }[] = [];
   const host = {
     register: async (source: BackgroundTaskSource) => { sources.set(source.taskId, source); void source.done.then(terminal => terminals.set(source.taskId, terminal)); return undefined as never; },
     notifyOutputMatch: async (taskId: string, summary: string, line: string) => { matches.push({ taskId, summary, line }); },
+    notifySubscriptionStopped: async (taskId: string, summary: string) => { stops.push({ taskId, summary }); },
     markPruned: async (sessionId: string, taskId: string) => { pruned.push({ sessionId, taskId }); },
   } as unknown as BackgroundTaskHost;
-  return { host, sources, terminals, matches, pruned };
+  return { host, sources, terminals, matches, stops, pruned };
 }
 let lastHost: ReturnType<typeof fakeHost>;
 /** Logs go under `dataRoot`; tests that do not look at them share the temp root. */
@@ -220,6 +221,16 @@ describe("shell-tools ports", () => {
     await ports.dispose?.();
     await vi.waitFor(() => expect(lastHost.terminals.get(taskId!)).toMatchObject({ status: "stopped" }));
   });
+  it("accepts a cwd whose name merely starts with two dots and rejects one that leaves the workspace", async () => {
+    const outer = await workspace(); const root = join(outer, "workspace"); await mkdir(join(root, "..data"), { recursive: true }); const tmpRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot });
+    try {
+      const inside = await invoke(ports.bash, { command: "pwd", cwd: "..data", intent: "verify cwd", blockMs: 5_000 });
+      expect(inside).toMatchObject({ status: "completed" }); expect(JSON.stringify(inside)).toContain(join("workspace", "..data"));
+      const outside = await invoke(ports.bash, { command: "pwd", cwd: "..", intent: "verify cwd", blockMs: 5_000 });
+      expect(outside).toMatchObject({ status: "failed", failure: { code: "WORKSPACE_BOUNDARY_DENIED" } });
+    } finally { await ports.dispose(); }
+  });
   it("keeps large foreground Bash output out of the model surface and exposes an artifact", async () => {
     const root = await workspace(); const tmpRoot = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot });
     const result = await invoke(ports.bash, { command: "node -e \"process.stdout.write('x'.repeat(9000))\"", intent: "verify bounded output", blockMs: 5_000 });
@@ -243,11 +254,39 @@ describe("shell-tools ports", () => {
 
     const background = await invoke(ports.bash, { command: "printf 'READY token-abcdefgh\\n'; sleep 30", intent: "verify notifications", blockMs: 0, notifyOnOutput: { pattern: "READY", reason: "service ready", debounceMs: 5_000 } });
     expect(JSON.stringify(background)).toContain("bash_");
-    await waitFor(() => lastHost.matches.length > 0);
+    await waitFor(() => lastHost.matches.length > 0, 5_000);
     expect(lastHost.matches[0].summary).toContain("service ready");
     expect(JSON.stringify(lastHost.matches)).toContain("[REDACTED]");
     expect(JSON.stringify(lastHost.matches)).not.toContain("token-abcdefgh");
     await ports.dispose?.();
+  });
+  it("reports a match found before the command went to the background, and only lines that match", async () => {
+    const root = await workspace(); const tmpRoot = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot });
+    try {
+      const background = await invoke(ports.bash, { command: "printf 'starting\\nlistening on 8080\\nidle\\n'; sleep 30", intent: "match while waiting", blockMs: 500, notifyOnOutput: { pattern: "^listening on \\d+$", reason: "port open" } });
+      expect(background.summary).toContain("block_timeout");
+      await waitFor(() => lastHost.matches.length > 0, 5_000);
+      expect(lastHost.matches).toEqual([{ taskId: JSON.stringify(background).match(/bash_[0-9a-f-]+/)![0], summary: "Background command output matched the subscription (port open).", line: "listening on 8080" }]);
+      expect(lastHost.stops).toEqual([]);
+    } finally { await ports.dispose(); }
+  });
+  it("drops an output subscription whose pattern takes too long, without stalling this thread, and tells the Host once", async () => {
+    const root = await workspace(); const tmpRoot = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, subscriptionMatchTimeoutMs: 300 });
+    // The longest stretch during which this thread could not run a timer.
+    let longestStall = 0; let last = performance.now();
+    const beat = setInterval(() => { const now = performance.now(); longestStall = Math.max(longestStall, now - last); last = now; }, 10);
+    try {
+      // (a+)+$ against 30 a's and a "!" backtracks for more than ten seconds. The later "aaa" line would match at once.
+      const background = await invoke(ports.bash, { command: `printf '${"a".repeat(30)}!\\n'; sleep 1; printf 'aaa\\n'; sleep 30`, intent: "slow pattern", blockMs: 0, notifyOnOutput: { pattern: "(a+)+$", reason: "never ready" } });
+      const taskId = JSON.stringify(background).match(/bash_[0-9a-f-]+/)![0];
+      await waitFor(() => lastHost.stops.length > 0, 5_000);
+      expect(longestStall).toBeLessThan(1_000);
+      await vi.waitFor(async () => expect(await readFile(lastHost.sources.get(taskId)!.bash!.outputPath, "utf8")).toContain("\naaa\n"), { timeout: 5_000 });
+      await new Promise(resolve => setTimeout(resolve, 200));
+      expect(lastHost.stops).toEqual([{ taskId, summary: expect.stringMatching(/never ready.*could not be matched in time.*still running/) }]);
+      expect(lastHost.matches).toEqual([]);
+      expect(ports.hasRunningBackgroundTask("session")).toBe(true);
+    } finally { clearInterval(beat); await ports.dispose(); }
   });
   it("deletes a foreground log once the result exists and keeps long output as an artifact", async () => {
     const root = await workspace(); const tmpRoot = await workspace(); const dataRoot = await workspace();
@@ -363,19 +402,23 @@ describe("shell-tools ports", () => {
 
   it("runs subagent commands in the foreground and kills them at the time limit", async () => {
     const root = await workspace(); const tmpRoot = await workspace();
-    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, subagentTimeoutMs: 400 });
-    const subagent = (args: Readonly<Record<string, RuntimeV2JsonValue>>) => ports.bash!(args, { ...context(), backgroundAllowed: false });
+    const subagent = (ports: ReturnType<typeof createNodeToolPorts>, args: Readonly<Record<string, RuntimeJsonValue>>) => ports.bash!(args, { ...context(), backgroundAllowed: false });
+    // One limit per half, so neither depends on how fast the machine is: the short command never reaches the first, the long one always reaches the second.
+    const patient = createNodeToolPorts({ workspaceRoot: root, tmpRoot, subagentTimeoutMs: 60_000 });
     try {
       // blockMs: 0 would background the command in a main Session; here it waits for the result.
-      const done = await subagent({ command: "sleep 0.2; printf finished", intent: "foreground", blockMs: 0 });
+      const done = await subagent(patient, { command: "sleep 0.2; printf finished", intent: "foreground", blockMs: 0 });
       expect(done.status).toBe("completed");
       expect(JSON.stringify(done.modelOutput)).toContain("finished");
       expect(lastHost.sources.size).toBe(0);
-      const slow = await subagent({ command: "sleep 30", intent: "too slow", blockMs: 0 });
+    } finally { await patient.dispose(); }
+    const strict = createNodeToolPorts({ workspaceRoot: root, tmpRoot, subagentTimeoutMs: 400 });
+    try {
+      const slow = await subagent(strict, { command: "sleep 30", intent: "too slow", blockMs: 0 });
       expect(slow).toMatchObject({ status: "failed", failure: { code: "BASH_TIMEOUT", message: "Bash timed out after 10 minutes in a subagent and was killed." } });
       expect(lastHost.sources.size).toBe(0);
-      expect(ports.hasRunningBackgroundTask("session")).toBe(false);
-    } finally { await ports.dispose(); }
+      expect(strict.hasRunningBackgroundTask("session")).toBe(false);
+    } finally { await strict.dispose(); }
   });
 
   it("sweeps scratch directories older than a day that belong to no live process", async () => {

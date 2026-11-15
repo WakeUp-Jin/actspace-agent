@@ -1,5 +1,5 @@
 import { CONTEXT_BUCKET_REGISTRY, getContextBucketDisplay, type ContextPanelBucketKey, type ContextPanelConversationKind, type ContextPanelEntry, type ContextPanelTrendPoint, type ContextPanelUsage, type ContextPanelView, type ContextState, type ContextStateEntry } from "@actspace/shared";
-import type { RuntimeV2SessionActivity, RuntimeV2UsageSummary } from "@actspace/shared/runtime-v2";
+import type { RuntimeSessionActivity, RuntimeUsageSummary } from "@actspace/shared/runtime-v2";
 
 /**
  * Context 面板的纯数据逻辑（见 `front-右侧面板与文件渲染规范.md`「Context 面板」）。
@@ -20,8 +20,8 @@ const STATE_KIND_TO_BUCKET: Record<ContextStateEntry["kind"], ContextPanelBucket
 export function buildInterimPanelView(input: {
   sessionId: string;
   contextState: ContextState | null;
-  activity: RuntimeV2SessionActivity | null;
-  usage: RuntimeV2UsageSummary | null;
+  activity: RuntimeSessionActivity | null;
+  usage: RuntimeUsageSummary | null;
 }): ContextPanelData {
   const { contextState, activity, usage } = input;
   const entries: ContextPanelEntry[] = (contextState?.entries ?? []).map((entry) => ({

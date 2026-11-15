@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { RuntimeV2LiveEvent, RuntimeV2SessionSnapshot, RuntimeV2ToolRunningPhase } from "@actspace/shared/runtime-v2";
+import type { RuntimeLiveEvent, RuntimeSessionSnapshot, RuntimeToolRunningPhase } from "@actspace/shared/runtime-v2";
 import { redactProjectionText } from "./redaction.js";
 
 export type LiveProgressInput = {
@@ -9,7 +9,7 @@ export type LiveProgressInput = {
   readonly pluginId?: string;
   readonly name?: string;
   readonly callId?: string;
-  readonly phase?: RuntimeV2ToolRunningPhase;
+  readonly phase?: RuntimeToolRunningPhase;
   readonly message?: string | null;
   readonly current?: number | null;
   readonly total?: number | null;
@@ -19,8 +19,8 @@ export type LiveProgressInput = {
 export type LiveCursor = { readonly runtimeInstanceId: string; readonly liveSeq: number };
 
 export type LiveHandshake = {
-  readonly snapshot: RuntimeV2SessionSnapshot;
-  readonly events: readonly RuntimeV2LiveEvent[];
+  readonly snapshot: RuntimeSessionSnapshot;
+  readonly events: readonly RuntimeLiveEvent[];
   readonly cursor: LiveCursor;
   readonly resyncRequired: boolean;
 };
@@ -35,7 +35,7 @@ export class LiveProgressHub {
   readonly runtimeInstanceId: string;
   readonly #maxBuffer: number;
   readonly #onDiagnostic: LiveProgressOptions["onDiagnostic"];
-  readonly #events: RuntimeV2LiveEvent[] = [];
+  readonly #events: RuntimeLiveEvent[] = [];
   readonly #terminalCalls = new Set<string>();
   readonly #runs = new Map<string, string>();
   #nextSeq = 0;
@@ -54,14 +54,14 @@ export class LiveProgressHub {
     this.#terminalCalls.add(`${sessionId}:${callId}`);
   }
 
-  publish(input: LiveProgressInput): RuntimeV2LiveEvent | null {
+  publish(input: LiveProgressInput): RuntimeLiveEvent | null {
     if (input.runtimeInstanceId !== undefined && input.runtimeInstanceId !== this.runtimeInstanceId) return this.drop("LIVE_EVENT_DROPPED", "runtime-changed");
     const activeRun = this.#runs.get(input.sessionId);
     if (activeRun !== undefined && input.agentRunId !== undefined && activeRun !== input.agentRunId) return this.drop("LIVE_EVENT_DROPPED", "agent-run-changed");
     if (input.callId !== undefined && this.#terminalCalls.has(`${input.sessionId}:${input.callId}`)) return this.drop("LIVE_EVENT_DROPPED", "late-terminal-event");
     if (input.current !== undefined && input.current !== null && (!Number.isFinite(input.current) || input.current < 0)) return this.drop("LIVE_EVENT_DROPPED", "invalid-current");
     if (input.total !== undefined && input.total !== null && (!Number.isFinite(input.total) || input.total < 0)) return this.drop("LIVE_EVENT_DROPPED", "invalid-total");
-    const event: RuntimeV2LiveEvent = Object.freeze({
+    const event: RuntimeLiveEvent = Object.freeze({
       kind: input.callId === undefined ? "runtime-live" : "tool-progress",
       schemaVersion: 1,
       runtimeInstanceId: this.runtimeInstanceId,
@@ -81,7 +81,7 @@ export class LiveProgressHub {
     return event;
   }
 
-  handshake(sessionId: string, snapshot: () => RuntimeV2SessionSnapshot, afterCursor?: LiveCursor): LiveHandshake {
+  handshake(sessionId: string, snapshot: () => RuntimeSessionSnapshot, afterCursor?: LiveCursor): LiveHandshake {
     const capturedSeq = this.#nextSeq - 1;
     const view = snapshot();
     const cursor = Object.freeze({ runtimeInstanceId: this.runtimeInstanceId, liveSeq: capturedSeq });
@@ -100,8 +100,8 @@ export class LiveProgressHub {
     return Object.freeze({ runtimeInstanceId: this.runtimeInstanceId, liveSeq: this.#nextSeq - 1 });
   }
 
-  private resync(snapshot: RuntimeV2SessionSnapshot, cursor: LiveCursor, reason: "gap" | "runtime-changed"): LiveHandshake {
-    const event: RuntimeV2LiveEvent = Object.freeze({ kind: "resync-required", schemaVersion: 1, runtimeInstanceId: this.runtimeInstanceId, liveSeq: cursor.liveSeq, throughJournalSeq: snapshot.throughJournalSeq, sessionId: snapshot.sessionId, reason });
+  private resync(snapshot: RuntimeSessionSnapshot, cursor: LiveCursor, reason: "gap" | "runtime-changed"): LiveHandshake {
+    const event: RuntimeLiveEvent = Object.freeze({ kind: "resync-required", schemaVersion: 1, runtimeInstanceId: this.runtimeInstanceId, liveSeq: cursor.liveSeq, throughJournalSeq: snapshot.throughJournalSeq, sessionId: snapshot.sessionId, reason });
     return Object.freeze({ snapshot, events: Object.freeze([event]), cursor, resyncRequired: true });
   }
 

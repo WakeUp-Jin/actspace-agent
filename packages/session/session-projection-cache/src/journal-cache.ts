@@ -1,6 +1,7 @@
 import { validateSessionEvents, type EventCodecRegistry, type SessionEventEnvelopeV1, type SessionHeaderV1 } from "@actspace/session-journal";
 import type { SessionStorage, SessionStorageSnapshot } from "@actspace/session-storage";
 import type { ProjectionCheckpoint, SessionProjectionRegistry } from "@actspace/session-projection";
+import { createHistoryIndex, forkHistoryIndex, indexHistoryEvents, type HistoryIndex } from "./history-index.js";
 
 export type ProjectionCacheRead = {
   readonly identity: symbol; readonly revision: string; readonly header: SessionHeaderV1;
@@ -94,8 +95,8 @@ export class SessionProjectionCache {
     const registry = fresh ?? this.options.createRegistry(snapshot.header);
     const accessState = this.#accessState(snapshot);
     registry.sync(sessionId, snapshot.events);
-    const index: EventIndex = { floor: 0, starts: [], requests: [], prompts: [], toolSets: [], calls: {} };
-    indexEvents(snapshot.events, index, null);
+    const index = createHistoryIndex();
+    indexHistoryEvents(snapshot.events, index);
     return this.#entry(sessionId, snapshot, registry, index, accessState);
   }
 
@@ -106,9 +107,9 @@ export class SessionProjectionCache {
     try {
       const added = snapshot.events.slice(fromEvent);
       base.registry.replayTail(sessionId, added);
-      // Reads already handed out must not change underneath their holders: extend copies of the indexes.
-      const index: EventIndex = { floor: base.floor, starts: [...base.read.starts], requests: [...base.read.requests], prompts: [...base.read.prompts], toolSets: [...base.read.toolSets], calls: { ...base.read.calls } };
-      indexEvents(added, index, new Set());
+      // Reads already handed out must not change underneath their holders: extend a fork of the indexes.
+      const { index, touched } = forkHistoryIndex(base.read, base.floor);
+      indexHistoryEvents(added, index, touched);
       return this.#entry(sessionId, snapshot, base.registry, index, snapshot.validated.accessState);
     } catch {
       // The registry commits only after every reducer succeeds, but be conservative: a full rebuild reproduces any real failure.
@@ -121,7 +122,7 @@ export class SessionProjectionCache {
     return validateSessionEvents(snapshot.events, this.options.codecs).accessState;
   }
 
-  #entry(sessionId: string, snapshot: SessionStorageSnapshot, registry: SessionProjectionRegistry, index: EventIndex, accessState: ProjectionCacheRead["accessState"]): CacheEntry {
+  #entry(sessionId: string, snapshot: SessionStorageSnapshot, registry: SessionProjectionRegistry, index: HistoryIndex, accessState: ProjectionCacheRead["accessState"]): CacheEntry {
     const identity = this.options.storage.identity, codecDigest = this.options.codecs.digest;
     const read: ProjectionCacheRead = { identity, revision: snapshot.revision, header: snapshot.header!, events: snapshot.events, starts: index.starts, requests: index.requests, prompts: index.prompts, toolSets: index.toolSets, calls: index.calls, checkpoint: registry.checkpoint(sessionId), accessState };
     const stateVersions = JSON.stringify(registry.stateVersions);
@@ -142,24 +143,5 @@ export class SessionProjectionCache {
       this.#drop(this.#cached.keys().next().value!);
     }
     return entry;
-  }
-}
-
-type EventIndex = { floor: number; starts: number[]; requests: number[]; prompts: number[]; toolSets: number[]; calls: Record<string, number[]> };
-
-/** Fold `events` into the indexes. `touched` (incremental use) makes call-id arrays copy-on-write. */
-function indexEvents(events: readonly SessionEventEnvelopeV1[], index: EventIndex, touched: Set<string> | null): void {
-  for (const event of events) {
-    if (event.type === "turn/start") index.starts.push(index.floor);
-    if (event.type === "turn/end") index.floor = event.seq + 1;
-    if (event.type === "request/header" || event.type === "llm/auxiliary-start") index.requests.push(event.seq);
-    if (event.type === "request/system-prompt") index.prompts.push(event.seq);
-    if (event.type === "request/tools") index.toolSets.push(event.seq);
-    const data = event.data;
-    const callId = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>).callId : null;
-    if (typeof callId === "string") {
-      if (touched !== null && !touched.has(callId)) { touched.add(callId); index.calls[callId] = [...(index.calls[callId] ?? [])]; }
-      (index.calls[callId] ??= []).push(event.seq);
-    }
   }
 }

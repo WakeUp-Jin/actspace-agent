@@ -1,9 +1,9 @@
-import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode } from '@actspace/shared/runtime-v2';
+import type { RuntimeJsonValue, RuntimeTrajectoryNode } from '@actspace/shared/runtime-v2';
 import type { TrajectoryPromptDetail, TrajectoryRecord } from './contract';
 
 const object = (value: unknown): Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const text = (value: unknown) => typeof value === 'string' ? value : JSON.stringify(value) ?? '';
-export type ContextSection = { id: string; owner: string; order: number; content: RuntimeV2JsonValue; provenance?: RuntimeV2JsonValue };
+export type ContextSection = { id: string; owner: string; order: number; content: RuntimeJsonValue; provenance?: RuntimeJsonValue };
 export function readContextSections(value: unknown): ContextSection[] | null {
   if (!Array.isArray(value)) return null;
   if (!value.every(item => typeof object(item).id === 'string' && typeof object(item).owner === 'string' && typeof object(item).order === 'number' && object(item).content !== undefined)) return null;
@@ -30,7 +30,7 @@ const titleOf = (section: ContextSection) => ({ 'host/user-instructions': '用�
  * 固定系统段落由系统行展示，这里只列规则、技能、路径导航等可变段落与模型事实。
  * seq 小于 `fromSeq` 的记录是历史窗口补进来的基线：只用来比较，不出行。
  */
-export function contextSectionRecords(nodes: readonly RuntimeV2TrajectoryNode[], fromSeq: number, base: (node: RuntimeV2TrajectoryNode, overrides: Partial<TrajectoryRecord>) => TrajectoryRecord): TrajectoryRecord[] {
+export function contextSectionRecords(nodes: readonly RuntimeTrajectoryNode[], fromSeq: number, base: (node: RuntimeTrajectoryNode, overrides: Partial<TrajectoryRecord>) => TrajectoryRecord): TrajectoryRecord[] {
   const output: TrajectoryRecord[] = [];
   let previous = new Map<string, ContextSection>();
   for (const node of [...nodes].sort((a, b) => a.eventSeq - b.eventSeq)) {

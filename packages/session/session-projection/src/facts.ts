@@ -1,16 +1,16 @@
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { isCommandPrefixSelector, isInboxSource, type GrantSelector, type GrantAccess, type GrantAction, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2SessionTiming, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
+import { isCommandPrefixSelector, isInboxSource, type GrantSelector, type GrantAccess, type GrantAction, type PermissionMode, type RuntimeJsonValue, type RuntimeSessionSnapshot, type RuntimeSessionTiming, type RuntimeUsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
 import type { SessionProjectionRegistry } from "./registry.js";
 
-export type SessionFacts = Pick<RuntimeV2SessionSnapshot, "metadata" | "todos" | "delegations" | "usage" | "activity" | "pendingInbox" | "permissionMode" | "sessionGrants">;
-type Data = Readonly<Record<string, RuntimeV2JsonValue>>;
+export type SessionFacts = Pick<RuntimeSessionSnapshot, "metadata" | "todos" | "delegations" | "usage" | "activity" | "pendingInbox" | "permissionMode" | "sessionGrants">;
+type Data = Readonly<Record<string, RuntimeJsonValue>>;
 type GrantState = { readonly grantId: string; readonly grant: SessionGrant | null; readonly revokedAt: string | null };
-type UsageState = { activeStep: string | null; requests: Record<string, string>; selected: Record<string, { assistant: boolean; step: string | null; usage: RuntimeV2UsageSummary }>; knownCosts: number; total: RuntimeV2UsageSummary };
-const emptyUsage = (): RuntimeV2UsageSummary => ({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null });
+type UsageState = { activeStep: string | null; requests: Record<string, string>; selected: Record<string, { assistant: boolean; step: string | null; usage: RuntimeUsageSummary }>; knownCosts: number; total: RuntimeUsageSummary };
+const emptyUsage = (): RuntimeUsageSummary => ({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null });
 /** 进行中的一步：请求开始时间与首个非空 chunk 时间（毫秒）；step/end 时移除，状态不随会话增长。 */
 type OpenStep = { readonly startedAt: number | null; readonly firstTokenAt: number | null };
 type ActivityState = SessionFacts["activity"] & { readonly openSteps: Readonly<Record<string, OpenStep>> };
-const emptyTiming = (): RuntimeV2SessionTiming => ({ llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 });
+const emptyTiming = (): RuntimeSessionTiming => ({ llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 });
 
 /** Domain reducers share one drive and one checkpoint protocol, never a second log. */
 export function registerSessionFacts(registry: SessionProjectionRegistry, redact: (text: string, limit?: number) => string): void {
@@ -195,10 +195,10 @@ function eventTime(event: SessionEventEnvelopeV1): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function record(value: RuntimeV2JsonValue | undefined): Data { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Data : {}; }
-function text(value: RuntimeV2JsonValue | undefined): string | null { return typeof value === "string" && value.length ? value : null; }
-function isText(value: RuntimeV2JsonValue | undefined): value is string { return typeof value === "string" && value.length > 0; }
-function number(value: RuntimeV2JsonValue | undefined): number { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0; }
+function record(value: RuntimeJsonValue | undefined): Data { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Data : {}; }
+function text(value: RuntimeJsonValue | undefined): string | null { return typeof value === "string" && value.length ? value : null; }
+function isText(value: RuntimeJsonValue | undefined): value is string { return typeof value === "string" && value.length > 0; }
+function number(value: RuntimeJsonValue | undefined): number { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0; }
 
 export function applySessionGrantEvent(state: readonly GrantState[], event: SessionEventEnvelopeV1): readonly GrantState[] {
   const data = record(event.data);

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ClientSessionStore } from "../sessions/session.js";
-import type { RuntimeV2LiveEvent, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeLiveEvent, RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
 
-function snapshot(sessionId: string, throughJournalSeq: number): RuntimeV2SessionSnapshot {
+function snapshot(sessionId: string, throughJournalSeq: number): RuntimeSessionSnapshot {
   return {
     kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-08-30T00:00:00.000Z", updatedAt: "2026-08-30T00:00:00.000Z", workspaceRoot: null, throughJournalSeq, permissionMode: "default", accessState: "read-write",
     metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null }, activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } }, lineage: null,
@@ -15,7 +15,7 @@ function envelope(sessionId: string, seq: number, title: string | null) {
   return { kind: "session-projection" as const, schemaVersion: 1 as const, sessionId, throughJournalSeq: seq, snapshot: { ...value, metadata }, values: { metadata }, activeMessageIds: [], deferredToolCalls: [], window: { events: [], fromSeq: seq + 1, throughJournalSeq: seq, beforeSeq: null, turnOffset: 0, requestOffset: 0 } };
 }
 
-function live(sessionId: string, liveSeq: number, kind: RuntimeV2LiveEvent["kind"] = "runtime-live"): RuntimeV2LiveEvent {
+function live(sessionId: string, liveSeq: number, kind: RuntimeLiveEvent["kind"] = "runtime-live"): RuntimeLiveEvent {
   return { kind, schemaVersion: 1, runtimeInstanceId: "runtime-1", liveSeq, throughJournalSeq: 0, sessionId, message: "progress" };
 }
 

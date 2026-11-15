@@ -15,8 +15,8 @@
 
 | 工作流 | 触发 | 内容 |
 |---|---|---|
-| `base-checks.yml` | `pull_request`（**不带路径过滤**）、`push: main`、手动 | `repository-checks`（`scripts/ci.sh` + markdownlint）。唯一每个 PR 都会产生的 check，也是唯一能安全设为 required status check 的 job。 |
-| `ci.yml` | `pull_request`、`push: main`（两者都跳过只改文档的提交，见下文「路径过滤」）、手动 | 十个并行 job：`lint-typecheck`（build graph、contract matrix、Biome lint、`pnpm typecheck`）、`test-process`（根目录脚本测试 + 进程级测试）、`test-packages` ×2（desktop 以外全部包的测试，按目录分两片）、`test-desktop` ×3（desktop vitest 按 `--shard` 分三片）、`build`（PR 上 `pnpm build`；`main` 上换成 Linux `release-package.sh` 冒烟加 `pnpm build:cli-web`，不上传产物）、`site`（`pnpm build:site`）、`browser-bridge`（契约检查 + Go 测试 + Windows / macOS 交叉编译，保证发布矩阵能 `go build`）。 |
+| `base-checks.yml` | `pull_request`（**不带路径过滤**）、`push: main`、手动 | `repository-checks`（`scripts/ci.sh` + markdownlint）。每个 PR 都会产生这个 check，是 `main` ruleset 的 required status check。 |
+| `ci.yml` | `pull_request`（**不带路径过滤**，只改文档的 PR 在 job 级跳过）、`push: main`（只改文档的 push 不触发，见下文「路径过滤」）、手动 | `changes`（「变更范围」，判断 PR 是否只改了文档）→ 十个并行的工程 job → `ci-gate`（「CI 汇总」，每个 PR 都报告，可设为 required status check）。十个工程 job：`lint-typecheck`（build graph、contract matrix、Biome lint、`pnpm typecheck`）、`test-process`（根目录脚本测试 + 进程级测试）、`test-packages` ×2（desktop 以外全部包的测试，按目录分两片）、`test-desktop` ×3（desktop vitest 按 `--shard` 分三片）、`build`（PR 上 `pnpm build`；`main` 上换成 Linux `release-package.sh` 冒烟加 `pnpm build:cli-web`，不上传产物）、`site`（`pnpm build:site`）、`browser-bridge`（契约检查 + Go 测试 + Windows / macOS 交叉编译，保证发布矩阵能 `go build`）。 |
 | `agent-cli-binaries.yml` | `pull_request` 改到 CLI / packages / 打包脚本或它跑的测试时、手动 | 在 CLI 支持的最低 Node 大版本上跑两个并行 job：`managed-esm`（构建并校验 managed package，artifact 保留 3 天）、`process-tests`（CLI 进程级测试，跑的是 workspace 里的 `apps/cli/dist/cli.js`，不读打出来的包）。 |
 | `supply-chain-security.yml` | `pull_request` 改到依赖清单 / lockfile / patches 时（`docs/**` 下的原型 `package.json` 不算）、每周一定时、手动 | 依赖变更审查（仅 PR）、OSV 扫描。 |
 | `codeql.yml` | `push: main`、`pull_request`（均忽略纯文档路径和 issue 模板）、每周一定时、手动 | CodeQL `javascript-typescript` 与 `actions` 两种语言，`security-and-quality` 查询集；忽略测试、fixture、dist、生成文件和 `scripts/acceptance/**`（`.github/codeql/codeql-config.yml`）。不要在仓库设置里同时开启 CodeQL default setup。本地复现：用 [CodeQL CLI](https://github.com/github/codeql-action/releases) `database create --language=javascript-typescript --codescanning-config=.github/codeql/codeql-config.yml` 建库后 `database analyze --format=sarif-latest`，结果与 GitHub 一致。 |
@@ -27,17 +27,31 @@
 
 所有 PR 触发的工作流都带 `concurrency` 组并 `cancel-in-progress`，同一个 PR 连续推送只保留最后一次；`main` 上的 push 不取消。`ci.yml`、`codeql.yml`、`base-checks.yml` 在 `main` 上按提交（`github.sha`）分组，不能按分支分组：同一组只允许一个在跑、一个排队，前一次没跑完又连推两次时，中间那次会在排队阶段被后一次顶掉，那个提交就没有完整的运行。需要 pnpm 的 job 统一用 `pnpm/action-setup`（读根 `package.json` 的 `packageManager`）加 `actions/setup-node` 的 `cache: pnpm`，store 命中时 `pnpm install` 约 20 秒；`release.yml` 的 macOS / Windows job 例外，见下文「桌面发布」。
 
-GitHub 托管 runner 另有账户级的并发上限：Free 计划同时最多跑 20 个 job（其中 macOS 最多 5 个），仓库所有者名下的所有仓库、所有工作流共享，超出的 job 排队等前面的跑完（见 [Actions limits](https://docs.github.com/en/actions/reference/limits)）。一次 PR 推送产生的 job：`ci.yml` 10 个、CodeQL 2 个、`仓库基础检查` 1 个，共 13 个；改到 CLI / packages 时加 Agent CLI 的 2 个，改到依赖清单或 lockfile 时加供应链安全的 2 个，改到打包脚本时加发布的 4 个。全部触发是 21 个，比上限多 1 个：会有一个 job 等十几秒，等最短的那个跑完。两个 PR 在一两分钟内先后推送时，后一个要排队（实测 7 个 job 各等了 17–50 秒）。给工作流加 job、加分片之前先数一数。同时在跑的 job 满 20 个之后，排多久取决于各 job 的时长之和，不取决于 job 的个数：把一个 job 拆成几个，各自还要做一遍环境准备，时长之和不会降，多个 PR 同时推送时也就不会更快。
+GitHub 托管 runner 另有账户级的并发上限：Free 计划同时最多跑 20 个 job（其中 macOS 最多 5 个），仓库所有者名下的所有仓库、所有工作流共享，超出的 job 排队等前面的跑完（见 [Actions limits](https://docs.github.com/en/actions/reference/limits)）。一次 PR 推送产生的 job：`ci.yml` 12 个（十个工程 job 加 `变更范围`、`CI 汇总` 两个几秒钟的小 job）、CodeQL 2 个、`仓库基础检查` 1 个，共 15 个；改到 CLI / packages 时加 Agent CLI 的 2 个，改到依赖清单或 lockfile 时加供应链安全的 2 个，改到打包脚本时加发布的 4 个。全部触发是 23 个，但 `CI 汇总` 要等工程 job 都结束才开始，同时在跑的最多 22 个，比上限多 2 个：会有一两个 job 等十几秒，等最短的那个跑完。两个 PR 在一两分钟内先后推送时，后一个要排队（实测 7 个 job 各等了 17–50 秒）。给工作流加 job、加分片之前先数一数。同时在跑的 job 满 20 个之后，排多久取决于各 job 的时长之和，不取决于 job 的个数：把一个 job 拆成几个，各自还要做一遍环境准备，时长之和不会降，多个 PR 同时推送时也就不会更快。
 
 `ci.yml` 里需要 workspace 产物的四类 job（`lint-typecheck`、`test-process`、`test-packages` 两片、`test-desktop` 三片，共七个）共用 `.github/actions/setup-workspace`：装 pnpm / Node、`pnpm install`，再用 `actions/cache` 恢复 `packages/*/*/dist`（含 `tsc -b` 的 `.tsbuildinfo`；不能写 `packages/**/dist`，`**` 会跟进 `node_modules` 里的符号链接匹配上万个第三方 `dist`）。随后各 job 跑 `pnpm build:deps`——即 desktop 的 `build:deps:dev`：`tsc -b tsconfig.desktop-deps.json` 按项目引用图编全部 packages，再补 client / agent-host 的 esbuild 包、english-learning 的 prompts 和 runtime 的默认 harness。缓存 key 带 commit SHA、`restore-keys` 退到同一 lockfile 下最近一次的产物，所以 `tsc -b` 只重编源码变了的包（冷 10 s 级、热 1 s 级）；PR 分支能读到 `main` 和自己之前推送的缓存。手动 `workflow_dispatch` 不恢复缓存，用来强制全量构建。这些 job 互不 `needs`，总时长取最长的那个。
 
 markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-cli2.jsonc`：第三方 skill 原文（`.agents/skills/**`）、已完成的 history 和测试 fixture 不扫；纯排版类规则（空行、列表周围空行、表格对齐、代码块语言等）关闭，只保留会影响渲染或链接正确性的规则（表格列数、标题层级、重复的兄弟标题、图片 alt、文件末尾换行等）。本地复现用 `npx -y markdownlint-cli2@0.20.0 "**/*.md"`。
 
-`main` 的 ruleset 只把 `仓库基础检查`（`base-checks.yml` 的 `repository-checks`）设为 required status check，也只能选它：它不带路径过滤，每个 PR 都会报告。`ci.yml` 的全部 job、CodeQL、Agent CLI、供应链安全、发布这些带 `paths` / `paths-ignore` 的工作流不能设为必需——纯文档 PR 不触发它们，GitHub 会一直显示 Expected 并永远卡住合并。分片 job 的 check 名还带片号（`包测试 (1/2)`、`桌面端测试 (2/3)`），改片数就改了名字，同样不适合登记成必需检查。历史上 `repository-checks` 曾放在 `ci.yml`、并有一份路径互补的 `docs.yml`，两者都带路径过滤、任一设为必需都会卡死另一类 PR，所以拆成了独立的 `base-checks.yml`。
+### 哪些 check 可以设为必需
+
+`main` 的 ruleset 里能设为 required status check 的只有两个，它们所在的工作流都不带路径过滤，每个 PR 都会报告：
+
+- `仓库基础检查`（`base-checks.yml` 的 `repository-checks`）：已经是必需检查。
+- `CI 汇总`（`ci.yml` 的 `ci-gate`）：lint、类型检查、测试、构建的总结果。它 `needs` 全部工程 job 并带 `if: always()`，任何一个 job 失败或被取消它就失败；被 `changes` 判定跳过的 job 结果是 skipped，算通过。要让「CI 红着不能合并」生效，需要仓库管理员在 **Settings › Rules › Rulesets › main › Require status checks to pass** 里把 `CI 汇总` 加进去；工作流合入后先确认这个 check 在 PR 上出现过，再设为必需，否则所有 PR 都会停在 Expected。
+
+`lint-typecheck`、`test-*`、`build`、`site`、`browser-bridge` 这些 job 自己不要设为必需：纯文档 PR 会跳过它们。分片 job 的 check 名还带片号（`包测试 (1/2)`、`桌面端测试 (2/3)`），改片数就改了名字，也不适合登记成必需检查。GitHub 把 job 级 `if` 跳过的必需 check 当作通过，但把「工作流因为 `paths` / `paths-ignore` 根本没触发」的必需 check 一直显示为 Expected 并卡住合并，所以 CodeQL、`agent-cli-binaries.yml`、`supply-chain-security.yml` 这类仍带工作流级路径过滤的 job 也不能设为必需。
+
+历史上 `repository-checks` 曾放在 `ci.yml`、并有一份路径互补的 `docs.yml`，两者都带工作流级路径过滤、任一设为必需都会卡死另一类 PR，所以拆成了独立的 `base-checks.yml`；`ci.yml` 当时保留 `paths-ignore`，工程 job 因此一直不是必需检查，2026-11-10 把 PR 上的过滤改成了 `changes` job 里的判断。
 
 ### 路径过滤
 
-`ci.yml` 的 `pull_request` 和 `push: main` 共用一份 `paths`（YAML 锚点 `code-paths`），只改文档的 PR 和 `main` 上只改文档的 push 都不触发。规则按顺序求值、后面的覆盖前面的，分三段：
+只改文档的 PR 和 `main` 上只改文档的 push 都不跑工程 job，两边用的是同一套规则，写在 `ci.yml` 的两个地方：
+
+- **PR**：工作流照常触发，`changes` job 检出 merge commit（`fetch-depth: 2`），用 `git diff --name-only --no-renames -z HEAD^1 HEAD` 列出改动文件，逐个过一遍 `case`。没有一个文件会被 CI 读取时输出 `code=false`，十个工程 job 的 `if: needs.changes.outputs.code == 'true'` 随之跳过，只剩 `变更范围` 和 `CI 汇总` 两个几秒钟的 job。工程 job 因此比原来晚十几秒开始（等 `changes` 跑完）。
+- **`push: main`**：工作流级的 `paths`，只改文档的 push 整个不触发。触发了的 push 和手动运行在 `changes` 里不再判断，全部照跑。
+
+两处的规则要一起改。`paths` 按顺序求值、后面的覆盖前面的，分三段（`case` 取第一个匹配的分支，所以顺序反过来写）：
 
 1. `'**'` 先全选。
 2. 排除没有任何 job 会读的文档：`docs/**`、各目录的 `README.md`、仓库根的 `*.md`、`.agents/**/*.md`、`apps/site/*.md`、`browser-bridge/docs/**`、`browser-bridge/skill/SKILL.md`、issue 与 PR 模板。
@@ -45,11 +59,11 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
 
 别处的 Markdown 不排除：官网内容（`apps/site/src/content/**`）、内置 skill、prompt 和测试夹具是构建和测试的输入，改了要跑 CI。维护时注意三点：
 
-- 让某个 job 读 `docs/` 下的新文件时，要把它加到第 3 段，否则只改它的提交不会跑 CI。
+- 让某个 job 读 `docs/` 下的新文件时，要把它加到 `push.paths` 的第 3 段和 `changes` 里 `case` 的开头，否则只改它的提交不会跑 CI。
 - `main` 上只改文档的提交没有 `ci.yml` 的运行（`仓库基础检查` 照常跑）。要看这个提交的代码是否通过，看它前面最近一个有运行的提交：两者之间只差文档。
-- GitHub 只取 diff 的前 300 个文件做路径匹配。一次改动超过 300 个文件、排在前面的 300 个又全是被排除的文档时，工作流不会触发，要到 Actions 页手动运行 `CI`。
+- GitHub 的 `paths` 只取 diff 的前 300 个文件做匹配。一次 push 到 `main` 超过 300 个文件、排在前面的 300 个又全是被排除的文档时，工作流不会触发，要到 Actions 页手动运行 `CI`。PR 上的判断是 `changes` 里的 `git diff`，没有这个上限。
 
-`pull_request` 的路径过滤看的是整个 PR 相对目标分支的 diff，不是最后一次推送：PR 里只要有一个提交改了代码，之后每次推送都会触发，哪怕那次只改文档。
+PR 上看的是整个 PR 相对目标分支的 diff，不是最后一次推送：PR 里只要有一个提交改了代码，之后每次推送都会跑工程 job，哪怕那次只改文档。
 
 ### Dependabot
 
@@ -90,15 +104,15 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
 ## 当前现状说明
 
 - `scripts/ci.sh` 当前只做仓库级基础检查：
-  - docs 骨架、active/completed 生命周期与 current truth zone 校验；current truth zone 会拒绝已删除 v1 路径、已丢弃 active 入口和相对 Markdown 断链
+  - docs 骨架、active 计划登记（完成的计划要删除，不留 `completed/` 归档）与 current truth zone 校验；current truth zone 会拒绝已删除 v1 路径、已丢弃 active 入口和相对 Markdown 断链
   - repo hygiene
   - GitHub Actions pinning
   - shell 脚本语法检查
 - `.github/workflows/base-checks.yml` 的 `repository-checks` 不需要 pnpm，只装 ripgrep 后跑 `scripts/ci.sh` 与 markdownlint。
 - 需要 `rg` 的 job（`repository-checks`、`test-process`、`test-packages`、`test-desktop`）统一用仓库内 composite action `.github/actions/install-ripgrep`：从 ripgrep GitHub Release 下载固定版本的 Linux musl 静态包、校验 sha256 后装到 `/usr/local/bin`。不走 apt，因为 runner 上 `archive.ubuntu.com` 会偶发 DNS 解析失败；升级版本时同时改 action 里的 `RG_VERSION` 与 `RG_SHA256`。
 - `.github/workflows/ci.yml` 中的工程 job 都从 `pnpm install --frozen-lockfile` 开始，然后各自执行：
-  - `lint-typecheck`：`pnpm check:desktop-build-graph`（必须排在 `build:deps` 之前，因为后者会重新生成 `tsconfig.build.json`）、`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。`pnpm typecheck` = `build:deps`（`tsc -b` 本身就是对全部 packages 的类型检查）+ 只对 apps 跑 `tsc --noEmit`（`packages/` 下每个包都在 `tsconfig.desktop-deps.json` 的引用图里；新增图外的包时要把它加进这条 filter）。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
-  - `test-process`：装 ripgrep、`pnpm build:deps`、`pnpm --filter @actspace/agent-cli build`、`pnpm test:scripts`。`test:scripts` 先跑五条 `check:*`，再由 `scripts/run-script-tests.mjs` 用一次 `node --test` 并行跑 `scripts/test/*.test.mjs`（含直接 spawn `apps/cli/dist/cli.js` 的进程级测试）；新增的测试文件自动包含在内，不用登记到 `package.json`。`agent-cli-process` 和 `agent-cli-safety` 两个文件不在这里跑，由 `agent-cli-binaries.yml` 负责。各个 `test:*` 脚本仍可单独运行。
+  - `lint-typecheck`：`pnpm check:desktop-build-graph`（必须排在 `build:deps` 之前，因为后者会重新生成 `tsconfig.build.json`）、`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`。改到契约矩阵读取的声明（Runtime 事件、服务、plugin manifest、composition、`package.json` 的 exports 与依赖）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale；只改注释或声明以外的代码不用重新生成。`pnpm typecheck` = `build:deps`（`tsc -b` 本身就是对全部 packages 的类型检查）+ 只对 apps 跑 `tsc --noEmit`（`packages/` 下每个包都在 `tsconfig.desktop-deps.json` 的引用图里；新增图外的包时要把它加进这条 filter）。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
+  - `test-process`：装 ripgrep、`pnpm build:deps`、`pnpm --filter @actspace/agent-cli build`、`pnpm test:scripts`。`test:scripts` 先跑九条 `check:*`，再由 `scripts/run-script-tests.mjs` 用一次 `node --test` 并行跑 `scripts/test/*.test.mjs`（含直接 spawn `apps/cli/dist/cli.js` 的进程级测试）；新增的测试文件自动包含在内，不用登记到 `package.json`。`agent-cli-process` 和 `agent-cli-safety` 两个文件不在这里跑，由 `agent-cli-binaries.yml` 负责。各个 `test:*` 脚本仍可单独运行。
   - `test-packages`：两个分片，各自装 ripgrep（`tool-fs-search` 的测试调真实 `rg`）、`pnpm build:deps`，再跑 `pnpm -r --no-sort --if-present <filters> test`。第 1 片是 `packages/core/**`、`packages/context/**` 和 `apps/*`（不含 desktop），第 2 片是其余全部；两片的 `--filter` 由 `ci.yml` 里同一份目录清单生成，一正一反，所以新增的包目录不用登记，自动落在第 2 片。测试只读 `build:deps` 的产物，包之间没有先后依赖，`--no-sort` 让 pnpm 不必按依赖拓扑一批一批地等。第 2 片另外带 `--workspace-concurrency=2`，同时跑的包从 pnpm 默认的 4 个降到 2 个：这一片是四十多个小包，已知的时间敏感用例都在里面；每个包的 vitest 自己还要开最多 3 个 worker，4 个包一起跑时十几个进程抢 4 个核。降到 2 个之后各包的耗时减半，整片的时间基本不变：CI 上同样的 42 个包，默认并发 48 s 跑完，并发 2 的两轮是 42 s 和 52 s，差别在 runner 之间的波动以内（本地多 4 s）；整片跑完约 60 s。第 1 片不限：它的时间集中在 `apps/cli`、`apps/web`、`packages/core/runtime` 三个各要 20 s 上下的包上，只开 2 个时它们排成两条队，测试步骤从 50 s 涨到 74 s。这个差别在本地 4 核机器上测不出来（33 s 对 35 s），调并发要看 CI 上的步骤时间。只带排除式 `--filter` 时 pnpm 会把 workspace 根也选进来，根的 `test` 会递归回 `pnpm -r test`，所以要一并排除。
   - `test-desktop`：三个分片，`pnpm build:deps` 后 `vitest run --shard=N/3`，片数只由 `ci.yml` 的 matrix 决定。desktop 的 vitest 配置分成 `main`（node 环境）和 `renderer`（jsdom）两个 project，`vitest run src/main` 这类路径过滤照常可用。两个 project 各用各的 setup 文件：`src/main/test/setup.ts` 只隔离 git 配置，`src/renderer/test/setup.ts` 加载 jest-dom、React 和 mock bridge；`setupFiles` 不要提回配置的根上，否则 main 的 90 多个测试文件每个都会加载一遍 renderer 的 setup，比跑用例本身还慢。vitest 按文件路径的哈希分片，不看耗时，各片文件数相同但时长不等。改片数会换掉每一片里第一个打开设置页、轨迹视图这类 `React.lazy` 页面的用例：整棵懒加载树的冷转译只由这一片里第一个加载它的用例承担，而且落在它那一次 `findBy*` 等待里，默认的 1 s 在慢 runner 上不够。从两片加到三片时有三条用例因此变成「第一个」，它们的等待已放宽到 10 s（`workbench-responsive`、`host-feedback`、`conversation-view-tooltip` 三个测试文件）；再改片数前先按 `docs/learnings/2026-11/vitest-shard-count-moves-lazy-cold-load.md` 的办法找出新的「第一个」。
   - `build`：PR 上跑 `pnpm build`，验证 desktop、CLI、Web 都能从干净检出构建出来（runner 上没有现成的 `dist/`，要按拓扑顺序构建 workspace 依赖）。`main` 上和手动触发时换成三步：装 Go、`./scripts/release-package.sh` 打包冒烟（产物不上传）、`pnpm build:cli-web`。打包脚本的第一步就是 desktop 构建，这样构建的内容和 PR 上一样，desktop 不用构建两遍。
@@ -186,9 +200,9 @@ SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 
 ## 下一步推荐
 
-1. 继续保留 `repository-checks`（`base-checks.yml`）与各工程 job（`ci.yml`）的分层，避免仓库卫生与工程构建互相遮蔽失败原因；`base-checks.yml` 不要加路径过滤，否则 required check 会失效。
+1. 继续保留 `repository-checks`（`base-checks.yml`）与各工程 job（`ci.yml`）的分层，避免仓库卫生与工程构建互相遮蔽失败原因；`base-checks.yml` 不要加路径过滤，`ci.yml` 的 `pull_request` 也不要加（`push: main` 上的 `paths` 不影响 PR），否则 required check 会卡死纯文档 PR。`ci.yml` 新增 job 时要同时加 `needs: changes`、`if: needs.changes.outputs.code == 'true'`，并把它列进 `ci-gate` 的 `needs`。
 2. 新增 action 时必须继续 pin 到 commit SHA；`scripts/check-action-pinning.sh` 会拦截浮动 tag。
-3. 如果后续接 installer（dmg 之外的 pkg、Windows 安装器、Linux AppImage / deb）、Developer ID 签名、notarization、Windows Authenticode、远程自动更新，再在现有 release 流水线上扩展；Electron 大版本升级见 `docs/exec-plans/completed/20261108-ci-pipelines.md` P5。
+3. 如果后续接 installer（dmg 之外的 pkg、Windows 安装器、Linux AppImage / deb）、Developer ID 签名、notarization、Windows Authenticode、远程自动更新，再在现有 release 流水线上扩展。Electron 大版本升级单独开一个 PR，跑完整 desktop 测试并在 Electron 里实机走查（上一次是 #58 的 39 → 45）。
 
 ## 供应链安全
 

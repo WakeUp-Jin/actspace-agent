@@ -7,7 +7,7 @@
 本轮采用两个互补的模式：
 
 1. **Provider seam**：Core 只接收稳定的 `driver`/`binding`，Provider 负责物理资源、lease、目录和 recovery。
-2. **Contract matrix**：从显式 allowlist 读取事件、服务、manifest、package 和 verification 声明，生成可复现的 JSON/Markdown 快照，并在 CI 中用 digest 与结构校验阻止漂移。
+2. **Contract matrix**：从显式 allowlist 读取事件、服务、manifest、package 和 verification 声明，生成可复现的 JSON/Markdown 快照，并在 CI 中用整份内容比对与结构校验阻止漂移。
 
 ## 为什么两个模式要一起使用
 
@@ -28,6 +28,7 @@
 - 只比较 Composer 输出、不比较实际 transport 文件；静态 `cordis.yml` 被手动修改后会出现“内存配置正确、真实加载错误”。
 - 生成器递归扫描整个仓库；这会把本地路径、临时 session 或密钥意外带入制品，也会让 digest 因无关文件频繁变化。
 - 将“声明存在”写成“能力已实现”；必须同时保存 implementation/producer status 与 declaration status。
+- 把按源文件全文计算的 digest 写进提交的生成文档。矩阵头部曾经带着这样一行：155 个源文件里改一行注释它就变，CI 的生成检查随即报过期；两个 PR 各自重新生成后，又必然在这一行冲突。2026-11-07 到 11-12 `main` 上有 14 次合入重新生成过矩阵，其中 7 次只变了这一行。提交的生成物只放由声明推导出来的内容，是否过期交给“重新生成后整份比对”判断；想标明生成自哪一版源文件，写进不入库的制品。
 
 ## 自检问题
 

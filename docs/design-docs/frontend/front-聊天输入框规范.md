@@ -135,7 +135,7 @@ Composer 是整页的操作中心，一套可复用的输入系统，有两种 s
 | 模式 | 用户意图 | 工具 profile | 运行时硬边界 |
 | --- | --- | --- | --- |
 | `Chat` | 对话、联网、图片生成 | `web`、`generate_image` | 不暴露工作区文件、Bash、Browser、Subagent；隐藏工作区、Skills、权限入口 |
-| `Plan` | 调查、分析、出计划 | 显式 allowlist | 可读文件（`read_file`、`grep`、`glob`、`list_directory`）、联网（`web_search`、`web_fetch`）、`inspect_image`、`explore`、`todo_read`、`todo_write`；禁止 Bash、文件写删、Browser、图片生成、通用 agent |
+| `Plan` | 调查、分析、出计划 | 显式 allowlist | 可读文件（`read_file`、`grep`、`glob`、`list_directory`）、联网（`web_search`、`web_fetch`）、`inspect_image`、子智能体与后台任务工具、`todo_read`、`todo_write`；禁止 Bash、文件写删、Browser、图片生成。完整清单见[形态与模式](../agent-runtime/agent-forms-and-modes.md) §5 |
 | `Agent` | 规划并执行 | `full` | 完整主 Agent 工具集，仍受设置页工具开关、provider 能力、工作区边界和审批约束 |
 
 - Plan 用 allowlist 而不是排除已知写工具的 denylist，避免新工具自动泄露；实际暴露集 = allowlist ∩ 当前注册工具。Plan 的行为指导以独立 system prompt segment 注入：先理解目标与实现、有关键未知先提问、计划含目标 / 边界 / 关键决策 / 顺序 / 验证 / 风险、不得声称已编辑或已测试。

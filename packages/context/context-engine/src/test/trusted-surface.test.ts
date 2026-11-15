@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCoreCodecRegistry, SessionJournal, surfaceViewVersion, type SessionEventCandidateV1, type SessionSurfaceView } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { ContextEngine } from "../engine.js";
 import { ContextInstanceRegistry } from "../instances.js";
 import { projectContext } from "../projection.js";
@@ -9,12 +9,12 @@ import { ContextSourceRegistry } from "../registry.js";
 import type { ContextSession } from "../supplements.js";
 import type { Context, ContextRequest } from "../types.js";
 
-// agent-spec-context-trusted-surface.md §6：已信任对话不复制、兼容路径照旧检查、版本号驱动 contextRevision。
+// agent-context-engine.md「已信任的对话视图」：已信任对话不复制、兼容路径照旧检查、版本号驱动 contextRevision。
 
 const source = { ownerPluginId: "@actspace/core" } as const;
 const request: ContextRequest = { sessionId: "s", logicalAgentScopeId: "main", turnId: "t", stepId: "step-1", requestId: "r1", routeId: "route", model: "model", options: { reasoning: true } };
 
-function candidate(type: string, data: RuntimeV2JsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
+function candidate(type: string, data: RuntimeJsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
   return { type, eventVersion: 1, source, data, surface: null, ...extra };
 }
 
