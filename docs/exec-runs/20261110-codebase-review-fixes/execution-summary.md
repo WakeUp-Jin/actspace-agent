@@ -32,6 +32,9 @@
 | `web_fetch` 只连检查过的地址（PR 3，M3） | `packages/web/tool-web/src/public-request.ts`、`node-ports.ts` | 域名只解析一次；IPv6 字面量地址能正确判断。 |
 | hooks 规则（PR 3，L2） | `biome.jsonc`、`packages/util/shared/src/desktop-bridge/contract.ts`、`apps/desktop/src/main/browser-bridge-service.ts` 等 | 打开 `useHookAtTopLevel`；两个以 `use` 开头的普通方法改名。 |
 | 子进程环境、ripgrep 解码、输出订阅（PR 3，L9） | `packages/util/shared/src/child-process-env.ts`、`packages/fs/tool-fs-search/src/node-ports.ts`、`packages/shell/tool-shell/src/node-ports.ts`、`packages/background-tasks/background-tasks/src/registry.ts` | 多剥几类凭据；多字节字符不再被切成乱码；订阅的正则在单独的线程里匹配，匹配不完就停掉订阅并通知模型。 |
+| 测试夹具走生产的上下文路径（PR 4，L5） | `packages/core/agent-loop/src/loop.ts`、`testing.ts` | `AgentLoop` 的 `contextSources` 改成必填，删掉只有测试在走的另一套请求拼装。 |
+| 首次请求和重试共用一段代码（PR 4，M2） | `packages/core/agent-loop/src/loop.ts`、`packages/llm/llm-service/src/service.ts` | 准备好但没派发的调用，在任何一步失败时都归还它占着的路由；重试也经过 `agent/request` 钩子，消息和工具按钩子的返回值来，路由和模型沿用首次请求。 |
+| abort 监听器用完就摘（PR 4，M1） | `packages/llm/llm-service/src/prepared-call.ts`、`packages/core/tool-runtime/src/prepared-execution.ts` | 每次请求、每次工具调用结束后，不再在回合共用的 signal 上留一个监听器；监听器原先会把那次请求的快照和那次调用的结果留到回合结束。 |
 
 ## 人工验证指引
 
@@ -57,6 +60,11 @@
    - 预期结果：都成功，内容正确。下载大文件时 Host 的读盘量明显变小（原来每取 256 KiB 就把整个文件读一遍、算一遍摘要）。
    - 这一项云端验证不了的部分：真实设备、真实网络下的端到端传输。单测用本地文件和计数的文件系统验证了读取量和完整性校验。
 
+5. **中途停止仍然立刻生效（PR 4）**
+   - 验证方式：在桌面端让模型做一件要好几步的事（例如读几个文件再总结），等它跑过两三步之后，分别在「模型正在输出」和「一条较慢的命令正在运行」（例如 `sleep 30`）时点停止。
+   - 预期结果：输出或命令立刻停下，输入框恢复可用，再发一条消息能正常得到回复。
+   - 为什么列在这里：PR 4 改了「回合被中止」传给每次请求、每次工具调用的那一小段。单测覆盖了进行中的请求和工具体收到中止，云端没有真实的 Provider 连接和窗口。
+
 ### 建议验证
 
 1. **纯文档 PR 仍然很快**
@@ -77,6 +85,9 @@
 6. **后台命令的输出订阅（PR 3）**
    - 验证方式：让模型在后台起一个开发服务器，并要求它在输出里出现某一行（例如 `ready`）时通知。
    - 预期结果：和原来一样收到「输出匹配」通知。只有模型写出一个匹配极慢的正则时才会看到「输出订阅已停止」，这时命令本身不受影响。
+7. **请求失败后的自动重试（PR 4）**
+   - 验证方式：断开网络，发一条消息，两三秒后恢复网络。
+   - 预期结果：和原来一样，界面出现「网关异常，正在重试」的提示。默认一共试 3 次，中间等 1 秒和 2 秒：网络在这之前恢复，这一轮继续并得到回复；没赶上，这一轮以网络错误结束，再发一条消息能正常得到回复。
 
 ## Agent 已完成的验证
 
@@ -86,6 +97,7 @@
 - PR 2：四层各自的单测与集成用例（清单见 `docs/histories/2026-11/20261110-1710-tool-result-size-limits.md` 的 Verification）。额度的集成用例做了反向验证：去掉额度后同一个用例报 `Context exceeds model capacity`。`pnpm check:hot-path-reads`、`pnpm check:scale-tests` 通过。PR 2 上 15 项检查全部通过。
 - PR 3：M9 的规模测试、M7 的读取量测试、L9 的 ripgrep 解码用例和慢正则用例都在旧代码上确认过会失败；M3 的旧行为（IPv6 字面量地址全部读不了）单独确认过。数字见执行过程步骤 3。M9 的新旧读路径用 7,806 组读取参数对拍，返回内容逐字节一致。全量包测试、桌面端测试、仓库脚本与进程级测试在本地通过。
 - 2026-11-13 同步 `main` 之后：三个分支各跑了一遍全量验证（范围见执行过程步骤 4）；每次合并前后比较了各 PR 相对它的 base 的改动量，没有变化。三种随机失败都先在本地复现（把 CPU 占满之后报错和 CI 上一致），改完同样条件下反复跑，不再失败；次数见 `docs/histories/2026-11/20261113-1311-flaky-package-tests-and-registry-dispose.md`。环境变量值的检查换写法之后，新旧两种写法在 200 万个随机串上结果一致。
+- PR 4：M2 不改行为的那一步，重构前后把同一个场景的会话日志、实时事件、适配器收到的内容导出来逐字节对拍，一致。后两步和 M1 新增的用例都回到改之前的代码上确认过会失败（哪几条失败、报什么，见执行过程步骤 5），原有行为由「不带钩子时对拍仍然一致」守着。M1 另外量过内存，数字和量法见执行过程步骤 5。
 
 ## 已知风险和遗留事项
 
@@ -100,6 +112,10 @@
 - PR 3（M7）没有做的：上传的定时清理每 60 秒仍然读一遍全部上传的状态文件；文件写完头 2 秒内下载，每个分块仍然把整个文件算一遍摘要；产物不存在、不属于这个会话这两种情况设备收到的仍然是笼统的「Host operation failed」；令牌过期与轮换不在这批范围。
 - PR 3（M3）没有覆盖的：设置了 `NODE_USE_ENV_PROXY=1` 时 `web_fetch` 走代理，目标域名由代理解析，固定不了地址；图片生成工具下载图片时用的还是旧的地址检查（网址来自你配置的图片服务商的响应，不是模型给的），记在 `docs/exec-plans/tech-debt-tracker.md`。
 - PR 3（L9）的取舍：代理变量即使带密码也照常交给命令，否则需要带账号代理的机器上命令连不了网，代价是命令能读到代理密码；输出订阅在命令结束时还没匹配完的行不再匹配，结束通知本身带着输出尾部。
+- PR 4 没有用户能直接感知的变化，所以没有写发布记录。重试经过 `agent/request` 钩子改的是给插件的约定，目前没有生产插件注册这个钩子。
+- PR 4 核对设计文档时发现的两处，都没有在这批改，记在 `docs/exec-plans/tech-debt-tracker.md`：
+  - LLM Core 设计 §13 写的「一个逻辑请求的全部尝试和退避等待由一个 lease 罩着」（`LlmRetryScope`）没有实现。两次尝试之间没有 lease，这期间路由被完整注销的话重试会失败。生产里走不到，因为进行中的 Run 持有它那一代 Harness 的 lease，路由要等 Run 结束才注销。§13 末尾补了一段实现现状。
+  - `llm/stream` 钩子在派发之后抛错时，已经发出去的那次请求没有人中止，要等回合被中止或 Provider 那边结束。目前没有生产插件注册这个钩子。
 
 ## 后续建议
 

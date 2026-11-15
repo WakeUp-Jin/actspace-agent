@@ -1,3 +1,4 @@
+import { getEventListeners } from "node:events";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -657,6 +658,39 @@ describe("incremental tool completion", () => {
     try { await first; expect(commits.map((result) => result.callId)).toEqual(["fast"]); }
     finally { release(); await batch; }
     expect(commits.map((result) => result.callId)).toEqual(["fast", "slow"]);
+  });
+});
+
+describe("caller abort signal", () => {
+  it("stops listening once each call has finished", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { return success(); } } });
+    // 一个回合里的所有工具调用共用一个 signal：结束的调用不摘监听器，监听器和它抓住的参数、结果就一直留到回合结束。
+    const turn = new AbortController();
+    const listeners: number[] = [];
+    for (let step = 0; step < 3; step += 1) {
+      await runtime.executeBatch([{ ...call(`first-${step}`), signal: turn.signal }, { ...call(`second-${step}`), signal: turn.signal }], environment([]));
+      listeners.push(getEventListeners(turn.signal, "abort").length);
+    }
+    expect(listeners).toEqual([0, 0, 0]);
+    const [unused] = runtime.scheduler.prepareBatch([{ ...call("unused"), signal: turn.signal }], environment([]));
+    await unused?.dispose();
+    expect(getEventListeners(turn.signal, "abort")).toHaveLength(0);
+  });
+
+  it("aborts a tool body that is running when the signal fires", async () => {
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => { started = resolve; });
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { execute: (_args, context) => new Promise<ToolBodyResult>((_resolve, reject) => {
+      context.signal.addEventListener("abort", () => reject(new Error("stopped")), { once: true });
+      started();
+    }) } });
+    const turn = new AbortController();
+    const run = runtime.executeBatch([{ ...call("running"), signal: turn.signal }], environment([]));
+    await running;
+    turn.abort();
+    expect((await run)[0]).toMatchObject({ status: "aborted", failure: { code: "TOOL_ABORTED" } });
   });
 });
 

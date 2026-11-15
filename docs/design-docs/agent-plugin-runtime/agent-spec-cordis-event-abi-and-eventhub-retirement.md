@@ -83,13 +83,15 @@ ctx.on("session/event", containNotification(ctx, function (event) {
 | 插入点 | 模式 | 阶段与结果 |
 | --- | --- | --- |
 | `agent/pre-step` | waterfall | 接受、改写或跳过候选 step |
-| `agent/request` | waterfall | 请求提交前生成/修改 LLM call config |
+| `agent/request` | waterfall | 每次请求提交前（含重试）生成/修改 LLM call config |
 | `llm/stream` | waterfall | 包裹整个 Provider AsyncIterable，而非逐 chunk 观察 |
 | `agent/request-error` | waterfall | 生成 retry/terminal decision |
 | `tools/pre-execute` | waterfall | 参数物化后干预，结果再次校验，随后权限与审批 |
 | `tools/execute` | waterfall | checkpoint 后包裹 executor 执行入口 |
 | `tools/post-execute` | waterfall | body settle 后修饰输出；保留执行成败，异常记入 finalizerFailures 后继续清理 |
 | `agent/turn-stopping` | serial | 本轮停止前返回第一个继续/停止决策 |
+
+`agent/request` 在一步的每次尝试提交前都调用，重试也不例外；payload 的 `attempt` 从 1 开始，告诉钩子这是第几次。返回的消息和工具对这一次尝试生效。路由和模型只在首次请求（`attempt` 为 1）采纳：重试时 payload 里是这一步已经定下的路由和模型，返回别的值不生效，原因见 [LLM Core Pi 设计 §13](agent-llm-core-pi.md#13-重试-generation-所有权)。
 
 系统提示词、规则、Skill 和动态内容通过 Context 来源接口贡献；英语学习使用按 Session/Agent 隔离的 PromptExtensionRegistry。`system-prompt/assemble` 已移除，模型输入只有 Context 转换链路。
 

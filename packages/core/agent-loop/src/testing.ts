@@ -2,11 +2,23 @@ import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox } from "@actspace/agent";
 import { AgentScope } from "@actspace/scope";
 import { createCoreCodecRegistry, createSessionHeader } from "@actspace/session-journal";
 import { SessionHandle } from "@actspace/session-persistence";
-import { RequestAssembler } from "@actspace/prompt";
+import { ContextSourceRegistry } from "@actspace/context-engine";
+import { codecs as contextCodecs } from "@actspace/context-engine/codec";
 import { LlmRouteRegistry, LlmService, EMPTY_LLM_USAGE, type LlmStreamEvent } from "@actspace/llm-service";
 import { ToolRuntime, type ToolBodyResult, type ToolPermissionContract } from "@actspace/tool-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { AgentLoop, type AgentLoopLiveEvent } from "./loop.js";
+
+/**
+ * 每个生产 Agent 都带着的两个来源：对话和工具，都是原样透传。Loop 的预算提示挂在对话来源的 owner 名下；
+ * 注册表里有对话来源而没有工具来源时，工具列表会被清空。
+ */
+function passThroughSources(): ContextSourceRegistry {
+  const registry = new ContextSourceRegistry();
+  registry.register({ id: "context-conversation", owner: "actspace.context-conversation", order: 40, criticality: "required", fields: ["conversation"], get: (context, write) => write({ conversation: context.content.conversation }) });
+  registry.register({ id: "context-tools", owner: "actspace.context-tools", order: 50, criticality: "required", fields: ["tools"], get: (context, write) => write({ tools: context.content.tools }) });
+  return registry;
+}
 
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
 export async function runToolStreamFixture(options: {
@@ -49,9 +61,12 @@ export async function runToolStreamFixture(options: {
   contextWindow?: number;
   /** 在 fixture 自己的回合开始前调用；返回 Promise 时会等它结束，可以用来先跑一个回合。 */
   onLoop?: (loop: AgentLoop, inbox: MainAgentInbox) => void | Promise<void>;
+  /** 交出路由表和 fixture 注册的那条路由，测试可以在回合进行中把它换掉。 */
+  onRoute?: (routes: LlmRouteRegistry, handle: import("@actspace/llm-service").LlmRouteRegistrationHandle) => void;
   wake?: boolean;
 } = {}) {
   const registry = createCoreCodecRegistry();
+  for (const codec of contextCodecs) registry.register(codec);
   const session = options.session ?? SessionHandle.createEphemeral({ registry, header: createSessionHeader({
     sessionId: options.sessionId ?? "tool-stream-test", createdAt: "2026-09-06T00:00:00.000Z", lineage: options.subagent ? { origin: "delegation", parentSessionId: "parent", parentCallId: "delegate", parentBoundarySeq: 0, seedDigest: "fixture", delegationDepth: 1 } : null,
     createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest },
@@ -90,11 +105,11 @@ export async function runToolStreamFixture(options: {
       }
     })(),
   } });
+  options.onRoute?.(routes, handle);
   const events: AgentLoopLiveEvent[] = [];
   const inbox = new MainAgentInbox(session);
-  const loop = new AgentLoop({ createContextEngine: options.createContextEngine, contextSources: options.contextSources, session, tools, inbox, inputSource: options.inputSource,
+  const loop = new AgentLoop({ createContextEngine: options.createContextEngine, contextSources: options.contextSources ?? passThroughSources(), session, tools, inbox, inputSource: options.inputSource,
     descriptor: { ...MAIN_AGENT_DESCRIPTOR, ...(options.subagent ? { kind: "subagent" as const, maxSteps: 2 } : {}), ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }), routeId: "test", model: "test" }, scope: new AgentScope("main:test", undefined, "main:test"),
-    assembler: new RequestAssembler({ prepare: () => { throw new Error("not used"); } }),
     llm: new LlmService(routes, { resolve: async () => options.credential ?? ({ apiKey: "fixture" }) }),
     compositionDigest: "test", hostCapabilityDigest: "test", host: { hostKind: "desktop", capabilityCeiling: [], runtimeContract: "actspace.runtime.v2", invocationId: "test", workspaceRef: "/fixture" },
     toolEnvironment: () => ({ ...options.toolEnvironment, resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: options.toolEnvironment?.createArtifact ?? (async () => { throw new Error("not used"); }) }),

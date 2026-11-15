@@ -47,7 +47,7 @@ export function sourceBlocks(value: RuntimeV2JsonValue | undefined, fallbackType
   return value.flatMap(item => {
     const data = asRecord(item);
     const type = pick(data, ["type", "kind"]) ?? fallbackType;
-    // The loop appends a runtime-context block for the model; it is not message content.
+    // Older sessions carry a runtime-context block the loop appended for the model; it is not message content.
     if (type === "runtime-context") return [];
     const args = data.arguments ?? data.args ?? data.input;
     const content = type === "tool-call" && args !== undefined ? (typeof args === "string" ? args : JSON.stringify(args)) : valueText(item);
