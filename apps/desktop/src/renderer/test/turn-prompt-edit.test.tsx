@@ -8,6 +8,7 @@ import { RightPanelProvider } from "../components/right-panel/RightPanelContext"
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { preparedAttachments, turnPromptDraft } from "../components/conversation/turn-prompt-draft";
 import type { TurnResend } from "../session/active-session-context";
+import { setupBridge } from "./helpers/bridge";
 
 // 编辑提问重发（agent-edit-resend-rewind.md §5.1–5.3、§7）。
 
@@ -182,5 +183,22 @@ describe("editor initial content", () => {
   it("ignores prepared blocks that are not attachments", () => {
     expect(preparedAttachments("plain text")).toEqual([]);
     expect(preparedAttachments([{ type: "text", text: "Attached file: but not really" }, { type: "response-excerpt" }])).toEqual([]);
+  });
+});
+
+describe("editor attachment button", () => {
+  it("adds images only by default, and images or documents once document parsing is on", async () => {
+    const user = userEvent.setup();
+    const selectFiles = vi.fn(async () => ({ canceled: true, attachments: [] }));
+    const handle = setupBridge({ "dialogs.selectFiles": selectFiles });
+    renderConversation({ messages: turns(1), onResendTurn: vi.fn() });
+    await user.click(screen.getByText("第 1 轮提问"));
+    expect(screen.getByRole("button", { name: "添加图片" })).toBeInTheDocument();
+
+    handle.db.settingsV4.settings.tools.deepseekDocumentEnabled = true;
+    handle.db.settings.providers.deepseek.hasApiKey = true;
+    act(() => handle.emit("settingsChanged", { revision: "r2", changedNamespaces: ["tools"] }));
+    await user.click(await screen.findByRole("button", { name: "添加图片或文件" }));
+    expect(selectFiles).toHaveBeenCalledWith({ documents: true });
   });
 });

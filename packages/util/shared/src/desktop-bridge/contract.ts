@@ -55,7 +55,7 @@ export const desktopBridgeContract = {
     listPending: invokeWithDefault<S.ApprovalListPendingInput, S.PendingApprovalInfo[]>(CH.listPendingApprovals, {}),
   },
   dialogs: {
-    selectFiles: invoke<{ remote?: boolean } | undefined, S.SelectFilesResult>(CH.selectFiles),
+    selectFiles: invoke<{ remote?: boolean; documents?: boolean } | undefined, S.SelectFilesResult>(CH.selectFiles),
     selectImages: invoke<void, S.SelectImagesResult>(CH.selectImages),
     selectWorkspaceDirectory: invoke<S.SelectWorkspaceDirectoryInput | undefined, S.SelectWorkspaceDirectoryResult>(CH.selectWorkspaceDirectory),
     importComposerImage: invoke<S.ImportComposerImageInput, S.ImportComposerImageResult>(CH.importComposerImage),

@@ -3,6 +3,7 @@ import * as React from "react";
 import { afterEach, beforeEach, vi } from "vitest";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { resetBridge, setupBridge } from "./helpers/bridge";
+import { resetDocumentParsingAvailableForTests } from "../components/composer/attachment-entry";
 
 vi.mock("@testing-library/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@testing-library/react")>();
@@ -33,6 +34,8 @@ vi.mock("@testing-library/react", async (importOriginal) => {
 beforeEach(() => { setupBridge(); });
 afterEach(() => {
   resetBridge();
+  // 「文档解析」可用状态是模块级共享值。
+  resetDocumentParsingAvailableForTests();
   // 14 T20：所有会话的未确认提交都存 localStorage，用例之间不能互相影响。
   for (const key of Object.keys(localStorage)) if (key.startsWith("actspace:pending-submission:")) localStorage.removeItem(key);
   // 侧栏视图选项和折叠状态也存 localStorage。

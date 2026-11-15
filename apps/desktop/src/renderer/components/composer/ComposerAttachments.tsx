@@ -164,11 +164,11 @@ export function useComposerAttachments({
     }
   }
 
-  async function selectFiles() {
+  async function selectFiles(kind: "files" | "documents" = "files") {
     onBeforePick();
 
     try {
-      const result = await dialogsApi.selectFiles(isRemoteTarget ? { remote: true } : undefined);
+      const result = await dialogsApi.selectFiles(isRemoteTarget ? { remote: true } : kind === "documents" ? { documents: true } : undefined);
       if (!result.canceled) append(result.attachments);
     } catch (selectError) {
       console.error("Failed to select Chat attachments", selectError);

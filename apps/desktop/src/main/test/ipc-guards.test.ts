@@ -98,7 +98,7 @@ const CASES: Record<string, Case> = {
   "sessions.archive": { spec: contract.sessions.archive, valid: [{ sessionId: "s", archived: false }], invalid: [{ sessionId: "s", archived: 0 }] },
   "sessions.archiveMany": { spec: contract.sessions.archiveMany, valid: [{ sessionIds: [] }, { sessionIds: ["a", "b"] }], invalid: [{ sessionIds: "a" }, { sessionIds: ["a", 1] }, {}] },
   // 对话框
-  "dialogs.selectFiles": { spec: contract.dialogs.selectFiles, valid: [undefined, {}, { remote: true }], invalid: [{ remote: "yes" }, "x"] },
+  "dialogs.selectFiles": { spec: contract.dialogs.selectFiles, valid: [undefined, {}, { remote: true }, { documents: true }], invalid: [{ remote: "yes" }, { documents: "yes" }, "x"] },
   "dialogs.importComposerImage": { spec: contract.dialogs.importComposerImage, valid: [{ name: "a.png", bytes: new Uint8Array(0) }, { name: "a.png", mimeType: "image/png", bytes: new Uint8Array([1]) }], invalid: [undefined, { name: "a.png", bytes: [1, 2] }, { name: "a.png", bytes: "AQ==" }, { bytes: new Uint8Array(0) }] },
   "dialogs.showArtifactContextMenu": { spec: contract.dialogs.showArtifactContextMenu, valid: [{ kind: "session_image", sessionId: "s", artifactPath: "a.png" }, { kind: "workspace_file", relativePath: "a.md" }, { kind: "workspace_file", workspaceRoot: "/w", relativePath: "a.md" }], invalid: [undefined, { kind: "url", href: "x" }, { kind: "session_image", sessionId: "s" }, { kind: "workspace_file", workspaceRoot: "/w" }] },
   // 工作区 Git

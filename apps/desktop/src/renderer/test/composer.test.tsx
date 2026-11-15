@@ -365,6 +365,23 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByPlaceholderText("继续追问…")).toBeInTheDocument();
   });
 
+  it("offers documents from 「+」 when document parsing is on for a local Agent", async () => {
+    const user = userEvent.setup();
+    const selectFiles = vi.fn(async () => ({ canceled: false, attachments: [{ id: "pdf", kind: "file" as const, name: "季度报告.pdf", path: "/tmp/季度报告.pdf" }] }));
+    const handle = setupBridge({ "dialogs.selectFiles": selectFiles });
+    handle.db.settingsV4.settings.tools.deepseekDocumentEnabled = true;
+    handle.db.settings.providers.deepseek.hasApiKey = true;
+
+    renderComposer();
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    const option = await screen.findByRole("option", { name: /图片与文件/ });
+    expect(option).toHaveTextContent("PNG、JPEG、WEBP、GIF、PDF、Word、PPT");
+    await user.click(option);
+
+    expect(selectFiles).toHaveBeenCalledWith({ documents: true });
+    expect(within(screen.getByLabelText("已附加的文件")).getByText("季度报告.pdf")).toBeInTheDocument();
+  });
+
   it("keeps selected images in the attachment area above the input bar", async () => {
     const user = userEvent.setup();
     const selectedAttachments: ComposerAttachment[] = [

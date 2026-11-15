@@ -59,4 +59,26 @@ describe("useComposerAttachments", () => {
 
     expect(selectFiles).toHaveBeenCalledWith({ remote: true });
   });
+
+  it("asks the document picker for documents and keeps the returned PDF", async () => {
+    const pdf = { id: "pdf", kind: "file" as const, name: "季度报告.pdf", path: "/tmp/季度报告.pdf" };
+    const selectFiles = vi.fn(async () => ({ canceled: false, attachments: [pdf] }));
+    setupBridge({ "dialogs.selectFiles": selectFiles });
+    const { result } = renderAttachments();
+
+    await act(() => result.current.selectFiles("documents"));
+
+    expect(selectFiles).toHaveBeenCalledWith({ documents: true });
+    expect(result.current.attachments.map((attachment) => attachment.name)).toEqual(["季度报告.pdf"]);
+  });
+
+  it("lets a remote target win over documents", async () => {
+    const selectFiles = vi.fn(async () => ({ canceled: true, attachments: [] }));
+    setupBridge({ "dialogs.selectFiles": selectFiles });
+    const { result } = renderAttachments({ isRemoteTarget: true });
+
+    await act(() => result.current.selectFiles("documents"));
+
+    expect(selectFiles).toHaveBeenCalledWith({ remote: true });
+  });
 });
