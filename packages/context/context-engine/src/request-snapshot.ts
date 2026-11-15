@@ -5,8 +5,8 @@ import type { Context, LlmInput } from "./types.js";
 
 /** 一次请求要写进日志的三样东西（agent-spec-request-record.md §3–§5）。提示词、工具只在 digest 与日志里最近一条不同时才写。 */
 export type RequestRecords = {
-  readonly systemPrompt: { readonly digest: string; readonly sections: RuntimeV2JsonValue; readonly modelFacts: RuntimeV2JsonValue; readonly contributorProvenance: RuntimeV2JsonValue };
-  readonly tools: { readonly digest: string; readonly tools: RuntimeV2JsonValue };
+  readonly systemPrompt: { readonly digest: string; readonly sections: readonly RuntimeV2JsonValue[]; readonly modelFacts: readonly RuntimeV2JsonValue[]; readonly contributorProvenance: readonly RuntimeV2JsonValue[] };
+  readonly tools: { readonly digest: string; readonly tools: readonly RuntimeV2JsonValue[] };
   readonly snapshot: RuntimeV2JsonValue;
 };
 

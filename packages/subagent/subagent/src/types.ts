@@ -1,3 +1,4 @@
+import { serviceKey } from "@actspace/cordis-adapter";
 import type { AgentScope } from "@actspace/scope";
 import type { RuntimeV2JsonValue, SubagentPreset } from "@actspace/shared/runtime-v2";
 import type { ExternalSubagentBackend, SpawnExternalInput } from "./external.js";
@@ -48,3 +49,4 @@ export interface SubagentHostPort {
   sendMessage(input: SubagentCaller & { readonly agentId: string; readonly message: string }): Promise<SubagentToolOutcome>;
   listModels(input: SubagentCaller): Promise<SubagentToolOutcome>;
 }
+export const SUBAGENT_HOST_PORT = serviceKey<SubagentHostPort>(SUBAGENT_HOST_SERVICE);

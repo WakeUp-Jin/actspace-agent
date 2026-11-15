@@ -1,6 +1,5 @@
 export { manifest } from "./manifest.js";
-export { apply, LLM_HOST_PORT_ID } from "./plugin.js";
-export type { LlmHostPort } from "./plugin.js";
+export { apply } from "./plugin.js";
 export * from "./activation-lease.js";
 export * from "./adapter.js";
 export * from "./auxiliary-request.js";
@@ -16,6 +15,7 @@ export * from "./request-redaction.js";
 export * from "./retry-policy.js";
 export * from "./route-registry.js";
 export * from "./service.js";
+export * from "./service-keys.js";
 export * from "./stream.js";
 export * from "./usage.js";
 

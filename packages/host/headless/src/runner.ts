@@ -6,7 +6,7 @@ type HeadlessRunService = {
   service: Pick<import("@actspace/agent-service").AgentService, "exclusive" | "snapshot" | "resume">;
 };
 import type { SessionHandle } from "@actspace/session-persistence";
-import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
+import { ACTSPACE_SERVICE_IDS, emitNotification, serviceKey, serviceView, type CordisContext } from "@actspace/cordis-adapter";
 
 export const HEADLESS_HOST_PORT_ID = "actspace.host.headless" as const;
 
@@ -34,6 +34,10 @@ export type HeadlessHostPort = {
 };
 
 export type DisabledHeadlessHostPort = { readonly enabled: false };
+export const HEADLESS_HOST_PORT = serviceKey<HeadlessHostPort | DisabledHeadlessHostPort>(HEADLESS_HOST_PORT_ID);
+/** Runner 用到的两个 Runtime 服务，各取自己读的那一面。 */
+export const HEADLESS_SESSIONS_VIEW = serviceView<HeadlessSessionService>(ACTSPACE_SERVICE_IDS.sessionRuntime);
+export const HEADLESS_AGENT_RUNTIME_VIEW = serviceView<{ readonly runs: HeadlessRunService }>(ACTSPACE_SERVICE_IDS.agentRuntime);
 
 export type HeadlessRunResult = RuntimeV2RunTurnResponse & { readonly session: SessionHandle };
 
@@ -82,3 +86,4 @@ export class HeadlessRunner {
     emitNotification(this.options.context, type, payload);
   }
 }
+export const HEADLESS_RUNNER_SERVICE = serviceKey<HeadlessRunner>(ACTSPACE_SERVICE_IDS.headlessRunner);

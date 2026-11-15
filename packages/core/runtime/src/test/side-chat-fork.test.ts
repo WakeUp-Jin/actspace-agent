@@ -40,7 +40,7 @@ it("opens a Plan-mode side chat from a running parent and attaches the boundary 
   cordis.context.provide?.("session.runtime", sessions);
   await cordis.mount("side-chat", ({ context }) => { applySideChat(context!); });
   const runs = {
-    inspectCapability: (_name: string, inspect: (service: undefined) => unknown) => inspect(undefined),
+    inspectCapability: (_key: { readonly id: string }, inspect: (service: undefined) => unknown) => inspect(undefined),
     configuration: () => ({}),
     service: { exclusive: async (_id: string, operation: () => Promise<unknown>) => operation() },
     isActive: () => false,

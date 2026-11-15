@@ -1,26 +1,26 @@
 import { dirname, resolve } from "node:path";
 import { homedir } from "node:os";
 import type { GrantAudience } from "@actspace/shared/runtime-v2";
-import { FILESYSTEM_HOST_PORT_ID, isPathWithin, type FilesystemHostGrant, type ToolGrantSuggestion } from "@actspace/tool-runtime";
+import { FILESYSTEM_HOST_PORT, isPathWithin, TOOL_RUNTIME_SERVICE, type ToolGrantSuggestion } from "@actspace/tool-runtime";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime, ToolPermissionContract } from "@actspace/tool-runtime";
-import type { CordisContext } from "@actspace/cordis-adapter";
+import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntimeContract, ToolPermissionContract } from "@actspace/tool-runtime";
+import { getService, type CordisContext } from "@actspace/cordis-adapter";
 import { createNodeToolPorts } from "./node-ports.js";
 import { FILESYSTEM_SEARCH_PLUGIN_ID, type FILESYSTEM_SEARCH_TOOLS } from "./manifest.js";
 
 export type ToolName = (typeof FILESYSTEM_SEARCH_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & { readonly dispose?: () => Promise<void> };
-export type ToolRegistration = { readonly name: string; readonly localName: ToolName; readonly handle: ReturnType<ToolRuntime["register"]> };
+export type ToolRegistration = { readonly name: string; readonly localName: ToolName; readonly handle: ReturnType<ToolRuntimeContract["register"]> };
 
 /**
  * The Host grants the filesystem (roots, artifact resolution); this plugin owns the tool implementation. Without the
  * grant every tool reports CAPABILITY_UNAVAILABLE instead of failing the Harness.
  */
 export async function apply(ctx: CordisContext): Promise<void> {
-  const runtime = ctx.get?.("tools.runtime") as ToolRuntime | undefined;
+  const runtime = getService(ctx, TOOL_RUNTIME_SERVICE);
   if (!runtime) throw new Error("filesystem-search requires tools.runtime.");
-  const grant = ctx.get?.(FILESYSTEM_HOST_PORT_ID) as FilesystemHostGrant | undefined;
+  const grant = getService(ctx, FILESYSTEM_HOST_PORT);
   const ports: ToolPorts = grant ? createNodeToolPorts(grant) : {};
   let registrations: readonly ToolRegistration[];
   try { registrations = registerTools(runtime, ports); }
@@ -33,7 +33,7 @@ export async function apply(ctx: CordisContext): Promise<void> {
     if (failures.length) throw new AggregateError(failures.map((item) => item.reason), "filesystem-search cleanup failed.");
   }, "filesystem-search");
 }
-export function registerTools(runtime: ToolRuntime, ports: ToolPorts): readonly ToolRegistration[] {
+export function registerTools(runtime: ToolRuntimeContract, ports: ToolPorts): readonly ToolRegistration[] {
   const registrations: ToolRegistration[] = [];
   try {
     for (const item of TOOL_DEFINITIONS) {

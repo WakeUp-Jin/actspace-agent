@@ -12,17 +12,17 @@ import { harnessEntriesMissingHostCapabilities, harnessEntriesOffByDefault } fro
 import { MAIN_AGENT_FORM } from "../main-agent-form.js";
 import type { EventCodec } from "@actspace/session-journal";
 import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
-import type { LlmService } from "@actspace/llm-service";
+import { LLM_SERVICE } from "@actspace/llm-service";
 import type { ResolvedComposition } from "@actspace/composition";
-import { discoverPluginCodecs, type CodecModuleLoader, type CordisContext } from "@actspace/cordis-adapter";
+import { discoverPluginCodecs, getService, provideService, type CodecModuleLoader, type CordisContext, type ServiceKey } from "@actspace/cordis-adapter";
 import { inspectCordisAdmission } from "@actspace/cordis-adapter";
 import type { CordisAdmissionReport, CordisRootHandle } from "@actspace/cordis-adapter";
 import { bootDshCordis, createDshBootCandidate } from "@actspace/boot";
 import { RuntimeProfileConflictError } from "./errors.js";
 import { RuntimeShutdownFailure } from "./errors.js";
 import { createRuntimeHostServices, type RuntimeHostServices } from "./host-services.js";
-import type { RuntimeSessionController } from "../session/session-controller.js";
 import { SESSION_RUNTIME_HOST_PORT_ID, type RuntimeSessionHostPort } from "../session/session-plugin.js";
+import { AGENT_RUNTIME_SERVICE, RUNTIME_CORDIS_HOST_PORT, SESSION_RUNTIME_SERVICE } from "../service-keys.js";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "../harness/agent-host-port.js";
 import type { AgentRuntimeService } from "../harness/agent-runtime-plugin.js";
 import { HEADLESS_HOST_PORT_ID } from "@actspace/headless";
@@ -112,8 +112,9 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
   const pluginVersions = new Map(composition.entries.filter((entry) => entry.enabled && entry.state !== "skipped").map((entry) => [entry.pluginId, entry.pluginVersion]));
   const configRevision = createHash("sha256").update(JSON.stringify(composition.config)).digest("hex");
   const diagnostics = new DiagnosticsCollector({ runtimeInstanceId: state.runtimeInstanceId });
-  const requireService = <T>(value: T | undefined, serviceId: string): T => {
-    if (value === undefined) throw new Error(`DSH Cordis config did not publish ${serviceId}.`);
+  const published = <T>(ctx: CordisContext, key: ServiceKey<T>): T => {
+    const value = getService(ctx, key);
+    if (value === undefined) throw new Error(`DSH Cordis config did not publish ${key.id}.`);
     return value;
   };
   const runtimeHost = Object.freeze({
@@ -135,12 +136,12 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
   const providedHostServices = Object.freeze({
     ...hostServices.services,
     "actspace.host.subagents": createSubagentHost(() => {
-      const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
+      const runtime = getService(runtimeContext, AGENT_RUNTIME_SERVICE);
       if (!runtime) throw new Error("Agent runtime is not ready");
       return runtime.subagents;
     }),
     [BACKGROUND_TASK_HOST_SERVICE]: createBackgroundTaskHost(() => {
-      const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
+      const runtime = getService(runtimeContext, AGENT_RUNTIME_SERVICE);
       if (!runtime) throw new Error("Agent runtime is not ready");
       return runtime.backgroundTasks;
     }),
@@ -160,12 +161,12 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
       ...(options.pinnedHarness ? { pinnedHarness: options.pinnedHarness } : {}),
       evolution: {
         inspect: (context: import("@actspace/tool-runtime").ToolExecutionContext) => {
-          const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
+          const runtime = getService(runtimeContext, AGENT_RUNTIME_SERVICE);
           if (!runtime?.evolution) throw new Error("Evolution service is not ready");
           return runtime.evolution.inspect(context);
         },
         execute: (args: Readonly<Record<string, unknown>>, context: import("@actspace/tool-runtime").ToolExecutionContext) => {
-          const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
+          const runtime = getService(runtimeContext, AGENT_RUNTIME_SERVICE);
           if (!runtime?.evolution) throw new Error("Evolution service is not ready");
           return runtime.evolution.execute(args, context);
         },
@@ -175,7 +176,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
       host: options.host,
       agentForm: MAIN_AGENT_FORM,
       toolEnvironment: options.toolEnvironment,
-      contextDisclosure: createContextHost(() => runtimeContext?.get?.("session.runtime") as RuntimeSessionController | undefined, options.toolEnvironment),
+      contextDisclosure: createContextHost(() => getService(runtimeContext, SESSION_RUNTIME_SERVICE), options.toolEnvironment),
       workspaceRoot: options.toolEnvironment.workspaceRoot,
       compositionDigest: composition.digest,
       hostCapabilityDigest: configRevision,
@@ -198,7 +199,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
       requiredServices: ["actspace.runtime", "session.journal", "session.runtime", "llm.service", "core.agent", "agent.registry", "agent.service", "agent.runtime"],
       prepare: (prepared) => {
         runtimeContext = prepared;
-        prepared.provide?.("actspace.host", Object.freeze({
+        provideService(prepared, RUNTIME_CORDIS_HOST_PORT, Object.freeze({
           hostKind: options.host.hostKind,
           descriptor: hostServices.descriptor,
           services: providedHostServices,
@@ -207,9 +208,9 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     });
     root = boot.root;
     context = boot.context;
-    requireService(context.get?.("session.runtime") as RuntimeSessionController | undefined, "session.runtime");
-    requireService(context.get?.("llm.service") as LlmService | undefined, "llm.service");
-    const agentRuntime = requireService(context.get?.("agent.runtime") as AgentRuntimeService | undefined, "agent.runtime");
+    published(context, SESSION_RUNTIME_SERVICE);
+    published(context, LLM_SERVICE);
+    const agentRuntime = published(context, AGENT_RUNTIME_SERVICE);
     const candidate = await createDshBootCandidate({ host: options.host, composition, cordisAdmission, root, discoveredCodecs: pluginCodecs });
     for (const item of candidate.diagnostics) diagnostics.record({ severity: item.severity, source: "boot", code: item.code, message: item.message, ...(item.provenance.pluginId === undefined ? {} : { pluginId: item.provenance.pluginId }), details: isRecord(item.details) ? item.details : { value: item.details } });
     state.ready();
@@ -247,7 +248,7 @@ function createBootedProfile(input: {
       // the tree. Plugin effects remain the fallback for partial boot failures.
       for (const dispose of [
         () => input.agentRuntime.dispose(),
-        () => (input.context.get?.("session.runtime") as RuntimeSessionController | undefined)?.closeAll(),
+        () => getService(input.context, SESSION_RUNTIME_SERVICE)?.closeAll(),
         () => input.candidate.disposeCandidate(),
         () => input.options.disposeCordis?.(),
         () => input.options.disposePlugins?.(),

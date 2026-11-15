@@ -26,6 +26,7 @@ export * from "./config-path.js";
 export { SessionReadModel } from "./projection/durable-session.js";
 export { apply as applyCordisRuntimeEntry } from "./startup/cordis-entry.js";
 export type { RuntimeCordisHost } from "./startup/cordis-entry.js";
+export type { ProfileServices } from "./startup/profile-services.js";
 export * from "./profiles/index.js";
 export { PLUGIN_CATALOG, PLUGIN_PACKAGES_OUTSIDE_DEFAULT, pluginCatalogEntry } from "./plugin-catalog.js";
 export type { PluginCatalogEntry, PluginLoader } from "./plugin-catalog.js";

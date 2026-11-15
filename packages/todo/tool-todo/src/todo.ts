@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { SessionHandle } from "@actspace/session-persistence";
-import { mergeRuntimeV2TodoItems } from "@actspace/shared/runtime-v2";
+import { mergeRuntimeV2TodoItems, type SessionEventCandidateV1 } from "@actspace/shared/runtime-v2";
 import { TODO_EVENT_TYPE, TODO_PLUGIN_ID } from "./manifest.js";
 
 export type TodoState = "pending" | "in_progress" | "completed" | "cancelled";
@@ -69,4 +69,4 @@ export class TodoService {
   }
   private require(todoId: string, revision: number): TodoItem { const item = this.list().find((candidate) => candidate.todoId === todoId); if (item === undefined) throw new Error(`Todo ${todoId} does not exist.`); if (item.revision !== revision) throw new Error(`Todo ${todoId} revision conflict.`); return item; }
 }
-function todoWrite(data: Record<string, unknown>) { return { type: TODO_EVENT_TYPE, eventVersion: 1, source: { ownerPluginId: TODO_PLUGIN_ID }, data, surface: null } as never; }
+function todoWrite(data: { readonly items: readonly TodoItem[]; readonly revision: number }): SessionEventCandidateV1 { return { type: TODO_EVENT_TYPE, eventVersion: 1, source: { ownerPluginId: TODO_PLUGIN_ID }, data, surface: null }; }

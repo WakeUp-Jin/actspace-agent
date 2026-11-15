@@ -1,4 +1,4 @@
-import type { CordisContext } from "@actspace/cordis-adapter";
+import type { CordisContext, HookName, HookPayload, HookResult, SerialHookName, WaterfallHookName } from "@actspace/cordis-adapter";
 import { emitNotification, serialDispatch, waterfallDispatch, type DispatchCarrier } from "@actspace/cordis-adapter";
 import { carrierKeyOf, isScopeCarrier, scopeActiveOf, scopeTarget, type AgentScope, type ScopeKey } from "@actspace/scope";
 
@@ -10,13 +10,20 @@ export type AgentSubject = Readonly<Record<string, unknown>> & {
 
 export type AgentEventPayload = Readonly<Record<string, unknown>>;
 
+/** 以 Agent 为主体的干预点：契约的 payload 里有 `agent`。工具的干预点没有，不从这里分发。 */
+export type AgentHookName = { [K in HookName]: HookPayload<K> extends { readonly agent: AgentSubject } ? K : never }[HookName];
+/** 分发方交给 dispatcher 的内容：契约的 payload 去掉 `agent`，`agent` 由 dispatcher 填。 */
+export type AgentHookInput<K extends AgentHookName> = Omit<HookPayload<K>, "agent">;
+
 export interface AgentEventDispatcher {
   readonly subject: AgentSubject;
   readonly scopeKey: ScopeKey;
   readonly carrier: DispatchCarrier;
   emit(type: string, payload?: AgentEventPayload): void;
-  serial(type: string, payload?: AgentEventPayload): Promise<unknown>;
-  waterfall<T extends unknown = AgentEventPayload>(type: string, payload?: AgentEventPayload, next?: () => T | Promise<T>): Promise<unknown>;
+  /** 结果是 `unknown`，见 `serialDispatch`。 */
+  serial<K extends AgentHookName & SerialHookName>(type: K, payload: AgentHookInput<K>): Promise<unknown>;
+  /** `next` 是内置行为。结果是 `unknown`：监听器来自插件，分发方检查之后再用。 */
+  waterfall<K extends AgentHookName & WaterfallHookName>(type: K, payload: AgentHookInput<K>, next: () => HookResult<K> | Promise<HookResult<K>>): Promise<unknown>;
 }
 
 /** Create the single fused subject/carrier dispatcher for one live Agent. */
@@ -41,6 +48,8 @@ export function createAgentEventDispatcher(
     if (existing !== undefined && existing !== subject) throw new Error("Agent event subject does not match its scope carrier.");
     return Object.freeze({ ...payload, agent: subject });
   };
+  // 契约的 payload 就是「分发方给的内容加上 agent」。K 是泛型时编译器推不出这一点，只在这里断言一次。
+  const hookPayloadFor = <K extends AgentHookName>(payload: AgentHookInput<K>): HookPayload<K> => payloadFor(payload as AgentEventPayload) as unknown as HookPayload<K>;
 
   return Object.freeze({
     subject,
@@ -50,15 +59,15 @@ export function createAgentEventDispatcher(
       assertDispatchable();
       emitNotification(context, type, payloadFor(payload), carrier);
     },
-    serial: async (type: string, payload: AgentEventPayload = {}) => {
+    serial: async <K extends AgentHookName & SerialHookName>(type: K, payload: AgentHookInput<K>) => {
       assertDispatchable();
       const release = scope.disposer.acquire();
-      try { return await serialDispatch(context, type, payloadFor(payload), carrier); } finally { release(); }
+      try { return await serialDispatch(context, type, hookPayloadFor<K>(payload), carrier); } finally { release(); }
     },
-    waterfall: async <T>(type: string, payload: AgentEventPayload = {}, next: () => T | Promise<T> = () => payloadFor(payload) as unknown as T) => {
+    waterfall: async <K extends AgentHookName & WaterfallHookName>(type: K, payload: AgentHookInput<K>, next: () => HookResult<K> | Promise<HookResult<K>>) => {
       assertDispatchable();
       const release = scope.disposer.acquire();
-      try { return await waterfallDispatch(context, type, payloadFor(payload), next, carrier); } finally { release(); }
+      try { return await waterfallDispatch(context, type, hookPayloadFor<K>(payload), next, carrier); } finally { release(); }
     },
   });
 }

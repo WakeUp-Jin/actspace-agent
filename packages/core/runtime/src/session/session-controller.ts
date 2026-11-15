@@ -5,7 +5,7 @@ import { agentFormComposition } from "@actspace/agent";
 import { MAIN_AGENT_FORM } from "../main-agent-form.js";
 import type { RuntimeV2SessionListItem, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 import type { MainAgentForm } from "@actspace/shared/runtime-v2";
-import { surfaceNode } from "@actspace/shared/runtime-v2";
+import { coreEvent, surfaceNode } from "@actspace/shared/runtime-v2";
 import type { EventCodecRegistry, SessionJournal } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { SessionHandle as RuntimeSessionHandle } from "@actspace/session-persistence";
@@ -530,7 +530,7 @@ export class RuntimeSessionController {
     const closed = await Promise.allSettled(entries.map(async ([sessionId, session]) => {
       let error: unknown;
       try {
-        if (session.journal.eventsAfter(Math.max(-1, session.lastSeq - 1)).at(-1)?.type !== "session/end-seed") await session.append({ type: "session/end-seed", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { sessionId: session.header.sessionId, lastSeq: session.lastSeq }, surface: null });
+        if (session.journal.eventsAfter(Math.max(-1, session.lastSeq - 1)).at(-1)?.type !== "session/end-seed") await session.append(coreEvent("session/end-seed", { sessionId: session.header.sessionId, lastSeq: session.lastSeq }));
         await session.flush();
         // The Session already left #open, so onFlush cannot see the end-seed; record it here.
         if (!this.#ephemeral.has(sessionId) && this.#globalIndexReady) this.#globalIndex.replace(this.summary(this.snapshot(session), this.options.profileId));

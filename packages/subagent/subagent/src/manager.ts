@@ -8,8 +8,8 @@ import type { AgentLoop } from "@actspace/agent-loop";
 import type { AgentScope } from "@actspace/scope";
 import type { ModelsHostPort } from "@actspace/shared";
 import {
-  EMPTY_SUBAGENT_TREE, CONTEXT_TRACE_DETAIL_LABEL, listedSubagents, reduceSubagentTree, runningActivation,
-  type RuntimeV2AgentMode, type RuntimeV2JsonValue, type SubagentActivationStatus, type SubagentDelivery, type SubagentKind, type SubagentPreset, type SubagentTree,
+  coreEvent, EMPTY_SUBAGENT_TREE, CONTEXT_TRACE_DETAIL_LABEL, listedSubagents, reduceSubagentTree, runningActivation,
+  type CoreEventDataMap, type PermissionMode, type RuntimeV2AgentMode, type RuntimeV2JsonValue, type SubagentActivationStatus, type SubagentDelivery, type SubagentKind, type SubagentPreset, type SubagentTree,
 } from "@actspace/shared/runtime-v2";
 import { FORKED_SUBAGENT_PRESET_ID, resolveSessionWorkspaceRoot, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHandle, SessionStore } from "@actspace/session-persistence";
@@ -66,7 +66,7 @@ export type SubagentManagerOptions = {
   readonly models: () => ModelsHostPort;
   /** The main agent's current model settings (not its request headers). */
   readonly parentConfiguration: (sessionId: string) => ParentConfiguration;
-  readonly permissionMode: (session: SessionHandle) => string;
+  readonly permissionMode: (session: SessionHandle) => PermissionMode;
   readonly isSessionRunning: (sessionId: string) => boolean;
   readonly wake: (sessionId: string) => void;
   /**
@@ -713,7 +713,7 @@ function withStatus(detail: SubagentDetail, status: string): SubagentDetail {
   return detail.map(item => item.label === "delegation" ? { ...item, value: { ...record(item.value), status } } : item);
 }
 
-function startData(activation: Activation, input: { readonly trigger: "spawn"; readonly callId: string; readonly background: boolean; readonly startedAt: string }): Record<string, RuntimeV2JsonValue> {
+function startData(activation: Activation, input: { readonly trigger: "spawn"; readonly callId: string; readonly background: boolean; readonly startedAt: string }): Extract<CoreEventDataMap["subagent/activation"], { readonly op: "start" }> {
   return {
     op: "start", agentId: activation.agentId, activationId: activation.activationId, trigger: input.trigger,
     callId: input.callId, background: input.background, ...(activation.model.model ? { model: activation.model.model } : {}),
@@ -729,8 +729,6 @@ function modelInput(config: SubagentModelConfiguration): { model?: string; think
   };
 }
 
-/** A Journal event owned by `@actspace/core` (core types and the `subagent/*` extensions alike). */
-function coreEvent(type: string, data: Record<string, RuntimeV2JsonValue>) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
 function record(value: unknown): Readonly<Record<string, unknown>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, unknown>> : {}; }
 function ok(text: string, detail?: SubagentDetail): SubagentToolOutcome { return detail ? { ok: true, text, detail } : { ok: true, text }; }
 function fail(code: string, text: string): SubagentToolOutcome { return { ok: false, code, text }; }

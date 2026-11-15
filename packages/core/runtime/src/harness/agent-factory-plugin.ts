@@ -1,32 +1,31 @@
-import type { AutoReviewer } from "@actspace/auto-review";
+import { AUTO_REVIEW_SERVICE } from "@actspace/auto-review";
 import { reviewSessionAction } from "./review-session-action.js";
-import type { ContextCompactionCoordinator } from "@actspace/context-engine";
-import { CONTEXT_ASSEMBLY_SERVICE_ID, type ContextAgentRole, type ContextAssemblyService } from "@actspace/context-assembly";
+import { CONTEXT_ENGINE_SERVICE } from "@actspace/context-engine";
+import { CONTEXT_ASSEMBLY_SERVICE, CONTEXT_ASSEMBLY_SERVICE_ID, type ContextAgentRole } from "@actspace/context-assembly";
 import type { ContributorRegistry, PromptContributor } from "@actspace/prompt";
-import type { PromptHostPort, PromptRuntimeService, ScriptingFacts } from "@actspace/prompt";
+import { PROMPT_HOST_PORT, PROMPT_RUNTIME_SERVICE, type ScriptingFacts } from "@actspace/prompt";
 import type { ShellToolsService } from "@actspace/tool-shell";
-import type { ContextEngine, ContextEngineOptions } from "@actspace/context-engine";
-import type { RunFactory } from "@actspace/agent-service";
+import type { RUN_FACTORY, RunFactory } from "@actspace/agent-service";
 import { AgentLoop } from "@actspace/agent-loop";
 import type { AgentLoopAssembly } from "@actspace/agent-loop";
-import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, resolveMainAgentPreset, activateAgentFormTools, allowedAgentModeTools, isEvolvedPluginId } from "@actspace/agent";
+import { AGENT_REGISTRY_SERVICE, MAIN_AGENT_DESCRIPTOR, MainAgentInbox, resolveMainAgentPreset, activateAgentFormTools, allowedAgentModeTools, isEvolvedPluginId } from "@actspace/agent";
 import type { AgentSubject } from "@actspace/agent";
 import { type AgentScope, scopeContext } from "@actspace/scope";
-import type { LlmService } from "@actspace/llm-service";
-import type { ToolRuntime } from "@actspace/tool-runtime";
-import type { CompactionPlugin } from "@actspace/context-compaction";
-import type { RuntimeSessionController } from "../session/session-controller.js";
-import type { CordisContext } from "@actspace/cordis-adapter";
+import { LLM_SERVICE } from "@actspace/llm-service";
+// 引 `/plugin` 这个入口：从包的根入口引，会把内核用不到的清单定义一起带进来。
+import { COMPACTION_RUNTIME_SERVICE } from "@actspace/context-compaction/plugin";
+import { getService, provideService, requireService, type CordisContext, type ServiceOf } from "@actspace/cordis-adapter";
 import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
 import { isBashLogReadPath, isSessionTranscriptReadPath } from "@actspace/session-transcript";
 import type { SessionHandle } from "@actspace/session-persistence";
-import { HOST_READABLE_FILES_SERVICE_ID, HOST_WRITABLE_ROOTS_SERVICE_ID, HostReadableFiles, type HostWritableRoots } from "@actspace/tool-runtime";
+import { HOST_READABLE_FILES_SERVICE, HOST_WRITABLE_ROOTS_SERVICE, HostReadableFiles, TOOL_RUNTIME_SERVICE } from "@actspace/tool-runtime";
 import { projectPermissionMode, applySessionGrantEvent } from "@actspace/session-projection";
 import { isBackgroundWake } from "@actspace/shared/runtime-v2";
-import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
+import { AGENT_FACTORY_SERVICE, AGENT_RUNTIME_HOST_PORT, FACTORY_SHELL_TOOLS_VIEW, SESSION_RUNTIME_HOST_PORT, SESSION_RUNTIME_SERVICE } from "../service-keys.js";
 import { blockedTool, isExternalRecordPath, isSubagentBlockedTool, SUBAGENT_APPROVAL_UNAVAILABLE, type ChildLoopInput } from "@actspace/subagent";
 
 const PURPOSE_ROUTE_IDS = new Set(["utility", "auto-review"]);
+const CONSUMER = "Agent factory plugin";
 type AgentRole = ContextAgentRole;
 
 export type AgentFactoryService = {
@@ -74,24 +73,24 @@ export function composeSessionReadablePath(
 }
 
 function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableFiles): AgentFactoryService {
-  const host = requireService<AgentRuntimeHostPort>(ctx, AGENT_RUNTIME_HOST_PORT_ID);
-  const registry = requireService<import("@actspace/agent").AgentRegistry>(ctx, "agent.registry");
-  const sessions = requireService<RuntimeSessionController>(ctx, "session.runtime");
-  const llm = requireService<LlmService>(ctx, "llm.service");
-  const tools = requireService<ToolRuntime>(ctx, "tools.runtime");
-  const prompt = requireService<PromptRuntimeService>(ctx, "prompt.runtime");
+  const host = requireService(ctx, AGENT_RUNTIME_HOST_PORT, CONSUMER);
+  const registry = requireService(ctx, AGENT_REGISTRY_SERVICE, CONSUMER);
+  const sessions = requireService(ctx, SESSION_RUNTIME_SERVICE, CONSUMER);
+  const llm = requireService(ctx, LLM_SERVICE, CONSUMER);
+  const tools = requireService(ctx, TOOL_RUNTIME_SERVICE, CONSUMER);
+  const prompt = requireService(ctx, PROMPT_RUNTIME_SERVICE, CONSUMER);
 
-  const engine = requireService<{ compaction: ContextCompactionCoordinator; create(options: ContextEngineOptions): ContextEngine }>(ctx, "context.engine");
-  const assembly = requireService<ContextAssemblyService>(ctx, CONTEXT_ASSEMBLY_SERVICE_ID);
+  const engine = requireService(ctx, CONTEXT_ENGINE_SERVICE, CONSUMER);
+  const assembly = requireService(ctx, CONTEXT_ASSEMBLY_SERVICE, CONSUMER);
   const activeSessions = new Map<string, import("@actspace/session-persistence").SessionHandle>();
 
   // Which sources an agent gets, and which tool results feed context state, is what the context plugins registered for its role.
   const createSources = (scope: AgentScope, agent: import("@actspace/agent").AgentDescriptor, workspaceRoot: string, role: AgentRole) => {
-    const scripting = scriptingFacts(ctx.get?.("tools.shell-tools") as ShellToolsService | undefined);
+    const scripting = scriptingFacts(getService(ctx, FACTORY_SHELL_TOOLS_VIEW));
     return assembly.sourcesFor(role, { scope, scopeId: scope.identity.scopeId, agent, host: host.host, workspaceRoot, prompt, ...(scripting === undefined ? {} : { scripting }) });
   };
   const observeContextToolResult = (session: SessionHandle, event: import("@actspace/session-journal").SessionEventEnvelopeV1) => assembly.observeToolResult(session, event);
-  const extensions = (sessionId: string, scopeId: string, kind: "main" | "subagent") => () => (ctx.get?.("actspace.host.prompt") as PromptHostPort | undefined)?.extensions?.list(sessionId, scopeId, kind) ?? [];
+  const extensions = (sessionId: string, scopeId: string, kind: "main" | "subagent") => () => getService(ctx, PROMPT_HOST_PORT)?.extensions?.list(sessionId, scopeId, kind) ?? [];
   // A fork keeps its parent's system prompt (design 02 §8.4): the sections plugins registered for the parent main session,
   // plus whatever is registered for the fork's own scope.
   const forkExtensions = (session: import("@actspace/session-persistence").SessionHandle, scopeId: string) => {
@@ -100,11 +99,11 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
     return () => [...parent(), ...own()];
   };
 
-  const sessionDataRoot = (ctx.get?.("actspace.host.session") as { readonly dataRoot?: string } | undefined)?.dataRoot;
+  const sessionDataRoot = getService(ctx, SESSION_RUNTIME_HOST_PORT)?.dataRoot;
   const isHostReadablePath = composeHostReadablePath(sessionDataRoot, hostReadableFiles);
   const readableFor = composeSessionReadablePath(isHostReadablePath, id => sessions.getOpen(id));
   // Resolved per call: shell-tools registers its scratch directory after this plugin is applied.
-  const isHostWritablePath = (canonicalPath: string) => (ctx.get?.(HOST_WRITABLE_ROOTS_SERVICE_ID) as HostWritableRoots | undefined)?.has(canonicalPath) === true;
+  const isHostWritablePath = (canonicalPath: string) => getService(ctx, HOST_WRITABLE_ROOTS_SERVICE)?.has(canonicalPath) === true;
   const toolEnvironmentFor = (session: import("@actspace/session-persistence").SessionHandle) => {
     activeSessions.set(session.header.sessionId, session);
     const configuredMode = host.toolEnvironment.permissionMode;
@@ -113,7 +112,7 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
       isHostReadablePath: readableFor(session),
       isHostWritablePath,
       autoReview: async (input: import("@actspace/tool-runtime").AutoReviewInput) => {
-        const reviewer = ctx.get?.("approval.auto-review") as AutoReviewer | undefined;
+        const reviewer = getService(ctx, AUTO_REVIEW_SERVICE);
         if (!reviewer) throw new Error("Auto reviewer unavailable");
         return reviewSessionAction(session, reviewer, input);
       },
@@ -180,7 +179,7 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
       registerMainTools(scope);
       // The parent's system prompt and conversation name the parent's scratch directory; the fork keeps both, so it works there.
       const parentId = session.header.lineage?.parentSessionId;
-      const shared = parentId === undefined ? undefined : (ctx.get?.("tools.shell-tools") as ShellToolsService | undefined)?.shareScratchDirectory?.(session.header.sessionId, parentId);
+      const shared = parentId === undefined ? undefined : getService(ctx, FACTORY_SHELL_TOOLS_VIEW)?.shareScratchDirectory?.(session.header.sessionId, parentId);
       if (shared !== undefined) scope.disposer.add(shared);
     }
     const binding = tools.bindAgentScope(session.header.sessionId, subject.agentId, () => new Set(allowedToolNames ?? []));
@@ -222,7 +221,7 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
       const subject: AgentSubject = Object.freeze({ agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
       const inbox = new MainAgentInbox(session);
       const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal, host.workspaceRoot);
-      const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot, "main"), contextExtensions: extensions(session.header.sessionId, scope.identity.scopeId, "main"), observeContextToolResult, createContextEngine: options => engine.create(options), descriptor, scope, agentSubject: subject, session, inbox, inputSource: run.inputSource, modeRuntime: async mode => { const compaction = ctx.get?.("compaction.runtime") as CompactionPlugin | undefined; return { compaction: mode === "chat" && compaction ? engine.compaction.withStrategy(compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8))) : engine.compaction }; }, llm, tools, toolEnvironment: activeSession => {
+      const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot, "main"), contextExtensions: extensions(session.header.sessionId, scope.identity.scopeId, "main"), observeContextToolResult, createContextEngine: options => engine.create(options), descriptor, scope, agentSubject: subject, session, inbox, inputSource: run.inputSource, modeRuntime: async mode => { const compaction = getService(ctx, COMPACTION_RUNTIME_SERVICE); return { compaction: mode === "chat" && compaction ? engine.compaction.withStrategy(compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8))) : engine.compaction }; }, llm, tools, toolEnvironment: activeSession => {
         const environment = toolEnvironmentFor(activeSession);
         const broker = environment.approvalBroker;
         return !broker || !run.budget ? environment : { ...environment, approvalBroker: {
@@ -282,7 +281,7 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
       return createLoop({ session, scope, signal, agentId, allowedToolNames, role: "subagent", descriptor: Object.freeze({ id: `actspace.subagent.${preset}`, version: 2, kind: "subagent", description: `Subagent (${preset}): ${description}`, presetId: `actspace.subagent.${preset}`, routeId: mainRouteId(), model: MAIN_AGENT_DESCRIPTOR.model, maxSteps }) });
     },
   });
-  ctx.provide?.("actspace.agent.factory", service);
+  provideService(ctx, AGENT_FACTORY_SERVICE, service);
   return service;
 }
 
@@ -310,18 +309,14 @@ export function createModeContributorActivation(
   };
 }
 
-function requireService<T>(ctx: CordisContext, id: string): T {
-  const value = ctx.get?.(id) as T | undefined;
-  if (value === undefined) throw new Error(`Agent factory plugin requires ${id}.`);
-  return value;
-}
-
 /** Harness entry: publish the structural one-Run factory from this isolated service tree. */
 export function apply(ctx: CordisContext): void {
   const hostReadableFiles = new HostReadableFiles();
-  ctx.provide?.(HOST_READABLE_FILES_SERVICE_ID, hostReadableFiles);
+  provideService(ctx, HOST_READABLE_FILES_SERVICE, hostReadableFiles);
   const factory = createAgentFactory(ctx, hostReadableFiles);
-  ctx.provide?.("agent.run-factory", factory.runFactory);
+  // 这一处按 id 注册：`RUN_FACTORY` 的定义在 Host 一侧的 `@actspace/agent-service`，值引用会把那个包打进 Harness 内核。
+  // 类型仍然按定义检查（`typeof RUN_FACTORY` 只用到类型）；id 写错时 Host 取不到工厂，任何一次 Run 都起不来。
+  ctx.provide?.("agent.run-factory", factory.runFactory satisfies ServiceOf<typeof RUN_FACTORY>);
 }
 
 function taskContent(content: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue) {

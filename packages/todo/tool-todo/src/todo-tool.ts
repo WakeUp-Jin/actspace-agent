@@ -2,14 +2,14 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionHandle } from "@actspace/session-persistence";
 import type { ToolDefinition } from "@actspace/tool-runtime";
 import type { ToolExecutionContext, ToolBodyResult } from "@actspace/tool-runtime";
-import type { ToolRuntime } from "@actspace/tool-runtime";
+import type { ToolRuntimeContract } from "@actspace/tool-runtime";
 import { TodoService, type TodoItem, type TodoState } from "./todo.js";
 
 const PLUGIN_ID = "actspace.todo";
 export type TodoToolRegistration = { readonly name: string; readonly dispose: () => Promise<void> };
 
-export function registerTodoTools(runtime: ToolRuntime, resolveSession: (sessionId: string) => SessionHandle | undefined): readonly TodoToolRegistration[] {
-  const handles: ReturnType<ToolRuntime["register"]>[] = [];
+export function registerTodoTools(runtime: ToolRuntimeContract, resolveSession: (sessionId: string) => SessionHandle | undefined): readonly TodoToolRegistration[] {
+  const handles: ReturnType<ToolRuntimeContract["register"]>[] = [];
   try { return Object.freeze([
     register("todo_read", "Read the durable Todo list for the current Agent Session.", readSchema(), "read-only", async (args, context) => {
       const service = serviceFor(resolveSession, context.sessionId);

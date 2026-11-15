@@ -1,6 +1,6 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { AgentScope } from "@actspace/scope";
-import type { JsonSchema, ToolBodyResult, ToolDefinition, ToolExecutionContext, ToolRuntime } from "@actspace/tool-runtime";
+import type { JsonSchema, ToolBodyResult, ToolDefinition, ToolExecutionContext, ToolRuntimeContract } from "@actspace/tool-runtime";
 import {
   AGENT_FORK_DESCRIPTION, AGENT_FORK_PARAMETERS, AGENT_PARAMETERS, AGENT_TOOL_DESCRIPTION, LIST_SUBAGENT_MODELS_DESCRIPTION,
   SEND_MESSAGE_DESCRIPTION, SEND_MESSAGE_PARAMETERS, externalAgentDescription, externalAgentParameters,
@@ -19,7 +19,7 @@ const AGENT_ID = { type: "string", minLength: 1, description: SEND_MESSAGE_PARAM
  * Register the four subagent tools of `local` and forked subagents (design 02 §2). The Host port does the work;
  * `mainScope` resolves a main agent's scope (child callers are resolved by the Host).
  */
-export function registerSubagentTools(runtime: ToolRuntime, port: SubagentHostPort, mainScope: (sessionId: string) => AgentScope | undefined): readonly SubagentToolRegistration[] {
+export function registerSubagentTools(runtime: ToolRuntimeContract, port: SubagentHostPort, mainScope: (sessionId: string) => AgentScope | undefined): readonly SubagentToolRegistration[] {
   const caller = (context: ToolExecutionContext): SubagentCaller => {
     const scope = mainScope(context.sessionId);
     return { sessionId: context.sessionId, callId: context.callId, ...(scope ? { scope } : {}) };
@@ -90,7 +90,7 @@ export function registerSubagentTools(runtime: ToolRuntime, port: SubagentHostPo
  * Register `agent_codex` / `agent_claude_code` for one external backend (design 04 §2). `pluginId` is the
  * plugin that owns the backend, so the tool is a member of that plugin in the main Agent form.
  */
-export function registerExternalSubagentTool(runtime: ToolRuntime, port: SubagentHostPort, backend: ExternalSubagentBackend, pluginId: string, mainScope: (sessionId: string) => AgentScope | undefined): SubagentToolRegistration {
+export function registerExternalSubagentTool(runtime: ToolRuntimeContract, port: SubagentHostPort, backend: ExternalSubagentBackend, pluginId: string, mainScope: (sessionId: string) => AgentScope | undefined): SubagentToolRegistration {
   const parameters = externalAgentParameters(backend.label);
   const definition: ToolDefinition = Object.freeze({
     abiVersion: 2, pluginId, name: backend.toolName, definitionVersion: 2, description: externalAgentDescription(backend.label),

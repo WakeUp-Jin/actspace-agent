@@ -1,7 +1,7 @@
 import { COMPACTION_SYSTEM, COMPACTION_TEMPLATE, PRIOR_SUMMARY_RULES } from "./prompts.js";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionSurfaceEntry } from "@actspace/session-journal";
-import { completeAuxiliaryText, type AuxiliaryRequestRecorder, type LlmService } from "@actspace/llm-service";
+import { completeAuxiliaryText, type AuxiliaryRequestRecorder, type LlmServiceContract } from "@actspace/llm-service";
 
 export type CompactionSummary = { readonly content: string; readonly pathlist?: readonly string[]; readonly metadata?: RuntimeV2JsonValue };
 
@@ -17,7 +17,7 @@ export class DeterministicCompactionSummarizer implements CompactionSummarizer {
 }
 
 export class LlmCompactionSummarizer implements CompactionSummarizer {
-  constructor(private readonly options: { readonly llm: LlmService; readonly recorder: AuxiliaryRequestRecorder; readonly routeId: string; readonly model: string }) {}
+  constructor(private readonly options: { readonly llm: LlmServiceContract; readonly recorder: AuxiliaryRequestRecorder; readonly routeId: string; readonly model: string }) {}
 
   async summarize(entries: readonly SessionSurfaceEntry[], context: { readonly sessionId: string; readonly turnId?: string; readonly summaryIds?: readonly string[]; readonly signal?: AbortSignal }): Promise<CompactionSummary> {
     const prior = entries.filter(entry => context.summaryIds?.includes(entry.node.messageId));

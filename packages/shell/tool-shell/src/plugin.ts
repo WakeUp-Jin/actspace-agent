@@ -1,15 +1,15 @@
 import { realpath } from "node:fs/promises";
 import { analyzeCommandPrefixGrant } from "./command-prefix.js";
 import { queryPathsWithinWorkspace } from "./query-paths.js";
-import { HOST_WRITABLE_ROOTS_SERVICE_ID, isPathWithin, PROCESS_HOST_PORT_ID, type BundledPythonGrant, type HostWritableRoots, type ProcessHostGrant } from "@actspace/tool-runtime";
+import { HOST_WRITABLE_ROOTS_SERVICE, isPathWithin, PROCESS_HOST_PORT, TOOL_RUNTIME_SERVICE, type BundledPythonGrant, type ProcessHostGrant } from "@actspace/tool-runtime";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { getBashHardRejectReason } from "./command-rules.js";
 import { detectScriptCommand, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime, ToolPermissionContract } from "@actspace/tool-runtime";
-import type { CordisContext } from "@actspace/cordis-adapter";
-import type { BackgroundTaskHost } from "@actspace/background-tasks";
-import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
+import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntimeContract, ToolPermissionContract } from "@actspace/tool-runtime";
+import { ACTSPACE_SERVICE_DEFINITIONS, ACTSPACE_SERVICE_IDS, bindServiceType, getService, provideService, serviceView, type CordisContext } from "@actspace/cordis-adapter";
+import { BACKGROUND_TASK_HOST_PORT, type BackgroundTaskHost } from "@actspace/background-tasks";
+import { SANDBOX_SERVICE, type SandboxService } from "@actspace/sandbox/types";
 import { SHELL_TOOLS_PLUGIN_ID, type SHELL_TOOLS_TOOLS } from "./manifest.js";
 import { createNodeBashToolPorts } from "./node-ports.js";
 import { ScratchOwners, sessionScratchDirectory } from "./scratch.js";
@@ -32,7 +32,7 @@ export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & {
 };
 /** The bundled Python as the process grant describes it; see `BundledPythonGrant` for what each field feeds. */
 export type BashPythonRuntime = BundledPythonGrant;
-export type ToolRegistration = { readonly name: string; readonly localName: ToolName; readonly handle: ReturnType<ToolRuntime["register"]> };
+export type ToolRegistration = { readonly name: string; readonly localName: ToolName; readonly handle: ReturnType<ToolRuntimeContract["register"]> };
 /** The `tools.shell-tools` service: what other plugins (the prompt, forks) read about Bash in this Harness. */
 export type ShellToolsService = {
   readonly registrations: readonly ToolRegistration[];
@@ -45,6 +45,9 @@ export type ShellToolsService = {
   readonly shareScratchDirectory?: (sessionId: string, ownerSessionId: string) => () => void;
   readonly python?: BashPythonRuntime;
 };
+export const SHELL_TOOLS_SERVICE = bindServiceType<ShellToolsService>(ACTSPACE_SERVICE_DEFINITIONS.shellTools);
+/** 这个包用到的 Session Host 端口：只要数据目录。 */
+export const SHELL_SESSION_HOST_VIEW = serviceView<{ readonly dataRoot?: string }>(ACTSPACE_SERVICE_IDS.hostSession);
 
 /**
  * The Host grants process execution (roots, shutdown hook); this plugin owns Bash itself. `sandbox` is absent when
@@ -53,18 +56,18 @@ export type ShellToolsService = {
  * `sessions-v2/<id>/bash-log/`, where command logs go.
  */
 export async function apply(ctx: CordisContext): Promise<void> {
-  const runtime = ctx.get?.("tools.runtime") as ToolRuntime | undefined;
-  const dataRoot = (ctx.get?.("actspace.host.session") as { readonly dataRoot?: string } | undefined)?.dataRoot;
+  const runtime = getService(ctx, TOOL_RUNTIME_SERVICE);
+  const dataRoot = getService(ctx, SHELL_SESSION_HOST_VIEW)?.dataRoot;
   if (!runtime || !dataRoot) throw new Error("shell-tools requires tools.runtime and actspace.host.session.");
-  const sandbox = ctx.get?.(SANDBOX_SERVICE_ID) as SandboxService | undefined;
-  const grant = ctx.get?.(PROCESS_HOST_PORT_ID) as ProcessHostGrant | undefined;
+  const sandbox = getService(ctx, SANDBOX_SERVICE);
+  const grant = getService(ctx, PROCESS_HOST_PORT);
   const scratchOwners = new ScratchOwners();
-  const ports: ToolPorts = grant ? createGrantedPorts(grant, ctx.get?.("actspace.host.background-tasks") as BackgroundTaskHost | undefined, sandbox, dataRoot, scratchOwners.ownerOf) : {};
+  const ports: ToolPorts = grant ? createGrantedPorts(grant, getService(ctx, BACKGROUND_TASK_HOST_PORT), sandbox, dataRoot, scratchOwners.ownerOf) : {};
   let registrations: readonly ToolRegistration[];
   try { registrations = registerTools(runtime, ports, sandbox); }
   catch (error) { await ports.dispose?.(); throw error; }
   // write_file / read_file inside the scratch directory need no workspace-scope approval; the Host cleans it up.
-  const writableRoots = ctx.get?.(HOST_WRITABLE_ROOTS_SERVICE_ID) as HostWritableRoots | undefined;
+  const writableRoots = getService(ctx, HOST_WRITABLE_ROOTS_SERVICE);
   const scratchRoot = ports.scratchRoot;
   if (scratchRoot !== undefined) writableRoots?.add(scratchRoot);
   const service: ShellToolsService = Object.freeze({
@@ -74,7 +77,7 @@ export async function apply(ctx: CordisContext): Promise<void> {
       shareScratchDirectory: (sessionId: string, ownerSessionId: string) => scratchOwners.share(sessionId, ownerSessionId),
     }),
   });
-  ctx.provide?.("tools.shell-tools", service);
+  provideService(ctx, SHELL_TOOLS_SERVICE, service);
   ctx.effect?.(() => async () => {
     if (scratchRoot !== undefined) writableRoots?.remove(scratchRoot);
     const results = await Promise.allSettled([...registrations].reverse().map((item) => item.handle.dispose()));
@@ -83,7 +86,7 @@ export async function apply(ctx: CordisContext): Promise<void> {
     if (failures.length) throw new AggregateError(failures.map((item) => item.reason), "shell-tools cleanup failed.");
   }, "shell-tools");
 }
-export function registerTools(runtime: ToolRuntime, ports: ToolPorts, sandbox?: SandboxService): readonly ToolRegistration[] {
+export function registerTools(runtime: ToolRuntimeContract, ports: ToolPorts, sandbox?: SandboxService): readonly ToolRegistration[] {
   const registrations: ToolRegistration[] = [];
   try {
     for (const item of TOOL_DEFINITIONS) {

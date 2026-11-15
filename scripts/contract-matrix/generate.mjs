@@ -49,14 +49,14 @@ const SESSION_SURFACES = Object.freeze({
 });
 
 const LOOP_META = Object.freeze({
-  "agent/pre-step": { mode: "waterfall", scope: "agent", containment: "step-skip-or-rewrite" },
+  "agent/pre-step": { mode: "waterfall", scope: "agent", containment: "annotate-or-fail" },
   "agent/request": { mode: "waterfall", scope: "agent", containment: "request-reject" },
   "llm/stream": { mode: "waterfall", scope: "agent", containment: "abort-or-replace" },
   "agent/request-error": { mode: "waterfall", scope: "agent", containment: "retry-abort-escalate" },
   "tools/pre-execute": { mode: "waterfall", scope: "agent", containment: "deny-or-rewrite" },
   "tools/execute": { mode: "waterfall", scope: "agent", containment: "wrap-or-replace" },
   "tools/post-execute": { mode: "waterfall", scope: "agent", containment: "result-redact-finalizer-diagnostics" },
-  "agent/turn-stopping": { mode: "serial", scope: "agent", containment: "stop-or-continue" },
+  "agent/turn-stopping": { mode: "serial", scope: "agent", containment: "observe-or-fail" },
 });
 
 const NOTIFICATION_META = Object.freeze({
@@ -109,6 +109,21 @@ function sourceRef(path, symbol) {
   return `${path}#${symbol}`;
 }
 
+/**
+ * 干预点的名字在 cordis-adapter，payload 和结果的契约在分发它的包里：某个领域声明文件里带 `@mode` 的同名成员。
+ * 返回每个名字的契约所在的文件。找不到契约，或者契约的模式和 LOOP_META 不一致，就报错，目录不会带着对不上的内容生成出来。
+ */
+export function interventionContractPaths(ids, declarations) {
+  const paths = new Map();
+  for (const id of ids) {
+    const contract = declarations.find((item) => item.eventType === id);
+    if (contract === undefined) throw new Error(`Intervention ${id} has no @mode contract in the domain event declarations.`);
+    if (contract.mode !== LOOP_META[id]?.mode) throw new Error(`Intervention ${id} is declared as ${contract.mode} in ${contract.path}, but the matrix metadata says ${LOOP_META[id]?.mode}.`);
+    paths.set(id, contract.path);
+  }
+  return paths;
+}
+
 function stableSort(rows) {
   return [...rows].sort((left, right) => `${left.kind}\u0000${left.id}`.localeCompare(`${right.kind}\u0000${right.id}`));
 }
@@ -136,14 +151,16 @@ async function parseEvents() {
     const auxiliary = id === "llm/auxiliary-start" || id === "llm/auxiliary-end";
     rows.push(row("event", `session:${id}`, "@actspace/session-journal", future ? "unimplemented" : "active", [sourceRef(EVENT_SOURCES.sessionExtensions.path, EVENT_SOURCES.sessionExtensions.symbol)], { plane: "session", category: "extension", eventType: id, scope: "session", surface: "internal", codecStatus: "present", producerStatus: future ? "not-implemented" : auxiliary ? "present" : "none", required: true, ...(auxiliary ? { tests: ["session-journal/auxiliary-request-contract", "runtime/auxiliary-request-recorder", "image-inspection/auxiliary-request-lifecycle"] } : {}) }));
   }
-  for (const id of interventions) rows.push(row("event", `intervention:${id}`, "@actspace/cordis-adapter", "active", [sourceRef(EVENT_SOURCES.loopInterventions.path, EVENT_SOURCES.loopInterventions.symbol)], { plane: "intervention", category: "agent-loop", eventType: id, scope: LOOP_META[id]?.scope ?? "agent", mode: LOOP_META[id]?.mode ?? "waterfall", containment: LOOP_META[id]?.containment ?? "defined", codecStatus: "n/a", producerStatus: "present", required: true }));
-  for (const id of notifications) rows.push(row("event", `notification:${id}`, "@actspace/cordis-adapter", "active", [sourceRef(EVENT_SOURCES.notifications.path, EVENT_SOURCES.notifications.symbol)], { plane: "notification", category: "notification", eventType: id, scope: NOTIFICATION_META[id]?.scope ?? "runtime", containment: NOTIFICATION_META[id]?.containment ?? "observer-isolated", mode: "emit", codecStatus: "n/a", producerStatus: "present", required: true }));
+  const domainDeclarations = [];
   for (const path of DOMAIN_EVENT_PATHS) {
-    const source = await readRelative(path);
-    for (const match of source.matchAll(/\/\*\*\s*@mode\s+(emit|waterfall|parallel|serial|bail)\s*\*\/\s*"([^"]+)"/g)) {
-      if (rows.some(item => item.eventType === match[2])) continue;
-      rows.push(row("event", `domain:${match[2]}`, path.split("/").slice(0, 2).join("/"), "declared", [path], { plane: "domain", category: "domain", eventType: match[2], mode: match[1], producerStatus: "not-inferred", codecStatus: "n/a" }));
-    }
+    for (const match of (await readRelative(path)).matchAll(/\/\*\*\s*@mode\s+(emit|waterfall|parallel|serial|bail)\s*\*\/\s*"([^"]+)"/g)) domainDeclarations.push({ path, mode: match[1], eventType: match[2] });
+  }
+  const contractPaths = interventionContractPaths(interventions, domainDeclarations);
+  for (const id of interventions) rows.push(row("event", `intervention:${id}`, "@actspace/cordis-adapter", "active", [sourceRef(EVENT_SOURCES.loopInterventions.path, EVENT_SOURCES.loopInterventions.symbol), contractPaths.get(id)], { plane: "intervention", category: "agent-loop", eventType: id, scope: LOOP_META[id]?.scope ?? "agent", mode: LOOP_META[id]?.mode ?? "waterfall", containment: LOOP_META[id]?.containment ?? "defined", codecStatus: "n/a", producerStatus: "present", required: true }));
+  for (const id of notifications) rows.push(row("event", `notification:${id}`, "@actspace/cordis-adapter", "active", [sourceRef(EVENT_SOURCES.notifications.path, EVENT_SOURCES.notifications.symbol)], { plane: "notification", category: "notification", eventType: id, scope: NOTIFICATION_META[id]?.scope ?? "runtime", containment: NOTIFICATION_META[id]?.containment ?? "observer-isolated", mode: "emit", codecStatus: "n/a", producerStatus: "present", required: true }));
+  for (const { path, mode, eventType } of domainDeclarations) {
+    if (rows.some(item => item.eventType === eventType)) continue;
+    rows.push(row("event", `domain:${eventType}`, path.split("/").slice(0, 2).join("/"), "declared", [path], { plane: "domain", category: "domain", eventType, mode, producerStatus: "not-inferred", codecStatus: "n/a" }));
   }
   return stableSort(rows);
 }

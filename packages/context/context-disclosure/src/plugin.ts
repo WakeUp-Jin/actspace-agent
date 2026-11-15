@@ -1,10 +1,10 @@
-import type { CordisContext } from "@actspace/cordis-adapter";
-import { CONTEXT_ASSEMBLY_SERVICE_ID, type ContextAssemblyService } from "@actspace/context-assembly";
+import { ACTSPACE_SERVICE_IDS, getService, serviceView, type CordisContext } from "@actspace/cordis-adapter";
+import { CONTEXT_ASSEMBLY_SERVICE, CONTEXT_ASSEMBLY_SERVICE_ID } from "@actspace/context-assembly";
 import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import type { Context, ContextPathState, ContextSource, CompactionDisclosure, CompactionRegion, CompactionResult, CompactionSession, ContextCompactionCoordinator } from "@actspace/context-engine";
+import type { Context, ContextPathState, ContextSource, CompactionDisclosure, CompactionRegion, CompactionResult, CompactionSession } from "@actspace/context-engine";
 import { CONTEXT_OWNER, STATE_EVENT } from "@actspace/context-engine/codec";
-import { ContextSupplements, contextEvents, latestContextEvent } from "@actspace/context-engine";
+import { CONTEXT_ENGINE_SERVICE, ContextSupplements, contextEvents, latestContextEvent } from "@actspace/context-engine";
 import { applyStateEvent, candidatePaths, emptyDisclosureState, registerPaths, type DisclosureState, type StateOperation } from "@actspace/context-engine/state";
 import { selectActive } from "./policy.js";
 import { collectPathHints, referenceText, type DisclosureHost, type PathReference } from "./paths.js";
@@ -165,16 +165,19 @@ export function createDisclosureSource(): ContextSource {
     write({ supplements: [{ id: "navigation", owner: DISCLOSURE_OWNER, afterEventSeq: -1, sourceEventSeq: -1, text }] });
   } };
 }
+/** 这个包用到的 Agent Host 端口：Host 给了 `contextDisclosure` 才启用。 */
+export const DISCLOSURE_HOST_VIEW = serviceView<{ readonly contextDisclosure?: DisclosureHost }>(ACTSPACE_SERVICE_IDS.hostAgent);
+
 /**
  * Enabled, the strategy joins the engine three ways: compaction hooks and Context hydration through the coordinator,
  * the navigation source and the tool-result observer through `context.assembly`. The loop references none of them.
  */
 export function apply(ctx: CordisContext): void {
-  const host = ctx.get?.("actspace.host.agent") as { contextDisclosure?: DisclosureHost } | undefined;
+  const host = getService(ctx, DISCLOSURE_HOST_VIEW);
   if (!host?.contextDisclosure) { ctx.provide?.("context.disclosure", undefined); return; }
   const disclosure = new ProgressiveDisclosure(host.contextDisclosure);
-  const engine = ctx.get?.("context.engine") as { compaction: ContextCompactionCoordinator } | undefined;
-  const assembly = ctx.get?.(CONTEXT_ASSEMBLY_SERVICE_ID) as ContextAssemblyService | undefined;
+  const engine = getService(ctx, CONTEXT_ENGINE_SERVICE);
+  const assembly = getService(ctx, CONTEXT_ASSEMBLY_SERVICE);
   if (!engine || !assembly) throw new Error(`Context disclosure requires context.engine and ${CONTEXT_ASSEMBLY_SERVICE_ID}.`);
   const remove = engine.compaction.registerDisclosure(disclosure); ctx.effect?.(() => remove);
   ctx.effect?.(() => assembly.register({ kind: "disclosure", create: () => createDisclosureSource() }), "context.source.disclosure");

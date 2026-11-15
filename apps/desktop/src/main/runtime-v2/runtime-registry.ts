@@ -1,5 +1,6 @@
 import { readSessionWorkspaceFacts } from "./session-workspace-facts";
 import type { EnglishLearningService, SpeechHostPort } from "@actspace/english-learning";
+import { profileService } from "./profile-service";
 import { formatChatAttachmentIssue, type ChatAttachmentIssue, type EnglishLearningTargetInput, type EnglishLearningState } from "@actspace/shared";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "../workspace-registry-service";
 import { FixedRendererStreamAdapter } from "./fixed-renderer-stream-adapter";
@@ -291,7 +292,7 @@ export class DesktopRuntimeV2Registry {
     this.#admittedWork++;
     try {
       const snapshot = await this.requireApp().updateSessionMetadata(input.sessionId, input);
-      if (input.archived && this.#profile?.context.get?.("english-learning")) {
+      if (input.archived && this.#profile && profileService(this.#profile, "english-learning")) {
         const learning = this.englishLearning();
         if (learning.getState().targetSessionId === input.sessionId) await learning.disable();
       }
@@ -436,16 +437,15 @@ export class DesktopRuntimeV2Registry {
     this.#sessionRelease()?.setObserved(this.#observedSessions);
   }
   #observedSessions: readonly string[] = [];
-  #sessionRelease(): SessionReleaseControl | undefined { return this.#profile?.context.get?.("session.runtime") as SessionReleaseControl | undefined; }
+  #sessionRelease(): SessionReleaseControl | undefined { return this.#profile && profileService(this.#profile, "session.runtime"); }
   /** A fresh boot starts without viewers: replay the renderer's set and pin what Host features hold open. */
   #installSessionRelease(profile: BootedRuntimeProfile): void {
-    const control = profile.context.get?.("session.runtime") as SessionReleaseControl | undefined;
+    const control: SessionReleaseControl | undefined = profileService(profile, "session.runtime");
     if (control === undefined) return;
     control.setObserved(this.#observedSessions);
     // English learning keeps the target Session's handle to read each finished turn.
     control.addPin((sessionId) => {
-      const learning = profile.context.get?.("english-learning") as EnglishLearningService | undefined;
-      const state = learning?.getState();
+      const state = profileService(profile, "english-learning")?.getState();
       return state?.enabled === true && state.targetSessionId === sessionId;
     });
   }
@@ -475,7 +475,7 @@ export class DesktopRuntimeV2Registry {
   #learningTargetToRestore: EnglishLearningTargetInput | undefined;
 
   englishLearning(): EnglishLearningService {
-    const service = this.requireProfile().context.get?.("english-learning") as EnglishLearningService | undefined;
+    const service = profileService(this.requireProfile(), "english-learning");
     if (!service) throw new Error("英语辅助学习尚未就绪。");
     return service;
   }
@@ -493,7 +493,7 @@ export class DesktopRuntimeV2Registry {
   }
 
   #bindLearningNotifications(): void {
-    if (this.#profile === undefined || this.#stopLearningNotifications || this.#learningListeners.size === 0 || !this.#profile.context.get?.("english-learning")) return;
+    if (this.#profile === undefined || this.#stopLearningNotifications || this.#learningListeners.size === 0 || !profileService(this.#profile, "english-learning")) return;
     this.#stopLearningNotifications = this.englishLearning().subscribe((state) => {
       for (const listener of this.#learningListeners) listener(state);
     });
@@ -535,7 +535,7 @@ export class DesktopRuntimeV2Registry {
     const profile = this.#profile;
     if (profile === undefined) return;
     this.learningOperation++;
-    const learning = profile.context.get?.("english-learning") as EnglishLearningService | undefined;
+    const learning = profileService(profile, "english-learning");
     if (forRestart && learning) {
       const state = learning.getState();
       this.#learningTargetToRestore = { enabled: state.enabled, sessionId: state.targetSessionId };
@@ -709,7 +709,7 @@ export class DesktopRuntimeV2Registry {
   }
 
   private requireApp(): DesktopAppServiceContract {
-    const app = this.requireProfile().context.get?.("desktop.app") as DesktopAppServiceContract | undefined;
+    const app = profileService(this.requireProfile(), "desktop.app");
     if (app === undefined) throw new Error(this.#bootError ?? "Desktop application service is not ready.");
     return app;
   }
