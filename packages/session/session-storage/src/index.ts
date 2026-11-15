@@ -15,7 +15,7 @@ export interface SessionStorageSnapshot {
 
 /** Result of `SessionStorage.refresh`: how the physical Journal relates to the base snapshot. */
 export type SessionStorageRefresh =
-  /** Nothing changed; `snapshot` is the base object itself and no Journal content was read. */
+  /** Nothing changed; `snapshot` is the base object itself. Deciding this reads at most a bounded amount of Journal content, never the whole file. */
   | { readonly kind: "unchanged"; readonly snapshot: SessionStorageSnapshot }
   /** The Journal only grew. `snapshot.events` starts with all of the base events; events from index `fromEvent` are new. */
   | { readonly kind: "appended"; readonly snapshot: SessionStorageSnapshot; readonly fromEvent: number }

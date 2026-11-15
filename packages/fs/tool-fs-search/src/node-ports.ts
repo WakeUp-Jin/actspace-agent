@@ -125,10 +125,9 @@ async function runRipgrep(command: string | undefined, args: readonly string[], 
       signal.removeEventListener("abort", abort);
       resolveResult({ exitCode, stdout, error, truncated });
     };
-    const append = (current: string, chunk: Buffer) => {
+    const append = (current: string, text: string) => {
       const room = MAX_SEARCH_OUTPUT_CHARS - current.length;
       if (room <= 0) { truncated = true; return current; }
-      const text = chunk.toString("utf8");
       if (text.length > room) truncated = true;
       return current + text.slice(0, room);
     };
@@ -136,8 +135,11 @@ async function runRipgrep(command: string | undefined, args: readonly string[], 
     const timer = setTimeout(() => { child.kill("SIGTERM"); finish(null, `ripgrep timed out after ${RG_TIMEOUT_MS}ms`); }, RG_TIMEOUT_MS);
     if (signal.aborted) abort();
     else signal.addEventListener("abort", abort, { once: true });
-    child.stdout.on("data", (chunk: Buffer) => { stdout = append(stdout, chunk); });
-    child.stderr.on("data", (chunk: Buffer) => { stderr = append(stderr, chunk); });
+    // 管道按字节切块，一个多字节字符可能落在两块之间。让流自己解码，它会把没收全的字节留到下一块。
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (text: string) => { stdout = append(stdout, text); });
+    child.stderr.on("data", (text: string) => { stderr = append(stderr, text); });
     child.on("error", (error) => finish(null, error.message.includes("ENOENT") ? "ripgrep (rg) is required for grep/glob tools but was not found." : error.message));
     child.on("close", (code) => finish(code));
   });

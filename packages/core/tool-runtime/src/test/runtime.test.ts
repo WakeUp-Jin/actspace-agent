@@ -1,3 +1,6 @@
+import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createCordisRoot } from "@actspace/cordis-adapter";
 import type { RuntimeV2JsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
 import type { ApprovalBroker } from "@actspace/approval";
@@ -19,6 +22,12 @@ class FakeCapabilities implements ToolCapabilitySet {
     return this.values.get(capabilityId) as T;
   }
 }
+
+// 权限检查会对工作区根目录做 realpath。写死的 /workspace 在它恰好是符号链接的机器上
+// （云端 Agent、devcontainer）会被解析到别处，所以每次运行建一个真实目录。
+let workspaceRoot = "";
+beforeAll(async () => { workspaceRoot = await realpath(await mkdtemp(join(tmpdir(), "actspace-tool-runtime-"))); });
+afterAll(async () => { await rm(workspaceRoot, { recursive: true, force: true }); });
 
 function definition(overrides: Partial<ToolDefinition> = {}): ToolDefinition {
   return {
@@ -82,7 +91,7 @@ function environment(
   };
   const capabilitySet = new FakeCapabilities(new Map([["filesystem.read", Object.freeze({ kind: "read" })]]));
   return {
-    workspaceRoot: "/workspace",
+    workspaceRoot,
     hostCapabilities: new Set(["filesystem.read"]),
     capabilitySet,
     approvalBroker: options.approvalBroker,
@@ -287,7 +296,7 @@ describe("Tool Runtime execution contract", () => {
     runtime.register({
       definition: definition({ effects: [{ capabilityId: "filesystem.read", mode: "use", resourceScope: "workspace" }] }),
       executor: { concurrencySafe: true, async execute() { return success(); } },
-      permission: { extractResources: (args) => [{ kind: "file", access: "read", canonicalPath: `/workspace/${String(args.value)}`, targetKind: "file" }], evaluate: () => ({ kind: "allow" }) },
+      permission: { extractResources: (args) => [{ kind: "file", access: "read", canonicalPath: join(workspaceRoot, String(args.value)), targetKind: "file" }], evaluate: () => ({ kind: "allow" }) },
     });
     const [result] = await runtime.executeBatch([call("relative", { value: "src/index.ts" })], environment([]));
     expect(result).toMatchObject({ status: "completed" });
@@ -692,10 +701,10 @@ describe("process Session Grant execution", () => {
     let calls = 0;
     runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { calls++; return success(); } }, permission: {
       grantAudience: { pluginId: "plugin.test", permissionDomain: "bash", policyVersion: 1 },
-      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: "/workspace/sub", workspaceRoot: "/workspace", noSandbox: false, dynamic: false,
+      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: join(workspaceRoot, "sub"), workspaceRoot, noSandbox: false, dynamic: false,
         ...(String(args.value).startsWith("pnpm ") && !String(args.value).includes("&&") ? { argv: String(args.value).split(" "), grantPrefix: ["pnpm"] } : {}) }],
       evaluate: args => args.value === "blocked" ? { kind: "deny", code: "POLICY_DENIED", reason: "blocked" } : { kind: "ask", risk: "high", reason: "run", reusable: true },
-      suggestGrants: () => [{ action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["pnpm"], cwdRoot: "/workspace" }, label: "pnpm" }],
+      suggestGrants: () => [{ action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["pnpm"], cwdRoot: workspaceRoot }, label: "pnpm" }],
     } });
     const trustedGrantAudiences = new Set(["plugin.test\u0000bash\u00001"]);
     const options = { sessionGrants: grants, sessionGrantCapability: true, trustedGrantAudiences, permissionRecords: records };
@@ -725,12 +734,12 @@ describe("process Session Grant execution", () => {
     let calls = 0;
     runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { calls++; return success(); } }, permission: {
       grantAudience: audience,
-      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: "/workspace", workspaceRoot: "/workspace", noSandbox: false, dynamic: false, argv: String(args.value).split(" "), grantPrefix: [String(args.value).split(" ")[0]] }],
+      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: workspaceRoot, workspaceRoot, noSandbox: false, dynamic: false, argv: String(args.value).split(" "), grantPrefix: [String(args.value).split(" ")[0]] }],
       evaluate: () => ({ kind: "ask", risk: "high", reason: "run", reusable: true }),
-      suggestGrants: () => [{ action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: "/workspace" }, label: "ls" }],
+      suggestGrants: () => [{ action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: workspaceRoot }, label: "ls" }],
     } });
     const parentGrant: SessionGrant = { schemaVersion: 1, grantId: "grant-1", sessionId: "parent-1", agentId: "main:parent-1", audience, action: "process.execute", access: "execute",
-      selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: "/workspace" }, sourceRequestId: "request-1", sourceCallId: "call-0", sourceToolName: "bash", issuedAt: new Date().toISOString() } as SessionGrant;
+      selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: workspaceRoot }, sourceRequestId: "request-1", sourceCallId: "call-0", sourceToolName: "bash", issuedAt: new Date().toISOString() } as SessionGrant;
     const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
     const child = { ...environment([], { sessionGrants: [parentGrant], trustedGrantAudiences: new Set(["plugin.test\u0000bash\u00001"]), permissionRecords: records }),
       sessionGrantCapability: false, sessionGrantOwner: { sessionId: "parent-1", agentId: "main:parent-1" }, approvalUnavailableMessage: "needs approval" };

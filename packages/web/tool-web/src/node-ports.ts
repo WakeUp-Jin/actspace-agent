@@ -1,8 +1,8 @@
 import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
+import { publicAddresses, requestPinned, type PageRequest } from "./public-request.js";
 
 const SEARCH_TIMEOUT_MS = 15_000;
 const FETCH_TIMEOUT_MS = 30_000;
@@ -20,18 +20,34 @@ export type NodeWebToolPortsOptions = {
   readonly credentials?: WebSearchCredentials;
   /** Presence authorizes paid Fetch independently of search credentials. */
   readonly deepseekFetchApiKey?: string;
+  /** Calls the search and fetch providers' own APIs. Pages the model names go through `requestPage`. */
   readonly fetchImpl?: typeof fetch;
   readonly resolveHostname?: (hostname: string) => Promise<readonly string[]>;
+  /** Opens a page the model named. Defaults to `defaultPageRequest`. */
+  readonly requestPage?: PageRequest;
 };
 
 export type NodeWebToolPorts = Pick<ToolPorts, "web" | "web_search" | "web_fetch"> & { readonly dispose: () => Promise<void> };
 
+/**
+ * Pages are opened over a connection pinned to the addresses that were checked.
+ *
+ * The exception is a process told to send its requests through a proxy (NODE_USE_ENV_PROXY=1, which the
+ * evaluation sandbox sets). There the proxy resolves the name and is the only way out, so the request has
+ * to go through `fetch`, and which hosts are reachable is the proxy's decision.
+ */
+export function defaultPageRequest(env: NodeJS.ProcessEnv, fetchImpl: typeof fetch): PageRequest {
+  if (env.NODE_USE_ENV_PROXY !== "1") return requestPinned;
+  return (url, _addresses, init) => fetchImpl(url, { ...init, redirect: "manual" });
+}
+
 export function createNodeWebToolPorts(options: NodeWebToolPortsOptions = {}): NodeWebToolPorts {
   const fetchImpl = options.fetchImpl ?? fetch;
   const resolveHostname = options.resolveHostname ?? resolveHostnameAddresses;
+  const requestPage = options.requestPage ?? defaultPageRequest(process.env, fetchImpl);
   const cache = new Map<string, { readonly expiresAt: number; readonly value: string }>();
   const search = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => webSearch(args, context, options.credentials ?? {}, fetchImpl);
-  const open = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => webFetch(args, context, fetchImpl, resolveHostname, cache, options.deepseekFetchApiKey);
+  const open = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => webFetch(args, context, fetchImpl, requestPage, resolveHostname, cache, options.deepseekFetchApiKey);
   return Object.freeze({
     web: (args, context) => args.action === "search" ? search(args, context) : args.action === "open" ? open(args, context) : Promise.resolve(failed("INVALID_ARGUMENTS", "action must be search or open", false)),
     web_search: search,
@@ -168,6 +184,7 @@ async function webFetch(
   args: Readonly<Record<string, RuntimeV2JsonValue>>,
   context: ToolExecutionContext,
   fetchImpl: typeof fetch,
+  requestPage: PageRequest,
   resolveHostname: (hostname: string) => Promise<readonly string[]>,
   cache: Map<string, { readonly expiresAt: number; readonly value: string }>,
   deepseekApiKey?: string,
@@ -183,7 +200,7 @@ async function webFetch(
   if (cached !== undefined) cache.delete(cacheKey);
   let fallbackNote = "";
   if (deepseekApiKey) {
-    try { await assertPublicHostname(parsed.hostname, resolveHostname); }
+    try { await publicAddresses(parsed.hostname, resolveHostname); }
     catch { return failed("WEB_FETCH_URL_DENIED", "Target must resolve to a public address.", false); }
     try {
       const remote = await fetchImpl("https://api.deepseek.com/v1/tools/fetch", {
@@ -206,8 +223,8 @@ async function webFetch(
       fallbackNote = "Note: DeepSeek fetch unavailable; used local fetch.";
     }
   }
-  let response: Response;
-  try { response = await fetchFollowingSafeRedirects(parsed, context.signal, fetchImpl, resolveHostname); }
+  let response: Response, finalUrl: string;
+  try { const page = await fetchFollowingSafeRedirects(parsed, context.signal, requestPage, resolveHostname); response = page.response; finalUrl = page.url.toString(); }
   catch (error) { return failed("WEB_FETCH_FAILED", safeError("web_fetch", error), true); }
   if (!response.ok) return failed("WEB_FETCH_HTTP_ERROR", `Fetching ${raw} returned HTTP ${response.status} ${response.statusText}.`, response.status >= 500 || response.status === 429);
   const declared = Number(response.headers.get("content-length") ?? "0");
@@ -223,18 +240,21 @@ async function webFetch(
   if (!content) return failed("WEB_FETCH_EMPTY", `Fetched ${raw} but found no readable text content.`, false);
   const originalChars = content.length;
   if (content.length > MAX_MARKDOWN_CHARS) content = `${content.slice(0, MAX_MARKDOWN_CHARS)}\n\n[Content truncated: showing first ${MAX_MARKDOWN_CHARS} of ${originalChars} characters]`;
-  const value = [`URL: ${response.url || raw}`, `Provider: local`, fallbackNote, title ? `Title: ${title}` : "", `Content-Type: ${mime || "unknown"}`, `Fetched at: ${new Date().toISOString()}`, "", content].filter((line, index) => line || index >= 4).join("\n");
+  const value = [`URL: ${finalUrl}`, `Provider: local`, fallbackNote, title ? `Title: ${title}` : "", `Content-Type: ${mime || "unknown"}`, `Fetched at: ${new Date().toISOString()}`, "", content].filter((line, index) => line || index >= 4).join("\n");
   if (cache.size >= CACHE_MAX_ENTRIES) { const oldest = cache.keys().next().value; if (oldest) cache.delete(oldest); }
   cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, value });
-  return completed(value, `Fetched ${response.url || raw} locally${fallbackNote ? " (DeepSeek fallback)" : ""}`);
+  return completed(value, `Fetched ${finalUrl} locally${fallbackNote ? " (DeepSeek fallback)" : ""}`);
 }
 
-async function fetchFollowingSafeRedirects(start: URL, signal: AbortSignal, fetchImpl: typeof fetch, resolveHostname: (hostname: string) => Promise<readonly string[]>): Promise<Response> {
+/** Every hop is checked again, and each request goes only to the addresses its own check returned. */
+async function fetchFollowingSafeRedirects(start: URL, signal: AbortSignal, requestPage: PageRequest, resolveHostname: (hostname: string) => Promise<readonly string[]>): Promise<{ readonly response: Response; readonly url: URL }> {
   let current = start;
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
-    await assertPublicHostname(current.hostname, resolveHostname);
-    const response = await fetchImpl(current, { redirect: "manual", signal: combinedSignal(signal, FETCH_TIMEOUT_MS), headers: { "User-Agent": "actspace-agent", Accept: "text/markdown;q=1.0, text/html;q=0.9, text/plain;q=0.8, application/json;q=0.7, */*;q=0.1" } });
-    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const addresses = await publicAddresses(current.hostname, resolveHostname);
+    const response = await requestPage(current, addresses, { signal: combinedSignal(signal, FETCH_TIMEOUT_MS), headers: { "User-Agent": "actspace-agent", Accept: "text/markdown;q=1.0, text/html;q=0.9, text/plain;q=0.8, application/json;q=0.7, */*;q=0.1" } });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return { response, url: current };
+    // A redirect's body is never read; cancelling it releases the connection.
+    void response.body?.cancel().catch(() => undefined);
     const location = response.headers.get("location");
     if (!location) throw new Error("Redirect response is missing Location.");
     if (redirect === MAX_REDIRECTS) throw new Error(`Redirect limit exceeded (${MAX_REDIRECTS}).`);
@@ -253,23 +273,7 @@ function parsePublicUrl(raw: string): URL | Error {
   return value;
 }
 
-async function assertPublicHostname(hostname: string, resolveHostname: (hostname: string) => Promise<readonly string[]>): Promise<void> {
-  const normalized = hostname.toLowerCase();
-  if (normalized === "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) throw new Error("Local and private network hosts are not allowed.");
-  const addresses = isIP(normalized) ? [normalized] : await resolveHostname(normalized);
-  if (!addresses.length || addresses.some(isPrivateAddress)) throw new Error("Local and private network addresses are not allowed.");
-}
-
 async function resolveHostnameAddresses(hostname: string): Promise<readonly string[]> { return (await lookup(hostname, { all: true, verbatim: true })).map(({ address }) => address); }
-
-function isPrivateAddress(address: string): boolean {
-  const value = address.toLowerCase();
-  if (value === "::" || value === "::1" || value === "0.0.0.0" || value.startsWith("fc") || value.startsWith("fd") || /^fe[89ab]/.test(value)) return true;
-  if (value.startsWith("::ffff:")) return isPrivateAddress(value.slice(7));
-  const parts = value.split(".").map(Number); if (parts.length !== 4 || parts.some(Number.isNaN)) return false;
-  const [a, b] = parts as [number, number, number, number];
-  return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
-}
 
 async function readBoundedBody(response: Response, maxBytes: number): Promise<Buffer> {
   if (!response.body) return Buffer.alloc(0);

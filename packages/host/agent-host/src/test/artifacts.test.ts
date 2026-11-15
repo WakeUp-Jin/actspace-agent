@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile, symlink, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it, vi } from "vitest";
+import { HostRequestError } from "@actspace/shared/host-protocol";
 import { HostArtifacts } from "../artifacts.js";
 import { HostUploads } from "../uploads.js";
 import { NodeArtifactStore } from "../node-ports/artifact-store.js";
@@ -25,6 +26,25 @@ it("snapshots workspace results and rejects cross-session reads and symlink esca
     await writeFile(join(workspace, "large.bin"), Buffer.alloc(20 * 1024 * 1024 + 1));
     await expect(artifacts.reference("s", workspace, "large.bin")).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
     await expect(artifacts.reference("s", workspace, ".")).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+it("serves ranges up to one chunk and names a bad range as the caller's mistake", async () => {
+  const root = await mkdtemp(join(tmpdir(), "host-artifacts-range-"));
+  try {
+    const workspace = join(root, "workspace"); await mkdir(workspace);
+    await writeFile(join(workspace, "result.txt"), "0123456789");
+    const artifacts = new HostArtifacts(new HostUploads(join(root, "uploads")), new NodeArtifactStore(join(root, "data")));
+    const ref = await artifacts.reference("s", workspace, "result.txt");
+    const text = async (offset: number, length: number) => { const part = await artifacts.read("s", ref.id, offset, length); expect(part.size).toBe(10); return Buffer.from(part.data, "base64").toString(); };
+    expect(await text(0, 4)).toBe("0123");
+    expect(await text(8, 262144)).toBe("89");
+    expect(await text(10, 1)).toBe("");
+    for (const [offset, length] of [[11, 1], [-1, 1], [0, 0], [0, 262145], [0.5, 1], [0, 1.5]] as const) {
+      const failure = await artifacts.read("s", ref.id, offset, length).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(HostRequestError);
+      expect(failure).toMatchObject({ message: "Invalid artifact range", code: -32602 });
+    }
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

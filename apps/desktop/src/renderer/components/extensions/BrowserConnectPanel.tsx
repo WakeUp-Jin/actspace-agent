@@ -84,7 +84,7 @@ export function BrowserConnectPanel({ status, refresh }: { status: BrowserBridge
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" disabled={busy} onClick={() => void action(() => browserBridgeApi.selectSourceExtension())}>选择源码扩展</Button>
           {status?.sourceRoot && <Button variant="secondary" disabled={busy} onClick={() => void action(() => browserBridgeApi.installFromRepo())}>从源码编译</Button>}
-          {status?.sourceRoot && <Button variant="secondary" disabled={busy} onClick={() => void action(() => browserBridgeApi.useBundledExtension())}>切回随包扩展</Button>}
+          {status?.sourceRoot && <Button variant="secondary" disabled={busy} onClick={() => void action(() => browserBridgeApi.switchToBundledExtension())}>切回随包扩展</Button>}
         </div>
         <p>更换来源后，请在 Chrome 扩展页移除旧加载位置，并按页面显示的目录重新加载。</p>
       </div>}

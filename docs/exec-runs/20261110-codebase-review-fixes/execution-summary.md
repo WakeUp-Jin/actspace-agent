@@ -20,11 +20,18 @@
 | `main` 的 markdownlint 红灯 | `docs/design-docs/site-v6/README.md` | 6 张图补 alt。不修的话这批 PR 的必需检查全是红的。 |
 | `ci.yml` 改成 job 级路径判断加汇总 job | `.github/workflows/ci.yml` | 每个 PR 都会报告 `CI 汇总`，可以设为合并必需检查；纯文档 PR 仍然跳过全部工程 job。 |
 | 文档同步 | `.github/workflows/base-checks.yml`、`docs/CICD.md` | 说明哪些 check 可以设为必需、新增 job 时要改哪三处。 |
+| 三种让「包测试」随机变红的失败（PR 1，2026-11-13 加） | `packages/background-tasks/background-tasks/src/registry.ts`、`packages/shell/tool-shell/src/test/node-ports.test.ts`、`packages/subagent/subagent/src/test/{external,manager}.test.ts` | #90 带进 `main` 的。两处只改用例；后台任务登记表关闭时改成等刚结束的任务把通知和收尾记录写完。不属于审查条目，放在 PR 1 是因为 `CI 汇总` 设成必需之后它们会卡住无关的 PR。 |
 | 文件工具的输出上限（PR 2） | `packages/fs/tool-fs-read`、`packages/fs/tool-fs-write` | `read_file` 流式读取，输出 64,000 字符、单行 2,000 字符，拒绝二进制；`list_directory`、`write_file`、`edit_file` 的输出同样限制在 64,000 字符。 |
 | tool-runtime 兜底（PR 2） | `packages/core/tool-runtime/src/output-limits.ts`、`prepared-execution.ts` | 任何工具的一条结果提交前按字节数检查，超出的截短，完整输出存成文件。 |
 | 按窗口的批次额度（PR 2） | `packages/core/agent-loop/src/tool-output-budget.ts`、`loop.ts`、`tool-runtime` 的 `ToolOutputBudget` | 一批工具结果合计不超过上下文窗口放得下的量。 |
 | 回合收尾（PR 2） | `packages/session/session-persistence/src/recovery.ts`、`packages/core/agent-loop/src/loop.ts` | 一条记录写入失败后回合照常闭合，会话可以继续用。 |
 | 目录卡片读真实条目数（PR 2） | `packages/client/client/src/sessions/tool-card.ts` | 条目数读结果的 `detail`，不受输出截短影响。 |
+| 测试不依赖机器环境（PR 3，M6） | `packages/core/tool-runtime/src/test/runtime.test.ts`、`packages/session/session-persistence-jsonl/src/jsonl-reader.ts` | 测试工作区改用临时目录；JSONL 增量读不再漏掉同一时钟刻度内的等长改写。 |
+| 打开中的会话的读路径（PR 3，M9） | `packages/session/session-projection-cache/src/history-index.ts`、`packages/core/runtime/src/session/session-controller.ts`、`packages/subagent/subagent/src/manager.ts` | 读一屏、翻页、展开工具详情从归档读的事件数不随会话长度增长。 |
+| Agent Host 的错误、下载与上传（PR 3，M7） | `packages/host/agent-host/src/{server,rpc,artifacts,uploads,verified-content}.ts`、`node-ports/artifact-store.ts`、`packages/util/shared/src/host-protocol/index.ts` | Host 内部错误不再把原始信息发给设备；分块下载只读请求的那一块；新建上传不再读全部状态文件；上传目录里有 `.DS_Store` 之类的条目时清理不再报错。 |
+| `web_fetch` 只连检查过的地址（PR 3，M3） | `packages/web/tool-web/src/public-request.ts`、`node-ports.ts` | 域名只解析一次；IPv6 字面量地址能正确判断。 |
+| hooks 规则（PR 3，L2） | `biome.jsonc`、`packages/util/shared/src/desktop-bridge/contract.ts`、`apps/desktop/src/main/browser-bridge-service.ts` 等 | 打开 `useHookAtTopLevel`；两个以 `use` 开头的普通方法改名。 |
+| 子进程环境、ripgrep 解码、输出订阅（PR 3，L9） | `packages/util/shared/src/child-process-env.ts`、`packages/fs/tool-fs-search/src/node-ports.ts`、`packages/shell/tool-shell/src/node-ports.ts`、`packages/background-tasks/background-tasks/src/registry.ts` | 多剥几类凭据；多字节字符不再被切成乱码；订阅的正则在单独的线程里匹配，匹配不完就停掉订阅并通知模型。 |
 
 ## 人工验证指引
 
@@ -40,6 +47,16 @@
    - 预期结果：第一次读取只返回开头，工具卡片正常显示，结果末尾有 `line truncated` 的说明；二进制文件返回「looks like a binary file」的失败；之后的消息照常得到回复，不出现 `Cannot start Turn … while … is open`，也不出现 `Context exceeds model capacity`。
    - 这一项云端验证不了的部分：真实模型看到截短说明后会不会按提示用 `offset` 或 `grep` 继续读。单测只验证了说明的内容和数字。
 
+3. **命令里用到的数据库地址等环境变量（PR 3）**
+   - 验证方式：如果你平时让模型跑的命令依赖 shell 里已有的 `DATABASE_URL`、以 `_PWD` 或 `_DSN` 结尾的变量，或者值里带 `://用户名:密码@` 的变量（例如带密码的 Redis 地址），在桌面端让模型跑一次这样的命令。
+   - 预期结果：命令读不到这些变量。这是有意的：它们和 API Key 一样不再交给工具子进程。需要的话让命令自己从 `.env` 之类的文件读。`HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY` 不受影响。
+   - 为什么列在这里：这是这批里唯一一处会让原本能跑的命令跑不了的改动。
+
+4. **手机或网页端下载文件、上传附件（PR 3）**
+   - 验证方式：用 Web 端连上桌面端的 Host，下载一个十几 MB 的文件（单个文件上限是 20 MiB），再上传一个附件发给模型。
+   - 预期结果：都成功，内容正确。下载大文件时 Host 的读盘量明显变小（原来每取 256 KiB 就把整个文件读一遍、算一遍摘要）。
+   - 这一项云端验证不了的部分：真实设备、真实网络下的端到端传输。单测用本地文件和计数的文件系统验证了读取量和完整性校验。
+
 ### 建议验证
 
 1. **纯文档 PR 仍然很快**
@@ -51,22 +68,38 @@
 3. **小窗口模型下的一批读取（PR 2）**
    - 验证方式：选一个上下文窗口较小的模型（例如 32K），让它在一步里并行读四五个各有几百行以上的文件。
    - 预期结果：部分结果末尾出现 `[Output truncated: … the context window has room for about …]`，并附一个「Full tool output」文件引用；这一轮正常继续。
+4. **读取 IPv6 地址的网页（PR 3）**
+   - 验证方式：在有 IPv6 网络的机器上让模型用 `web_fetch` 读 `http://[2606:4700:4700::1111]/`；再让它读 `http://[::1]/`。
+   - 预期结果：前一个不再报「地址不允许」，能连上时返回页面内容（原来所有 IPv6 字面量地址都读不了）；后一个被拒绝。
+5. **连接浏览器扩展（PR 3）**
+   - 验证方式：在 扩展 › 插件 里开启「操控浏览器」后，在浏览器连接面板里先「选择源码扩展」，再点出现的「切回随包扩展」。
+   - 预期结果：和原来一样能切回。这里只是把方法名从 `useBundledExtension` 改成了 `switchToBundledExtension`，IPC channel 没变；云端没有真实的 Electron 窗口，只跑了单测。
+6. **后台命令的输出订阅（PR 3）**
+   - 验证方式：让模型在后台起一个开发服务器，并要求它在输出里出现某一行（例如 `ready`）时通知。
+   - 预期结果：和原来一样收到「输出匹配」通知。只有模型写出一个匹配极慢的正则时才会看到「输出订阅已停止」，这时命令本身不受影响。
 
 ## Agent 已完成的验证
 
 - `changes` 的判断脚本：在临时仓库里造 merge commit 模拟纯文档（含中文文件名）、代码、代码改名成文档、工作流文件、中文路径代码文件五种改动，输出符合预期。
 - `./scripts/check-action-pinning.sh`、`./scripts/ci.sh`、`npx -y markdownlint-cli2@0.24.0 "**/*.md"` 通过。
 - PR 1 上 `仓库基础检查`、`变更范围`、八个工程 job、`CI 汇总` 全部通过。
-- PR 2：四层各自的单测与集成用例（清单见 `docs/histories/2026-11/20261110-1710-tool-result-size-limits.md` 的 Verification）。额度的集成用例做了反向验证：去掉额度后同一个用例报 `Context exceeds model capacity`。`pnpm check:hot-path-reads`、`pnpm check:scale-tests` 通过。
+- PR 2：四层各自的单测与集成用例（清单见 `docs/histories/2026-11/20261110-1710-tool-result-size-limits.md` 的 Verification）。额度的集成用例做了反向验证：去掉额度后同一个用例报 `Context exceeds model capacity`。`pnpm check:hot-path-reads`、`pnpm check:scale-tests` 通过。PR 2 上 15 项检查全部通过。
+- PR 3：M9 的规模测试、M7 的读取量测试、L9 的 ripgrep 解码用例和慢正则用例都在旧代码上确认过会失败；M3 的旧行为（IPv6 字面量地址全部读不了）单独确认过。数字见执行过程步骤 3。M9 的新旧读路径用 7,806 组读取参数对拍，返回内容逐字节一致。全量包测试、桌面端测试、仓库脚本与进程级测试在本地通过。
+- 2026-11-13 同步 `main` 之后：三个分支各跑了一遍全量验证（范围见执行过程步骤 4）；每次合并前后比较了各 PR 相对它的 base 的改动量，没有变化。三种随机失败都先在本地复现（把 CPU 占满之后报错和 CI 上一致），改完同样条件下反复跑，不再失败；次数见 `docs/histories/2026-11/20261113-1311-flaky-package-tests-and-registry-dispose.md`。环境变量值的检查换写法之后，新旧两种写法在 200 万个随机串上结果一致。
 
 ## 已知风险和遗留事项
 
 - 工程 job 现在要等 `changes` 跑完才开始，每次 CI 多十几秒。
 - `CI 汇总` 设为必需之后，`ci.yml` 里新增 job 时要同时加 `needs: changes`、`if: needs.changes.outputs.code == 'true'`，并把它列进 `ci-gate` 的 `needs`；漏了第三步，那个 job 失败不会拦合并。`docs/CICD.md` 的「下一步推荐」第 1 条写了这一点。
 - 没有做的条目和原因见计划的「范围 › 不包含」。
+- 2026-11-13 写这一条时，`main` 自己最近一次 CI（#91 合入后）是红的，红在核心变更清单里「三种随机失败」的第一种上。PR 1 合入后消失；在那之前，别的 PR 的「包测试」也可能随机红一次，重跑一次通常就过。
 - PR 2 的额度按 4 个字符 1 token 估算，对中文偏低。以中文为主的大输出（例如一次读几个很长的中文文档）仍可能比估算的多占窗口；Provider 报了用量时，已有内容的占用是准的，偏差只在新的这一批结果上。要根治得改共用的估算器，它同时影响上下文面板、自动压缩和容量检查，这批没有动。
 - PR 2 之后，一条记录写不进会话时这一轮仍然会失败，只是会话不再卡死。其中一种情况值得单独决定：工具调用的参数对象或工具返回的 json 块里有名为 `authorization`、`apikey`、`api_key`、`secret`、`password`、`cookie` 的字段时，`session-journal` 会拒绝这条记录。这是原有的安全规则，这批没有改；要不要改成「把值脱敏后写入」而不是拒绝，需要你来定。
 - PR 2 的额度在并行调用整体超额时，各调用被截到多长取决于谁先出结果，同样的请求两次运行截断位置可能不同。完整输出都存成了文件，模型可以再读。
+- PR 3（M9）只解决了「从归档读多少事件」。长会话读起来仍然会随长度变慢的两处没有动：每次读都重建整份会话快照并校验一遍（10k 事件约 13 毫秒，40k 约 125 毫秒）；打开后第一次读要回放读模型，随工具调用次数按平方增长（合成会话里 3,334 次工具调用约 1.3 秒，17,670 次约 35 秒）。数字是单机合成会话上量的，只看量级。线索写在 `docs/exec-plans/perf-backlog.md` 的 P5、P6。
+- PR 3（M7）没有做的：上传的定时清理每 60 秒仍然读一遍全部上传的状态文件；文件写完头 2 秒内下载，每个分块仍然把整个文件算一遍摘要；产物不存在、不属于这个会话这两种情况设备收到的仍然是笼统的「Host operation failed」；令牌过期与轮换不在这批范围。
+- PR 3（M3）没有覆盖的：设置了 `NODE_USE_ENV_PROXY=1` 时 `web_fetch` 走代理，目标域名由代理解析，固定不了地址；图片生成工具下载图片时用的还是旧的地址检查（网址来自你配置的图片服务商的响应，不是模型给的），记在 `docs/exec-plans/tech-debt-tracker.md`。
+- PR 3（L9）的取舍：代理变量即使带密码也照常交给命令，否则需要带账号代理的机器上命令连不了网，代价是命令能读到代理密码；输出订阅在命令结束时还没匹配完的行不再匹配，结束通知本身带着输出尾部。
 
 ## 后续建议
 

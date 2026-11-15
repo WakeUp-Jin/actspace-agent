@@ -389,9 +389,9 @@ function registerBrowserBridgeIpc(options: FixedRendererIpcOptions, ipc: IpcRegi
   ipc.handle(contract.browserBridge.selectSourceExtension, async () => {
     const result = await showOpenDialog(options.getMainWindow(), { title: "选择 actspace 源码目录（需包含 browser-bridge/）", properties: ["openDirectory"] });
     if (result.canceled || !result.filePaths[0]) return { ok: true, canceled: true };
-    return browserBridge.useSourceExtension(result.filePaths[0]);
+    return browserBridge.setSourceExtension(result.filePaths[0]);
   });
-  ipc.handle(contract.browserBridge.useBundledExtension, () => browserBridge.useSourceExtension(null));
+  ipc.handle(contract.browserBridge.switchToBundledExtension, () => browserBridge.setSourceExtension(null));
   ipc.handle(contract.browserBridge.prepareUpdate, () => browserBridge.prepareUpdate());
   ipc.handle(contract.browserBridge.disconnect, () => browserBridge.disconnect());
   ipc.handle(contract.browserBridge.selectInstance, (instanceId) => browserBridge.selectInstance(instanceId));
