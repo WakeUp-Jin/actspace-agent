@@ -162,4 +162,12 @@ export class SettingsService {
   getStoredKey(provider: PersistedSecretProviderId): string | undefined {
     return this.store.getStoredKey(provider);
   }
+
+  isDeepseekDeepSearchAvailable(): boolean {
+    return this.store.isDeepseekDeepSearchAvailable();
+  }
+
+  isDeepseekDocumentAvailable(): boolean {
+    return this.store.isDeepseekDocumentAvailable();
+  }
 }

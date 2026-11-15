@@ -43,6 +43,10 @@ export interface DesktopRuntimeModelPort {
   /** 设置里的子智能体默认模型（ModelKey）；null = 跟随父会话。 */
   subagentDefaultModel?(): string | null;
   resolveImageInspectionModel(): DesktopRuntimeModelResolution;
+  isDeepseekDeepSearchAvailable?(): boolean;
+  isDeepseekDocumentAvailable?(): boolean;
+  /** DeepSeek 默认连接的 Key；主进程内使用，每次调用时读取。 */
+  getDeepseekApiKey?(): string | undefined;
   getToolEnvironment(): {
     readonly deepseekFetchApiKey?: string;
     readonly searchCredentials: Partial<Record<"zhipu" | "tavily" | "tinyfish" | "exa" | "deepseek", string>>;
