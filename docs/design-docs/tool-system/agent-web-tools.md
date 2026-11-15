@@ -10,9 +10,9 @@
 | `web_search` | 关键词搜索，返回结构化来源列表 | 至少一个已配置搜索 Provider |
 | `web` | `action=search` 复用搜索，`action=open` 复用抓取 | 按 action 使用对应依赖 |
 
-主 Agent 使用 `actspace.main`，模式决定工具白名单：Chat 提供 `web`；Agent / Plan 提供 `web_search`、`web_fetch`。这些工具不通过额外 LLM 总结网页，不挂 Kimi 原生 `$web_search`。
+主 Agent 使用 `actspace.main`，模式决定工具白名单：Chat 提供 `web`；Agent / Plan 提供 `web_search`、`web_fetch`。`web`、`web_search`、`web_fetch` 不通过额外 LLM 总结网页，不挂 Kimi 原生 `$web_search`。
 
-插件注册时贡献全部三个工具，凭据不会改变 schema 注册。缺少搜索凭据时调用返回不可重试的 `WEB_SEARCH_NOT_CONFIGURED`；`web_fetch` 仍可执行。Runtime 还会应用 Scope、模式和显式工具白名单。
+插件注册时贡献全部三个工具，凭据不会改变 schema 注册。例外是独立插件里的 `deep_search`：开关关闭或没有 DeepSeek Key 时它不出现在工具列表里，见[深度搜索与文档解析](agent-deep-search-and-document-parsing.md)。缺少搜索凭据时调用返回不可重试的 `WEB_SEARCH_NOT_CONFIGURED`；`web_fetch` 仍可执行。Runtime 还会应用 Scope、模式和显式工具白名单。
 
 ## web_fetch
 
@@ -67,10 +67,13 @@ Desktop 仅启用且配置了 Key 的 Provider 参与；旧来源缺省保持开
 - 远端、本地缓存以实现前缀隔离；开关从下一次调用生效，已开始的请求使用启动时配置。
 - 官方当前 Search/Fetch 均为每1,000次成功且有结果的请求5元；多路搜索各自计费，不做付费重排。价格来源：[官方说明](https://api-docs.deepseek.com/zh-cn/guides/search/)，核对日期2026-10-18。
 
+## 深度搜索
+
+`deep_search`（`packages/web/tool-deep-search`）把一个自带上下文的问题交给 DeepSeek 的深度思考搜索，由 DeepSeek 服务端多轮搜索、读网页，只返回带 `[n]` 标记的要点和来源列表，主模型据此写回复。它是另一次 LLM 调用，和本页三个工具的「不额外总结」不冲突。开关 `tools.deepseekDeepSearchEnabled` 默认关，要「允许联网搜索」打开且连接了 DeepSeek 才可用；不可用时对模型隐藏。Chat、Plan、Agent 三个模式都有。契约、失败码和界面见[设计文档](agent-deep-search-and-document-parsing.md)。
 
 ## 配置、预览与安全
 
-Desktop 从 `ModelRuntimeService.getToolEnvironment().searchCredentials` 创建 Host 端口；CLI 通过自己的配置入口注入。工具执行器不直接读取全局环境。Key 由 main-only 凭据服务管理，设置 UI 归入“能力 → 搜索与网页读取”。DeepSeek 与模型共享官方 Key，模型和搜索/抓取的启用状态独立；设置页明确共享与更换影响。关闭联网搜索总开关时Host不注入任何搜索凭据，Chat的web(action=search)也不可绕过；网页读取仍独立可用。搜索来源和抓取开关通过 tools namespace 持久化，每次调用读取，不要求重启Runtime。CLI/Node Host 需显式设置 ACTSPACE_DEEPSEEK_SEARCH=1 或 ACTSPACE_DEEPSEEK_FETCH=1 才使用 DEEPSEEK_API_KEY，单独存在Key不会启用任何付费Web能力。Desktop 不把 DeepSeek Key 写入环境变量。
+Desktop 从 `ModelRuntimeService.getToolEnvironment().searchCredentials` 创建 Host 端口；CLI 通过自己的配置入口注入。工具执行器不直接读取全局环境。Key 由 main-only 凭据服务管理，设置 UI 归入“能力 → 搜索与网页读取”。DeepSeek 与模型共享官方 Key，模型和搜索/抓取的启用状态独立；设置页明确共享与更换影响。关闭联网搜索总开关时Host不注入任何搜索凭据，Chat的web(action=search)也不可绕过；网页读取仍独立可用。搜索来源和抓取开关通过 tools namespace 持久化，每次调用读取，不要求重启Runtime。CLI/Node Host 需显式设置 ACTSPACE_DEEPSEEK_SEARCH=1、ACTSPACE_DEEPSEEK_FETCH=1 或 ACTSPACE_DEEPSEEK_DEEP_SEARCH=1 才使用 DEEPSEEK_API_KEY，单独存在Key不会启用任何付费Web能力。Desktop 不把 DeepSeek Key 写入环境变量。
 
 `ToolUiPreview.kind=web_search` 是 Client 投影结果，不是 ToolDefinition 注册字段；`mode=query|url` 区分搜索与抓取。遵循[工具预览规范](agent-tool-preview-design-guidelines.md)。
 

@@ -1,6 +1,6 @@
 # DeepSeek 深度搜索与文档解析工具（目标设计，未实现）
 
-本文是 `deep_search` 和 `read_document` 两个工具的目标设计。两个工具都还没有实现；实现步骤见[执行计划](../../exec-plans/active/20261114-deepseek-deep-search-document-parsing/README.md)，界面以 [demo](../frontend/deep-search-and-document-demo.html) 为准。实现合入后，把本文改写成当前事实，去掉标题里的「目标设计，未实现」。
+本文是 `deep_search` 和 `read_document` 两个工具的设计。`deep_search`（第 7 节、第 9.1、9.3 节）已经实现，那几节写的是当前事实；`read_document` 还没有实现。实现步骤见[执行计划](../../exec-plans/active/20261114-deepseek-deep-search-document-parsing/README.md)，界面以 [demo](../frontend/deep-search-and-document-demo.html) 为准。实现合入后，把本文改写成当前事实，去掉标题里的「目标设计，未实现」。
 
 本文负责：为什么做、做成什么样、模块边界、否决过的方案。改哪些文件、按什么顺序、每步怎么验证，写在执行计划里。
 
@@ -157,6 +157,8 @@ OCR：
 
 ## 7. `deep_search` 契约
 
+实现在 `packages/web/tool-deep-search/src/`：`plugin.ts` 是工具定义，`node-ports.ts` 发请求和处理超时，`sse.ts` 读事件流，`stream-state.ts` 累积进度和结果，`assemble.ts` 拼交给主模型的文本，`failure.ts` 生成失败结果。桌面端在 `apps/desktop/src/main/runtime-v2/tool-host-services.ts` 构造端口，CLI 和远程 Host 在 `packages/host/agent-host/src/node-ports/tool-host-services.ts`（要 `ACTSPACE_DEEPSEEK_DEEP_SEARCH=1` 和 `DEEPSEEK_API_KEY`）。
+
 ### 7.1 参数与说明
 
 ```json
@@ -179,7 +181,7 @@ OCR：
 
 ### 7.2 内部请求
 
-一次流式请求：系统提示词要求只写要点（事实、数字、日期的短列表，没有开场白和结语，来源互相矛盾或找不到可靠信息时直说，用问题的语言），用户消息就是 `question`。只声明 `deepseek_web_search`，不声明 `deepseek_read_url`。
+一次流式请求（`POST https://api.deepseek.com/chat/completions`，模型 `deepseek-flash`，开启思考，`redirect: "error"`）：系统提示词（`DEEP_SEARCH_SYSTEM_PROMPT`）要求只写要点（事实、数字、日期的短列表，没有开场白和结语，来源互相矛盾或找不到可靠信息时直说，用问题的语言），用户消息就是 `question`。只声明 `deepseek_web_search`，不声明 `deepseek_read_url`。
 
 不带会话历史，不带用户的其他消息。
 
@@ -195,6 +197,8 @@ Sources:
 Pages that could not be opened:
 - <网址> (<错误码>)
 ```
+
+固定的英文说明行（`assemble.ts`）：截断时 `[The findings were cut off at DeepSeek's length limit.]`；超过 20,000 字符时 `[Findings truncated at 20,000 characters.]`；没有搜索时 `No web search was performed; these findings have no sources.`；搜索了但没有引用时 `No sources were cited.`。
 
 - 编号按来源第一次被引用的顺序分配，同一网址只有一个编号。标题按网址到 `sources` 或 `page` 里找，找不到用引用自带的标题，再没有就用网址。
 - 标记插在每条引用的 `end_index` 处，按码点切分，从后往前插；同一位置同一来源只插一次。下标越界的引用不插标记，但来源照常列出。
@@ -256,15 +260,13 @@ Pages that could not be opened:
 
 `deep_search` 的定义声明 Chat、Plan、Agent 三个模式，Chat 里和 `web`、`generate_image` 并列出现。不可用时不出现，Chat 仍然是原来两个工具。
 
-**这和确认时的表述有出入。** 确认的是「做成现有 `web` 工具的第三种动作，Chat 仍然恰好两个工具」。用户看到的效果相同（Chat 里能用深度搜索），差别在形式。改成独立工具的理由：
+最初确认的是「做成现有 `web` 工具的第三种动作，Chat 仍然恰好两个工具」；2026-11-15 审核改为独立工具。用户看到的效果相同（Chat 里能用深度搜索），差别在形式。理由：
 
 - `web` 的参数结构是固定的。把 `deep` 写进动作枚举，它就一直在列表里；而开关默认关，模型调了只会失败。
 - 让 `web` 的结构随开关变化行不通：同一版本的工具不允许有两份定义，而且 `web` 所在的插件是必需成员，重新注册会和正在进行的 Run 冲突。
 - 独立工具在三个模式里是同一个工具、同一种行、同一套投影和测试。做成 `web` 的动作，Chat 和 Agent 就是两套。
 
-代价是改一条现行规范：「Chat 恰好两个工具」变成「Chat 固定两个工具，深度搜索打开时多一个 `deep_search`」。
-
-如果坚持原表述，改动范围见执行计划总览。
+代价是改了一条现行规范：「Chat 恰好两个工具」变成「Chat 固定两个工具，深度搜索打开时多一个 `deep_search`」，见[模式规范](../agent-runtime/agent-forms-and-modes.md)。`packages/core/agent/src/main-preset.ts` 里 Chat 预设的 `allowedToolNames` 只是说明，运行时按定义的 `modes` 决定。
 
 ## 8. `read_document` 契约
 
@@ -397,6 +399,8 @@ Long pages were split; page numbers here are positions in this output, not the d
 
 ### 9.1 Deep Search 行
 
+投影在 `packages/client/client/src/sessions/deep-search-preview.ts`（失败文字在同目录 `tool-failure-text.ts`），流式行在 `packages/client/client/src/live/stream-blocks.ts`；桌面端行是 `apps/desktop/src/renderer/components/messages/DeepSearchBlock.tsx`，样式 `styles/deep-search.css`；Web / PWA 的单行在 `apps/web/src/pages/session/blocks/ExploreGroup.tsx`。mock 场景 `?mock=deepseek-tools`。
+
 - 运行中：`Deep Search <问题>`，有进度消息时接 ` · <消息>`，整行用共享的流光效果。
 - 完成：动作 `Deep Search`，目标是问题，行尾是 `6 searches · 11 sources` 这样的统计。
 - 展开：「搜索词」列表；「引用来源」编号列表，每条是标题（点击用系统浏览器打开）加站点名，没有图标、没有日期；有打不开的网页时多一组「未能打开」。
@@ -419,6 +423,8 @@ Long pages were split; page numbers here are positions in this output, not the d
 - 文档的结果通常比较大，历史里的行大多先只有摘要：文件名和行尾统计从摘要里取，展开时再加载正文和「识别不完整」的提示。
 
 ### 9.3 设置
+
+深度搜索的开关在 `apps/desktop/src/renderer/components/settings/SearchSettings.tsx`，字段 `tools.deepseekDeepSearchEnabled`，可用性由 `ModelRuntimeService.isDeepseekDeepSearchAvailable()` 读取。
 
 - 「搜索与网页读取」页，第一组，「允许联网搜索」下面新增一行「使用 DeepSeek 深度搜索」。说明：有 Key 时「问题将发送至 DeepSeek · 搜索 ¥0.005 / 次，另计模型用量」，没有 Key 时「请先连接 DeepSeek」。没有 Key 或「允许联网搜索」关闭时置灰。
 - 「工具」页「多媒体」组，「图片分析」下面新增一行「文档解析」。说明：有 Key 时「文档将发送至 DeepSeek · ¥0.0015 / 页」；没有 Key 时用警示写法「尚未连接 DeepSeek，文档由本机 Python 提取。」，开关不置灰。
@@ -474,6 +480,9 @@ Long pages were split; page numbers here are positions in this output, not the d
 
 ## 13. 已知限制
 
+- 深度搜索同一个问题每次跑出来的结论和来源不一样（PA.1 实测）；来源的标题、日期元数据不干净，界面不显示日期。
+- 中止深度搜索不会取消 DeepSeek 那边已经发生的搜索，已产生的费用照常计费；超时和中止都不返回已收到的部分结果。
+- PA.1 的 5 次真实调用里没有出现 `: keep-alive` 注释和打不开的网页，这两条路径只用合成数据测过。
 - PPT、PPTX 和老格式 DOC、PPT 没有用真实接口测过。
 - 文档缓存只在内存里，重启后重新解析、重新计费。
 - 不能在文档内搜索，只能按页读。

@@ -71,11 +71,11 @@
 - 连接 Base URL 命中 pi-ai 内置服务商时复用其实现（协议、思考参数、兼容开关、会话请求头），`auth.apiKey` 仍走 ActSpace 的请求级凭据解析器，不从 pi-ai 自己的环境变量读取 Key；规则见 [LLM Core Pi §17](design-docs/agent-plugin-runtime/agent-llm-core-pi.md)。
 - 服务商级代理只注入该连接的请求级 `fetch`，不写全局代理环境变量，不影响工具、更新器或其他连接。
 - 统计页的 DeepSeek 余额查询通过 main 进程调用 `GET /user/balance`，renderer 只接收裁剪后的余额展示模型，不接触 Key、鉴权头或原始响应。
-- `web_search`（外部搜索 API 双通道）任一搜索 provider key 存在时注册，`web_fetch`（本地抓取）始终注册（见 `agent-web-tools.md`）。缺 key 时 executor 的兜底错误只提示需要配置的 key 名，不泄露其它运行时信息。联网能力统一由受密钥和工具权限控制的本地 `web_search` / `web_fetch` 提供，不依赖任何服务商的原生联网搜索。
+- `web_search`（外部搜索 API 双通道）任一搜索 provider key 存在时注册，`web_fetch`（本地抓取）始终注册（见 `agent-web-tools.md`）。缺 key 时 executor 的兜底错误只提示需要配置的 key 名，不泄露其它运行时信息。联网能力统一由受密钥和工具权限控制的本地 `web_search` / `web_fetch` 提供，不依赖任何服务商的原生联网搜索。例外是用户打开「使用 DeepSeek 深度搜索」后的 `deep_search`：问题会发给 DeepSeek，由其服务端搜索；请求只带问题本身，不带会话历史或工作区内容。
 - `generate_image` 仅在配置图片服务 Key 时向主 Agent 注册；默认模型为 `gpt-image-2`，模型名和 Base URL 均由设置页覆盖。完整生成请求不自动重试，避免上游已计费时产生重复费用。
 - 图片附件在当前模型 `input` 包含 `image` 时直接进入主 LLM 请求；text-only 主模型只接收附件元信息、runtime model 状态和可用时的 `inspect_image` 调用指引。`inspect_image` 的视觉请求只包含固定 system prompt、问题、安全文件名和单张图片，不携带主会话历史、主 system prompt 或其他附件。
 - `inspect_image` 的图片 Base64 只存在于单次视觉请求内存，不进入工具输出、session、renderer 或日志。图片内文字一律视为不可信证据；视觉模型只返回最终观察，不返回隐藏推理。单次请求 90 秒超时、SDK 重试为 0，失败不自动切换其他 Key 或服务商，避免重复计费和不可解释的数据发送。
-- 服务商响应里的 server-side tool 结果（历史 Anthropic 路线的 `serverToolUse` 计数等）属于 provider 响应协议，不当作本地工具执行日志写入；session 只保留请求计数，不写未裁剪网页全文或 provider tool result 原文。
+- 服务商响应里的 server-side tool 结果（历史 Anthropic 路线的 `serverToolUse` 计数等）属于 provider 响应协议，不当作本地工具执行日志写入；session 只保留请求计数，不写未裁剪网页全文或 provider tool result 原文。`deep_search` 写进会话的只有要点、被引用来源的标题和网址、搜索词、打不开的网页和计费次数；不写网页原文和 DeepSeek 的思考过程。
 - 验收真实 provider 时应先发送不含仓库内容和隐私的固定探针，确认连接后再决定是否允许工具结果进入外部模型上下文。
 - API 错误仅暴露必要的结构化诊断信息，不把鉴权请求头或密钥写入日志、session 或界面。
 - LLM 错误脱敏必须使用实际出站请求的凭据：Host 或 Desktop 在路由中延迟绑定凭据时，`PreparedLlmCall` 的早期解析结果可能为空。共用 PiAiAdapter 在最终凭据绑定后，对两种传输引擎的错误事件、取消原因和同步/异步异常执行请求级脱敏；正常回复内容不改写。脱敏器不跨请求共享密钥，不保留原始 cause、stack、headers 或任意 Provider 属性；通用格式匹配仅作补充，不能代替实际凭据匹配。

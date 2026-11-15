@@ -132,7 +132,7 @@
 
 `PageShell title="搜索与网页读取"`：
 
-- **联网搜索**：单行「允许联网搜索」开关。
+- **联网搜索**：「允许联网搜索」开关；下面一行「使用 DeepSeek 深度搜索」（默认关），说明有 Key 时「问题将发送至 DeepSeek · 搜索 ¥0.005 / 次，另计模型用量」，没有 Key 时「请先连接 DeepSeek」；没有 Key 或联网搜索关闭时禁用。
 - **搜索通道**：分组右上角 meta「N / 5 已连接」。行：DeepSeek、智谱 Web Search、Tavily、TinyFish、Exa。每行有 logo、名称、状态点；已连接的行有启用开关和「管理」菜单（更换 Key / 断开连接），未连接的行点开行内编辑器填 Key；没有 Key 时启用开关禁用。
 - **网页读取**：「使用 DeepSeek 抓取网页」开关；说明写明网址会发给 DeepSeek 及单次价格；没有 DeepSeek Key 时说明改为「请先连接 DeepSeek」并禁用开关。
 

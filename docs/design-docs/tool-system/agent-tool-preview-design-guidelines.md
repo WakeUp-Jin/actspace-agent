@@ -151,6 +151,16 @@ Read/List/Grep/Glob/Search 等轻量组件在失败时保留动作、目标和�
 - url 模式展示：`Web Search https://example.com/path`（2026-07-06 起两种模式统一 `Web Search` 前缀，`mode` 字段仍保留区分）。
 - 不在工具日志行里展示搜索结果正文、来源摘要或页面摘要；完整输出保留在 `tool/result.data.modelOutput` 与输出引用中；Client 的 `contentPreview` 只是有界展示摘要，不是另一份事实源。
 
+### `deep_search`
+
+- `ToolUiPreview.kind`: `deep_search`；投影在 `packages/client/client/src/sessions/deep-search-preview.ts`，行组件是桌面端 `components/messages/DeepSearchBlock.tsx`。
+- 运行中：`Deep Search <问题>`，有进度消息（`searching N queries` / `reading N pages` / `summarizing`）时接 ` · <消息>`，整行共享流光。问题超过 240 个字符时截断加 `…`。
+- 完成：动作 `Deep Search`、目标是问题、行尾 `6 searches · 11 sources`。展开是有界明细框：「搜索词」、「引用来源」（编号、标题链接用系统浏览器打开、右侧站点名）、有打不开的网页时多一组「未能打开」。列表只取 `deep-search` 明细块，逐项校验，只放行 `http` / `https` 网址。
+- 失败 / 拒绝：行尾 `failed` / `denied`，danger 色，展开是按失败码映射的中文（`deepSearchFailureText`）。中止：行尾 `aborted`，不能展开。
+- 延迟加载：历史里只有摘要的行，统计来自摘要、问题来自参数摘要；首次展开触发加载明细。
+- Web / PWA 只有一行，不展开。
+- 这是另行约定的样式，`web_search` 一节「不在工具行里展示来源」的规定不变。
+
 ### `generate_image`
 
 - `ToolUiPreview.kind`: `image_generation`。

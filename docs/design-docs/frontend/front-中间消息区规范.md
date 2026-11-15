@@ -100,6 +100,7 @@
 | Listed | `Listed Demos/ 25 entries` | 目录结果 |
 | Edit / Write | `Edit Demos/README.md +1 −1` | 真实 diff 与变动统计 |
 | Bash | `Ran ls -lt Demos/` / `Denied …` / `Failed …` | 见 Bash |
+| Deep Search | `Deep Search 2026 年电动车销量 6 searches · 11 sources` | 原地展开搜索词、编号来源（标题链接 + 站点名）、未能打开的网页；运行中接 ` · searching 3 queries` 这类进度 |
 
 - 动作与必要状态不参与目标的截断；目标 `min-width: 0` 视觉省略，完整路径 / 命令可键盘访问和展开。展示层截断不得改变实际打开文件的路径。溢出的工具行 hover / 聚焦时用 Tooltip 显示全文。
 - 失败时仍保留动作与目标并显示失败终态，诊断放进可展开详情（danger token、长文本换行）；失败 Read 不打开文件，不展示旧成功预览；空目录明确显示 0 项，未获知结果时不伪造计数。

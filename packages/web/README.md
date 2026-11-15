@@ -26,6 +26,7 @@ kind: "package-group"
 - `src/manifest.ts`、`src/plugin.ts`、`src/node-ports.ts`；参数约束（`web` 的 schema 不用顶层 `oneOf` / `allOf` / `anyOf`，以兼容 Anthropic）见[包 README](tool-web/README.md)。
 - `src/public-request.ts`：`web_fetch` 判断一个地址是不是公网地址、并且只连检查过的地址。规则见 [Web 工具](../../docs/design-docs/tool-system/agent-web-tools.md)。
 - 测试在 `tool-web/src/test/`：`pnpm --filter @actspace/tool-web test`。
+- `tool-deep-search`：`src/plugin.ts` 是工具定义，`src/node-ports.ts` 是 DeepSeek 请求的 Node 实现；测试 `pnpm --filter @actspace/tool-deep-search test`，见[包 README](tool-deep-search/README.md)。
 
 ## 怎么扩展
 
