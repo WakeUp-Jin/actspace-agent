@@ -3,7 +3,7 @@ import type { ContextUsageBucketName } from "./context-buckets";
 /**
  * 右侧栏 Context 面板的读取形状（`sessions.describeContextPanel`）。
  *
- * 字段含义、key 规则和估算口径以 `docs/design-docs/frontend/front-Context面板规范.md` §6 为准（字段推导细节见归档 `docs/exec-plans/completed/design-archive/frontend/front-Context面板后端数据需求.md`）；
+ * 字段含义、key 规则和估算口径以 `docs/design-docs/frontend/front-Context面板规范.md` §6 为准；
  * 当前与历史拥有独立版本；相同令牌的条件读取不重复发送条目。
  */
 export type DescribeContextPanelInput = {

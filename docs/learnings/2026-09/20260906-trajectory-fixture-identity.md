@@ -2,7 +2,7 @@
 
 合并自：大列表 mock 必须复制关系不能只复制行（含点击关系与真实数据接入）、排序 UI 测试必须使用确定性时间 Fixture、用可区分的夹具判断是否读错了数据。
 
-关联：`apps/desktop/src/renderer/trajectory/fixtures.ts`、[v2 多包插件化切换 history](../../histories/2026-08/20260826-0000-v2-package-cutover.md)、[P5 修复与复核](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-feedback-fixes.md)
+关联：`apps/desktop/src/renderer/trajectory/fixtures.ts`、[v2 多包插件化切换 history](../../histories/2026-08/20260826-0000-v2-package-cutover.md)、[P5 Cordis 与 Host 收敛 history](../../histories/2026-10/20261004-1310-p5-cordis-host-convergence.md)
 
 主线：夹具不只是“能填满字段”，它要把被测行为所依赖的顺序、关联、来源差异编码出来，否则测试要么偶发失败，要么永远通过。
 

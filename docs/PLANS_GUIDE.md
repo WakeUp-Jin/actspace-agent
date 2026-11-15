@@ -12,19 +12,27 @@ execution plan 适合用在那些超出单轮聊天上下文、需要多次推�
 ## 存放位置
 
 - 进行中的 plan 放在 `docs/exec-plans/active/`
-- 已完成的 plan 移到 `docs/exec-plans/completed/`
-- 已失效、被取代或明确不再执行的 plan 经确认后删除，不另建归档或历史跳转页。
+- 完成的 plan 直接删除，不归档；已失效、被取代或明确不再执行的 plan 经确认后同样删除。需要时查 git 历史，办法见 `docs/exec-plans/README.md`。
 - 复用模板在 `docs/exec-plans/templates/execution-plan.md`
 - 暂不处理但值得保留的债务放到 `docs/exec-plans/tech-debt-tracker.md`
 
 ## 维护要求
 
 - 写清目标、范围、约束、风险和验证方式。
-- 推进过程和关键决定要落在仓库里，不要只存在聊天记录里。
-- 状态变化要同步更新；完成后应在同一轮移动到 `completed/`。
-- 实现已经完成、仅保留人工验收边界的 plan 也应进入 `completed/`，并在正文明确尚未验证的范围。
-- 清理时按文件选择删除或保留，不搬迁或提炼旧内容；现有 histories 保持原样。
+- 推进过程和关键决定记在 plan 的「进度记录」「决策记录」里，不要只存在聊天记录里。
+- 状态变化要同步更新。
 - `active/` 每个一级入口必须出现在 `docs/exec-plans/README.md`，并具有可执行的下一步。
+- plan 是临时文件。设计文档、learnings、包 README 和代码注释不把 plan 或执行记录当内容来源：要长期成立的规则写进设计文档，出处写 history。
+
+## 计划完成时
+
+实现做完就在同一轮收尾，只剩人工验收的 plan 也一样，不为了等验收留在 `active/`。夜间模式例外：执行摘要要先交给人看，人看过之后再收尾。收尾做三件事：
+
+1. plan 里定下、今后还要遵守的规则和约束，确认已经写进设计文档或包 README；没有就先补上。
+2. 没验证的范围和没做完的事写进 history 的「未验证与遗留」和 PR 描述。需要后续处理的登记到 `docs/exec-plans/tech-debt-tracker.md`，性能类登记到 `docs/exec-plans/perf-backlog.md`。
+3. 删除 plan 和 `docs/exec-runs/<plan-slug>/`，去掉 `docs/exec-plans/README.md` 里对应的一行，以及其他文档里指向它们的链接。
+
+`pnpm check:docs` 会拦住设计文档、learnings、计划目录和 `docs/` 顶层文档里指向已删文件的链接；包 README、代码注释和脚本里的它查不到，删之前按 plan 的文件名搜一遍。现有 histories 保持原样。
 
 ## 执行模式
 
@@ -50,14 +58,14 @@ plan 执行时，根据任务性质选择执行模式：
 
 ## 执行文档
 
-无论哪种执行模式，plan 执行时都要在 `docs/exec-runs/<plan-slug>/` 下创建两份文档：
+交互模式不另写执行文档：人全程在场，进度和决定记在 plan 里，要人验证什么写在 PR 描述和 history 里。
+
+夜间模式要在 `docs/exec-runs/<plan-slug>/` 下创建两份文档，它们是人了解执行全貌的唯一途径：
 
 - **执行过程**（`execution-process.md`）：执行过程中持续更新的时间线记录，包含关键步骤、关键决定和遇到的问题。
 - **执行摘要**（`execution-summary.md`）：执行完成后填写，核心部分是人工验证指引——告诉接手的人要验证什么、怎么验证。
 
-模板在 `docs/exec-runs/templates/`。详细使用说明见 `docs/exec-runs/README.md`。
-
-夜间模式下这两份文档的完整性尤为重要——它们是人了解执行全貌的唯一途径。
+模板在 `docs/exec-runs/templates/`，详细说明见 `docs/exec-runs/README.md`。这两份文档留到人看过执行摘要，随 plan 一起删除。
 
 ## 从设计文档生成 plan
 

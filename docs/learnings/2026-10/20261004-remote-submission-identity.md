@@ -33,4 +33,4 @@
 2. Desktop 重启以后，是否仍知道该用哪个 submissionId 查询？
 3. 重试时正文或附件变了，是否会明确冲突，而不是悄悄替换已接纳内容？
 
-来源：[P4 实施记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-4-process.md)。这些是验收要求，不代表本阶段所有故障场景已经验证完成。
+来源：[P4 远端 Host history](../../histories/2026-10/20261004-0108-p4-remote-host-in-progress.md)。这些是验收要求，不代表本阶段所有故障场景已经验证完成。

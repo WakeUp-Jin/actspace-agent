@@ -19,7 +19,7 @@
 
 ## 背景
 
-- 相关文档：`docs/CICD.md`、`docs/exec-plans/completed/20261108-ci-pipelines.md`（上一轮 CI 拆分）、`docs/histories/2026-11/20261109-1130-base-checks-workflow.md`。
+- 相关文档：`docs/CICD.md`、`docs/histories/2026-11/20261109-1130-base-checks-workflow.md`；上一轮 CI 拆分（2026-11-08）的遗留在 `docs/exec-plans/tech-debt-tracker.md`「CI 与工程化遗留」。
 - 相关代码路径：`.github/workflows/ci.yml`、`package.json`、`tsconfig.package.json`、`tsconfig.desktop-deps.json`、`scripts/generate-desktop-build-graph.mjs`、`apps/desktop/package.json`（`build:deps:dev`）、`apps/desktop/vitest.config.ts`。
 - 基线（`main` 最近两次运行，4 vCPU runner）：
   - Typecheck 1:47–2:33：`typecheck:contracts` 逐包全量 `tsc -p` 约 1 min，再起 73 个 `tsc --noEmit` 进程。
@@ -44,7 +44,7 @@
 1. P1：`exclude` 修正；根 `build:deps` / `typecheck` 改用 `tsc -b`；本地 `pnpm typecheck`、进程级测试、runtime 测试通过。
 2. P2：`ci.yml` 拆四个 job + composite action + `actions/cache`。
 3. P3：desktop 分片矩阵 + main 测试 node 环境。
-4. 验证：推送后看一次完整 CI，记录各 job 时长；文档同步；plan 移到 `completed/`。
+4. 验证：推送后看一次完整 CI，记录各 job 时长；文档同步；删除本计划和执行记录目录。
 
 ## 验证方式
 
@@ -62,7 +62,7 @@
 - [x] P2 `ci.yml` 拆 job + 缓存。
 - [x] P3 desktop 分片 + node 环境（本地两分片 65 s / 68 s，全部通过）。
 - [ ] 推送后记录 CI 各 job 时长。
-- [ ] 文档同步，plan 移到 `completed/`。
+- [ ] 文档同步；各 job 时长写进 history，然后删除本计划和 `docs/exec-runs/20261109-ci-speedup/`。
 
 ## 决策记录
 

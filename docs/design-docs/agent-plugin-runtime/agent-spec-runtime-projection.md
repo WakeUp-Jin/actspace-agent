@@ -852,5 +852,3 @@ ClientSessionStore 按 sessionId 管理 facts/window/live overlay，请求 gener
 - user/context 概述展示已有开始时间，复用本地时间/Unix 切换。
 - 父轨迹通过 `delegation/requested` 的 parentCallId/childSessionId 读取直接子 Session。DesktopSessionBridge 引用计数订阅相关会话，数据仍归 ClientSessionStore；退出释放订阅，不切换当前会话。加载失败可重试，有更早历史时显式提供加载入口。
 - 各 Session 独立构建工具记录，关联后使用子 Session 命名空间防 callId 冲突。子工具 Schema 来自子请求，父请求统计不重复计入子请求。当前不递归加载孙会话；跨页记录随加载补齐，不能将未加载历史显示为完整结果。
-
-实施记录：[轨迹上下文分类](../../exec-runs/20261018-trajectory-context/execution-summary.md)。

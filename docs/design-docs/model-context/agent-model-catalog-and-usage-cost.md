@@ -1,7 +1,5 @@
 # 本地模型目录与使用费用设计
 
-> 执行入口：[使用统计更新计划](../../exec-plans/completed/20260906-actspace-usage-statistics/README.md)；2026-11-08 目录生成规则与删除运行时刷新见[目录价格锁定计划](../../exec-plans/completed/20261108-catalog-price-lock.md)。页面设计：[使用统计页面更新](../../exec-plans/completed/design-archive/frontend/front-usage-statistics-refresh.md)。
-
 ## 目标与已有证据
 
 费用能够解释来源；没有价格或完整用量时显示未知；模型目录随包交付，断网时仍可使用，运行时不联网拉取价目。
@@ -77,7 +75,7 @@ models.dev / OpenRouter public API
 
 ## 模型有效值（2026-10-21）
 
-> 2026-10-21 改：删掉连接级 `billingMode`（reference / token / manual）和「已乘倍率」开关，价格与能力统一按四层数据模型算。计划见 `docs/exec-plans/completed/20261021-model-provider-redesign.md`，页面见 [设置页规范](../frontend/front-设置页规范.md)。
+> 2026-10-21 改：删掉连接级 `billingMode`（reference / token / manual）和「已乘倍率」开关，价格与能力统一按四层数据模型算。页面见 [设置页规范](../frontend/front-设置页规范.md)。
 
 每个模型字段（显示名称、上下文、最大输出、输入类型、思考档位、价格）的有效值按下面的顺序取第一个有值的，并记录来源（`EffectiveModel.sources`）：
 
@@ -174,5 +172,3 @@ Session 与全局统计保留全部辅助请求的请求数、Token 与费用；
 目录归一化、端点匹配位于 `packages/util/shared/src/model-catalog-normalize.ts`、`model-pricing.ts`；费用计算器位于 `packages/llm/llm-service/src/usage-cost.ts`。目录合并规则位于 `model-catalog-merge.ts`，改价清单位于 `model-catalog-overrides.ts`，生成脚本为 `scripts/generate-model-catalog.mjs`。
 
 桌面统计通过 `UsageReadModelService` 和 SQLite Worker 分批投影 Journal，收到宿主 durable 通知后失效；未变更时筛选和分页不会重读 Journal。活动行保存完整历史，时间窗只在查询时过滤。SQLite schema 10 通过现有派生库重建机制淘汰旧的截断索引及其游标，回放 Journal 补回历史；此过程会重建同库的目录与 Context 派生数据，不修改 Session 原始事实。旧 JSON `UsageSourceCache` 同步升级到版本 2，拒绝复用版本 1 的截断结果。首次升级需承担重建成本，之后沿用增量读取，不承诺即时完成。
-
-自动化、浏览器截图观察、构建 worker 压测与真实宿主缺口见[执行摘要](../../exec-runs/20260906-actspace-usage-statistics/execution-summary.md)。

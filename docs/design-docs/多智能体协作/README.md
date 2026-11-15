@@ -10,8 +10,6 @@
 | [space-demo.html](space-demo.html) | 可交互 demo，数据全部 mock；直接用浏览器打开 | 设计以它为准 |
 | [assets/demo/](assets/demo/) | 头像素材：6 色 Space 头像、5 色小球，256px；桌面端 `apps/desktop/src/renderer/assets/space/` 由它缩放而来 | — |
 
-执行计划：[多智能体协作前端演示](../../exec-plans/completed/20261007-multi-agent-collab-frontend-demo.md)（只做前端，不碰后端）。
-
 ## 和其他专题的关系
 
 - [collaboration/](../collaboration/)：当前的子智能体运行时（默认后台运行、可续聊、Fork、外部 Codex / Claude Code）与 Explore 只读预设。子智能体不参与 Space。更早的 Member / Room / Team 产品稿已删除，由本专题取代。

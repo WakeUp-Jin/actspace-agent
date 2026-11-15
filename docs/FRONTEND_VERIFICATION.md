@@ -129,5 +129,3 @@ Web 使用独立 Host 协议与浏览器存储；Desktop renderer 的 `?mock=` �
 已运行 pnpm typecheck、pnpm build 和 pnpm dev。
 本次涉及 preload 与 session 恢复，需要 Electron 窗口验证；当前环境没有 Computer Use，因此需要用户提供窗口截图和终端日志。
 ```
-
-历史验证矩阵、Space 演示走查与 ModelPicker pinned 验收见归档：[前端验证清单：归档材料](exec-plans/completed/design-archive/frontend/前端验证清单-重构期矩阵与演示走查.md)。

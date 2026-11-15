@@ -2,7 +2,7 @@
 
 > 插件状态：默认不加载，在 扩展 › 插件 中开启后重启生效。
 
-> 插件、配置与固定 UI 已实现；空闲会话开启与跨 Run 绑定见第 5.1 节。验收证据见[执行摘要](../../exec-runs/20260906-actspace-english-learning/execution-summary.md)与[修复记录](../../exec-runs/20261006-context-acceptance-bugfix/execution-summary.md)；执行入口：[英语辅助学习执行计划](../../exec-plans/completed/20260906-actspace-english-learning/README.md)。
+> 插件、配置与固定 UI 已实现；空闲会话开启与跨 Run 绑定见第 5.1 节。
 
 ## 1. 目标与已确认决策
 
@@ -194,7 +194,7 @@ Provider 参数参考 [MiniMax 同步语音接口](https://platform.minimaxi.com
 - [Agent Scope](agent-spec-agent-scope-model.md)
 - [Cordis 事件 ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md)
 - [Prompt 与 Context Contributor](agent-spec-prompt-context-contributors.md)
-- [设置中心](../../exec-plans/completed/design-archive/frontend/front-设置中心重构规范.md)
+- [设置页规范](../frontend/front-设置页规范.md)
 - [前端验证](../../FRONTEND_VERIFICATION.md)
 - [Agent 测试](agent-testing.md)
 

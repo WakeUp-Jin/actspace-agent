@@ -3,8 +3,6 @@
 > v2 权限事实源；基础 Runtime、once、Desktop 文件 Session Grant 与 `auto-review` 均已实现。
 >
 > 实施方式：直接切换，不保留旧 `trusted` / `yolo` 模式、旧 approval decision、旧 permission preset 或旧权限事件的兼容层。
->
-> 执行计划：[`permission-runtime-foundation`](../../exec-plans/completed/permission-runtime-foundation.md)、[`session-scope-grants`](../../exec-plans/completed/session-scope-grants.md)。
 
 ## 1. 目标
 

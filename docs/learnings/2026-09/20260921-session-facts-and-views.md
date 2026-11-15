@@ -71,4 +71,4 @@ todo_write success rev 2  -> authoritative snapshot 2
 5. 用户以后手动删一个 context entry，应覆盖 `context-state.json`，还是改写历史 `context_snapshot`？
 6. 模型价格变了，历史统计该重算还是读当时落盘的 `cost`？
 
-来源：token usage 基础（2026-05）、v2 cutover（`docs/histories/2026-08/20260823-0958-actspace-v2-cutover.md`）、Todo 工具 V1（`docs/histories/2026-08/20260809-0010-agent-todo-tools.md`）、usage 请求详情（`docs/histories/2026-06/20260604-1954-usage-request-details.md`）、[Session 投影切换执行摘要](../../exec-runs/20260921-session-projection-cutover/execution-summary.md)。
+来源：token usage 基础（2026-05）、v2 cutover（`docs/histories/2026-08/20260823-0958-actspace-v2-cutover.md`）、Todo 工具 V1（`docs/histories/2026-08/20260809-0010-agent-todo-tools.md`）、usage 请求详情（`docs/histories/2026-06/20260604-1954-usage-request-details.md`）、[Session 投影切换 history](../../histories/2026-09/20260921-2230-session-projection-cutover.md)。

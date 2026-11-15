@@ -1,6 +1,6 @@
 # 前端设计文档
 
-桌面端 renderer（`apps/desktop`）与 web 客户端（`apps/web`）的设计规范。品牌总纲见根目录 [DESIGN.md](../../../DESIGN.md)。规则只写现行做法；决策过程与历史在 `docs/exec-plans/completed/` 和 `docs/histories/`。
+桌面端 renderer（`apps/desktop`）与 web 客户端（`apps/web`）的设计规范。品牌总纲见根目录 [DESIGN.md](../../../DESIGN.md)。规则只写现行做法；决策过程与历史在 `docs/histories/`。
 
 ## 做什么事，读哪几份
 

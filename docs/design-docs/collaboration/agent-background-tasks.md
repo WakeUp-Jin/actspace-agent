@@ -1,6 +1,6 @@
 # 后台任务：后台 Bash、后台子智能体与任务工具
 
-> 设计依据见 [03 后台 Bash 设计规范](../子智能体和后台任务设计规范/03-后台Bash设计规范.md) 与 [01 决策](../子智能体和后台任务设计规范/01-设计决策.md)；实现记录见[执行过程](../../exec-runs/20261103-subagent-background-redesign/execution-process.md)。
+> 设计依据见 [03 后台 Bash 设计规范](../子智能体和后台任务设计规范/03-后台Bash设计规范.md) 与 [01 决策](../子智能体和后台任务设计规范/01-设计决策.md)。
 >
 > 登记表里有两种任务：后台 Bash（`kind: "bash"`）和后台子智能体（`kind: "agent"`，`taskId` 就是 `agent_id`）。子智能体自己的管理器、工具和事件见[子智能体运行规范](agent-subagent-runtime.md)；以后的生图、workflow 也按同样方式接入登记表。
 

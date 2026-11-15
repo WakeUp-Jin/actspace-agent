@@ -1,6 +1,6 @@
 # ActSpace v2 总体架构
 
-验收证据：P4 本机夹具验收已完成；P5 自动化与 Computer Use 分别见 [执行摘要](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)，不代表真实云部署或 Provider 验收。
+验证边界：P4、P5 的自动化与 Computer Use 走查在本机夹具上完成，不代表真实云部署或外部 Provider 已验证。
 
 ## Host、Harness 与 Run
 

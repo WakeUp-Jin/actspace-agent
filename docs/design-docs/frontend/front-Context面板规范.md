@@ -123,7 +123,7 @@ Composer 上下文弹层的「查看完整上下文」、对象启动页的「�
 - **命令原文**：只为「最慢」「重复最多」两行保存，每条最多 1000 个字符；程序统计只存程序名和子命令名。
 - 不做：逐条命令列表、执行输出、退出码明细、失败占比、按程序拆耗时、「可用专用工具替代」之类的提示、跨会话汇总、PowerShell 解析。
 
-解析细则与存储表设计见归档 `docs/exec-plans/completed/design-archive/frontend/front-Context面板Bash命令统计.md`。
+解析细则以 `apps/desktop/src/main/runtime-v2/bash-programs.ts` 及其单测为准；存储表定义在 `apps/desktop/src/main/runtime-v2/context-history-projection.ts`：每个会话最多记 500 个「程序 + 子命令」组合，超出的归入「其他」；「重复最多」最多跟踪 500 条不同的命令。
 
 ## 6. 数据来源与刷新
 

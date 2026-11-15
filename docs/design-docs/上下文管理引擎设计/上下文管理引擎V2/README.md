@@ -1,6 +1,6 @@
 # 上下文管理引擎 V2
 
-V2 引擎、Context 面板与 SQLite 联合实现已落地。面板契约为 schemaVersion 2，SQLite 读模型版本以 `usage-read-model-schema.ts` 的 `user_version` 为准（现为 18）；验收结果与未覆盖边界见[联合执行摘要](../../../exec-runs/20261011-context-sqlite-integration/execution-summary.md)。
+V2 引擎、Context 面板与 SQLite 联合实现已落地。面板契约为 schemaVersion 2，SQLite 读模型版本以 `usage-read-model-schema.ts` 的 `user_version` 为准（现为 18）。
 
 **Context 是按 Session 与 Agent 逻辑作用域隔离的长期状态；每次模型调用从它生成不可变的 LlmInput。** 模型与工具输出继续先进入 Session，再由对应插件更新 Context。
 
@@ -15,8 +15,6 @@ V2 引擎、Context 面板与 SQLite 联合实现已落地。面板契约为 sch
 | [03：插件包与职责边界](03-插件包与职责边界.md) | context 目录如何拆包，谁拥有状态，压缩策略位于哪里 |
 | [05：Context 面板与 SQLite 联合设计](05-Context面板与SQLite联合设计.md) | 当前与历史数据如何分工、索引如何同步、面板如何刷新、Bug 修复如何共用基础能力 |
 | [07：Step 增量更新与披露面板决策记录](07-Step增量更新与披露面板决策记录.md) | 读取链路、DSH 参考；T1–T5 后端与刷新的决策记录 |
-
-[联合执行计划](../../../exec-plans/completed/20261011-context-sqlite-integration/README.md) · [测试验收计划](../../../exec-plans/completed/20261011-context-sqlite-integration/acceptance.md)
 
 ## 已确认方向
 
@@ -47,4 +45,4 @@ Host/IPC 接线已经由 Runtime 的 `context.engine.getProjection`、Desktop Ap
 
 包迁移与 V2 生命周期的既有实施记录保留；实现完成不代表未覆盖的验收点已通过。
 
-Step 更新：[执行摘要](../../../exec-runs/20261018-context-step-update/execution-summary.md)。来源依赖缓存、Step 安全点压缩和路径分页已接入；面板前端见 `docs/design-docs/frontend/` 下的 Context 面板规范。
+Step 更新：来源依赖缓存、Step 安全点压缩和路径分页已接入；面板前端见 [Context 面板规范](../../frontend/front-Context面板规范.md)。

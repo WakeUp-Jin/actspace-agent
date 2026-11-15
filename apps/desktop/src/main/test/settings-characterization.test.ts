@@ -1,7 +1,8 @@
 // @vitest-environment node
 /**
  * 特征测试（17 T1）：在拆分 settings-service 之前，把现有行为原样记下来。
- * 这里只断言「现在是什么样」，不评价对不对；看起来不合理的行为在注释里标出，并记在 17 的执行记录。
+ * 这里只断言「现在是什么样」，不评价对不对；看起来不合理的行为在注释里标出，
+ * 并登记在 `docs/exec-plans/tech-debt-tracker.md`「Desktop settings 遗留」。
  *
  * 快照存成 `fixtures/settings/expected/*.json`（不用 vitest 的 toMatchSnapshot：本机 `src/main` 的 realpath
  * 和测试路径不一致时 snapshot 状态找不到）。现有行为有意改变时，用 `UPDATE_SETTINGS_GOLDEN=1` 重新生成，并在提交里说明。

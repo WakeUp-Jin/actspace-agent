@@ -1,7 +1,6 @@
 # 会话记录 Markdown（Session Transcript）设计
 
-> 已实现；验收证据见执行摘要。
-> 执行计划：`docs/exec-plans/completed/20261101-session-history-transcript.md`
+> 已实现。
 
 ## 为什么做
 

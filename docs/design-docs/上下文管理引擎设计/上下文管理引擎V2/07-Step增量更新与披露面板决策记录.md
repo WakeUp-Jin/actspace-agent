@@ -1,6 +1,6 @@
 # Step 增量更新与披露面板决策记录
 
-后端、Desktop 刷新与前端交接已按 T1–T5 实施；实施结果见[执行摘要](../../../exec-runs/20261018-context-step-update/execution-summary.md)，接口与面板见[前端交接](../../../exec-plans/completed/design-archive/frontend/front-Context面板Step刷新与路径展示交接.md)。§2、§4 保留讨论时的源码基线，存储重构另行负责。
+后端、Desktop 刷新与前端面板已按 T1–T5 实施；接口与面板的现行规则见 [Context 面板规范](../../frontend/front-Context面板规范.md) §4、§6。§2、§4 保留讨论时的源码基线，存储重构另行负责。
 
 基线：ActSpace `e3468f2b`；DeepSeek Harness 外部参考快照 `d743267388`。本文为源码核对，没有运行时性能测量或 Computer Use 验收。
 
@@ -197,7 +197,7 @@ SQLite 服务还负责会话目录、搜索、Usage 筛选与统计等查询；�
 
 本轮已在 `ContextPanelView.disclosure` 提供能力状态、周期、数量、上限与当前版本；`sessions.listContextPaths` 按 active / sleeping 返回有界元数据分页。版本沿用 currentVersion，不随单独的历史索引更新而重置。后端检查实例代际、水位和版本，拒绝过期游标；无实时披露能力返回 unavailable，不冒充零路径。
 
-路径读取不访问文件正文、不激活路径、不触发压缩。列表不包含 history 或正文，单页最多 100 条，路径行预算 192 KiB。详细字段、刷新和 UI 验收要求见[前端交接](../../../exec-plans/completed/design-archive/frontend/front-Context面板Step刷新与路径展示交接.md)。具体布局与 UI 由前端实现；趋势保留。
+路径读取不访问文件正文、不激活路径、不触发压缩。列表不包含 history 或正文，单页最多 100 条，路径行预算 192 KiB。字段、刷新和界面规则见 [Context 面板规范](../../frontend/front-Context面板规范.md) §4、§6；趋势保留。
 
 ## 7. 任务交付与后续边界
 
@@ -211,7 +211,7 @@ SQLite 服务还负责会话目录、搜索、Usage 筛选与统计等查询；�
 | T4 | 活跃/睡眠路径展示数据 | 已完成摘要、带版本分页、Desktop IPC 与 guard；不包括路径区块布局 |
 | T5 | Context 面板前端交接 | 已交付字段、读取时机、版本规则、空态/异常和逐项验收要求 |
 
-自动化结果与未覆盖范围见[执行摘要](../../../exec-runs/20261018-context-step-update/execution-summary.md)。保留版本一致性保护、Token 估算、活跃上限 100 和趋势。存储文档交付后，只核对必要事件、水位和恢复接口，不自动扩大为存储重构任务。
+真实 Provider 调用和压缩质量评估没有做；真实 Electron 上验过工具 Step 刷新、压缩后的下一次请求、移除 SQLite 后的恢复与继续执行，部分恢复与路径边界没有覆盖。保留版本一致性保护、Token 估算、活跃上限 100 和趋势。存储文档交付后，只核对必要事件、水位和恢复接口，不自动扩大为存储重构任务。
 
 后续维护规则：新增决定继续编号并注明日期；修改旧决定写明替代关系；区分当前实现、目标、建议与未覆盖验收。
 

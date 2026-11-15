@@ -1,8 +1,8 @@
 # ActSpace v2 LLM Adapter 目标设计
 
-> pi-ai adapter、路由/代理和结构化错误契约已实现并有自动化记录；真实 Provider 与 packaged lifecycle 的外部验收见对应执行摘要，不因文档校准宣称通过。
+> pi-ai adapter、路由/代理和结构化错误契约已实现并有自动化记录；真实 Provider 与 packaged lifecycle 没有做过专项外部验收，不因文档校准宣称通过。
 
-> 收敛实现见 [LLM Core Pi](agent-llm-core-pi.md)与[执行计划](../../exec-plans/completed/20260922-llm-core-pi.md)。本文保留 Adapter 的既有目标契约；当前 Host 已通过 prepare 固定模型事实、dispatch 配置和 retry generation，外部验收边界见执行摘要。
+> 收敛实现见 [LLM Core Pi](agent-llm-core-pi.md)。本文保留 Adapter 的既有目标契约；当前 Host 已通过 prepare 固定模型事实、dispatch 配置和 retry generation，未完成的外部验收项见 LLM Core Pi。
 
 ## 1. 决策
 

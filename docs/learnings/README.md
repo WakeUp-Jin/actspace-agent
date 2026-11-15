@@ -6,7 +6,7 @@
 - 目录：`docs/learnings/YYYY-MM/`，月份目录表示文章首次写入的时间。
 - 命名：新文章用 `topic-slug.md`（英文 kebab-case，不带日期前缀）；历史文章保留原有的 `YYYYMMDD-topic-slug.md`，不批量改名，避免大量外部引用失效。
 - 本页按主题分组，每篇一行，日期为文章首次写入的月份或日期；合并过的文章在正文开头注明合并来源。标题括号里的篇数、每篇文章都被索引且只索引一次，由 `pnpm check:docs` 校验。
-- 2026-11-04 文档整理把 323 篇合并去重为 225 篇（含 HTML 全部转为 Markdown），详见[整理计划](../exec-plans/completed/20261104-docs-reorg.md)。
+- 2026-11-04 文档整理把 323 篇合并去重为 225 篇（含 HTML 全部转为 Markdown），详见[整理记录](../histories/2026-11/20261105-0000-docs-reorg.md)。
 
 ## Agent 运行时、插件与架构分层（36）
 

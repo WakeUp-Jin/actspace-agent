@@ -53,9 +53,11 @@
 
 ## 执行文档
 
-执行开始时，在 `docs/exec-runs/<plan-slug>/` 创建以下两份文档（从 `docs/exec-runs/templates/` 复制模板）：
+- 交互模式：不另写执行文档。进度和决定记在上面的「进度记录」「决策记录」里。
+- 夜间模式：执行开始时在 `docs/exec-runs/<plan-slug>/` 创建两份文档（从 `docs/exec-runs/templates/` 复制模板）。没有人工审批环节，它们是人了解执行全貌的唯一途径。
+  - `execution-process.md`：执行过程中持续更新，记录关键步骤、决定和问题。
+  - `execution-summary.md`：执行结束后填写，重点写人工验证指引。
 
-- `execution-process.md`：执行过程中持续更新，记录关键步骤、决定和问题。
-- `execution-summary.md`：执行结束后填写，重点写人工验证指引。
+## 收尾
 
-夜间模式下，因为没有人工审批环节，这两份文档的完整性尤为重要——它们是人了解执行全貌的唯一途径。
+计划完成后删除本文件和 `docs/exec-runs/<plan-slug>/`，不归档：没验证的范围和遗留写进 history 与 PR 描述，需要后续处理的登记到 `docs/exec-plans/tech-debt-tracker.md`。步骤见 `docs/PLANS_GUIDE.md`「计划完成时」。
