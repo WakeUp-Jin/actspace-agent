@@ -182,7 +182,7 @@ export function assembleDeepSearchResult(outcome: DeepSearchOutcome): ToolBodyRe
 
 ### PA.2 解析流、组装结果
 
-- 新建 `packages/web/tool-deep-search/src/sse.ts`：`async function* readSseData(body: ReadableStream<Uint8Array>, onData: () => void): AsyncGenerator<string>`。按行切分，支持 `\n` 和 `\r\n`、跨 chunk 的半行、一个事件多行 `data:`；注释行不调用 `onData`。
+- 新建 `packages/web/tool-deep-search/src/sse.ts`：`async function* readSseData(body: ReadableStream<Uint8Array>, onData: () => void, signal?: AbortSignal): AsyncGenerator<string>`（`signal` 中止时取消读取器并抛出，不依赖网络流自己报错）。按行切分，支持 `\n` 和 `\r\n`、跨 chunk 的半行、一个事件多行 `data:`；注释行不调用 `onData`。
 - 新建 `packages/web/tool-deep-search/src/stream-state.ts`：把 chunk 逐个喂进去，维护正文、搜索词、来源查找表、打不开的网页、计费次数、结束原因、当前进度消息。
 - 新建 `packages/web/tool-deep-search/src/assemble.ts`：见契约。
 - 测试，`src/test/sse.test.ts`、`stream-state.test.ts`、`assemble.test.ts`：

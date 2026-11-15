@@ -3,10 +3,14 @@ const MAX_EVENT_CHARS = 8 * 1024 * 1024;
 
 /**
  * Yields the `data` of each server-sent event, `[DONE]` included. Comment lines (`: keep-alive`) are dropped and do not
- * call `onData`, so they never reset an idle timer. Stopping early, or a read error, cancels the body and releases it.
+ * call `onData`, so they never reset an idle timer. Stopping early, a read error, or `signal` aborting cancels the body
+ * and releases it; an abort then throws the signal's reason.
  */
-export async function* readSseData(body: ReadableStream<Uint8Array>, onData: () => void): AsyncGenerator<string> {
+export async function* readSseData(body: ReadableStream<Uint8Array>, onData: () => void, signal?: AbortSignal): AsyncGenerator<string> {
+  signal?.throwIfAborted();
   const reader = body.getReader();
+  const onAbort = () => { void reader.cancel(signal?.reason).catch(() => undefined); };
+  signal?.addEventListener("abort", onAbort, { once: true });
   const decoder = new TextDecoder();
   let buffer = "";
   let dataLines: string[] = [];
@@ -32,6 +36,7 @@ export async function* readSseData(body: ReadableStream<Uint8Array>, onData: () 
   try {
     for (;;) {
       const { done, value } = await reader.read();
+      signal?.throwIfAborted();
       buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
       let newline = buffer.indexOf("\n");
       while (newline !== -1) {
@@ -48,6 +53,7 @@ export async function* readSseData(body: ReadableStream<Uint8Array>, onData: () 
     const last = takeLine("");
     if (last !== undefined) { onData(); yield last; }
   } finally {
+    signal?.removeEventListener("abort", onAbort);
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }

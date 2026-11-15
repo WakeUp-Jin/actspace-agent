@@ -63,4 +63,14 @@ describe("readSseData", () => {
     expect(cancel).toHaveBeenCalled();
     expect(stream.locked).toBe(false);
   });
+
+  it("cancels the body and throws when the signal aborts mid-read", async () => {
+    const cancel = vi.fn();
+    const stream = new ReadableStream<Uint8Array>({ start() { /* never sends */ }, cancel });
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new Error("stop")), 10);
+    await expect((async () => { for await (const _ of readSseData(stream, () => {}, controller.signal)) { /* none */ } })()).rejects.toThrow("stop");
+    expect(cancel).toHaveBeenCalled();
+    expect(stream.locked).toBe(false);
+  });
 });
