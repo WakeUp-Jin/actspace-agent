@@ -8,7 +8,10 @@ import type { ToolArtifactOwner, ToolArtifactRef } from "@actspace/tool-runtime"
 type ArtifactMetadata = ToolArtifactRef & {
   readonly schemaVersion: 1;
   readonly owner: ToolArtifactOwner;
+  /** The imported file's name; older artifacts have none. */
+  readonly fileName?: string;
 };
+const MAX_FILE_NAME = 240;
 
 export class DesktopArtifactStore {
   readonly root: string;
@@ -17,7 +20,7 @@ export class DesktopArtifactStore {
     this.root = join(dataRoot, "artifacts-v2");
   }
 
-  async create(input: { readonly bytes: Uint8Array; readonly mediaType: string; readonly owner: ToolArtifactOwner }): Promise<ToolArtifactRef> {
+  async create(input: { readonly bytes: Uint8Array; readonly mediaType: string; readonly owner: ToolArtifactOwner; readonly fileName?: string }): Promise<ToolArtifactRef> {
     await mkdir(this.root, { recursive: true });
     const artifactId = randomUUID();
     const path = join(this.root, artifactId);
@@ -28,7 +31,8 @@ export class DesktopArtifactStore {
       size: input.bytes.byteLength,
       sha256: createHash("sha256").update(input.bytes).digest("hex"),
     });
-    const metadata: ArtifactMetadata = Object.freeze({ schemaVersion: 1, ...ref, owner: Object.freeze({ ...input.owner }) });
+    const fileName = cleanFileName(input.fileName);
+    const metadata: ArtifactMetadata = Object.freeze({ schemaVersion: 1, ...ref, owner: Object.freeze({ ...input.owner }), ...(fileName ? { fileName } : {}) });
     try {
       const file = await open(path, "wx", 0o600);
       try { await file.writeFile(input.bytes); await file.sync(); } finally { await file.close(); }
@@ -51,13 +55,13 @@ export class DesktopArtifactStore {
   async copyForSession(parentSessionId: string, childSessionId: string, artifactId: string): Promise<ToolArtifactRef> {
     const verified = await this.#readVerified(artifactId);
     if (verified.metadata.owner.sessionId !== parentSessionId) throw new Error("Artifact does not belong to this Session.");
-    return this.create({ bytes: verified.bytes, mediaType: verified.metadata.mediaType, owner: { ...verified.metadata.owner, sessionId: childSessionId } });
+    return this.create({ bytes: verified.bytes, mediaType: verified.metadata.mediaType, owner: { ...verified.metadata.owner, sessionId: childSessionId }, ...(verified.metadata.fileName ? { fileName: verified.metadata.fileName } : {}) });
   }
 
-  async readForSession(sessionId: string, artifactId: string): Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }> {
+  async readForSession(sessionId: string, artifactId: string): Promise<{ readonly bytes: Uint8Array; readonly mediaType: string; readonly fileName?: string }> {
     const verified = await this.#readVerified(artifactId);
     if (verified.metadata.owner.sessionId !== sessionId) throw new Error("Artifact does not belong to this Session.");
-    return Object.freeze({ bytes: verified.bytes, mediaType: verified.metadata.mediaType });
+    return Object.freeze({ bytes: verified.bytes, mediaType: verified.metadata.mediaType, ...(verified.metadata.fileName ? { fileName: verified.metadata.fileName } : {}) });
   }
 
   async resolveForSession(sessionId: string, artifactId: string): Promise<{ readonly path: string; readonly bytes: Uint8Array; readonly mediaType: string }> {
@@ -100,5 +104,14 @@ function parseMetadata(raw: string, artifactId: string): ArtifactMetadata {
   if (record.schemaVersion !== 1 || record.artifactId !== artifactId || typeof record.mediaType !== "string" || typeof record.size !== "number" || !Number.isSafeInteger(record.size) || record.size < 0 || typeof record.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(record.sha256) || owner === null || typeof owner !== "object" || Array.isArray(owner)) throw new Error("Artifact metadata is invalid.");
   const fields = owner as Record<string, unknown>;
   if ([fields.sessionId, fields.callId, fields.pluginId, fields.name].some((field) => typeof field !== "string" || field.length === 0)) throw new Error("Artifact owner metadata is invalid.");
-  return value as ArtifactMetadata;
+  // An unusable name is dropped rather than failing the read: the name is only for display.
+  const { fileName, ...rest } = record;
+  return (typeof fileName === "string" && fileName.length > 0 ? { ...rest, fileName } : rest) as ArtifactMetadata;
+}
+
+/** Control characters removed, at most 240 characters; empty means no name. */
+function cleanFileName(value: string | undefined): string | undefined {
+  // eslint-disable-next-line no-control-regex
+  const clean = Array.from((value ?? "").replace(/[\u0000-\u001f\u007f-\u009f]/g, "")).slice(0, MAX_FILE_NAME).join("");
+  return clean.length > 0 ? clean : undefined;
 }

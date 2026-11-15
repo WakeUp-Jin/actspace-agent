@@ -1,4 +1,5 @@
 import { readSessionWorkspaceFacts } from "./session-workspace-facts";
+import { attachmentMediaType } from "./attachment-media-type";
 import type { EnglishLearningService, SpeechHostPort } from "@actspace/english-learning";
 import { profileService } from "./profile-service";
 import { formatChatAttachmentIssue, type ChatAttachmentIssue, type EnglishLearningTargetInput, type EnglishLearningState } from "@actspace/shared";
@@ -77,7 +78,7 @@ export class DesktopRuntimeRegistry {
   #bootError: string | null = null;
   #cursor = 0;
   #artifacts: {
-    create(input: { readonly bytes: Uint8Array; readonly mediaType: string; readonly owner: { readonly sessionId: string; readonly callId: string; readonly pluginId: string; readonly name: string } }): Promise<{ readonly artifactId: string; readonly mediaType: string; readonly size: number }>;
+    create(input: { readonly bytes: Uint8Array; readonly mediaType: string; readonly owner: { readonly sessionId: string; readonly callId: string; readonly pluginId: string; readonly name: string }; readonly fileName?: string }): Promise<{ readonly artifactId: string; readonly mediaType: string; readonly size: number }>;
     readForSession(sessionId: string, artifactId: string): Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }>;
     resolveForSession(sessionId: string, artifactId: string): Promise<{ readonly path: string; readonly bytes: Uint8Array; readonly mediaType: string }>;
     deleteForSession(sessionId: string, artifactId: string): Promise<void>;
@@ -358,7 +359,7 @@ export class DesktopRuntimeRegistry {
         if (metadata.size > 20 * 1024 * 1024) throw new Error("Attachment exceeds the 20 MiB limit.");
       });
       const mediaType = attachmentMediaType(path);
-      const created = await this.#artifacts.create({ bytes, mediaType, owner: { sessionId, callId: `attachment-${randomUUID()}`, pluginId: "@actspace/desktop", name: "user-attachment" } });
+      const created = await this.#artifacts.create({ bytes, mediaType, fileName: basename(path), owner: { sessionId, callId: `attachment-${randomUUID()}`, pluginId: "@actspace/desktop", name: "user-attachment" } });
       return Object.freeze({ artifactId: created.artifactId, mimeType: created.mediaType, name: basename(path).slice(0, 240), sizeBytes: created.size });
     } finally { this.#admittedWork--; }
   }
@@ -736,19 +737,6 @@ function findHistoricalArtifactRef(events: readonly SessionEventEnvelopeV1[], ar
   return null;
 }
 
-function attachmentMediaType(path: string): string {
-  switch (extname(path).toLowerCase()) {
-    case ".png": return "image/png";
-    case ".jpg": case ".jpeg": return "image/jpeg";
-    case ".webp": return "image/webp";
-    case ".gif": return "image/gif";
-    case ".pdf": return "application/pdf";
-    case ".json": return "application/json";
-    case ".csv": return "text/csv";
-    case ".md": return "text/markdown";
-    default: return "text/plain";
-  }
-}
 
 const CHAT_TEXT_BYTE_LIMIT = 1024 * 1024;
 const CHAT_TEXT_TOTAL_CHARACTER_LIMIT = 256_000;
