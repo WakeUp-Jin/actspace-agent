@@ -1,6 +1,6 @@
 import type { AgentHandle } from "@actspace/agent";
-import { containNotification, type CordisContext } from "@actspace/cordis-adapter";
-import type { PromptHostPort } from "@actspace/prompt";
+import { ACTSPACE_SERVICE_IDS, containNotification, getService, requireService, serviceKey, serviceView, type CordisContext } from "@actspace/cordis-adapter";
+import { PROMPT_HOST_PORT } from "@actspace/prompt";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { EnglishLearningState } from "@actspace/shared";
 import { completedMessage, record } from "./completion.js";
@@ -10,6 +10,8 @@ import type { SpeechHostPort } from "./host-port.js";
 import { SpeechQueue } from "./queue.js";
 
 type Binding = { session: AgentHandle["session"]; watermark: number; injected: Map<string, Set<string>>; remove: () => void };
+/** 这个包用到的 `session.runtime`：按 id 取打开着的会话。 */
+export const ENGLISH_LEARNING_SESSIONS_VIEW = serviceView<{ getOpen(id: string): AgentHandle["session"] | undefined }>(ACTSPACE_SERVICE_IDS.sessionRuntime);
 export class EnglishLearningService {
   private binding: Binding | undefined;
   private closed = false;
@@ -36,8 +38,7 @@ export class EnglishLearningService {
   subscribe(listener: (state: EnglishLearningState) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
 
   async enableSession(sessionId: string): Promise<EnglishLearningState> {
-    const sessions = this.ctx.get?.("session.runtime") as { getOpen(id: string): AgentHandle["session"] | undefined };
-    const session = sessions.getOpen(sessionId);
+    const session = requireService(this.ctx, ENGLISH_LEARNING_SESSIONS_VIEW, "English learning").getOpen(sessionId);
     if (!session) throw new Error("目标会话尚未就绪。");
     return this.bind(session);
   }
@@ -52,7 +53,7 @@ export class EnglishLearningService {
     if (this.closed) throw new Error("英语辅助学习已停止。");
     if (session.header.lineage !== null) throw new Error("请选择主会话。");
     const binding: Binding = { session, watermark: session.journal.lastSeq, injected: new Map(), remove: () => {} };
-    const extensions = (this.ctx.get?.("actspace.host.prompt") as PromptHostPort | undefined)?.extensions;
+    const extensions = getService(this.ctx, PROMPT_HOST_PORT)?.extensions;
     if (!extensions) throw new Error("会话提示词入口不可用。");
     this.binding?.remove();
     const remove = extensions.registerMainSession(session.header.sessionId, {
@@ -105,7 +106,7 @@ export class EnglishLearningService {
     if (!binding || sessionId !== binding.session.header.sessionId) return;
     // The bound Session rewound: its Journal is shorter and lives under a new handle; bind that one from its new end.
     if (event.type === "session/rewound") {
-      const sessions = this.ctx.get?.("session.runtime") as { getOpen(id: string): AgentHandle["session"] | undefined } | undefined;
+      const sessions = getService(this.ctx, ENGLISH_LEARNING_SESSIONS_VIEW);
       const reopened = sessions?.getOpen(sessionId);
       if (reopened && !this.closed) void this.bind(reopened).catch(() => undefined);
       return;
@@ -116,7 +117,7 @@ export class EnglishLearningService {
     const injected = binding.injected.get(turnId);
     binding.injected.delete(turnId);
     if (!injected) return;
-    const sessions = this.ctx.get?.("session.runtime") as { getOpen(id: string): AgentHandle["session"] | undefined } | undefined;
+    const sessions = getService(this.ctx, ENGLISH_LEARNING_SESSIONS_VIEW);
     const latest = (sessions?.getOpen(sessionId) ?? binding.session).journal.latestEvent("assistant/message", event.seq - 1);
     const message = completedMessage(latest ? [latest] : [], event);
     if (!message || !injected.has(message.stepId)) return;
@@ -132,3 +133,4 @@ export class EnglishLearningService {
     for (const listener of this.listeners) { try { listener(this.getState()); } catch { /* UI observers cannot affect the Agent. */ } }
   }
 }
+export const ENGLISH_LEARNING_SERVICE = serviceKey<EnglishLearningService>("english-learning");

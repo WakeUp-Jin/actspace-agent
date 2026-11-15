@@ -110,7 +110,8 @@ describe("external subagents", () => {
     const view = subagentTree(f.root).agents[agentId];
     expect(view.status).toBe("closed");
     expect(view.activations[0].settle).toMatchObject({ status: "completed", delivery: "notified", result: "subagent, subagent-codex, subagent-claude-code", summary: `Subagent ${agentId} finished.` });
-    await until(() => new MainAgentInbox(f.root).pending().length === 1);
+    // The registry wakes the parent last, after the notice is in the inbox and the settle record is written.
+    await until(() => new MainAgentInbox(f.root).pending().length === 1 && f.woken.length > 0);
     const notice = String(new MainAgentInbox(f.root).pending()[0].content);
     expect(notice).toContain(`<transcript>${path}</transcript>`);
     expect(notice).toContain("<closing_message>\nsubagent, subagent-codex, subagent-claude-code\n</closing_message>");

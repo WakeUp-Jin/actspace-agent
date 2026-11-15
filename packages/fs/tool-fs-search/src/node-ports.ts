@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process";
 import { stat, realpath } from "node:fs/promises";
-import { basename, isAbsolute, relative, resolve } from "node:path";
-import { toolChildEnv } from "@actspace/shared";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import * as nodePath from "node:path";
+import { basename, isAbsolute, resolve } from "node:path";
+import { isLexicallyInside, relativePathInside, toolChildEnv } from "@actspace/shared";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
 // 单次输出上限：一次宽泛的 grep 很容易命中几百行，全部进模型上下文和会话日志。截断时提示模型缩小范围。
@@ -17,7 +18,7 @@ function contextWorkspaceRoot(context: ToolExecutionContext, fallback: string): 
   return resolve(context.workspaceRoot || fallback);
 }
 
-async function grepTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string, ripgrepPath?: string, resolveArtifact?: SessionArtifactResolver): Promise<ToolBodyResult> {
+async function grepTool(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext, workspaceRoot: string, ripgrepPath?: string, resolveArtifact?: SessionArtifactResolver): Promise<ToolBodyResult> {
   const pattern = stringArg(args, "pattern");
   if (!pattern) return failure("INVALID_ARGUMENTS", "pattern is required");
   const pathArg = stringArg(args, "path") || ".";
@@ -41,7 +42,7 @@ async function grepTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, cont
   }
 }
 
-async function globTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string, ripgrepPath?: string): Promise<ToolBodyResult> {
+async function globTool(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext, workspaceRoot: string, ripgrepPath?: string): Promise<ToolBodyResult> {
   const pattern = stringArg(args, "pattern");
   if (!pattern) return failure("INVALID_ARGUMENTS", "pattern is required");
   const pathArg = stringArg(args, "path") || ".";
@@ -107,8 +108,7 @@ function resolveWorkspacePath(input: string, workspaceRoot: string): string {
 }
 
 function isWithin(root: string, candidate: string): boolean {
-  const nested = relative(resolve(root), resolve(candidate));
-  return nested === "" || (!nested.startsWith("..") && !isAbsolute(nested));
+  return isLexicallyInside(nodePath, root, candidate, { includeRoot: true });
 }
 
 async function runRipgrep(command: string | undefined, args: readonly string[], cwd: string, signal: AbortSignal): Promise<{ readonly exitCode: number | null; readonly stdout: string; readonly error: string; readonly truncated: boolean }> {
@@ -125,10 +125,9 @@ async function runRipgrep(command: string | undefined, args: readonly string[], 
       signal.removeEventListener("abort", abort);
       resolveResult({ exitCode, stdout, error, truncated });
     };
-    const append = (current: string, chunk: Buffer) => {
+    const append = (current: string, text: string) => {
       const room = MAX_SEARCH_OUTPUT_CHARS - current.length;
       if (room <= 0) { truncated = true; return current; }
-      const text = chunk.toString("utf8");
       if (text.length > room) truncated = true;
       return current + text.slice(0, room);
     };
@@ -136,14 +135,17 @@ async function runRipgrep(command: string | undefined, args: readonly string[], 
     const timer = setTimeout(() => { child.kill("SIGTERM"); finish(null, `ripgrep timed out after ${RG_TIMEOUT_MS}ms`); }, RG_TIMEOUT_MS);
     if (signal.aborted) abort();
     else signal.addEventListener("abort", abort, { once: true });
-    child.stdout.on("data", (chunk: Buffer) => { stdout = append(stdout, chunk); });
-    child.stderr.on("data", (chunk: Buffer) => { stderr = append(stderr, chunk); });
+    // 管道按字节切块，一个多字节字符可能落在两块之间。让流自己解码，它会把没收全的字节留到下一块。
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (text: string) => { stdout = append(stdout, text); });
+    child.stderr.on("data", (text: string) => { stderr = append(stderr, text); });
     child.on("error", (error) => finish(null, error.message.includes("ENOENT") ? "ripgrep (rg) is required for grep/glob tools but was not found." : error.message));
     child.on("close", (code) => finish(code));
   });
 }
 
-function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeV2JsonValue): ToolBodyResult {
+function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeJsonValue): ToolBodyResult {
   return { status: "completed", modelOutput: [{ type: "text", text }], summary, ...(detail === undefined ? {} : { detail: [{ label: "result", value: detail }] }) };
 }
 
@@ -158,7 +160,7 @@ function ioFailure(action: string, path: string, error: unknown): ToolBodyResult
   return failure("IO_ERROR", `Failed to ${action}: ${message}`);
 }
 
-function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
-function displayPath(path: string, workspaceRoot: string): string { const nested = relative(workspaceRoot, path); return nested && !nested.startsWith("..") && !isAbsolute(nested) ? nested : path; }
+function stringArg(args: Readonly<Record<string, RuntimeJsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
+function displayPath(path: string, workspaceRoot: string): string { return relativePathInside(nodePath, workspaceRoot, path) || path; }
 function normalizeSearchLine(line: string, workspaceRoot: string): string { return line.startsWith(`${workspaceRoot}/`) ? line.slice(workspaceRoot.length + 1) : line; }
 function formatBytes(size: number): string { if (size < 1024) return `${size} B`; const units = ["KB", "MB", "GB", "TB"]; let value = size / 1024; let index = 0; while (value >= 1024 && index < units.length - 1) { value /= 1024; index += 1; } return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[index]}`; }

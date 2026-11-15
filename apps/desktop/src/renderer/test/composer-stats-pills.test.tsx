@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { RuntimeV2SessionSnapshot, RuntimeV2UsageSummary } from "@actspace/shared/runtime-v2/projection";
+import type { RuntimeSessionSnapshot, RuntimeUsageSummary } from "@actspace/shared/runtime-v2/projection";
 import type { SessionProjectionContextValue } from "../session";
 import { ComposerStatsPills, activityPillModel, usagePillModel } from "../components/composer/ComposerStatsPills";
 import {
@@ -30,11 +30,11 @@ vi.mock("../session", async (importOriginal) => ({
 
 const NO_STATS: ComposerSessionStats = { turns: 0, steps: 0, llmMs: 0, toolMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 };
 
-function usage(overrides: Partial<RuntimeV2UsageSummary>): RuntimeV2UsageSummary {
+function usage(overrides: Partial<RuntimeUsageSummary>): RuntimeUsageSummary {
   return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null, ...overrides };
 }
 
-function setProjection(snapshot: Partial<RuntimeV2SessionSnapshot>) {
+function setProjection(snapshot: Partial<RuntimeSessionSnapshot>) {
   const fixture = projectionFixture("s");
   projection = {
     sessionId: "s",
@@ -81,7 +81,7 @@ describe("sessionStats", () => {
     const stats = sessionStats({
       ...fixture.snapshot,
       activity: { ...fixture.snapshot.activity, turnCount: 2, stepCount: 5 },
-      tools: [{ durationMs: 1_500 }, { durationMs: null }, { durationMs: 500 }] as unknown as RuntimeV2SessionSnapshot["tools"],
+      tools: [{ durationMs: 1_500 }, { durationMs: null }, { durationMs: 500 }] as unknown as RuntimeSessionSnapshot["tools"],
     });
     expect(stats).toEqual({ ...NO_STATS, turns: 2, steps: 5, toolMs: 2_000 });
   });

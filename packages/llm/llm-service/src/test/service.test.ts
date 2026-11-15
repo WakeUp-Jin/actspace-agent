@@ -1,3 +1,4 @@
+import { getEventListeners } from "node:events";
 import { describe, expect, it } from "vitest";
 import { LlmService } from "../service.js";
 import { LlmRouteRegistry } from "../route-registry.js";
@@ -64,6 +65,41 @@ describe("LlmService", () => {
     await handle.dispose(100);
   });
 
+  it("stops listening to the caller's signal once each stream has settled", async () => {
+    const routes = new LlmRouteRegistry();
+    const handle = routes.register({ routeId: "route", providerId: "provider", modelPattern: "*", adapter: adapter([]), credentialRef: "credential", defaults: {} });
+    const service = new LlmService(routes, credentials);
+    // 一个回合里的所有请求共用一个 signal：结束的请求不摘监听器，监听器和它抓住的流就一直留到回合结束。
+    const turn = new AbortController();
+    const listeners: number[] = [];
+    for (let request = 0; request < 3; request += 1) {
+      const stream = await service.prepare({ routeId: "route", model: "model", messages: [], signal: turn.signal }).dispatch();
+      for await (const _event of stream) { /* 读完 */ }
+      listeners.push(getEventListeners(turn.signal, "abort").length);
+    }
+    expect(listeners).toEqual([0, 0, 0]);
+    const aborted = await service.prepare({ routeId: "route", model: "model", messages: [], signal: turn.signal }).dispatch();
+    await aborted.abort("test");
+    expect(getEventListeners(turn.signal, "abort")).toHaveLength(0);
+    await handle.dispose(100);
+  });
+
+  it("cancels a stream in flight when the caller's signal fires", async () => {
+    const cancelled: string[] = [];
+    const routes = new LlmRouteRegistry();
+    const handle = routes.register({ routeId: "route", providerId: "provider", modelPattern: "*", credentialRef: "credential", defaults: {}, adapter: {
+      adapterVersion: "test", dispatch: async () => completedStream(), cancel: async (requestId) => { cancelled.push(requestId); },
+    } });
+    const turn = new AbortController();
+    const stream = await new LlmService(routes, credentials).prepare({ routeId: "route", model: "model", messages: [], signal: turn.signal, requestId: "in-flight" }).dispatch();
+    const iterator = stream[Symbol.asyncIterator]();
+    await iterator.next();
+    turn.abort();
+    await handle.dispose(100);
+    expect(cancelled).toEqual(["in-flight"]);
+    expect(stream.settled).toBe(true);
+  });
+
   it("uses a request-bound adapter preparation result for snapshot and dispatch", async () => {
     const dispatched: string[] = [];
     const routes = new LlmRouteRegistry();
@@ -128,6 +164,28 @@ describe("LlmService", () => {
     first.release();
     retry.release();
     await old.dispose(100);
+  });
+
+  it.each(["prepareCaptured", "prepareCapturedAsync"] as const)("detaches the messages and tool schemas given to %s", async (method) => {
+    const source = {
+      content: [{ type: "text" as const, text: "original" }],
+      schema: { type: "object", properties: { value: { type: "string" } } },
+    };
+    const routes = new LlmRouteRegistry();
+    const handle = routes.register({ routeId: "retry", providerId: "provider", modelPattern: "*", adapter: adapter([]), credentialRef: "credential", defaults: {} });
+    const service = new LlmService(routes, credentials);
+    const first = service.prepare({ routeId: "retry", model: "model", messages: [] });
+    const retry = await service[method](handle.registration, { ...first.request, requestId: "retry-request",
+      messages: [{ role: "user", content: source.content }],
+      tools: [{ name: "tool", definitionVersion: 1, definitionDigest: "d", description: "tool", inputSchema: source.schema }],
+    }, undefined, first.preparedAdapterCall);
+    source.content[0].text = "mutated";
+    source.schema.properties.value.type = "number";
+    expect(retry.request.messages[0]?.content).toEqual([{ type: "text", text: "original" }]);
+    expect(retry.request.tools[0]?.inputSchema).toEqual({ type: "object", properties: { value: { type: "string" } } });
+    first.release();
+    retry.release();
+    await handle.dispose(100);
   });
 
   it("acquires before async adapter preparation and permits only that retry scope through draining", async () => {

@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue, RuntimeTrajectoryNode } from "@actspace/shared/runtime-v2";
 
 export type TrajectoryTimelineMode = "sequence" | "duration" | "time" | "actual";
 export type TrajectoryRecordKind =
@@ -9,10 +9,10 @@ export type TrajectoryRecordState = "started" | "running" | "updated" | "complet
 /** A prompt/tool snapshot used by an explicit SYSTEM prompt boundary. */
 export type TrajectoryPromptDetail = {
   readonly systemPrompt?: string | null;
-  readonly contextSections?: RuntimeV2JsonValue;
-  readonly contextModelFacts?: RuntimeV2JsonValue;
-  readonly tools?: RuntimeV2JsonValue;
-  readonly raw?: RuntimeV2JsonValue;
+  readonly contextSections?: RuntimeJsonValue;
+  readonly contextModelFacts?: RuntimeJsonValue;
+  readonly tools?: RuntimeJsonValue;
+  readonly raw?: RuntimeJsonValue;
 };
 
 export type TrajectorySystemChangeKind = "initial" | "updated" | "tools-updated" | "prompt-updated" | "unknown";
@@ -23,7 +23,7 @@ export type TrajectorySourceBlock = {
   readonly content: string;
   readonly callId?: string;
   readonly toolName?: string;
-  readonly raw?: RuntimeV2JsonValue;
+  readonly raw?: RuntimeJsonValue;
 };
 
 /** Timing facts needed to render DSH's assistant timing summary. */
@@ -49,9 +49,9 @@ export type TrajectoryRequestDetail = {
   readonly purpose?: "assistant" | "compaction" | "unknown";
   readonly provider?: string | null;
   readonly model?: string | null;
-  readonly header: RuntimeV2JsonValue | null;
-  readonly context: RuntimeV2JsonValue | null;
-  readonly options: RuntimeV2JsonValue | null;
+  readonly header: RuntimeJsonValue | null;
+  readonly context: RuntimeJsonValue | null;
+  readonly options: RuntimeJsonValue | null;
   readonly prompt?: TrajectoryPromptDetail | null;
   readonly sourceSequences: readonly number[];
   readonly startedAt: string | null;
@@ -84,7 +84,7 @@ export type TrajectoryRecord = {
   readonly messageId: string | null;
   readonly summary: string;
   readonly preview: string;
-  readonly raw: RuntimeV2JsonValue;
+  readonly raw: RuntimeJsonValue;
   readonly sourceSequences: readonly number[];
   readonly startedAt: string | null;
   readonly completedAt: string | null;
@@ -102,28 +102,28 @@ export type TrajectoryRecord = {
   readonly systemChange?: TrajectorySystemChangeKind;
   readonly promptDetail?: TrajectoryPromptDetail | null;
   readonly previousPromptDetail?: TrajectoryPromptDetail | null;
-  readonly inputDetail?: RuntimeV2JsonValue | null;
-  readonly outputDetail?: RuntimeV2JsonValue | null;
+  readonly inputDetail?: RuntimeJsonValue | null;
+  readonly outputDetail?: RuntimeJsonValue | null;
   readonly thinkingDetail?: string | null;
   readonly sourceBlocks?: readonly TrajectorySourceBlock[];
   readonly outputBlocks?: readonly TrajectorySourceBlock[];
-  readonly schemaDetail?: RuntimeV2JsonValue | null;
+  readonly schemaDetail?: RuntimeJsonValue | null;
   readonly hierarchy?: string | null;
   readonly timingSource?: string | null;
   readonly assistantMetrics?: TrajectoryAssistantMetrics | null;
   readonly requestDetail?: TrajectoryRequestDetail | null;
-  readonly requestOptions?: RuntimeV2JsonValue | null;
-  readonly requestContext?: RuntimeV2JsonValue | null;
-  readonly resultRaw?: RuntimeV2JsonValue | null;
+  readonly requestOptions?: RuntimeJsonValue | null;
+  readonly requestContext?: RuntimeJsonValue | null;
+  readonly resultRaw?: RuntimeJsonValue | null;
   readonly toolName?: string | null;
-  readonly toolArguments?: RuntimeV2JsonValue | null;
+  readonly toolArguments?: RuntimeJsonValue | null;
   /** Provider/model identity copied from request facts when available. */
   readonly provider?: string | null;
   readonly model?: string | null;
   readonly finishReason?: string | null;
   readonly error?: string | null;
   /** Original message source/provenance, when the event carries one. */
-  readonly messageSource?: RuntimeV2JsonValue | null;
+  readonly messageSource?: RuntimeJsonValue | null;
   /** Parent call identity for nested tool dispatch records. */
   readonly parentCallId?: string | null;
   readonly contextPresentation?: { readonly category: string; readonly title: string; readonly action: string; readonly placement: string; readonly previousText?: string };
@@ -206,7 +206,7 @@ export type TrajectoryRequestView = {
   readonly group: string;
   readonly provider: string | null;
   readonly model: string | null;
-  readonly options: RuntimeV2JsonValue | null;
+  readonly options: RuntimeJsonValue | null;
   readonly usage: TrajectoryUsage | null;
   readonly startedAt: number | null;
   readonly completedAt: number | null;
@@ -262,15 +262,15 @@ export type TrajectoryTimeline = TrajectoryTimeRange & {
 
 export type TrajectoryDetail = {
   readonly record: TrajectoryRecord;
-  readonly sourceNodes: readonly RuntimeV2TrajectoryNode[];
-  readonly sections: readonly { readonly key: string; readonly value: RuntimeV2JsonValue }[];
+  readonly sourceNodes: readonly RuntimeTrajectoryNode[];
+  readonly sections: readonly { readonly key: string; readonly value: RuntimeJsonValue }[];
 };
 
 export type TrajectoryRuntimeSnapshot = {
   readonly requestOffset?: number;
   readonly sessionId: string;
   readonly throughJournalSeq: number;
-  readonly nodes: readonly RuntimeV2TrajectoryNode[];
+  readonly nodes: readonly RuntimeTrajectoryNode[];
   readonly records: readonly TrajectoryRecord[];
   /** All event-level records, including metadata hidden from the semantic ledger. */
   readonly rawRecords?: readonly TrajectoryRecord[];

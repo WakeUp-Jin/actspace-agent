@@ -17,7 +17,7 @@ const CHEVRON_CLASS = "shrink-0 transition-transform duration-(--motion-fast) mo
 const BODY_CLASS =
   "mb-2 max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-act-md bg-surface-subtle px-3.5 py-3 font-mono text-act-xs leading-5 text-text-muted animate-[rise-in_180ms_ease_both]";
 
-const STATUS_LABELS: Record<string, string> = { completed: "已完成", failed: "失败", stopped: "已停止", lost: "已失联", output_match: "输出匹配" };
+const STATUS_LABELS: Record<string, string> = { completed: "已完成", failed: "失败", stopped: "已停止", lost: "已失联", output_match: "输出匹配", subscription_stopped: "输出订阅已停止" };
 
 /** 子智能体一次激活结束：「子智能体 ‹描述› 已完成」；子智能体发来消息：「‹描述› 发来消息」；Bash 照旧（设计 05 §1）。 */
 export function backgroundNoticeLabel(message: Pick<BackgroundNoticeMessage, "taskKind" | "title" | "status">): string {

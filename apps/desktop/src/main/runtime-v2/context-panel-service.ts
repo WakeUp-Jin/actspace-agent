@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import type { ContextEntriesInput, ContextEntriesPage, ContextEntryInput, ContextEntryText, ContextEstimateView, ContextPanelBucketKey, ContextPanelEntry, ContextPanelHistory, ContextPanelResponse, ContextPanelView, ContextSurfaceNodeInput, DescribeContextPanelInput, ManagedContextProjection } from "@actspace/shared";
 import { contextEstimateSummaryKeys, describeConversationNode } from "@actspace/shared";
 import type { UsageReadModelService } from "./usage-read-model";
-import type { DesktopRuntimeV2Registry } from "./runtime-registry";
+import type { DesktopRuntimeRegistry } from "./runtime-registry";
 
 type Current = { historyVersion: string; projection: ManagedContextProjection | null; version: string; entries: ContextPanelEntry[]; previous: NonNullable<ContextPanelView["previous"]>["entries"]; view: ContextPanelView };
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -12,13 +12,13 @@ const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(va
  * wait for global indexing, recover a Session or initiate Context assembly. */
 export class ContextPanelService {
   #views = new Map<string, Current>();
-  constructor(private readonly runtime: Pick<DesktopRuntimeV2Registry, "readContextProjection" | "readContextEntryText" | "sessionQuerySource" | "readSessionProjectionValue">, private readonly history: UsageReadModelService) {}
+  constructor(private readonly runtime: Pick<DesktopRuntimeRegistry, "readContextProjection" | "readContextEntryText" | "sessionQuerySource" | "readSessionProjectionValue">, private readonly history: UsageReadModelService) {}
   async describe(input: DescribeContextPanelInput): Promise<ContextPanelResponse | null> {
     const { sessionId } = input;
     if (input.release) { if (input.consumerId) this.history.releaseContext(sessionId, input.consumerId); return null; }
     const projection = await this.#projection(sessionId);
     const estimate = await this.#estimate(sessionId);
-    let source: Awaited<ReturnType<DesktopRuntimeV2Registry["sessionQuerySource"]>> = null;
+    let source: Awaited<ReturnType<DesktopRuntimeRegistry["sessionQuerySource"]>> = null;
     let sourceError = false;
     try { source = await this.runtime.sessionQuerySource(sessionId); } catch { sourceError = true; }
     let indexed: ReturnType<UsageReadModelService["contextHistory"]> | null = null;

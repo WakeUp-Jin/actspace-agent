@@ -1,14 +1,14 @@
 import { realpath, stat } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep } from "node:path";
-import { normalizeWorkspaceRelativePath } from "@actspace/shared";
+import * as nodePath from "node:path";
+import { resolve } from "node:path";
+import { isLexicallyInside, normalizeWorkspaceRelativePath } from "@actspace/shared";
 
 export type WorkspaceFileReferenceResolution =
   | { ok: true }
   | { ok: false; code: "file_not_found" | "file_outside_workspace" | "not_a_file" };
 
 function isInside(root: string, target: string): boolean {
-  const pathFromRoot = relative(root, target);
-  return pathFromRoot === "" || (pathFromRoot !== ".." && !pathFromRoot.startsWith(`..${sep}`) && !isAbsolute(pathFromRoot));
+  return isLexicallyInside(nodePath, root, target, { includeRoot: true });
 }
 
 /**

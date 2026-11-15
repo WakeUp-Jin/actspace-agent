@@ -46,7 +46,7 @@
 | 调用、结果、失败原因 | `tool/call`（`callId, pluginId, name, args`）、`tool/result`（`status, failure.code, failure.phase`） |
 | 纯执行耗时 | `tool-workflow/run-start` 到 `tool/result` 的信封时间差（run-start 在审批之后、执行体之前写入） |
 | 输出 token | `tool/result.modelOutput` 按统一估算（`ceil(字数/4)`，与上下文估算同一口径） |
-| 输出被截断 | `modelOutput` 文本中的截断标记：Bash `[Output truncated;`、read_file `[Showing lines`、grep/glob 方括号后缀、web_fetch `[Content truncated]`。调用参数里带 `offset` / `limit` 的读取是主动分段，不算截断 |
+| 输出被截断 | `modelOutput` 文本中的截断标记：Bash `[Output truncated;`、read_file `[Showing lines`（单行被截短是 `[line truncated`）、list_directory `[Showing first`、write_file / edit_file 的 diff 和 tool-runtime 兜底 `[Output truncated`、grep/glob 方括号后缀、web_fetch `[Content truncated]`。调用参数里带 `offset` / `limit` 的读取是主动分段，不算截断 |
 | 审批 | `tool/result.approvalMode`（`auto / manual / session`）与 `approvalReason`；`permission/asked`（`requestedAt`）、`permission/decided`（`kind, decidedAt, code`）、`permission/grant-used`、`permission/scope-denied` |
 | bash 沙盒 | `tool/result.detail[label="environment"].value.sandboxed`；出沙箱申请 = `tool/call.args.sandbox_permissions === "require_escalated"` |
 | 同参数重复 / 失败后重试 | 同一 turn 内 `tool/call` 的 `name + args` 摘要相同；失败结果之后下一次调用同名工具 |

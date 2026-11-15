@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { RuntimeV2EventWindow, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import type { RuntimeEventWindow, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { projectTrajectoryWindow } from "../sessions/trajectory.js";
 
 function envelope(seq: number, type: string, data: SessionEventEnvelopeV1["data"]): SessionEventEnvelopeV1 {
   return { recordKind: "event", seq, type, eventVersion: 1, criticality: "required", time: "2026-10-14T00:00:00.000Z", source: { ownerPluginId: "@actspace/core" }, data, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
 }
-const window = (events: SessionEventEnvelopeV1[]): RuntimeV2EventWindow => ({ events, fromSeq: 0, throughJournalSeq: events.at(-1)!.seq, beforeSeq: null, turnOffset: 0, requestOffset: 0 });
+const window = (events: SessionEventEnvelopeV1[]): RuntimeEventWindow => ({ events, fromSeq: 0, throughJournalSeq: events.at(-1)!.seq, beforeSeq: null, turnOffset: 0, requestOffset: 0 });
 
 describe("trajectory projection", () => {
   it("converts each event object once across windows", () => {

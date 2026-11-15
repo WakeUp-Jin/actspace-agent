@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { HostError } from "@actspace/shared/host-protocol";
+import { HostError, HostRequestError } from "@actspace/shared/host-protocol";
 import { SerialGate, writeDurableJson } from "./storage.js";
 export interface Device { id: string; name: string; tokenHash: string; createdAt: number; lastUsedAt: number; revoked: boolean }
 interface AuthState { schemaVersion: 1; hostId: string; devices: Device[]; codes: { hash: string; expiresAt: number }[] }
@@ -44,7 +44,7 @@ export class HostAuth {
       this.#assertHealthy();
       const next = structuredClone(this.#state), index = next.codes.findIndex(c => c.hash === hash(code) && c.expiresAt > this.now());
       if (index < 0) throw new HostError("UNAUTHENTICATED", "Pairing code is invalid or expired");
-      if (!name.trim() || name.length > 128) throw new TypeError("Invalid device name");
+      if (!name.trim() || name.length > 128) throw new HostRequestError("Invalid device name");
       const token = randomBytes(32).toString("hex"), id = randomUUID();
       next.codes.splice(index, 1);
       next.devices.push({ id, name: name.trim(), tokenHash: hash(token), createdAt: this.now(), lastUsedAt: this.now(), revoked: false });

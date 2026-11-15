@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { MockClock } from "../clock";
 import type { MockHandlers } from "../handlers";
 import { appendMockMessage, type MockDb, type MockSession } from "../mock-db";
@@ -27,7 +27,7 @@ function edited(path: string, start: number, context: string, removed: readonly 
   return { tool: "edit_file", path, diff: [`--- a/${path}`, `+++ b/${path}`, `@@ -${start},${oldLines} +${start},${newLines} @@`, ` ${context}`, ...removed.map((line) => `-${line}`), ...added.map((line) => `+${line}`)].join("\n") };
 }
 
-function appendTool(db: MockDb, session: MockSession, runId: string, name: string, args: Record<string, RuntimeV2JsonValue>, result: Record<string, RuntimeV2JsonValue>): void {
+function appendTool(db: MockDb, session: MockSession, runId: string, name: string, args: Record<string, RuntimeJsonValue>, result: Record<string, RuntimeJsonValue>): void {
   const message = appendMockMessage(db, session, "tool", "", runId);
   session.messages[session.messages.length - 1] = { ...message, role: "tool", tool: { name, args, result } };
 }
@@ -44,17 +44,17 @@ function appendEdit(db: MockDb, session: MockSession, runId: string, edit: FileE
 }
 
 function appendPresent(db: MockDb, session: MockSession, runId: string, files: readonly { path: string; description?: string }[]): void {
-  appendTool(db, session, runId, "present", { files: files as RuntimeV2JsonValue }, {
+  appendTool(db, session, runId, "present", { files: files as RuntimeJsonValue }, {
     status: "completed",
     summary: `Presented ${files.length} ${files.length === 1 ? "file" : "files"}`,
-    detail: [{ label: "present", value: { files: files as RuntimeV2JsonValue } }],
+    detail: [{ label: "present", value: { files: files as RuntimeJsonValue } }],
   });
 }
 
 const PRICING = { version: 1, basis: "estimated", reason: null, pricingSnapshot: { providerId: "deepseek", connectionId: "deepseek:default", modelKey: "deepseek:deepseek-flash", apiModel: "deepseek-flash", currency: "USD" } };
 
 /** 最终回复带上本轮用量，回复尾部才会出现「用量 … tok」胶囊。 */
-function appendReply(db: MockDb, session: MockSession, runId: string, content: string, usage: Record<string, RuntimeV2JsonValue>): void {
+function appendReply(db: MockDb, session: MockSession, runId: string, content: string, usage: Record<string, RuntimeJsonValue>): void {
   const message = appendMockMessage(db, session, "assistant", content, runId);
   session.messages[session.messages.length - 1] = { ...message, usage };
 }

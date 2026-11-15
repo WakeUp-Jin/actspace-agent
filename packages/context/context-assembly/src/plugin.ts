@@ -1,4 +1,4 @@
-import type { CordisContext } from "@actspace/cordis-adapter";
+import { getService, provideService, serviceKey, type CordisContext } from "@actspace/cordis-adapter";
 import { ContextSourceRegistry, type CompactionSession, type ContextSource } from "@actspace/context-engine";
 import type { SourceFactory, SourceOptions } from "@actspace/prompt";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
@@ -28,6 +28,8 @@ export type ContextAssemblyService = {
   sourcesFor(role: ContextAgentRole, options: SourceOptions): ContextSourceRegistry;
   observeToolResult(session: CompactionSession, event: SessionEventEnvelopeV1): Promise<void>;
 };
+
+export const CONTEXT_ASSEMBLY_SERVICE = serviceKey<ContextAssemblyService>(CONTEXT_ASSEMBLY_SERVICE_ID);
 
 export class ContextAssembly implements ContextAssemblyService {
   readonly requiredKinds: readonly string[];
@@ -73,7 +75,7 @@ export class ContextAssembly implements ContextAssemblyService {
  * Both end with the plugin: the registration is removed and the service disposed.
  */
 export function publish(ctx: CordisContext, kind: string, create: SourceFactory["create"], roles?: readonly ContextAgentRole[]): void {
-  const assembly = ctx.get?.(CONTEXT_ASSEMBLY_SERVICE_ID) as ContextAssemblyService | undefined;
+  const assembly = getService(ctx, CONTEXT_ASSEMBLY_SERVICE);
   if (!assembly) throw new Error(`Context source ${kind} requires ${CONTEXT_ASSEMBLY_SERVICE_ID}.`);
   const remove = assembly.register({ kind, create, ...(roles ? { roles } : {}) });
   ctx.effect?.(() => remove, `context.source.${kind}`);
@@ -89,5 +91,5 @@ function requiredKinds(config: unknown): readonly string[] {
 
 /** Harness entry: the one registry the loop reads sources and tool-result observers from. */
 export function apply(ctx: CordisContext, config?: unknown): void {
-  ctx.provide?.(CONTEXT_ASSEMBLY_SERVICE_ID, new ContextAssembly(requiredKinds(config)));
+  provideService(ctx, CONTEXT_ASSEMBLY_SERVICE, new ContextAssembly(requiredKinds(config)));
 }

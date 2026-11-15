@@ -1,18 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import type { RuntimeV2LiveEvent } from "@actspace/shared/runtime-v2";
-import { CliV2ApprovalBroker } from "./approval";
+import type { RuntimeLiveEvent } from "@actspace/shared/runtime-v2";
+import { CliApprovalBroker } from "./approval";
 import { NodeArtifactStore, NodeLlmAdapter, resolveEnvModelProvider } from "@actspace/agent-host/node-ports";
-import { loadRuntimeV2 } from "./loader";
+import { loadRuntimeModule } from "./loader";
 import { currentModelHostPort, MODELS_HOST_PORT_ID } from "@actspace/shared";
-import type { RuntimeV2PermissionMode } from "./types";
+import type { RuntimePermissionMode } from "./types";
 
 /** The CLI runs from `apps/cli/dist/runtime-v2`; a repo checkout keeps the fetched nono under `<repo>/dist/sandbox-components`. */
 export const CLI_REPO_ROOT = join(__dirname, "../../../..");
 
 
-export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: () => void) => void; readonly kind: "cli-run"; readonly workspace: string; readonly dataRoot: string; readonly persistentArtifacts?: boolean; readonly permissionMode: RuntimeV2PermissionMode; readonly permissionModeExplicit?: boolean; readonly sandboxInherited?: boolean; readonly pinnedHarness?: import("@actspace/runtime").PinnedHarness; readonly mock: boolean; readonly model?: string; readonly headlessInput?: string; readonly headlessSessionId?: string; readonly env?: NodeJS.ProcessEnv; readonly onLiveEvent?: (event: Omit<RuntimeV2LiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq" | "throughJournalSeq">) => void; readonly onHeadlessSession?: (sessionId: string, abort: () => boolean) => void }) {
-  const runtime = await loadRuntimeV2(); const provider = resolveEnvModelProvider(options.env ?? process.env);
+export async function bootCli(options: { readonly onForceCleanup?: (cleanup: () => void) => void; readonly kind: "cli-run"; readonly workspace: string; readonly dataRoot: string; readonly persistentArtifacts?: boolean; readonly permissionMode: RuntimePermissionMode; readonly permissionModeExplicit?: boolean; readonly sandboxInherited?: boolean; readonly pinnedHarness?: import("@actspace/runtime").PinnedHarness; readonly mock: boolean; readonly model?: string; readonly headlessInput?: string; readonly headlessSessionId?: string; readonly env?: NodeJS.ProcessEnv; readonly onLiveEvent?: (event: Omit<RuntimeLiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq" | "throughJournalSeq">) => void; readonly onHeadlessSession?: (sessionId: string, abort: () => boolean) => void }) {
+  const runtime = await loadRuntimeModule(); const provider = resolveEnvModelProvider(options.env ?? process.env);
   const host = { hostKind: options.kind, capabilityCeiling: ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const, runtimeContract: "actspace.runtime.v2" as const, invocationId: randomUUID(), workspaceRef: options.workspace };
   // The trusted CLI assembly is now a checked-in cordis.yml tree. External
   // plugin admission remains an explicit future surface; the default run does
@@ -25,7 +25,7 @@ export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: (
   const disposeResources = onceAsync(async () => { await artifacts.dispose(); });
   const sandbox = { nonoPath: toolModule.resolveNodeHostNonoPath(process.env, CLI_REPO_ROOT), sandboxInherited: options.sandboxInherited === true };
   try {
-    const approval = new CliV2ApprovalBroker();
+    const approval = new CliApprovalBroker();
     const capabilities = host.capabilityCeiling;
     const capabilitySet = Object.freeze({
       ids: Object.freeze([...capabilities]),

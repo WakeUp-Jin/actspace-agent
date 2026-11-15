@@ -1,11 +1,12 @@
 import { isAbsolute, relative, resolve } from "pathe";
-const sep = "/";
-import { subagentActivationStatusLabel, type ToolUiPreview } from "@actspace/shared";
-import type { RuntimeV2JsonValue, RuntimeV2ToolView, SubagentKind, SubagentView } from "@actspace/shared/runtime-v2";
-type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
+import { relativePathInside, subagentActivationStatusLabel, type PathRules, type ToolUiPreview } from "@actspace/shared";
+import type { RuntimeJsonValue, RuntimeToolView, SubagentKind, SubagentView } from "@actspace/shared/runtime-v2";
+type EventRecord = Readonly<Record<string, RuntimeJsonValue>>;
 type FileChangeStats = { readonly additions: number; readonly deletions: number };
+/** 界面里不能用 `node:path`。pathe 两种分隔符都认，输出统一成 `/`，Windows 的路径也能比。 */
+const PATH_RULES: PathRules = { relative, isAbsolute, sep: "/" };
 
-export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefined, data: EventRecord, call: EventRecord | undefined, child: { childSessionId: string; presetId: string; status: string; model?: string; subagent?: SubagentView } | undefined, sessionId: string, agentRunId: string, phase: "streaming" | "prepared" | "running" | "finished" = "finished", workspaceRoot?: string, fileChangeStats?: FileChangeStats, background?: { readonly status: string }, describeAgent?: (agentId: string) => string | undefined): ToolUiPreview {
+export function toolPreview(toolName: string, tool: RuntimeToolView | undefined, data: EventRecord, call: EventRecord | undefined, child: { childSessionId: string; presetId: string; status: string; model?: string; subagent?: SubagentView } | undefined, sessionId: string, agentRunId: string, phase: "streaming" | "prepared" | "running" | "finished" = "finished", workspaceRoot?: string, fileChangeStats?: FileChangeStats, background?: { readonly status: string }, describeAgent?: (agentId: string) => string | undefined): ToolUiPreview {
   data = { ...(tool?.approvalMode ? { approvalMode: tool.approvalMode } : {}), ...(tool?.approvalReason ? { approvalReason: tool.approvalReason } : {}), ...data };
   const localName = toolName;
   const args = record(call?.args);
@@ -20,7 +21,11 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
   const failed = terminal && state !== undefined && state !== "completed";
   const resultPreview = terminal && !failed ? outputPreview(output) : undefined;
   if (localName === "read_file") return { kind: "read", filePath: displayPath(string(args.path) ?? ""), ...(typeof args.offset === "number" || typeof args.limit === "number" ? { range: `${nonNegative(args.offset) || 1}-${(nonNegative(args.offset) || 1) + Math.max(0, nonNegative(args.limit) - 1)}` } : {}), displayText: summary, resultPreview };
-  if (localName === "list_directory") return { kind: "directory_list", path: displayPath(string(args.path) ?? "."), entryCount: terminal && !failed ? directoryEntryCount(output) : undefined, displayText: summary, resultPreview };
+  if (localName === "list_directory") {
+    // 给模型的列表可能被截断，真实条目数在 detail 里；旧会话没有这一项，才从文本里数。
+    const counted = record(detailValue(data, "result")).entryCount;
+    return { kind: "directory_list", path: displayPath(string(args.path) ?? "."), entryCount: terminal && !failed ? typeof counted === "number" ? nonNegative(counted) : directoryEntryCount(output) : undefined, displayText: summary, resultPreview };
+  }
   if (localName === "grep") return { kind: "grep", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
   if (localName === "glob") return { kind: "glob", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
   if (localName === "web" || localName === "web_search" || localName === "web_fetch") { const open = localName === "web_fetch" || string(args.action) === "open"; return { kind: "web_search", mode: open ? "url" : "query", ...(open ? { url: string(args.url) ?? "" } : { query: string(args.query) ?? "" }), displayText: summary, contentPreview: output.slice(0, 2_000) }; }
@@ -138,25 +143,24 @@ function directoryEntryCount(output: string): number | undefined {
 }
 function outputPreview(output: string): string[] | undefined { const lines = output.split("\n").map((line) => line.trim()).filter(Boolean).slice(0, 8).map((line) => line.length > 240 ? `${line.slice(0, 237)}…` : line); return lines.length ? lines : undefined; }
 
-function detailValue(data: EventRecord, label: string): RuntimeV2JsonValue { if (!Array.isArray(data.detail)) return null; for (const entry of data.detail) { const detail = record(entry); if (detail.label === label) return detail.value ?? null; } return null; }
-function modelOutputText(value: RuntimeV2JsonValue | undefined): string { if (!Array.isArray(value)) return ""; return value.map((entry) => { const block = record(entry); return typeof block.text === "string" ? block.text : block.value === undefined ? "" : JSON.stringify(block.value); }).filter(Boolean).join("\n"); }
-function toolModelOutputText(tool: RuntimeV2ToolView | undefined): string { return tool?.modelOutput?.map((block) => block.type === "text" ? block.text : `${block.alt} (${block.artifactId})`).join("\n") ?? ""; }
-function record(value: RuntimeV2JsonValue | undefined): EventRecord { return isRecord(value) ? value : {}; }
-function isRecord(value: RuntimeV2JsonValue | undefined): value is EventRecord { return value !== undefined && value !== null && typeof value === "object" && !Array.isArray(value); }
-function string(value: RuntimeV2JsonValue | undefined): string | null { return typeof value === "string" && value.length > 0 ? value : null; }
-function nonNegative(value: RuntimeV2JsonValue | undefined): number { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0; }
+function detailValue(data: EventRecord, label: string): RuntimeJsonValue { if (!Array.isArray(data.detail)) return null; for (const entry of data.detail) { const detail = record(entry); if (detail.label === label) return detail.value ?? null; } return null; }
+function modelOutputText(value: RuntimeJsonValue | undefined): string { if (!Array.isArray(value)) return ""; return value.map((entry) => { const block = record(entry); return typeof block.text === "string" ? block.text : block.value === undefined ? "" : JSON.stringify(block.value); }).filter(Boolean).join("\n"); }
+function toolModelOutputText(tool: RuntimeToolView | undefined): string { return tool?.modelOutput?.map((block) => block.type === "text" ? block.text : `${block.alt} (${block.artifactId})`).join("\n") ?? ""; }
+function record(value: RuntimeJsonValue | undefined): EventRecord { return isRecord(value) ? value : {}; }
+function isRecord(value: RuntimeJsonValue | undefined): value is EventRecord { return value !== undefined && value !== null && typeof value === "object" && !Array.isArray(value); }
+function string(value: RuntimeJsonValue | undefined): string | null { return typeof value === "string" && value.length > 0 ? value : null; }
+function nonNegative(value: RuntimeJsonValue | undefined): number { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0; }
 
 export function workspaceDisplayPath(path: string, workspaceRoot?: string): string {
   if (!path || !workspaceRoot) return path;
   const absolute = resolve(workspaceRoot, path);
-  const local = relative(workspaceRoot, absolute);
-  return local === "" ? "." : local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local) ? absolute : local;
+  const local = relativePathInside(PATH_RULES, workspaceRoot, absolute);
+  return local === null ? absolute : local || ".";
 }
 
 function workspaceOutputMetadata(path: string, workspaceRoot?: string): { outputPath?: string; outputRelativePath?: string } {
   if (!path || !workspaceRoot) return {};
   const absolute = resolve(workspaceRoot, path);
-  const local = relative(workspaceRoot, absolute);
-  if (local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local)) return {};
-  return { outputPath: absolute, outputRelativePath: local || "." };
+  const local = relativePathInside(PATH_RULES, workspaceRoot, absolute);
+  return local === null ? {} : { outputPath: absolute, outputRelativePath: local || "." };
 }

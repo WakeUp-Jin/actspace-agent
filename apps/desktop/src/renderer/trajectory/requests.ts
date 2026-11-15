@@ -1,13 +1,13 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { TrajectoryCell, TrajectoryRecord, TrajectoryRequestView, TrajectoryRuntimeSnapshot, TrajectoryStatus } from "./contract";
 import { parseTimestamp } from "./format";
 import { auxiliaryRequestViews, collectAuxiliaryRequests } from "./auxiliary-requests";
 
-type Data = Readonly<Record<string, RuntimeV2JsonValue>>;
-const asData = (value: RuntimeV2JsonValue | undefined): Data =>
+type Data = Readonly<Record<string, RuntimeJsonValue>>;
+const asData = (value: RuntimeJsonValue | undefined): Data =>
   value !== null && typeof value === "object" && !Array.isArray(value) ? value as Data : {};
-const str = (value: RuntimeV2JsonValue | undefined) => typeof value === "string" && value !== "" ? value : null;
-const num = (value: RuntimeV2JsonValue | undefined) => typeof value === "number" && Number.isFinite(value) ? value : null;
+const str = (value: RuntimeJsonValue | undefined) => typeof value === "string" && value !== "" ? value : null;
+const num = (value: RuntimeJsonValue | undefined) => typeof value === "number" && Number.isFinite(value) ? value : null;
 
 export const stepKey = (turnId: string, stepId: string) => `${turnId}\u0000${stepId}`;
 
@@ -21,7 +21,7 @@ export function requestKeyOf(record: TrajectoryRecord, requests: { readonly byRe
   return requests.keys.has(key) ? key : null;
 }
 
-type StepRequest = { key: string; seq: number; turnId: string | null; stepId: string | null; headers: Data[]; options: RuntimeV2JsonValue | null; startedAt: number | null; retries: Data[] };
+type StepRequest = { key: string; seq: number; turnId: string | null; stepId: string | null; headers: Data[]; options: RuntimeJsonValue | null; startedAt: number | null; retries: Data[] };
 
 /**
  * One request view per step: a retry starts a new request id inside the same step, so DSH-style

@@ -1,5 +1,5 @@
 import { surfaceNode } from "@actspace/shared/runtime-v2";
-import type { RuntimeV2DesktopSessionProjection, RuntimeV2EventWindow, RuntimeV2JsonValue, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot, RuntimeV2SessionUpdate } from "@actspace/shared/runtime-v2";
+import type { RuntimeDesktopSessionProjection, RuntimeEventWindow, RuntimeJsonValue, RuntimeLiveEvent, RuntimeSessionSnapshot, RuntimeSessionUpdate } from "@actspace/shared/runtime-v2";
 import { liveOverlayFromEvent, type ClientLiveOverlay } from "./live-overlay.js";
 import { emptyClientSessionCell, type ClientSessionCell } from "./session-snapshot.js";
 
@@ -11,9 +11,9 @@ const TRANSACTION_BOUNDARIES: ReadonlySet<string> = new Set(["compaction/start",
  * previous answer plus the one appended event (O(1)); only a window that came from elsewhere (a snapshot/page merge) is
  * scanned once, backwards, without copying.
  */
-const pendingTransactionByWindow = new WeakMap<RuntimeV2EventWindow, boolean>();
+const pendingTransactionByWindow = new WeakMap<RuntimeEventWindow, boolean>();
 
-function hasPendingTransaction(window: RuntimeV2EventWindow): boolean {
+function hasPendingTransaction(window: RuntimeEventWindow): boolean {
   const known = pendingTransactionByWindow.get(window);
   if (known !== undefined) return known;
   let pending = false;
@@ -76,7 +76,7 @@ export class ClientSessionStore {
     }
   }
 
-  applySnapshot(snapshot: RuntimeV2SessionSnapshot, options: { readonly requestGeneration?: number; readonly runtimeInstanceId?: string } = {}): boolean {
+  applySnapshot(snapshot: RuntimeSessionSnapshot, options: { readonly requestGeneration?: number; readonly runtimeInstanceId?: string } = {}): boolean {
     const cell = this.#cell(snapshot.sessionId);
     if (options.requestGeneration !== undefined && options.requestGeneration !== cell.requestGeneration) return false;
     if (cell.snapshot !== null && snapshot.throughJournalSeq < cell.snapshot.throughJournalSeq) return false;
@@ -99,7 +99,7 @@ export class ClientSessionStore {
     return true;
   }
 
-  applyLiveEvent(event: RuntimeV2LiveEvent): boolean {
+  applyLiveEvent(event: RuntimeLiveEvent): boolean {
     const cell = this.#cell(event.sessionId);
     if (cell.runtimeInstanceId !== null && cell.runtimeInstanceId !== event.runtimeInstanceId) {
       this.#cells.set(event.sessionId, Object.freeze({ ...cell, runtimeInstanceId: event.runtimeInstanceId, lastLiveSeq: event.liveSeq, liveGap: true, status: "stale" as const }));
@@ -134,12 +134,12 @@ export class ClientSessionStore {
 
   isResetting(sessionId: string): boolean { return this.#resetting.has(sessionId); }
 
-  applyEnvelope(envelope: RuntimeV2DesktopSessionProjection, requestGeneration?: number): boolean {
+  applyEnvelope(envelope: RuntimeDesktopSessionProjection, requestGeneration?: number): boolean {
     const cell = this.#cell(envelope.sessionId);
     if (requestGeneration !== undefined && requestGeneration !== cell.requestGeneration) return false;
     if (envelope.snapshot.sessionId !== envelope.sessionId || envelope.snapshot.throughJournalSeq !== envelope.throughJournalSeq) throw new Error("Session projection revision mismatch.");
     if (this.#resetting.delete(envelope.sessionId)) {
-      const values: Record<string, RuntimeV2JsonValue> = {};
+      const values: Record<string, RuntimeJsonValue> = {};
       const revisions: Record<string, number> = {};
       for (const [key, value] of Object.entries(envelope.values)) if (value !== undefined) { values[key] = value; revisions[key] = envelope.throughJournalSeq; }
       this.#overlays.delete(envelope.sessionId);
@@ -175,7 +175,7 @@ export class ClientSessionStore {
       const current = this.#cell(envelope.sessionId);
       this.#cells.set(envelope.sessionId, Object.freeze({ ...current, window, watermarks: envelope.watermarks ?? current.watermarks, deferredToolCalls: [...new Set([...cell.deferredToolCalls, ...envelope.deferredToolCalls])] }));
       if (!older) {
-        const values: Record<string, RuntimeV2JsonValue> = {};
+        const values: Record<string, RuntimeJsonValue> = {};
         const revisions: Record<string, number> = {};
         for (const [key, value] of Object.entries(envelope.values)) {
           if (value === undefined) continue;
@@ -191,7 +191,7 @@ export class ClientSessionStore {
     return true;
   }
 
-  applyJournalUpdate(update: RuntimeV2SessionUpdate): boolean {
+  applyJournalUpdate(update: RuntimeSessionUpdate): boolean {
     const cell = this.#cell(update.sessionId);
     if (!cell.window || !cell.snapshot || this.#resetting.has(update.sessionId)) return false;
     const event = update.event;
@@ -201,32 +201,32 @@ export class ClientSessionStore {
     const pendingTransaction = hasPendingTransaction(cell.window);
     const node = !pendingTransaction && event.surface?.kind === "append" ? surfaceNode(event) : null;
     const messages = node ? snapshot.messages.concat([{ kind: node.kind, messageId: node.messageId, content: node.content, ...(node.kind === "tool-result" ? { callId: node.callId } : {}) }]) : snapshot.messages;
-    const values: Record<string, RuntimeV2JsonValue | undefined> = { ...cell.projectionValues, ...update.values };
+    const values: Record<string, RuntimeJsonValue | undefined> = { ...cell.projectionValues, ...update.values };
     const tools = update.tool ? withToolUpdated(snapshot.tools, update.tool) : snapshot.tools;
     const nextSnapshot = { ...snapshot, throughJournalSeq: event.seq, updatedAt: event.time, messages, tools,
-      metadata: (values.metadata ?? snapshot.metadata) as RuntimeV2SessionSnapshot["metadata"],
-      todos: (values.todos ?? snapshot.todos) as RuntimeV2SessionSnapshot["todos"],
-      usage: (values.providerUsage ?? snapshot.usage) as RuntimeV2SessionSnapshot["usage"],
-      activity: (values.sessionStats ?? snapshot.activity) as RuntimeV2SessionSnapshot["activity"],
-      delegations: (values.delegations ?? snapshot.delegations) as RuntimeV2SessionSnapshot["delegations"],
-      pendingInbox: (values.pendingInbox ?? snapshot.pendingInbox) as RuntimeV2SessionSnapshot["pendingInbox"],
-      agentMode: (values.agentMode as { mode?: RuntimeV2SessionSnapshot["agentMode"] } | undefined)?.mode ?? snapshot.agentMode,
+      metadata: (values.metadata ?? snapshot.metadata) as RuntimeSessionSnapshot["metadata"],
+      todos: (values.todos ?? snapshot.todos) as RuntimeSessionSnapshot["todos"],
+      usage: (values.providerUsage ?? snapshot.usage) as RuntimeSessionSnapshot["usage"],
+      activity: (values.sessionStats ?? snapshot.activity) as RuntimeSessionSnapshot["activity"],
+      delegations: (values.delegations ?? snapshot.delegations) as RuntimeSessionSnapshot["delegations"],
+      pendingInbox: (values.pendingInbox ?? snapshot.pendingInbox) as RuntimeSessionSnapshot["pendingInbox"],
+      agentMode: (values.agentMode as { mode?: RuntimeSessionSnapshot["agentMode"] } | undefined)?.mode ?? snapshot.agentMode,
       agentModeRevision: (values.agentMode as { revision?: number } | undefined)?.revision ?? snapshot.agentModeRevision,
-      permissionMode: (values.permissionMode ?? snapshot.permissionMode) as RuntimeV2SessionSnapshot["permissionMode"],
+      permissionMode: (values.permissionMode ?? snapshot.permissionMode) as RuntimeSessionSnapshot["permissionMode"],
     };
     const revisions = { ...cell.projectionRevisions };
     for (const key of Object.keys(update.values)) revisions[key] = event.seq;
     // Published arrays are never mutated (consumers compare array identity/length across renders), so appending is one native copy.
-    const nextWindow: RuntimeV2EventWindow = { ...cell.window, events: cell.window.events.concat([event]), throughJournalSeq: event.seq };
+    const nextWindow: RuntimeEventWindow = { ...cell.window, events: cell.window.events.concat([event]), throughJournalSeq: event.seq };
     pendingTransactionByWindow.set(nextWindow, TRANSACTION_BOUNDARIES.has(event.type) ? event.type.endsWith("/start") : pendingTransaction);
-    this.#cells.set(update.sessionId, Object.freeze({ ...cell, snapshot: nextSnapshot, projectionValues: values as Record<string, RuntimeV2JsonValue>, projectionRevisions: revisions,
+    this.#cells.set(update.sessionId, Object.freeze({ ...cell, snapshot: nextSnapshot, projectionValues: values as Record<string, RuntimeJsonValue>, projectionRevisions: revisions,
       window: nextWindow,
       liveGap: false, status: "ready" }));
     this.#emit(update.sessionId);
     return true;
   }
 
-  applyProjectionValue(input: { readonly sessionId: string; readonly key: string; readonly throughJournalSeq: number; readonly value: RuntimeV2JsonValue }): boolean {
+  applyProjectionValue(input: { readonly sessionId: string; readonly key: string; readonly throughJournalSeq: number; readonly value: RuntimeJsonValue }): boolean {
     const cell = this.#cell(input.sessionId);
     if (!Number.isSafeInteger(input.throughJournalSeq) || input.throughJournalSeq < -1) throw new TypeError("Projection seq must be an integer >= -1.");
     if (this.#resetting.has(input.sessionId)) return false;
@@ -303,7 +303,7 @@ export class ClientSessionStore {
 }
 
 /** The updated tool moves to the end of the list (its latest activity); other tools keep their order. */
-function withToolUpdated(tools: RuntimeV2SessionSnapshot["tools"], tool: RuntimeV2SessionSnapshot["tools"][number]): RuntimeV2SessionSnapshot["tools"] {
+function withToolUpdated(tools: RuntimeSessionSnapshot["tools"], tool: RuntimeSessionSnapshot["tools"][number]): RuntimeSessionSnapshot["tools"] {
   let at = -1;
   for (let index = tools.length - 1; index >= 0; index--) if (tools[index].callId === tool.callId) { at = index; break; }
   if (at === -1) return tools.concat([tool]);

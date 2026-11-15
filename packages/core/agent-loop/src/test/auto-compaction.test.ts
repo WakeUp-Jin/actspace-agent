@@ -25,7 +25,7 @@ describe("auto compaction live events", () => {
       compaction: stubCompaction(async (onStarted) => { onStarted(); return true; }),
     });
     const kinds = events.map((event) => event.kind === "run-state" ? `run-state:${event.message}` : event.kind);
-    expect(kinds.slice(-3)).toEqual(["compaction-started", "compaction-finished", "run-state:completed"]);
+    expect(kinds.slice(-4)).toEqual(["compaction-started", "compaction-finished", "run-state:context-updated", "run-state:completed"]);
     expect(events.find((event) => event.kind === "compaction-finished")).toMatchObject({ removedCount: 3, agentRunId: "run-test" });
     expect(result.reason).toBe("completed");
   });
@@ -78,7 +78,8 @@ it("checks complete durable tool batches before dispatching the next request, in
 
 it("does not send a known oversized request after a failed Step compaction", async () => {
   let requests = 0;
-  await expect(runToolStreamFixture({ contextWindow: 5000, onMessages: () => { requests++; },
+  // 用户消息约 4,750 token，窗口 5,000：工具结果按窗口截到最短（一千多字符，约 300 token）之后仍然放不下。
+  await expect(runToolStreamFixture({ contextWindow: 5000, content: "u".repeat(19_000), onMessages: () => { requests++; },
     execute: async () => ({ status: "completed", summary: "large", modelOutput: [{ type: "text", text: "x".repeat(30_000) }] }),
     compaction: stubCompaction(async () => { throw new Error("cannot summarize"); }),
   })).rejects.toThrow("Context exceeds model capacity");

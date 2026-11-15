@@ -1,6 +1,8 @@
 import { existsSync, realpathSync } from "node:fs";
 import { lstat, realpath } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import * as nodePath from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { isLexicallyInside } from "@actspace/shared";
 import { ToolRuntimeError } from "../errors.js";
 import type { ResourceSensitivity, ToolResource } from "./types.js";
 
@@ -42,10 +44,15 @@ export async function canonicalizeFileResource(
   }
 }
 
+/**
+ * `candidate` 是不是在 `root` 里面，就是 `root` 本身也算。
+ *
+ * 比 `isLexicallyInside` 多做一步：`root` 存在时先换成它的真实路径。工作区和授权的根目录可能是符号链接，
+ * 而拿来比的 `candidate` 多半已经是 `canonicalizeFileResource` 解析过的真实路径。`candidate` 本身不解析。
+ */
 export function isPathWithin(root: string, candidate: string): boolean {
-  const canonicalRoot = existsSync(root) ? realpathSync(root) : resolve(root);
-  const nested = relative(canonicalRoot, resolve(candidate));
-  return nested === "" || (!nested.startsWith(`..${sep}`) && nested !== ".." && !isAbsolute(nested));
+  const canonicalRoot = existsSync(root) ? realpathSync(root) : root;
+  return isLexicallyInside(nodePath, canonicalRoot, candidate, { includeRoot: true });
 }
 
 export function classifyFileResource(resource: Extract<ToolResource, { kind: "file" }>): ResourceSensitivity {

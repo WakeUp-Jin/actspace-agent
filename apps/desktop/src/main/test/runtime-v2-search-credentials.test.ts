@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WEB_TOOLS_HOST_PORT_ID } from "@actspace/tool-web";
-import type { DesktopRuntimeV2ModelPort } from "../runtime-v2/model-port";
+import type { DesktopRuntimeModelPort } from "../runtime-v2/model-port";
 import { createDesktopToolHostServices } from "../runtime-v2/tool-host-services";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Desktop search credentials on a live tool port", () => {
   it("uses current credentials after disconnect, reconnect and key rotation", async () => {
-    let searchCredentials: ReturnType<DesktopRuntimeV2ModelPort["getToolEnvironment"]>["searchCredentials"] = { zhipu: "test-old", tavily: "test-tavily" };
+    let searchCredentials: ReturnType<DesktopRuntimeModelPort["getToolEnvironment"]>["searchCredentials"] = { zhipu: "test-old", tavily: "test-tavily" };
     const fetch = vi.fn(async (url: string | URL, init?: RequestInit) => new Response(JSON.stringify(String(url).includes("bigmodel")
       ? { search_result: [{ title: "Domestic", link: "https://example.com/domestic", content: "result" }] }
       : { results: [{ title: "International", url: "https://example.com/international", content: "result" }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetch);
-    const modelRuntime: DesktopRuntimeV2ModelPort = {
+    const modelRuntime: DesktopRuntimeModelPort = {
       resolveMainModel: () => ({ ok: false, message: "not needed" }),
       resolveImageInspectionModel: () => ({ ok: false, message: "not needed" }),
       getToolEnvironment: () => ({ searchCredentials }),
