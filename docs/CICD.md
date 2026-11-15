@@ -81,7 +81,7 @@ PR 上看的是整个 PR 相对目标分支的 diff，不是最后一次推送�
 - `pnpm lint`
 - `pnpm build:deps`
 - `pnpm typecheck`
-- `pnpm test`（= `pnpm test:scripts` + `pnpm -r --if-present test`）
+- `pnpm test`（= `pnpm test:scripts` + `pnpm -r --no-bail --if-present test`，由 `scripts/run-tests.mjs` 依次跑：前一段失败后一段照跑，一个包失败其余的包照跑，结尾列出失败的段和包，有失败就以 1 退出）
 - `pnpm package:desktop`
 - `pnpm dev:site`
 - `pnpm dev:web`

@@ -139,6 +139,8 @@ pnpm test
 pnpm build
 ```
 
+`pnpm test` 一轮跑完脚本测试和所有包，结尾列出全部失败的段和包。修的时候只重跑失败的包（`pnpm --filter <包名> test`）或脚本测试文件（`node --test scripts/test/<文件>`），都修完再整套跑一次确认。
+
 涉及发布时再追加：
 
 ```sh
