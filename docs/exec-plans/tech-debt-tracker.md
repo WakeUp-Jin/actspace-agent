@@ -73,7 +73,6 @@
 |---|---|---|---|
 | 2026-11-08 | Desktop main / git | `runGitCommand` 用 `execFile` 跑 git 并等 stdio 关闭；用户全局 `core.fsmonitor=true` 时，git 会为仓库拉起 fsmonitor 守护进程并继承管道，一次 `git status` 要等 20–30 秒才返回。测试侧已用 `GIT_CONFIG_GLOBAL=/dev/null` 隔离，产品侧没动。 | 在产品的 git 调用里加 `-c core.fsmonitor=false`（或改为 `spawn` + 只等 exit），用开启 fsmonitor 的真实仓库复验。 |
 | 2026-11-08 | 测试环境 | `runtime-v2-output-reference-flow.test.ts` 对 `bash -lc` 的输出按行数断言；shell 启动时若有 nvm 等打印告警（如 `npm_config_prefix`），多出的行会让它失败。GitHub runner 上没这个问题，只在装了 nvm 的开发机上出现。 | 断言改成只看目标行，或给测试用的 shell 传 `--noprofile --norc`。 |
-| 2026-11-08 | 测试环境 | `packages/core/tool-runtime` 的 `runtime.test.ts` 用 `/workspace/...` 当假的资源路径；机器上真有 `/workspace` 目录（如某些容器）时 3 个用例变成 `denied`。GitHub runner 上没这个问题。 | 测试用例改用 `mkdtemp` 出来的真实工作区路径，而不是硬编码的绝对路径。 |
 | 2026-11-08 | Release / Windows | Windows 产物是 portable zip：`electron.exe` 只是改名，没换图标和版本资源（任务管理器、属性里仍显示 Electron），也没有 Authenticode 签名，首次运行会被 SmartScreen 拦。 | 接 `rcedit`（或 electron-builder / Forge）替换图标与版本信息；签名需要证书，视发行需求再立项。 |
 | 2026-11-08 | Release / Windows | Windows 包只在 CI 上打出、校验过文件结构，没有人实机启动过；沙盒缺位（nono 只有 darwin / linux）没验证。浏览器桥 CLI 在 Windows 上只是能编译（`ownedByCurrentUser` 的 Windows 实现恒为 `false`，实例注册表用 Unix socket 与 POSIX 权限位），`browser-tools` 插件在 Windows 上不可用。 | 第一个 tag 的草稿 Release 出来后，用 Windows 机器解压运行 `ActSpace.exe` 走一遍聊天、工具调用、浏览器桥。 |
 | 2026-11-10 | 脚本执行 / Windows | Windows 包里带了随包 `python.exe` 和 shim，`release.yml` 的 windows-latest 上 `verify-python-runtime.mjs` 也通过了，但 `bash` 工具在 Windows 上没有可用的 shell：`packages/shell/tool-shell/src/node-ports.ts` 在 macOS 以外一律启动 `/bin/bash -lc`。用 Git Bash 还是 PowerShell、shim 在选定的 shell 里能不能按 `actspace-python` 叫到、没有 nono 时怎么隔离，都没有设计（[脚本执行](../design-docs/tool-system/agent-script-execution.md) §3 只写了「另立设计」）。 | 单独写 Windows 设计；定下 shell 后在 Windows 机器上让模型跑一次 `actspace-python`。 |
@@ -85,6 +84,23 @@
 | 2026-11-01 | 文档检查 | `check:package-readmes` 的类别核对要读 `packages/core/runtime/dist/plugin-catalog.js`，没构建时整项跳过，只打印一行提示；`base-checks.yml` 不构建，所以必需检查里这一项不生效。能力目录 README 里「包之间怎么连」靠人工同步，脚本不核对依赖方向。 | 让脚本直接读源码里的 catalog，或把这一项挪到构建之后的 job。 |
 | 2026-11-09 | 测试环境 / 增量刷新 | `session-persistence-jsonl` 的 `refresh` 在文件大小不变时只比 `dev:ino:birthtimeMs:size:mtimeMs:ctimeMs`，同一个时间戳粒度内的等长改写会被当成没变。`refresh.test.ts > same-size rewrite falls back to a full read` 因此在部分机器上失败（`expected 'unchanged' to be 'replaced'`，2026-11-14 在云端 Linux VM 上复现），GitHub runner 上通过。 | 先让用例不依赖时间戳粒度；日志正常只追加，等长改写只会来自外部改文件，要不要给这种情况加内容校验另行决定。 |
 | 2026-11-14 | CI / 包测试 | `main` 上 `CI` 的「包测试」连续两次失败，失败的用例不同，都是 2026-11-12 子智能体简化带进来的、和等待时间有关的用例：`bf566305` 那次是 `packages/subagent/subagent` 的 `external.test.ts > runs a Codex task in the background, records it like any subagent and notifies the parent`（`expected [] to deeply equal ['root']`）；`d0ca51c7` 那次是 `packages/shell/tool-shell` 的 `node-ports.test.ts > runs subagent commands in the foreground and kills them at the time limit`（`expected 'failed' to be 'completed'`）。 | 两条用例各自在 runner 上反复跑，分清是测试里的等待太紧还是产品逻辑有竞态，再修。 |
+
+## 代码库审查修复遗留
+
+2026-11-10 代码库审查修复（`active/20261110-codebase-review-fixes.md`）里看到、但没有在那一批处理的事项：
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-11-10 | 图片生成 / 下载地址检查 | `packages/image/tool-image-generation/src/node-ports.ts` 的 `downloadImage` 自己有一份公网地址检查，是 `web_fetch` 修之前的写法：检查时解析一次域名、`fetch` 再解析一次；带方括号的 IPv6 主机名被当成域名；域名解析出 `::ffff:7f00:1` 这种写法的回环地址时判成公网。网址来自用户配置的图片服务商的响应，不是模型给的。 | 把 `packages/web/tool-web/src/public-request.ts` 的地址检查和固定地址的请求抽到两个包都能用的位置，`downloadImage` 改用它。 |
+| 2026-11-10 | `web_fetch` / 环境代理 | 设置了 `NODE_USE_ENV_PROXY=1` 时 `web_fetch` 仍然走 `fetch`：连的是代理，目标域名由代理解析，固定不了地址，检查的地址和代理实际连的地址可以不同。 | 需要时改成自己向代理发 `CONNECT` 到检查过的地址；先确认有没有用户在这种配置下使用。 |
+| 2026-11-10 | Agent Host / 上传清理 | 上传的定时清理每 60 秒把所有上传的 `state.json` 读一遍。被任务引用的上传跟着会话一直留着，所以这一遍随附件总数增长。它是后台任务，不在请求路径上。 | 上传数量大到这一遍明显占用磁盘读取时，改成只扫还没被引用的上传（内存里已经有这份集合）。 |
+| 2026-11-10 | Agent Host / 产物错误 | `NodeArtifactStore` 在产物不存在、产物不属于这个会话时抛普通 `Error`，设备收到的是 -32603 `Host operation failed`，看不出是哪种情况（Host 日志里有）。 | 这两种情况改抛 `HostError`（`NOT_FOUND`、`FORBIDDEN`）。 |
+| 2026-11-10 | 子进程输出解码 | `apps/desktop/src/main/browser-bridge-service.ts` 收集编译日志、`packages/subagent/subagent/src/external-cli.ts` 的 `OutputTail` 都按块 `toString`，一个多字节字符落在两块之间时显示成乱码。两处都只在失败时给出诊断信息。 | 换成 `setEncoding("utf8")` 或 `StringDecoder`，和 `tool-fs-search` 读 ripgrep 输出的写法一致。 |
+| 2026-11-13 | LLM 重试 / `LlmRetryScope` | `agent-llm-core-pi.md` §13 设计的 `LlmRetryScope`（一个 lease 覆盖一个逻辑请求的全部尝试和退避等待）没有实现。现在每次尝试的 lease 在它的流结束时归还，重试时重新取一次；退避期间 registration 被完整注销的话，重试报 `LLM registration … is disposed.`，这一步失败。生产里走不到：路由随 Harness generation 一起注册和注销，进行中的 Run 持有那个 generation 的 lease。直接使用 `LlmService` 并自己注销路由的调用方没有这层保护。§13 末尾的「实现现状」写了差异。 | 出现不经 Harness 就使用带重试的 LLM 调用的地方，或者 Run 持有 generation lease 的做法要改时，在 `llm-service` 里实现 `LlmRetryScope`，并补 §13 关键回归序列里缺的那一段测试（退避期间旧 registration 被注销）。 |
+| 2026-11-13 | Agent Loop / `llm/stream` 钩子 | `llm/stream` 钩子在派发之后抛错时，那条已经派发的流没有人读，也没有人中止：路由的 lease 会归还，但这次请求要等回合被中止或 Provider 那边结束才停。适配器拿到的是整个回合共用的 signal，没有只属于这一次请求的中止手段；生产适配器也都没有实现 `cancel`。目前没有生产插件注册 `llm/stream` 钩子。 | 有插件要注册 `llm/stream` 钩子之前，给每次请求派生自己的 `AbortSignal`（回合的 signal 触发时跟着触发），钩子在派发后抛错时中止这一次请求。 |
+| 2026-11-14 | Agent Loop / `agent/pre-step`、`agent/turn-stopping` | 事件规范原来写 `agent/pre-step` 可以「接受、改写或跳过候选 step」，`agent/turn-stopping`「返回第一个继续/停止决策」。Loop 没有实现过这两种能力：`agent/pre-step` 的返回值只写进 `step/start` 的 `metadata`，`agent/turn-stopping` 的返回值没有人读。2026-11-14 给干预点加类型契约时，规范和契约都按代码写了。目前没有生产插件注册这两个干预点。 | 需要让插件跳过一步，或者在一轮结束前让它继续时，先在 `packages/core/agent-loop/src/hooks.ts` 的契约里定下返回值的形状，再让 Loop 读它，规范的表跟着改。 |
+| 2026-11-14 | Harness 选择 / Host 契约摘要 | 持久化的 Harness 选择里记着 Host 契约摘要，启动时和当前算出来的不同就不加载这个选择（`RESTART_REQUIRED`）；只有内置插件、没有自定义历史的选择会自动换成随应用发布的内置版本。摘要里随代码变的只有 7 个 Host 模块入口文件的内容哈希（`packages/core/runtime/src/harness/default-harness.ts` 的 `hostModules`）；服务的版本号都是常量 1，事件和 codec 两项是空数组。所以它和「契约有没有变」两头都对不上：入口文件的字节一变摘要就变，哪怕只是重新导出的名字改了（2026-11-14 的改名就是这样）；入口文件以外的改动，例如某个共享服务的方法签名变了，摘要不变。有自定义选择的数据目录在前一种情况下升级后进不来，要重新准备一个选择。 | 先确认摘要要表达的是「Host 的构建换了」还是「契约变了」。是后者的话，给共享服务的版本号定规则（签名变了就加一），摘要改成看版本号和入口导出的名字，不看文件字节。 |
+| 2026-11-14 | LLM / legacy wire 的名字和设计文档 | `LegacyProxyWireEngine`（`packages/llm/llm-pi-ai/src/legacy-proxy-wire-engine.ts`）名字里的 `Legacy` 和设计一致（`agent-llm-core-pi.md` §7、§14 的 legacy transport），2026-11-14 的命名清理没有改它。名字里的 `Proxy` 只对一半：§7 在 2026-11-08 改成了「代理不再是 legacy 理由」，现在选中它的是 OpenRouter 官方端点上不走 Anthropic 协议的路线，以及 DeepSeek 带图片并且有文件上传器的请求；但引擎里按代理地址进入的那条路径和它的用例还在。同一份设计文档有两处没有跟上：§3 的图和说明仍写「需要代理的请求切到兼容 wire」；§14 末尾一段还提到 `LegacyTransportAdapter`，§10 第 5 条写了这个类不再保留，代码里也没有。另外桌面端两个测试（`custom-connection-protocol.test.ts`、`runtime-v2-thinking-options.test.ts`）mock `@actspace/llm-pi-ai` 时带着 `LegacyProxyWireEngine` 这个键，而包的入口不导出它。 | 先定引擎里按代理进入的那条路径留不留。不留：删掉它和用例，类名去掉 `Proxy`，文档两处和两个 mock 一起改。留：只改文档两处和两个 mock。改类名时把新旧名字加进 `scripts/check-transitional-names.mjs` 的表。 |
 
 ## Web / PWA 客户端遗留
 
@@ -120,6 +136,9 @@
 | 2026-11-03 | 外部子智能体 / 进程残留 | Host 被强杀时 Codex / Claude Code 子进程可能留下；下次启动只把那次运行补记成 `lost`，不清理进程。 | 启动外部 CLI 时记 pid，启动时清理上次留下的进程。 |
 | 2026-11-12 | 同步子智能体 / 停止 | 同步运行的子智能体不进后台任务登记表，模型不能用 `task_stop` 停它（父会话本来就在等它），只有用户能在界面上停。 | 暂不处理；出现「模型需要中途放弃同步子智能体」的场景再议。 |
 | 2026-11-12 | 同步转后台 / 登记失败 | 同步子智能体等满 30 分钟转后台时如果登记失败，它会被直接停掉、不发通知，界面上没有单独提示；转后台这条路径只有单测。 | 登记失败时给父会话一条说明；实机上把等待时间调短验一次转后台。 |
+| 2026-11-12 | 官网文档 | `apps/site/src/content/docs/subagents.md` 还是 2026-11-04 的说法：默认在后台运行、做完可以继续派活、停掉后仍可续派、子智能体之间互相发消息、面板显示模型和第几轮。现在是默认等结果、做完就结束、兄弟之间不能发消息、列表不显示模型。 | 按[子智能体运行规范](../design-docs/collaboration/agent-subagent-runtime.md)重写「默认在后台运行」「在右侧查看」两节和 `description`，配图 `subagent-running.png` 一并核对。 |
+| 2026-11-12 | 插件页说明 | `packages/subagent/subagent/src/manifest.ts` 的 `display.description` 还是「子智能体的创建、续派、插话、中断与完成通知」，显示在 扩展 › 插件 里；续派和中断工具都没有了。 | 改成现在的能力（创建、消息、停止、完成通知）。 |
+| 2026-11-07 | 对话里的通知行 | 子智能体完成通知在 `groupMessagesIntoTurns` 里被跳过，来信走 `SubagentMessageCard`，所以 `BackgroundNoticeRow.tsx` 里 `taskKind` 为 `subagent`、`agent_message` 的分支（标题、展开内容、「打开子智能体」按钮）在桌面端对话里走不到，只有 `background-notice-row.test.tsx` 在用。 | 确认 Web 端也不用之后，把这些分支和对应用例删掉，组件只留 Bash 通知。 |
 
 ## 没有实机验证记录的功能
 

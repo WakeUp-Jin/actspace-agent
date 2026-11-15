@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { RuntimeV2JsonValue } from '@actspace/shared/runtime-v2';
+import type { RuntimeJsonValue } from '@actspace/shared/runtime-v2';
 import type { TrajectoryCell, TrajectoryLayout } from '../../../trajectory';
 import { JsonTree } from '../../ui/JsonTree';
 
@@ -12,7 +12,7 @@ export type RecordBodyProps = {
   readonly onSelectRecord: (recordId: string) => void;
 };
 
-export type JsonValue = RuntimeV2JsonValue | null | undefined;
+export type JsonValue = RuntimeJsonValue | null | undefined;
 
 export function valueText(value: JsonValue): string | undefined {
   if (value === null || value === undefined) return undefined;

@@ -83,7 +83,7 @@ journal.jsonl
     ↓ codec + invariant validation
 Session Journal / Surface
     ↓ projection（另带 accepted / durable 水位）
-RuntimeV2SessionSnapshot
+RuntimeSessionSnapshot
     ↓ fixed renderer adapter
 SessionRecord / Context / Usage
 ```

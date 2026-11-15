@@ -2,7 +2,7 @@ import { createServer as createHttpServer, type Server } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
-import { HOST_PROTOCOL, HOST_LIMITS, HostError, isRecord, parseHostRequest, stringParam, integerParam, type HostMethod, type HostHello } from "@actspace/shared/host-protocol";
+import { HOST_PROTOCOL, HOST_LIMITS, HostError, HostRequestError, isRecord, parseHostRequest, stringParam, integerParam, type HostMethod, type HostHello } from "@actspace/shared/host-protocol";
 import { HostPayloads } from "./payloads.js";
 import type { HostAuth } from "./auth.js";
 import { createStaticHandler } from "./static.js";
@@ -24,6 +24,8 @@ export interface HostGatewayOptions {
   readonly webRoot?: string;
   readonly state: () => HostHello["state"];
   readonly dispatch: (method: HostMethod, params: Readonly<Record<string, unknown>>, context: HostRequestContext) => Promise<unknown>;
+  /** Called for a failure the device only sees as "Host operation failed". */
+  readonly onFailure?: (method: string, error: unknown) => void;
 }
 export function isAllowedOrigin(origin: string, options: { allowedOrigins?: readonly string[]; loopback: boolean }): boolean {
   if (options.allowedOrigins?.includes(origin)) return true;
@@ -91,10 +93,11 @@ export class HostGateway {
     };
     const request = async (value: unknown, afterReply: (() => void)[]): Promise<unknown | undefined> => {
       let id: unknown = isRecord(value) ? value.id : null;
+      let method = "unparsed request";
       // JSON-RPC notifications never receive a response; mutation notifications are not executed.
       if (isRecord(value) && value.jsonrpc === "2.0" && value.id === undefined) return undefined;
       try {
-        const input = parseHostRequest(value); id = input.id;
+        const input = parseHostRequest(value); id = input.id; method = input.method;
         let result: unknown;
         if (input.method === "host.hello") {
           if (input.params.protocol !== HOST_PROTOCOL) throw new HostError("INCOMPATIBLE_PROTOCOL", "Unsupported Host protocol");
@@ -120,7 +123,7 @@ export class HostGateway {
           if (!deviceId) throw new HostError("UNAUTHENTICATED", "Authenticate before calling Host operations");
           this.options.auth.assertDevice(deviceId);
           if (input.method === "payloads.read") {
-            if (Object.keys(input.params).some(key => !["payloadId", "part"].includes(key))) throw new TypeError("Unexpected payload parameter");
+            if (Object.keys(input.params).some(key => !["payloadId", "part"].includes(key))) throw new HostRequestError("Unexpected payload parameter");
             result = payloads.read(stringParam(input.params, "payloadId", 128), integerParam(input.params, "part", 1024));
           } else result = await this.options.dispatch(input.method, input.params, {
             deviceId, connectionId, close: () => ws.close(4008, "Resync required"),
@@ -136,8 +139,11 @@ export class HostGateway {
         return { jsonrpc: "2.0", id, result: result ?? null };
       } catch (error) {
         const validId = typeof id === "string" || typeof id === "number" ? id : null;
-        const code = error instanceof HostError ? -32000 : error instanceof TypeError ? error.message === "Unknown Host method" ? -32601 : error.message === "Invalid JSON-RPC request" ? -32600 : -32602 : -32603;
-        return { jsonrpc: "2.0", id: validId, error: { code, message: error instanceof HostError || error instanceof TypeError ? error.message : "Host operation failed", ...(error instanceof HostError ? { data: { kind: error.kind, retryable: error.retryable } } : {}) } };
+        if (error instanceof HostError) return { jsonrpc: "2.0", id: validId, error: { code: -32000, message: error.message, data: { kind: error.kind, retryable: error.retryable } } };
+        if (error instanceof HostRequestError) return { jsonrpc: "2.0", id: validId, error: { code: error.code, message: error.message } };
+        // Anything else is a Host fault. Its message can name local paths or internals, so it is reported to the operator and never to the device.
+        this.options.onFailure?.(method, error);
+        return { jsonrpc: "2.0", id: validId, error: { code: -32603, message: "Host operation failed" } };
       }
     };
     ws.on("message", (bytes, binary) => {

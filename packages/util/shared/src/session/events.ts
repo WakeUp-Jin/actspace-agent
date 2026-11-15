@@ -3,7 +3,7 @@
 
 import type { FileReference, ResponseAnnotationReference } from "../composer-content";
 import type { ModelApi } from "../model-config";
-import type { MainAgentForm, RuntimeV2AgentMode } from "../runtime-v2/runtime";
+import type { MainAgentForm, RuntimeAgentMode } from "../runtime-v2/runtime";
 import type { ComposerAttachment } from "./attachments";
 import type { ContextState, ContextUsageSnapshot } from "./context";
 import type { AgentRunId, EventId, LlmCallId, LlmUsageCost, SessionError, SessionId, ToolCallId, TurnId } from "./primitives";
@@ -218,7 +218,7 @@ export type SessionMeta = {
   createdAt: string;
   agentRunCount: number;
   agentForm?: MainAgentForm;
-  agentMode?: RuntimeV2AgentMode;
+  agentMode?: RuntimeAgentMode;
   agentModeRevision?: number;
   /** 工作区注册表里的稳定 id；缺省时按 workspaceRoot 或默认 workspace 解析。 */
   workspaceId?: string;

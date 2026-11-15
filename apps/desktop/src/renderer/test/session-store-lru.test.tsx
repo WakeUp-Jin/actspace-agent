@@ -1,7 +1,7 @@
 import { act, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ClientSessionStore, type ClientSessionCell } from "@actspace/client/sessions";
-import { surfaceNode, type RuntimeV2DesktopSessionProjection, type SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import { surfaceNode, type RuntimeDesktopSessionProjection, type SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { createSessionCellRetention, SESSION_CELL_RETAIN_LIMIT, useSessionCell } from "../session/session-store";
 import { loadEarlier } from "../session/session-pages";
 import { projectionFixture } from "./projection-fixture";
@@ -15,7 +15,7 @@ function message(seq: number): SessionEventEnvelopeV1 {
 }
 
 /** seq 为 [fromSeq, toSeq] 的一页；整个会话的最新 seq 是 latest。 */
-function page(sessionId: string, fromSeq: number, toSeq: number, latest = toSeq): RuntimeV2DesktopSessionProjection {
+function page(sessionId: string, fromSeq: number, toSeq: number, latest = toSeq): RuntimeDesktopSessionProjection {
   const events = Array.from({ length: toSeq - fromSeq + 1 }, (_, index) => message(fromSeq + index));
   const base = projectionFixture(sessionId, latest, events);
   return { ...base, activeMessageIds: events.map((event) => surfaceNode(event)!.messageId), snapshot: { ...base.snapshot, messages: events.map((event) => surfaceNode(event)!) },
@@ -132,8 +132,8 @@ describe("loadEarlier", () => {
   it("shares one request per session while it is in flight", async () => {
     const store = new ClientSessionStore();
     store.applyEnvelope(page("s-1", 10, 19));
-    let resolve!: (value: RuntimeV2DesktopSessionProjection) => void;
-    const getPage = vi.fn(() => new Promise<RuntimeV2DesktopSessionProjection>((done) => { resolve = done; }));
+    let resolve!: (value: RuntimeDesktopSessionProjection) => void;
+    const getPage = vi.fn(() => new Promise<RuntimeDesktopSessionProjection>((done) => { resolve = done; }));
     const first = loadEarlier(store, "s-1", getPage);
     expect(loadEarlier(store, "s-1", getPage)).toBe(first);
     resolve(page("s-1", 0, 9, 19));
@@ -144,8 +144,8 @@ describe("loadEarlier", () => {
   it("drops a page that arrives after the cell was evicted or its window replaced", async () => {
     const store = new ClientSessionStore();
     store.applyEnvelope(page("s-1", 10, 19));
-    let resolve!: (value: RuntimeV2DesktopSessionProjection) => void;
-    const getPage = () => new Promise<RuntimeV2DesktopSessionProjection>((done) => { resolve = done; });
+    let resolve!: (value: RuntimeDesktopSessionProjection) => void;
+    const getPage = () => new Promise<RuntimeDesktopSessionProjection>((done) => { resolve = done; });
 
     const evicted = loadEarlier(store, "s-1", getPage);
     store.evict("s-1");

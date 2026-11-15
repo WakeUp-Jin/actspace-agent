@@ -15,6 +15,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [代码库审查修复：工具结果体积上限、CI 门禁与中低优先级修复](active/20261110-codebase-review-fixes.md) | 2026-11-10 立项并开始执行（夜间模式）。8 个按顺序合并的 PR：CI 门禁、工具结果体积上限、修复合集、Loop 请求路径、路径安全模块、类型安全、命名、格式化；进度见计划的「进度记录」。 |
 | [App 装配层拆分](active/20261110-app-assembly-split.md) | 2026-11-10 立项，未开始。`App.tsx` 1670 行按 8 个职责拆成 `use-*` hook，App 只留装配（目标 ≤ 300 行），Context 字段与 `WorkbenchLayout` prop 不变。下一步：M1 侧边对话 + evict。 |
 | [`@actspace/shared` 契约分层](active/20261109-shared-contract-split.md) | P1 已合入（#75）：`ipc.ts` / `session.ts` 按主题拆成 `src/ipc/`、`src/session/`，`check:packages` 新增「后端包不得引用桌面 IPC 契约」规则；对外 API 不变。下一步：评估 P2（子入口与引用迁移）和 P3（按归属拆包）做不做；当初要等的 #66 / #67 / #68 已合入，评估还没开始。 |
 | [CI 提速：拆 job 并行 + tsc -b 增量缓存](active/20261109-ci-speedup.md) | P1–P3 已合入：根脚本切 `tsc -b`、`ci.yml` 拆 job 加缓存、desktop 两分片。剩下的收尾（记录各 job 时长、删除本计划）和第二轮提速都在 #92，未合并。 |

@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, realpath, rm } from "node:fs/promises";
-import { isAbsolute, join, relative } from "node:path";
+import * as nodePath from "node:path";
+import { join } from "node:path";
+import { isLexicallyInside } from "@actspace/shared";
 import type { ToolArtifactOwner, ToolArtifactRef } from "@actspace/tool-runtime";
 
 type ArtifactMetadata = ToolArtifactRef & {
@@ -87,8 +89,7 @@ export class DesktopArtifactStore {
 }
 
 function isInside(root: string, target: string): boolean {
-  const fromRoot = relative(root, target);
-  return fromRoot === "" || (!fromRoot.startsWith("..") && !isAbsolute(fromRoot));
+  return isLexicallyInside(nodePath, root, target, { includeRoot: true });
 }
 
 function parseMetadata(raw: string, artifactId: string): ArtifactMetadata {

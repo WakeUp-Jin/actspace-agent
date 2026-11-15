@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 import { ChatAttachmentValidationError } from "../runtime-v2/runtime-registry";
 const { handlers } = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => any>() }));
 vi.mock("electron", () => ({ dialog: {}, nativeImage: {}, nativeTheme: {}, ipcMain: {
@@ -27,7 +27,7 @@ it("returns a serializable rejection before starting a turn and identifies the s
     { id: "bad", name: "bad.txt", path: "/fixture/bad.txt", kind: "file" },
   ] };
   try {
-    const handler = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask)!;
+    const handler = handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.submitTask)!;
     const result = await handler(trusted.event, input);
     expect(JSON.parse(JSON.stringify(result))).toEqual({ status: "submission-failed", acknowledgement: "rejected", message: "附件校验失败，请检查后重试。", attachmentIssue: { code: "invalid_utf8", fileName: "bad.txt", attachmentId: "bad" } });
     expect(submitTask).not.toHaveBeenCalled();
@@ -55,7 +55,7 @@ it.each(["agent", "plan"])("rejects %s preparation failures but keeps admission 
     getMainWindow: () => trusted.window,
   } as unknown as FixedRendererIpcOptions);
   try {
-    const handler = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask)!;
+    const handler = handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.submitTask)!;
     const input = { sessionId: "session", submissionId: "attempt", userInput: "keep body", attachments: [
       { id: "valid", name: "visible.png", path: "/fixture/visible.png", kind: "image" },
       { id: "large", name: "oversized.png", path: "/fixture/oversized.png", kind: "image" },
@@ -85,7 +85,7 @@ it("recovers the accepted call preview and excludes approvals resolved while rea
     getMainWindow: () => trusted.window,
   } as unknown as FixedRendererIpcOptions);
   try {
-    const handler = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listPendingApprovals)!;
+    const handler = handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.listPendingApprovals)!;
     expect(await handler(trusted.event, { sessionId: "s" })).toEqual([expect.objectContaining({ recovery: expect.objectContaining({ agentRunId: "r", toolCallId: "c", preview: expect.objectContaining({ kind: "read", filePath: "/outside/fixture.txt" }) }) })]);
     let release!: (value: typeof detail) => void;
     browseToolDetail.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));

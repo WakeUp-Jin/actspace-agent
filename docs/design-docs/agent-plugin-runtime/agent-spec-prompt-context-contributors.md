@@ -261,7 +261,7 @@ Request Assembly 的结构化诊断至少区分：
 
 - Session request snapshot、Event Codec 和物理 JSONL 见 [Session 格式公共契约](./agent-spec-session-format-v1.md)。
 - Tool definitions、prepared execution 与审批顺序见 [Tool Runtime 公共契约](./agent-spec-tool-runtime-abi.md)。
-- Agent Scope、静态 Preset 和 one-shot Subagent 见 [Agent 与 Subagent 公共契约](./agent-spec-agent-and-subagent.md)。
+- Agent Scope 见 [Agent Scope 模型](./agent-spec-agent-scope-model.md)；子智能体的预设与运行规则见[子智能体运行规范](../collaboration/agent-subagent-runtime.md)。
 - 插件 identity、manifest、Host ceiling 和 lifecycle 见 [插件 Runtime ABI](./agent-spec-plugin-runtime-abi.md)。
 - 固定 Host / Renderer 消费的 DTO 见 [Runtime Projection 公共契约](./agent-spec-runtime-projection.md)。
 - 总体控制流见 [ActSpace v2 总体架构](./agent-target-overall-architecture.md)。

@@ -4,7 +4,7 @@ import type {
   GrantAction,
   GrantAudience,
   PermissionMode,
-  RuntimeV2JsonValue,
+  RuntimeJsonValue,
   ScriptCommand,
 } from "@actspace/shared/runtime-v2";
 
@@ -72,16 +72,16 @@ export type ToolPermissionContext = {
 export type ToolPermissionContract = {
   readonly grantAudience?: GrantAudience;
   extractResources(
-    args: Readonly<Record<string, RuntimeV2JsonValue>>,
+    args: Readonly<Record<string, RuntimeJsonValue>>,
     context: ResourceExtractionContext,
   ): readonly ToolResource[] | Promise<readonly ToolResource[]>;
   evaluate(
-    args: Readonly<Record<string, RuntimeV2JsonValue>>,
+    args: Readonly<Record<string, RuntimeJsonValue>>,
     resources: readonly ToolResource[],
     context: ToolPermissionContext,
   ): ToolPermissionDecision | Promise<ToolPermissionDecision>;
   suggestGrants?(
-    args: Readonly<Record<string, RuntimeV2JsonValue>>,
+    args: Readonly<Record<string, RuntimeJsonValue>>,
     resources: readonly ToolResource[],
     context: ToolPermissionContext,
   ): readonly ToolGrantSuggestion[] | Promise<readonly ToolGrantSuggestion[]>;

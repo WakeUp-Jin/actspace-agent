@@ -15,8 +15,8 @@
 
 | 工作流 | 触发 | 内容 |
 |---|---|---|
-| `base-checks.yml` | `pull_request`（**不带路径过滤**）、`push: main`、手动 | `repository-checks`（`scripts/ci.sh` + markdownlint）。唯一每个 PR 都会产生的 check，也是唯一能安全设为 required status check 的 job。 |
-| `ci.yml` | `pull_request`（忽略纯文档路径）、`push: main`、手动 | 八个并行 job：`lint-typecheck`（build graph、contract matrix、Biome lint、`pnpm typecheck`）、`test-process`（根目录脚本测试 + 进程级测试）、`test-packages`（desktop 以外全部包的 vitest）、`test-desktop` ×2（desktop vitest 按 `--shard` 对半）、`build`（`pnpm build`；`main` 上额外跑一次 Linux `release-package.sh` 冒烟，不上传产物）、`site`（check / test / build）、`browser-bridge`（契约检查 + Go 测试 + Windows / macOS 交叉编译，保证发布矩阵能 `go build`）。 |
+| `base-checks.yml` | `pull_request`（**不带路径过滤**）、`push: main`、手动 | `repository-checks`（`scripts/ci.sh` + markdownlint）。每个 PR 都会产生这个 check，是 `main` ruleset 的 required status check。 |
+| `ci.yml` | `pull_request`（**不带路径过滤**，纯文档 PR 在 job 级跳过）、`push: main`、手动 | `changes`（判断是否只改了文档）→ 八个并行 job → `ci-gate`（「CI 汇总」，每个 PR 都报告，可设为 required status check）。八个并行 job：`lint-typecheck`（build graph、contract matrix、Biome lint、`pnpm typecheck`）、`test-process`（根目录脚本测试 + 进程级测试）、`test-packages`（desktop 以外全部包的 vitest）、`test-desktop` ×2（desktop vitest 按 `--shard` 对半）、`build`（`pnpm build`；`main` 上额外跑一次 Linux `release-package.sh` 冒烟，不上传产物）、`site`（check / test / build）、`browser-bridge`（契约检查 + Go 测试 + Windows / macOS 交叉编译，保证发布矩阵能 `go build`）。 |
 | `agent-cli-binaries.yml` | `pull_request` 改到 CLI / packages / 打包脚本时、手动 | 在 CLI 支持的最低 Node 大版本上构建并校验 managed package，artifact 保留 3 天。 |
 | `supply-chain-security.yml` | `pull_request` 改到依赖清单 / lockfile / patches 时（`docs/**` 下的原型 `package.json` 不算）、每周一定时、手动 | 依赖变更审查（仅 PR）、OSV 扫描。 |
 | `codeql.yml` | `push: main`、`pull_request`（均忽略纯文档路径）、每周一定时、手动 | CodeQL `javascript-typescript` 与 `actions` 两种语言，`security-and-quality` 查询集；忽略测试、fixture、dist、生成文件和 `scripts/acceptance/**`（`.github/codeql/codeql-config.yml`）。不要在仓库设置里同时开启 CodeQL default setup。本地复现：用 [CodeQL CLI](https://github.com/github/codeql-action/releases) `database create --language=javascript-typescript --codescanning-config=.github/codeql/codeql-config.yml` 建库后 `database analyze --format=sarif-latest`，结果与 GitHub 一致。 |
@@ -31,7 +31,18 @@
 
 markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-cli2.jsonc`：第三方 skill 原文（`.agents/skills/**`）、已完成的 history 和测试 fixture 不扫；纯排版类规则（空行、列表周围空行、表格对齐、代码块语言等）关闭，只保留会影响渲染或链接正确性的规则（表格列数、标题层级、重复的兄弟标题、图片 alt、文件末尾换行等）。本地复现用 `npx -y markdownlint-cli2@0.20.0 "**/*.md"`。
 
-`main` 的 ruleset 如果要加 required status checks，只能选 `仓库基础检查`（`base-checks.yml` 的 `repository-checks`）：它不带路径过滤，每个 PR 都会报告。`lint-typecheck`、`test-*`、`build`、CodeQL 这类带 `paths` / `paths-ignore` 的 job 不能设为必需——纯文档 PR 不触发它们，GitHub 会一直显示 Expected 并永远卡住合并。历史上 `repository-checks` 曾放在 `ci.yml`、并有一份路径互补的 `docs.yml`，两者都带路径过滤、任一设为必需都会卡死另一类 PR，所以拆成了独立的 `base-checks.yml`。
+### 哪些 check 可以设为必需
+
+`main` 的 ruleset 里能设为 required status check 的只有两个，它们所在的工作流都不带路径过滤，每个 PR 都会报告：
+
+- `仓库基础检查`（`base-checks.yml` 的 `repository-checks`）：已经是必需检查。
+- `CI 汇总`（`ci.yml` 的 `ci-gate`）：lint、类型检查、测试、构建的总结果。它 `needs` 全部工程 job 并带 `if: always()`，任何一个 job 失败或被取消它就失败；被 `changes` 判定跳过的 job 结果是 skipped，算通过。要让「CI 红着不能合并」生效，需要仓库管理员在 **Settings › Rules › Rulesets › main › Require status checks to pass** 里把 `CI 汇总` 加进去；工作流合入后先确认这个 check 在 PR 上出现过，再设为必需，否则所有 PR 都会停在 Expected。
+
+`lint-typecheck`、`test-*`、`build`、`site`、`browser-bridge` 这些 job 自己不要设为必需：纯文档 PR 会跳过它们。GitHub 把 job 级 `if` 跳过的必需 check 当作通过，但把「工作流因为 `paths` / `paths-ignore` 根本没触发」的必需 check 一直显示为 Expected 并卡住合并，所以 CodeQL、`agent-cli-binaries.yml`、`supply-chain-security.yml` 这类仍带工作流级路径过滤的 job 也不能设为必需。
+
+`ci.yml` 的路径判断在 `changes` job 里：PR 触发时检出 merge commit（`fetch-depth: 2`），用 `git diff --name-only --no-renames -z HEAD^1 HEAD` 列出改动文件，全部落在 `docs/**`、`**/*.md`、`.github/ISSUE_TEMPLATE/**`、`.github/PULL_REQUEST_TEMPLATE.md` 之内就输出 `code=false`，八个工程 job 的 `if: needs.changes.outputs.code == 'true'` 随之跳过。`push: main` 和手动触发不判断，全部照跑。工程 job 因此比原来晚十几秒开始（等 `changes` 跑完）。
+
+历史上 `repository-checks` 曾放在 `ci.yml`、并有一份路径互补的 `docs.yml`，两者都带工作流级路径过滤、任一设为必需都会卡死另一类 PR，所以拆成了独立的 `base-checks.yml`；`ci.yml` 当时保留 `paths-ignore`，工程 job 因此一直不是必需检查，2026-11-10 改成上面的 job 级判断。
 
 ### Dependabot
 
@@ -78,7 +89,7 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
 - `.github/workflows/base-checks.yml` 的 `repository-checks` 不需要 pnpm，只装 ripgrep 后跑 `scripts/ci.sh` 与 markdownlint。
 - 需要 `rg` 的 job（`repository-checks`、`test-process`、`test-packages`、`test-desktop`）统一用仓库内 composite action `.github/actions/install-ripgrep`：从 ripgrep GitHub Release 下载固定版本的 Linux musl 静态包、校验 sha256 后装到 `/usr/local/bin`。不走 apt，因为 runner 上 `archive.ubuntu.com` 会偶发 DNS 解析失败；升级版本时同时改 action 里的 `RG_VERSION` 与 `RG_SHA256`。
 - `.github/workflows/ci.yml` 中的工程 job 都从 `pnpm install --frozen-lockfile` 开始，然后各自执行：
-  - `lint-typecheck`：`pnpm check:desktop-build-graph`（必须排在 `build:deps` 之前，因为后者会重新生成 `tsconfig.build.json`）、`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。`pnpm typecheck` = `build:deps`（`tsc -b` 本身就是对全部 packages 的类型检查）+ 只对 apps 跑 `tsc --noEmit`（`packages/` 下每个包都在 `tsconfig.desktop-deps.json` 的引用图里；新增图外的包时要把它加进这条 filter）。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
+  - `lint-typecheck`：`pnpm check:desktop-build-graph`（必须排在 `build:deps` 之前，因为后者会重新生成 `tsconfig.build.json`）、`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`。改到契约矩阵读取的声明（Runtime 事件、服务、plugin manifest、composition、`package.json` 的 exports 与依赖）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale；只改注释或声明以外的代码不用重新生成。`pnpm typecheck` = `build:deps`（`tsc -b` 本身就是对全部 packages 的类型检查）+ 只对 apps 跑 `tsc --noEmit`（`packages/` 下每个包都在 `tsconfig.desktop-deps.json` 的引用图里；新增图外的包时要把它加进这条 filter）。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
   - `test-process`：装 ripgrep、`pnpm build:deps`、`pnpm --filter @actspace/agent-cli build`、`pnpm test:scripts`（根目录全部 `node --test` 与 `check:*`，含 `test:agent-host:process` 等直接 spawn `apps/cli/dist/cli.js` 的进程级测试）。
   - `test-packages`：装 ripgrep（`tool-fs-search` 的测试调真实 `rg`）、`pnpm build:deps`、`pnpm -r --filter '!@actspace/desktop' --filter '!actspace' test`（只带排除式 `--filter` 时 pnpm 会把 workspace 根也选进来，根的 `test` 会递归回 `pnpm -r test`，所以要一并排除）。
   - `test-desktop`：两个分片，`pnpm build:deps` 后 `vitest run --shard=N/2`。desktop 的 vitest 配置分成 `main`（node 环境）和 `renderer`（jsdom）两个 project，`vitest run src/main` 这类路径过滤照常可用。
@@ -167,7 +178,7 @@ SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 
 ## 下一步推荐
 
-1. 继续保留 `repository-checks`（`base-checks.yml`）与各工程 job（`ci.yml`）的分层，避免仓库卫生与工程构建互相遮蔽失败原因；`base-checks.yml` 不要加路径过滤，否则 required check 会失效。
+1. 继续保留 `repository-checks`（`base-checks.yml`）与各工程 job（`ci.yml`）的分层，避免仓库卫生与工程构建互相遮蔽失败原因；`base-checks.yml` 和 `ci.yml` 都不要加工作流级路径过滤，否则 required check 会卡死纯文档 PR。`ci.yml` 新增 job 时要同时加 `needs: changes`、`if: needs.changes.outputs.code == 'true'`，并把它列进 `ci-gate` 的 `needs`。
 2. 新增 action 时必须继续 pin 到 commit SHA；`scripts/check-action-pinning.sh` 会拦截浮动 tag。
 3. 如果后续接 installer（dmg 之外的 pkg、Windows 安装器、Linux AppImage / deb）、Developer ID 签名、notarization、Windows Authenticode、远程自动更新，再在现有 release 流水线上扩展。Electron 大版本升级单独开一个 PR，跑完整 desktop 测试并在 Electron 里实机走查（上一次是 #58 的 39 → 45）。
 

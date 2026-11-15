@@ -6,7 +6,7 @@ type Terminal = { readonly status: string; readonly summary: string; readonly bo
 
 /**
  * The model-facing completion message of a background task. Bash carries an output tail and its log path;
- * a subagent carries its transcript and closing message (design 02 §6.2).
+ * a subagent carries its transcript and closing message (agent-subagent-runtime.md「留痕与通知」).
  */
 export function renderTaskNotification(task: NotifiedTask, terminal: Terminal): string {
   const agent = task.kind === "agent";

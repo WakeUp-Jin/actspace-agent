@@ -28,12 +28,14 @@ export class PreparedLlmCall {
       redactor = createRequestRedactor(credential);
       const dispatchInput = { request: this.request, credential, signal: this.signal } satisfies LlmAdapterDispatchInput;
       const source = await (this.adapterCall?.dispatch(dispatchInput) ?? this.registration.adapter.dispatch(dispatchInput));
-      const stream = new LlmStreamHandle(redactor.stream(source), () => this.release(), async () => {
+      const onSignalAbort = (): void => { void stream.abort("signal-aborted"); };
+      // signal 通常属于整个回合，比这次请求活得久：流结束就摘掉监听器，否则它抓着这条流和请求快照一直到回合结束。
+      const stream = new LlmStreamHandle(redactor.stream(source), () => { this.signal.removeEventListener("abort", onSignalAbort); this.release(); }, async () => {
         try { await this.adapterCall?.cancel?.(this.request.requestId); await this.registration.adapter.cancel?.(this.request.requestId); }
         catch (error) { throw redactor.error(error); }
       });
       if (this.signal.aborted) await stream.abort("signal-aborted");
-      else this.signal.addEventListener("abort", () => { void stream.abort("signal-aborted"); }, { once: true });
+      else this.signal.addEventListener("abort", onSignalAbort, { once: true });
       return stream;
     } catch (error) {
       this.release();

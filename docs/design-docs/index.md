@@ -22,7 +22,6 @@
 | `execution-safety/` | Tool Runtime、权限模式、审批、Grant、Bash 硬防线、沙箱 | [README](execution-safety/README.md) |
 | `browser/` | Browser Bridge、ActSpace 集成与 canonical command | [入口](browser/agent-browser-use-index.md) |
 | `collaboration/` | 子智能体、后台 Bash 任务、侧边对话 | [子智能体](collaboration/agent-subagent-runtime.md)、[后台任务](collaboration/agent-background-tasks.md)、[侧边对话](collaboration/side-chat-design.md) |
-| `子智能体和后台任务设计规范/` | 子智能体与后台任务改造的设计决策与分项规范（模型可见文本、界面与设置） | [README](子智能体和后台任务设计规范/README.md) |
 | `自进化的方案设计/` | Harness 自进化：V1 用户显式修改、下一条消息使用新版本；V2 失败触发与沙箱评估；Harness 统计 | [README](自进化的方案设计/README.md)、[V1 使用说明](自进化的方案设计/10-V1实现与使用说明.md)、[Harness 统计](自进化的方案设计/11-Harness统计设计.md) |
 | `架构优化/` | 功能减法（什么属于 ActSpace）与插件结构（`packages/<能力>/<包>`、全局 / 会话插件、插件清单） | [README](架构优化/README.md) |
 | `多智能体协作/` | Space 工作台、Actor 名册与一对一对话的产品与前端设计（只做前端演示，不是 v2 Runtime 事实） | [README](多智能体协作/README.md) |
@@ -47,7 +46,7 @@
 - [包结构与插件打包](agent-plugin-runtime/agent-spec-package-layout-and-plugin-packaging.md)：包身份、服务接口与消费者、Plugin Entry。
 - Session：[Session Core 与持久化分离](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)、[Session 格式 v1](agent-plugin-runtime/agent-spec-session-format-v1.md)、[三类读模型](agent-plugin-runtime/agent-spec-runtime-projection.md)、[流式输出只走实时通道](agent-plugin-runtime/agent-spec-live-assistant-stream.md)（`assistant/chunk` 不持久化、实时底稿、每事件投影 / 校验 / IPC 开销约束）、[请求记录与上下文估算](agent-plugin-runtime/agent-spec-request-record.md)（提示词与工具变化才写、`request/context` 小快照、`contextEstimate` 投影与统一估算）、[上下文引擎不再每次请求复制对话](agent-plugin-runtime/agent-spec-context-trusted-surface.md)（日志交出的对话视图已信任、按版本号判断变化、`toLlmInput` 浅冻结）。
 - Tool / Prompt：[Tool Runtime ABI](agent-plugin-runtime/agent-spec-tool-runtime-abi.md)、[Tool 插件边界与 Todo 领域事件](agent-plugin-runtime/agent-tool-plugin-boundaries.md)、[Prompt / Context 贡献者](agent-plugin-runtime/agent-spec-prompt-context-contributors.md)。
-- [main Agent 与 Subagent 契约](agent-plugin-runtime/agent-spec-agent-and-subagent.md)、[Task / Run 生命周期](agent-plugin-runtime/agent-task-run-lifecycle.md)、[LLM Core Pi 收敛](agent-plugin-runtime/agent-llm-core-pi.md)、[契约矩阵生成](agent-plugin-runtime/agent-spec-contract-matrix-generation.md)、[测试分层](agent-plugin-runtime/agent-testing.md)。
+- [Task / Run 生命周期](agent-plugin-runtime/agent-task-run-lifecycle.md)、[LLM Core Pi 收敛](agent-plugin-runtime/agent-llm-core-pi.md)、[契约矩阵生成](agent-plugin-runtime/agent-spec-contract-matrix-generation.md)、[测试分层](agent-plugin-runtime/agent-testing.md)。
 - 其余契约：[Agent scope 模型](agent-plugin-runtime/agent-spec-agent-scope-model.md)、[DSH 事件模型](agent-plugin-runtime/agent-spec-dsh-event-model.md)、[工具名契约](agent-plugin-runtime/agent-spec-tool-name-contract.md)、[Tool Runtime 边界](agent-plugin-runtime/agent-spec-tool-runtime-boundary.md)、[LLM Adapter](agent-plugin-runtime/agent-target-llm-adapter.md)；[契约矩阵](agent-plugin-runtime/agent-contract-matrix.generated.md)由脚本生成，不手改。
 - [Host 部署指南](agent-plugin-runtime/agent-host-guide.md)（含 `apps/web` 所连接的 Host）、[英语辅助学习插件](agent-plugin-runtime/agent-english-learning.md)（默认不加载）。
 

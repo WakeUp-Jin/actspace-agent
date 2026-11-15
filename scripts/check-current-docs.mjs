@@ -1,6 +1,7 @@
 import { access, readFile, readdir } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { TRANSITIONAL_NAME } from "./check-transitional-names.mjs";
 
 export const currentTruthFiles = [
   "AGENTS.md",
@@ -36,7 +37,6 @@ export const currentTruthFiles = [
   "docs/design-docs/agent-plugin-runtime/agent-spec-plugin-runtime-abi.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md",
   "docs/design-docs/agent-plugin-runtime/agent-target-agent-core.md",
-  "docs/design-docs/agent-plugin-runtime/agent-spec-agent-and-subagent.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-profile-bundle-patch-layering.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-prompt-context-contributors.md",
   "docs/design-docs/frontend/README.md",
@@ -83,6 +83,7 @@ const forbiddenCurrentClaims = [
   { pattern: /schema\s*(?:=\s*)?9\b|user_version\s*=\s*9\b/g, message: "仍把 SQLite 读模型写成 schema 9（以 usage-read-model-schema.ts 的 user_version 为准）", allowHistoricalLine: true },
   { pattern: /`billingMode`/g, message: "仍描述已删除的连接级 billingMode", allowHistoricalLine: true },
   { pattern: /\/Users\/[A-Za-z0-9_.-]+\//g, message: "仍包含个人机器的绝对路径" },
+  { pattern: TRANSITIONAL_NAME, message: "仍使用改名前的标识符（哪些名字见 scripts/check-transitional-names.mjs）；node scripts/check-transitional-names.mjs --write <这份文档> 可以直接改", allowHistoricalLine: true },
 ];
 
 /** Design docs outside the truth list still must not restate retired facts; links are checked separately. */

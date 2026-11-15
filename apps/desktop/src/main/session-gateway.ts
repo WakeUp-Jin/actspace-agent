@@ -1,5 +1,5 @@
 import { decodeSessionLocator, type SessionLocatorRef } from "@actspace/shared/session-locator";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 import type { IpcMiddleware } from "./ipc/registry";
 import type { RemoteDesktopAdapter } from "./remote-hosts/desktop-adapter";
 
@@ -18,10 +18,10 @@ export function createSessionGateway(remote: SessionGatewayRemote | undefined): 
   return async ({ channel, input: raw }, next) => {
     if (!remote) return next();
     const input = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
-    if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessionPage && typeof input.search === "string" && input.search.trim()) return next();
-    if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession && input.hostId) return remote.create(input);
+    if (channel === RUNTIME_FIXED_RENDERER_CHANNELS.listSessionPage && typeof input.search === "string" && input.search.trim()) return next();
+    if (channel === RUNTIME_FIXED_RENDERER_CHANNELS.createSession && input.hostId) return remote.create(input);
     // 审批按 hostId 路由（15 T10/T11），不看 requestId 的格式。
-    if (channel === RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitApproval && isHostId(input.hostId)) return remote.decide(input);
+    if (channel === RUNTIME_FIXED_RENDERER_CHANNELS.submitApproval && isHostId(input.hostId)) return remote.decide(input);
     const ref: SessionLocatorRef | null = typeof input.sessionId === "string" ? decodeSessionLocator(input.sessionId) : null;
     if (ref) return remote.handle(channel, input, ref);
     return remote.mergeList(channel, input, await next());

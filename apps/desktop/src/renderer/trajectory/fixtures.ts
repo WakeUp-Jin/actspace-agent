@@ -1,12 +1,12 @@
 import completeFixture from "../fixtures/trajectory-complete.json";
-import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue, RuntimeTrajectoryNode, RuntimeTrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import type { RequestLiveOutput } from "@actspace/client/live";
 
 export type TrajectoryFixtureName = "complete" | "running" | "errors" | "long" | "empty" | "streaming" | "streaming-long";
 
 /** Reject malformed fixtures before their identities enter the renderer. */
-export function validateTrajectoryFixture(value: unknown): asserts value is RuntimeV2TrajectorySnapshot {
-  const data = value as RuntimeV2TrajectorySnapshot | null;
+export function validateTrajectoryFixture(value: unknown): asserts value is RuntimeTrajectorySnapshot {
+  const data = value as RuntimeTrajectorySnapshot | null;
   if (data?.kind !== "trajectory" || data.schemaVersion !== 1 || typeof data.sessionId !== "string" || !Array.isArray(data.nodes)) throw new Error("Invalid trajectory fixture envelope");
   const keys = new Set<string>();
   let previous = -1;
@@ -17,7 +17,7 @@ export function validateTrajectoryFixture(value: unknown): asserts value is Runt
   if (data.throughJournalSeq < previous) throw new Error("Invalid trajectory fixture revision");
 }
 validateTrajectoryFixture(completeFixture);
-const COMPLETE: RuntimeV2TrajectorySnapshot = completeFixture;
+const COMPLETE: RuntimeTrajectorySnapshot = completeFixture;
 const VALID_NAMES = new Set<TrajectoryFixtureName>(["complete", "running", "errors", "long", "empty", "streaming", "streaming-long"]);
 
 function isFixtureName(value: string | null | undefined): value is TrajectoryFixtureName {
@@ -35,27 +35,27 @@ export function trajectoryFixtureName(input: string | URL | URLSearchParams = wi
   return isFixtureName(value) ? value : null;
 }
 
-function cloneNode(node: RuntimeV2TrajectoryNode, changes: Partial<RuntimeV2TrajectoryNode> = {}): RuntimeV2TrajectoryNode {
+function cloneNode(node: RuntimeTrajectoryNode, changes: Partial<RuntimeTrajectoryNode> = {}): RuntimeTrajectoryNode {
   return { ...node, data: node.data, ...changes };
 }
 
-function snapshot(nodes: readonly RuntimeV2TrajectoryNode[], sessionId = "mock-trajectory-session"): RuntimeV2TrajectorySnapshot {
+function snapshot(nodes: readonly RuntimeTrajectoryNode[], sessionId = "mock-trajectory-session"): RuntimeTrajectorySnapshot {
   return { kind: "trajectory", schemaVersion: 1, sessionId, throughJournalSeq: nodes.at(-1)?.eventSeq ?? -1, nodes };
 }
 
-function runningFixture(): RuntimeV2TrajectorySnapshot {
+function runningFixture(): RuntimeTrajectorySnapshot {
   const nodes = COMPLETE.nodes.filter(node => node.eventType !== "turn/end" && node.eventType !== "step/end" && node.eventType !== "tool/result");
   return snapshot(nodes);
 }
 
-function errorsFixture(): RuntimeV2TrajectorySnapshot {
-  const nodes: RuntimeV2TrajectoryNode[] = COMPLETE.nodes.map(node => {
-    const data = node.data as Record<string, RuntimeV2JsonValue>;
+function errorsFixture(): RuntimeTrajectorySnapshot {
+  const nodes: RuntimeTrajectoryNode[] = COMPLETE.nodes.map(node => {
+    const data = node.data as Record<string, RuntimeJsonValue>;
     if (node.eventType === "tool/call" && node.callId === "call-1-1-2") {
       return cloneNode(node, { data: { ...data, parentCallId: "call-1-1-1" } });
     }
     if (node.eventType === "tool/result" && node.callId === "call-1-1-2") {
-      return cloneNode(node, { state: "failed", data: { ...(node.data as Record<string, RuntimeV2JsonValue>), status: "failed", error: "Command exited with code 1", result: "permission denied" } });
+      return cloneNode(node, { state: "failed", data: { ...(node.data as Record<string, RuntimeJsonValue>), status: "failed", error: "Command exited with code 1", result: "permission denied" } });
     }
     if (node.eventType === "permission/decided" && node.callId === "call-4-1-1") {
       return cloneNode(node, { data: { ...data, decision: "denied", kind: "deny" } });
@@ -69,31 +69,31 @@ function errorsFixture(): RuntimeV2TrajectorySnapshot {
     return node;
   });
   // 上下文行的两种来源：Context 插件的补充（op=add）和后台任务通知（inbox claim）。
-  const extra = (after: (node: RuntimeV2TrajectoryNode) => boolean, eventType: string, data: Record<string, RuntimeV2JsonValue>, surface?: RuntimeV2JsonValue) => {
+  const extra = (after: (node: RuntimeTrajectoryNode) => boolean, eventType: string, data: Record<string, RuntimeJsonValue>, surface?: RuntimeJsonValue) => {
     const index = nodes.findIndex(after);
     const anchor = nodes[index];
     nodes.splice(index + 1, 0, { ...anchor, eventType, kind: "other", state: "observed", callId: null, data, ...(surface === undefined ? {} : { surface }) });
   };
   // 第 2 轮第 2 次请求换了提示词：提示词只在变化时记一条 request/system-prompt（agent-spec-request-record.md §3）。
-  const initialPrompt = nodes.find(node => node.eventType === "request/system-prompt")!.data as Record<string, RuntimeV2JsonValue>;
+  const initialPrompt = nodes.find(node => node.eventType === "request/system-prompt")!.data as Record<string, RuntimeJsonValue>;
   const changedSections = [{ id: "model-prompt", owner: "actspace.context-system", order: 0, content: "你是 ActSpace 的代码助手。\n本轮只检查文件，不修改。" }];
-  extra(node => node.eventType === "request/header" && (node.data as Record<string, RuntimeV2JsonValue>).requestId === "request-2-2", "request/system-prompt",
+  extra(node => node.eventType === "request/header" && (node.data as Record<string, RuntimeJsonValue>).requestId === "request-2-2", "request/system-prompt",
     { ...initialPrompt, requestId: "request-2-2", turnId: "turn-2", stepId: "step-2-2", digest: "fixture-prompt-2", sections: changedSections });
   const content = "后台任务「pnpm build」已完成，退出码 0。";
-  extra(node => node.eventType === "user/message" && (node.data as Record<string, RuntimeV2JsonValue>).messageId === "user-1", "plugin/actspace.context/supplement",
+  extra(node => node.eventType === "user/message" && (node.data as Record<string, RuntimeJsonValue>).messageId === "user-1", "plugin/actspace.context/supplement",
     { turnId: "turn-1", op: "add", owner: "actspace.context-runtime", id: "runtime-state", lifetime: "turn", content: "运行环境：macOS · 工作目录 actspace-agent · 本轮执行预算剩余 18 步" });
-  extra(node => node.eventType === "turn/end" && (node.data as Record<string, RuntimeV2JsonValue>).turnId === "turn-1", "agent/inbox/spliced",
+  extra(node => node.eventType === "turn/end" && (node.data as Record<string, RuntimeJsonValue>).turnId === "turn-1", "agent/inbox/spliced",
     { operation: "claim", messageId: "notice-task-build", target: "next-turn", source: "task_notification", taskId: "task-build", content }, { kind: "append" });
   // 插入后重排 eventSeq，保持 Journal 序号严格递增。
   return snapshot(nodes.map((node, eventSeq) => cloneNode(node, { eventSeq, key: `${node.sessionId}:${eventSeq}` })));
 }
 
-function longFixture(): RuntimeV2TrajectorySnapshot {
+function longFixture(): RuntimeTrajectorySnapshot {
   const source = COMPLETE.nodes.filter(node => node.eventType !== "session/title-set");
-  const nodes: RuntimeV2TrajectoryNode[] = [];
+  const nodes: RuntimeTrajectoryNode[] = [];
   const idFields = new Set(["turnId", "stepId", "requestId", "messageId", "callId", "toolCallId", "parentCallId", "assistantMessageId"]);
   for (let repeat = 0; repeat < 24; repeat += 1) {
-    const remap = (value: RuntimeV2JsonValue, key = ""): RuntimeV2JsonValue => {
+    const remap = (value: RuntimeJsonValue, key = ""): RuntimeJsonValue => {
       if (typeof value === "string" && idFields.has(key)) return `batch-${repeat + 1}:${value}`;
       if (Array.isArray(value)) return value.map(item => remap(item));
       if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, remap(v, k)]));
@@ -112,7 +112,7 @@ function longFixture(): RuntimeV2TrajectorySnapshot {
   return snapshot(nodes, "mock-long-session");
 }
 
-function emptyFixture(): RuntimeV2TrajectorySnapshot {
+function emptyFixture(): RuntimeTrajectorySnapshot {
   return snapshot([], "mock-empty-session");
 }
 
@@ -122,10 +122,10 @@ const STREAMING_CHUNK = 6;
 export const STREAMING_FRAMES = Math.ceil(STREAMING_TEXT.length / STREAMING_CHUNK);
 
 /** A streaming fixture frame: the Journal (the running request still open) and the live run's output. */
-export type TrajectoryFixtureFrame = { readonly snapshot: RuntimeV2TrajectorySnapshot; readonly live: ReadonlyMap<string, RequestLiveOutput> };
+export type TrajectoryFixtureFrame = { readonly snapshot: RuntimeTrajectorySnapshot; readonly live: ReadonlyMap<string, RequestLiveOutput> };
 
-const isRunningChunk = (node: RuntimeV2TrajectoryNode) => node.eventType === "assistant/chunk" && String((node.data as Record<string, RuntimeV2JsonValue>).messageId).endsWith("assistant-running");
-const liveOf = (node: RuntimeV2TrajectoryNode, text: string): ReadonlyMap<string, RequestLiveOutput> => {
+const isRunningChunk = (node: RuntimeTrajectoryNode) => node.eventType === "assistant/chunk" && String((node.data as Record<string, RuntimeJsonValue>).messageId).endsWith("assistant-running");
+const liveOf = (node: RuntimeTrajectoryNode, text: string): ReadonlyMap<string, RequestLiveOutput> => {
   const data = node.data as Record<string, string>;
   return text === "" ? new Map() : new Map([[data.requestId, { messageId: data.messageId, text, thinking: "", calls: new Map() }]]);
 };
@@ -147,7 +147,7 @@ export const STREAMING_LONG_CHUNKS = 2000;
  * The long fixture with one reply still streaming in its last turn, grown by `chunks` chunks.
  * Earlier batches drop their unfinished reply and its request, so exactly one call is streaming.
  */
-let streamingLongBase: { readonly template: RuntimeV2TrajectoryNode; readonly base: RuntimeV2TrajectorySnapshot } | null = null;
+let streamingLongBase: { readonly template: RuntimeTrajectoryNode; readonly base: RuntimeTrajectorySnapshot } | null = null;
 
 export function streamingLongFixture(chunks: number): TrajectoryFixtureFrame {
   if (streamingLongBase === null) {
@@ -175,7 +175,7 @@ export function streamingReplay(name: TrajectoryFixtureName | null): { readonly 
 }
 
 /** Build one deterministic fixture while keeping the checked-in complete fixture as the source of truth. */
-export function loadTrajectoryFixture(name: TrajectoryFixtureName): RuntimeV2TrajectorySnapshot {
+export function loadTrajectoryFixture(name: TrajectoryFixtureName): RuntimeTrajectorySnapshot {
   switch (name) {
     case "complete": return COMPLETE;
     case "running": return runningFixture();
@@ -188,7 +188,7 @@ export function loadTrajectoryFixture(name: TrajectoryFixtureName): RuntimeV2Tra
 }
 
 /** Load a fixture only when the URL explicitly requests one; normal sessions return null. */
-export function loadTrajectoryFixtureFromUrl(input: string | URL | URLSearchParams = window.location.search): RuntimeV2TrajectorySnapshot | null {
+export function loadTrajectoryFixtureFromUrl(input: string | URL | URLSearchParams = window.location.search): RuntimeTrajectorySnapshot | null {
   const name = trajectoryFixtureName(input);
   return name === null ? null : loadTrajectoryFixture(name);
 }

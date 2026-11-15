@@ -6,17 +6,17 @@ import { DeepSeekFileUploader, PiAiAdapter } from "@actspace/llm-pi-ai";
 import { ProviderProxyPool } from "@actspace/llm-service";
 import type { ModelApi, ModelCapabilities, ThinkingLevel } from "@actspace/shared";
 import { IMAGE_INSPECTION_CREDENTIAL_REF, bearerAwareAuth } from "./credential-resolver";
-import { customConnectionPricingInput, type DesktopRuntimeV2ModelPort } from "./model-port";
+import { customConnectionPricingInput, type DesktopRuntimeModelPort } from "./model-port";
 
 type SessionArtifactReader = (sessionId: string, artifactId: string) => Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }>;
 
-/** Desktop v2 provider boundary. The historical filename remains until P15 removes v1 source. */
-export class DesktopLegacyLlmAdapter implements LlmAdapter {
+/** Desktop provider boundary. */
+export class DesktopLlmAdapter implements LlmAdapter {
   readonly adapterVersion = "actspace.desktop-pi-ai.v3";
   readonly #proxies = new ProviderProxyPool();
   #deepSeekFiles: DeepSeekFileUploader | undefined;
 
-  constructor(private readonly models: DesktopRuntimeV2ModelPort, private readonly readArtifact: SessionArtifactReader, private readonly purpose: "chat" | "utility" | "auto-review" = "chat") {}
+  constructor(private readonly models: DesktopRuntimeModelPort, private readonly readArtifact: SessionArtifactReader, private readonly purpose: "chat" | "utility" | "auto-review" = "chat") {}
 
   private resolveModel(requested?: string) {
     if (this.purpose === "auto-review") {

@@ -1,5 +1,5 @@
 import * as net from "node:net";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolArtifactRef, ToolBodyResult, ToolExecutionContext, ToolModelOutputBlock } from "@actspace/tool-runtime";
 import type { BrowserCapability } from "./host-port.js";
 import { redactBrowserValue } from "./redaction.js";
@@ -276,7 +276,7 @@ type BridgeResponse = {
 async function executeBrowserCommand(
   transport: BrowserBridgeTransport,
   name: string,
-  args: Readonly<Record<string, RuntimeV2JsonValue>>,
+  args: Readonly<Record<string, RuntimeJsonValue>>,
   context: ToolExecutionContext,
 ): Promise<ToolBodyResult> {
   if (name === "browser_help") return browserHelp(transport, args, context.signal);
@@ -291,7 +291,7 @@ async function executeBrowserCommand(
   return renderExecutions([execution], context, "Browser action completed");
 }
 
-async function browserHelp(transport: BrowserBridgeTransport, args: Readonly<Record<string, RuntimeV2JsonValue>>, signal: AbortSignal): Promise<ToolBodyResult> {
+async function browserHelp(transport: BrowserBridgeTransport, args: Readonly<Record<string, RuntimeJsonValue>>, signal: AbortSignal): Promise<ToolBodyResult> {
   const category = stringValue(args.category);
   const action = stringValue(args.action);
   const query = stringValue(args.query)?.toLowerCase();
@@ -309,7 +309,7 @@ async function browserHelp(transport: BrowserBridgeTransport, args: Readonly<Rec
   return completed(truncate(redactBrowserValue(JSON.stringify({ count: commands.length, categories: report?.categories ?? [], commands }, null, 2)), 20_000), "Listed Browser commands");
 }
 
-async function browserRun(transport: BrowserBridgeTransport, args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext): Promise<ToolBodyResult> {
+async function browserRun(transport: BrowserBridgeTransport, args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext): Promise<ToolBodyResult> {
   const actions = normalizeActions(args.actions);
   if (actions.length === 0) return failure("INVALID_ARGUMENTS", "browser_run requires at least one action.", false);
   const identity = { sessionId: context.sessionId, turnId: context.turnId };
@@ -388,7 +388,7 @@ async function createImageArtifact(value: { readonly mimeType: string; readonly 
   return context.createArtifact({ bytes, mediaType: value.mimeType });
 }
 
-function normalizeActions(value: RuntimeV2JsonValue | undefined): readonly Readonly<Record<string, RuntimeV2JsonValue>>[] {
+function normalizeActions(value: RuntimeJsonValue | undefined): readonly Readonly<Record<string, RuntimeJsonValue>>[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
     const action = recordValue(item);
@@ -404,11 +404,11 @@ function isImageResult(value: unknown): value is { readonly mimeType: string; re
   return typeof record?.mimeType === "string" && typeof record.data === "string";
 }
 
-function recordValue(value: unknown): Readonly<Record<string, RuntimeV2JsonValue>> | undefined {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : undefined;
+function recordValue(value: unknown): Readonly<Record<string, RuntimeJsonValue>> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : undefined;
 }
 
-function stringValue(value: RuntimeV2JsonValue | undefined): string | undefined {
+function stringValue(value: RuntimeJsonValue | undefined): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 

@@ -4,7 +4,7 @@ import { createCordisRoot, emitNotification } from "@actspace/cordis-adapter";
 import { AgentScope } from "@actspace/scope";
 import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, type AgentHandle } from "@actspace/agent";
 import { AgentLoop } from "@actspace/agent-loop";
-import { RequestAssembler, PromptExtensionRegistry } from "@actspace/prompt";
+import { PromptExtensionRegistry } from "@actspace/prompt";
 import { createCoreCodecRegistry, createSessionHeader } from "@actspace/session-journal";
 import { apply as applySessionCheckpointPolicy } from "@actspace/session-checkpoint-policy/plugin";
 import { SessionHandle } from "@actspace/session-persistence";
@@ -49,7 +49,7 @@ describe("English learning real AgentLoop integration", () => {
       const scope = new AgentScope(`main:${id}`); scopes.push(scope); sessions.push(session); liveSessions.set(id, session);
       const descriptor = { ...MAIN_AGENT_DESCRIPTOR, routeId: "fixture", model: "fixture" };
       const agent: AgentHandle = { agentId: scope.agentId, scope, descriptor, session, dispose: () => scope.dispose() };
-      const loop = new AgentLoop({ contextSources: new ContextSourceRegistry(), contextExtensions: () => extensions.list(id, scope.identity.scopeId, "main"), scope, session, descriptor, context: root.context, inbox: new MainAgentInbox(session), tools: new ToolRuntime(), assembler: new RequestAssembler({ prepare: () => { throw new Error("unused"); } }), llm: new LlmService(routes, { resolve: async () => ({ apiKey: "model-canary" }) }), compositionDigest: "fixture", hostCapabilityDigest: "fixture", host: { hostKind: "desktop", invocationId: "test", runtimeContract: "actspace.runtime.v2", capabilityCeiling: [] }, toolEnvironment: () => ({ workspaceRoot: "/same-workspace", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("unused"); } }, createArtifact: async () => { throw new Error("unused"); } }) });
+      const loop = new AgentLoop({ contextSources: new ContextSourceRegistry(), contextExtensions: () => extensions.list(id, scope.identity.scopeId, "main"), scope, session, descriptor, context: root.context, inbox: new MainAgentInbox(session), tools: new ToolRuntime(), llm: new LlmService(routes, { resolve: async () => ({ apiKey: "model-canary" }) }), compositionDigest: "fixture", hostCapabilityDigest: "fixture", host: { hostKind: "desktop", invocationId: "test", runtimeContract: "actspace.runtime.v2", capabilityCeiling: [] }, toolEnvironment: () => ({ workspaceRoot: "/same-workspace", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("unused"); } }, createArtifact: async () => { throw new Error("unused"); } }) });
       return { agent, loop, session };
     };
     const a = create("a"); const b = create("b");

@@ -19,7 +19,7 @@
 | Session 事件 | [Session 业务与存储后端边界](agent-spec-session-core-persistence-separation.md)（接纳、observer、durability barrier、checkpoint）、[Session Format v1](agent-spec-session-format-v1.md)、[DSH 事件模型](agent-spec-dsh-event-model.md)（当前事件词汇的唯一来源） |
 | 请求与流式 | [流式输出只走实时通道](agent-spec-live-assistant-stream.md)、[请求记录与上下文估算](agent-spec-request-record.md)、[对话内容只存一份](agent-spec-surface-derived.md)、[上下文引擎直接用日志视图](agent-spec-context-trusted-surface.md) |
 | 投影与读模型 | [Runtime Projection](agent-spec-runtime-projection.md)（Durable / Live / Diagnostics 三平面、Generic Tool DTO、当前读取实现与水位） |
-| Agent 与 Scope | [Agent Core 所有权](agent-target-agent-core.md)、[Agent 与 Subagent](agent-spec-agent-and-subagent.md)、[Agent Scope 模型](agent-spec-agent-scope-model.md) |
+| Agent 与 Scope | [Agent Core 所有权](agent-target-agent-core.md)、[Agent Scope 模型](agent-spec-agent-scope-model.md)、[子智能体运行规范](../collaboration/agent-subagent-runtime.md) |
 | Tool | [Tool Runtime 内核与外壳](agent-spec-tool-runtime-boundary.md)、[Tool Runtime ABI](agent-spec-tool-runtime-abi.md)、[Tool Name 契约](agent-spec-tool-name-contract.md)、[Tool 插件边界与 Todo 领域事件](agent-tool-plugin-boundaries.md) |
 | Prompt 与上下文贡献 | [Prompt 与 Context Contributor](agent-spec-prompt-context-contributors.md) |
 | LLM | [LLM Adapter 目标](agent-target-llm-adapter.md)、[LLM Core Pi](agent-llm-core-pi.md)（含 pi-ai 内置服务商复用）、[多供应商与模型管理](../model-context/agent-multi-provider-llm.md) |
@@ -27,6 +27,8 @@
 | Host 与插件 | [独立 Agent Host 指南](agent-host-guide.md)（启动、配对、WSS / SSH、附件、停机、[systemd 示例](actspace-host.service.example)）、[英语辅助学习插件](agent-english-learning.md) |
 
 Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧产品资料。早期逻辑语义与后续事件规范冲突时，以 DSH 事件模型和实际 codec 为准。写入 / 恢复先读存储边界，读取 / 投影先读 Runtime Projection。
+
+代码里的名字不带 `V2`。仓库里只有一套 Runtime，类型、函数和常量直接叫 `RuntimeJsonValue`、`bootDesktopRuntime`、`RUNTIME_FIXED_RENDERER_CHANNELS`。带 `v2` 的只剩几个写在磁盘上或跨进程可见的字符串：`runtime-v2` 目录名和引入路径 `@actspace/shared/runtime-v2`（Harness 产物里记着这个路径）、IPC channel 的 `runtime-v2:` 前缀、契约 id `actspace.runtime.v2`、落盘目录 `sessions-v2`，改它们要带迁移。设置的 `SettingsV4`、Session 事件的 `SessionEventEnvelopeV1` 这类是格式版本号，照常保留。`pnpm check:transitional-names`（`scripts/check-transitional-names.mjs`）检查源码里有没有再出现改名前的名字，加 `--write` 按同一张表直接改；设计文档里的由 `pnpm check:docs` 检查。
 
 ## 决策背景
 

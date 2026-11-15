@@ -4,7 +4,7 @@ import { parseCliArgs, usage } from "./args";
 import { CliError, CliUsageError } from "./errors";
 import type { CliArtifactResult, CliExitCode } from "./types";
 import { formatCliVersion } from "./version";
-import { runV2Command } from "./runtime-v2/run";
+import { runCommand } from "./runtime-v2/run";
 import { CliTermination } from "./termination";
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
@@ -26,7 +26,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     process.on("SIGINT", onSigint);
     process.on("SIGTERM", onSigterm);
-    const result = await runV2Command(parsed.options, {
+    const result = await runCommand(parsed.options, {
       stdinIsTTY: process.stdin.isTTY === true,
       readStdin: readProcessStdin,
       onLiveEvent: parsed.options.outputFormat === "jsonl"

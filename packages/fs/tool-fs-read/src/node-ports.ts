@@ -1,10 +1,16 @@
 import { lstat, open, stat, readdir, realpath } from "node:fs/promises";
-import { basename, extname, isAbsolute, relative, resolve } from "node:path";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tool-runtime";
+import * as nodePath from "node:path";
+import { basename, extname, isAbsolute, resolve } from "node:path";
+import { isLexicallyInside, relativePathInside } from "@actspace/shared";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
+import { canonicalizeFileResource, TOOL_OUTPUT_LINE_CHARS, TOOL_OUTPUT_TEXT_CHARS, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
 import { PRESENT_MAX_FILES } from "./manifest.js";
+import { readNumberedRange, type NumberedLines } from "./line-range.js";
 const READ_FILE_DEFAULT_LIMIT = 200;
+/** 图片整个进内存再存成 artifact；和其它图片工具用同一个上限。 */
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+const TEXT_LIMIT_LABEL = `${TOOL_OUTPUT_TEXT_CHARS.toLocaleString("en-US")}-character output limit`;
 const IMAGE_MIME_BY_EXT: Readonly<Record<string, string>> = Object.freeze({
   ".png": "image/png",
   ".jpg": "image/jpeg",
@@ -23,7 +29,7 @@ function contextWorkspaceRoot(context: ToolExecutionContext, fallback: string): 
 }
 
 async function readFileTool(
-  args: Readonly<Record<string, RuntimeV2JsonValue>>,
+  args: Readonly<Record<string, RuntimeJsonValue>>,
   context: ToolExecutionContext,
   workspaceRoot: string,
   cache: Map<string, { readonly size: number; readonly mtimeMs: number }>,
@@ -40,6 +46,7 @@ async function readFileTool(
       if (!fileStat.isFile()) return failure("NOT_A_FILE", `Path is not a regular file: ${pathArg}`);
       const mimeType = IMAGE_MIME_BY_EXT[extname(filePath).toLowerCase()];
       if (mimeType !== undefined) {
+        if (fileStat.size > MAX_IMAGE_BYTES) return failure("IMAGE_TOO_LARGE", `Image exceeds ${MAX_IMAGE_BYTES} bytes: ${pathArg} is ${fileStat.size} bytes.`);
         const bytes = await handle.readFile();
         const artifact = await context.createArtifact({ bytes, mediaType: mimeType });
         const summary = `Read image ${displayPath(filePath, workspaceRoot)} (${fileStat.size} bytes).`;
@@ -53,23 +60,33 @@ async function readFileTool(
         const text = "File unchanged since the previous read of this exact path and range. Reuse the earlier numbered lines, or pass force=true.";
         return completed(text, undefined, { path: filePath, kind: "file", operation: "read" });
       }
-      const raw = await handle.readFile("utf8");
-      const lines = raw.split("\n");
-      const start = Math.max(0, offset - 1);
-      const end = Math.min(lines.length, start + limit);
-      let text = lines.slice(start, end).map((line, index) => `${String(start + index + 1).padStart(6)}|${line}`).join("\n");
-      if (end < lines.length) text += `\n\n[Showing lines ${offset}-${end} of ${lines.length}. Use offset/limit to read more.]`;
+      const range = await readNumberedRange(handle, fileStat.size, offset, limit, context.signal);
+      if (range.kind === "binary") return failure("BINARY_FILE", `Cannot read ${pathArg} as text: it looks like a binary file (${fileStat.size} bytes). If its contents matter, inspect it with a shell command.`);
       cache.set(cacheKey, { size: fileStat.size, mtimeMs: fileStat.mtimeMs });
-      return completed(text || "(empty file)", `Read ${displayPath(filePath, workspaceRoot)}`, { path: filePath, kind: "file", operation: "read" });
+      return completed(range.kind === "empty" ? "(empty file)" : numberedText(range, offset, fileStat.size), `Read ${displayPath(filePath, workspaceRoot)}`, { path: filePath, kind: "file", operation: "read" });
     } finally {
       await handle.close();
     }
   } catch (error) {
+    // 中止不是读取失败：抛出去，由 tool-runtime 记成 TOOL_ABORTED。
+    if (context.signal.aborted) throw error;
     return ioFailure("read file", pathArg, error);
   }
 }
 
-async function listDirectoryTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
+/** 行号文本加尾注；尾注告诉模型下一次从哪一行接着读。 */
+function numberedText(range: NumberedLines, offset: number, size: number): string {
+  if (range.lastLine === 0) return `[No lines at offset ${offset}: the file has ${range.totalLines ?? 0} line${range.totalLines === 1 ? "" : "s"}.]`;
+  const notes: string[] = [];
+  if (range.more) {
+    const scope = range.totalLines === null ? `; the file is ${size} bytes, so its lines were not counted` : ` of ${range.totalLines}`;
+    notes.push(`[Showing lines ${offset}-${range.lastLine}${scope}${range.budgetExhausted ? ` (stopped at the ${TEXT_LIMIT_LABEL})` : ""}. Use offset=${range.lastLine + 1} to continue.]`);
+  }
+  if (range.cutLines > 0) notes.push(`[${range.cutLines} line${range.cutLines === 1 ? " was" : "s were"} cut at ${TOOL_OUTPUT_LINE_CHARS.toLocaleString("en-US")} characters. To read more of a long line, search it with grep or slice it with a shell command.]`);
+  return notes.length === 0 ? range.text : `${range.text}\n\n${notes.join("\n")}`;
+}
+
+async function listDirectoryTool(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
   const pathArg = stringArg(args, "path");
   if (!pathArg) return failure("INVALID_ARGUMENTS", "path is required");
   try {
@@ -78,15 +95,26 @@ async function listDirectoryTool(args: Readonly<Record<string, RuntimeV2JsonValu
     if (!info.isDirectory()) return failure("NOT_A_DIRECTORY", `Path is not a directory: ${pathArg}`);
     const entries = await readdir(directory, { withFileTypes: true });
     entries.sort((left, right) => left.name.localeCompare(right.name));
-    const text = entries.length === 0 ? "(empty directory)" : entries.map((entry) => `${entry.isDirectory() ? "[dir]  " : "[file] "}${entry.name}`).join("\n");
-    return completed(text, `Listed ${displayPath(directory, workspaceRoot)}`);
+    const shown: string[] = [];
+    let chars = 0;
+    for (const entry of entries) {
+      const rendered = `${entry.isDirectory() ? "[dir]  " : "[file] "}${entry.name}`;
+      const cost = rendered.length + (shown.length === 0 ? 0 : 1);
+      if (shown.length > 0 && chars + cost > TOOL_OUTPUT_TEXT_CHARS) break;
+      shown.push(rendered);
+      chars += cost;
+    }
+    const listing = entries.length === 0 ? "(empty directory)" : shown.join("\n");
+    const text = shown.length < entries.length ? `${listing}\n\n[Showing first ${shown.length} of ${entries.length} entries (stopped at the ${TEXT_LIMIT_LABEL}). Use glob with a pattern, or list a subdirectory, to see the rest.]` : listing;
+    // 界面上的条目数读这里，不从给模型的文本里数。
+    return { status: "completed", modelOutput: [{ type: "text", text }], summary: `Listed ${displayPath(directory, workspaceRoot)}`, detail: [{ label: "result", value: { entryCount: entries.length, shownCount: shown.length } }] };
   } catch (error) {
     return ioFailure("list directory", pathArg, error);
   }
 }
 
 /** Declared deliverables stay at their workspace paths; the result records them for the turn-tail cards. */
-async function presentTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, workspaceRoot: string): Promise<ToolBodyResult> {
+async function presentTool(args: Readonly<Record<string, RuntimeJsonValue>>, workspaceRoot: string): Promise<ToolBodyResult> {
   const entries = Array.isArray(args.files) ? args.files : [];
   if (entries.length === 0 || entries.length > PRESENT_MAX_FILES) return failure("INVALID_ARGUMENTS", `present accepts 1 to ${PRESENT_MAX_FILES} files`);
   const files: { path: string; description?: string }[] = [];
@@ -145,11 +173,10 @@ function resolveWorkspacePath(input: string, workspaceRoot: string): string {
 }
 
 function isWithin(root: string, candidate: string): boolean {
-  const nested = relative(resolve(root), resolve(candidate));
-  return nested === "" || (!nested.startsWith("..") && !isAbsolute(nested));
+  return isLexicallyInside(nodePath, root, candidate, { includeRoot: true });
 }
 
-function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeV2JsonValue): ToolBodyResult {
+function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeJsonValue): ToolBodyResult {
   return { status: "completed", modelOutput: [{ type: "text", text }], summary, ...(detail === undefined ? {} : { detail: [{ label: "actspace.context.file", value: detail }] }) };
 }
 
@@ -164,6 +191,6 @@ function ioFailure(action: string, path: string, error: unknown): ToolBodyResult
   return failure("IO_ERROR", `Failed to ${action}: ${message}`);
 }
 
-function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
-function integerArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string, fallback: number): number { const value = args[key]; return typeof value === "number" && Number.isInteger(value) ? Math.max(1, value) : fallback; }
-function displayPath(path: string, workspaceRoot: string): string { const nested = relative(workspaceRoot, path); return nested && !nested.startsWith("..") && !isAbsolute(nested) ? nested : path; }
+function stringArg(args: Readonly<Record<string, RuntimeJsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
+function integerArg(args: Readonly<Record<string, RuntimeJsonValue>>, key: string, fallback: number): number { const value = args[key]; return typeof value === "number" && Number.isInteger(value) ? Math.max(1, value) : fallback; }
+function displayPath(path: string, workspaceRoot: string): string { return relativePathInside(nodePath, workspaceRoot, path) || path; }
