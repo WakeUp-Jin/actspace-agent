@@ -231,4 +231,10 @@ describe("UserMessage sent response annotations", () => {
     rerender(<UserMessage message={makeUserBlock("普通消息")} sessionId="session-1" />);
     expect(screen.queryByRole("button", { name: /条批注/ })).toBeNull();
   });
+
+  it("draws no empty card when only annotations were sent", () => {
+    const { container } = render(<UserMessage message={{ ...annotated, content: "" }} sessionId="session-1" />);
+    expect(screen.getByRole("button", { name: "2 条批注" })).toBeInTheDocument();
+    expect(container.querySelector(".user-card")).toBeNull();
+  });
 });

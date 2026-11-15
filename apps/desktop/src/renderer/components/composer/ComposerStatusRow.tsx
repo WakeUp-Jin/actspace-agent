@@ -55,12 +55,14 @@ export type ComposerStatusRowProps = {
   stats?: ComposerStatsOverlay;
 };
 
-const ROW_CLASS = "composer-status-row flex min-h-5 min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 text-act-xs leading-4 text-text-faint";
+// 外层是容器查询的容器：统计胶囊按状态行宽度切换合并形态（ComposerStatsPills）。
+const ROW_CONTAINER_CLASS = "@container min-w-0";
+const ROW_CLASS = "composer-status-row flex min-h-5 min-w-0 flex-nowrap items-center justify-between gap-x-3 px-3 text-act-xs leading-4 text-text-faint";
 const FACTS_CLASS = "flex min-w-0 items-center gap-1.5";
 const FACT_CLASS = "inline-flex min-w-0 items-center gap-1.5";
 const ICON_CLASS = "shrink-0 text-text-subtle";
 const SEP_CLASS = "shrink-0 opacity-60";
-const TRAILING_CLASS = "flex min-w-0 items-center gap-1";
+const TRAILING_CLASS = "flex min-w-0 shrink-0 items-center gap-1";
 const USAGE_CLASS = "inline-flex shrink-0 items-center gap-1.5 text-text-muted";
 const USAGE_DOT_CLASS = "h-[15px] w-[15px] shrink-0 rounded-full";
 // 3px 环形进度：conic 填充已用占比，radial mask 挖空中心形成圆环。
@@ -105,12 +107,13 @@ export function ComposerStatusRow({ form, target, notReady, host, remoteDescript
     </div>
   );
 
-  if (form === "chat") return <div className={`${ROW_CLASS} justify-end`}>{trailing}</div>;
+  if (form === "chat") return <div className={ROW_CONTAINER_CLASS}><div className={`${ROW_CLASS} justify-end`}>{trailing}</div></div>;
 
   const facts = target.kind === "remote"
     ? remoteFacts(target, notReady, host, remoteDescription)
     : localFacts(target, branchLabel, runLocation);
   return (
+    <div className={ROW_CONTAINER_CLASS}>
     <div className={ROW_CLASS} aria-label="运行位置">
       <div className="flex min-w-0 items-center gap-3">
         <div className={FACTS_CLASS}>
@@ -124,6 +127,7 @@ export function ComposerStatusRow({ form, target, notReady, host, remoteDescript
         {permissionControl ? <span className={FACT_CLASS}>{permissionControl}</span> : null}
       </div>
       {trailing}
+    </div>
     </div>
   );
 }

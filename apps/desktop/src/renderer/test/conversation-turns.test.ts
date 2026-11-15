@@ -139,6 +139,15 @@ describe("createTurnNavigationItems", () => {
     ]);
     expect(createTurnNavigationItems(turns, false).map((item) => item.pending)).toEqual([false, false]);
   });
+
+  it("labels a turn that sent only annotations or attachments instead of leaving it blank", () => {
+    const annotation = { annotationId: "a" };
+    const turns = groupMessagesIntoTurns([
+      msg("user", "u1", { content: "", responseAnnotations: [annotation, { annotationId: "b" }] }),
+      msg("user", "u2", { content: "", attachments: [{ id: "f" }] }),
+    ]);
+    expect(createTurnNavigationItems(turns, false).map((item) => item.input)).toEqual(["2 条批注", "1 个附件"]);
+  });
 });
 
 describe("workDurationMs", () => {

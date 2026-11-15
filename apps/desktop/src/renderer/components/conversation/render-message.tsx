@@ -1,4 +1,4 @@
-import type { MessageBlock } from "@actspace/shared";
+import { hasReadableText, type MessageBlock } from "@actspace/shared";
 import { Check, GitBranch, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getSessionToolDetail } from "../../api/sessions";
@@ -255,9 +255,9 @@ export function renderMessageList(
   onOpenReadFile?: (message: ReadMessageBlock) => void,
   onOpenWorkspaceFile?: (path: string, line?: number) => void,
 ) {
-  // Preserve message/usage data, but do not give empty assistant text a prose gap.
+  // Preserve message/usage data, but do not give empty or punctuation-only assistant text (a lone「.」between tool calls) a prose gap.
   return messages
-    .filter((message) => message.kind !== "assistant" || message.content.trim().length > 0)
+    .filter((message) => message.kind !== "assistant" || hasReadableText(message.content))
     .map((message) => (
       <div
         key={message.renderKey ?? message.id}

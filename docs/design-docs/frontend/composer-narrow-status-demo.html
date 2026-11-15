@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>窄窗状态行 Demo</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --hover: #ececea;
+  --line: #deded9; --line-soft: #e9e9e5; --line-strong: #8c8c85;
+  --text: #20201e; --muted: #676762; --faint: #72726b; --subtle: #8a8a83;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --hover: #2c2d29;
+  --line: #353630; --line-soft: #2e2f2a; --line-strong: #787870;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #85857e;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.2);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 13px/1.55 var(--font-ui); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+svg { display: block; flex: none; }
+
+.bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar h1 { margin: 0; font-size: 13px; font-weight: 600; }
+.grp { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.grp input[type=range] { width: 220px; accent-color: var(--muted); }
+.grp output { font-variant-numeric: tabular-nums; min-width: 44px; color: var(--text); }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.seg button { padding: 2px 9px; border-radius: 5px; font-size: 12px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--hover); }
+
+.page { max-width: 1400px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 22px; }
+.variant h2 { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
+.variant > p { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; max-width: 880px; }
+.strip { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.cell { display: flex; flex-direction: column; gap: 4px; }
+.cell .w { font-size: 11px; color: var(--subtle); font-variant-numeric: tabular-nums; }
+.live .w { color: var(--text); font-weight: 600; }
+
+/* composer mock */
+.composer { container-type: inline-size; background: var(--bg); padding: 0 0 10px; border-radius: 12px; border: 1px dashed var(--line); }
+.panel { margin: 8px 8px 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 18px; padding: 10px 14px 8px; box-shadow: var(--shadow); }
+.panel .ph { color: var(--subtle); font-size: 14px; height: 30px; }
+.panel .tools { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.panel .tools .send { margin-left: auto; width: 26px; height: 26px; border-radius: 50%; background: #8c8c85; }
+
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding: 0 12px 0 20px; font-size: 12px; line-height: 16px; color: var(--faint); min-height: 20px; }
+.facts { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.fact { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.fact svg, .pill svg { color: var(--subtle); }
+.perm { display: inline-flex; align-items: center; gap: 2px; }
+.trailing { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.pills { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.pill { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 20px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--faint); }
+.pill:hover { background: var(--hover); color: var(--muted); }
+.pill .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sep { margin: 0 6px; color: var(--line-strong); }
+.ring { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); white-space: nowrap; flex: none; }
+.ring i { width: 15px; height: 15px; border-radius: 50%; background: conic-gradient(var(--faint) 5%, var(--line) 5%); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px)); }
+
+/* ---------- 现状 ---------- */
+/* 不加任何规则：flex-wrap 让胶囊各自掉行 */
+
+/* ---------- A 单行 · 逐级收起 ---------- */
+.vA .row { flex-wrap: nowrap; }
+.vA .pills { flex-wrap: nowrap; }
+.vA .trailing { flex: none; }
+@container (max-width: 560px) {
+  .vA .opt { display: none; }          /* 去掉次要段：tok/s、缓存命中 */
+}
+@container (max-width: 400px) {
+  .vA .pill .lbl { display: none; }    /* 只剩图标 */
+  .vA .pill { padding: 2px 4px; }
+}
+
+/* ---------- B 两行 · 统计另起一行 ---------- */
+.vB .pills { flex-wrap: nowrap; }
+@container (max-width: 560px) {
+  .vB .row { display: grid; grid-template-columns: minmax(0,1fr) auto; row-gap: 2px; }
+  .vB .trailing { display: contents; }
+  .vB .ring { grid-column: 2; grid-row: 1; justify-self: end; }
+  .vB .pills { grid-column: 1 / -1; grid-row: 2; margin-left: -8px; overflow: hidden; }
+  .vB .pill { flex-shrink: 1; min-width: 0; }
+}
+
+/* ---------- C 合并成一个胶囊 ---------- */
+.vC .row { flex-wrap: nowrap; }
+.vC .merged { display: none; }
+.vC .trailing { flex: none; }
+@container (max-width: 560px) {
+  .vC .pills .pill:not(.merged) { display: none; }
+  .vC .merged { display: inline-flex; }
+}
+@container (max-width: 360px) {
+  .vC .merged .lbl { display: none; }
+  .vC .merged { padding: 2px 4px; }
+}
+.pop { margin: 6px 12px 0 auto; width: 260px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); padding: 10px 12px; font-size: 12px; color: var(--muted); display: none; }
+.vC.show-pop .pop { display: block; }
+.pop h4 { margin: 0 0 6px; font-size: 12px; color: var(--text); font-weight: 600; display: flex; justify-content: space-between; }
+.pop h4 + .kv { margin-top: 0; }
+.pop .kv { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; line-height: 20px; }
+.pop .kv b { font-weight: 500; color: var(--text); }
+.pop hr { border: 0; border-top: 1px solid var(--line-soft); margin: 8px 0; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>窄窗状态行</h1>
+  <div class="grp">实时宽度 <input id="w" type="range" min="300" max="760" value="460" /><output id="wo">460px</output></div>
+  <div class="grp">主题 <span class="seg" id="theme"><button aria-pressed="true" data-v="light">浅色</button><button aria-pressed="false" data-v="dark">深色</button></span></div>
+  <div class="grp"><label><input type="checkbox" id="pop" /> 显示 C 的合并面板</label></div>
+</div>
+<main class="page" id="page"></main>
+
+<template id="composer">
+  <div class="composer">
+    <div class="panel">
+      <div class="ph">继续追问...</div>
+      <div class="tools"><span>＋</span><span>deepseek-flash ⌄</span><span class="send"></span></div>
+    </div>
+    <div class="row">
+      <div class="facts">
+        <span class="fact"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55A1 1 0 0 1 20.38 20H3.62a1 1 0 0 1-.9-1.45L4 16"/></svg>本机</span>
+        <span class="fact perm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span>
+      </div>
+      <div class="trailing">
+        <span class="pills">
+          <button class="pill" title="会话统计"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span class="lbl">2 轮 30 步<span class="opt"><span class="sep">·</span>211 tok/s</span></span></button>
+          <button class="pill" title="会话累计消耗"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg><span class="lbl">累计 1.2M tok<span class="opt"><span class="sep">·</span>缓存命中 89%</span></span></button>
+          <button class="pill merged" title="会话统计"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span class="lbl">30 步<span class="sep">·</span>1.2M tok</span></button>
+        </span>
+        <button class="ring"><i></i>5%</button>
+      </div>
+    </div>
+    <div class="pop">
+      <h4>会话统计</h4>
+      <div class="kv"><span>轮次 / 步数</span><b>2 轮 30 步</b></div>
+      <div class="kv"><span>模型用时</span><b>2m 14s</b></div>
+      <div class="kv"><span>输出速度（TPS）</span><b>211 tok/s</b></div>
+      <hr />
+      <h4>会话累计消耗<span>1,203,442 tok</span></h4>
+      <div class="kv"><span>缓存命中</span><b>89%</b></div>
+      <div class="kv"><span>未缓存输入</span><b>118,204 tok</b></div>
+      <div class="kv"><span>缓存读取</span><b>1,002,881 tok</b></div>
+      <div class="kv"><span>输出</span><b>82,357 tok</b></div>
+    </div>
+  </div>
+</template>
+
+<script>
+const VARIANTS = [
+  ["cur", "现状", "flex-wrap：两个胶囊和圆环各自掉行，窄窗下拼成三行、右侧参差。"],
+  ["vA", "A · 单行，逐级收起", "始终一行。≤560px 去掉次要段（tok/s、缓存命中，点开面板仍能看到）；≤400px 胶囊只留图标，悬停/点击照常。"],
+  ["vB", "B · 两行，统计另起一行", "≤560px 第一行「本机 · 权限 …… 圆环」，第二行左对齐放两个完整胶囊；不够时胶囊截断，不再三行。"],
+  ["vC", "C · 合并成一个胶囊", "≤560px 两个胶囊合成「30 步 · 1.2M tok」一个入口，面板里上下两段（会话统计 + 累计消耗）；≤360px 只留图标。"],
+];
+const FIXED = [340, 420, 620];
+const page = document.getElementById("page");
+const tpl = document.getElementById("composer");
+const lives = [];
+for (const [cls, title, desc] of VARIANTS) {
+  const sec = document.createElement("section");
+  sec.className = "variant";
+  sec.innerHTML = `<h2>${title}</h2><p>${desc}</p><div class="strip"></div>`;
+  const strip = sec.querySelector(".strip");
+  for (const width of [null, ...FIXED]) {
+    const cell = document.createElement("div");
+    cell.className = "cell" + (width === null ? " live" : "");
+    const node = tpl.content.firstElementChild.cloneNode(true);
+    node.classList.add(cls);
+    node.style.width = (width ?? 460) + "px";
+    cell.innerHTML = `<span class="w">${width === null ? "实时 460px" : width + "px"}</span>`;
+    cell.append(node);
+    strip.append(cell);
+    if (width === null) lives.push([node, cell.querySelector(".w")]);
+  }
+  page.append(sec);
+}
+const w = document.getElementById("w"), wo = document.getElementById("wo");
+w.addEventListener("input", () => {
+  wo.textContent = w.value + "px";
+  for (const [node, label] of lives) { node.style.width = w.value + "px"; label.textContent = `实时 ${w.value}px`; }
+});
+document.getElementById("pop").addEventListener("change", (e) => {
+  document.querySelectorAll(".vC").forEach((n) => n.classList.toggle("show-pop", e.target.checked));
+});
+document.getElementById("theme").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.documentElement.dataset.theme = b.dataset.v;
+  e.currentTarget.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+});
+</script>
+</body>
+</html>

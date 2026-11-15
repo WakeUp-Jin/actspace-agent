@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type RefObject } from "react";
 import { cx } from "../ui/Button";
-import { getLatestTodoMessage, type ConversationTurn } from "./turns";
+import { getLatestTodoMessage, userMessageSummary, type ConversationTurn } from "./turns";
 
 // 提问卡片跟着内容滚走；滚出视野后在消息区顶部叠一条一行高的同款卡片（参考 Cursor）。
 // 叠加层不占布局，出现、消失都不会推动下面的消息。点它滚回这一轮（可编辑时直接进入编辑）。
@@ -92,8 +92,7 @@ export function PinnedTurnPrompt({
   const user = turn?.user;
   if (!turn || !user) return null;
 
-  const attachmentCount = user.attachments?.length ?? 0;
-  const text = user.content || (attachmentCount > 0 ? `${attachmentCount} 个附件` : "");
+  const text = userMessageSummary(user);
   const todo = getLatestTodoMessage(turn.messages);
   const showTodo = Boolean(todo && (todo.totalCount > 0 || todo.status === "failed"));
   const jump = () => {
