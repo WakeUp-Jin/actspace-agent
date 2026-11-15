@@ -130,6 +130,16 @@
 
 - **现象**：`RuntimeV2` 出现 2,010 处（265 个文件），`Legacy` 483 处（94 个文件），`SettingsV4` 292 处。v1 已经退役，`LegacyProxyWireEngine`、`DesktopLegacyLlmAdapter` 其实是生产路径。
 - **修法**：机械重命名去掉版本后缀；还在用的 `Legacy*` 按职责改名。磁盘格式、协议字段、IPC channel 名、设置键这些对外可见的字符串不改。
+- **2026-11-14 补充**：做完之后和上面两条对一下。
+  - **数量**：上面三个数是审查时按文本搜的估计。用 TypeScript 解析器只数标识符，动手之前是：`RuntimeV2` 这一类 113 个名字、2,144 处、292 个文件；带 `Legacy` 的 51 个名字、347 处、67 个文件；`SettingsV4` 这一类 31 个名字、391 处、48 个文件。
+  - **`RuntimeV2` 这一类全部改掉**，现在是 0 处。107 个名字只去掉 `V2`，6 个按表改整名。改名的那个提交完全是工具的输出，没有手改；工具就是下面那个检查脚本带 `--write`。
+  - **`Legacy` 只改了一个**：`DesktopLegacyLlmAdapter` 改名为 `DesktopLlmAdapter`，顺带删掉一个没有人读的字段和它的类型 `LegacyLlmConfig`。现在带 `Legacy` 的是 48 个名字、327 处、65 个文件。
+  - **两类没有按上面的修法改**：`SettingsV4` 这一类是设置落盘格式的版本号，不是过渡期的后缀；`LegacyProxyWireEngine` 是 LLM 设计文档定义的 legacy transport，名字和设计一致，审查时看错了。原因见决策记录。其余带 `Legacy` 的 43 个名字、282 处说的是旧数据、旧格式和迁移，名字和做的事一致。
+  - **不改的字符串比上面列的多一种**：`runtime-v2` 目录名、文件名和引入路径（`@actspace/shared/runtime-v2`）。原因见决策记录。
+  - **多做了一个检查**：`pnpm check:transitional-names`，接进 `pnpm test:scripts`；`pnpm check:docs` 多一条规则，查设计文档和当前事实文档里的旧名字。原因和 PR 5、PR 6 一样：旧名字仍然是合法的标识符，其它分支合并进来时会把它们带回来，编译器不报。
+  - **其它在飞的分支怎么对齐**：这个 PR 合并之后，在那个分支上合并 `main`，跑 `node scripts/check-transitional-names.mjs --write`，再跑 `pnpm typecheck`。用一个临时分支试过这个流程：分支上新写的 6 处旧名字合并后被检查报出来，`--write` 改掉后检查通过。
+  - **现在开着的别人的 PR 不用对齐**（2026-11-14 核对）：[#92](https://github.com/WakeUp-Jin/actspace-agent/pull/92)、[#93](https://github.com/WakeUp-Jin/actspace-agent/pull/93)、[#96](https://github.com/WakeUp-Jin/actspace-agent/pull/96)、[#97](https://github.com/WakeUp-Jin/actspace-agent/pull/97)、[#98](https://github.com/WakeUp-Jin/actspace-agent/pull/98) 新增的行里都没有旧名字。在本地试着把这个分支合进 #92、#97、#98（另外两个和这个 PR 没有改到同一个文件）：#97 没有冲突，合并后的代码命名检查和文档检查都通过；#92、#98 各有 3 个文件冲突，和只合到 PR 6 时是同样的 3 个，也就是这个 PR 没有多带来冲突。
+  - 「行为不变」是怎么核对的，见 `docs/histories/2026-11/20261114-1300-transitional-names.md`。
 
 ### PR 8：格式化（L1）
 
@@ -162,6 +172,7 @@
 
 - 每个 PR 提交前在本地跑：`./scripts/ci.sh`、`npx -y markdownlint-cli2@0.24.0 "**/*.md"`、`pnpm lint`、`pnpm typecheck`、改到的包的 `pnpm --filter <包> test`、`pnpm check:hot-path-reads`、`pnpm check:scale-tests`、`pnpm check:packages`；改到契约矩阵覆盖的源码时 `pnpm run gen:contract-matrix`。
 - 2026-11-13 起每个 PR 推送前还跑：`pnpm check:desktop-build-graph`、`pnpm run gen:contract-matrix --check`、`pnpm check:docs`、官网的 `pnpm check:site`、`pnpm test:site`、`pnpm build:site`，以及 `pnpm build`。原因见执行记录「遇到的问题」。
+- 2026-11-14 起改到 `apps/cli` 或 CLI 测试夹具的 PR 推送前还跑：`pnpm test:agent-cli:process`、`pnpm package:agent-cli`、`pnpm test:agent-cli:package`。原因：这三步只在「Agent CLI managed package」工作流里跑，不在 `pnpm test:scripts` 里。
 - 每个 PR 推送后看 GitHub 上的 `仓库基础检查` 与 `CI 汇总`，红了就在同一个分支上修。2026-11-13 起，上一个 PR 的 CI 跑完并且通过之后，才给下一个分支建 PR。
 - 栈顶分支上跑一遍完整的 `pnpm -r --if-present --filter '!actspace' test` 与 `pnpm test:scripts`。
 - 手工检查与未覆盖范围写在 `docs/exec-runs/20261110-codebase-review-fixes/execution-summary.md`。
@@ -175,8 +186,8 @@
 - [x] 2026-11-13：三个 PR 同步 `main`（`bf566305`）；修 #85 推送后才发现的两处 CI 失败；修 `main` 上三种让「包测试」随机变红的失败（放在 PR 1）。过程见执行记录步骤 4。同步后 #83 全部检查通过。
 - [x] PR 4：Agent Loop 请求路径。L5、M2（三个提交）、M1 都已落地，过程见执行记录步骤 5。[#94](https://github.com/WakeUp-Jin/actspace-agent/pull/94)，全部检查通过。
 - [x] PR 5：路径安全模块。一份共享实现、逐处替换、一个防止再手写的检查，过程见执行记录步骤 6。[#95](https://github.com/WakeUp-Jin/actspace-agent/pull/95)，全部检查通过。
-- [x] PR 6：类型安全。事件、服务、钩子三组，三个防止再写回去的检查，顺带修两个原有问题，过程见执行记录步骤 7。
-- [ ] PR 7：命名。
+- [x] PR 6：类型安全。事件、服务、钩子三组，三个防止再写回去的检查，顺带修两个原有问题，过程见执行记录步骤 7。[#100](https://github.com/WakeUp-Jin/actspace-agent/pull/100)，全部检查通过。
+- [x] PR 7：命名。`RuntimeV2` 这一类标识符全部改掉，一个防止旧名字回来的检查；`SettingsV4` 这一类和 `LegacyProxyWireEngine` 核对后不改。过程见执行记录步骤 8。
 - [ ] PR 8：格式化。
 - [ ] PR 9（可以不合）：去掉 `tsconfig.base.json` 的 `baseUrl`。
 - [ ] 执行摘要，计划移到 `completed/`。
@@ -238,6 +249,18 @@
 - 2026-11-14：新发现 N1（`tsconfig.base.json` 的 `"baseUrl": "."`）不在 PR 6 里改，放到栈顶单独一个 PR。现象：声明文件里出现 `import("packages/…/dist/x.js")` 这种以仓库根目录为起点的路径（634 个声明文件里 4 处），apps 解析不到，那个类型悄悄变成 `any`，`skipLibCheck` 下不报错。PR 6 里碰到的一处（`ProfileServices`）已经用逐行写明类型绕开，并加了编译期检查。原因：去掉 `baseUrl` 影响全部包的构建配置，要单独验证构建产物逐字节不变；它不在审查的 24 项里，合不合由用户决定，放在栈顶不合也不影响前面的 PR。
 - 2026-11-14：PR 6 的发布记录只有 `session.storage` 那一处修复的两行（已并进 2026-11-10 那一条），其余不写。原因：三组类型改动、三个检查和 lease 的修复都没有用户能直接感知的变化；CLI Agent Host 在 Profile 缺 `agent.runtime` 时改成启动就报错，正常安装里走不到。
 - 2026-11-14：`main` 在 PR 5 建好之后多了一个合并（[#91](https://github.com/WakeUp-Jin/actspace-agent/pull/91)，4 个文件，和这个栈没有重叠，试合没有冲突）。这次不为它单独同步，等栈顶的 PR 建完之后统一同步一次。原因：同步一次要从栈底往上逐层合，每个已有 PR 的 CI 都重跑一遍；合并时每个 PR 本来也要点一次「Update branch」。
+- 2026-11-14：L6 的改名用工具做，工具就是检查脚本带 `--write`，改名的那个提交里没有手改的行。原因：292 个文件的改动没法逐行评审，能评审的是规则、那张表和工具的用例；检查和改名共用一张表，以后别的分支带着旧名字合并进来，同一条命令就能对齐。
+- 2026-11-14：只改标识符，`runtime-v2` 目录名、文件名和引入路径（`@actspace/shared/runtime-v2`）不改。原因：审查条目说的是标识符。路径要改的话是另一种改动：三个目录、110 个带这个名字的文件路径，`@actspace/shared/runtime-v2` 这个引入路径在 303 个文件里出现 394 处，还登记在 `package.json` 的 `exports` 和 Default Harness 的 Host 模块列表里；别的分支新写的 import 合并之后会解析不到，而且没有检查脚本那样的一条命令可以对齐。要不要做由仓库所有者决定，做的话单独一个 PR。
+- 2026-11-14：113 个名字里 107 个只去掉 `V2`，6 个按表改整名。`RuntimeV2RuntimeState` → `RuntimeStateView`：只去 `V2` 得到 `RuntimeRuntimeState`，而 `RuntimeState` 已经是状态取值（`booting`、`ready` 等）的类型名；它是 `RuntimeStateController.view()` 给出的只读视图。`loadRuntimeV2` → `loadRuntimeModule`：只去 `V2` 会和 `@actspace/runtime/loader` 导出的 `loadRuntime` 重名，CLI 的这个函数正是包着它的。CLI 的 `runV2Command`、`RunV2Io`、`bootCliV2`、`CliV2ApprovalBroker`：`V2` 不挨着 `Runtime`，规则认不出，逐个列出。
+- 2026-11-14：`SettingsV4` 这一类不改，L6 的这一部分撤回。原因：它是设置落盘格式的版本号。格式从 `AppSettingsV1`、`AppSettingsV2`、`PersistedSettingsV3` 迁到 `SettingsV4`，迁移代码还在；bridge 上 `get`/`update` 和 `getV4`/`updateV4` 并存，[设置写入一致性](20261007-desktop-settings-write-consistency.md) 那份计划把删掉旧接口列在范围之外。去掉 `V4` 之后新旧两套类型的名字就分不开了。Session 事件的 `SessionEventEnvelopeV1` 这一类同理。
+- 2026-11-14：`LegacyProxyWireEngine` 不改，L6 的这一部分撤回。原因：审查时把它当成「名字带 Legacy 的生产路径」，这是看错了。`agent-llm-core-pi.md` 第 7 节和第 14 节把它定义为 legacy transport，指采用 pi-ai 之前的那条 wire，只在列明的路线上保留（官方 OpenRouter 读原始账单金额、DeepSeek 文件上传），每条路线都写着迁到 pi-ai 要什么证据。名字和设计文档的术语一致，只改类名会让两边对不上。按职责改名要连设计文档的术语一起改，这不是机械改名，由仓库所有者决定。名字里的 `Proxy` 说的是 2026-11-08 之前的选择理由：现在只配了代理的请求不再走这条 wire，引擎里按代理进入的那条路径和它的用例还在。要不要一起整理记在技术债里。
+- 2026-11-14：`DesktopLegacyLlmAdapter` 改名为 `DesktopLlmAdapter`，文件改名为 `llm-adapter.ts`。原因：`apps/desktop` 下实现 `LlmAdapter` 的类只有它一个，类上原来的注释写的就是「文件名等 P15 删掉 v1 源码之后再改」，P15 已经完成。`adapterVersion` 不变。其余带 `Legacy` 的名字说的是旧数据、旧格式和迁移，不改。
+- 2026-11-14：`pnpm check:transitional-names` 按文本匹配整个标识符，注释和字符串里的旧名字也报；要保留的按「文件、名字、处数」记清单，处数多了少了都失败。原因同 PR 5、PR 6 的几个检查。注释和字符串也查，是因为那里的旧名字同样让人去找一个不存在的类型，`scripts/check-ipc-channels.mjs` 里还有一处按名字找常量的字符串，必须跟着常量一起改。清单现在只有一条：浏览器验收脚本里填进输入框再读回来的测试文本。
+- 2026-11-14：文档里的旧名字只查讲现状的：当前事实文档和 `docs/design-docs`，带「旧」「历史」等字样的那一行除外。`docs/histories/`、已完成的计划和执行记录不查也不改。原因：它们记的是当时的名字，改了反而和当时的提交对不上。`docs/learnings`、`docs/coding-standards` 和各包的 README 不在这条规则的范围里，核对过现在没有旧名字。
+- 2026-11-14：PR 7 不写发布记录。原因：没有用户能感知的变化，运行时的差别只有调用栈里的函数名和类名。
+- 2026-11-14：改名让 `@actspace/shared/runtime-v2` 入口文件的内容变化，Host 契约摘要跟着变，不为了保持摘要不变而留旧的导出名。原因：摘要在 PR 5、PR 6 已经变了（7 个入口文件改了 5 个，这次改的是其中一个）；摘要变化的效果是没改过的内置选择自动换到新版本、定制过的 Harness 被拒绝并提示重新准备，而定制的 Harness 如果引用了这三个函数的旧名字，换了 Host 之后本来也加载不了，被拒绝是对的结果。
+- 2026-11-14：检查脚本里「路径在不在仓库里」的判断留一份本地副本，不引用 `@actspace/shared`，记进 `pnpm check:path-containment` 的清单。原因：脚本不引用工作区的包，没构建也要能跑，和 `cordis-adapter` 那一份同理。判断接受传入的路径规则。原因：「另一个盘符」那个条件在 Linux 上走不到，传 `path.win32` 才测得到，否则它是一行没有用例守着的代码。
+- 2026-11-14：变异测试从这次起先跑对照：在整棵源码树的副本上不做任何变异，全部用例必须通过，才开始逐处变异；`TMPDIR` 指到专用目录。原因：PR 7 中途有两次提交的变异结果没有对照，其中一条用例在只有脚本和用例的副本里本来就失败，所以当时「每一处都有用例失败」不能当证据。按新做法重跑之后结论不变。经过见 history，做法补进了 `docs/learnings/2026-07/testing-assertion-poisoned-by-command-echo.md`。
 
 ## 执行模式
 

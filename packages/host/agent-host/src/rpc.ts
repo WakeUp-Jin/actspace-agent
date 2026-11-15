@@ -5,7 +5,7 @@ import { resolveWorkspaceFileReference } from "./node-ports/workspace-file-refer
 import { isDeepStrictEqual } from "node:util";
 import { randomUUID } from "node:crypto";
 import type { AgentApplicationContract } from "@actspace/agent-service";
-import type { RuntimeV2JsonValue, TaskCommand, TaskConfiguration } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue, TaskCommand, TaskConfiguration } from "@actspace/shared/runtime-v2";
 import { HostError, HostRequestError, integerParam, isRecord, stringParam, type HostMethod } from "@actspace/shared/host-protocol";
 import type { HostConfig } from "./config.js";
 import type { HostRequestContext } from "./server.js";
@@ -144,7 +144,7 @@ export class HostRpc {
           rewind = { runId: stringParam(params.rewind, "runId", 128), expectedThroughSeq: integerParam(params.rewind, "expectedThroughSeq", Number.MAX_SAFE_INTEGER) };
         }
         // A rewind replaces the edited Turn; any other submission queues behind the Session's work.
-        const admit = async (content: RuntimeV2JsonValue) => {
+        const admit = async (content: RuntimeJsonValue) => {
           if (!rewind) return app.submitTask(sessionId, submissionId, content, agentRunId);
           try { return await app.rewindAndSubmit(sessionId, rewind, submissionId, content, agentRunId); }
           catch (error) { throw rewindHostError(error) ?? error; }
@@ -163,11 +163,11 @@ export class HostRpc {
         }
         const referencesInput = await validateRunReferences({ inspectSession: id => app.inspectSession(id), readSessionProjection: input => app.readSessionProjection(input), resolveFile: resolveWorkspaceFileReference }, { sessionId, fileReferences: params.fileReferences, responseAnnotations: params.responseAnnotations });
         if (!referencesInput.ok) throw new HostError("FORBIDDEN", `Invalid message reference: ${referencesInput.issue.code}`);
-        const referenceBlocks: RuntimeV2JsonValue[] = [...fileReferenceBlocks(referencesInput.fileReferences), ...responseExcerptBlocks(referencesInput.responseAnnotations)];
+        const referenceBlocks: RuntimeJsonValue[] = [...fileReferenceBlocks(referencesInput.fileReferences), ...responseExcerptBlocks(referencesInput.responseAnnotations)];
         if (!params.content.trim() && ids.length === 0 && !referenceBlocks.length) throw new HostRequestError("Task content is empty");
         if (!ids.length && !referenceBlocks.length) return admit(params.content);
         const references = ids.length ? await uploads.pin(context.deviceId, sessionId, ids as string[], submissionId) : [];
-        const blocks: RuntimeV2JsonValue[] = params.content ? [{ type: "text", text: params.content }, ...referenceBlocks] : [...referenceBlocks];
+        const blocks: RuntimeJsonValue[] = params.content ? [{ type: "text", text: params.content }, ...referenceBlocks] : [...referenceBlocks];
         for (const ref of references) {
           const stored = await uploads.resolve(sessionId, ref.id);
           blocks.push({ type: "artifact", artifact: { artifactId: ref.id, mediaType: stored.mediaType }, label: ref.name });

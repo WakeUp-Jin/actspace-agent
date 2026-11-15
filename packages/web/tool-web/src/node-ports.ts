@@ -1,5 +1,5 @@
 import { lookup } from "node:dns/promises";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
 import { publicAddresses, requestPinned, type PageRequest } from "./public-request.js";
@@ -46,8 +46,8 @@ export function createNodeWebToolPorts(options: NodeWebToolPortsOptions = {}): N
   const resolveHostname = options.resolveHostname ?? resolveHostnameAddresses;
   const requestPage = options.requestPage ?? defaultPageRequest(process.env, fetchImpl);
   const cache = new Map<string, { readonly expiresAt: number; readonly value: string }>();
-  const search = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => webSearch(args, context, options.credentials ?? {}, fetchImpl);
-  const open = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => webFetch(args, context, fetchImpl, requestPage, resolveHostname, cache, options.deepseekFetchApiKey);
+  const search = (args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => webSearch(args, context, options.credentials ?? {}, fetchImpl);
+  const open = (args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => webFetch(args, context, fetchImpl, requestPage, resolveHostname, cache, options.deepseekFetchApiKey);
   return Object.freeze({
     web: (args, context) => args.action === "search" ? search(args, context) : args.action === "open" ? open(args, context) : Promise.resolve(failed("INVALID_ARGUMENTS", "action must be search or open", false)),
     web_search: search,
@@ -59,7 +59,7 @@ export function createNodeWebToolPorts(options: NodeWebToolPortsOptions = {}): N
 type SearchResult = { readonly title: string; readonly url: string; readonly snippet: string; readonly publishedDate?: string };
 type SearchOutcome = { readonly provider?: WebSearchProviderId; readonly results: readonly SearchResult[]; readonly failure?: string };
 
-async function webSearch(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, credentials: WebSearchCredentials, fetchImpl: typeof fetch): Promise<ToolBodyResult> {
+async function webSearch(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext, credentials: WebSearchCredentials, fetchImpl: typeof fetch): Promise<ToolBodyResult> {
   const query = stringArg(args, "query").trim();
   if (!query) return failed("INVALID_ARGUMENTS", "query is required", false);
   const maxResults = clampInteger(args.max_results, 5, 1, 10);
@@ -137,7 +137,7 @@ async function runProviderFallback(candidates: readonly SearchProvider[], query:
   return { results: [], ...(failures.length ? { failure: failures.join("; ") } : {}) };
 }
 
-function normalizeResults(value: RuntimeV2JsonValue | undefined, fields: { readonly url: string; readonly snippet: string; readonly date?: string }, maxResults: number): readonly SearchResult[] {
+function normalizeResults(value: RuntimeJsonValue | undefined, fields: { readonly url: string; readonly snippet: string; readonly date?: string }, maxResults: number): readonly SearchResult[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
     const item = record(entry); const url = stringValue(item?.[fields.url]);
@@ -181,7 +181,7 @@ function formatSearchResults(query: string, lanes: readonly { readonly label: st
 }
 
 async function webFetch(
-  args: Readonly<Record<string, RuntimeV2JsonValue>>,
+  args: Readonly<Record<string, RuntimeJsonValue>>,
   context: ToolExecutionContext,
   fetchImpl: typeof fetch,
   requestPage: PageRequest,
@@ -305,9 +305,9 @@ async function htmlToMarkdown(html: string): Promise<string> {
 function extractHtmlTitle(html: string): string | undefined { const title = html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]?.trim(); return title?.replace(/\s+/g, " "); }
 function combinedSignal(signal: AbortSignal, timeoutMs: number): AbortSignal { return AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]); }
 function safeError(source: string, error: unknown): string { const message = error instanceof Error ? error.message : String(error); return `${source}: ${message.replace(/((?:Bearer|x-api-key|api[_-]?key)\s+)[^\s,]+/gi, "$1[REDACTED]")}`; }
-function record(value: unknown): Readonly<Record<string, RuntimeV2JsonValue>> | undefined { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : undefined; }
-function stringValue(value: RuntimeV2JsonValue | undefined): string | undefined { return typeof value === "string" && value ? value : undefined; }
-function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return stringValue(args[key]) ?? ""; }
-function clampInteger(value: RuntimeV2JsonValue | undefined, fallback: number, min: number, max: number): number { return typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.trunc(value))) : fallback; }
+function record(value: unknown): Readonly<Record<string, RuntimeJsonValue>> | undefined { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : undefined; }
+function stringValue(value: RuntimeJsonValue | undefined): string | undefined { return typeof value === "string" && value ? value : undefined; }
+function stringArg(args: Readonly<Record<string, RuntimeJsonValue>>, key: string): string { return stringValue(args[key]) ?? ""; }
+function clampInteger(value: RuntimeJsonValue | undefined, fallback: number, min: number, max: number): number { return typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.trunc(value))) : fallback; }
 function completed(text: string, summary: string): ToolBodyResult { return { status: "completed", summary, modelOutput: [{ type: "text", text }] }; }
 function failed(code: string, message: string, retryable: boolean): ToolBodyResult { return { status: "failed", summary: message, modelOutput: [{ type: "text", text: message }], failure: { code, message, retryable } }; }

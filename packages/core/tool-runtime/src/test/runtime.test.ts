@@ -3,7 +3,7 @@ import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createCordisRoot, onHook } from "@actspace/cordis-adapter";
-import type { RuntimeV2JsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue, SessionGrant } from "@actspace/shared/runtime-v2";
 import type { ApprovalBroker } from "@actspace/approval";
 import type { ToolDefinition } from "../definition.js";
 import type { ToolBodyResult, ToolCapabilitySet } from "../executor.js";
@@ -67,7 +67,7 @@ function environment(
     commits?: ToolExecutionResult[];
     approvalTimeoutMs?: number;
     permissionEvents?: string[];
-    permissionRecords?: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }>;
+    permissionRecords?: Array<{ type: string; data: Readonly<Record<string, RuntimeJsonValue>> }>;
     sessionGrants?: SessionGrant[];
     sessionGrantCapability?: boolean;
     trustedGrantAudiences?: ReadonlySet<string>;
@@ -178,7 +178,7 @@ describe("Tool Runtime execution contract", () => {
     let requested!: () => void;
     const ready = new Promise<void>(resolve => { requested = resolve; });
     const cleanup = vi.fn(); const execute = vi.fn(async () => success());
-    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeJsonValue>> }> = [];
     const runtime = new ToolRuntime();
     runtime.register({ definition: definition(), executor: { execute }, permission: {
       extractResources: () => [],
@@ -356,7 +356,7 @@ describe("Tool Runtime execution contract", () => {
       },
     });
     const grants: SessionGrant[] = [];
-    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeJsonValue>> }> = [];
     const broker: ApprovalBroker = { async requestApproval(request) {
       expect(request.supportedLifetimes).toEqual(["once", "session"]);
       expect(request.grantSuggestions).toHaveLength(1);
@@ -532,7 +532,7 @@ describe("Tool Runtime execution contract", () => {
           return {
             status: "completed",
             summary: "used token-abcdefgh",
-            modelOutput: [{ type: "json", value: { apiKey: "secret", ok: true } as RuntimeV2JsonValue }],
+            modelOutput: [{ type: "json", value: { apiKey: "secret", ok: true } as RuntimeJsonValue }],
           };
         },
       },
@@ -731,7 +731,7 @@ describe("process Session Grant execution", () => {
   it("issues, reuses and audits a prefix, but asks for other or complex commands and after revocation", async () => {
     const runtime = new ToolRuntime();
     const grants: SessionGrant[] = [];
-    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeJsonValue>> }> = [];
     let calls = 0;
     runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { calls++; return success(); } }, permission: {
       grantAudience: { pluginId: "plugin.test", permissionDomain: "bash", policyVersion: 1 },
@@ -774,7 +774,7 @@ describe("process Session Grant execution", () => {
     } });
     const parentGrant: SessionGrant = { schemaVersion: 1, grantId: "grant-1", sessionId: "parent-1", agentId: "main:parent-1", audience, action: "process.execute", access: "execute",
       selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: workspaceRoot }, sourceRequestId: "request-1", sourceCallId: "call-0", sourceToolName: "bash", issuedAt: new Date().toISOString() } as SessionGrant;
-    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeJsonValue>> }> = [];
     const child = { ...environment([], { sessionGrants: [parentGrant], trustedGrantAudiences: new Set(["plugin.test\u0000bash\u00001"]), permissionRecords: records }),
       sessionGrantCapability: false, sessionGrantOwner: { sessionId: "parent-1", agentId: "main:parent-1" }, approvalUnavailableMessage: "needs approval" };
     const childCall = (id: string, value: string) => ({ ...call(id, { value }), sessionId: "child-1", agentId: "child-1" });

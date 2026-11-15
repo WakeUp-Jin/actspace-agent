@@ -38,7 +38,7 @@ flowchart TD
 
 ## 3. 类型定义
 
-以下为目标 TypeScript 契约。`SessionSurfaceView` 来自现有 Session；`LlmMessage`、`LlmToolDefinition`、`LlmRequestOptions` 来自现有 LLM 服务；`RuntimeV2JsonValue` 为现有 JSON 值类型。本文不复制、改写这些已有类型。
+以下为目标 TypeScript 契约。`SessionSurfaceView` 来自现有 Session；`LlmMessage`、`LlmToolDefinition`、`LlmRequestOptions` 来自现有 LLM 服务；`RuntimeJsonValue` 为现有 JSON 值类型。本文不复制、改写这些已有类型。
 
 ### 3.1 Context 与内容
 
@@ -78,14 +78,14 @@ interface ContextContent {
 ```ts
 interface SystemContext {
   readonly sections: readonly SystemSection[];
-  readonly modelFacts: readonly RuntimeV2JsonValue[];
+  readonly modelFacts: readonly RuntimeJsonValue[];
 }
 
 interface SystemSection {
   readonly id: string;
   readonly owner: string;
   readonly order: number;
-  readonly content: RuntimeV2JsonValue;
+  readonly content: RuntimeJsonValue;
 }
 ```
 
@@ -128,8 +128,8 @@ interface ContextStatus {
     readonly mediaType: string;
     readonly path: string;
   };
-  readonly facts: readonly RuntimeV2JsonValue[];
-  readonly plugins: Readonly<Record<string, RuntimeV2JsonValue>>;
+  readonly facts: readonly RuntimeJsonValue[];
+  readonly plugins: Readonly<Record<string, RuntimeJsonValue>>;
 }
 
 interface ContextPathState {

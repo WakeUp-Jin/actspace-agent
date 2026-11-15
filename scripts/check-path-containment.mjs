@@ -42,6 +42,11 @@ export const ALLOWED = [
     count: 1,
     reason: "构建脚本不引用工作区的包。这里的宽松写法只会多拒绝，旁边另有 isAbsolute 和目录名检查。",
   },
+  {
+    file: "scripts/check-transitional-names.mjs",
+    count: 1,
+    reason: "检查脚本不引用工作区的包（没构建也要能跑），留了一份写法相同的判断，改动时对照 shared 的用例。",
+  },
 ];
 
 const PREFIX_CHECK = /startsWith\(\s*(["'`])\.\.(?:\1|[\\/]|\$\{)/g;

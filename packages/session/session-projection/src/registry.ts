@@ -2,13 +2,13 @@ import { createHash } from "node:crypto";
 import { effectiveSessionEvents, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type {
   ProjectionChange,
-  RuntimeV2JsonValue,
-  RuntimeV2ProjectionKey,
+  RuntimeJsonValue,
+  RuntimeProjectionKey,
   SessionProjectionSnapshot,
 } from "@actspace/shared/runtime-v2";
 
-export type ProjectionDefinition<State, Value extends RuntimeV2JsonValue = RuntimeV2JsonValue> = {
-  readonly key: RuntimeV2ProjectionKey;
+export type ProjectionDefinition<State, Value extends RuntimeJsonValue = RuntimeJsonValue> = {
+  readonly key: RuntimeProjectionKey;
   readonly stateVersion: number;
   readonly init: () => State;
   readonly apply: (state: State, event: SessionEventEnvelopeV1) => State;
@@ -18,7 +18,7 @@ export type ProjectionDefinition<State, Value extends RuntimeV2JsonValue = Runti
 export type ProjectionCheckpoint = {
   readonly throughJournalSeq: number;
   readonly pending: readonly SessionEventEnvelopeV1[];
-  readonly rows: Readonly<Record<string, { readonly stateVersion: number; readonly state: RuntimeV2JsonValue }>>;
+  readonly rows: Readonly<Record<string, { readonly stateVersion: number; readonly state: RuntimeJsonValue }>>;
 };
 
 export type ProjectionSnapshotListener = (change: ProjectionChange) => void;
@@ -48,7 +48,7 @@ export class SessionProjectionRegistry {
 
   constructor(private readonly accepts: (event: SessionEventEnvelopeV1) => boolean = () => true) {}
 
-  register<State, Value extends RuntimeV2JsonValue = RuntimeV2JsonValue>(definition: ProjectionDefinition<State, Value>): () => void {
+  register<State, Value extends RuntimeJsonValue = RuntimeJsonValue>(definition: ProjectionDefinition<State, Value>): () => void {
     if (this.#sealed) throw new Error("Register projection definitions before sealing the runtime registry.");
     validateDefinition(definition as unknown as ProjectionDefinition<unknown>);
     if (this.#definitions.has(definition.key)) throw new TypeError(`Duplicate projection key ${definition.key}.`);
@@ -109,8 +109,8 @@ export class SessionProjectionRegistry {
     if (event.seq !== cell.lastSeq + 1) throw new Error(`Projection event gap for ${sessionId}: expected ${cell.lastSeq + 1}, received ${event.seq}.`);
 
     const nextStates = new Map(cell.states);
-    const changedKeys: RuntimeV2ProjectionKey[] = [];
-    const changedValues: Record<string, RuntimeV2JsonValue> = {};
+    const changedKeys: RuntimeProjectionKey[] = [];
+    const changedValues: Record<string, RuntimeJsonValue> = {};
     const candidate = [...cell.pending, event];
     const effective = effectiveSessionEvents(candidate);
     for (const definition of this.#definitions.values()) {
@@ -176,7 +176,7 @@ export class SessionProjectionRegistry {
     validateSessionId(sessionId);
     const cell = this.#cells.get(sessionId) ?? this.#createCell();
     this.#cells.set(sessionId, cell);
-    const values: Record<string, RuntimeV2JsonValue> = {};
+    const values: Record<string, RuntimeJsonValue> = {};
     for (const definition of this.#definitions.values()) {
       values[definition.key] = sharedView(definition.view(cell.states.get(definition.key)));
     }
@@ -203,7 +203,7 @@ export class SessionProjectionRegistry {
 
   throughSeq(sessionId: string): number { return this.#cells.get(sessionId)?.lastSeq ?? -1; }
 
-  value(sessionId: string, key: string): RuntimeV2JsonValue | undefined {
+  value(sessionId: string, key: string): RuntimeJsonValue | undefined {
     const definition = this.#definitions.get(key);
     const cell = this.#cells.get(sessionId);
     return definition && cell ? sharedView(definition.view(cell.states.get(key))) : undefined;
@@ -211,9 +211,9 @@ export class SessionProjectionRegistry {
 
   checkpoint(sessionId: string): ProjectionCheckpoint {
     const cell = this.#cells.get(sessionId) ?? this.#createCell();
-    const rows: Record<string, { stateVersion: number; state: RuntimeV2JsonValue }> = {};
+    const rows: Record<string, { stateVersion: number; state: RuntimeJsonValue }> = {};
     for (const [key, definition] of this.#definitions) {
-      rows[key] = { stateVersion: definition.stateVersion, state: detached(cell.states.get(key) as RuntimeV2JsonValue) };
+      rows[key] = { stateVersion: definition.stateVersion, state: detached(cell.states.get(key) as RuntimeJsonValue) };
     }
     return { throughJournalSeq: cell.lastSeq, pending: structuredClone(cell.pending), rows };
   }
@@ -295,16 +295,16 @@ function validateEventSequence(events: readonly SessionEventEnvelopeV1[]): void 
  * the conversation) and copying it per change dominated main-process allocation. Readers must not
  * mutate; a write now throws instead of corrupting the next reader.
  */
-function sharedView(value: RuntimeV2JsonValue): RuntimeV2JsonValue {
+function sharedView(value: RuntimeJsonValue): RuntimeJsonValue {
   assertJson(value);
   return immutableState(value);
 }
 
 /** Checkpoint rows leave and enter the registry as independent copies (they are persisted and restored). */
-function detached(value: RuntimeV2JsonValue): RuntimeV2JsonValue {
+function detached(value: RuntimeJsonValue): RuntimeJsonValue {
   assertJson(value);
   if (value === null || typeof value !== "object") return value;
-  return JSON.parse(JSON.stringify(value)) as RuntimeV2JsonValue;
+  return JSON.parse(JSON.stringify(value)) as RuntimeJsonValue;
 }
 
 function assertJson(value: unknown, seen = new Set<object>()): void {

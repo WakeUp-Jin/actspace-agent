@@ -10,7 +10,7 @@ import { ModelStoreService } from "../model-store-service";
 import { ModelRuntimeService } from "../model-runtime-service";
 import { ModelConnectionsService } from "../model-connections-service";
 import type { ProviderNetworkService } from "../runtime-v2/provider-network-service";
-import { thinkingLevelOptions } from "../runtime-v2/legacy-llm-adapter";
+import { thinkingLevelOptions } from "../runtime-v2/llm-adapter";
 
 const roots: string[] = [];
 const crypto: SecretCrypto = { isAvailable: async () => true, encrypt: async (text) => Buffer.from(text), decrypt: async (data) => data.toString() };

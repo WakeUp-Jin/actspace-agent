@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { coreEvent, type CoreEventDataMap, type RuntimeV2AgentMode, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
+import { coreEvent, type CoreEventDataMap, type RuntimeAgentMode, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeHostDescriptor } from "@actspace/shared/runtime-v2";
 import { ContextEngine, surfaceMessage, requestRecords, describeContextContent, type RequestRecords, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context-engine";
 import { estimateMessage, estimateRequestInput } from "@actspace/shared";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
@@ -23,7 +23,7 @@ import { ACTSPACE_SERVICE_IDS, getService, serviceView, type CordisContext, type
 import type { AgentRequestPlan, AgentRequestRecovery } from "./hooks.js";
 import { toolBatchOutputChars } from "./tool-output-budget.js";
 
-export type RunTurnInput = { readonly content: RuntimeV2JsonValue; readonly messageId?: string; readonly agentRunId?: string; readonly model?: string; readonly mode?: RuntimeV2AgentMode; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly keepPendingOnAbort?: boolean; readonly selectedSkillIds?: readonly string[];
+export type RunTurnInput = { readonly content: RuntimeJsonValue; readonly messageId?: string; readonly agentRunId?: string; readonly model?: string; readonly mode?: RuntimeAgentMode; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly keepPendingOnAbort?: boolean; readonly selectedSkillIds?: readonly string[];
   /** Host wake turn: no user message; the first Step claims pending background notifications. */
   readonly wake?: boolean };
 type LiveIdentity = {
@@ -42,7 +42,7 @@ type StreamPayload =
 export type AgentLoopLiveEvent = LiveIdentity & (
   | (StreamPayload & { readonly requestId: string; readonly messageId: string })
   | { readonly kind: "run-state"; readonly message: string; readonly requestId?: string; readonly model?: string; readonly failure?: LlmFailure }
-  | { readonly kind: "tool-prepared"; readonly requestId: string; readonly callId: string; readonly name: string; readonly arguments: RuntimeV2JsonValue }
+  | { readonly kind: "tool-prepared"; readonly requestId: string; readonly callId: string; readonly name: string; readonly arguments: RuntimeJsonValue }
   | { readonly kind: "tool-started"; readonly requestId: string; readonly callId: string; readonly name: string }
   | { readonly kind: "tool-finished"; readonly requestId: string; readonly callId: string; readonly name: string; readonly result: ToolExecutionResult; readonly resultEventId: string }
   | { readonly kind: "compaction-started" }
@@ -58,7 +58,7 @@ type StepRequestInput = {
   readonly agentRunId: string;
   readonly turnId: string;
   readonly stepId: string;
-  readonly mode: RuntimeV2AgentMode;
+  readonly mode: RuntimeAgentMode;
   readonly modeRevision: number;
   readonly configuration: LoopExecutionConfiguration;
   readonly tools: readonly LlmToolDefinition[];
@@ -97,13 +97,13 @@ export type AgentLoopOptions = {
   readonly contextSources: ContextSourceRegistry;
   readonly contextExtensions?: () => readonly ContextSource[];
   readonly createContextEngine?: (options: ContextEngineOptions) => ContextEngine;
-  readonly modeRuntime?: (mode: RuntimeV2AgentMode) => Promise<{ readonly compaction?: ContextCompactor }>;
+  readonly modeRuntime?: (mode: RuntimeAgentMode) => Promise<{ readonly compaction?: ContextCompactor }>;
   readonly llm: LlmServiceContract;
   readonly tools: ToolRuntimeContract;
   readonly toolEnvironment: (session: SessionHandle) => Omit<ToolPreparedEnvironment, "journal">;
   readonly compositionDigest: string;
   readonly hostCapabilityDigest: string;
-  readonly host: RuntimeV2HostDescriptor;
+  readonly host: RuntimeHostDescriptor;
   readonly allowedToolNames?: ReadonlySet<string>;
   readonly toolScopeToken?: object;
   readonly compaction?: ContextCompactor;
@@ -169,7 +169,7 @@ export class AgentLoop {
         const preStep = await this.#events.waterfall("agent/pre-step", preStepInput, () => preStepInput);
         this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "step-started" });
         // 监听器的返回值只确认是对象，里面的值没有逐个检查。
-        await this.options.session.append(coreEvent("step/start", { turnId, stepId, agentRunId, stepIndex: stepCount, ...(isRecord(preStep) ? { metadata: preStep as RuntimeV2JsonValue } : {}) }));
+        await this.options.session.append(coreEvent("step/start", { turnId, stepId, agentRunId, stepIndex: stepCount, ...(isRecord(preStep) ? { metadata: preStep as RuntimeJsonValue } : {}) }));
         // 最后一步（main 与 subagent 一样）不给工具，留给总结，避免步数打满后没有任何回复。
         const budgetSummary = stepCount === this.options.descriptor.maxSteps;
         const step: StepRequestInput = { agentRunId, turnId, stepId, mode, modeRevision, configuration, tools: budgetSummary ? [] : this.toolDefinitions(mode), budgetSummary, compaction, signal: controller.signal };
@@ -307,7 +307,7 @@ export class AgentLoop {
       surface: this.options.session.journal.surface.entries.map((entry) => surfaceMessage(entry.node)),
       hostFacts: { agentRunId: step.agentRunId, agentMode: mode, hostKind: this.options.host.hostKind, invocationId: this.options.host.invocationId, workspaceRoot: this.options.session.header.cwd ?? this.options.host.workspaceRef ?? this.options.toolEnvironment(this.options.session).workspaceRoot },
       selectedSkillIds: Object.freeze(mode === "chat" ? [] : [...(configuration.selectedSkillIds ?? [])]),
-    }, step.tools as unknown as RuntimeV2JsonValue[], target);
+    }, step.tools as unknown as RuntimeJsonValue[], target);
     const requestId = randomUUID();
     let converted = await this.contextInput(candidate, requestId, { cacheRetention: mode === "chat" ? "long" : "short", ...(configuration.thinkingEnabled === undefined ? {} : { reasoning: configuration.thinkingEnabled }), ...(configuration.reasoningEffort === undefined ? {} : { reasoningEffort: configuration.reasoningEffort }) }, runtime);
     let llmInput = converted.input;
@@ -335,8 +335,8 @@ export class AgentLoop {
       const estimate = this.checkContextCapacity({ ...converted.input, messages: prepared.request.messages, tools: prepared.request.tools, options: prepared.request.options }, prepared.request.contextWindow ?? null, () => prepared.release());
       const contextWindow = prepared.request.contextWindow ?? null;
       converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${prepared.request.routeId}/${prepared.request.model}`, label: prepared.request.model, contextWindow, autoCompactAtTokens: step.compaction?.threshold?.(contextWindow) ?? null }) };
-      const metadata: PreparedRequestMetadata = { route: prepared.request.routeId, model: prepared.request.model, registrationId: origin.registration.registrationId, adapterVersion: origin.registration.adapter.adapterVersion, defaults: origin.request.options as RuntimeV2JsonValue, retryPolicy: retryPolicySnapshot(origin.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY) as unknown as RuntimeV2JsonValue, contextWindow };
-      const records = requestRecords(converted.context, { ...prepared.request, sessionId }, metadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest);
+      const metadata: PreparedRequestMetadata = { route: prepared.request.routeId, model: prepared.request.model, registrationId: origin.registration.registrationId, adapterVersion: origin.registration.adapter.adapterVersion, defaults: origin.request.options as RuntimeJsonValue, retryPolicy: retryPolicySnapshot(origin.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY) as unknown as RuntimeJsonValue, contextWindow };
+      const records = requestRecords(converted.context, { ...prepared.request, sessionId }, metadata as unknown as RuntimeJsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest);
       await converted.engine.bindRequest(converted.context);
       await this.options.session.append(coreEvent("request/header", { requestId, turnId, stepId, routeId: prepared.request.routeId, model: prepared.request.model, contextWindow, attempt, agentMode: mode, agentModeRevision: step.modeRevision }));
       await this.appendRequestRecords(records, { requestId, turnId, stepId });
@@ -348,13 +348,13 @@ export class AgentLoop {
     }
   }
 
-  private candidate(input: import("@actspace/prompt").AssemblyInput, tools: readonly RuntimeV2JsonValue[], requestOptions: RuntimeV2JsonValue): import("@actspace/prompt").LogicalRequestCandidate {
+  private candidate(input: import("@actspace/prompt").AssemblyInput, tools: readonly RuntimeJsonValue[], requestOptions: RuntimeJsonValue): import("@actspace/prompt").LogicalRequestCandidate {
     input.scope.assertActive();
     return { sessionId: input.sessionId, turnId: input.turnId, stepId: input.stepId, messages: input.surface, tools, requestOptions,
       systemSections: [], modelFacts: [], facts: [{ host: input.hostFacts }], renderedSystemPrompt: "", contributorProvenance: [] };
   }
 
-  private async contextInput(candidate: import("@actspace/prompt").LogicalRequestCandidate, requestId: string, options: import("@actspace/llm-service").LlmRequestOptions, runtime: { mode: RuntimeV2AgentMode; selectedSkillIds: readonly string[]; budgetSummary: boolean }) {
+  private async contextInput(candidate: import("@actspace/prompt").LogicalRequestCandidate, requestId: string, options: import("@actspace/llm-service").LlmRequestOptions, runtime: { mode: RuntimeAgentMode; selectedSkillIds: readonly string[]; budgetSummary: boolean }) {
     const model = isRecord(candidate.requestOptions) && typeof candidate.requestOptions.model === "string" ? candidate.requestOptions.model : this.options.descriptor.model;
     const request = { sessionId: candidate.sessionId, logicalAgentScopeId: this.options.agentSubject?.agentId ?? this.options.scope.agentId, turnId: candidate.turnId, stepId: candidate.stepId, requestId,
       routeId: isRecord(candidate.requestOptions) && typeof candidate.requestOptions.routeId === "string" ? candidate.requestOptions.routeId : this.options.descriptor.routeId, model, options };
@@ -376,7 +376,7 @@ export class AgentLoop {
     return { context, engine, input: await engine.toLlmInput(context) };
   }
 
-  private toolDefinitions(mode: RuntimeV2AgentMode): readonly LlmToolDefinition[] {
+  private toolDefinitions(mode: RuntimeAgentMode): readonly LlmToolDefinition[] {
     const available = this.options.tools.registry.listDefinitions();
     const modeTools = this.options.descriptor.kind === "subagent"
       ? new Set(available.map(definition => definition.name))
@@ -385,7 +385,7 @@ export class AgentLoop {
       .filter((definition) => modeTools.has(definition.name)
         && (this.options.toolScopeToken === undefined || this.options.descriptor.kind === "subagent" || this.options.scope.tools.get(definition.name)?.value === definition.pluginId)
         && (this.options.allowedToolNames?.has(definition.name) ?? true))
-      .map((definition) => ({ name: definition.name, definitionVersion: definition.definitionVersion, definitionDigest: definition.definitionDigest, description: definition.description, inputSchema: definition.inputSchema as RuntimeV2JsonValue }));
+      .map((definition) => ({ name: definition.name, definitionVersion: definition.definitionVersion, definitionDigest: definition.definitionDigest, description: definition.description, inputSchema: definition.inputSchema as RuntimeJsonValue }));
   }
   /** 提示词、工具与日志里最近一条 digest 不同时才写；比较对象是日志，所以恢复会话后不会重写（agent-spec-request-record.md §3）。 */
   private async appendRequestRecords(records: RequestRecords, ids: { requestId: string; turnId: string; stepId: string }): Promise<void> {
@@ -412,7 +412,7 @@ export class AgentLoop {
    * 这一批工具调用给模型的输出合计最多多少字符（见 toolBatchOutputChars）。窗口大小未知时返回 undefined。
    * 每个有工具调用的 Step 算一次：只估算系统提示词、工具定义和这条助手消息，对话消息只按角色筛一遍、不读内容。
    */
-  private toolBatchOutputChars(request: { readonly messages: readonly LlmMessage[]; readonly tools: readonly LlmToolDefinition[]; readonly options: { readonly maxTokens?: number }; readonly contextWindow?: number | null }, requestEstimate: number | null, output: { readonly content: readonly LlmContentBlock[]; readonly usage: RuntimeV2JsonValue }): number | undefined {
+  private toolBatchOutputChars(request: { readonly messages: readonly LlmMessage[]; readonly tools: readonly LlmToolDefinition[]; readonly options: { readonly maxTokens?: number }; readonly contextWindow?: number | null }, requestEstimate: number | null, output: { readonly content: readonly LlmContentBlock[]; readonly usage: RuntimeJsonValue }): number | undefined {
     const contextWindow = request.contextWindow ?? null;
     if (contextWindow === null || requestEstimate === null) return undefined;
     const assistant = estimateMessage(output.content);
@@ -533,18 +533,18 @@ export class AgentLoop {
 
 type CollectedToolCall = { readonly callId: string; readonly name: string; readonly arguments: string };
 type StreamDelta = { readonly messageId: string; readonly live: StreamPayload };
-async function collectStream(stream: AsyncIterable<LlmStreamEvent>, signal: AbortSignal, emit: (event: StreamDelta) => void | Promise<void>): Promise<{ messageId: string; text: string; content: readonly LlmContentBlock[]; toolCalls: readonly CollectedToolCall[]; usage: RuntimeV2JsonValue; stopReason: string | null; failure: LlmFailure | null; aborted: boolean; sawObservableDelta: boolean; firstTokenAt: string | null }> {
+async function collectStream(stream: AsyncIterable<LlmStreamEvent>, signal: AbortSignal, emit: (event: StreamDelta) => void | Promise<void>): Promise<{ messageId: string; text: string; content: readonly LlmContentBlock[]; toolCalls: readonly CollectedToolCall[]; usage: RuntimeJsonValue; stopReason: string | null; failure: LlmFailure | null; aborted: boolean; sawObservableDelta: boolean; firstTokenAt: string | null }> {
   const messageId = randomUUID();
   let firstTokenAt: string | null = null;
   const observed = (delta: string) => { if (delta.length > 0 && firstTokenAt === null) firstTokenAt = new Date().toISOString(); return delta.length > 0; };
-  let text = ""; let content: readonly LlmContentBlock[] = []; let usage: RuntimeV2JsonValue = {}; let stopReason: string | null = null; let failure: LlmFailure | null = null; let aborted = false; let sawObservableDelta = false; const calls = new Map<string, CollectedToolCall>();
+  let text = ""; let content: readonly LlmContentBlock[] = []; let usage: RuntimeJsonValue = {}; let stopReason: string | null = null; let failure: LlmFailure | null = null; let aborted = false; let sawObservableDelta = false; const calls = new Map<string, CollectedToolCall>();
   try {
     for await (const event of stream) {
       if (event.type === "text-delta") { sawObservableDelta = observed(event.text) || sawObservableDelta; text += event.text; await emit({ messageId, live: { kind: "assistant-delta", message: event.text } }); }
       if (event.type === "reasoning-delta") { sawObservableDelta = observed(event.text) || sawObservableDelta; await emit({ messageId, live: { kind: "reasoning-delta", message: event.text } }); }
       if (event.type === "tool-call-delta") { sawObservableDelta = observed(event.argumentsDelta) || sawObservableDelta; const prior = calls.get(event.callId); calls.set(event.callId, { callId: event.callId, name: event.name || prior?.name || "", arguments: `${prior?.arguments ?? ""}${event.argumentsDelta}` }); await emit({ messageId, live: { kind: "tool-call-delta", callId: event.callId, name: event.name || prior?.name || "", argumentsDelta: event.argumentsDelta } }); }
-      if (event.type === "done") { usage = event.usage as unknown as RuntimeV2JsonValue; stopReason = event.stopReason; content = event.content; for (const block of event.content) if (block.type === "tool-call") calls.set(block.callId, { callId: block.callId, name: block.name, arguments: block.arguments }); }
-      if ((event.type === "error" || event.type === "aborted") && event.usage) usage = event.usage as unknown as RuntimeV2JsonValue;
+      if (event.type === "done") { usage = event.usage as unknown as RuntimeJsonValue; stopReason = event.stopReason; content = event.content; for (const block of event.content) if (block.type === "tool-call") calls.set(block.callId, { callId: block.callId, name: block.name, arguments: block.arguments }); }
+      if ((event.type === "error" || event.type === "aborted") && event.usage) usage = event.usage as unknown as RuntimeJsonValue;
       if (event.type === "error") failure = event.failure;
       if (event.type === "aborted") { failure = { kind: "abort", message: event.reason, retryable: false, attempt: 1 }; aborted = true; }
       if (signal.aborted) { failure = { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 }; aborted = true; break; }
@@ -577,8 +577,8 @@ function normalizeLlmFailure(error: unknown, attempt: number): LlmFailure {
 function failedStreamOutput(failure: LlmFailure): Awaited<ReturnType<typeof collectStream>> {
   return { messageId: randomUUID(), text: "", content: Object.freeze([]), toolCalls: Object.freeze([]), usage: {}, stopReason: null, failure, aborted: failure.kind === "abort", sawObservableDelta: false, firstTokenAt: null };
 }
-function parseArgs(value: string): RuntimeV2JsonValue { try { const parsed = JSON.parse(value); return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}; } catch { return {}; } }
-function currentAgentModeRevision(events: readonly { readonly type: string; readonly data: RuntimeV2JsonValue }[]): number {
+function parseArgs(value: string): RuntimeJsonValue { try { const parsed = JSON.parse(value); return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}; } catch { return {}; } }
+function currentAgentModeRevision(events: readonly { readonly type: string; readonly data: RuntimeJsonValue }[]): number {
   for (let index = events.length - 1; index >= 0; index--) {
     const event = events[index];
     if (event.type === "agent/mode-set" && isRecord(event.data) && typeof event.data.revision === "number") return event.data.revision;
@@ -603,9 +603,9 @@ function requestRecoveryOf(value: unknown): AgentRequestRecovery | undefined {
   if (value.kind === "retry") return { kind: "retry", delayMs: typeof value.delayMs === "number" ? value.delayMs : undefined };
   return undefined;
 }
-function compactionUsage(value: RuntimeV2JsonValue, contextWindow: number | null): import("@actspace/context-engine").CompactionUsage | null {
+function compactionUsage(value: RuntimeJsonValue, contextWindow: number | null): import("@actspace/context-engine").CompactionUsage | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
-  const record = value as Readonly<Record<string, RuntimeV2JsonValue>>;
+  const record = value as Readonly<Record<string, RuntimeJsonValue>>;
   const inputTokens = record.inputTokens; const outputTokens = record.outputTokens;
   if (typeof inputTokens !== "number" || typeof outputTokens !== "number") return null;
   const cacheRead = typeof record.cacheReadTokens === "number" ? record.cacheReadTokens : 0;

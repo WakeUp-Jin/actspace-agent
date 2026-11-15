@@ -1,15 +1,15 @@
 export type {
-  RuntimeV2DiagnosticCode,
-  RuntimeV2DiagnosticDetails,
-  RuntimeV2DiagnosticSeverity,
-  RuntimeV2HostCapability,
-  RuntimeV2HostCapabilityCeiling,
-  RuntimeV2HostDescriptor,
-  RuntimeV2HostDiagnostic,
-  RuntimeV2HostKind,
-  RuntimeV2HostRequestContext,
-  RuntimeV2JsonPrimitive,
-  RuntimeV2JsonValue,
+  RuntimeDiagnosticCode,
+  RuntimeDiagnosticDetails,
+  RuntimeDiagnosticSeverity,
+  RuntimeHostCapability,
+  RuntimeHostCapabilityCeiling,
+  RuntimeHostDescriptor,
+  RuntimeHostDiagnostic,
+  RuntimeHostKind,
+  RuntimeHostRequestContext,
+  RuntimeJsonPrimitive,
+  RuntimeJsonValue,
 } from "@actspace/shared/runtime-v2";
 export * from "./startup/boot.js";
 export * from "./startup/errors.js";

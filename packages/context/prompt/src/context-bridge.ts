@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { Context, ContextRequest } from "@actspace/context-engine";
 import { surfaceMessage } from "@actspace/context-engine";
 import type { SessionSurfaceView, SessionSurfaceNodeV1 } from "@actspace/session-journal";
@@ -11,7 +11,7 @@ export function contextFromCandidate(request: ContextRequest, candidate: Logical
   const conversation: SessionSurfaceView = unchanged ? surface : {
     replaceGeneration: surface.replaceGeneration,
     entries: candidate.messages.map((value, index) => {
-      const record = value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {};
+      const record = value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : {};
       const messageId = `legacy-contributor-${index}`;
       const node: SessionSurfaceNodeV1 = record.role === "tool" && typeof record.callId === "string"
         ? { kind: "tool-result", messageId, callId: record.callId, content: record.content ?? null, isError: record.isError === true }

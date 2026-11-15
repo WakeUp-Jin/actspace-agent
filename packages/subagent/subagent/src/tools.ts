@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { AgentScope } from "@actspace/scope";
 import type { JsonSchema, ToolBodyResult, ToolDefinition, ToolExecutionContext, ToolRuntimeContract } from "@actspace/tool-runtime";
 import {
@@ -75,7 +75,7 @@ export function registerSubagentTools(runtime: ToolRuntimeContract, port: Subage
     register("list_subagent_models", LIST_SUBAGENT_MODELS_DESCRIPTION, {}, [], (_args, context) => port.listModels(caller(context))),
   ]);
 
-  function register(name: string, description: string, properties: Record<string, JsonSchema>, required: readonly string[], run: (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<SubagentToolOutcome>): SubagentToolRegistration {
+  function register(name: string, description: string, properties: Record<string, JsonSchema>, required: readonly string[], run: (args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<SubagentToolOutcome>): SubagentToolRegistration {
     const definition: ToolDefinition = Object.freeze({
       abiVersion: 2, pluginId: SUBAGENT_TOOL_PLUGIN_ID, name, definitionVersion: 2, description,
       inputSchema: { type: "object", properties, required: [...required], additionalProperties: false },
@@ -124,4 +124,4 @@ function toResult(name: string, outcome: SubagentToolOutcome): ToolBodyResult {
   return { status: "completed", summary: `${name} completed`, modelOutput: [{ type: "text", text: outcome.text }], ...(outcome.detail ? { detail: outcome.detail } : {}) };
 }
 
-function text(value: RuntimeV2JsonValue | undefined): string { return typeof value === "string" ? value.trim() : ""; }
+function text(value: RuntimeJsonValue | undefined): string { return typeof value === "string" ? value.trim() : ""; }

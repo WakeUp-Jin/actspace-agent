@@ -205,7 +205,7 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
     readonly scope: AgentScope;
     readonly budget?: Parameters<RunFactory["create"]>[0]["budget"];
     readonly inputSource: import("@actspace/agent-loop").LoopInputSource;
-    readonly mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode;
+    readonly mode: import("@actspace/shared/runtime-v2").RuntimeAgentMode;
   }): Promise<AgentLoopAssembly> => {
     resolveMainAgentPreset(session.header.createdWith.presetId);
     const descriptor = Object.freeze({ ...MAIN_AGENT_DESCRIPTOR, routeId: mainRouteId() });
@@ -319,7 +319,7 @@ export function apply(ctx: CordisContext): void {
   ctx.provide?.("agent.run-factory", factory.runFactory satisfies ServiceOf<typeof RUN_FACTORY>);
 }
 
-function taskContent(content: import("@actspace/shared/runtime-v2").RuntimeV2JsonValue) {
+function taskContent(content: import("@actspace/shared/runtime-v2").RuntimeJsonValue) {
   return content && typeof content === "object" && !Array.isArray(content) && "kind" in content && content.kind === "composer-task" ? content.prepared : content;
 }
 

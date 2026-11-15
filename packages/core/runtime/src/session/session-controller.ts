@@ -1,9 +1,9 @@
 import { GlobalSessionIndex, SessionProjectionCache, createHistoryIndex, indexHistoryEvent, indexHistoryEvents, type HistoryIndex, type ProjectionCacheRead } from "@actspace/session-projection-cache";
-import type { RuntimeV2DesktopSessionProjection, RuntimeV2SessionProjectionInput, RuntimeV2SessionUpdate, RuntimeV2ProjectionValues, RuntimeV2JsonValue, RuntimeV2SessionObservation, RuntimeV2ReadModelWatermarks, RuntimeV2WindowSupportFact } from "@actspace/shared/runtime-v2";
+import type { RuntimeDesktopSessionProjection, RuntimeSessionProjectionInput, RuntimeSessionUpdate, RuntimeProjectionValues, RuntimeJsonValue, RuntimeSessionObservation, RuntimeReadModelWatermarks, RuntimeWindowSupportFact } from "@actspace/shared/runtime-v2";
 import { randomUUID } from "node:crypto";
 import { agentFormComposition } from "@actspace/agent";
 import { MAIN_AGENT_FORM } from "../main-agent-form.js";
-import type { RuntimeV2SessionListItem, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeSessionListItem, RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
 import type { MainAgentForm } from "@actspace/shared/runtime-v2";
 import { coreEvent, surfaceNode } from "@actspace/shared/runtime-v2";
 import type { EventCodecRegistry, SessionJournal } from "@actspace/session-journal";
@@ -26,8 +26,8 @@ export class RuntimeSessionController {
   readonly #models = new Map<string, SessionReadModel>();
   /** 打开中的会话的位置索引（见 `liveIndex`），按日志对象存：重写或重新打开后的会话是另一份日志，旧索引跟着旧日志一起回收。 */
   readonly #liveIndexes = new WeakMap<SessionJournal, { readonly index: HistoryIndex; through: number }>();
-  readonly #changes = new Map<string, Map<number, RuntimeV2ProjectionValues>>();
-  readonly #projectionListeners = new Set<(update: RuntimeV2SessionUpdate) => void>();
+  readonly #changes = new Map<string, Map<number, RuntimeProjectionValues>>();
+  readonly #projectionListeners = new Set<(update: RuntimeSessionUpdate) => void>();
   /** Recency of open Sessions, oldest first; a touch moves a Session to the end. */
   readonly #recent = new Map<string, true>();
   readonly #pins = new Set<(sessionId: string) => boolean>();
@@ -40,12 +40,12 @@ export class RuntimeSessionController {
   #sweepQueued = false;
   #disposed = false;
   readonly #cache: SessionProjectionCache;
-  readonly #coldModels = new WeakMap<ProjectionCacheRead, { readonly model: SessionReadModel; readonly snapshot: RuntimeV2SessionSnapshot }>();
+  readonly #coldModels = new WeakMap<ProjectionCacheRead, { readonly model: SessionReadModel; readonly snapshot: RuntimeSessionSnapshot }>();
   readonly #globalIndex: GlobalSessionIndex;
   #globalIndexBuild: Promise<void> | undefined;
   #globalIndexReady = false;
 
-  subscribeProjection(listener: (update: RuntimeV2SessionUpdate) => void): () => void { this.#projectionListeners.add(listener); return () => { this.#projectionListeners.delete(listener); }; }
+  subscribeProjection(listener: (update: RuntimeSessionUpdate) => void): () => void { this.#projectionListeners.add(listener); return () => { this.#projectionListeners.delete(listener); }; }
 
   /**
    * 内存里正在写的会话：主会话（`#open`）或外部登记的子 Agent 会话（`#external`）。
@@ -90,7 +90,7 @@ export class RuntimeSessionController {
     return entry.index;
   }
 
-  private async readModel(sessionId: string): Promise<{ model: SessionReadModel; snapshot: RuntimeV2SessionSnapshot; read?: ProjectionCacheRead }> {
+  private async readModel(sessionId: string): Promise<{ model: SessionReadModel; snapshot: RuntimeSessionSnapshot; read?: ProjectionCacheRead }> {
     const live = this.liveSession(sessionId);
     if (live) { const model = this.liveModel(live); return { model, snapshot: model.snapshot(live.journal.validation.accessState) }; }
     const read = await this.#cache.read(sessionId);
@@ -106,14 +106,14 @@ export class RuntimeSessionController {
   }
 
   /** Summaries are disposable; each controller rebuilds them from its selected storage. */
-  private async repairGlobalIndex(snapshot: RuntimeV2SessionSnapshot, profileId: string): Promise<void> {
+  private async repairGlobalIndex(snapshot: RuntimeSessionSnapshot, profileId: string): Promise<void> {
     if (!this.#globalIndexReady) return;
     const indexed = this.#globalIndex.get(snapshot.sessionId);
     if (indexed !== undefined && indexed.throughJournalSeq >= snapshot.throughJournalSeq) return;
     this.#globalIndex.replace(this.summary(snapshot, profileId));
   }
 
-  private summary(snapshot: RuntimeV2SessionSnapshot, profileId: string): import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary {
+  private summary(snapshot: RuntimeSessionSnapshot, profileId: string): import("@actspace/shared/runtime-v2").RuntimeGlobalSessionSummary {
     return { sessionId: snapshot.sessionId, throughJournalSeq: snapshot.throughJournalSeq, summaryVersion: 2, createdAt: snapshot.createdAt, updatedAt: snapshot.updatedAt, workspaceRoot: snapshot.workspaceRoot, ...(snapshot.worktree ? { worktree: snapshot.worktree } : {}), profileId, agentForm: snapshot.agentForm, agentFormId: snapshot.agentFormId, agentMode: snapshot.agentMode, agentModeRevision: snapshot.agentModeRevision, title: snapshot.metadata.title, pinned: snapshot.metadata.pinned, archived: snapshot.metadata.archived, completedTurnCount: snapshot.activity.completedTurnCount, usage: snapshot.usage, accessState: snapshot.accessState, lineage: snapshot.lineage };
   }
 
@@ -121,7 +121,7 @@ export class RuntimeSessionController {
     if (this.#globalIndexReady) return;
     if (this.#globalIndexBuild) return this.#globalIndexBuild;
     this.#globalIndexBuild = (async () => {
-      const summaries = [] as import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[];
+      const summaries = [] as import("@actspace/shared/runtime-v2").RuntimeGlobalSessionSummary[];
         for (const sessionId of await this.store.listSessionIds()) {
           try { const { snapshot, model } = await this.readModel(sessionId); summaries.push(this.summary(snapshot, model.header.createdWith.profileId)); }
           catch { /* corrupt sessions remain visible through the failed count */ }
@@ -132,7 +132,7 @@ export class RuntimeSessionController {
     return this.#globalIndexBuild;
   }
 
-  async readProjection(input: RuntimeV2SessionProjectionInput): Promise<RuntimeV2DesktopSessionProjection> {
+  async readProjection(input: RuntimeSessionProjectionInput): Promise<RuntimeDesktopSessionProjection> {
     const source = await this.readModel(input.sessionId);
     const { model, snapshot, read } = source;
     const live = this.liveSession(input.sessionId);
@@ -213,7 +213,7 @@ export class RuntimeSessionController {
     };
     const projectionValues = model.projections.snapshot(input.sessionId).values;
     const values = publicValues(projectionValues);
-    const support: RuntimeV2WindowSupportFact[] = [];
+    const support: RuntimeWindowSupportFact[] = [];
     const surface = projectionValues.surface;
     if (surface && typeof surface === "object" && !Array.isArray(surface) && typeof (surface as Record<string, unknown>).replaceGeneration === "number") support.push({ kind: "surface", replaceGeneration: (surface as Record<string, number>).replaceGeneration });
     for (const [callId, call] of calls) support.push({ kind: "tool-call", callId, eventSeqs: call.eventSeqs });
@@ -223,7 +223,7 @@ export class RuntimeSessionController {
       window: { events: boundedJournal, fromSeq: windowFrom, throughJournalSeq: until - 1, beforeSeq: windowFrom > 0 ? windowFrom : null, turnOffset, requestOffset, support, deferredDetails: deferredToolCalls.map(callId => ({ sessionId: input.sessionId, callId, kind: "tool" as const })) } };
   }
 
-  async readObservation(input: RuntimeV2SessionProjectionInput): Promise<RuntimeV2SessionObservation> {
+  async readObservation(input: RuntimeSessionProjectionInput): Promise<RuntimeSessionObservation> {
     const envelope = await this.readProjection(input);
     const projection = Object.freeze({ kind: "session-projection" as const, schemaVersion: 1 as const, sessionId: envelope.sessionId, throughJournalSeq: envelope.throughJournalSeq, values: envelope.values });
     return Object.freeze({ kind: "session-observation" as const, schemaVersion: 1 as const, sessionId: envelope.sessionId, projection, snapshot: envelope.snapshot, window: envelope.window, activeMessageIds: envelope.activeMessageIds, deferredToolCalls: envelope.deferredToolCalls, watermarks: envelope.watermarks ?? watermarksFor(this.#open.get(input.sessionId), envelope.throughJournalSeq, envelope.window.throughJournalSeq) });
@@ -249,7 +249,7 @@ export class RuntimeSessionController {
         try { await this.readModel(id); } catch { /* Keep unreadable sessions in the failed count; retry on the next browse. */ }
       }
     }
-    const items: RuntimeV2SessionListItem[] = this.#globalIndex.values().map(summary => ({ sessionId: summary.sessionId, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, ...(summary.worktree ? { worktree: summary.worktree } : {}), profileId: summary.profileId, agentForm: summary.agentForm ?? "agent", agentFormId: summary.agentFormId, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, accessState: summary.accessState, metadata: { title: summary.title, pinned: summary.pinned, archived: summary.archived }, lineage: summary.lineage, completedTurnCount: summary.completedTurnCount }));
+    const items: RuntimeSessionListItem[] = this.#globalIndex.values().map(summary => ({ sessionId: summary.sessionId, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, ...(summary.worktree ? { worktree: summary.worktree } : {}), profileId: summary.profileId, agentForm: summary.agentForm ?? "agent", agentFormId: summary.agentFormId, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, accessState: summary.accessState, metadata: { title: summary.title, pinned: summary.pinned, archived: summary.archived }, lineage: summary.lineage, completedTurnCount: summary.completedTurnCount }));
     const known = new Set(items.map(item => item.sessionId));
     const failed = ids.filter(sessionId => !known.has(sessionId)).length;
     items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
@@ -290,7 +290,7 @@ export class RuntimeSessionController {
     const physical = live?.durabilityState === "healthy" && source.appendOnlyToken ? `owned:${source.appendOnlyToken}` : source.stamp;
     return { ...source, throughSeq, codecSetDigest: digest, stamp: `${physical}:${throughSeq}:${digest}` };
   }
-  async globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]> { await this.ensureGlobalIndex(); return this.#globalIndex.values(); }
+  async globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeGlobalSessionSummary[]> { await this.ensureGlobalIndex(); return this.#globalIndex.values(); }
   constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; projectionService?: SessionProjectionService; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void>; maxIdleSessions?: number }, store: SessionStore) { this.store = store; this.#cache = new SessionProjectionCache({ storage: store.storage, codecs: options.registry, createRegistry: header => new SessionReadModel(header, options.registry, options.rendererAllowlist, options.projectionService).projections }); this.#globalIndex = new GlobalSessionIndex(); }
   private onEvent(sessionId: string): (event: SessionEventEnvelopeV1) => void | Promise<void> {
     return event => {
@@ -301,7 +301,7 @@ export class RuntimeSessionController {
         const values = this.#changes.get(sessionId)?.get(event.seq) ?? change?.values ?? {};
         this.#changes.get(sessionId)?.delete(event.seq);
         const callId = event.data && typeof event.data === "object" && !Array.isArray(event.data) ? (event.data as Record<string, unknown>).callId : undefined;
-        const tool = (values.tools as RuntimeV2SessionSnapshot["tools"] | undefined)?.find(item => item.callId === callId);
+        const tool = (values.tools as RuntimeSessionSnapshot["tools"] | undefined)?.find(item => item.callId === callId);
         const update = { sessionId, throughJournalSeq: event.seq, event, values: publicValues(values), ...(tool ? { tool } : {}) };
         for (const listener of this.#projectionListeners) { try { listener(update); } catch { /* observers cannot block accepted facts */ } }
       }
@@ -321,7 +321,7 @@ export class RuntimeSessionController {
       }
   }; }
   /** New headers describe this runtime; inherited events retain their original provenance. */
-  creationProvenance(mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode = "agent"): import("@actspace/session-journal").SessionCreatedWithV1 {
+  creationProvenance(mode: import("@actspace/shared/runtime-v2").RuntimeAgentMode = "agent"): import("@actspace/session-journal").SessionCreatedWithV1 {
     const composition = agentFormComposition(MAIN_AGENT_FORM, this.options.plugins);
     return {
       profileId: this.options.profileId,
@@ -482,10 +482,10 @@ export class RuntimeSessionController {
     this.#sweepQueued = true;
     queueMicrotask(() => { this.#sweepQueued = false; void this.sweep(); });
   }
-  snapshot(session: SessionHandle): RuntimeV2SessionSnapshot { return this.liveModel(session).snapshot(session.journal.validation.accessState); }
-  async inspect(sessionId: string): Promise<RuntimeV2SessionSnapshot> { return (await this.readModel(sessionId)).snapshot; }
+  snapshot(session: SessionHandle): RuntimeSessionSnapshot { return this.liveModel(session).snapshot(session.journal.validation.accessState); }
+  async inspect(sessionId: string): Promise<RuntimeSessionSnapshot> { return (await this.readModel(sessionId)).snapshot; }
   /** 只读一个投影值（例如 `contextEstimate`），不读日志窗口。 */
-  async projectionValue(sessionId: string, key: string): Promise<import("@actspace/shared/runtime-v2").RuntimeV2JsonValue | undefined> { return (await this.readModel(sessionId)).model.projections.value(sessionId, key); }
+  async projectionValue(sessionId: string, key: string): Promise<import("@actspace/shared/runtime-v2").RuntimeJsonValue | undefined> { return (await this.readModel(sessionId)).model.projections.value(sessionId, key); }
   async recoveryAccess(sessionId: string): Promise<SessionRecoveryAccess> { const open = this.#open.get(sessionId); if (open !== undefined) return open.durabilityState === "blocked" ? "read-only" : "read-write"; return classifySessionRecoveryAccess(await this.store.inspect(sessionId)); }
   async readEventBatch(sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput) {
     if (!this.store.storage.readEventBatch) throw new Error("Session provider does not support bounded query reads.");
@@ -515,7 +515,7 @@ export class RuntimeSessionController {
     for (let index = events.length - 1; index >= 0; index -= 1) if (events[index].type === type) return events[index];
     return undefined;
   }
-  async list(): Promise<readonly RuntimeV2SessionListItem[]> { return (await this.browseSessions()).items; }
+  async list(): Promise<readonly RuntimeSessionListItem[]> { return (await this.browseSessions()).items; }
   async export(sessionId: string): Promise<string> { const open = this.#open.get(sessionId); if (open !== undefined && this.#ephemeral.has(sessionId)) return [open.header, ...open.journal.readEvents()].map((record) => JSON.stringify(record)).join("\n") + "\n"; const inspection = await this.store.inspect(sessionId); if (inspection.header === null) throw new Error(`Session ${sessionId} has no header.`); return [inspection.header, ...inspection.events].map((record) => JSON.stringify(record)).join("\n") + "\n"; }
   openSessions(): readonly SessionHandle[] { return Object.freeze([...this.#open.values()]); }
   async flushAll(): Promise<void> { for (const session of this.#open.values()) await session.flush(); }
@@ -594,14 +594,14 @@ export function slimHistoryWindow(journal: readonly SessionEventEnvelopeV1[]): S
 }
 
 // Match display text extraction without retaining bulky completed stream payloads.
-function hasChunkText(value: RuntimeV2JsonValue | undefined): boolean {
+function hasChunkText(value: RuntimeJsonValue | undefined): boolean {
   if (typeof value === "string") return value.length > 0;
   if (Array.isArray(value)) return value.some(hasChunkText);
   const record = jsonRecord(value);
   return record ? hasChunkText(record.text ?? record.content ?? record.value) : false;
 }
 
-function publicValues(values: RuntimeV2ProjectionValues): RuntimeV2ProjectionValues {
+function publicValues(values: RuntimeProjectionValues): RuntimeProjectionValues {
   return Object.fromEntries(Object.entries(values).filter(([key]) => !["surface", "tools", "updatedAt"].includes(key)));
 }
 
@@ -610,7 +610,7 @@ function boundToolEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {
   if (event.type === "llm/auxiliary-start" || event.type === "llm/auxiliary-end") return event;
   const data = eventData(event);
   if (!data) return event;
-  const bounded: Record<string, RuntimeV2JsonValue> = { deferredDetail: true };
+  const bounded: Record<string, RuntimeJsonValue> = { deferredDetail: true };
   for (const key of ["agentRunId", "turnId", "stepId", "requestId", "callId", "toolCallId", "pluginId", "name", "status", "phase"] as const) {
     const value = data[key];
     if (value !== undefined) bounded[key] = value;
@@ -621,11 +621,11 @@ function boundToolEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {
   // （这里同样清空了被延后的工具结果），窗口事件只用来定位，不拼节点（agent-spec-surface-derived.md §6）。
   return { ...event, data: bounded };
 }
-function jsonRecord(value: RuntimeV2JsonValue | undefined): Readonly<Record<string, RuntimeV2JsonValue>> | null {
-  return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : null;
+function jsonRecord(value: RuntimeJsonValue | undefined): Readonly<Record<string, RuntimeJsonValue>> | null {
+  return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : null;
 }
-function eventData(event: SessionEventEnvelopeV1): Readonly<Record<string, RuntimeV2JsonValue>> | null {
-  return event.data !== null && typeof event.data === "object" && !Array.isArray(event.data) ? event.data as Readonly<Record<string, RuntimeV2JsonValue>> : null;
+function eventData(event: SessionEventEnvelopeV1): Readonly<Record<string, RuntimeJsonValue>> | null {
+  return event.data !== null && typeof event.data === "object" && !Array.isArray(event.data) ? event.data as Readonly<Record<string, RuntimeJsonValue>> : null;
 }
 /** 有序 seq 列表里小于 `seq` 的有几个（也就是第一个不小于 `seq` 的下标）。 */
 function countBelow(seqs: readonly number[], seq: number): number {
@@ -649,6 +649,6 @@ function eventsAt(journal: SessionJournal, seqs: readonly number[]): SessionEven
   }
   return events;
 }
-function watermarksFor(session: SessionHandle | undefined, projectionThroughSeq: number, windowThroughSeq: number): RuntimeV2ReadModelWatermarks {
+function watermarksFor(session: SessionHandle | undefined, projectionThroughSeq: number, windowThroughSeq: number): RuntimeReadModelWatermarks {
   return { acceptedThroughSeq: session?.acceptedSeq ?? projectionThroughSeq, durableThroughSeq: session?.durableSeq ?? projectionThroughSeq, projectionThroughSeq, windowThroughSeq, indexGeneration: null };
 }

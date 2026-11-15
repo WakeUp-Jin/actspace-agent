@@ -1,6 +1,6 @@
 import { MainAgentInbox } from "@actspace/agent";
 import { serviceKey } from "@actspace/cordis-adapter";
-import { coreEvent, type CoreEventDataMap, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { coreEvent, type CoreEventDataMap, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { renderLostNotification, renderOutputMatchNotification, renderTaskNotification, userStoppedSummary, type NotifiedTask } from "./notification.js";
 import { BackgroundTaskError, type BackgroundTaskDelivery, type BackgroundTaskKind, type BackgroundTaskOutput, type BackgroundTaskOutputOptions, type BackgroundTaskRecord, type BackgroundTaskSource, type BackgroundTaskStatus, type BackgroundTaskTerminal } from "./types.js";
@@ -77,7 +77,7 @@ export class BackgroundTaskRegistry {
     const session = await this.options.openSession(sessionId);
     const known = session.journal.project(PRUNABLE_TASKS, () => new Map<string, boolean>(), (state, event) => {
       if (event.type !== "background/task") return state;
-      const data = event.data as Readonly<Record<string, RuntimeV2JsonValue>>;
+      const data = event.data as Readonly<Record<string, RuntimeJsonValue>>;
       if (typeof data.taskId !== "string" || (data.op !== "start" && data.op !== "prune")) return state;
       return new Map(state).set(data.taskId, data.op === "prune");
     });
@@ -132,7 +132,7 @@ export class BackgroundTaskRegistry {
   async reconcile(session: SessionHandle): Promise<void> {
     const open = session.journal.project(OPEN_TASKS, () => new Map<string, { readonly kind: BackgroundTaskKind; readonly description: string; readonly transcriptPath?: string }>(), (state, event) => {
       if (event.type !== "background/task") return state;
-      const data = event.data as Readonly<Record<string, RuntimeV2JsonValue>>;
+      const data = event.data as Readonly<Record<string, RuntimeJsonValue>>;
       const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
       if (taskId === undefined) return state;
       const next = new Map(state);

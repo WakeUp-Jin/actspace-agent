@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolExecutionContext } from "@actspace/tool-runtime";
 import type { ToolBodyResult } from "@actspace/tool-runtime";
 import type { BackgroundTaskHost, BackgroundTaskSource, BackgroundTaskTerminal } from "@actspace/background-tasks";
@@ -20,8 +20,8 @@ afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root,
 async function workspace(): Promise<string> { const root = await mkdtemp(join(tmpdir(), "actspace-v2-node-tools-")); roots.push(root); return root; }
 /** What the permission layer admitted; the executor follows its `noSandbox`. */
 function admitted(noSandbox: boolean): ToolExecutionContext["admittedResources"] { return [{ kind: "process", access: "execute", commandDigest: "digest", cwd: "", dynamic: false, noSandbox }]; }
-function context(sessionId = "session", notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>, workspaceRoot = "", noSandbox = true): ToolExecutionContext { return { admittedResources: admitted(noSandbox), pluginId: "actspace.shell-tools", name: "test", callId: "call", sessionId, workspaceRoot, agentRunId: "run", turnId: "turn", stepId: "step", signal: new AbortController().signal, capabilities: { ids: [], has: () => false, get: () => { throw new Error("missing"); } }, reportProgress: () => undefined, createArtifact: async ({ bytes, mediaType }) => ({ artifactId: "artifact", mediaType, size: bytes.byteLength, sha256: "sha" }), defer: () => undefined, ...(notifyAgent === undefined ? {} : { notifyAgent }) }; }
-async function invoke(handler: ((args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>) | undefined, args: Readonly<Record<string, RuntimeV2JsonValue>>, sessionId = "session", notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>, workspaceRoot = "", noSandbox = true) { if (!handler) throw new Error("handler unavailable"); return handler(args, context(sessionId, notifyAgent, workspaceRoot, noSandbox)); }
+function context(sessionId = "session", notifyAgent?: (content: RuntimeJsonValue) => Promise<void>, workspaceRoot = "", noSandbox = true): ToolExecutionContext { return { admittedResources: admitted(noSandbox), pluginId: "actspace.shell-tools", name: "test", callId: "call", sessionId, workspaceRoot, agentRunId: "run", turnId: "turn", stepId: "step", signal: new AbortController().signal, capabilities: { ids: [], has: () => false, get: () => { throw new Error("missing"); } }, reportProgress: () => undefined, createArtifact: async ({ bytes, mediaType }) => ({ artifactId: "artifact", mediaType, size: bytes.byteLength, sha256: "sha" }), defer: () => undefined, ...(notifyAgent === undefined ? {} : { notifyAgent }) }; }
+async function invoke(handler: ((args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>) | undefined, args: Readonly<Record<string, RuntimeJsonValue>>, sessionId = "session", notifyAgent?: (content: RuntimeJsonValue) => Promise<void>, workspaceRoot = "", noSandbox = true) { if (!handler) throw new Error("handler unavailable"); return handler(args, context(sessionId, notifyAgent, workspaceRoot, noSandbox)); }
 
 /** The real manager over a backend that records the resolved policy and runs the command unchanged. */
 function recordingSandbox(options: { readonly probe?: Awaited<ReturnType<SandboxBackend["probe"]>>; readonly prepareError?: string } = {}) {
@@ -402,7 +402,7 @@ describe("shell-tools ports", () => {
 
   it("runs subagent commands in the foreground and kills them at the time limit", async () => {
     const root = await workspace(); const tmpRoot = await workspace();
-    const subagent = (ports: ReturnType<typeof createNodeToolPorts>, args: Readonly<Record<string, RuntimeV2JsonValue>>) => ports.bash!(args, { ...context(), backgroundAllowed: false });
+    const subagent = (ports: ReturnType<typeof createNodeToolPorts>, args: Readonly<Record<string, RuntimeJsonValue>>) => ports.bash!(args, { ...context(), backgroundAllowed: false });
     // One limit per half, so neither depends on how fast the machine is: the short command never reaches the first, the long one always reaches the second.
     const patient = createNodeToolPorts({ workspaceRoot: root, tmpRoot, subagentTimeoutMs: 60_000 });
     try {

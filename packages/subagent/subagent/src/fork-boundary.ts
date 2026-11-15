@@ -1,5 +1,5 @@
 import { validateSessionEvents, type EventCodecRegistry, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import type { RuntimeV2AgentMode } from "@actspace/shared/runtime-v2";
+import type { RuntimeAgentMode } from "@actspace/shared/runtime-v2";
 
 export type ForkBoundary = {
   /** Last parent seq the fork copies (inclusive). */
@@ -7,7 +7,7 @@ export type ForkBoundary = {
   /** The parent's open Turn, which the fork closes with `turn/end` `reason: "forked"`. */
   readonly turnId: string;
   /** The Agent mode of that Turn: the fork runs in it so it sees the same tools and prompt. */
-  readonly mode: RuntimeV2AgentMode;
+  readonly mode: RuntimeAgentMode;
 };
 
 export class ForkBoundaryError extends Error {

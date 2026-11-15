@@ -1,10 +1,10 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { TOOL_RUNTIME_SERVICE, type ToolBodyResult, type ToolExecutionContext, type ToolDefinition, type ToolRuntimeContract, type ToolPermissionContract } from "@actspace/tool-runtime";
 import { getService, serviceKey, type CordisContext } from "@actspace/cordis-adapter";
 import { WEB_TOOLS_PLUGIN_ID, type WEB_TOOLS_TOOLS } from "./manifest.js";
 
 export type ToolName = (typeof WEB_TOOLS_TOOLS)[number];
-export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
+export type ToolHandler = (args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & { readonly dispose?: () => Promise<void> };
 export const WEB_TOOLS_HOST_PORT_ID = "actspace.host.tools.web-tools" as const;
 export type HostPort = { readonly createPorts: () => ToolPorts | Promise<ToolPorts> };

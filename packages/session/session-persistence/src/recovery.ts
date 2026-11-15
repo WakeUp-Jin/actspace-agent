@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { coreEvent, type CoreEventDataMap, type CoreEventType, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { coreEvent, type CoreEventDataMap, type CoreEventType, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionInspection } from "./session-store.js";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHandle } from "./session.js";
@@ -163,10 +163,10 @@ function stableRepairId(events: readonly SessionEventEnvelopeV1[]): string {
   return `repair-${hash}`;
 }
 
-function record(value: RuntimeV2JsonValue): Readonly<Record<string, RuntimeV2JsonValue>> {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {};
+function record(value: RuntimeJsonValue): Readonly<Record<string, RuntimeJsonValue>> {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : {};
 }
 
-function string(value: RuntimeV2JsonValue | undefined): string {
+function string(value: RuntimeJsonValue | undefined): string {
   return typeof value === "string" ? value : "";
 }

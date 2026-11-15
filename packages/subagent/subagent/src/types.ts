@@ -1,6 +1,6 @@
 import { serviceKey } from "@actspace/cordis-adapter";
 import type { AgentScope } from "@actspace/scope";
-import type { RuntimeV2JsonValue, SubagentPreset } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue, SubagentPreset } from "@actspace/shared/runtime-v2";
 import type { ExternalSubagentBackend, SpawnExternalInput } from "./external.js";
 
 /** Host service id of {@link SubagentHostPort}; the Harness tool plugin injects it. */
@@ -8,7 +8,7 @@ export const SUBAGENT_HOST_SERVICE = "actspace.host.subagents" as const;
 
 /** What a subagent tool returns: the model-visible text, plus result details on success. */
 export type SubagentToolOutcome =
-  | { readonly ok: true; readonly text: string; readonly detail?: readonly { readonly label: string; readonly value: RuntimeV2JsonValue }[] }
+  | { readonly ok: true; readonly text: string; readonly detail?: readonly { readonly label: string; readonly value: RuntimeJsonValue }[] }
   | { readonly ok: false; readonly code: string; readonly text: string };
 
 /** The calling agent: its Session and, for a main agent, its scope (child callers are resolved by the Host). */

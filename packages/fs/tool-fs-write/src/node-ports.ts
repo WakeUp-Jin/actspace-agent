@@ -4,7 +4,7 @@ import { chmod, lstat, mkdir, readFile, realpath, rename, rm, stat, unlink, writ
 import * as nodePath from "node:path";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { isLexicallyInside, relativePathInside } from "@actspace/shared";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { canonicalizeFileResource, sliceWholeChars, TOOL_OUTPUT_LINE_CHARS, TOOL_OUTPUT_TEXT_CHARS, type ToolBodyResult, type ToolExecutionContext } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
 export type NodeToolPortsOptions = { readonly workspaceRoot: string };
@@ -13,7 +13,7 @@ function contextWorkspaceRoot(context: ToolExecutionContext, fallback: string): 
   return resolve(context.workspaceRoot || fallback);
 }
 
-async function writeFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
+async function writeFileTool(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
   const pathArg = stringArg(args, "path");
   const content = typeof args.content === "string" ? args.content : undefined;
   if (!pathArg || content === undefined) return failure("INVALID_ARGUMENTS", "path and content are required");
@@ -32,7 +32,7 @@ async function writeFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>,
   }
 }
 
-async function editFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
+async function editFileTool(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
   const pathArg = stringArg(args, "path");
   const oldText = typeof args.old_string === "string" ? args.old_string : undefined;
   const newText = typeof args.new_string === "string" ? args.new_string : undefined;
@@ -57,7 +57,7 @@ async function editFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, 
   }
 }
 
-async function deleteFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
+async function deleteFileTool(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
   const pathArg = stringArg(args, "path");
   if (!pathArg) return failure("INVALID_ARGUMENTS", "path is required");
   try {
@@ -133,7 +133,7 @@ async function writeTextAtomic(target: string, content: string): Promise<void> {
     throw error;
   }
 }
-function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeV2JsonValue, filePath?: string): ToolBodyResult {
+function completed(text: string, summary = text.split("\n", 1)[0] || "Tool completed.", detail?: RuntimeJsonValue, filePath?: string): ToolBodyResult {
   return { status: "completed", modelOutput: [{ type: "text", text }], summary, ...(detail === undefined ? {} : { detail: [{ label: "result", value: detail }, ...(filePath ? [{ label: "actspace.context.file", value: { path: filePath, kind: "file", operation: "write" } }] : [])] }) };
 }
 
@@ -148,7 +148,7 @@ function ioFailure(action: string, path: string, error: unknown): ToolBodyResult
   return failure("IO_ERROR", `Failed to ${action}: ${message}`);
 }
 
-function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
+function stringArg(args: Readonly<Record<string, RuntimeJsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
 async function displayPath(path: string, workspaceRoot: string): Promise<string> { return relativePathInside(nodePath, await realpath(workspaceRoot), path) || path; }
 function countOccurrences(text: string, needle: string): number { let count = 0; let offset = 0; while ((offset = text.indexOf(needle, offset)) !== -1) { count += 1; offset += Math.max(needle.length, 1); } return count; }
 function replaceOnePreservingLine(text: string, oldText: string, newText: string): string { const index = text.indexOf(oldText); if (newText !== "" || oldText.includes("\n") || text[index + oldText.length] !== "\n") return text.slice(0, index) + newText + text.slice(index + oldText.length); return text.slice(0, index) + text.slice(index + oldText.length + 1); }

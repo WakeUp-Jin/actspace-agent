@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue, RuntimeTrajectoryNode } from "@actspace/shared/runtime-v2";
 import type { RequestLiveOutput } from "@actspace/client/live";
 import type { TrajectoryCell, TrajectoryRecord, TrajectorySourceBlock } from "./contract";
 import { dataOf, pick, sourceBlocks, valueText } from "./node-data";
@@ -10,14 +10,14 @@ import { dataOf, pick, sourceBlocks, valueText } from "./node-data";
  */
 
 /** Chunk group key, shared with the builder: the message id, then the request, then a per-session fallback. */
-export function chunkKey(node: RuntimeV2TrajectoryNode): string {
+export function chunkKey(node: RuntimeTrajectoryNode): string {
   const data = dataOf(node);
   const requestId = pick(data, ["requestId"]);
   return pick(data, ["messageId"]) ?? (requestId === null ? `${node.sessionId}:partial` : `request:${requestId}`);
 }
 
 /** The open chunk group an `assistant/message` closes. */
-export function closedKey(node: RuntimeV2TrajectoryNode, open: ReadonlyMap<string, readonly RuntimeV2TrajectoryNode[]>): string | undefined {
+export function closedKey(node: RuntimeTrajectoryNode, open: ReadonlyMap<string, readonly RuntimeTrajectoryNode[]>): string | undefined {
   const data = dataOf(node);
   const messageId = pick(data, ["messageId"]);
   const requestId = pick(data, ["requestId"]);
@@ -36,13 +36,13 @@ export type LiveContent = {
   thinking: string;
   readonly calls: Map<string, { readonly toolName: string | null; content: string }>;
   readonly sequences: number[];
-  readonly chunks: RuntimeV2JsonValue[];
+  readonly chunks: RuntimeJsonValue[];
 };
 
 export const emptyLiveContent = (): LiveContent => ({ text: "", thinking: "", calls: new Map(), sequences: [], chunks: [] });
 
 /** Fold `chunks[from..]` into `content`: message text, reasoning, and tool-argument deltas per callId. */
-export function appendChunks(content: LiveContent, chunks: readonly RuntimeV2TrajectoryNode[], from = 0): LiveContent {
+export function appendChunks(content: LiveContent, chunks: readonly RuntimeTrajectoryNode[], from = 0): LiveContent {
   for (let index = from; index < chunks.length; index += 1) {
     const node = chunks[index];
     const data = dataOf(node);

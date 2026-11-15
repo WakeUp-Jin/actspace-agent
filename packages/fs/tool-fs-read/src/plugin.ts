@@ -2,14 +2,14 @@ import { dirname, resolve } from "node:path";
 import { homedir } from "node:os";
 import type { GrantAudience } from "@actspace/shared/runtime-v2";
 import { FILESYSTEM_HOST_PORT, isPathWithin, TOOL_RUNTIME_SERVICE, type ToolGrantSuggestion } from "@actspace/tool-runtime";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntimeContract, ToolPermissionContract } from "@actspace/tool-runtime";
 import { getService, type CordisContext } from "@actspace/cordis-adapter";
 import { createNodeToolPorts } from "./node-ports.js";
 import { FILESYSTEM_READ_PLUGIN_ID, type FILESYSTEM_READ_TOOLS, PRESENT_MAX_FILES } from "./manifest.js";
 
 export type ToolName = (typeof FILESYSTEM_READ_TOOLS)[number];
-export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
+export type ToolHandler = (args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & { readonly dispose?: () => Promise<void> };
 export type ToolRegistration = { readonly name: string; readonly localName: ToolName; readonly handle: ReturnType<ToolRuntimeContract["register"]> };
 

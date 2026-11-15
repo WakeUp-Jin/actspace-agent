@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionHandle } from "@actspace/session-persistence";
 import type { ToolDefinition } from "@actspace/tool-runtime";
 import type { ToolExecutionContext, ToolBodyResult } from "@actspace/tool-runtime";
@@ -36,7 +36,7 @@ export function registerTodoTools(runtime: ToolRuntimeContract, resolveSession: 
     description: string,
     inputSchema: ToolDefinition["inputSchema"],
     concurrency: ToolDefinition["concurrency"],
-    execute: (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>,
+    execute: (args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>,
   ): TodoToolRegistration {
     const definition: ToolDefinition = Object.freeze({
       abiVersion: 2,
@@ -65,7 +65,7 @@ function serviceFor(resolveSession: (sessionId: string) => SessionHandle | undef
 
 function visible(items: readonly TodoItem[]): readonly TodoItem[] { return items.filter((item) => item.state !== "cancelled"); }
 
-function snapshot(items: readonly TodoItem[]): RuntimeV2JsonValue {
+function snapshot(items: readonly TodoItem[]): RuntimeJsonValue {
   return {
     todos: items.map((item) => ({ id: item.todoId, content: item.text, status: item.state, ...(item.activeForm === undefined ? {} : { activeForm: item.activeForm }), createdAt: item.createdAt, updatedAt: item.updatedAt })),
     totalCount: items.length,
@@ -74,11 +74,11 @@ function snapshot(items: readonly TodoItem[]): RuntimeV2JsonValue {
   };
 }
 
-function completed(summary: string, value: RuntimeV2JsonValue): ToolBodyResult {
+function completed(summary: string, value: RuntimeJsonValue): ToolBodyResult {
   return { status: "completed", summary, modelOutput: [{ type: "json", value }], detail: [{ label: "todo", value }] };
 }
 
-function parseItems(value: RuntimeV2JsonValue | undefined): readonly { readonly id?: string; readonly content: string; readonly status: Exclude<TodoState, "cancelled">; readonly activeForm?: string }[] {
+function parseItems(value: RuntimeJsonValue | undefined): readonly { readonly id?: string; readonly content: string; readonly status: Exclude<TodoState, "cancelled">; readonly activeForm?: string }[] {
   if (!Array.isArray(value)) throw new Error("todos must be an array.");
   return value.map((entry) => {
     if (!isRecord(entry)) throw new Error("Each Todo must be an object.");
@@ -92,7 +92,7 @@ function parseItems(value: RuntimeV2JsonValue | undefined): readonly { readonly 
   });
 }
 
-function arrayOfStrings(value: RuntimeV2JsonValue | undefined): readonly string[] {
+function arrayOfStrings(value: RuntimeJsonValue | undefined): readonly string[] {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new Error("Todo filters must be string arrays.");
   return value as readonly string[];
@@ -106,4 +106,4 @@ function writeSchema(): ToolDefinition["inputSchema"] {
   return { type: "object", properties: { todos: { type: "array", items: { type: "object", properties: { id: { type: "string", description: "Omit to create; use the full ID returned by todo_read/todo_write to update." }, content: { type: "string", minLength: 1 }, status: { type: "string", enum: ["pending", "in_progress", "completed"] }, activeForm: { type: "string" } }, required: ["content", "status"], additionalProperties: false } }, merge: { type: "boolean", default: false, description: "False replaces the list; true preserves unmentioned items." } }, required: ["todos"], additionalProperties: false };
 }
 
-function isRecord(value: RuntimeV2JsonValue): value is Readonly<Record<string, RuntimeV2JsonValue>> { return value !== null && typeof value === "object" && !Array.isArray(value); }
+function isRecord(value: RuntimeJsonValue): value is Readonly<Record<string, RuntimeJsonValue>> { return value !== null && typeof value === "object" && !Array.isArray(value); }

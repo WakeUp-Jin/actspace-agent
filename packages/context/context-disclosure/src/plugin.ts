@@ -1,6 +1,6 @@
 import { ACTSPACE_SERVICE_IDS, getService, serviceView, type CordisContext } from "@actspace/cordis-adapter";
 import { CONTEXT_ASSEMBLY_SERVICE, CONTEXT_ASSEMBLY_SERVICE_ID } from "@actspace/context-assembly";
-import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { Context, ContextPathState, ContextSource, CompactionDisclosure, CompactionRegion, CompactionResult, CompactionSession } from "@actspace/context-engine";
 import { CONTEXT_OWNER, STATE_EVENT } from "@actspace/context-engine/codec";
@@ -23,7 +23,7 @@ export class ProgressiveDisclosure implements CompactionDisclosure {
     return state;
   }
   private async append(session: CompactionSession, data: StateOperation): Promise<void> {
-    await session.append({ type: STATE_EVENT, eventVersion: 1, source: { ownerPluginId: CONTEXT_OWNER }, data: data as unknown as RuntimeV2JsonValue, surface: null });
+    await session.append({ type: STATE_EVENT, eventVersion: 1, source: { ownerPluginId: CONTEXT_OWNER }, data: data as unknown as RuntimeJsonValue, surface: null });
     this.state(session);
   }
   private async indexPaths(session: CompactionSession): Promise<Set<string>> {
@@ -184,7 +184,7 @@ export function apply(ctx: CordisContext): void {
   ctx.effect?.(() => assembly.registerToolResultObserver((session, event) => disclosure.observe(session, event)), "context.disclosure.observer");
   ctx.provide?.("context.disclosure", disclosure);
 }
-function record(value: unknown): Readonly<Record<string, RuntimeV2JsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {}; }
+function record(value: unknown): Readonly<Record<string, RuntimeJsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : {}; }
 /** 本次请求的提示词是否由 disclosure 参与组装：看 `request/system-prompt` 的 contributorProvenance。 */
 function disclosureEnabled(event: SessionEventEnvelopeV1): boolean {
   const provenance = record(event.data).contributorProvenance;

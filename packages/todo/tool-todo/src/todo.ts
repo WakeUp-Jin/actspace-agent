@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { SessionHandle } from "@actspace/session-persistence";
-import { mergeRuntimeV2TodoItems, type SessionEventCandidateV1 } from "@actspace/shared/runtime-v2";
+import { mergeRuntimeTodoItems, type SessionEventCandidateV1 } from "@actspace/shared/runtime-v2";
 import { TODO_EVENT_TYPE, TODO_PLUGIN_ID } from "./manifest.js";
 
 export type TodoState = "pending" | "in_progress" | "completed" | "cancelled";
@@ -20,12 +20,12 @@ const TODO_STATE = Symbol("todo-state");
 export class TodoService {
   constructor(private readonly session: SessionHandle) {}
   list(): readonly TodoItem[] {
-    const items = this.session.journal.project(TODO_STATE, () => [] as readonly import("@actspace/shared/runtime-v2").RuntimeV2TodoItem[], (items, event) => {
+    const items = this.session.journal.project(TODO_STATE, () => [] as readonly import("@actspace/shared/runtime-v2").RuntimeTodoItem[], (items, event) => {
       if (event.type !== TODO_EVENT_TYPE || event.data === null || typeof event.data !== "object" || Array.isArray(event.data)) return items;
       const data = event.data as Record<string, unknown>;
       if (!Array.isArray(data.items)) return items;
       const rawItems = data.items.filter((value): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value));
-      return mergeRuntimeV2TodoItems(items, rawItems, value => value, event.time);
+      return mergeRuntimeTodoItems(items, rawItems, value => value, event.time);
     });
     return Object.freeze(items.map(item => Object.freeze({ ...item, createdAt: item.createdAt ?? "", updatedAt: item.updatedAt ?? item.createdAt ?? "" })) as TodoItem[]);
   }

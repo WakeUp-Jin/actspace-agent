@@ -17,7 +17,7 @@
 
 - 58%：投影注册表。每个 `assistant/chunk` 都让 `requestContext` 投影产生新状态，注册表对约 0.9 MB（随对话增长）的 view 做一次 JSON 校验加 `JSON.parse(JSON.stringify())` 深拷贝。
 - 17%：日志校验。上下文插件的两个事件规则声明了 `validateRelations`，每次写入都从磁盘读出整段会话历史拼成 `previous`，但规则本身只看当前事件。写盘前 `storage.ts` 又按同样条件再读一遍。
-- 跑完后的 307 MB：`DesktopRuntimeV2Registry` 的 512 条实时事件缓冲，每条都带一份上下文副本；它的读取方法 `replayLiveEvents` 没有调用方。
+- 跑完后的 307 MB：`DesktopRuntimeRegistry` 的 512 条实时事件缓冲，每条都带一份上下文副本；它的读取方法 `replayLiveEvents` 没有调用方。
 - 界面进程：每个 chunk 的 `journal-update` 都携带整份 `requestContext`，33ms 一批经 IPC 结构化克隆。
 
 根因是**每个流式片段都作为持久事件写入日志**（`agent-loop/src/loop.ts` 每个 delta 一次 `session.append("assistant/chunk")`，chunk 约占日志事件的 97%）。之后的校验、投影、持久化、IPC 都按 token 数线性放大。DeepSeek harness 的 v2 格式不持久化 chunk（参考 `tmp/deepseek-harness/.agents/notes/archived/architecture/2026-08-31-live-assistant-stream-frames.zh.md`、`.agents/notes/implemented/architecture/2026-09-01-v2-embedded-assistant-streams.zh.md`），本规范照此收敛，并去掉上面几处与 chunk 无关、但同样按事件放大的开销。
@@ -101,7 +101,7 @@ chunk 移出日志后，工具调用、请求头等事件仍会走同一条路�
    - 事件规则要读历史，必须在 codec 上显式声明 `readsHistory: true`，校验器和 JSONL 写盘前的检查才会物化 `previous`。
    - 没声明的规则访问 `previous` 直接抛错，不静默给空数组。
    - 上下文插件的两个规则只检查当前事件，不声明。
-5. **删除无调用方的实时事件缓冲。** `DesktopRuntimeV2Registry` 的 `#eventBuffer` 与 `replayLiveEvents` 一并删除。
+5. **删除无调用方的实时事件缓冲。** `DesktopRuntimeRegistry` 的 `#eventBuffer` 与 `replayLiveEvents` 一并删除。
 6. **删除只为 chunk 存在的快速路径**，新会话里这些路径不会再被触发：
    - 主进程 `LiveEnvelopeBatcher`；
    - 渲染进程 `desktop-session-bridge` 的 chunk 排队；

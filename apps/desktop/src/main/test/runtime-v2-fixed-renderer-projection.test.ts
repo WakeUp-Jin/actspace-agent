@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue, RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
 import { projectSubagentItems, subagentChildrenWithoutModel, latestRequestModel, projectSubagentTranscript, projectChatEvents, projectChatSession, projectSessionUsageActivities } from "@actspace/client/sessions";
 
 it("restores a durable failed turn as an error block, including old failures without details", () => {
@@ -228,7 +228,7 @@ describe("fixed renderer v2 projection", () => {
 
 const TIME = "2026-08-23T00:00:00.000Z";
 
-function baseSnapshot(patch: Partial<RuntimeV2SessionSnapshot> = {}): RuntimeV2SessionSnapshot {
+function baseSnapshot(patch: Partial<RuntimeSessionSnapshot> = {}): RuntimeSessionSnapshot {
   return {
     kind: "session-snapshot",
     schemaVersion: 1,
@@ -251,11 +251,11 @@ function baseSnapshot(patch: Partial<RuntimeV2SessionSnapshot> = {}): RuntimeV2S
   };
 }
 
-function event(seq: number, type: string, data: RuntimeV2JsonValue, surface: SessionEventEnvelopeV1["surface"] = null): SessionEventEnvelopeV1 {
+function event(seq: number, type: string, data: RuntimeJsonValue, surface: SessionEventEnvelopeV1["surface"] = null): SessionEventEnvelopeV1 {
   return eventAt(seq, type, data, TIME, surface);
 }
 
-function eventAt(seq: number, type: string, data: RuntimeV2JsonValue, time: string, surface: SessionEventEnvelopeV1["surface"] = null): SessionEventEnvelopeV1 {
+function eventAt(seq: number, type: string, data: RuntimeJsonValue, time: string, surface: SessionEventEnvelopeV1["surface"] = null): SessionEventEnvelopeV1 {
   return { recordKind: "event", seq, type, eventVersion: 1, criticality: "required", time, source: { ownerPluginId: "@actspace/core" }, data, surface, provenance: { sourceEventSeqs: surface?.kind === "replace" ? surface.sourceEventSeqs : [], contributorIds: [], runtimeSelectionSeq: null } };
 }
 

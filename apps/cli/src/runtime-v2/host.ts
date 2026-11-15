@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { loadRuntimeV2 } from "./loader";
+import { loadRuntimeModule } from "./loader";
 import { profileService } from "./profile-service";
 import type { HostConfig } from "@actspace/agent-host";
 import { HostModelRouter, createNodeToolHostServices, resolveNodeHostNonoPath, resolveNodeHostPython } from "@actspace/agent-host/node-ports";
@@ -9,7 +9,7 @@ import { currentModelHostPort, MODELS_HOST_PORT_ID } from "@actspace/shared";
 const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<typeof import("@actspace/agent-host")>;
 
 export async function startRemoteHost(config: HostConfig, options: { mock?: boolean; forceExit?: () => void } = {}) {
-  const [runtime, hostModule] = await Promise.all([loadRuntimeV2(), dynamicImport("@actspace/agent-host")]);
+  const [runtime, hostModule] = await Promise.all([loadRuntimeModule(), dynamicImport("@actspace/agent-host")]);
   return hostModule.bootstrapHost(config, {
     forceExit: options.forceExit,
     log: message => { process.stderr.write(`${message}\n`); },

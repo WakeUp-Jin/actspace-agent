@@ -1,7 +1,7 @@
 import type { AgentSubject } from "@actspace/agent";
 import type { SerialHook, WaterfallHook } from "@actspace/cordis-adapter";
 import type { LlmFailure, LlmMessage, LlmStreamEvent, LlmToolDefinition, ResolvedLlmRequest } from "@actspace/llm-service";
-import type { RuntimeV2AgentMode, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeAgentMode, RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 
 // 五个 payload 里的 `agent` 都由 Loop 的 dispatcher 填：分发的地方给其余字段，监听器收到的是带 `agent` 的完整 payload。
 
@@ -13,10 +13,10 @@ export type AgentPreStepPayload = {
   readonly stepId: string;
   /** 这一轮里的第几步，从 1 开始。 */
   readonly stepIndex: number;
-  readonly mode: RuntimeV2AgentMode;
+  readonly mode: RuntimeAgentMode;
 };
 /** `agent/pre-step` 的结果，原样写进 `step/start` 的 `metadata`。内置行为返回 payload 里 `agent` 以外的字段。 */
-export type AgentStepMetadata = Readonly<Record<string, RuntimeV2JsonValue>>;
+export type AgentStepMetadata = Readonly<Record<string, RuntimeJsonValue>>;
 
 /** `agent/request` 的 payload：上下文已经组装好，请求还没准备。重试和首次请求都经过这里，`attempt` 从 1 开始。 */
 export type AgentRequestPayload = {

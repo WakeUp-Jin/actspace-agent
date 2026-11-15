@@ -2,7 +2,7 @@ import { coreEvent, isBackgroundWake, taskOperation } from "@actspace/shared/run
 import { randomUUID } from "node:crypto";
 import { SessionError, snapshotSessionJson, type SessionEventCandidateV1 } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { TaskError, type TaskSnapshot, type TaskRecord, type TaskReceipt, type HarnessIdentity, type RunOutcome } from "./contracts.js";
 import { TASK_EVENT, RUN_EVENT, QUEUE_EVENT, QUEUE_RETURN_EVENT, eventCandidate } from "./task-events.js";
 import { projectTasks } from "./task-projection.js";
@@ -38,7 +38,7 @@ export class TaskLedger {
    * pause nobody asked it to honour. When nothing is running and nothing else waits, accept and resume
    * in one commit. Older queued messages keep the whole queue paused until the user resumes it.
    */
-  submit(submissionId: string, content: RuntimeV2JsonValue, continuationOf: string | null = null, options: { readonly resumeWhenIdle?: boolean } = {}): Promise<TaskReceipt> {
+  submit(submissionId: string, content: RuntimeJsonValue, continuationOf: string | null = null, options: { readonly resumeWhenIdle?: boolean } = {}): Promise<TaskReceipt> {
     // Capture before waiting: caller mutation must not change a queued submission.
     const captured = snapshotSessionJson(content);
     return this.#serialize(async () => {
@@ -102,7 +102,7 @@ export class TaskLedger {
   }
 
   /** Persist run identity and its initial input atomically before calling the factory. */
-  start(taskId: string, runId: string, harness: HarnessIdentity, configuration: RuntimeV2JsonValue): Promise<TaskRecord> {
+  start(taskId: string, runId: string, harness: HarnessIdentity, configuration: RuntimeJsonValue): Promise<TaskRecord> {
     const captured = snapshotSessionJson({ harness, configuration });
     return this.#serialize(async () => {
       if (this.#snapshot.paused) this.#error("QUEUE_PAUSED");
@@ -133,10 +133,10 @@ export class TaskLedger {
       await this.#commit([eventCandidate(TASK_EVENT, { op: "operation-start", sessionId: this.session.header.sessionId, taskId })]);
     });
   }
-  finishOperation(taskId: string, outcome: RunOutcome, result: RuntimeV2JsonValue = null): Promise<void> {
+  finishOperation(taskId: string, outcome: RunOutcome, result: RuntimeJsonValue = null): Promise<void> {
     return this.#serialize(() => this.#commit([eventCandidate(TASK_EVENT, { op: "operation-finish", sessionId: this.session.header.sessionId, taskId, outcome, result })]));
   }
-  finish(runId: string, outcome: RunOutcome, result: RuntimeV2JsonValue = null): Promise<TaskSnapshot> {
+  finish(runId: string, outcome: RunOutcome, result: RuntimeJsonValue = null): Promise<TaskSnapshot> {
     return this.#serialize(async () => {
       this.#active(runId);
       await this.#commit([
@@ -199,9 +199,9 @@ export class TaskLedger {
   #error(code: ConstructorParameters<typeof TaskError>[0]): never { throw new TaskError(code, this.#snapshot); }
 }
 const TASK_OWNER_ID = "actspace.agent-service";
-function canonical(value: RuntimeV2JsonValue): string {
+function canonical(value: RuntimeJsonValue): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  const object = value as Readonly<Record<string, RuntimeV2JsonValue>>;
+  const object = value as Readonly<Record<string, RuntimeJsonValue>>;
   return `{${Object.keys(object).sort().map(key => `${JSON.stringify(key)}:${canonical(object[key])}`).join(",")}}`;
 }

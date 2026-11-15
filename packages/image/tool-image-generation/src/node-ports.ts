@@ -1,6 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tool-runtime";
 const MAX_PROMPT_CHARS = 32_000;
 const MAX_BATCH_BYTES = 100 * 1024 * 1024;
@@ -16,7 +16,7 @@ export type NodeToolPortsOptions = {
 };
 import type { ToolPorts } from "./plugin.js";
 export function createNodeToolPorts(options: NodeToolPortsOptions): ToolPorts { return Object.freeze({ generate_image: (args, context) => generateImage(args, context, options) }); }
-async function generateImage(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, options: NodeToolPortsOptions): Promise<ToolBodyResult> {
+async function generateImage(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext, options: NodeToolPortsOptions): Promise<ToolBodyResult> {
   const prompt = stringArg(args, "prompt").trim();
   const size = stringArg(args, "size") || "1024x1024";
   const count = integerArg(args, "n", 1);
@@ -97,8 +97,8 @@ function parseProviderResponse(raw: Uint8Array, contentType: string | null): unk
 function sniffImage(bytes: Uint8Array): string | undefined { const value = Buffer.from(bytes); if (value.length >= 8 && value.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png"; if (value.length >= 3 && value[0] === 0xff && value[1] === 0xd8 && value[2] === 0xff) return "image/jpeg"; if (value.length >= 12 && value.toString("ascii", 0, 4) === "RIFF" && value.toString("ascii", 8, 12) === "WEBP") return "image/webp"; return undefined; }
 function imageHttpCode(status: number): string { return status === 401 || status === 403 ? "IMAGE_GENERATION_AUTH" : status === 429 ? "IMAGE_GENERATION_RATE_LIMIT" : status >= 500 ? "IMAGE_GENERATION_PROVIDER" : "IMAGE_GENERATION_INVALID_REQUEST"; }
 function object(value: unknown): Record<string, unknown> | undefined { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined; }
-function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
-function integerArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string, fallback: number): number { return typeof args[key] === "number" && Number.isInteger(args[key]) ? args[key] : fallback; }
+function stringArg(args: Readonly<Record<string, RuntimeJsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
+function integerArg(args: Readonly<Record<string, RuntimeJsonValue>>, key: string, fallback: number): number { return typeof args[key] === "number" && Number.isInteger(args[key]) ? args[key] : fallback; }
 function combinedSignal(signal: AbortSignal, timeoutMs: number): AbortSignal { return AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]); }
 // Only controlled messages and known system codes may leave the Host. Never serialize
 // upstream error messages, signed URLs, headers, local paths or arbitrary causes.

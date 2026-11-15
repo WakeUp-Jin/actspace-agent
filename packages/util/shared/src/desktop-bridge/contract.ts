@@ -1,17 +1,17 @@
 import type * as S from "../index";
 import type * as RV2 from "../runtime-v2/index";
-import type { RuntimeV2SessionSnapshot } from "../runtime-v2/projection";
+import type { RuntimeSessionSnapshot } from "../runtime-v2/projection";
 import type { SessionEventEnvelopeV1 } from "../runtime-v2/session-events";
 import type { AddHostInput, HostArtifactPreview, HostConnection, HostEvent, HostMethod, HostUploadProgress } from "../host-protocol/index";
 import { ENGLISH_LEARNING_CHANNELS } from "../english-learning";
 import { HOST_IPC } from "../host-protocol/connections";
 import { RESOURCE_MONITOR_CHANNELS } from "../resource-monitor";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as CH } from "../runtime-v2/fixed-renderer";
+import { RUNTIME_FIXED_RENDERER_CHANNELS as CH } from "../runtime-v2/fixed-renderer";
 import { event, invoke, invokeWithDefault, local, send, type BridgeOf } from "./types";
 
 /** `session:tool-detail` 的原始返回；renderer 自己投影成 MessageBlock。 */
 export type DesktopToolDetailPage = {
-  readonly snapshot: RuntimeV2SessionSnapshot;
+  readonly snapshot: RuntimeSessionSnapshot;
   readonly journal: readonly SessionEventEnvelopeV1[];
 };
 
@@ -95,10 +95,10 @@ export const desktopBridgeContract = {
     listPage: invokeWithDefault<S.SessionListPageInput, S.SessionListPage>(CH.listSessionPage, {}),
     list: invokeWithDefault<S.SessionListInput, S.SessionListItem[]>(CH.listSessions, {}),
     /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */
-    get: invoke<S.SessionGetInput, RV2.RuntimeV2DesktopSessionProjection | null>(CH.getSession),
-    getPage: invoke<RV2.RuntimeV2SessionProjectionInput, RV2.RuntimeV2DesktopSessionProjection>(CH.getSessionPage),
-    getProjectionSnapshot: invoke<RV2.RuntimeV2SessionProjectionInput, RV2.RuntimeV2DesktopSessionProjection>(CH.getSessionProjectionSnapshot),
-    getObservation: invoke<RV2.RuntimeV2SessionProjectionInput, RV2.RuntimeV2SessionObservation>(CH.getSessionObservation),
+    get: invoke<S.SessionGetInput, RV2.RuntimeDesktopSessionProjection | null>(CH.getSession),
+    getPage: invoke<RV2.RuntimeSessionProjectionInput, RV2.RuntimeDesktopSessionProjection>(CH.getSessionPage),
+    getProjectionSnapshot: invoke<RV2.RuntimeSessionProjectionInput, RV2.RuntimeDesktopSessionProjection>(CH.getSessionProjectionSnapshot),
+    getObservation: invoke<RV2.RuntimeSessionProjectionInput, RV2.RuntimeSessionObservation>(CH.getSessionObservation),
     /** 原始页；`apps/desktop/src/renderer/api/sessions.ts` 负责投影成 MessageBlock。 */
     getToolDetail: invoke<{ sessionId: string; callId: string }, DesktopToolDetailPage>(CH.getSessionToolDetail),
     getPreview: invoke<S.SessionPreviewInput, S.SessionPreviewResult | null>(CH.getSessionPreview),
@@ -115,9 +115,9 @@ export const desktopBridgeContract = {
     /** 外部子智能体详情的「在 Finder 中显示」：路径由主进程从父 Journal 的 `subagent/spawned` 取，renderer 不传路径。 */
     revealSubagentRecord: invoke<{ sessionId: string; agentId: string }, { ok: boolean }>(CH.revealSubagentRecord),
     /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */
-    create: invokeWithDefault<S.SessionCreateInput, RV2.RuntimeV2DesktopSessionProjection>(CH.createSession, {}),
+    create: invokeWithDefault<S.SessionCreateInput, RV2.RuntimeDesktopSessionProjection>(CH.createSession, {}),
     /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */
-    fork: invoke<S.SessionForkInput, RV2.RuntimeV2DesktopSessionProjection>(CH.forkSession),
+    fork: invoke<S.SessionForkInput, RV2.RuntimeDesktopSessionProjection>(CH.forkSession),
     /** 侧边对话：分出与按主会话列出（含已收起的）。 */
     openSideChat: invoke<S.SideChatOpenInput, S.SideChatOpenResult>(CH.openSideChat),
     listSideChats: invoke<S.SideChatListInput, S.SessionListItem[]>(CH.listSideChats),
@@ -244,7 +244,7 @@ export const desktopBridgeContract = {
   },
   events: {
     agentStream: event<S.RuntimeStreamEvent>(CH.agentStream),
-    sessionLive: event<RV2.RuntimeV2DesktopLiveEnvelope>(CH.sessionLiveEvent),
+    sessionLive: event<RV2.RuntimeDesktopLiveEnvelope>(CH.sessionLiveEvent),
     reviewChanged: event<S.ReviewChangeNotification>(CH.reviewChanged),
     settingsChanged: event<S.SettingsV4ChangedNotification>(CH.settingsChangedV4),
     quickOpenRequested: event<void>(CH.quickOpenRequested),

@@ -1,11 +1,11 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { TOOL_RUNTIME_SERVICE, type ToolBodyResult, type ToolExecutionContext, type ToolDefinition, type ToolRuntimeContract, type ToolPermissionContract } from "@actspace/tool-runtime";
 import { getService, serviceKey, type CordisContext } from "@actspace/cordis-adapter";
 import { LLM_AUXILIARY_REQUESTS_SERVICE, LLM_SERVICE, type AuxiliaryRequestRecorder, type LlmServiceContract } from "@actspace/llm-service";
 import { IMAGE_INSPECTION_PLUGIN_ID, type IMAGE_INSPECTION_TOOLS } from "./manifest.js";
 
 export type ToolName = (typeof IMAGE_INSPECTION_TOOLS)[number];
-export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
+export type ToolHandler = (args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & { readonly dispose?: () => Promise<void> };
 export const IMAGE_INSPECTION_HOST_PORT_ID = "actspace.host.tools.image-inspection" as const;
 export type HostPort = { readonly createPorts: (llm: LlmServiceContract, recorder: AuxiliaryRequestRecorder) => ToolPorts | Promise<ToolPorts> };

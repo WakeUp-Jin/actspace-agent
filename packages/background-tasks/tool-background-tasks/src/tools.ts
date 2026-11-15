@@ -1,17 +1,17 @@
 import { isBackgroundTaskError, type BackgroundTaskHost, type BackgroundTaskOutput, type BackgroundTaskRecord } from "@actspace/background-tasks";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolDefinition, ToolExecutionContext, ToolRuntimeContract } from "@actspace/tool-runtime";
 import { BACKGROUND_TASK_TOOLS_PLUGIN_ID } from "./manifest.js";
 
 export type BackgroundTaskToolRegistration = { readonly name: string; readonly dispose: () => Promise<void> };
-type Args = Readonly<Record<string, RuntimeV2JsonValue>>;
+type Args = Readonly<Record<string, RuntimeJsonValue>>;
 
 const NO_POLLING = "Background tasks notify you automatically when they finish; prefer waiting for that notification. Do not poll with sleep or repeated task_output.";
 const TASK_ID = { type: "string", description: "Background task id: a Bash task (bash_…) or a background subagent's agent id." } as const;
 
 export function registerBackgroundTaskTools(runtime: ToolRuntimeContract, tasks: BackgroundTaskHost): readonly BackgroundTaskToolRegistration[] {
   const handles: ReturnType<ToolRuntimeContract["register"]>[] = [];
-  const register = (name: string, description: string, properties: Record<string, RuntimeV2JsonValue>, required: string[], concurrency: ToolDefinition["concurrency"], execute: (args: Args, context: ToolExecutionContext) => Promise<ToolBodyResult>): BackgroundTaskToolRegistration => {
+  const register = (name: string, description: string, properties: Record<string, RuntimeJsonValue>, required: string[], concurrency: ToolDefinition["concurrency"], execute: (args: Args, context: ToolExecutionContext) => Promise<ToolBodyResult>): BackgroundTaskToolRegistration => {
     const definition: ToolDefinition = Object.freeze({ abiVersion: 2, pluginId: BACKGROUND_TASK_TOOLS_PLUGIN_ID, name, definitionVersion: 1, description, inputSchema: { type: "object", properties, required, additionalProperties: false }, effects: [], modes: ["plan", "agent"] as const, concurrency, sensitiveArgumentPaths: [], resultSchemaVersion: 1 });
     const handle = runtime.register({ definition, executor: { concurrencySafe: concurrency !== "exclusive", execute: (args, context) => execute(args, context).catch(failed) } });
     handles.push(handle);
@@ -77,11 +77,11 @@ function failure(code: string, message: string): ToolBodyResult {
   return { status: "failed", summary: message, modelOutput: [{ type: "text", text: message }], failure: { code, message, retryable: false } };
 }
 
-function requiredString(value: RuntimeV2JsonValue | undefined, name: string): string {
+function requiredString(value: RuntimeJsonValue | undefined, name: string): string {
   if (typeof value !== "string" || !value.trim()) throw new BackgroundTaskInputError(`${name} must be a non-empty string.`);
   return value.trim();
 }
 
-function integer(value: RuntimeV2JsonValue | undefined, min: number, max: number): number | undefined {
+function integer(value: RuntimeJsonValue | undefined, min: number, max: number): number | undefined {
   return typeof value === "number" && Number.isInteger(value) && value >= min && value <= max ? value : undefined;
 }

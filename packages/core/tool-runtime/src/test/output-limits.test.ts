@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolArtifactRef, ToolModelOutputBlock } from "../executor.js";
 import { boundToolResult, sliceWholeChars, TOOL_BATCH_PENDING_CALL_CHARS, TOOL_RESULT_DETAIL_BYTES, TOOL_RESULT_MODEL_OUTPUT_BYTES, TOOL_RESULT_TEXT_FIELD_BYTES, ToolOutputBudget } from "../output-limits.js";
 import type { ToolExecutionResult } from "../result.js";
@@ -93,7 +93,7 @@ describe("boundToolResult", () => {
 
   it("merges text and json blocks in order and keeps file references", async () => {
     const { saved, save } = store();
-    const value = { rows: Array.from({ length: 20_000 }, (_, index) => ({ index, name: `row-${index}` })) } as unknown as RuntimeV2JsonValue;
+    const value = { rows: Array.from({ length: 20_000 }, (_, index) => ({ index, name: `row-${index}` })) } as unknown as RuntimeJsonValue;
     const image = { type: "artifact" as const, artifact: { artifactId: "image-1", mediaType: "image/png", size: 10, sha256: "2".repeat(64) }, label: "Screenshot" };
     const bounded = await boundToolResult(result({ modelOutput: [{ type: "text", text: "Rows:" }, image, { type: "json", value }] }), { saveFullOutput: save });
     expect(saved).toEqual([`Rows:\n${JSON.stringify(value)}`]);

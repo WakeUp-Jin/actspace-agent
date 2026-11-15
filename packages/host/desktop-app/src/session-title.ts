@@ -1,6 +1,6 @@
 import { ACTSPACE_SERVICE_IDS, containNotification, getService, provideService, requireService, serviceKey, serviceView, type CordisContext } from "@actspace/cordis-adapter";
 import type { SessionHandle } from "@actspace/session-persistence";
-import { coreEvent, type RuntimeV2JsonValue, type RuntimeV2RunTurnRequest, type RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import { coreEvent, type RuntimeJsonValue, type RuntimeRunTurnRequest, type RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
 import { LLM_AUXILIARY_REQUESTS_SERVICE, LLM_SERVICE } from "@actspace/llm-service";
 import { completeText } from "./complete-text.js";
 
@@ -8,12 +8,12 @@ import { completeText } from "./complete-text.js";
 export class SessionTitleBehavior {
   readonly #titleJobs = new Map<string, { controller: AbortController; done: Promise<void> }>();
   #disposed = false;
-  readonly #snapshot: (session: SessionHandle) => RuntimeV2SessionSnapshot;
+  readonly #snapshot: (session: SessionHandle) => RuntimeSessionSnapshot;
   readonly #complete: (input: Parameters<typeof completeText>[1]) => ReturnType<typeof completeText>;
-  constructor(snapshot: (session: SessionHandle) => RuntimeV2SessionSnapshot, complete: (input: Parameters<typeof completeText>[1]) => ReturnType<typeof completeText>) { this.#snapshot = snapshot; this.#complete = complete; }
+  constructor(snapshot: (session: SessionHandle) => RuntimeSessionSnapshot, complete: (input: Parameters<typeof completeText>[1]) => ReturnType<typeof completeText>) { this.#snapshot = snapshot; this.#complete = complete; }
   get busy(): boolean { return this.#titleJobs.size > 0; }
   cancel(sessionId: string): void { this.#titleJobs.get(sessionId)?.controller.abort(); }
-  prepare(session: SessionHandle, input: RuntimeV2RunTurnRequest, snapshot: RuntimeV2SessionSnapshot) {
+  prepare(session: SessionHandle, input: RuntimeRunTurnRequest, snapshot: RuntimeSessionSnapshot) {
     if (!this.#disposed && snapshot.metadata.title === null && !this.#titleJobs.has(input.sessionId)) {
       const title = titleFromContent(input.content);
       if (title !== null) {
@@ -25,7 +25,7 @@ export class SessionTitleBehavior {
       }
     }
   }
-  async #generateTitle(session: SessionHandle, input: RuntimeV2RunTurnRequest, fallback: string, signal: AbortSignal): Promise<void> {
+  async #generateTitle(session: SessionHandle, input: RuntimeRunTurnRequest, fallback: string, signal: AbortSignal): Promise<void> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30_000);
     const cancel = () => controller.abort();
@@ -61,7 +61,7 @@ export class SessionTitleBehavior {
 
 export const DESKTOP_TITLES_SERVICE = serviceKey<SessionTitleBehavior>("desktop.titles");
 /** 标题生成用到的 `session.runtime`：只要快照。 */
-export const TITLE_SESSIONS_VIEW = serviceView<{ snapshot(session: SessionHandle): RuntimeV2SessionSnapshot }>(ACTSPACE_SERVICE_IDS.sessionRuntime);
+export const TITLE_SESSIONS_VIEW = serviceView<{ snapshot(session: SessionHandle): RuntimeSessionSnapshot }>(ACTSPACE_SERVICE_IDS.sessionRuntime);
 
 export const inject = ["session.runtime", "llm.service", "llm.auxiliary-requests"];
 export function apply(ctx: CordisContext): void {
@@ -71,20 +71,20 @@ export function apply(ctx: CordisContext): void {
   if (!recorder) throw new Error("Session title requires llm.auxiliary-requests");
   const titles = new SessionTitleBehavior(session => sessions.snapshot(session), input => completeText(llm, { ...input, auxiliary: { recorder, owner: { sessionId: input.sessionId!, purpose: "session-title" } } }));
   provideService(ctx, DESKTOP_TITLES_SERVICE, titles);
-  ctx.on?.("application/run-preparing", containNotification(ctx, (event: { session: SessionHandle; input: RuntimeV2RunTurnRequest; snapshot: RuntimeV2SessionSnapshot }) => titles.prepare(event.session, event.input, event.snapshot)));
+  ctx.on?.("application/run-preparing", containNotification(ctx, (event: { session: SessionHandle; input: RuntimeRunTurnRequest; snapshot: RuntimeSessionSnapshot }) => titles.prepare(event.session, event.input, event.snapshot)));
   ctx.on?.("application/title-changing", containNotification(ctx, (event: { sessionId: string }) => titles.cancel(event.sessionId)));
   ctx.effect?.(() => () => titles.dispose(), "desktop.titles");
 }
 
-function titleFromContent(value: RuntimeV2JsonValue): string | null {
+function titleFromContent(value: RuntimeJsonValue): string | null {
   const raw = textFromContent(value);
   const normalized = raw.trim().replace(/\s+/g, " ");
   if (!normalized) return null;
   return normalized.length <= 48 ? normalized : `${normalized.slice(0, 47)}...`;
 }
 
-function textFromContent(value: RuntimeV2JsonValue): string {
-  if (value && typeof value === "object" && !Array.isArray(value) && "kind" in value && value.kind === "composer-task") return textFromContent((value as { prepared: RuntimeV2JsonValue }).prepared);
+function textFromContent(value: RuntimeJsonValue): string {
+  if (value && typeof value === "object" && !Array.isArray(value) && "kind" in value && value.kind === "composer-task") return textFromContent((value as { prepared: RuntimeJsonValue }).prepared);
   return typeof value === "string" ? value : Array.isArray(value) ? value.flatMap((item) => item !== null && typeof item === "object" && !Array.isArray(item) && item.type === "text" && typeof item.text === "string" ? [item.text] : []).join(" ") : "";
 }
 

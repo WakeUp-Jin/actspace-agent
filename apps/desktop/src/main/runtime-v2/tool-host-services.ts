@@ -5,8 +5,8 @@ import { createNodeToolPorts as createImageinspection, IMAGE_INSPECTION_HOST_POR
 import { createLlmImageInspector, type SessionArtifactReader } from "@actspace/tool-image-inspection";
 import { createNodeSandboxHostPort, SANDBOX_HOST_PORT_ID } from "@actspace/sandbox";
 import { IMAGE_INSPECTION_CREDENTIAL_REF } from "./credential-resolver";
-import type { DesktopRuntimeV2ModelPort } from "./model-port";
-export function createDesktopToolHostServices(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly modelRuntime: DesktopRuntimeV2ModelPort; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tool-runtime").SessionArtifactResolver; readonly nonoPath?: string; readonly python?: import("@actspace/python-runtime").PythonRuntimeForBash }) {
+import type { DesktopRuntimeModelPort } from "./model-port";
+export function createDesktopToolHostServices(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly modelRuntime: DesktopRuntimeModelPort; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tool-runtime").SessionArtifactResolver; readonly nonoPath?: string; readonly python?: import("@actspace/python-runtime").PythonRuntimeForBash }) {
   return Object.freeze({
     [SANDBOX_HOST_PORT_ID]: createNodeSandboxHostPort({ nonoPath: options.nonoPath }),
     // File and shell tools live in the Harness; Desktop only grants roots, artifact resolution and the bundled Python.

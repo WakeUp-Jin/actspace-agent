@@ -5,7 +5,7 @@ import { HOST_WRITABLE_ROOTS_SERVICE, isPathWithin, PROCESS_HOST_PORT, TOOL_RUNT
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { getBashHardRejectReason } from "./command-rules.js";
-import { detectScriptCommand, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { detectScriptCommand, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntimeContract, ToolPermissionContract } from "@actspace/tool-runtime";
 import { ACTSPACE_SERVICE_DEFINITIONS, ACTSPACE_SERVICE_IDS, bindServiceType, getService, provideService, serviceView, type CordisContext } from "@actspace/cordis-adapter";
 import { BACKGROUND_TASK_HOST_PORT, type BackgroundTaskHost } from "@actspace/background-tasks";
@@ -21,7 +21,7 @@ function createGrantedPorts(grant: ProcessHostGrant, background: BackgroundTaskH
 }
 
 export type ToolName = (typeof SHELL_TOOLS_TOOLS)[number];
-export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
+export type ToolHandler = (args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & {
   readonly hasRunningBackgroundTask?: (sessionId: string) => boolean;
   /** Canonical Host-owned scratch directory; registered as Host-writable and accepted as a script location. */
@@ -139,7 +139,7 @@ function permissionContract(name: ToolName, sandbox: SandboxService | undefined,
   return Object.freeze(contract);
 }
 /** The schema checks each field; asking without saying why, or saying why without asking, is a malformed call in every mode. */
-function escalation(args: Readonly<Record<string, RuntimeV2JsonValue>>): "none" | "requested" | "invalid" {
+function escalation(args: Readonly<Record<string, RuntimeJsonValue>>): "none" | "requested" | "invalid" {
   const requested = args.sandbox_permissions === "require_escalated";
   const justified = typeof args.justification === "string" && args.justification.trim() !== "";
   return requested && justified ? "requested" : requested || "justification" in args ? "invalid" : "none";

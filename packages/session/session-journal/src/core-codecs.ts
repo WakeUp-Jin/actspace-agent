@@ -1,4 +1,4 @@
-import { isCommandPrefixSelector, isSurfaceNode, SUBAGENT_ACTIVATION_STATUSES, SUBAGENT_DELIVERIES, SUBAGENT_KINDS, SUBAGENT_PRESETS, SUBAGENT_RESULT_LIMIT_BYTES, type CoreEventType, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { isCommandPrefixSelector, isSurfaceNode, SUBAGENT_ACTIVATION_STATUSES, SUBAGENT_DELIVERIES, SUBAGENT_KINDS, SUBAGENT_PRESETS, SUBAGENT_RESULT_LIMIT_BYTES, type CoreEventType, type RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { EventCodecRegistry, type EventCodec } from "./codec-registry.js";
 import { SessionError } from "./errors.js";
 import { validateAuxiliaryRequest } from "./auxiliary-codec.js";
@@ -104,7 +104,7 @@ function createCoreCodec(type: CoreSessionEventType): EventCodec {
     ownerPluginId: "@actspace/core",
     currentVersion: 1,
     criticality: "required",
-    validate: (data: RuntimeV2JsonValue) => validateCoreData(type, data),
+    validate: (data: RuntimeJsonValue) => validateCoreData(type, data),
   });
 }
 
@@ -114,35 +114,35 @@ function createExtensionCodec(type: PersistedExtensionEventType): EventCodec {
     ownerPluginId: "@actspace/core",
     currentVersion: 1,
     criticality: "required",
-    validate: (data: RuntimeV2JsonValue) => {
+    validate: (data: RuntimeJsonValue) => {
       if (data === null || typeof data !== "object" || Array.isArray(data)) {
         throw invalid(type, "data must be an object");
       }
       if (type === "llm/auxiliary-start" || type === "llm/auxiliary-end") validateAuxiliaryRequest(type, record(data));
       if (type === "agent/mode-set") {
-        const mode = (data as Readonly<Record<string, RuntimeV2JsonValue>>).mode;
-        const revision = (data as Readonly<Record<string, RuntimeV2JsonValue>>).revision;
+        const mode = (data as Readonly<Record<string, RuntimeJsonValue>>).mode;
+        const revision = (data as Readonly<Record<string, RuntimeJsonValue>>).revision;
         if (mode !== "chat" && mode !== "plan" && mode !== "agent") throw invalid(type, "mode must be chat, plan or agent");
         if (!Number.isSafeInteger(revision) || (revision as number) < 1) throw invalid(type, "revision must be a positive integer");
       }
-      if (type.startsWith("permission/")) validatePermissionData(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
-      if (type === "background/task") validateBackgroundTaskData(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
-      if (type === "surface/replaced") validateSurfaceReplaced(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
+      if (type.startsWith("permission/")) validatePermissionData(type, data as Readonly<Record<string, RuntimeJsonValue>>);
+      if (type === "background/task") validateBackgroundTaskData(type, data as Readonly<Record<string, RuntimeJsonValue>>);
+      if (type === "surface/replaced") validateSurfaceReplaced(type, data as Readonly<Record<string, RuntimeJsonValue>>);
       // 恢复结果的模型可见文案存在 data.content，节点由 surfaceNode 推出（agent-spec-surface-derived.md §4.2）。
-      if (type === "tool/recovery-outcome" && typeof (data as Readonly<Record<string, RuntimeV2JsonValue>>).content !== "string") throw invalid(type, "content must be a string");
-      if (type === "subagent/spawned") validateSubagentSpawned(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
-      if (type === "subagent/activation") validateSubagentActivation(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
-      if (type === "session/rewound") validateSessionRewound(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
+      if (type === "tool/recovery-outcome" && typeof (data as Readonly<Record<string, RuntimeJsonValue>>).content !== "string") throw invalid(type, "content must be a string");
+      if (type === "subagent/spawned") validateSubagentSpawned(type, data as Readonly<Record<string, RuntimeJsonValue>>);
+      if (type === "subagent/activation") validateSubagentActivation(type, data as Readonly<Record<string, RuntimeJsonValue>>);
+      if (type === "session/rewound") validateSessionRewound(type, data as Readonly<Record<string, RuntimeJsonValue>>);
     },
   });
 }
 
 /** 替换事件带被替换范围的估算，上下文估算投影据此扣减（agent-spec-request-record.md §6.3.1）。 */
-function validateSurfaceReplaced(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+function validateSurfaceReplaced(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   const replaced = data.replacedTokens;
   if (replaced === null || typeof replaced !== "object" || Array.isArray(replaced)) throw invalid(type, "replacedTokens must be an object");
   for (const field of ["conversation", "summarizedConversation"] as const) {
-    const value = (replaced as Readonly<Record<string, RuntimeV2JsonValue>>)[field];
+    const value = (replaced as Readonly<Record<string, RuntimeJsonValue>>)[field];
     if (!Number.isSafeInteger(value) || (value as number) < 0) throw invalid(type, `replacedTokens.${field} must be a non-negative integer`);
   }
   requireId(data.estimatorVersion, type, "estimatorVersion");
@@ -151,7 +151,7 @@ function validateSurfaceReplaced(type: PersistedExtensionEventType, data: Readon
 }
 
 /** 从某一轮重来之后，重新打开的会话追加这一条（agent-edit-resend-rewind.md §3.6）。 */
-function validateSessionRewound(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+function validateSessionRewound(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   for (const field of ["cutSeq", "droppedThroughSeq"] as const) {
     if (!Number.isSafeInteger(data[field]) || (data[field] as number) < 0) throw invalid(type, `${field} must be a non-negative integer`);
   }
@@ -161,7 +161,7 @@ function validateSessionRewound(type: PersistedExtensionEventType, data: Readonl
   requireTimestamp(data.rewoundAt, type, "rewoundAt");
 }
 
-function validateBackgroundTaskData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+function validateBackgroundTaskData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   requireId(data.taskId, type, "taskId");
   if (data.op === "start") {
     if (data.kind !== "bash" && data.kind !== "agent") throw invalid(type, "kind must be bash or agent");
@@ -185,7 +185,7 @@ function validateBackgroundTaskData(type: PersistedExtensionEventType, data: Rea
   throw invalid(type, "op must be start, settle or prune");
 }
 
-function validateSubagentSpawned(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+function validateSubagentSpawned(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   for (const field of ["agentId", "callId", "description", "transcriptPath"] as const) requireId(data[field], type, field);
   if (!oneOf(data.kind, SUBAGENT_KINDS)) throw invalid(type, "kind must be local, fork, codex or claude-code");
   if (data.kind === "local") {
@@ -198,7 +198,7 @@ function validateSubagentSpawned(type: PersistedExtensionEventType, data: Readon
   requireTimestamp(data.createdAt, type, "createdAt");
 }
 
-function validateSubagentActivation(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+function validateSubagentActivation(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   requireId(data.agentId, type, "agentId");
   requireId(data.activationId, type, "activationId");
   if (data.op === "start") {
@@ -225,11 +225,11 @@ function validateSubagentActivation(type: PersistedExtensionEventType, data: Rea
   throw invalid(type, "op must be start or settle");
 }
 
-function oneOf<T extends string>(value: RuntimeV2JsonValue | undefined, values: readonly T[]): value is T {
+function oneOf<T extends string>(value: RuntimeJsonValue | undefined, values: readonly T[]): value is T {
   return typeof value === "string" && (values as readonly string[]).includes(value);
 }
 
-function validatePermissionData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+function validatePermissionData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   if (type === "permission/mode-set") {
     if (data.mode !== "default" && data.mode !== "full-access" && data.mode !== "auto-review") throw invalid(type, "mode must be default or full-access or auto-review");
     return;
@@ -276,7 +276,7 @@ function validatePermissionData(type: PersistedExtensionEventType, data: Readonl
   if (data.kind === "deny" && !["user-denied", "timeout", "aborted", "broker-unavailable", "invalid-decision"].includes(String(data.code))) throw invalid(type, "deny code is invalid");
 }
 
-function validateGrantAdded(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+function validateGrantAdded(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   requireSchemaVersion(data, type);
   for (const field of ["grantId", "sessionId", "agentId", "sourceRequestId", "sourceCallId", "sourceToolName", "issuedAt"] as const) requireId(data[field], type, field);
   requireTimestamp(data.issuedAt, type, "issuedAt");
@@ -287,13 +287,13 @@ function validateGrantAdded(type: PersistedExtensionEventType, data: Readonly<Re
   validateGrantScope(type, data);
 }
 
-function validateGrantSuggestion(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+function validateGrantSuggestion(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   for (const field of ["suggestionId", "label"] as const) requireId(data[field], type, `grantSuggestions.${field}`);
   if (data.lifetime !== "session") throw invalid(type, "grantSuggestions.lifetime must be session");
   validateGrantScope(type, data);
 }
 
-function validateGrantScope(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+function validateGrantScope(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   const process = data.action === "process.execute";
   if (!process && data.action !== "file.read" && data.action !== "file.write") throw invalid(type, "invalid grant action");
   if (data.access !== (process ? "execute" : data.action === "file.read" ? "read" : "write")) throw invalid(type, "action and access must agree");
@@ -310,19 +310,19 @@ function validateGrantScope(type: PersistedExtensionEventType, data: Readonly<Re
   else throw invalid(type, "selector.kind must be exact or subtree");
 }
 
-function requireSchemaVersion(data: Readonly<Record<string, RuntimeV2JsonValue>>, type: string): void {
+function requireSchemaVersion(data: Readonly<Record<string, RuntimeJsonValue>>, type: string): void {
   if (data.schemaVersion !== 1) throw invalid(type, "schemaVersion must be 1");
 }
 
-function requireTimestamp(value: RuntimeV2JsonValue | undefined, type: string, field: string): void {
+function requireTimestamp(value: RuntimeJsonValue | undefined, type: string, field: string): void {
   if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) throw invalid(type, `${field} must be a valid timestamp`);
 }
 
-function requireCanonicalPath(value: RuntimeV2JsonValue | undefined, type: string, field: string): void {
+function requireCanonicalPath(value: RuntimeJsonValue | undefined, type: string, field: string): void {
   if (typeof value !== "string" || value.length === 0 || !(/^\//.test(value) || /^[A-Za-z]:[\\/]/.test(value)) || /[*?\[\]{}]/.test(value)) throw invalid(type, `${field} must be an absolute canonical path without glob syntax`);
 }
 
-function validateCoreData(type: CoreSessionEventType, data: RuntimeV2JsonValue): void {
+function validateCoreData(type: CoreSessionEventType, data: RuntimeJsonValue): void {
   if (!isRecord(data)) throw invalid(type, "data must be an object");
   switch (type) {
     case "turn/start":
@@ -388,19 +388,19 @@ function validateCoreData(type: CoreSessionEventType, data: RuntimeV2JsonValue):
   }
 }
 
-function isRecord(value: RuntimeV2JsonValue): value is Readonly<Record<string, RuntimeV2JsonValue>> {
+function isRecord(value: RuntimeJsonValue): value is Readonly<Record<string, RuntimeJsonValue>> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function record(value: RuntimeV2JsonValue | undefined): Readonly<Record<string, RuntimeV2JsonValue>> {
+function record(value: RuntimeJsonValue | undefined): Readonly<Record<string, RuntimeJsonValue>> {
   return value !== undefined && isRecord(value) ? value : {};
 }
 
-function requireId(value: RuntimeV2JsonValue | undefined, type: string, field: string): void {
+function requireId(value: RuntimeJsonValue | undefined, type: string, field: string): void {
   if (typeof value !== "string" || value.length === 0) throw invalid(type, `${field} must be a non-empty string`);
 }
 
-function requireToolName(value: RuntimeV2JsonValue | undefined, type: string): void {
+function requireToolName(value: RuntimeJsonValue | undefined, type: string): void {
   if (typeof value !== "string" || !/^[a-zA-Z0-9_-]+$/.test(value)) throw invalid(type, "name must match ^[a-zA-Z0-9_-]+$");
 }
 

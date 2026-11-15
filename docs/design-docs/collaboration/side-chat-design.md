@@ -34,7 +34,7 @@
 ```text
 renderer  右栏 sideChat tab ─ SideChatView（TurnView + Composer） ─ /side
    │ IPC sessions.openSideChat / sessions.listSideChats
-main      RuntimeV2Registry.openSideChat ─ usage 目录 side_chat_parent_id
+main      DesktopRuntimeRegistry.openSideChat ─ usage 目录 side_chat_parent_id
    │
 agent-service  AgentApplication.openSideChat：算分叉点 → SessionStore.fork(origin "side-chat") → 设 Plan 模式
    │                    ↑ resolveSideChatBoundary（纯函数）

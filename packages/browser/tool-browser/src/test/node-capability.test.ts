@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ApprovalBroker } from "@actspace/tool-runtime";
 import type { ToolCapabilitySet, ToolExecutionContext } from "@actspace/tool-runtime";
 import type { ToolJournalPort, ToolPreparedEnvironment } from "@actspace/tool-runtime";
@@ -78,7 +78,7 @@ describe("v2 Browser Bridge capability", () => {
   it("binds preflight and run to exact actions, Session and Turn without exposing the token", async () => {
     const trace: Array<{ readonly method: string; readonly params: unknown }> = [];
     const browser = createNodeBrowserCapability({ ready: true, socketPath: "/unused", transportFactory: () => fakeTransport(trace) });
-    const args = { actions: [{ category: "navigation", action: "goto", params: { url: "https://example.com" } }], stop_on_error: true } as unknown as Readonly<Record<string, RuntimeV2JsonValue>>;
+    const args = { actions: [{ category: "navigation", action: "goto", params: { url: "https://example.com" } }], stop_on_error: true } as unknown as Readonly<Record<string, RuntimeJsonValue>>;
     const result = await browser.command("browser_run", args, context());
     await browser.endTurn?.("session-1", "turn-1");
     expect(result.status).toBe("completed");

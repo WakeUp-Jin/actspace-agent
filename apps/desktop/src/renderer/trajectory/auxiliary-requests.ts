@@ -1,9 +1,9 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { TrajectoryCell, TrajectoryRecord, TrajectoryRequestView } from "./contract";
 import { parseTimestamp } from "./format";
 
-const dataOf = (record: TrajectoryRecord) => record.raw as Readonly<Record<string, RuntimeV2JsonValue>>;
-const text = (value: RuntimeV2JsonValue | undefined) => typeof value === "string" ? value : null;
+const dataOf = (record: TrajectoryRecord) => record.raw as Readonly<Record<string, RuntimeJsonValue>>;
+const text = (value: RuntimeJsonValue | undefined) => typeof value === "string" ? value : null;
 export type AuxiliaryRequest = { key: string; start: TrajectoryRecord; end?: TrajectoryRecord };
 
 /** Auxiliary attempts have their own identity; sharing a parent step never merges them with its main request. */

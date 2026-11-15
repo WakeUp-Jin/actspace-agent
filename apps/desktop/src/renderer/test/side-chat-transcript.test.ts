@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MessageBlock, SessionListItem } from "@actspace/shared";
-import type { RuntimeV2EventWindow } from "@actspace/shared/runtime-v2";
+import type { RuntimeEventWindow } from "@actspace/shared/runtime-v2";
 import {
   countInheritedTurns,
   hideInheritedMessages,
@@ -16,7 +16,7 @@ const createdAt = "2026-10-21T00:00:00.000Z";
 const user = (id: string, content: string, sourceSeq?: number, runId?: string): MessageBlock => ({ kind: "user", id, content, createdAt, sourceSeq, runId });
 const assistant = (id: string, sourceSeq?: number, runId?: string): MessageBlock => ({ kind: "assistant", id, content: id, createdAt, sourceSeq, runId });
 
-function eventWindow(types: readonly string[], fromSeq = 0, turnOffset = 0): RuntimeV2EventWindow {
+function eventWindow(types: readonly string[], fromSeq = 0, turnOffset = 0): RuntimeEventWindow {
   return {
     events: types.map((type, index) => ({ seq: fromSeq + index, type })),
     fromSeq,
@@ -24,7 +24,7 @@ function eventWindow(types: readonly string[], fromSeq = 0, turnOffset = 0): Run
     beforeSeq: fromSeq > 0 ? fromSeq - 1 : null,
     turnOffset,
     requestOffset: 0,
-  } as unknown as RuntimeV2EventWindow;
+  } as unknown as RuntimeEventWindow;
 }
 
 describe("side chat transcript", () => {

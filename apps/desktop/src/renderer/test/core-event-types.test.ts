@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { coreEvent, type CoreEventDataMap, type CoreEventType, type RuntimeV2JsonValue, type SessionEventCandidateV1 } from "@actspace/shared/runtime-v2";
+import { coreEvent, type CoreEventDataMap, type CoreEventType, type RuntimeJsonValue, type SessionEventCandidateV1 } from "@actspace/shared/runtime-v2";
 
 /**
  * 类型层校验：`coreEvent` 只接受 `CoreEventDataMap` 里登记的事件名和字段。
@@ -11,7 +11,7 @@ describe("core event builder types", () => {
     expectTypeOf(coreEvent("turn/start", { turnId: "t", agentRunId: "r", mode: "agent", modeRevision: 0 })).toEqualTypeOf<SessionEventCandidateV1>();
     expectTypeOf(coreEvent("user/message", { messageId: "m", agentRunId: "r", content: "hi" }, { surface: { kind: "append" } })).toEqualTypeOf<SessionEventCandidateV1>();
     // 每种事件的 data 都能直接当 JSON 用，构造函数里不需要类型断言。
-    expectTypeOf<CoreEventDataMap[CoreEventType]>().toMatchTypeOf<RuntimeV2JsonValue>();
+    expectTypeOf<CoreEventDataMap[CoreEventType]>().toMatchTypeOf<RuntimeJsonValue>();
   });
 
   it("rejects unknown event names and wrong fields at compile time", () => {

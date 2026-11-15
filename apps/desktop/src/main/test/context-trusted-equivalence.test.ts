@@ -19,7 +19,7 @@ import { expect, it } from "vitest";
 import { ContextEngine, ContextInstanceRegistry, ContextReducerRegistry, ContextSourceRegistry, projectContext, requestRecords, type Context, type ContextRequest, type ContextSession, type ContextSource, type ContextSupplement } from "@actspace/context-engine";
 import { createConversationSource } from "@actspace/context-conversation";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1, SessionJournal } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { convert, readOldFixture, seedJournal } from "./surface-fixture";
 
 const GOLDEN = join(__dirname, "fixtures", "context-trusted", "expected.json");
@@ -72,10 +72,10 @@ const IGNORED_KEYS: Record<string, unknown> = { instanceGeneration: "<generation
 function stable(value: unknown): string {
   return JSON.stringify(value, (key, child) => key in IGNORED_KEYS ? IGNORED_KEYS[key] : child);
 }
-function plain(value: unknown): RuntimeV2JsonValue { return JSON.parse(stable(value)) as RuntimeV2JsonValue; }
+function plain(value: unknown): RuntimeJsonValue { return JSON.parse(stable(value)) as RuntimeJsonValue; }
 function digest(value: unknown): string { return createHash("sha256").update(stable(value)).digest("hex"); }
 
-async function run(): Promise<Record<string, RuntimeV2JsonValue>> {
+async function run(): Promise<Record<string, RuntimeJsonValue>> {
   const { header, oldEvents } = readOldFixture();
   const events = oldEvents.map(convert);
   const journal = seedJournal(events.slice(0, COMPACTION_START), () => "2026-11-07T12:00:00.000Z");
@@ -92,14 +92,14 @@ async function run(): Promise<Record<string, RuntimeV2JsonValue>> {
     }),
   });
 
-  const steps: RuntimeV2JsonValue[] = [];
-  let last: RuntimeV2JsonValue = null;
+  const steps: RuntimeJsonValue[] = [];
+  let last: RuntimeJsonValue = null;
   const record = async (label: string, request: ContextRequest, how: "get" | "reconcile") => {
     const current = engine();
     let context: Context = how === "get" ? await current.getContext(request) : await current.reconcile(request, journal.lastSeq);
     const input = await current.toLlmInput(context);
     context = await current.recordPrepared(context, { modelKey: `${request.routeId}/${request.model}`, label: request.model, contextWindow: 200_000, autoCompactAtTokens: 160_000 });
-    const records = requestRecords(context, { sessionId: request.sessionId, routeId: input.routeId, model: input.model, tools: input.tools }, { prepared: label } as RuntimeV2JsonValue, "composition-digest", "host-digest");
+    const records = requestRecords(context, { sessionId: request.sessionId, routeId: input.routeId, model: input.model, tools: input.tools }, { prepared: label } as RuntimeJsonValue, "composition-digest", "host-digest");
     // 摘要按 JSON 串算，键顺序也算在内（发给 provider 的 JSON 顺序影响提示缓存）。
     steps.push({
       label,
@@ -133,7 +133,7 @@ async function run(): Promise<Record<string, RuntimeV2JsonValue>> {
   const legacyContext = await legacy.getContext({ ...base, requestId: "legacy-1" });
   const legacyInput = await legacy.toLlmInput(legacyContext);
 
-  return { steps: steps as RuntimeV2JsonValue, last, legacy: { contextRevision: legacyContext.status.contextRevision ?? null, digests: { llmInput: digest(legacyInput), projection: digest(projectContext(legacyContext)) } } };
+  return { steps: steps as RuntimeJsonValue, last, legacy: { contextRevision: legacyContext.status.contextRevision ?? null, digests: { llmInput: digest(legacyInput), projection: digest(projectContext(legacyContext)) } } };
 }
 
 it("keeps revisions, model input, panel projection and request records identical to the copying engine", async () => {
