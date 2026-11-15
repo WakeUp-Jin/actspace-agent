@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SettingsV4Snapshot, UsageActivityRow, UsageActivitySnapshot } from "@actspace/shared";
 import { UsageStatisticsPage } from "../components/UsageStatisticsPage";
 import { mockUsageActivity } from "../mock/usage-stats-fixture";
-import { gapNote, rangeDays, tokenTypeSegments } from "../components/usage/usage-stats-model";
+import { costDetail, gapNote, rangeDays, tokenTypeSegments } from "../components/usage/usage-stats-model";
 
 const NOW = new Date("2026-11-07T12:00:00.000Z");
 const data = mockUsageActivity({ range: "month" }, NOW);
@@ -70,6 +70,13 @@ describe("使用统计", () => {
     expect(tip).toHaveTextContent("模型未配置价格：1 次");
     expect(tip).toHaveTextContent("服务商未返回缓存字段：1 次");
     expect(gapNote({ ...data, summary: { ...data.summary, unknownTokenRequestCounts: { ...known, cacheWrite: 3 } }, costSummary: { ...data.costSummary!, unknownCostRequestCount: 0 } })).toBeNull();
+  });
+
+  it("费用明细把 1 小时缓存写入单列，按输入价 2 倍计", () => {
+    const pricingSnapshot = { providerId: "anthropic", connectionId: null, modelKey: "anthropic:m", apiModel: "m", currency: "USD" as const, rates: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 }, multiplier: 1, source: "configured" as const, contentHash: "x", fetchedAt: "2026-11-15T00:00:00Z", capturedAt: "2026-11-15T00:00:00Z", unsupportedBilling: false };
+    const row: UsageActivityRow = { ...data.rows[0], costAmount: 1, costCurrency: "USD", costProvenance: { version: 1, basis: "estimated", reason: null, pricingSnapshot }, tokens: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 1_000_000, cacheWrite1hTokens: 400_000, reasoningTokens: null, totalTokens: 1_000_000 } };
+    expect(costDetail(row)?.rows).toEqual([["缓存写入（5 分钟）", "$2.2500"], ["缓存写入（1 小时）", "$2.4000"]]);
+    expect(costDetail({ ...row, tokens: { ...row.tokens, cacheWrite1hTokens: undefined } })?.rows).toEqual([["缓存写入", "$3.7500"]]);
   });
 
   it("Token 按类型：模型回复 = 输出 − 思考", () => {

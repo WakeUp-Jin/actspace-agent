@@ -86,14 +86,16 @@ it("prices catalog matches at the reference rate times the multiplier and never 
   expect(runtime.resolvePricing(manualModel.model, "claude-manual")).toMatchObject({ source: "configured", rates: { input: 4, output: 20 } });
 });
 
-it.each(["openai-completions", "anthropic-messages"] as const)("binds mode cache retention and honors connection opt-out (%s)", async (api) => {
-  for (const promptCacheMode of [undefined, "off"] as const) {
+it.each(["openai-completions", "anthropic-messages"] as const)("binds mode cache retention unless the connection sets a duration or opts out (%s)", async (api) => {
+  for (const promptCacheMode of [undefined, "off", "short", "long"] as const) {
     const resolution = { ok: true as const, model: { key: "fixture", definition: { api, provider: "openrouter", apiModel: "anthropic/claude-fixture", contextWindow: 1_000_000 }, providerRuntime: { baseUrl: "https://openrouter.ai/api/v1", promptCacheMode } } };
     const adapter = new DesktopLlmAdapter({ resolveMainModel: () => resolution, resolveImageInspectionModel: () => resolution, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); });
     try {
       for (const cacheRetention of ["long", "short", "none"] as const) {
         await adapter.dispatch({ request: { model: "fixture", options: { cacheRetention } }, credential: {}, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
-        expect(wire).toHaveBeenLastCalledWith(expect.objectContaining({ cacheRetention: promptCacheMode === "off" ? "none" : cacheRetention }));
+        // 连接设置优先于模式策略；没有连接设置时按请求模式。
+        const expected = promptCacheMode === "off" ? "none" : promptCacheMode ?? cacheRetention;
+        expect(wire).toHaveBeenLastCalledWith(expect.objectContaining({ cacheRetention: expected }));
       }
     } finally { await adapter.dispose(); }
   }

@@ -25,7 +25,7 @@ import { OutputFiles } from "./OutputFiles";
 
 function BlockView({ block, sessionId }: { readonly block: MessageBlock; readonly sessionId: string }) {
   switch (block.kind) {
-    case "user": return <UserBubble text={block.content} />;
+    case "user": return <UserBubble block={block} />;
     case "assistant": return <AssistantText content={block.content} />;
     case "thinking": return <ThinkingRow title={block.title} content={block.content} running={block.status === "running"} />;
     case "edit_diff":
@@ -137,7 +137,7 @@ export function TurnView({ turn, sessionId, active, approvalsAfter, renderApprov
   const showTail = !active && turn.reply.some(item => itemBlocks(item).some(block => block.kind === "assistant" && block.content.trim()));
   return (
     <>
-      {turn.user ? <div className="tl-user flex flex-col"><UserBubble text={turn.user.content} /></div> : null}
+      {turn.user ? <div className="tl-user flex flex-col"><UserBubble block={turn.user} /></div> : null}
       {folded ? (
         <div className="tl-proc">
           <ToolLine verb={formatWorked(workedMs(turn))} open={open} onToggle={() => setOpen(value => !value)}>

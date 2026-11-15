@@ -242,6 +242,21 @@ describe("设置 › 模型", () => {
     expect(screen.queryByRole("button", { name: /^我的中转/ })).not.toBeInTheDocument();
   });
 
+  it("Anthropic 连接可以选提示缓存时长；官方 DeepSeek 连接没有这一行", async () => {
+    await openConnection(/^Claude 中转/);
+    const select = screen.getByRole("combobox", { name: "提示缓存" });
+    expect(select).toHaveTextContent("5 分钟");
+    expect(screen.getByText("1 小时写入按输入价 2 倍计")).toBeInTheDocument();
+    await userEvent.click(select);
+    await userEvent.click(await screen.findByRole("option", { name: "1 小时" }));
+    await waitFor(() => expect(api.update).toHaveBeenCalledWith({ connectionId: RELAY, promptCacheMode: "long" }));
+    expect(await screen.findByRole("combobox", { name: "提示缓存" })).toHaveTextContent("1 小时");
+    await userEvent.click(screen.getByRole("button", { name: "返回模型" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^DeepSeek/ }));
+    await screen.findByRole("heading", { name: "连接", level: 3 });
+    expect(screen.queryByRole("combobox", { name: "提示缓存" })).not.toBeInTheDocument();
+  });
+
   it("余额读取失败时就地反馈，并可重试恢复", async () => {
     api.getBalance.mockRejectedValueOnce(new Error("deepseek balance request failed."));
     await openConnection(/^DeepSeek/);

@@ -25,6 +25,8 @@ it("exposes real JSONL files, normalizes only files and does not fabricate ephem
     await writeFile(join(dataRoot, "AGENTS.md"), "rules"); await mkdir(join(dataRoot, "directory"));
     expect(await host.normalizeFile("persisted", "AGENTS.md")).toMatch(/AGENTS\.md$/);
     expect(await host.normalizeFile("persisted", "directory")).toBeUndefined();
+    // 被误认成路径的思考签名（base64 带「/」）：realpath 抛 ENAMETOOLONG，只算「不是文件」。
+    expect(await host.normalizeFile("persisted", `Eu${"A".repeat(2200)}/tail`)).toBeUndefined();
     expect(await host.normalizeFile("unknown", "AGENTS.md")).toBeUndefined();
     expect(await host.historyPath("persisted")).toBe(await host.normalizeFile("persisted", sessionFileLayout(dataRoot, "persisted").journalPath));
     expect(await host.historyPath("ephemeral")).toBeUndefined();

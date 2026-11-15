@@ -48,6 +48,7 @@ import type { ProviderNetworkService } from "./runtime-v2/provider-network-servi
 import type { SettingsService } from "./settings-service";
 import { ProviderSettingsError } from "./settings/types";
 import { normalizeBaseUrl, normalizePricingMultiplier, normalizeProxyUrl } from "./settings/sanitize";
+import { resolvePromptCacheMode } from "./settings/custom-connection";
 
 /**
  * 设置 › 模型：连接、连接下的模型、用途表。
@@ -238,6 +239,9 @@ export class ModelConnectionsService {
       if (input.proxy !== undefined) next.proxy = normalizeProxy(input.proxy);
       if (input.multiplier !== undefined) next.defaultPricingMultiplier = normalizePricingMultiplier(input.multiplier);
       if (input.enabled !== undefined) next.enabled = input.enabled === true;
+      if (input.promptCacheMode !== undefined && (next.protocol ?? connectionProtocol(current, template)) === "anthropic-messages") next.promptCacheMode = input.promptCacheMode;
+      // 协议变了：缓存模式回到新协议的默认值（Anthropic 5 分钟，其他关闭）。
+      if (next.protocol !== current.protocol && next.protocol) next.promptCacheMode = resolvePromptCacheMode(next.protocol);
       const addressChanged = next.baseUrl !== current.baseUrl || next.protocol !== current.protocol;
       const apiKey = input.apiKey?.trim() || undefined;
       // 地址、协议或 Key 变了，之前测出来的认证方式和连接状态都作废。
@@ -403,6 +407,7 @@ export class ModelConnectionsService {
       lastConnection: connection.lastConnection,
       multiplier: connection.defaultPricingMultiplier ?? 1,
       proxy: connection.proxy,
+      ...(connectionProtocol(connection, template) === "anthropic-messages" ? { promptCacheMode: resolvePromptCacheMode("anthropic-messages", connection.promptCacheMode) } : {}),
       balance: Boolean(template.balance),
       ...(legacy && connection.providerId === "openrouter" ? { hasManagementKey: this.settings.hasOpenRouterManagementKey() } : {}),
       models,

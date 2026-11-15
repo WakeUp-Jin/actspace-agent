@@ -219,6 +219,16 @@ describe("Tool Runtime execution contract", () => {
     expect(Object.isFrozen(value.nested)).toBe(true);
   });
 
+  it("drops placeholder arguments a model sends to a parameterless tool, but still rejects typos elsewhere", () => {
+    const parameterless = { type: "object", properties: {}, required: [], additionalProperties: false };
+    // DeepSeek 对空参数工具会编一个 `_call` 键。
+    expect(materializeToolArguments(parameterless, { _call: "list_subagent_models" })).toEqual({});
+    expect(materializeToolArguments(parameterless, {})).toEqual({});
+    expect(() => materializeToolArguments(parameterless, "x")).toThrow();
+    const withParams = { type: "object", properties: { id: { type: "string" } }, additionalProperties: false };
+    expect(() => materializeToolArguments(withParams, { id: "a", _call: 1 })).toThrow(/Unknown property/);
+  });
+
   it("keeps executor facts and finalizers when post-execute changes or throws", async () => {
     for (const throws of [false, true]) {
       const root = await createCordisRoot();

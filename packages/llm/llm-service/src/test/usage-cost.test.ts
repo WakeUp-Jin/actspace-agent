@@ -18,6 +18,14 @@ describe("usage cost", () => {
     expect(calculateUsageCost(usage, { ...pricing, rates: { input: 0, output: 0, cacheRead: null, cacheWrite: null } }).cost).toBe(0);
     expect(calculateUsageCost({ ...usage, cacheReadTokens: 1 }, { ...pricing, rates: { ...pricing.rates, cacheRead: null } }).cost).toBeNull();
   });
+  it("prices the 1-hour cache write share at twice the input rate", () => {
+    const usage = { ...EMPTY_LLM_USAGE, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 1_000_000, cacheWrite1hTokens: 400_000, source: "provider-reported" as const };
+    // 60 万 × 3（5 分钟写入价）+ 40 万 × 2 × 2（输入价 × 2）
+    expect(calculateUsageCost(usage, pricing).cost).toBeCloseTo(1.8 + 1.6, 10);
+    expect(calculateUsageCost({ ...usage, cacheWrite1hTokens: 5_000_000 }, pricing).cost).toBeCloseTo(4, 10);
+    expect(calculateUsageCost({ ...usage, cacheWrite1hTokens: undefined }, pricing).cost).toBeCloseTo(3, 10);
+    expect(calculateUsageCost(usage, { ...pricing, rates: { ...pricing.rates, input: null } }).cost).toBeNull();
+  });
   it("rejects unsupported billing, missing usage and invalid counts", () => {
     expect(calculateUsageCost(EMPTY_LLM_USAGE, pricing).cost).toBeNull();
     expect(calculateUsageCost({ ...EMPTY_LLM_USAGE, inputTokens: -1, outputTokens: 1 }, pricing).cost).toBeNull();

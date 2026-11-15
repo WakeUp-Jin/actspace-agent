@@ -44,7 +44,7 @@ type PiAiModels = { setProvider(provider: PiAiProvider): void; getModel(provider
 type PiAiModel = { readonly id: string; readonly provider: string };
 type PiAiContext = { readonly systemPrompt?: string; readonly messages: readonly RuntimeJsonValue[]; readonly tools?: readonly RuntimeJsonValue[] };
 type PiAiWireUsage = { readonly version: 1; readonly input: number | null; readonly output: number | null; readonly cacheRead: number | null; readonly cacheWrite: number | null; readonly reasoning: number | null };
-type PiAiUsage = { readonly actspaceWireUsage?: PiAiWireUsage };
+type PiAiUsage = { readonly actspaceWireUsage?: PiAiWireUsage; readonly cacheWrite1h?: number };
 type PiAiAssistant = { readonly content: readonly RuntimeJsonValue[]; readonly stopReason: string; readonly errorMessage?: string; readonly usage?: PiAiUsage; readonly status?: number; readonly code?: string; readonly retryAfterMs?: number };
 type PiAiEvent = { readonly type: string; readonly contentIndex?: number; readonly delta?: string; readonly content?: string; readonly toolCall?: { readonly id: string; readonly name: string; readonly arguments: RuntimeJsonValue }; readonly partial?: PiAiAssistant; readonly message?: PiAiAssistant; readonly error?: PiAiAssistant };
 
@@ -231,6 +231,8 @@ function mapUsage(usage: PiAiUsage | undefined, protocol: string): LlmUsage {
     outputTokens: wire?.output ?? null,
     cacheReadTokens: cacheRead,
     cacheWriteTokens: cacheWrite,
+    // pi-ai 只在 Anthropic 上解析 1 小时写入；字段缺失时是合成的 0，等于全按 5 分钟计价。
+    ...(protocol === "anthropic-messages" && cacheWrite !== null && typeof usage?.cacheWrite1h === "number" && Number.isFinite(usage.cacheWrite1h) && usage.cacheWrite1h > 0 ? { cacheWrite1hTokens: Math.min(usage.cacheWrite1h, cacheWrite) } : {}),
     reasoningTokens: wire?.reasoning ?? null,
     cost: null, costCurrency: null,
     source: wire && [wire.input, wire.output, wire.cacheRead, wire.cacheWrite, wire.reasoning].some(value => value !== null) ? "provider-reported" : "unknown",

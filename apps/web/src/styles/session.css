@@ -32,6 +32,7 @@
 
 /* 用户气泡：右对齐白底，发丝外圈。 */
 .user-bubble { align-self: flex-end; max-width: 84%; padding: 9px 14px; border-radius: var(--act-radius-xl); background: var(--act-color-surface); box-shadow: 0 0 0 0.5px var(--web-glass-edge); font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.user-bubble-meta { color: var(--act-color-text-muted); font-size: 13px; }
 
 /* 时间线间距：块 14；过程行之间 5；用户消息后 18；新一轮用户消息前 30。 */
 .timeline { display: flex; flex-direction: column; }

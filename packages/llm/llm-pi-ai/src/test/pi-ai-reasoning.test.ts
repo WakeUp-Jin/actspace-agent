@@ -33,6 +33,13 @@ it.each(["short", "long", "none"] as const)("passes Anthropic cache retention an
   expect(streamOptions).toMatchObject({ sessionId: "session-cache", cacheRetention });
 });
 
+it.each([[300, 300], [0, undefined], [900, 500]] as const)("maps pi-ai cacheWrite1h %s into the 1-hour write share", async (cacheWrite1h, expected) => {
+  const usage = { actspaceWireUsage: { version: 1 as const, input: 10, output: 5, cacheRead: 0, cacheWrite: 500, reasoning: null }, cacheWrite1h };
+  const engine = new PiAiAdapter({ wire: { route: "anthropic-messages", providerId: "custom", baseUrl: "https://relay.example", load: async () => ({ core: { createProvider: () => ({ id: "custom" }), createModels: () => ({ setProvider: () => {}, getModel: () => ({ id: "claude", provider: "custom" }), streamSimple: () => (async function* () { yield { type: "done", message: { content: [], stopReason: "stop", usage } }; })() }) }, api: { stream: () => {}, streamSimple: () => {} } }) } });
+  const input = { request: { requestId: "r", model: "claude", messages: [], tools: [], options: {} }, credential: {}, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput;
+  for await (const event of await engine.dispatch(input)) if (event.type === "done") expect(event.usage.cacheWrite1hTokens).toBe(expected);
+});
+
 it("ignores the SDK zero-price cost and freezes an estimated price for the request", async () => {
   const { calculateCost } = await import("@earendil-works/pi-ai");
   const usage = { actspaceWireUsage: { version: 1 as const, input: 3000, output: 500, cacheRead: 2000, cacheWrite: 0, reasoning: null }, input: 1000, output: 500, cacheRead: 2000, cacheWrite: 0, totalTokens: 3500, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };

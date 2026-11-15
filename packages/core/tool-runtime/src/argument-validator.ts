@@ -6,11 +6,23 @@ export function materializeToolArguments(
   schema: JsonSchema,
   input: unknown,
 ): Readonly<Record<string, RuntimeJsonValue>> {
-  const value = cloneJson(input, "$");
+  const value = dropArgumentsOfParameterlessTool(schema, cloneJson(input, "$"));
   applyDefaults(schema, value);
   validateSchema(schema, value, "$", true);
   if (value === null || typeof value !== "object" || Array.isArray(value)) fail("$", "Tool arguments must be an object.");
   return deepFreeze(value as Record<string, RuntimeJsonValue>);
+}
+
+/**
+ * 没有任何参数的工具（`properties` 为空、`additionalProperties: false`）：模型传来的键一律丢掉。
+ * 部分模型（DeepSeek）对空参数工具会编一个占位键，例如 `{"_call": …}`；这种调用没有可写错的参数，不该失败。
+ * 有参数的工具照旧严格校验，写错的键继续报 `Unknown property`。
+ */
+function dropArgumentsOfParameterlessTool(schema: JsonSchema, value: RuntimeJsonValue): RuntimeJsonValue {
+  if (schema.additionalProperties !== false) return value;
+  if (isRecord(schema.properties) && Object.keys(schema.properties).length > 0) return value;
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+  return {};
 }
 
 function applyDefaults(schema: JsonSchema, value: RuntimeJsonValue): void {

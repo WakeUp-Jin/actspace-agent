@@ -6,11 +6,11 @@ import { SubagentMessageCard } from "../messages/SubagentMessageCard";
 import { TodoListBlock } from "../messages/TodoListBlock";
 import { ReplyStreamingContext, WritingReplyContext } from "../messages/reply-streaming-context";
 import { ToolActivityGroup } from "../messages/ToolActivityGroup";
-import { USER_ANNOTATIONS_ROW_CLASS, UserMessage } from "../messages/UserMessage";
+import { USER_ANNOTATIONS_ONLY_ROW_CLASS, USER_ANNOTATIONS_ROW_CLASS, UserMessage } from "../messages/UserMessage";
 import { renderMessageList, type SubagentOpenHandler, type ReadMessageBlock } from "./render-message";
 import { TurnTail } from "../turn-tail/TurnTail";
 import { TurnActions } from "./TurnActions";
-import { finalAssistantMessages, getLatestTodoMessage, hasToolLikeItem, liftSubagentMessages, splitTurnMessages, workDurationMs, type ConversationTurn } from "./turns";
+import { finalAssistantMessages, getLatestTodoMessage, hasToolLikeItem, liftSubagentMessages, splitTurnMessages, userMessageHasBody, workDurationMs, type ConversationTurn } from "./turns";
 import { TurnPromptEditor } from "./TurnPromptEditor";
 import { useTurnEdit } from "./turn-edit-context";
 
@@ -19,8 +19,9 @@ const MESSAGE_TURN_CLASS = "message-turn relative flex min-w-0 flex-col gap-0";
 const TURN_PROMPT_CLASS = "turn-prompt min-w-0 py-4";
 // 来信唤醒的一轮以来信卡片开头，占提问卡片的位置。
 const TURN_LETTER_CLASS = "turn-prompt min-w-0 pt-4 pb-2";
+const TURN_PROMPT_ANCHOR_CLASS = "turn-prompt-card";
 const TURN_PROMPT_CARD_CLASS =
-  "turn-prompt-card overflow-hidden rounded-act-lg border border-line bg-surface";
+  `${TURN_PROMPT_ANCHOR_CLASS} overflow-hidden rounded-act-lg border border-line bg-surface`;
 // 可编辑的提问卡片：悬停边框加深、文本光标，点击原地变成编辑器（agent-edit-resend-rewind.md §5.1）。
 const TURN_PROMPT_CARD_EDITABLE_CLASS = "cursor-text transition-[border-color] duration-(--motion-fast) hover:border-line-strong";
 // 编辑时，编辑器以下（这一轮的正文、轮尾和之后所有轮次）变淡、不响应鼠标；发送时淡出。
@@ -91,29 +92,34 @@ function TurnPrompt({
     edit.start(turn.id);
   };
 
+  const showTodo = Boolean(latestTodo && (latestTodo.totalCount > 0 || latestTodo.status === "failed"));
+  // 只发回复批注（没有文字、附件和待办）时不画空卡片，只留批注胶囊；这样的提问也就没有可点的编辑入口。
+  const showCard = userMessageHasBody(turn.user) || showTodo;
+
   return (
     <div className={TURN_PROMPT_CLASS}>
       {turn.user.responseAnnotations?.length ? (
-        <div className={USER_ANNOTATIONS_ROW_CLASS}>
+        // 没有卡片时批注行顶替卡片的锚点：PinnedTurnPrompt 按 `.turn-prompt-card` 判断提问是否滚出视野。
+        <div className={showCard ? USER_ANNOTATIONS_ROW_CLASS : `${TURN_PROMPT_ANCHOR_CLASS} ${USER_ANNOTATIONS_ONLY_ROW_CLASS}`}>
           <ResponseAnnotationPill annotations={turn.user.responseAnnotations} variant="sent" />
         </div>
       ) : null}
-      <div
-        className={canEdit ? `${TURN_PROMPT_CARD_CLASS} ${TURN_PROMPT_CARD_EDITABLE_CLASS}` : TURN_PROMPT_CARD_CLASS}
-        data-editable={canEdit ? "true" : undefined}
-        title={canEdit ? "点击编辑并重新发送" : undefined}
-        onClick={canEdit ? startEdit : undefined}
-      >
-        <UserMessage
-          message={turn.user}
-          onOpenAttachmentPreview={onOpenAttachmentPreview}
-          sessionId={sessionId}
-          variant="execution"
-        />
-        {latestTodo && (latestTodo.totalCount > 0 || latestTodo.status === "failed") ? (
-          <TodoListBlock message={latestTodo} attached />
-        ) : null}
-      </div>
+      {showCard ? (
+        <div
+          className={canEdit ? `${TURN_PROMPT_CARD_CLASS} ${TURN_PROMPT_CARD_EDITABLE_CLASS}` : TURN_PROMPT_CARD_CLASS}
+          data-editable={canEdit ? "true" : undefined}
+          title={canEdit ? "点击编辑并重新发送" : undefined}
+          onClick={canEdit ? startEdit : undefined}
+        >
+          <UserMessage
+            message={turn.user}
+            onOpenAttachmentPreview={onOpenAttachmentPreview}
+            sessionId={sessionId}
+            variant="execution"
+          />
+          {showTodo && latestTodo ? <TodoListBlock message={latestTodo} attached /> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

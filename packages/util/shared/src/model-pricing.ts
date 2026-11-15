@@ -1,7 +1,7 @@
 import { deepSeekPeakPricing, DEEPSEEK_FLASH_RELEASE_AT } from "./deepseek-model-facts";
 import { CNY_PER_USD } from "./usage-cost";
 import type { ModelPricing } from "./model-config";
-import type { ModelCatalogSnapshot, ModelPricingSnapshot } from "./model-catalog";
+import type { CatalogRates, ModelCatalogSnapshot, ModelPricingSnapshot } from "./model-catalog";
 
 /** Resolve by endpoint owner, not the legacy credential namespace or display name. */
 export function catalogProviderForEndpoint(baseUrl: string): string | null {
@@ -35,4 +35,9 @@ export function resolveModelPricing(catalog: ModelCatalogSnapshot, input: { prov
   const factor = configured ? currencyFactor : multiplier * currencyFactor;
   const rate = (value: number | null) => value === null ? null : value * factor;
   return { providerId: configured ? input.providerId : owner!, connectionId: input.connectionId ?? null, modelKey: input.modelKey, apiModel: input.apiModel, currency: "USD", rates: { input: rate(baseRates.input), output: rate(baseRates.output), cacheRead: rate(baseRates.cacheRead), cacheWrite: rate(baseRates.cacheWrite) }, multiplier, source: configured ? "configured" : entry!.source, contentHash: configured ? JSON.stringify(configured) : catalog.contentHash, fetchedAt: configured ? capturedAt : entry!.fetchedAt ?? catalog.generatedAt, capturedAt, unsupportedBilling: configured ? input.unsupportedBilling === true || configured.reasoningPerMillion !== undefined : entry!.unsupportedBilling };
+}
+
+/** Anthropic 1 小时缓存写入单价：基础输入价 × 2（5 分钟是 × 1.25，用 rates.cacheWrite）。输入价未知则未知。 */
+export function cacheWrite1hRate(rates: CatalogRates): number | null {
+  return rates.input === null ? null : rates.input * 2;
 }

@@ -1,4 +1,4 @@
-import type { MessageBlock } from "@actspace/shared";
+import { hasReadableText, type MessageBlock } from "@actspace/shared";
 
 // 会话时间线 = 已落盘块 + 流式块（规则对齐桌面端 renderer/session/transcript.ts），再把相邻的探索类工具合并成一组。
 
@@ -48,6 +48,8 @@ export function groupTranscript(entries: readonly TranscriptEntry[]): Transcript
       if (group) group.blocks.push(entry.block); else group = { key: entry.key, blocks: [entry.block] };
       continue;
     }
+    // 空的或只有标点的回复段（两次工具调用之间的一个「.」）不占一行，也不打断探索组；原文仍在 durable 里。
+    if (entry.block.kind === "assistant" && !hasReadableText(entry.block.content)) continue;
     flush();
     items.push({ type: "block", key: entry.key, block: entry.block });
   }

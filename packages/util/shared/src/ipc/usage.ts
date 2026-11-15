@@ -75,6 +75,8 @@ export type UsageActivityTokens = {
   outputTokens: number | null;
   cacheReadTokens: number | null;
   cacheWriteTokens: number | null;
+  /** cacheWriteTokens 里 1 小时缓存的部分（Anthropic）；缺省表示没有或未报告。 */
+  cacheWrite1hTokens?: number;
   reasoningTokens: number | null;
   totalTokens: number | null;
 };

@@ -7,6 +7,8 @@ import { sessionsApi } from "../../api/sessions";
 const USER_MESSAGE_CLASS = "message-row user-message flex flex-col items-stretch animate-[rise-in_260ms_ease_both]";
 // 已发送的回复批注胶囊：贴在它所属的用户消息上方，右对齐。execution 变体由 TurnPrompt 放在卡片外面。
 export const USER_ANNOTATIONS_ROW_CLASS = "flex justify-end pb-2";
+// 只发批注、没有卡片时：胶囊独占这一行，不留和卡片之间的间距。
+export const USER_ANNOTATIONS_ONLY_ROW_CLASS = "flex justify-end";
 const USER_CARD_CLASS =
   "user-card w-full rounded-act-lg border border-line bg-surface px-[var(--conversation-card-padding)] py-3 text-act-base leading-relaxed text-text-main";
 const USER_EXECUTION_CARD_CLASS =
@@ -106,6 +108,9 @@ export function UserMessage({
   const attachments = message.attachments ?? EMPTY_ATTACHMENTS;
   const [previewById, setPreviewById] = useState<Record<string, string>>({});
   const cardClass = variant === "execution" ? USER_EXECUTION_CARD_CLASS : USER_CARD_CLASS;
+  const annotations = message.responseAnnotations ?? [];
+  // 只发回复批注时没有文字也没有附件：standalone 不画空卡片，只留批注胶囊。
+  const hasBody = Boolean(message.content) || attachments.length > 0;
 
   useEffect(() => {
     if (!sessionId) return;
@@ -132,42 +137,44 @@ export function UserMessage({
 
   return (
     <article className={USER_MESSAGE_CLASS}>
-      {variant === "standalone" && message.responseAnnotations?.length ? (
-        <div className={USER_ANNOTATIONS_ROW_CLASS}>
-          <ResponseAnnotationPill annotations={message.responseAnnotations} variant="sent" />
+      {variant === "standalone" && annotations.length > 0 ? (
+        <div className={hasBody ? USER_ANNOTATIONS_ROW_CLASS : USER_ANNOTATIONS_ONLY_ROW_CLASS}>
+          <ResponseAnnotationPill annotations={annotations} variant="sent" />
         </div>
       ) : null}
-      <div className={cardClass}>
-        {message.content ? <UserMessageContent content={message.content} /> : null}
-        {attachments.length > 0 ? (
-          <div className={USER_ATTACHMENTS_CLASS} aria-label="Message attachments">
-            {attachments.map((attachment) => {
-              if (attachment.kind === "image") {
-                const effectiveAttachment = { ...attachment, previewUrl: attachment.previewUrl ?? previewById[attachment.id] };
-                return (
-                  <button
-                    type="button"
-                    className={USER_IMAGE_ATTACHMENT_CLASS}
-                    aria-label={`Preview message image ${attachment.name}`}
-                    disabled={!effectiveAttachment.previewUrl || !onOpenAttachmentPreview}
-                    key={attachment.id}
-                    onClick={() => onOpenAttachmentPreview?.(effectiveAttachment)}
-                    style={getAttachmentPreviewStyle(effectiveAttachment)}
-                    title={attachment.name}
-                  />
-                );
-              }
+      {hasBody || annotations.length === 0 ? (
+        <div className={cardClass}>
+          {message.content ? <UserMessageContent content={message.content} /> : null}
+          {attachments.length > 0 ? (
+            <div className={USER_ATTACHMENTS_CLASS} aria-label="Message attachments">
+              {attachments.map((attachment) => {
+                if (attachment.kind === "image") {
+                  const effectiveAttachment = { ...attachment, previewUrl: attachment.previewUrl ?? previewById[attachment.id] };
+                  return (
+                    <button
+                      type="button"
+                      className={USER_IMAGE_ATTACHMENT_CLASS}
+                      aria-label={`Preview message image ${attachment.name}`}
+                      disabled={!effectiveAttachment.previewUrl || !onOpenAttachmentPreview}
+                      key={attachment.id}
+                      onClick={() => onOpenAttachmentPreview?.(effectiveAttachment)}
+                      style={getAttachmentPreviewStyle(effectiveAttachment)}
+                      title={attachment.name}
+                    />
+                  );
+                }
 
-              return (
-                <div className={USER_FILE_ATTACHMENT_CLASS} aria-label={`Attached file ${attachment.name}`} key={attachment.id}>
-                  <FileText size={16} aria-hidden="true" />
-                  <span className={USER_FILE_NAME_CLASS}>{attachment.name}</span>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
+                return (
+                  <div className={USER_FILE_ATTACHMENT_CLASS} aria-label={`Attached file ${attachment.name}`} key={attachment.id}>
+                    <FileText size={16} aria-hidden="true" />
+                    <span className={USER_FILE_NAME_CLASS}>{attachment.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }

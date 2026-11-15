@@ -6,11 +6,14 @@ import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
 import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
 import type { RuntimeSessionController } from "../session/session-controller.js";
 
+const NOT_A_FILE_CODES: ReadonlySet<string> = new Set(["ENOENT", "ENOTDIR", "EACCES", "ENAMETOOLONG", "ELOOP", "EINVAL"]);
+
 /** File discovery only; reading these references still uses ordinary tool permissions. */
 export function createContextHost(getSessions: () => RuntimeSessionController | undefined, tools: Omit<ToolPreparedEnvironment, "journal">): DisclosureHost {
   const file = async (path: string): Promise<string | undefined> => {
     try { const canonical = await realpath(path); return (await stat(canonical)).isFile() ? canonical : undefined; }
-    catch (error) { if (["ENOENT", "ENOTDIR", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? "")) return; throw error; }
+    // 候选路径只是从对话文本里猜出来的提示：不存在、太长（ENAMETOOLONG，例如被误认作路径的 base64）或成环都只是「不是文件」，不能让压缩失败。
+    catch (error) { if (NOT_A_FILE_CODES.has((error as NodeJS.ErrnoException).code ?? "")) return; throw error; }
   };
   return {
     normalizeFile: async (sessionId, path) => {

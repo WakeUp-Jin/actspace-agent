@@ -45,18 +45,18 @@ beforeEach(() => {
 });
 afterEach(() => rectSpy.mockRestore());
 
-function Harness({ onJump }: { onJump?: (turnId: string) => void }) {
+function Harness({ onJump, turns = TURNS }: { onJump?: (turnId: string) => void; turns?: ConversationTurn[] }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   return (
     <div>
       <div ref={scrollRef} data-testid="scroller" data-top="0" data-bottom="600">
-        {TURNS.map((turn) => (
+        {turns.map((turn) => (
           <section key={turn.id} data-conversation-turn-id={turn.id} data-testid={`turn-${turn.id}`}>
             <div className="turn-prompt-card" data-testid={`card-${turn.id}`} />
           </section>
         ))}
       </div>
-      <PinnedTurnPrompt scrollRef={scrollRef} turns={TURNS} className="w-full" onJump={onJump} />
+      <PinnedTurnPrompt scrollRef={scrollRef} turns={turns} className="w-full" onJump={onJump} />
     </div>
   );
 }
@@ -110,5 +110,12 @@ describe("PinnedTurnPrompt", () => {
     scrollTo(2200);
     expect(await screen.findByRole("button", { name: "回到提问：那 Linux 上对应的机制是什么？" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/^任务/)).not.toBeInTheDocument();
+  });
+
+  it("只发批注的一轮写「N 条批注」，不是空行", async () => {
+    const annotationOnly = { ...user("u1", ""), responseAnnotations: [{ annotationId: "a" }, { annotationId: "b" }] } as unknown as UserBlock;
+    render(<Harness turns={[{ id: "t1", user: annotationOnly, messages: [] }, TURNS[1]]} />);
+    scrollTo(400);
+    expect(await screen.findByRole("button", { name: "回到提问：2 条批注" })).toBeInTheDocument();
   });
 });

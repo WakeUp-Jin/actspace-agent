@@ -7,6 +7,7 @@ import {
   type ConnectionProbeResult,
   type ConnectionUpdateInput,
   type ConnectionView,
+  type CustomConnectionPromptCacheMode,
   type ModelApi,
   type ModelConnectionsView,
   type ProbedModel,
@@ -27,6 +28,11 @@ import { ModelsError, useModelsPage } from "./ModelsPage";
 
 const PROTOCOL_OPTIONS = (Object.keys(PROTOCOL_LABELS) as ModelApi[]).map((value) => ({ value, label: PROTOCOL_LABELS[value] }));
 const CURRENCY_SYMBOL: Record<string, string> = { CNY: "¥", USD: "$" };
+const PROMPT_CACHE_OPTIONS: { value: CustomConnectionPromptCacheMode; label: string }[] = [
+  { value: "short", label: "5 分钟" },
+  { value: "long", label: "1 小时" },
+  { value: "off", label: "关闭" },
+];
 /** 移除后撤销条停留多久，到点才真正移除。 */
 const UNDO_MS = 8000;
 
@@ -329,6 +335,19 @@ function ConnectionGroup({ connection, saved, update }: { connection: Connection
         />
         {mark("proxy")}
       </FieldRow>
+      {connection.promptCacheMode ? (
+        <FieldRow label="提示缓存">
+          <Select
+            value={connection.promptCacheMode}
+            options={PROMPT_CACHE_OPTIONS}
+            ariaLabel="提示缓存"
+            className="w-[120px] flex-none"
+            onValueChange={(mode) => void update("promptCacheMode", { promptCacheMode: mode as CustomConnectionPromptCacheMode })}
+          />
+          <span className="min-w-0 text-act-xs text-text-faint">1 小时写入按输入价 2 倍计</span>
+          {mark("promptCacheMode")}
+        </FieldRow>
+      ) : null}
     </SettingGroup>
   );
 }

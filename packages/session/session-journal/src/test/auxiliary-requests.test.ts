@@ -49,7 +49,13 @@ describe("auxiliary model request facts", () => {
     expect(journal.lastSeq).toBe(4);
   });
 
-  it.each([{}, { ...usage, inputTokens: -1 }, { ...usage, outputTokens: "20" }, { ...usage, source: "made-up" }])("rejects malformed nullable usage %j", badUsage => {
+  it("accepts an optional 1-hour cache write count", () => {
+    const journal = setup();
+    journal.append(event("llm/auxiliary-start", start));
+    journal.append(event("llm/auxiliary-end", { ...end, usage: { ...usage, cacheWriteTokens: 50, cacheWrite1hTokens: 30 } }));
+  });
+
+  it.each([{}, { ...usage, inputTokens: -1 }, { ...usage, outputTokens: "20" }, { ...usage, source: "made-up" }, { ...usage, cacheWrite1hTokens: -1 }])("rejects malformed nullable usage %j", badUsage => {
     const journal = setup();
     journal.append(event("llm/auxiliary-start", start));
     expect(() => journal.append(event("llm/auxiliary-end", { ...end, usage: badUsage }))).toThrow();

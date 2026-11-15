@@ -148,6 +148,20 @@ export function liftSubagentMessages(processItems: MessageBlock[], running: bool
   return { process: processItems.filter((message) => !isSubagentMessageNotice(message)), letters: processItems.filter(isSubagentMessageNotice) };
 }
 
+/** 用户消息有没有要放进卡片的正文：文字或附件。只发回复批注时两样都没有，只显示批注胶囊。 */
+export function userMessageHasBody(user: UserMessageBlock): boolean {
+  return Boolean(user.content) || (user.attachments?.length ?? 0) > 0;
+}
+
+/** 一行摘要（顶部固定行、轮次导航）：文字 → `N 个附件` → `N 条批注`。 */
+export function userMessageSummary(user: UserMessageBlock): string {
+  if (user.content) return user.content;
+  const attachmentCount = user.attachments?.length ?? 0;
+  if (attachmentCount > 0) return `${attachmentCount} 个附件`;
+  const annotationCount = user.responseAnnotations?.length ?? 0;
+  return annotationCount > 0 ? `${annotationCount} 条批注` : "";
+}
+
 function normalizeTurnPreviewText(content: string): string {
   return content.replace(/\s+/g, " ").trim();
 }
@@ -166,7 +180,7 @@ export function createTurnNavigationItems(
 
     return {
       id: turn.id,
-      input: normalizeTurnPreviewText(turn.user.content),
+      input: normalizeTurnPreviewText(userMessageSummary(turn.user)),
       reply: finalReply ? normalizeTurnPreviewText(finalReply) : null,
       pending: isStreaming && index === userTurns.length - 1,
     };

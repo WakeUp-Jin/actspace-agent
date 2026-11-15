@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeSessionSnapshot, RuntimeUsageSummary } from "@actspace/shared/runtime-v2/projection";
 import type { SessionProjectionContextValue } from "../session";
-import { ComposerStatsPills, activityPillModel, usagePillModel } from "../components/composer/ComposerStatsPills";
+import { ComposerStatsPills, activityPillModel, summaryPillModel, usagePillModel } from "../components/composer/ComposerStatsPills";
 import {
   formatCacheHitPercent,
   formatDuration,
@@ -121,6 +121,23 @@ describe("pill models", () => {
   });
 });
 
+describe("summaryPillModel (narrow status row)", () => {
+  it("merges steps and total tokens into one pill whose panel stacks both dialogs", () => {
+    const stats: ComposerSessionStats = { ...NO_STATS, turns: 2, steps: 30, llmMs: 134_000, decodeMs: 1_000, decodeTokens: 211 };
+    const model = summaryPillModel(stats, usage({ inputTokens: 118_204, cacheReadTokens: 1_002_881, outputTokens: 82_357 }));
+    expect(model?.label).toEqual(["30 步", "1.2M tok"]);
+    expect(model?.ariaLabel).toBe("会话统计：2 轮 30 步 · 累计 1.2M tok · 缓存命中 89%");
+    expect(model?.dialogs.map((dialog) => dialog.title)).toEqual(["会话统计", "会话累计消耗"]);
+    expect(model?.dialogs[0].rows[0]).toEqual(["轮次", "2 轮 30 步"]);
+  });
+
+  it("keeps whichever half exists and hides when neither does", () => {
+    expect(summaryPillModel(NO_STATS, null)).toBeNull();
+    expect(summaryPillModel({ ...NO_STATS, turns: 1, steps: 1 }, null)?.label).toEqual(["1 步"]);
+    expect(summaryPillModel(NO_STATS, usage({ inputTokens: 10, outputTokens: 5 }))?.label).toEqual(["15 tok"]);
+  });
+});
+
 describe("ComposerStatsPills", () => {
   beforeEach(() => {
     projection = null;
@@ -159,6 +176,19 @@ describe("ComposerStatsPills", () => {
     await userEvent.click(outside);
     expect(screen.queryByRole("dialog", { name: "会话累计消耗" })).toBeNull();
     outside.remove();
+  });
+
+  it("renders the wide pills and the narrow merged pill side by side, switched by container queries", async () => {
+    setProjection({ usage: usage({ inputTokens: 1_967, cacheReadTokens: 8_033, outputTokens: 2_240 }) });
+    render(<ComposerStatsPills />);
+    const usagePill = document.querySelector("[data-composer-stat=usage]")!;
+    const summary = document.querySelector("[data-composer-stat=summary]")!;
+    expect(usagePill.className).toContain("@max-[560px]:hidden");
+    expect(summary.className).toContain("@max-[560px]:inline-flex");
+    expect(summary.className.split(" ")).not.toContain("inline-flex");
+    await userEvent.click(summary);
+    const dialog = await screen.findByRole("dialog", { name: "会话统计与累计消耗" });
+    expect(dialog).toHaveTextContent("12,240 tok");
   });
 
   it("reports panel toggles to the composer overlay instead of opening on its own", async () => {

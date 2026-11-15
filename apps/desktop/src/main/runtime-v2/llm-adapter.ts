@@ -72,7 +72,11 @@ export class DesktopLlmAdapter implements LlmAdapter {
     if (capabilities?.reasoning === false) { delete requestOptions.reasoning; delete requestOptions.reasoningEffort; }
     const requestModel = reasoningEffort ? model.definition.requestModelByReasoningEffort?.[reasoningEffort] ?? model.definition.apiModel : model.definition.apiModel;
     const route = toWireRoute(model.definition.api);
-    const cacheRetention = runtime.promptCacheMode === "off" ? "none" : requestedOptions.cacheRetention ?? "short";
+    // 连接上的缓存设置优先于按模式的策略；没有连接级设置（OpenRouter 内置连接）才按请求模式。
+    const cacheRetention = runtime.promptCacheMode === "off" ? "none"
+      : runtime.promptCacheMode === "long" ? "long"
+      : runtime.promptCacheMode === "short" ? "short"
+      : requestedOptions.cacheRetention ?? "short";
     const pricingModel = model;
     const pricing = this.models.resolvePricing ? this.models.resolvePricing(pricingModel, requestModel) : resolveModelPricing(BUILTIN_MODEL_CATALOG, customConnectionPricingInput(pricingModel, requestModel));
     const endpointOwner = catalogProviderForEndpoint(runtime.baseUrl ?? "");

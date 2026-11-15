@@ -395,6 +395,11 @@ export function ToolLogLine({ message, className, onOpenFile, onExpand, onOpenSu
   }
 
   const status = message.status === "pending" ? "running" : message.status;
+  // 失败时不把原始报错（多是英文的参数校验信息）拼进标题行：写「标题 · 失败」，报错收进展开项。
+  // 拒绝（denied）的说明是我们自己写的中文短句，仍留在一行里。
+  if (message.content && status !== "denied" && (message.isError || status === "failed")) {
+    return <ResultPreviewBlock displayText={`${message.title} · 失败`} status="failed" detail={message.content} className={className} />;
+  }
   return (
     <OverflowToolLine
       className={getToolLogLineClass(status, className)}

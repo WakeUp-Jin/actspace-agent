@@ -9,7 +9,11 @@ import type {
 
 export function resolvePromptCacheMode(protocol: ModelApi, value?: CustomConnectionPromptCacheMode): CustomConnectionPromptCacheMode {
   if (protocol !== "anthropic-messages") return "off";
-  return value === "off" ? "off" : "short";
+  return value === "off" || value === "long" ? value : "short";
+}
+
+export function isPromptCacheMode(value: unknown): value is CustomConnectionPromptCacheMode {
+  return value === "short" || value === "long" || value === "off";
 }
 
 export function isCustomConnectionAuthMode(value: unknown): value is CustomConnectionAuthMode {
