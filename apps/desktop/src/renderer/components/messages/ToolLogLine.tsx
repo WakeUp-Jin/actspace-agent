@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import type { MessageBlock } from "@actspace/shared";
+import type { DocumentReadInfo, MessageBlock } from "@actspace/shared";
 import { ToolLogShimmer } from "./ToolLogShimmer";
 import { observeOverflow } from "./overflow-observer";
 import {
@@ -215,10 +215,12 @@ export function ToolSummary({ action, target, meta }: { action: string; target: 
   return <span className="tool-summary-parts"><span className="tool-summary-action">{action}</span>{" "}<span className="tool-summary-target" title={target}>{target}</span>{meta ? <> <span className="tool-summary-meta">{meta}</span></> : null}</span>;
 }
 
-function ResultPreviewBlock({ displayText, status, resultPreview, className, onOpenFile, detail, summaryContent, onExpand }: {
+function ResultPreviewBlock({ displayText, status, resultPreview, warning, className, onOpenFile, detail, summaryContent, onExpand }: {
   displayText: string;
   status: ToolLogStatus;
   resultPreview?: string[];
+  /** Shown as the first expanded item, in the warning color; enough on its own to make the row expandable. */
+  warning?: string;
   className?: string;
   onOpenFile?: () => void;
   detail?: string;
@@ -233,7 +235,8 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
   const detailItems = status === "completed" || status === undefined
     ? resultPreview?.length ? resultPreview : detail ? [detail] : []
     : detail ? [detail] : [];
-  if (status === "running" || (!detailItems.length && !onExpand)) {
+  const warningItem = warning && (status === "completed" || status === undefined) ? warning : undefined;
+  if (status === "running" || (!detailItems.length && !warningItem && !onExpand)) {
     return <div className={`${getToolLogLineClass(status, className)} tool-result-line`}>{summary}</div>;
   }
   return <article className={`tool-result-disclosure${getToolFailureLabel(status) ? " is-error" : ""}${className ? ` ${className}` : ""}`}>
@@ -244,7 +247,7 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
         {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </button>
     </div>
-    {expanded ? <ul className="tool-result-list">{detailItems.map((item, index) => <li key={`${item}-${index}`} className="tool-result-item">{item}</li>)}</ul> : null}
+    {expanded ? <ul className="tool-result-list">{warningItem ? <li className="tool-result-item is-warning">{warningItem}</li> : null}{detailItems.map((item, index) => <li key={`${item}-${index}`} className="tool-result-item">{item}</li>)}</ul> : null}
   </article>;
 }
 
@@ -272,10 +275,27 @@ function SubagentToolLine({ message, className, onOpenSubagent }: { message: Ext
   </article>;
 }
 
+/** A `read_document` row: the file name is plain text, not a link; the row tail is the page stats or the failure label. */
+function DocumentReadLine({ message, document, className, onExpand }: { message: Extract<MessageBlock, { kind: "read" }>; document: DocumentReadInfo; className?: string; onExpand?: () => void }) {
+  const failure = getToolFailureLabel(message.status);
+  const text = message.status === "running" ? `Read ${document.name}` : message.displayText;
+  return <ResultPreviewBlock
+    onExpand={message.status === "aborted" ? undefined : onExpand}
+    displayText={text}
+    summaryContent={<ToolSummary action="Read" target={document.name} meta={failure ?? document.stats} />}
+    detail={failure && message.status !== "aborted" ? document.errorText || undefined : undefined}
+    status={message.status}
+    resultPreview={message.resultPreview}
+    warning={document.warning}
+    className={className}
+  />;
+}
+
 export function ToolLogLine({ message, className, onOpenFile, onExpand, onOpenSubagent }: { onExpand?: () => void; message: ToolLogMessage; className?: string; onOpenFile?: (message: Extract<MessageBlock, { kind: "read" }>) => void; onOpenSubagent?: (agentId: string) => void }) {
   if (message.kind === "tool" && message.status === "pending" && message.approvalRequestId) return <GenericToolApprovalLine message={message} className={className} />;
   if (message.kind === "tool" && message.subagentLink) return <SubagentToolLine message={message} className={className} onOpenSubagent={onOpenSubagent} />;
   if ((message.kind === "read" || message.kind === "grep" || message.kind === "glob") && message.status === "pending") return <FileReadApprovalLine message={message} className={className} />;
+  if (message.kind === "read" && message.document) return <DocumentReadLine message={message} document={message.document} className={className} onExpand={onExpand} />;
   if (message.kind === "read") {
     const failure = getToolFailureLabel(message.status);
     const text = `Read ${message.filePath}${message.range ? ` ${message.range}` : ""}`;

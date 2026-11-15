@@ -7,7 +7,10 @@ const RUNNING_STATES: ReadonlySet<string | undefined> = new Set(["running", "pen
 export function exploreLine(block: ExploreBlock): { verb: string; target: string; meta?: string } {
   const scope = (value?: string) => (value ? ` in ${value}` : "");
   switch (block.kind) {
-    case "read": return { verb: "Read", target: block.filePath, ...(block.range ? { meta: block.range } : {}) };
+    case "read": {
+      const meta = block.document ? block.document.stats : block.range;
+      return { verb: "Read", target: block.document?.name ?? block.filePath, ...(meta ? { meta } : {}) };
+    }
     case "grep": return { verb: "Grep", target: `${block.pattern}${scope(block.scope)}` };
     case "glob": return { verb: "Glob", target: `${block.pattern}${scope(block.scope)}` };
     case "search": return { verb: "Searched files", target: `${block.scope ? `${block.scope} ` : ""}for ${block.query}` };

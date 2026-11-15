@@ -17,3 +17,17 @@ describe("ExploreGroup deep search row", () => {
     expect(exploreLine(deep({ stats: undefined, status: "failed" }))).toEqual({ verb: "Deep Search", target: "2026 electric car sales" });
   });
 });
+
+describe("ExploreGroup read rows", () => {
+  const read = (overrides: Partial<Extract<ExploreBlock, { kind: "read" }>> = {}): ExploreBlock => ({ kind: "read", id: "r", filePath: "", displayText: "x", createdAt: at, status: "completed", ...overrides });
+
+  it("shows a document row's name and page stats", () => {
+    expect(exploreLine(read({ document: { name: "季度报告.pdf", stats: "2 pages" } }))).toEqual({ verb: "Read", target: "季度报告.pdf", meta: "2 pages" });
+    expect(exploreLine(read({ filePath: "docs/big.pdf", document: { name: "big.pdf", stats: "pages 31-45" } }))).toEqual({ verb: "Read", target: "big.pdf", meta: "pages 31-45" });
+  });
+
+  it("keeps a plain read row's path and range", () => {
+    expect(exploreLine(read({ filePath: "src/a.ts", range: "1-40" }))).toEqual({ verb: "Read", target: "src/a.ts", meta: "1-40" });
+    expect(exploreLine(read({ filePath: "src/a.ts" }))).toEqual({ verb: "Read", target: "src/a.ts" });
+  });
+});

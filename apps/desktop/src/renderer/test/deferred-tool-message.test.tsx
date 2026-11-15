@@ -109,3 +109,19 @@ it("loads deep search detail on first expansion and keeps it open", async () => 
   fireEvent.click(toggle());
   expect(load).toHaveBeenCalledTimes(1);
 });
+
+it("loads a deferred read_document row on first expand, then shows its warning and preview lines", async () => {
+  const document = { name: "季度报告.pdf", stats: "124 pages" };
+  const message: MessageBlock = {
+    kind: "read", id: "doc", renderKey: "page:doc", createdAt: "now", filePath: "", displayText: "季度报告.pdf · 124 pages", status: "completed",
+    document, deferredToolDetail,
+  };
+  const full: MessageBlock = { ...message, renderKey: undefined, deferredToolDetail: undefined, resultPreview: ["# 第一章"], document: { ...document, warning: "第 13 页识别不完整，内容已截断。" } };
+  getSessionToolDetail.mockResolvedValueOnce([full]);
+  render(<>{renderMessage(message)}</>);
+  const toggle = screen.getByRole("button", { name: /Read 季度报告.pdf 124 pages/ });
+  fireEvent.click(toggle);
+  await waitFor(() => expect(screen.getByText("# 第一章")).toBeVisible());
+  expect(screen.getByText("第 13 页识别不完整，内容已截断。")).toHaveClass("is-warning");
+  expect(getSessionToolDetail).toHaveBeenCalledWith(deferredToolDetail);
+});

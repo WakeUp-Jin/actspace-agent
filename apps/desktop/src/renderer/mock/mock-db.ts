@@ -36,6 +36,8 @@ export type MockMessage = {
   readonly tool?: MockToolCall;
   /** role 为 assistant 时：这次请求的用量，紧跟着投影成一条带 usage 的 step/end。 */
   readonly usage?: Readonly<Record<string, RuntimeJsonValue>>;
+  /** role 为 user 时：带附件的内容块，替代 `content` 写进 user/message（如 `[{ type: "text" }, { type: "artifact" }]`）。 */
+  readonly contentBlocks?: RuntimeJsonValue;
   /** 原样写入的 journal 事件（如 background/task、delegation/*、收件箱领取），排在本条消息的事件之前。 */
   readonly events?: readonly MockRawEvent[];
 };
@@ -257,7 +259,7 @@ export function journal(session: MockSession): SessionEventEnvelopeV1[] {
       ...base(message),
       seq: events.length,
       type: message.role === "user" ? "user/message" : "assistant/message",
-      data: { agentRunId: message.agentRunId, messageId: message.id, content: message.content },
+      data: { agentRunId: message.agentRunId, messageId: message.id, content: message.contentBlocks ?? message.content },
       surface: { kind: "append" },
     });
     if (message.usage) {
