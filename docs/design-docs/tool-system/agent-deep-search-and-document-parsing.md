@@ -107,7 +107,9 @@ OCR：
 - 模型看到工具就会去调。默认关闭的付费工具摆在列表里，每次调用都白白失败一轮。
 - `read_document` 只有从列表里消失，模型才会按提示词和 Skill 走本机 Python 那条路。
 
-做法：工具始终注册，但登记时带一个同步的可见性判断。工具运行时列出工具定义时，跳过判断为「不可见」的工具；判断本身抛错时按不可见处理。按名字取工具执行的路径不受影响。
+做法（已实现）：工具始终注册，但登记时带一个同步的可见性判断（`packages/core/tool-runtime/src/registry.ts` 的 `ToolExecutorRegistration.visible`）。`ToolRegistry.listDefinitions()` 跳过判断为「不可见」的工具；判断本身抛错时按不可见处理。按名字取工具执行的路径（`capture()`）不受影响。
+
+这个机制只能用在可选插件上：主形态激活工具时（`packages/core/agent/src/agent-form.ts` 的 `activateAgentFormTools`），可选成员一个工具都不可见就跳过，必需成员的工具不可见会让 Run 启动失败。所以两个插件各自只贡献一个工具。
 
 由此得到的时序：
 
@@ -124,7 +126,7 @@ OCR：
 
 ## 6. 插件、Host 端口与 Key
 
-两个工具各自是一个可选的 Harness 插件，照网页和图片工具的方式：工具定义、参数校验和注册在插件里，联网实现由 Host 端口构造（Key 在 Host）。
+两个工具各自是一个可选的 Harness 插件，照网页和图片工具的方式：工具定义、参数校验和注册在插件里，联网实现由 Host 端口构造（Key 在 Host）。插件包、清单登记和可选端口已实现（`packages/web/tool-deep-search/`、`packages/document/tool-document/`；登记在 `packages/core/runtime/src/plugin-catalog.ts`，可选端口在 `packages/core/runtime/src/harness/default-harness.ts` 的 `OPTIONAL_HOST_SHARED_SERVICES`）；Host 端口的实现还没有，所以现在三种 Host 都不提供端口，两个工具都不注册。
 
 | | 深度搜索 | 文档解析 |
 | --- | --- | --- |
@@ -140,7 +142,7 @@ OCR：
 - 插件会出现在「扩展 › 插件」的内置插件列表里，不能关闭。是否给模型用，由上面两个设置开关决定，不由插件开关决定。
 - Host 端口有两个成员：`createPorts()` 构造工具实现，每个 Harness 一次；`available()` 就是第 5 节的可见性判断。
 - **Key 每次调用时读取**，不在构造时固定。换 Key 或删 Key 不用重启；调用时读不到 Key，返回「不可用」的失败。Key 只在主进程里流动，不进入 Journal、工具结果和 renderer。
-- 桌面端从设置读开关和 Key。CLI 和远程 Host 用环境变量：`ACTSPACE_DEEPSEEK_DEEP_SEARCH=1`、`ACTSPACE_DEEPSEEK_DOCUMENT=1`，各自和 `DEEPSEEK_API_KEY` 一起才生效，和现有的 `ACTSPACE_DEEPSEEK_SEARCH`、`ACTSPACE_DEEPSEEK_FETCH` 同一写法。CLI 的 mock 模式不提供这两个端口。
+- 桌面端从设置读开关和 Key：设置字段 `tools.deepseekDeepSearchEnabled`、`tools.deepseekDocumentEnabled`（默认 `false`）；`ModelRuntimeService.isDeepseekDeepSearchAvailable()`、`isDeepseekDocumentAvailable()` 只读 `SettingsStore` 内存里的开关、停用列表和 Key，不取设置快照（`apps/desktop/src/main/settings/store.ts`），`getDeepseekApiKey()` 每次调用时取 Key。CLI 和远程 Host 用环境变量：`ACTSPACE_DEEPSEEK_DEEP_SEARCH=1`、`ACTSPACE_DEEPSEEK_DOCUMENT=1`，各自和 `DEEPSEEK_API_KEY` 一起才生效，和现有的 `ACTSPACE_DEEPSEEK_SEARCH`、`ACTSPACE_DEEPSEEK_FETCH` 同一写法。CLI 的 mock 模式不提供这两个端口。
 - Harness 在多个会话之间共享，所以端口里的状态（文档缓存）是跨会话的，见第 8.5 节。
 
 子智能体：`general` 预设按现有规则继承这两个工具，`explore` 预设没有。

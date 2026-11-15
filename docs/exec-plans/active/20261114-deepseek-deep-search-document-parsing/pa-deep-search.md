@@ -1,6 +1,6 @@
 # PA：深度搜索
 
-状态：待审核，尚未开始（交互模式）。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。
+状态：未开始（交互模式），等 P0 确认。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。
 
 ## 目标
 

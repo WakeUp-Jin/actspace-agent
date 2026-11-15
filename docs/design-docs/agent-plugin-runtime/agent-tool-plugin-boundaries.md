@@ -8,6 +8,8 @@ Tool Runtime 只拥有注册、参数验证、权限准入、prepared execution�
 
 文件和 Shell 工具的实现随 Harness 产物打包（插件 `apply` 用授予里的根目录创建自己的 `node-ports`），Host 只保留能力门禁、审批和授予；授予是可选注入，没有时工具注册但返回 `CAPABILITY_UNAVAILABLE`。网页和图片工具仍由 Host 端口构造实现（凭据和模型绑定在 Host）。
 
+两个 DeepSeek 工具（`deep_search`、`read_document`）不走「始终注册、缺配置时报错」：它们的 Host 端口是可选注入，没有端口时不注册；有端口时注册，并把端口的 `available()` 作为工具登记上的可见性判断（`ToolExecutorRegistration.visible`）。判断为假或抛错时，`ToolRegistry.listDefinitions()` 跳过这个工具，模型看不到它；按名字取工具执行的路径不受影响。这个机制只用在可选插件上：主形态里必需成员的工具不可见会让 Run 启动失败。理由和时序见 [DeepSeek 深度搜索与文档解析工具](../tool-system/agent-deep-search-and-document-parsing.md)第 5 节。
+
 | 包 | 工具 | Host 侧 |
 |---|---|---|
 | `@actspace/tool-fs-read` | read_file、list_directory、present | 授予 `actspace.host.filesystem`（可选） |
@@ -18,6 +20,8 @@ Tool Runtime 只拥有注册、参数验证、权限准入、prepared execution�
 | `@actspace/tool-web` | web、web_search、web_fetch | `actspace.host.tools.web-tools` |
 | `@actspace/tool-image-generation` | generate_image | `actspace.host.tools.image-generation` |
 | `@actspace/tool-image-inspection` | inspect_image | `actspace.host.tools.image-inspection` |
+| `@actspace/tool-deep-search` | deep_search | `actspace.host.tools.deep-search`（可选） |
+| `@actspace/tool-document` | read_document | `actspace.host.tools.document`（可选） |
 | `@actspace/tool-todo` | todo_read、todo_write | Session / Projection 服务 |
 
 `browser-tools` 保留原有 Browser Bridge Host 边界。文件工具之间不复用注册、permission audience 或 Host factory；小型路径校验 helper 保存在各自包内，均复用 Tool Runtime 的 canonical resource 契约。

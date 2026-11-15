@@ -1,6 +1,6 @@
 # PB：文档解析
 
-状态：待审核，尚未开始（交互模式）。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。和 [PA](pa-deep-search.md) 互不依赖，默认排在 PA 之后；PA 新建、这里往里加的几个文件，任务里都写了先做 PB 时怎么办。
+状态：未开始（交互模式）。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。和 [PA](pa-deep-search.md) 互不依赖，默认排在 PA 之后；PA 新建、这里往里加的几个文件，任务里都写了先做 PB 时怎么办。
 
 ## 目标
 

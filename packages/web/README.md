@@ -1,23 +1,25 @@
 ---
-description: "网页搜索与读取的模型工具。"
+description: "网页搜索、读取与深度搜索的模型工具。"
 kind: "package-group"
 ---
 
 # web
 
-`tool-web` 提供网页搜索和读取。网络访问本身由 Host 端口完成，插件只定义工具、校验参数、登记到工具运行时。
+`tool-web` 提供网页搜索和读取，`tool-deep-search` 把问题交给 DeepSeek 深度思考搜索。网络访问本身由 Host 端口完成，插件只定义工具、校验参数、登记到工具运行时。
 
 ## 包
 
 | 包 | 角色 | 类别 | 默认 | 职责 |
 | --- | --- | --- | --- | --- |
 | `tool-web` | 工具 | 会话 | 开 | `web`、`web_search`、`web_fetch` 三个工具；提供 `tools.web-tools` |
+| `tool-deep-search` | 工具 | 会话 | 开 | `deep_search`；提供 `tools.deep-search` |
 
 ## 包之间怎么连
 
 - inject `tools.runtime` 和 Host 端口 `actspace.host.tools.web-tools`（`node-ports.ts` 是 Node 实现）。
 - manifest 声明 Host 能力 `network`。
 - 工具设置页里的“关掉网页搜索”只控制工具可见性，不影响插件加载。
+- `tool-deep-search` 的 Host 端口 `actspace.host.tools.deep-search` 是可选注入：没有时不注册工具；有时由端口的 `available()`（设置开关 + DeepSeek Key）决定模型能不能看到 `deep_search`。
 
 ## 入口与测试
 
