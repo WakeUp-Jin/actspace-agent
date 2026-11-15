@@ -47,6 +47,7 @@
     "@actspace/python-runtime": "workspace:*",
     "@actspace/tool-web": "workspace:*",
     "@actspace/tool-deep-search": "workspace:*",
+    "@actspace/tool-document": "workspace:*",
     "@actspace/tool-image-generation": "workspace:*",
     "@actspace/tool-image-inspection": "workspace:*",
     "@actspace/agent-service": "workspace:*",

@@ -134,6 +134,9 @@ importers:
       '@actspace/tool-deep-search':
         specifier: workspace:*
         version: link:../../packages/web/tool-deep-search
+      '@actspace/tool-document':
+        specifier: workspace:*
+        version: link:../../packages/document/tool-document
       '@actspace/tool-fs-read':
         specifier: workspace:*
         version: link:../../packages/fs/tool-fs-read
@@ -1708,6 +1711,9 @@ importers:
       '@actspace/tool-deep-search':
         specifier: workspace:*
         version: link:../../web/tool-deep-search
+      '@actspace/tool-document':
+        specifier: workspace:*
+        version: link:../../document/tool-document
       '@actspace/tool-image-generation':
         specifier: workspace:*
         version: link:../../image/tool-image-generation

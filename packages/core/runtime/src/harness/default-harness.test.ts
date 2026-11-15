@@ -24,6 +24,7 @@ import { RuntimeSessionController } from "../session/session-controller.js";
 import { createAuxiliaryRequestRecorder } from "../session/auxiliary-request-recorder.js";
 import { createNodeSandboxHostPort, type SandboxStatus } from "@actspace/sandbox";
 import { createNodeDeepSearchPorts } from "@actspace/tool-deep-search";
+import { createNodeDocumentPorts } from "@actspace/tool-document";
 import { DEFAULT_HARNESS_ENTRIES, DEFAULT_HARNESS_KERNEL_ID } from "./default-harness-definition.js";
 import { MAIN_AGENT_FORM } from "../main-agent-form.js";
 import { harnessToolPluginEntries } from "../plugin-catalog.js";
@@ -47,6 +48,8 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   // Hidden while the first Run starts, so that Run proves a hidden optional tool does not break activation.
   let deepSearchAvailable = false;
   const deepSearchFetch = vi.fn<typeof fetch>(async () => new Response('data: {"choices":[{"index":0,"delta":{"content":"- fact"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', { status: 200, headers: { "content-type": "text/event-stream" } }));
+  let documentAvailable = false;
+  const documentFetch = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ pages: [{ index: 0, text: "fixture page", finish_reason: "stop" }] }), { status: 200, headers: { "content-type": "application/json" } }));
   const ports = {
     "actspace.host.sandbox": createNodeSandboxHostPort(),
     "agent.registry": agentRegistry,
@@ -54,6 +57,10 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     "actspace.host.tools.deep-search": {
       available: () => deepSearchAvailable,
       createPorts: () => createNodeDeepSearchPorts({ available: () => deepSearchAvailable, apiKey: () => "fixture-ds", fetchImpl: deepSearchFetch }),
+    },
+    "actspace.host.tools.document": {
+      available: () => documentAvailable,
+      createPorts: () => createNodeDocumentPorts({ available: () => documentAvailable, apiKey: () => "fixture-ds", workspaceRoot: directory, fetchImpl: documentFetch }),
     },
     "session.runtime": sessions,
     "llm.auxiliary-requests": createAuxiliaryRequestRecorder(sessions),
@@ -116,6 +123,18 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     expect(deepSearchFetch).toHaveBeenCalledTimes(1);
     deepSearchAvailable = false;
     for (const mode of ["chat", "plan", "agent"] as const) expect(withDeepSearch(mode).has("deep_search")).toBe(false);
+    // read_document: hidden while unavailable (the first Run above started with it hidden), Plan and Agent only.
+    for (const mode of ["chat", "plan", "agent"] as const) expect(withDeepSearch(mode).has("read_document")).toBe(false);
+    documentAvailable = true;
+    expect(withDeepSearch("plan").has("read_document")).toBe(true);
+    expect(withDeepSearch("agent").has("read_document")).toBe(true);
+    expect(withDeepSearch("chat").has("read_document")).toBe(false);
+    await writeFile(join(directory, "fixture.pdf"), "%PDF-1.7\nplaceholder\n");
+    const documentTool = parentLease.getService<import("@actspace/tool-runtime").ToolRuntime>("tools.runtime")!.registry.capture("read_document");
+    const documentResult = await documentTool.executor.execute({ path: "fixture.pdf" }, { sessionId: "conversation", workspaceRoot: directory, signal: new AbortController().signal, reportProgress: () => {} } as never);
+    expect(documentResult).toMatchObject({ status: "completed", summary: "fixture.pdf · 1 page" });
+    expect(documentFetch).toHaveBeenCalledTimes(1);
+    documentAvailable = false;
     const reviewer = parentLease.getService<import("@actspace/auto-review").AutoReviewer>("approval.auto-review");
     expect(reviewer).toBeDefined();
     const reviewRoute = parentLease.getService<import("@actspace/llm-service").LlmService>("llm.service")!.routes.register({ routeId: "auto-review", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async input => {

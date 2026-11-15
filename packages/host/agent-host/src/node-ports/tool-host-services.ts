@@ -1,6 +1,7 @@
 import { FILESYSTEM_HOST_PORT_ID, PROCESS_HOST_PORT_ID, type FilesystemHostGrant, type ProcessHostGrant } from "@actspace/tool-runtime";
 import { createNodeWebToolPorts as createWebtools, WEB_TOOLS_HOST_PORT_ID } from "@actspace/tool-web";
 import { createNodeDeepSearchPorts, DEEP_SEARCH_HOST_PORT_ID } from "@actspace/tool-deep-search";
+import { createNodeDocumentPorts, DOCUMENT_HOST_PORT_ID } from "@actspace/tool-document";
 import { createNodeToolPorts as createImagegeneration, IMAGE_GENERATION_HOST_PORT_ID } from "@actspace/tool-image-generation";
 import { createNodeToolPorts as createImageinspection, IMAGE_INSPECTION_HOST_PORT_ID } from "@actspace/tool-image-inspection";
 import { createLlmImageInspector, type SessionArtifactReader } from "@actspace/tool-image-inspection";
@@ -39,6 +40,7 @@ export function createNodeToolHostServices(options: { readonly onShellProcesses?
   const keys = { deepseek: process.env.ACTSPACE_DEEPSEEK_SEARCH === "1" ? process.env.DEEPSEEK_API_KEY : undefined, zhipu: process.env.ZHIPU_API_KEY, tavily: process.env.TAVILY_API_KEY, tinyfish: process.env.TINYFISH_API_KEY, exa: process.env.EXA_API_KEY };
   const credentials = Object.fromEntries(Object.entries(keys).filter((entry): entry is [keyof WebSearchCredentials, string] => Boolean(entry[1]))) as WebSearchCredentials;
   const deepSearchKey = process.env.ACTSPACE_DEEPSEEK_DEEP_SEARCH === "1" ? process.env.DEEPSEEK_API_KEY || undefined : undefined;
+  const documentKey = process.env.ACTSPACE_DEEPSEEK_DOCUMENT === "1" ? process.env.DEEPSEEK_API_KEY || undefined : undefined;
   const apiKey = process.env.IMAGE_GENERATION_API_KEY; const baseUrl = process.env.IMAGE_GENERATION_BASE_URL; const model = process.env.IMAGE_GENERATION_MODEL;
   return Object.freeze({
     ...createNodeSandboxHostServices(options),
@@ -46,6 +48,8 @@ export function createNodeToolHostServices(options: { readonly onShellProcesses?
     [PROCESS_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspaceRoot, tmpRoot: options.tmpRoot, onProcesses: options.onShellProcesses, python: options.python } satisfies ProcessHostGrant),
     [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({ credentials, deepseekFetchApiKey: process.env.ACTSPACE_DEEPSEEK_FETCH === "1" ? process.env.DEEPSEEK_API_KEY : undefined }) } satisfies import("@actspace/tool-web").HostPort,
     [DEEP_SEARCH_HOST_PORT_ID]: { available: () => deepSearchKey !== undefined, createPorts: () => createNodeDeepSearchPorts({ available: () => deepSearchKey !== undefined, apiKey: () => deepSearchKey }) } satisfies import("@actspace/tool-deep-search").HostPort,
+    // Attachments here carry no file name, so an artifact_id read is named `attachment`.
+    [DOCUMENT_HOST_PORT_ID]: { available: () => documentKey !== undefined, createPorts: () => createNodeDocumentPorts({ available: () => documentKey !== undefined, apiKey: () => documentKey, workspaceRoot: options.workspaceRoot, readArtifact: options.readArtifact }) } satisfies import("@actspace/tool-document").HostPort,
     [IMAGE_GENERATION_HOST_PORT_ID]: { createPorts: () => createImagegeneration({ generation: apiKey && baseUrl && model ? { apiKey, baseUrl, model } : undefined }) } satisfies import("@actspace/tool-image-generation").HostPort,
     [IMAGE_INSPECTION_HOST_PORT_ID]: { createPorts: (llm: import("@actspace/llm-service").LlmServiceContract, recorder: import("@actspace/llm-service").AuxiliaryRequestRecorder) => createImageinspection({ readArtifact: options.readArtifact, inspect: createLlmImageInspector({ llm, recorder, routeId: "default", model: options.model }) }) } satisfies import("@actspace/tool-image-inspection").HostPort,
   });

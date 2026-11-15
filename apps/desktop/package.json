@@ -51,6 +51,7 @@
     "@actspace/tool-fs-search": "workspace:*",
     "@actspace/tool-fs-write": "workspace:*",
     "@actspace/tool-deep-search": "workspace:*",
+    "@actspace/tool-document": "workspace:*",
     "@actspace/tool-image-generation": "workspace:*",
     "@actspace/tool-image-inspection": "workspace:*",
     "@actspace/tool-runtime": "workspace:*",

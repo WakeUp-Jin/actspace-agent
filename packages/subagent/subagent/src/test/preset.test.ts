@@ -16,4 +16,17 @@ describe("subagentToolNames", () => {
     expect(subagentToolNames("general", parent, hidden)).toEqual(["read_file", "send_message"]);
     expect(subagentToolNames("explore", parent, hidden)).not.toContain("deep_search");
   });
+
+  it("gives general subagents read_document when the parent allows it, never explore", () => {
+    const withDocument = [...registered, "read_document"];
+    const parent = ["read_file", "read_document"];
+    expect(subagentToolNames("general", parent, withDocument)).toContain("read_document");
+    expect(subagentToolNames("explore", parent, withDocument)).not.toContain("read_document");
+  });
+
+  it("leaves read_document out of both presets when it is hidden from the registered list", () => {
+    const parent = ["read_file", "read_document"];
+    expect(subagentToolNames("general", parent, registered)).not.toContain("read_document");
+    expect(subagentToolNames("explore", parent, registered)).not.toContain("read_document");
+  });
 });

@@ -1,4 +1,5 @@
 import { createDesktopToolHostServices } from "./tool-host-services";
+import { DESKTOP_TRUSTED_GRANT_AUDIENCES } from "./trusted-grant-audiences";
 import type { SpeechHostPort } from "@actspace/english-learning";
 import { join } from "node:path";
 import type { RuntimeHostCapability, RuntimeHostDescriptor, RuntimeJsonValue } from "@actspace/shared/runtime-v2";
@@ -149,7 +150,7 @@ export async function bootDesktopRuntime(options: DesktopRuntimeBootOptions) {
         capabilitySet,
         approvalBroker,
         sessionGrantCapability: true,
-        trustedGrantAudiences: new Set(["actspace.shell-tools\u0000bash\u00001", "actspace.filesystem-read\u0000filesystem-read\u00001", "actspace.filesystem-search\u0000filesystem-search\u00001", "actspace.filesystem-write\u0000filesystem-write\u00001"]),
+        trustedGrantAudiences: DESKTOP_TRUSTED_GRANT_AUDIENCES,
         reportProgress: options.onToolProgress,
         createArtifact: (input) => artifacts.create(input),
         resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId),
