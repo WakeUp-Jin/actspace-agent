@@ -1,0 +1,18 @@
+{
+ "object": "ocr.result",
+ "created": 1794753364,
+ "purpose": "text_recognition",
+ "page_count": 1,
+ "pages": [
+  {
+   "index": 0,
+   "text": "Short placeholder\nDo incididunt adipiscing eiusmod beta magna dolor gamma gamma sed delta eiusmod delta \nincididunt. Dolor et do labore et beta sit delta eiusmod labore dolore ut ipsum delta. Ipsum \naliqua lorem amet magna magna alpha dolore tempor gamma ut elit et et. Sed sit adipiscing \nincididunt aliqua lorem tempor incididunt lorem dolore labore consectetur eiusmod dolor.\n",
+   "finish_reason": "stop"
+  }
+ ],
+ "usage": {
+  "input_tokens": 401,
+  "output_tokens": 95,
+  "total_tokens": 496
+ }
+}

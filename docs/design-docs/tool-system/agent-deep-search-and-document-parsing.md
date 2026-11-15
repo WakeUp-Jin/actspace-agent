@@ -60,7 +60,7 @@
 - `purpose`：`text_recognition` 时，不含图片的 Word、PowerPoint 直接提取文字，其他文件逐页识别；`rich_layout_recognition` 时所有文件都逐页识别。
 - 限制：文件 100 MiB（超过返回 413）；1,000 页；上传要在 120 秒内完成且中途停顿不超过 30 秒（否则 408）；从开始上传算起总时长 180 秒；每个账号同时最多 15 个识别（超过返回 429），客户端断开后没做完的识别仍然占名额。
 - 响应：识别期间服务端持续发换行符，完成后返回一个 JSON：`page_count`（等于 `pages` 的长度）、`pages[]`（`index` 从 0 开始、`text`、`finish_reason`）。换行符是 JSON 允许的前导空白，整个响应体可以直接按 JSON 解析。`finish_reason` 为 `length` 表示这一页输出到了上限，文本不完整。
-- `text` 是模型的原始输出，服务端不做清理。逐页识别的文本里可能带 `<｜ref｜>`、`<｜box｜>` 标记和坐标，例如 `<｜ref｜>标题<｜/ref｜><｜box｜>[[52, 40, 948, 96]]<｜/box｜>`；直接提取文字的文档不带。
+- `text` 是模型的原始输出，服务端不做清理。`rich_layout_recognition` 的文本每块都带标记和坐标，例如 `<｜ref｜>text<｜/ref｜><｜box｜>[[33,17,621,35]]<｜/box｜> 正文`，`<｜ref｜>` 里是块的类型名（2026-11-15 实测）；`text_recognition` 和直接提取文字的文档不带。
 - 上传阶段的错误用状态码返回：400（表单不合法或文件无法处理）、402、408、413、429、500、503（服务繁忙）、504（上传与提交超过总时长）。Key 无效时的 401 在 OCR 文档里没有列出，按 DeepSeek 通用的错误码处理。
 - **识别开始后状态码已经是 200，失败时响应体是错误对象**（`{ "error": { "message", "type", "param", "code" } }`），必须检查 `error`。识别开始前就失败时，同样的 `error.message` 也可能跟着 HTTP 错误状态码返回。
 - 重试解决不了的 `error.message`：`The file is password-protected and cannot be processed. Remove the password and upload it again.`；`Failed to recognize the file: …`（文件无法解析、格式不支持、图片无法解码）；`Failed to recognize the file: the document has more than 1000 pages`；`file is too large: max 100 MiB`；`OCR did not finish in time`、`OCR did not finish within 180 seconds`。暂时性的：`The OCR service is temporarily unavailable. Please try again later.`、`Internal Server Error`。
@@ -93,7 +93,8 @@ OCR：
 - `text_recognition` 返回干净的 Markdown，表格是 HTML `<table>`，公式是 LaTeX；`rich_layout_recognition` 每个块都带 `<｜ref｜>`、`<｜box｜>` 标记和坐标。所以用前者，另外防御性地去掉这两种标记。
 - 文字版 PDF 2 页 2.9 秒；扫描版 PDF 2 页 3.0 秒；DOCX 1 页 4.4 秒；论文 PDF 15 页 11.8 秒、5.8 万字，其中 1 页是 `length`；综述 PDF 124 页 15.6 秒、74 万字、约 ¥0.19。
 - 纯文本和 xlsx 会被拒绝（状态码 200，响应体是错误对象）。
-- PPT、PPTX 和老格式 DOC、PPT 没有实测。
+
+2026-11-15 复测（测试文件自己造）：PPTX（纯文字 3 页、带图片 2 页）能读，一张幻灯片一页；60 节的纯文字 DOCX 返回 120 页（分页符把每节分成两页），单页最多 3,331 字符；带密码的 PDF 是 200 + `password-protected`；改了扩展名的 xlsx 是 200 + `Failed to recognize the file: the file format is not supported`；错 Key 是 401；文件头前有 16 个杂字节的 PDF 正常解析；几秒内完成的响应没有开头的换行符，`content-type` 是 `application/json`。老格式 DOC、PPT 仍没有实测。
 
 ## 4. 两个工具与可用条件
 
@@ -313,7 +314,7 @@ OCR 接口要求上传时带文件名。按路径读时用路径的最后一段�
 - `purpose` 固定为 `text_recognition`。
 - 整个文件读进内存后一次上传。大文件上传时内存峰值约为文件大小的两倍，所以同时最多 2 份文档在读入和上传，其余排队。
 - 只有一个计时：从发出请求起 190 秒。服务端自己的上限是 180 秒，多等 10 秒让服务端的结论先到。识别期间服务端只发换行符，所以不设空闲超时。
-- 响应先按错误对象检查，再取 `pages`，按 `index` 排序。每页文本去掉 `<｜ref｜>`、`<｜box｜>` 标记（坐标整段删掉，`<｜ref｜>` 里的文字保留）。`finish_reason` 为 `length` 的页记为「识别不完整」。
+- 响应先按错误对象检查，再取 `pages`，按 `index` 排序。每页文本防御性地去掉 `<｜ref｜>…<｜/ref｜>` 和 `<｜box｜>…<｜/box｜>`（两种都整段删掉：前者里面是块的类型名，后者是坐标）。`finish_reason` 为 `length` 的页记为「识别不完整」。
 - 整理后超过 50,000 个字符的页，按行拆成几页（见第 8.4 节）。
 - 工具自己不重试。
 
@@ -483,7 +484,7 @@ Long pages were split; page numbers here are positions in this output, not the d
 - 深度搜索同一个问题每次跑出来的结论和来源不一样（PA.1 实测）；来源的标题、日期元数据不干净，界面不显示日期。
 - 中止深度搜索不会取消 DeepSeek 那边已经发生的搜索，已产生的费用照常计费；超时和中止都不返回已收到的部分结果。
 - PA.1 的 5 次真实调用里没有出现 `: keep-alive` 注释和打不开的网页，这两条路径只用合成数据测过。
-- PPT、PPTX 和老格式 DOC、PPT 没有用真实接口测过。
+- 老格式 DOC、PPT 没有用真实接口测过；带图的 PPT 页、内容很密导致 `length` 的页只测过少量样本。
 - 文档缓存只在内存里，重启后重新解析、重新计费。
 - 不能在文档内搜索，只能按页读。
 - 附件最大 20 MiB。

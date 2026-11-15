@@ -1,6 +1,6 @@
 # PB：文档解析
 
-状态：未开始（交互模式）。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。和 [PA](pa-deep-search.md) 互不依赖，默认排在 PA 之后；PA 新建、这里往里加的几个文件，任务里都写了先做 PB 时怎么办。
+状态：执行中（交互模式），PB.1 实测做完了。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。和 [PA](pa-deep-search.md) 互不依赖，默认排在 PA 之后；PA 新建、这里往里加的几个文件，任务里都写了先做 PB 时怎么办。
 
 ## 目标
 
@@ -128,7 +128,7 @@
 
 1. 按 `index` 升序排。有哪一页的 `index` 不是整数，或者有重复，就保持数组原来的顺序。总页数用 `pages` 的长度，不用 `page_count`。
 2. 每页的 `text` 不是字符串时当作空字符串。
-3. 去标记：`<｜box｜>…<｜/box｜>` 连同里面的坐标整段删掉；`<｜ref｜>`、`<｜/ref｜>` 只删标记，保留中间的文字。只认官方文档里写的这两种全角竖线的写法，不删别的尖括号内容。`text_recognition` 正常不带这些标记，这一步是防御。
+3. 去标记：`<｜box｜>…<｜/box｜>` 连同里面的坐标整段删掉；`<｜ref｜>…<｜/ref｜>` 也整段删掉（PB.1 实测里面是块的类型名，如 `text`，不是正文），标记后面紧跟的一个空格一起删。只认官方文档里写的这两种全角竖线的写法，不删别的尖括号内容。`text_recognition` 正常不带这些标记，这一步是防御。
 4. `finish_reason` 为 `length` 的页记为「识别不完整」。其余取值都算完整。
 5. 拆超长页：整理后超过 50,000 个字符的页，按行贪心地拆成每份不超过 50,000 个字符的连续几页；单独一行就超过上限时在 50,000 处硬切，不切开代理对。「识别不完整」的标记留在拆出来的最后一份上。
 
@@ -267,6 +267,18 @@ export type DocumentReadInfo = { name: string; stats?: string; warning?: string;
 - 没有 Key：按本文的写法实现，夹具按官方文档手写，执行摘要里把 PB.1 标成「未验证」。
 
 验证：执行过程记录里有七项结论。
+
+**结论（2026-11-15，真实 Key，测试文件用随包 Python 自己造，内容是占位文字）：**
+
+1. 只有文字的 PPTX（3 页）、带图片的 PPTX（2 页）都能读，2.7 到 4.9 秒，一张幻灯片一页。老格式 DOC、PPT：本机没有 LibreOffice，造不出来，**未验证**；保留在支持列表里（官方文档写明支持）。
+2. 只有文字的 DOCX（60 节、带分页符）：返回 120 页，3.1 秒；每页 0 到 3,331 个字符（分页符把每节拆成一满一空两页）。直接提取的 Word 也按页返回，单页远不到 50,000，拆页规则保留作防御。
+3. 设了打开密码的 PDF：状态码 200，`error.message` 是 `The file is password-protected and cannot be processed. Remove the password and upload it again.`，和「失败」表一致。老格式 DOC 的同项未验证。
+4. 很密的单页扫描件（A4、300 dpi、约 100 行小字）两次都返回空文本、`finish_reason: "stop"`，没有复现 `length`。`length` 只按 2026-11-14 那次论文 PDF 的实测处理。
+5. `text_recognition` 的扫描版 PDF 没有标记；同一个文件用 `rich_layout_recognition`，每行都是 `<｜ref｜>text<｜/ref｜><｜box｜>[[x1,y1,x2,y2]]<｜/box｜> 正文`，`<｜ref｜>` 里是块的类型名。按回退规则改成整段删掉。
+6. 错的 Key：401，`error.message` 以 `Authentication Fails` 开头。扩展名改成 `.pdf` 的 xlsx：200，`Failed to recognize the file: the file format is not supported`，和表一致。文件头前面有 16 个杂字节的 PDF：正常解析，2 页，本机判断不改。
+7. 这几次响应都没有开头的换行符（都在几秒内完成），`response.text()` 后直接 `JSON.parse`；`content-type` 是 `application/json`。顶层字段 `id`、`object`、`created`、`purpose`、`page_count`、`pages`、`usage`。
+
+夹具（去掉了 `id`）：`packages/document/tool-document/src/test/fixtures/` 下 `short-docx`、`with-image-pptx`、`scan-text`、`password-pdf`、`xlsx-renamed` 五份。
 
 ### PB.2 纯函数：类型判断、响应解析、分页组装
 

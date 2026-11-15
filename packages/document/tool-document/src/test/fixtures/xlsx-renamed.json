@@ -1,0 +1,8 @@
+{
+ "error": {
+  "message": "Failed to recognize the file: the file format is not supported",
+  "type": "invalid_request_error",
+  "param": null,
+  "code": "invalid_request_error"
+ }
+}
