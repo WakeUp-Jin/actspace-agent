@@ -12,6 +12,8 @@ license: Complete terms in LICENSE.txt
 
 ## 速查
 
+工具列表里有 `read_document` 时，读文字（包括扫描件）先用它，按页返回 Markdown；没有这个工具时按下表。合并、拆分、填表单、提取表格数据仍然按下表。
+
 | 任务 | 工具 | 做法 |
 |---|---|---|
 | 合并 | pypdf | `writer.append(reader)` 或逐页 `add_page` |
@@ -24,7 +26,7 @@ license: Complete terms in LICENSE.txt
 | 填表单 | pypdf | `writer.update_page_form_field_values` |
 | 加密 / 解密 | pypdf | `writer.encrypt` / `reader.decrypt` |
 | 提取图片 | pypdf | `page.images` |
-| OCR | 本机没有 | 渲染成图后用 `inspect_image` 读；要可搜索 PDF 就说明做不到 |
+| OCR | `read_document` 或本机没有 | 有 `read_document` 时用它；没有时渲染成图后用 `inspect_image` 读；要可搜索 PDF 就说明做不到 |
 
 ## pypdf 基本操作
 
@@ -86,7 +88,7 @@ with pdfplumber.open("document.pdf") as pdf:
 actspace-python scripts/pdf_to_images.py input.pdf "$ACTSPACE_SCRATCH/pages" --first 1 --last 3
 ```
 
-生成 `page_N.png`（200 dpi，长边缩到 1000px），然后用 `inspect_image` 看。扫描件没有文本层（`extract_text()` 为空）时只能走这条路；需要大量 OCR 时如实告诉用户本机没有 OCR 引擎。
+生成 `page_N.png`（200 dpi，长边缩到 1000px），然后用 `inspect_image` 看。扫描件没有文本层（`extract_text()` 为空）时，有 `read_document` 就先用它读文字；没有时走这条路，需要大量 OCR 时如实告诉用户本机没有 OCR 引擎。要看版面仍然渲染成图。
 
 ## 创建 PDF
 

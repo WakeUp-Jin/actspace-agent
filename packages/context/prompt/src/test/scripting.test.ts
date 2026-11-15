@@ -32,6 +32,8 @@ describe("scripting guidance", () => {
     expect(section).toContain("at most 8000 characters");
     expect(section).toContain("Do not pip install");
     expect(section).not.toContain("python3");
+    // Conditional on the tool list, so turning document parsing on or off never changes the system prompt.
+    expect(section).toContain("when read_document is in your tool list, use it to read text from PDF, Word and PowerPoint files");
 
     const facts = (await resolveById({ scripting }, "host/scripting-facts")) as { scratchDirectory: string; python: { command: string; corePackages: string[]; dataExtension: { installed: boolean } } };
     expect(facts.scratchDirectory).toBe("/tmp/bash-v2/p1/scripts/s1");

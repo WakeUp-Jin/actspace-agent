@@ -26,3 +26,11 @@ it("keeps the upstream Apache license next to every adapted skill", async () => 
   }
   await access(join(officialSkillsRoot, "pdf/scripts/pdf_to_images.py"));
 });
+it("points the PDF, Word and PowerPoint skills at read_document when it is in the tool list", async () => {
+  for (const id of ["pdf", "office-docx", "office-pptx"]) {
+    expect(await readFile(join(officialSkillsRoot, id, "SKILL.md"), "utf8"), id).toContain("read_document");
+  }
+  for (const id of ["office-xlsx", "data-analysis"]) {
+    expect(await readFile(join(officialSkillsRoot, id, "SKILL.md"), "utf8"), id).not.toContain("read_document");
+  }
+});

@@ -14,7 +14,7 @@ license: Complete terms in LICENSE.txt
 |---|---|
 | **新建**文档 | `python-docx` 写脚本——见下方要点 |
 | **编辑**已有文档 | 能用 `python-docx` 就用它（段落、表格、图片、样式）；要动修订 / 批注 / 它不支持的结构时，`zipfile` 解包 → 改 `word/document.xml` → 重新打包 |
-| **读取**内容 | 装了数据扩展就 `actspace-python -m markitdown file.docx`（Markdown，含表格）；否则 `python-docx` 逐段落 / 表格读 |
+| **读取**内容 | 工具列表里有 `read_document` 时先用它（老格式 `.doc` / `.ppt` 也能读）；否则装了数据扩展就 `actspace-python -m markitdown file.docx`（Markdown，含表格）；否则 `python-docx` 逐段落 / 表格读 |
 
 脚本写到 `$ACTSPACE_SCRATCH`，交付物写进工作区。
 

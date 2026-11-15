@@ -12,7 +12,7 @@ license: Complete terms in LICENSE.txt
 |---|---|
 | **新建**一套幻灯片 | `python-pptx` 写脚本——见要点 |
 | **编辑**已有幻灯片或基于模板做 | 能用 `python-pptx` 就用它；要复制幻灯片、动母版等它不支持的结构时解包 `ppt/slides/slideN.xml` 改 XML 再打包 |
-| **读取**内容 | 装了数据扩展就 `actspace-python -m markitdown deck.pptx`（每页一块，`<!-- Slide number: N -->` 分隔）；否则 `python-pptx` 遍历 `slide.shapes` 取 `text_frame.text` 和 `notes_slide` |
+| **读取**内容 | 工具列表里有 `read_document` 时先用它（老格式 `.doc` / `.ppt` 也能读）；否则装了数据扩展就 `actspace-python -m markitdown deck.pptx`（每页一块，`<!-- Slide number: N -->` 分隔）；否则 `python-pptx` 遍历 `slide.shapes` 取 `text_frame.text` 和 `notes_slide` |
 
 脚本写到 `$ACTSPACE_SCRATCH`，交付物写进工作区。
 

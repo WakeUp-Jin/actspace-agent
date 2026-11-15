@@ -145,7 +145,7 @@ function coreScripting(bundledPython: boolean): string {
     bundledPython
       ? "- actspace-python is ActSpace's own interpreter with the Office / PDF libraries listed in the runtime facts. Do not pip install into it or search for a system Python for ActSpace work. When the task is the user's own Python project, use that project's interpreter or venv."
       : "- This build has no bundled Python; use the system python3 and tell the user when a library is missing instead of installing packages without asking.",
-    "- Office and PDF files: convert with markitdown when the data extension is installed, otherwise read with python-docx / openpyxl / pypdf; to see a page's layout render it with pypdfium2 and inspect_image. Data analysis needs the data extension (numpy, pandas); when it is not installed, say so and point the user to 设置 › 扩展 › 插件 › 命令行.",
+    "- Office and PDF files: when read_document is in your tool list, use it to read text from PDF, Word and PowerPoint files (it also reads scans); otherwise, and for spreadsheets, convert with markitdown when the data extension is installed or read with python-docx / openpyxl / pypdf. To see a page's layout render it with pypdfium2 and inspect_image. Data analysis needs the data extension (numpy, pandas); when it is not installed, say so and point the user to 设置 › 扩展 › 插件 › 命令行.",
   ].join("\n");
 }
 
