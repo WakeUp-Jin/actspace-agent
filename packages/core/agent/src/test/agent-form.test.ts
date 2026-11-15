@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AgentScope } from "@actspace/scope";
-import type { ToolRuntime } from "@actspace/tool-runtime";
+import { ToolRuntime as RealToolRuntime, type ToolRuntime } from "@actspace/tool-runtime";
 import { activateAgentFormTools, agentFormComposition, defineMainAgentForm, type AgentFormMember } from "../agent-form.js";
 import { allowedAgentModeTools, type ModeVisibleTool } from "../agent-mode-policy.js";
 
@@ -15,6 +15,18 @@ function runtime(missing: readonly string[] = []): ToolRuntime {
   return { registry: { listDefinitions: () => MEMBERS.flatMap(member => member.toolNames
     .filter(name => !missing.includes(name))
     .map(name => ({ name, pluginId: member.id }))) } } as unknown as ToolRuntime;
+}
+
+function registeredRuntime(visibility: Readonly<Record<string, () => boolean>>): ToolRuntime {
+  const real = new RealToolRuntime();
+  for (const member of MEMBERS) for (const name of member.toolNames) {
+    real.register({
+      definition: { abiVersion: 2, pluginId: member.id, name, definitionVersion: 1, description: name, inputSchema: { type: "object", properties: {}, additionalProperties: false }, effects: [], modes: ["plan", "agent"], concurrency: "read-only", sensitiveArgumentPaths: [], resultSchemaVersion: 1 },
+      executor: { execute: async () => ({ status: "completed", summary: "ok", modelOutput: [] }) },
+      ...(visibility[name] === undefined ? {} : { visible: visibility[name] }),
+    });
+  }
+  return real;
 }
 
 describe("main Agent form", () => {
@@ -39,6 +51,22 @@ describe("main Agent form", () => {
     expect(() => activateAgentFormTools(FORM, scope, runtime(["todo_write"]))).toThrow(/test.todo/);
     await scope.dispose();
     expect(scope.tools.entries()).toEqual([]);
+  });
+
+  it("skips an optional single-tool member whose tool is hidden by its visibility predicate", async () => {
+    const real = registeredRuntime({ browser_help: () => false });
+    const scope = new AgentScope("hidden-optional");
+    const formed = activateAgentFormTools(FORM, scope, real);
+    expect(formed.members.map(member => member.id)).toEqual(["test.read", "test.todo"]);
+    expect(scope.tools.get("browser_help")).toBeUndefined();
+    await scope.dispose();
+  });
+
+  it("still fails when a required member's tool is hidden, so visibility cannot gate required plugins", async () => {
+    const real = registeredRuntime({ todo_write: () => false });
+    const scope = new AgentScope("hidden-required");
+    expect(() => activateAgentFormTools(FORM, scope, real)).toThrow(/incomplete or unavailable/);
+    await scope.dispose();
   });
 
   it("rejects duplicate members, shared tool names, toolless members and zero versions", () => {

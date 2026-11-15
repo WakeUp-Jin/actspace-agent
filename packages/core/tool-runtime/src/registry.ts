@@ -10,6 +10,8 @@ export type ToolExecutorRegistration = {
   readonly definition: ToolDefinition;
   readonly executor: ToolExecutor;
   readonly permission?: ToolPermissionContract;
+  /** Synchronous and O(1). `false`, or a throw, hides the tool from `listDefinitions()`; `capture()` is unaffected. */
+  readonly visible?: () => boolean;
 };
 
 export type CapturedToolRegistration = {
@@ -18,6 +20,7 @@ export type CapturedToolRegistration = {
   readonly executor: ToolExecutor;
   readonly permission: ToolPermissionContract;
   readonly leaseOwner: ToolRegistrationLeaseOwner;
+  readonly visible?: () => boolean;
 };
 
 export class ToolRegistrationHandle {
@@ -56,6 +59,7 @@ export class ToolRegistry {
       executor: input.executor,
       permission: input.permission ?? ALLOW_ALL_PERMISSION,
       leaseOwner: new ToolRegistrationLeaseOwner(registrationId),
+      ...(input.visible === undefined ? {} : { visible: input.visible }),
     });
     this.#byName.set(definition.name, registration);
     this.#digestByVersion.set(versionKey, definition.definitionDigest);
@@ -76,8 +80,15 @@ export class ToolRegistry {
   }
 
   listDefinitions(): readonly NormalizedToolDefinition[] {
-    return Object.freeze([...this.#byName.values()].map((item) => item.definition).sort((left, right) => left.name.localeCompare(right.name)));
+    const definitions: NormalizedToolDefinition[] = [];
+    for (const item of this.#byName.values()) if (isVisible(item)) definitions.push(item.definition);
+    return Object.freeze(definitions.sort((left, right) => left.name.localeCompare(right.name)));
   }
+}
+
+function isVisible(registration: CapturedToolRegistration): boolean {
+  if (registration.visible === undefined) return true;
+  try { return registration.visible() === true; } catch { return false; }
 }
 
 const ALLOW_ALL_PERMISSION: ToolPermissionContract = Object.freeze({
