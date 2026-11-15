@@ -112,6 +112,7 @@ function seed(): { connections: MockConnection[]; purposes: PurposesView } {
       lastConnection: { status: "available", checkedAt: checkedAt() },
       multiplier: 0.6,
       proxy: { enabled: false, url: null },
+      promptCacheMode: "short",
       balance: false,
       models: [
         model(relay, "claude-sonnet-4-5"),

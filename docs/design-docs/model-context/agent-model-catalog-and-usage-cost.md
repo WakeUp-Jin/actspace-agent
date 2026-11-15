@@ -113,6 +113,7 @@ models.dev / OpenRouter public API
 - 只有响应协议中可验证的实际费用字段才允许标记 provider-reported。官方 OpenRouter 端点的 Chat Completions / Responses 经公共 OpenAI SDK 读取原始 usage.cost，保留有限非负 USD 金额（包括 0），优先于估算。当前由 `PiAiAdapter` 在请求前选择对应 wire backend；官方 OpenRouter 请求在兼容 backend 读取实际费用，代理仍使用 request-scoped fetch。其他端点不能仅凭 providerId 或 SDK cost 冒充实际扣款。没有可验证实际金额时继续估算。
 - 本地估算统一由纯计算器负责，不读取 SDK 默认零费用。SDK 如需数值型 cost 配置可保留兼容占位，但不能作为账单事实。
 - 输入先统一为未缓存输入、缓存读取、缓存写入等互斥计费桶；不同协议的 input 是否包含 cache 必须在引擎映射层处理。缓存命中率分母使用总输入，不叠加已经包含的缓存。
+- Anthropic 缓存写入分 5 分钟和 1 小时两档，单价分别为基础输入价的 1.25 倍和 2 倍。`LlmUsage.cacheWrite1hTokens`（可选，可空）记录 `cache_creation.ephemeral_1h_input_tokens`，是 `cacheWriteTokens` 的子集；计价时 `cacheWriteTokens - cacheWrite1hTokens` 用 `rates.cacheWrite`，1 小时部分用 `cacheWrite1hRate(rates)`（基础输入价 × 2，输入价缺失则未知）。旧记录没有该字段，全部按 5 分钟价计。
 - 推理 token 若已包含于输出，不重复收费。只有协议明确提供独立计费桶及对应价格时才单独计算。
 - 任意实际发生的计费桶缺少单价，或计费桶无法可靠拆分，整次估算为未知；零 token 的缺价桶不阻止其他桶计价。
 - 缺 usage、取消或失败请求也保留记录；有可靠已消耗用量即可估算，没有则未知，不能根据请求失败推断费用为零。

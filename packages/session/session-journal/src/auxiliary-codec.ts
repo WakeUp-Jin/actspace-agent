@@ -26,8 +26,9 @@ export function validateAuxiliaryRequest(type: string, data: Readonly<Record<str
   const usage = data.usage;
   if (usage === null || typeof usage !== "object" || Array.isArray(usage)) invalid("usage must be an object");
   const fields = usage as Readonly<Record<string, RuntimeV2JsonValue>>;
-  for (const field of ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "reasoningTokens", "cost"]) {
+  for (const field of ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "reasoningTokens", "cost", "cacheWrite1hTokens"]) {
     const value = fields[field];
+    if (field === "cacheWrite1hTokens" && value === undefined) continue;
     if (value !== null && (typeof value !== "number" || !Number.isFinite(value) || value < 0)) invalid(`usage.${field} must be a non-negative finite number or null`);
   }
   if (fields.costCurrency !== null && (typeof fields.costCurrency !== "string" || fields.costCurrency.length === 0)) invalid("invalid usage.costCurrency");

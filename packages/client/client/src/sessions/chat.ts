@@ -554,7 +554,8 @@ function activityTokens(usage: EventRecord): UsageActivityTokens {
   const cacheWriteTokens = nullableNonNegative(usage.cacheWriteTokens);
   const reasoningTokens = nullableNonNegative(usage.reasoningTokens);
   const known = [inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens];
-  return { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, reasoningTokens, totalTokens: known.every((value) => value === null) ? null : known.reduce<number>((sum, value) => sum + (value ?? 0), 0) };
+  const cacheWrite1h = nullableNonNegative(usage.cacheWrite1hTokens);
+  return { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, ...(cacheWrite1h && cacheWriteTokens !== null ? { cacheWrite1hTokens: Math.min(cacheWrite1h, cacheWriteTokens) } : {}), reasoningTokens, totalTokens: known.every((value) => value === null) ? null : known.reduce<number>((sum, value) => sum + (value ?? 0), 0) };
 }
 
 

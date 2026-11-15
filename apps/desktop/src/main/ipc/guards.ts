@@ -297,7 +297,7 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
     return check(value, value.kind === "draft" ? { draft: nested(connectionDraft) } : { connectionId: "string" }, "Invalid connection probe");
   }],
   [contract.modelConnections.create, shape({ ...connectionDraft, multiplier: "number?", resolvedAuth: optional(oneOf(["x-api-key", "bearer"])), models: connectionModels }, "Invalid model connection")],
-  [contract.modelConnections.update, shape({ connectionId: "string", label: "string?", protocol: optional(oneOf(["openai-completions", "openai-responses", "anthropic-messages"])), baseUrl: "string?", apiKey: "string?", proxy: "record?", multiplier: "number?", enabled: "boolean?", managementKey: "string?" }, "Invalid model connection")],
+  [contract.modelConnections.update, shape({ connectionId: "string", label: "string?", protocol: optional(oneOf(["openai-completions", "openai-responses", "anthropic-messages"])), baseUrl: "string?", apiKey: "string?", proxy: "record?", multiplier: "number?", enabled: "boolean?", managementKey: "string?", promptCacheMode: optional(oneOf(["short", "long", "off"])) }, "Invalid model connection")],
   [contract.modelConnections.remove, connectionIdInput],
   [contract.modelConnections.addModels, shape({ connectionId: "string", models: connectionModels }, "Invalid connection models")],
   [contract.modelConnections.updateModel, shape({ key: modelKey, overrides: nullable(isRecord) }, "Invalid model patch")],

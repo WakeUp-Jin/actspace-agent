@@ -413,7 +413,7 @@ owner lease 在成功、不可重试失败、重试耗尽、backoff abort、snap
 
 Agent Loop 在每次准备请求时设置 `LlmRequestOptions.cacheRetention`：Chat 使用 `long`（1 小时），Plan、Agent 等其他模式使用 `short`（5 分钟）。模式切换从下一次请求生效；同一次请求的重试复用已准备的选项。缺少模式策略的辅助请求默认短缓存。
 
-Desktop 在 prepare 阶段应用连接级关闭开关，`promptCacheMode: off` 优先于模式策略，并把实际选择写回 prepared options。持久设置的 `short` 保留兼容性，表示启用缓存，实际时长由请求模式决定。
+**连接设置优先（2026-11-15）**：Anthropic Messages 连接有 `promptCacheMode: "short" | "long" | "off"`（设置页「提示缓存」：5 分钟 / 1 小时 / 关闭），Desktop 在 prepare 阶段用它覆盖模式策略，并把实际选择写回 prepared options：`short → short`、`long → long`、`off → none`。主会话、子 Agent、压缩、自动审批等所有走该连接的请求都用同一时长。没有连接级设置的路径（OpenRouter 内置连接的 `anthropic/*`）仍按上面的模式策略。旧数据里的 `short` 现在就表示 5 分钟，Chat 模式不再自动升到 1 小时。
 
 - Anthropic Messages 直连：把 `short / long / none` 传给 pi-ai；SDK 将 long 转成 `cache_control.ttl: 1h`，short 使用默认 5 分钟。
 - Anthropic Messages 代理：稳定前缀断点显式携带同一时长的 `cache_control`。

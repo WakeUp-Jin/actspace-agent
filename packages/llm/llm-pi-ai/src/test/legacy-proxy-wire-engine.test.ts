@@ -49,6 +49,19 @@ describe("LegacyProxyWireEngine", () => {
     await pool.dispose();
   });
 
+  it("reads the 1-hour cache write share from Anthropic usage through the proxy", async () => {
+    const pool = proxyPool();
+    const events = (async function* () {
+      yield { type: "message_start", message: { usage: { input_tokens: 10, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 800, cache_creation: { ephemeral_5m_input_tokens: 200, ephemeral_1h_input_tokens: 600 } } } };
+      yield { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 7 } };
+      yield { type: "message_stop" };
+    })();
+    const engine = new LegacyProxyWireEngine({ route: "anthropic-messages", providerId: "custom", baseUrl: "https://relay.example", proxies: pool, cacheRetention: "long", loadSdk: loaderFor("anthropic-messages", {}, events) });
+    const seen = []; for await (const event of await engine.stream(input("anthropic-messages"))) seen.push(event);
+    expect(seen.at(-1)).toMatchObject({ type: "done", usage: { cacheWriteTokens: 800, cacheWrite1hTokens: 600, outputTokens: 7 } });
+    await pool.dispose();
+  });
+
   it.each(["short", "long", "none"] as const)("enables OpenRouter Claude caching on direct and proxy requests (%s)", async (cacheRetention) => {
     for (const proxy of [false, true]) {
       for (const modelId of ["anthropic/claude-opus-5.5", "openai/gpt-fixture"]) {

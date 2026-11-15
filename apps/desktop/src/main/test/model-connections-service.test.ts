@@ -187,6 +187,25 @@ it("updates a connection and forgets the tested auth when the address changes", 
   expect(await service.update({ connectionId: id, baseUrl: "ftp://bad" })).toMatchObject({ ok: false, error: { code: "invalid_base_url" } });
 });
 
+it("sets the Anthropic prompt cache duration per connection and resets it when the protocol changes", async () => {
+  const { settings, service } = await fixture({ ok: true, models: [] });
+  const created = await service.create({ templateId: "custom", protocol: "anthropic-messages", apiKey: "k", baseUrl: "https://relay.example", models: [{ apiModel: "claude-sonnet-5" }] });
+  if (!created.ok) throw new Error(created.error.message);
+  const id = created.connectionId!;
+  expect(created.view.connections.find((item) => item.connectionId === id)).toMatchObject({ promptCacheMode: "short" });
+  const long = await service.update({ connectionId: id, promptCacheMode: "long" });
+  if (!long.ok) throw new Error(long.error.message);
+  expect(long.view.connections.find((item) => item.connectionId === id)).toMatchObject({ promptCacheMode: "long" });
+  expect(settings.getConnectionRuntimeConfig("openrouter", id)).toMatchObject({ promptCacheMode: "long" });
+  const moved = await service.update({ connectionId: id, protocol: "openai-completions" });
+  if (!moved.ok) throw new Error(moved.error.message);
+  expect(moved.view.connections.find((item) => item.connectionId === id)).not.toHaveProperty("promptCacheMode");
+  expect(settings.getV4().settings.models.connections[id]).toMatchObject({ promptCacheMode: "off" });
+  // 非 Anthropic 协议忽略缓存时长。
+  await service.update({ connectionId: id, promptCacheMode: "long" });
+  expect(settings.getConnectionRuntimeConfig("openrouter", id)).toMatchObject({ promptCacheMode: "off" });
+});
+
 it("previews a model for a draft connection without saving it", async () => {
   const { service, settings } = await fixture();
   expect(service.preview({ apiModel: "claude-sonnet-5", templateId: "custom", protocol: "anthropic-messages", multiplier: 0.5 })).toMatchObject({ added: false, effective: { contextWindow: 200_000, rates: { input: 1.5 } } });

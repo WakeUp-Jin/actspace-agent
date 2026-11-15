@@ -40,6 +40,8 @@ export type ConnectionView = {
   lastConnection: ProviderConnectionState;
   multiplier: number;
   proxy: ProviderProxySettings;
+  /** 只有 Anthropic Messages 协议的连接才有。 */
+  promptCacheMode?: import("./settings").CustomConnectionPromptCacheMode;
   /** 这个连接能查余额（DeepSeek / Kimi / OpenRouter 模板）。 */
   balance: boolean;
   /** 只有 OpenRouter：查余额要单独的管理 Key。 */
@@ -127,6 +129,8 @@ export type ConnectionUpdateInput = {
   proxy?: ProviderProxySettings;
   multiplier?: number;
   enabled?: boolean;
+  /** 只对 Anthropic Messages 协议的连接生效。 */
+  promptCacheMode?: import("./settings").CustomConnectionPromptCacheMode;
   /** 只有 OpenRouter；null = 清除。 */
   managementKey?: string | null;
 };

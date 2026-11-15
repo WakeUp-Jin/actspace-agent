@@ -4,6 +4,8 @@ export type LlmUsage = {
   readonly outputTokens: number | null;
   readonly cacheReadTokens: number | null;
   readonly cacheWriteTokens: number | null;
+  /** Anthropic 1 小时缓存写入，是 cacheWriteTokens 的一部分；缺省按全是 5 分钟写入计价。 */
+  readonly cacheWrite1hTokens?: number | null;
   readonly reasoningTokens: number | null;
   readonly costProvenance?: UsageCostProvenance;
   readonly cost: number | null;

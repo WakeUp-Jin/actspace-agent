@@ -1,4 +1,4 @@
-import type { UsageActivityAggregate, UsageActivityRow, UsageActivitySnapshot, UsageAuxiliaryPurpose, UsageSeries, UsageStatisticsRange } from "@actspace/shared";
+import { cacheWrite1hRate, type UsageActivityAggregate, type UsageActivityRow, type UsageActivitySnapshot, type UsageAuxiliaryPurpose, type UsageSeries, type UsageStatisticsRange } from "@actspace/shared";
 import type { DonutSegment, HoverDetail } from "../stats/stats-ui";
 import { DASH, average, fmtDuration, fmtInt, fmtTokens, fmtUsd, ratio } from "../stats/stats-format";
 import { billedInputTokens, formatCacheHitPercent } from "../composer/composer-stats";
@@ -189,7 +189,9 @@ export function costDetail(row: UsageActivityRow): HoverDetail | null {
   const parts: (readonly [string, string])[] = [];
   const add = (label: string, tokens: number | null, rate: number | null) => { if (tokens && rate != null) parts.push([label, `$${((tokens * rate) / 1e6).toFixed(4)}`]); };
   add("缓存读取", row.tokens.cacheReadTokens, pricing.rates.cacheRead);
-  add("缓存写入", row.tokens.cacheWriteTokens, pricing.rates.cacheWrite);
+  const longWrite = Math.min(row.tokens.cacheWrite1hTokens ?? 0, row.tokens.cacheWriteTokens ?? 0);
+  add(longWrite > 0 ? "缓存写入（5 分钟）" : "缓存写入", (row.tokens.cacheWriteTokens ?? 0) - longWrite, pricing.rates.cacheWrite);
+  add("缓存写入（1 小时）", longWrite, cacheWrite1hRate(pricing.rates));
   add("输入", row.tokens.inputTokens, pricing.rates.input);
   add("输出", row.tokens.outputTokens, pricing.rates.output);
   return { title: "费用明细", rows: parts, total: ["合计", `$${row.costAmount.toFixed(4)}`] };

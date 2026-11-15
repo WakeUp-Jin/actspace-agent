@@ -13,7 +13,7 @@ import {
   type SettingsV4SubagentRoute,
 } from "@actspace/shared";
 import { BUILTIN_MODEL_ADDED_AT } from "./constants";
-import { isCustomConnectionAuthMode, isResolvedAuth, resolvePromptCacheMode } from "./custom-connection";
+import { isCustomConnectionAuthMode, isPromptCacheMode, isResolvedAuth, resolvePromptCacheMode } from "./custom-connection";
 import { defaultSettingsFromEnv, defaultSettingsV4Metadata } from "./defaults";
 import {
   isModelId,
@@ -237,7 +237,7 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
           ...(typeof value.catalogId === "string" ? { catalogId: value.catalogId.slice(0, 80) } : {}),
           promptCacheMode: resolvePromptCacheMode(
             isConnectionProtocol(value.protocol) ? value.protocol : "openai-completions",
-            value.promptCacheMode === "short" || value.promptCacheMode === "off" ? value.promptCacheMode : undefined,
+            isPromptCacheMode(value.promptCacheMode) ? value.promptCacheMode : undefined,
           ),
           ...(isCustomConnectionAuthMode(value.authMode) ? { authMode: value.authMode } : {}),
           ...(value.authMode === "auto" && isResolvedAuth(value.resolvedAuth) ? { resolvedAuth: value.resolvedAuth } : {}),

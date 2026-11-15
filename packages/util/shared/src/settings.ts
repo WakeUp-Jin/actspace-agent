@@ -241,7 +241,8 @@ export interface SettingsV4ConnectionSettings extends ProviderConnectionSettings
   resolvedAuth?: CustomConnectionResolvedAuth;
 }
 
-export type CustomConnectionPromptCacheMode = "short" | "off";
+/** Anthropic 提示缓存：short = 5 分钟，long = 1 小时（写入按输入价 2 倍），off = 不发 cache_control。 */
+export type CustomConnectionPromptCacheMode = "short" | "long" | "off";
 export type CustomConnectionAuthMode = "auto" | "x-api-key" | "bearer";
 export type CustomConnectionResolvedAuth = "x-api-key" | "bearer";
 

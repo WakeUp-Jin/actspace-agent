@@ -150,7 +150,7 @@ interface CustomConnectionSettings extends ProviderConnectionSettings {
   connectionId: string;
   protocol: ModelApi;
   defaultModel: string | null;
-  promptCacheMode?: "short" | "off";
+  promptCacheMode?: "short" | "long" | "off";
 }
 
 interface ModelCapabilities {
@@ -216,7 +216,7 @@ openrouter:anthropic/claude-...
 - 认证方式 `authMode`：`auto | x-api-key | bearer`，缺省按 `x-api-key`（旧连接行为不变）。`auto` 在测试或探测时先发 `x-api-key`，遇到 401/403 再发 `Authorization: Bearer`，把能用的那种写入 `resolvedAuth`。`resolvedAuth` 只在 `auto` 下存在；地址、Key、认证方式或代理变化时清空，等下次测试重新识别。运行时 `authScheme` 只在 Anthropic 连接上下发，OpenAI 协议固定 Bearer。
 - Bearer 请求只带 `Authorization`，不带 `x-api-key`：direct pi-ai 线路传 `apiKey: null` 加 `headers.Authorization`；legacy proxy 线路构造 Anthropic SDK 时传 `apiKey: null, authToken: null`。x-api-key 线路也显式传 `authToken: null`，避免 SDK 从 `ANTHROPIC_AUTH_TOKEN` 环境变量读出无关令牌发给中转站。
 - 显式连接测试发送 `max_tokens: 1` 的最小真实 Messages 请求，不带工具和缓存标记。
-- 新建连接默认 `promptCacheMode: "short"`。该模式在 direct pi-ai 和 request-scoped proxy 两条 wire 上标记 system、最后一个工具定义和最后一个 user 内容块；`off` 完全不发送 `cache_control`。
+- 新建连接默认 `promptCacheMode: "short"`。`short` / `long` 在 direct pi-ai 和 request-scoped proxy 两条 wire 上标记 system、最后一个工具定义和最后一个 user 内容块，分别发送默认 5 分钟和 `ttl: "1h"`；`off` 完全不发送 `cache_control`。连接设置对所有模式和辅助请求生效（见 `agent-llm-core-pi.md` §16）。非 Anthropic 协议恒为 `off`；协议切换时缓存模式回到新协议的默认值。
 - 缓存开关只描述请求策略。是否命中以 provider 返回的 `cache_read_input_tokens` / `cache_creation_input_tokens` 为准，不能用一次成功请求推断缓存已生效。
 
 旧 `ModelId` 继续作为兼容 alias。读取旧 session / settings 时映射到对应 `ModelKey`，历史事件不重写。
