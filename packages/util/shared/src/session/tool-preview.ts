@@ -210,8 +210,11 @@ export type DeepSearchPreviewFields = {
   errorText?: string;
 };
 
+/** Only `read_document` rows have it. When present the row shows `name`, not `filePath`. */
+export type DocumentReadInfo = { name: string; stats?: string; warning?: string; errorText?: string };
+
 export type ToolUiPreview =
-  | { kind: "read"; filePath: string; range?: string; displayText: string; resultPreview?: string[] }
+  | { kind: "read"; filePath: string; range?: string; displayText: string; resultPreview?: string[]; document?: DocumentReadInfo }
   | { kind: "search"; query: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }
   | { kind: "grep"; pattern: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }
   | { kind: "glob"; pattern: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }

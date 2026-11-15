@@ -544,6 +544,15 @@ describe("session selectors", () => {
     expect(failed).toMatchObject({ kind: "deep_search", status: "failed", errorText: "余额不足" });
   });
 
+  it("keeps a read preview's document on the restored block, and adds nothing without one", () => {
+    const document = { name: "季度报告.pdf", stats: "2 pages", warning: "第 2 页识别不完整，内容已截断。" };
+    const [withDocument] = createMessageBlocks([toolResultEvent({ toolName: "read_document", toolCallId: "tool-doc-1", ok: true, summary: "季度报告.pdf · 2 pages", modelOutput: "", uiPreview: { kind: "read", filePath: "", displayText: "季度报告.pdf · 2 pages", resultPreview: ["hello"], document } })]);
+    expect(withDocument).toMatchObject({ kind: "read", filePath: "", document, resultPreview: ["hello"], status: "completed" });
+    const [plain] = createMessageBlocks([toolResultEvent({ toolName: "read_file", toolCallId: "tool-read-1", ok: true, summary: "Read a.ts", modelOutput: "", uiPreview: { kind: "read", filePath: "a.ts", displayText: "Read a.ts" } })]);
+    expect(plain).toMatchObject({ kind: "read", filePath: "a.ts" });
+    expect(plain).not.toHaveProperty("document");
+  });
+
   it("restores a completed present result as a present message block", () => {
     const files = [{ path: "report.docx", outputPath: "/workspace/report.docx", outputRelativePath: "report.docx", description: "Quarterly report" }];
     const blocks = createMessageBlocks([

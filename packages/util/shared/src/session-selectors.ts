@@ -101,6 +101,7 @@ function messageBlockFromToolPreview(
         range: preview.range,
         displayText: preview.displayText,
         resultPreview: preview.resultPreview,
+        ...(preview.document ? { document: preview.document } : {}),
         status,
         createdAt: getDisplayTime(timestamp)
       };
