@@ -40,6 +40,8 @@
   --color-text-muted: var(--act-color-text-muted);
   --color-text-faint: var(--act-color-text-faint);
   --color-text-subtle: var(--act-color-text-subtle);
+  --color-sprite: var(--act-color-sprite);
+  --color-sprite-eye: var(--act-color-sprite-eye);
 
   --color-action: var(--act-color-action);
   --color-action-hover: var(--act-color-action-hover);

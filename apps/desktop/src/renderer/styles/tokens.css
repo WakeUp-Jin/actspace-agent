@@ -82,6 +82,10 @@
   --act-color-on-danger: #a93a3a;
   --act-color-on-danger-solid: #ffffff;
 
+  /* 品牌精灵（像素形象，只做装饰，不跟强调色）：front-视觉token规范.md §1 Sprite */
+  --act-color-sprite: #a397d4;
+  --act-color-sprite-eye: #20201e;
+
   --act-color-success: #087a4b;
   --act-color-success-soft: #e5f2ea;
   --act-color-on-success: #087a4b;
@@ -415,6 +419,8 @@
   --act-color-danger-hover: #ef8585;
   --act-color-danger-soft: #452525;
   --act-color-on-danger: #f08a8a;
+  --act-color-sprite: #b9aef0;
+  --act-color-sprite-eye: #181916;
   --act-color-on-danger-solid: #181916;
 
   --act-color-success: #36c783;
@@ -605,6 +611,8 @@
     --act-color-danger-hover: #ef8585;
     --act-color-danger-soft: #452525;
     --act-color-on-danger: #f08a8a;
+    --act-color-sprite: #b9aef0;
+    --act-color-sprite-eye: #181916;
     --act-color-on-danger-solid: #181916;
 
     --act-color-success: #36c783;

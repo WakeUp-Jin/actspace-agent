@@ -53,13 +53,17 @@
 
 手动 `/compact` 与自动压缩共用同一消息块（`context_compaction`，`CompactCommandBlock.tsx`）和同一套 UI，消息流里不区分、不标注触发方式（触发方式只在轨迹详情里显示）。它是系统执行事件，不是工具调用，不渲染为 Tool Preview；必须作为独立 timeline item 占据消息流位置，不能贴到上一条回复里。
 
-- 共同结构：居中分隔线，左右两段 1px 细线（线色比普通分隔线深一档，`compact-divider-line`），中间一组图标 + 文字，字号 `text-act-xs`；窄窗时中间一组换行，数据挪到第二行，不截断 token 和耗时。
-- running：小转圈 + `正在压缩上下文` + 已用时间（`8s`，每秒刷新，来自 `startedAt`）；两侧细线各有一道 `operational` 色的光从外端收向中间（`compact-divider-running`，减少动态效果时不显示）。进行中不显示条数，文本不做 opacity pulse、扫光或省略号动画。手动 `/compact` 被任务服务领取后进入 running，等待时显示在队列中，不再显示淡色 `/compact` 命令行。
-- completed：归档图标 + `以上 48 条消息已压缩` + `182K → 约 9.1K tokens · 23s` + `·` + `在轨迹中查看 ›`。
+- 共同结构：一行分隔线，字号 `text-act-xs`。completed 是居中分隔线：左右两段 1px 细线（线色比普通分隔线深一档，`compact-divider-line`），中间一组图标 + 文字；窄窗时中间一组换行，数据挪到第二行，不截断 token 和耗时。running 与 failed 是「推到墙角」：左侧是像素舞台（`CompactionSprite.tsx`，`flex-1`，最小 96px），右侧是文字。
+- 精灵：品牌形象（一团圆顶软体、两道横眼）的像素版，12×7 像素，1 像素 = 2px，舞台高 16px，不撑高这一行。颜色只用 `sprite` / `sprite-eye` token（品牌紫），不跟强调色，不表达状态；它是装饰，SVG 整体 `aria-hidden`，状态靠旁边的文字。
+- running：舞台最左是一根竖墙，墙右边是一条由长短不一的消息块组成的像素条，精灵在条的右端往左推；右侧文字是 `正在压缩上下文` + 已用时间（`8s`，每秒刷新，来自 `startedAt`）。节奏是逐格的，320ms 一拍，两拍一组：抬起 → 压低往前顶。每顶一下，条最多短 1 格（靠精灵那头的缝先合上、块先变窄，挤过的块颜色更深；相邻块深浅交替，挤紧后仍看得出一块一块，不连成一整条粗线），脚后扬起 1 个尘点，精灵身后留一条淡点线。条长按时间算（`compaction-sprite-model.ts` 的 `barLengthAt`）：最多每拍短 1 格，同时不低于 `Lmin + (L0 - Lmin)·e^(-t/12s)`，越往后越推不动，压缩没完成前不会推到墙。切走再切回、窗口变宽变窄都按 `startedAt` 重新算，接着推，不从头开始。不要改成连续滑动：用户明确选了逐格的「一挤、一动、一压」，连续版像普通进度条。进行中不显示条数，文字不做 opacity pulse、扫光或省略号动画。手动 `/compact` 被任务服务领取后进入 running，等待时显示在队列中，不再显示淡色 `/compact` 命令行。
+- running → completed（同一块在屏上从 running 变成 completed）：先播一次收尾，约 1 秒：条一口气压成一个小方块（每 70ms 一拍），精灵转身轻跳一下消失，然后换成下面的 completed 行。块一出现就是 completed（历史会话、刷新、重新打开）时不播，直接显示文字。
+- 减少动态效果：舞台画一帧静止画面（站姿，条按已用时间算出的长度），不跑逐拍定时器，不播收尾；文字计时照常。
+- 性能：只有 running 时才有一个 320ms 的定时器；每拍只改有变化的那几个 SVG 元素的属性，不走 React 重渲染，也不重建 SVG；精灵两帧预先画好，切换只改 `display`；窗口隐藏时跳过绘制。
+- completed：像素方块图标（和收尾时压成的方块一样，6×5 像素，`text-muted` 色）+ `以上 48 条消息已压缩` + `182K → 约 9.1K tokens · 23s` + `·` + `在轨迹中查看 ›`。
   - 条数来自压缩区间大小；token 来自 `compaction/end.data.beforeTokens` / `afterTokens` / `beforeEstimated`：压缩前 = 最近一次有效实测用量（往前跳过没有 usage 或 usage 全空的回复；之后若又发生过压缩，改用那次压缩后的数）+ 之后新加内容的估算；压缩后 = 压缩前 - 被替换条目估算 + 摘要估算，总是写「约」；压缩前含估算（`beforeEstimated: true`）时也写「约」。旧 journal 缺这两项时只显示条数和耗时。
   - 耗时优先取 `compaction/end.data.durationMs`（含事务提交前的模型摘要等待），旧 journal 回退 `compaction/start` 与 `compaction/end` 的时间差。
   - `在轨迹中查看` 调用 `revealInTrajectory({ compactionId })` 切到轨迹并选中这次压缩的行；没有 `compactionId` 或不在工作台里时不显示。摘要不在消息流里展开，只在轨迹详情里看。
-- failed：红色分隔线（`text-on-danger` + `bg-danger-soft`），中间警告图标 + `上下文压缩失败` + 原因 + 下划线文字按钮 `重试`（走同一 `/compact` 路径）。压缩未成功不提交摘要事务；任务失败状态由 TaskSnapshot 恢复；自动压缩的非取消类失败不使主运行失败，live run 结束后改由对应会话的本地状态显示，直到下一次发送或压缩状态更新，不跨应用重启持久化。
+- failed：舞台定格，精灵瘫成一滩（眼睛转向用户），精灵、墙和消息块都换成 `on-danger` 低透明度，不画点线和尘点，右侧 `上下文压缩失败` + 原因（单行截断，完整内容在 `title`）+ 下划线文字按钮 `重试`（走同一 `/compact` 路径），文字 `text-on-danger`。在屏上从 running 变成 failed 时，条停在当时的长度；一出现就是 failed 时，条画在 55% 长度处。压缩未成功不提交摘要事务；任务失败状态由 TaskSnapshot 恢复；自动压缩的非取消类失败不使主运行失败，live run 结束后改由对应会话的本地状态显示，直到下一次发送或压缩状态更新，不跨应用重启持久化。
 - skipped（对话太短）：不进消息流，只在 Composer 输入框顶部显示一行 `对话还很短，暂时不需要压缩`，约 3 秒后消失。
 - 被压缩的旧消息和工具调用继续在分隔线上方照常显示，不置灰；摘要不投影成用户消息卡片。
 - `/compact` 经统一 `submitTask` 接纳，繁忙时排队，不作为普通用户消息写入模型历史（契约见 [Task/Run 规范](../agent-plugin-runtime/agent-task-run-lifecycle.md)）。自动压缩属于当前 Agent Run：输入框为空时停止按钮可用并沿用 Run 的取消信号；独立 `/compact` 没有可取消的 Loop Run，停止按钮置灰并提示 `压缩完成后可继续`。自动压缩在工具批次全部完成后的 Step 安全点判断阈值，触发时先完成压缩再发下一模型请求；无工具的最终回复仍保留 Turn 收尾检查。
