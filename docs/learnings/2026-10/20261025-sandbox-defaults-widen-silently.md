@@ -42,4 +42,4 @@
 2. allowlist 接口收到空列表，你的代码与底层工具理解一致吗？怎么确认？沙箱配置里没写的部分由谁决定、有无工具打印“最终生效规则”？
 3. 只能加一个集成用例，选“该成功的成功”还是“该失败的失败”？除此之外还应测别名路径吗？
 
-来源：`docs/histories/2026-07/20260704-1840-bash-sandbox-e5.md`、[沙箱第一期执行过程](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-process.md)、`docs/histories/2026-10/20261025-1517-sandbox-v2-evaluation-sandbox.md`。
+来源：`docs/histories/2026-07/20260704-1840-bash-sandbox-e5.md`、[沙箱第一期 history](../../histories/2026-10/20261025-1313-sandbox-v1-tool-sandbox.md)、`docs/histories/2026-10/20261025-1517-sandbox-v2-evaluation-sandbox.md`。

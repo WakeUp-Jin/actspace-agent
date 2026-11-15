@@ -1,6 +1,6 @@
 # 聊天区 Markdown 渲染规范
 
-管聊天区 Markdown 的渲染、排版、流式效果和 Mermaid 图表。组件是 `components/messages/MarkdownProse.tsx`，插件与子组件在 `components/messages/markdown/`。决策表、问题清单、流式实测与测试清单见 `docs/exec-plans/completed/design-archive/frontend/front-聊天区Markdown渲染-决策与验收.md`。
+管聊天区 Markdown 的渲染、排版、流式效果和 Mermaid 图表。组件是 `components/messages/MarkdownProse.tsx`，插件与子组件在 `components/messages/markdown/`。
 
 ## 1. 范围
 

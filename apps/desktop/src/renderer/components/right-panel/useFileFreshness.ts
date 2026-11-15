@@ -9,9 +9,8 @@ import { workspacesApi } from "../../api/workspaces";
  * 文件内容是打开那一刻的快照，磁盘随后可能被 Agent、外部编辑器或 git checkout 改掉。
  * 早期实现没有任何刷新机制，右侧会一直显示旧内容且不给提示 —— 在 Agent 编码场景里会直接让人误判。
  *
- * 这里使用两级信号，不依赖后台目录监听（理由见
- * `docs/exec-plans/completed/20260730-right-panel-file-view-optimization.md` 的决策记录：
- * 那是用户可选安装的常驻进程，监听根与当前 workspaceRoot 无关，且输出是给 Agent 读的审计日志）：
+ * 这里使用两级信号，不依赖后台目录监听
+ * （那是用户可选安装的常驻进程，监听根与当前 workspaceRoot 无关，且输出是给 Agent 读的审计日志）：
  *
  * 1. **Agent 编辑事件**（主力，零成本）：`edit_diff` / `write_diff` 消息块自带 `filePath`，
  *    renderer 本来就实时收到，直接 `markFileTabStale`。由 `App.tsx` 调用，不在本 hook 内。

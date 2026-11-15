@@ -6,7 +6,7 @@
 
 1. **白底白字**（2026-07，Kairos 通知中心，同一天踩三次：分页激活按钮、紧凑视图「开启」按钮、KairosPage「开启」按钮；`docs/histories/2026-07/20260704-1110-kairos-notification-center.md`）：`cn(base, isActive && "bg-brand text-white")`，base 里有 `bg-surface text-text-muted`。四个类同时挂上，`bg-surface` 排在 `bg-brand` 后、`text-white` 排在 `text-text-muted` 后，结果 surface 白底 + white 白字——两组冲突各赢一半，恰好“不可见”。难查在于不是全覆盖或全不覆盖，而是逐属性分胜负。非激活态只挂基础类，所以只有激活态才暴露。
 2. **字号翻转**（2026-09-26，设计 token 收口，`docs/histories/2026-09/20260926-1400-frontend-design-token-convergence.md`）：`` `${NAV_ITEM_CLASS} text-[12px]` ``，常量里已有 `text-[13px]`。作者以为后写的 12px 生效，实际一直是 13px，且看着不违和，没人发现。把 `text-[13px]/text-[12px]` 改名成 `text-act-sm/text-act-xs` 后，排序变成 sm 在前、xs 在后，渲染突然变 12px——一次“零视觉变化”的重命名在 3 个地方改变了界面。冲突常常跨常量：一个值在 `BASE_CLASS`，另一个在调用处追加或 `cx(BASE, "text-act-xs")` 的另一个参数，肉眼看不到。
-3. **选中背景不显示**（2026-10，多智能体协作前端演示 T4，[执行过程](../../exec-runs/20261007-multi-agent-collab-frontend-demo/execution-process.md)）：左栏行按钮基础样式含 `bg-transparent`，选中再拼 `bg-sidebar-selected`。构建产物里几个背景类的位置是 `.bg-selected 78086 / .bg-sidebar-selected 78196 / .bg-surface 78583 / .bg-transparent 79778`，`bg-transparent` 在最后所以永远赢。换个颜色名结果可能反过来，所以时有时无。
+3. **选中背景不显示**（2026-10，多智能体协作前端演示 T4，[history](../../histories/2026-10/20261007-1423-multi-agent-collab-frontend-demo.md)）：左栏行按钮基础样式含 `bg-transparent`，选中再拼 `bg-sidebar-selected`。构建产物里几个背景类的位置是 `.bg-selected 78086 / .bg-sidebar-selected 78196 / .bg-surface 78583 / .bg-transparent 79778`，`bg-transparent` 在最后所以永远赢。换个颜色名结果可能反过来，所以时有时无。
 
 ## 根因
 

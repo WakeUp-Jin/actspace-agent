@@ -12,7 +12,7 @@ import { recordProjectionFixture } from "./projection-fixture";
 // 14 T0：会话数据流的 IPC 与投影预算。T0 只记录基线；T3 起断言审批 / 队列补齐只按新增会话 id 发生，T10 起断言投影次数
 // （T0 → T10：mount100 5 → 4，open2000 5 → 5，earlier10 30 → 10，即每页一次）。
 // `createMessageBlocks` 的计数经 vi.mock 拦截 `@actspace/shared` 的导出，覆盖 App 与
-// renderer/api/sessions.ts 的调用；@actspace/client 内部的调用是否计入，以首次运行结果为准（见执行记录）。
+// renderer/api/sessions.ts 的调用；@actspace/client 内部的调用是否计入，以首次运行结果为准。
 vi.mock("@actspace/shared", async (importOriginal) => {
   const actual = await importOriginal<typeof shared>();
   return { ...actual, createMessageBlocks: vi.fn(actual.createMessageBlocks) };

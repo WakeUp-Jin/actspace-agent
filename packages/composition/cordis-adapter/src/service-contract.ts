@@ -52,8 +52,12 @@ export const ACTSPACE_SERVICE_IDS = Object.freeze({
   headlessRunner: serviceId("headless.runner"),
 } as const);
 
-/** A public role-independent contract for one replaceable runtime capability. */
-export type ServiceDefinition<TService = unknown, TConfig = unknown, TId extends string = string> = Readonly<{
+/**
+ * A public role-independent contract for one replaceable runtime capability.
+ * 这里直接写对象类型，不在外面再包一层 `Readonly<>`（字段本来就都是 readonly）：包了之后类型别名在
+ * 声明文件里会被展开，`ServiceId` 的品牌写不出来，别的包就不能 `export const X = bindServiceType<T>(…)`。
+ */
+export type ServiceDefinition<TService = unknown, TConfig = unknown, TId extends string = string> = {
   readonly kind: "actspace.service-definition";
   readonly id: ServiceId & TId;
   readonly abiVersion: number;
@@ -66,7 +70,7 @@ export type ServiceDefinition<TService = unknown, TConfig = unknown, TId extends
   readonly publicSurface: readonly string[];
   readonly service?: TService;
   readonly config?: TConfig;
-}>;
+};
 
 /** Constructor shape accepted by Cordis for a Service-owned plugin. */
 export type CordisServiceClass<TService = unknown, TConfig = unknown> = {
@@ -102,8 +106,12 @@ export function defineServiceDefinition<TService = unknown, TConfig = unknown, T
   });
 }
 
-/** Audit metadata for selected capabilities; manifests and production interfaces remain authoritative. */
-export const ACTSPACE_SERVICE_DEFINITIONS: Readonly<Record<string, ServiceDefinition>> = Object.freeze({
+/**
+ * Audit metadata for selected capabilities; manifests and production interfaces remain authoritative.
+ * 条目在这里不带服务类型（这个包看不到各个包的类型）；类型所属的包用 `bindServiceType` 补上并导出。
+ * 表内不要写类型参数：契约矩阵的生成脚本按 `key: defineServiceDefinition({` 的文本形状读这张表。
+ */
+export const ACTSPACE_SERVICE_DEFINITIONS = Object.freeze({
   sessionCheckpoint: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.sessionCheckpoint, owner: "@actspace/session-checkpoint-policy", scope: "root", description: "Required live Session durability barrier.", publicSurface: ["flush"] }),
   sessionJournal: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.sessionJournal, owner: "@actspace/session-journal", description: "Session event codecs, envelope validation and Journal replay owner.", publicSurface: ["registry", "append", "replay"] }),
   sessionStore: defineServiceDefinition({ id: ACTSPACE_SERVICE_IDS.sessionStore, owner: "@actspace/session-persistence", scope: "session", description: "Session live log, surface and replay owner.", publicSurface: ["create", "open", "append", "flush", "close"] }),

@@ -3,7 +3,7 @@ import { validateDeepSeekImage, validateDeepSeekImageMessages, validateDeepSeekP
 import { catalogProviderForEndpoint, type ModelPricingSnapshot } from "@actspace/shared";
 import { calculateUsageCost } from "@actspace/llm-service";
 import { reasoningPayload } from "./reasoning-options.js";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { providerCodeFromUnknown, retryAfterMsFromUnknown, type LlmFailure, type LlmFailureKind } from "@actspace/llm-service";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
@@ -197,8 +197,8 @@ async function* anthropicStream(client: SdkClient, input: LlmAdapterDispatchInpu
 
 type OpenAiFileResolver = (sessionId: string, artifactId: string, artifact: { readonly data: Uint8Array; readonly mimeType: string }) => Promise<string>;
 
-async function toOpenAiMessages(messages: readonly LlmMessage[], sessionId?: string, readArtifact?: PiAiArtifactReader, deepseek = false, resolveFileId?: OpenAiFileResolver): Promise<RuntimeV2JsonValue[]> {
-  const output: RuntimeV2JsonValue[] = [];
+async function toOpenAiMessages(messages: readonly LlmMessage[], sessionId?: string, readArtifact?: PiAiArtifactReader, deepseek = false, resolveFileId?: OpenAiFileResolver): Promise<RuntimeJsonValue[]> {
+  const output: RuntimeJsonValue[] = [];
   for (const message of messages) {
     if (message.role === "system") { output.push({ role: "system", content: messageText(message) }); continue; }
     if (message.role === "user") { output.push({ role: "user", content: await toOpenAiUserContent(message, sessionId, readArtifact, resolveFileId) }); continue; }
@@ -208,9 +208,9 @@ async function toOpenAiMessages(messages: readonly LlmMessage[], sessionId?: str
   return output;
 }
 
-async function toOpenAiUserContent(message: LlmMessage, sessionId?: string, readArtifact?: PiAiArtifactReader, resolveFileId?: OpenAiFileResolver): Promise<RuntimeV2JsonValue> {
+async function toOpenAiUserContent(message: LlmMessage, sessionId?: string, readArtifact?: PiAiArtifactReader, resolveFileId?: OpenAiFileResolver): Promise<RuntimeJsonValue> {
   if (typeof message.content === "string") return message.content;
-  const output: RuntimeV2JsonValue[] = [];
+  const output: RuntimeJsonValue[] = [];
   for (const block of message.content) {
     if (block.type === "text") output.push({ type: "text", text: block.text });
     else if (block.type === "image") {
@@ -225,45 +225,45 @@ async function toOpenAiUserContent(message: LlmMessage, sessionId?: string, read
   return output;
 }
 
-async function toResponsesInput(messages: readonly LlmMessage[], sessionId?: string, readArtifact?: PiAiArtifactReader): Promise<{ readonly instructions: string; readonly input: RuntimeV2JsonValue[] }> {
-  const instructions = messages.filter((message) => message.role === "system").map(messageText).join("\n\n"); const input: RuntimeV2JsonValue[] = [];
+async function toResponsesInput(messages: readonly LlmMessage[], sessionId?: string, readArtifact?: PiAiArtifactReader): Promise<{ readonly instructions: string; readonly input: RuntimeJsonValue[] }> {
+  const instructions = messages.filter((message) => message.role === "system").map(messageText).join("\n\n"); const input: RuntimeJsonValue[] = [];
   for (const message of messages) {
     if (message.role === "system") continue;
-    if (message.role === "user") { const content: RuntimeV2JsonValue[] = []; for (const block of blocksOf(message)) { if (block.type === "text") content.push({ type: "input_text", text: block.text }); else if (block.type === "image") content.push({ type: "input_image", image_url: await artifactDataUrl(block.artifactId, block.mimeType, sessionId, readArtifact) }); } input.push({ role: "user", content }); continue; }
+    if (message.role === "user") { const content: RuntimeJsonValue[] = []; for (const block of blocksOf(message)) { if (block.type === "text") content.push({ type: "input_text", text: block.text }); else if (block.type === "image") content.push({ type: "input_image", image_url: await artifactDataUrl(block.artifactId, block.mimeType, sessionId, readArtifact) }); } input.push({ role: "user", content }); continue; }
     if (message.role === "assistant") { for (const block of blocksOf(message)) { if (block.type === "text") input.push({ role: "assistant", content: [{ type: "output_text", text: block.text, annotations: [] }] }); else if (block.type === "tool-call") input.push({ type: "function_call", call_id: block.callId, name: block.name, arguments: block.arguments }); } continue; }
     input.push({ type: "function_call_output", call_id: message.callId ?? "unknown", output: messageText(message) });
   }
   return { instructions, input };
 }
 
-async function toAnthropicMessages(messages: readonly LlmMessage[], sessionId?: string, readArtifact?: PiAiArtifactReader): Promise<{ readonly system: string; readonly messages: RuntimeV2JsonValue[] }> {
-  const system = messages.filter((message) => message.role === "system").map(messageText).join("\n\n"); const output: RuntimeV2JsonValue[] = [];
+async function toAnthropicMessages(messages: readonly LlmMessage[], sessionId?: string, readArtifact?: PiAiArtifactReader): Promise<{ readonly system: string; readonly messages: RuntimeJsonValue[] }> {
+  const system = messages.filter((message) => message.role === "system").map(messageText).join("\n\n"); const output: RuntimeJsonValue[] = [];
   for (const message of messages) {
     if (message.role === "system") continue;
-    if (message.role === "user") { const content: RuntimeV2JsonValue[] = []; for (const block of blocksOf(message)) { if (block.type === "text") content.push({ type: "text", text: block.text }); else if (block.type === "image") { const dataUrl = await artifactDataUrl(block.artifactId, block.mimeType, sessionId, readArtifact); content.push({ type: "image", source: { type: "base64", media_type: anthropicMediaType(block.mimeType), data: dataUrl.slice(dataUrl.indexOf(",") + 1) } }); } } output.push({ role: "user", content }); continue; }
-    if (message.role === "assistant") { const content: RuntimeV2JsonValue[] = []; for (const block of blocksOf(message)) { if (block.type === "text") content.push({ type: "text", text: block.text }); else if (block.type === "reasoning" && block.signature) content.push({ type: "thinking", thinking: block.text, signature: block.signature }); else if (block.type === "tool-call") content.push({ type: "tool_use", id: block.callId, name: block.name, input: parseArguments(block.arguments) }); } if (content.length) output.push({ role: "assistant", content }); continue; }
-    const content: RuntimeV2JsonValue[] = [];
+    if (message.role === "user") { const content: RuntimeJsonValue[] = []; for (const block of blocksOf(message)) { if (block.type === "text") content.push({ type: "text", text: block.text }); else if (block.type === "image") { const dataUrl = await artifactDataUrl(block.artifactId, block.mimeType, sessionId, readArtifact); content.push({ type: "image", source: { type: "base64", media_type: anthropicMediaType(block.mimeType), data: dataUrl.slice(dataUrl.indexOf(",") + 1) } }); } } output.push({ role: "user", content }); continue; }
+    if (message.role === "assistant") { const content: RuntimeJsonValue[] = []; for (const block of blocksOf(message)) { if (block.type === "text") content.push({ type: "text", text: block.text }); else if (block.type === "reasoning" && block.signature) content.push({ type: "thinking", thinking: block.text, signature: block.signature }); else if (block.type === "tool-call") content.push({ type: "tool_use", id: block.callId, name: block.name, input: parseArguments(block.arguments) }); } if (content.length) output.push({ role: "assistant", content }); continue; }
+    const content: RuntimeJsonValue[] = [];
     for (const block of blocksOf(message)) {
       if (block.type === "image") {
         const dataUrl = await artifactDataUrl(block.artifactId, block.mimeType, sessionId, readArtifact);
         content.push({ type: "image", source: { type: "base64", media_type: anthropicMediaType(block.mimeType), data: dataUrl.slice(dataUrl.indexOf(",") + 1) } });
       } else if (block.type === "text") content.push({ type: "text", text: block.text });
     }
-    const result = { type: "tool_result", tool_use_id: message.callId ?? "unknown", content: content.some((block) => (block as { type?: string }).type === "image") ? content : messageText(message) }; const previous = output.at(-1) as { role?: string; content?: RuntimeV2JsonValue[] } | undefined; if (previous?.role === "user" && Array.isArray(previous.content) && previous.content.every((part) => typeof part === "object" && part !== null && (part as { type?: string }).type === "tool_result")) previous.content.push(result); else output.push({ role: "user", content: [result] });
+    const result = { type: "tool_result", tool_use_id: message.callId ?? "unknown", content: content.some((block) => (block as { type?: string }).type === "image") ? content : messageText(message) }; const previous = output.at(-1) as { role?: string; content?: RuntimeJsonValue[] } | undefined; if (previous?.role === "user" && Array.isArray(previous.content) && previous.content.every((part) => typeof part === "object" && part !== null && (part as { type?: string }).type === "tool_result")) previous.content.push(result); else output.push({ role: "user", content: [result] });
   }
   return { system, messages: output };
 }
 
-function toOpenAiTools(tools: readonly LlmToolDefinition[]): RuntimeV2JsonValue[] { return tools.map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.inputSchema } })); }
-function toResponsesTools(tools: readonly LlmToolDefinition[]): RuntimeV2JsonValue[] { return tools.map((tool) => ({ type: "function", name: tool.name, description: tool.description, parameters: tool.inputSchema, strict: false })); }
-function toAnthropicTools(tools: readonly LlmToolDefinition[]): RuntimeV2JsonValue[] { return tools.map((tool) => ({ name: tool.name, description: tool.description, input_schema: { type: "object", ...(tool.inputSchema as Record<string, RuntimeV2JsonValue>) } })); }
+function toOpenAiTools(tools: readonly LlmToolDefinition[]): RuntimeJsonValue[] { return tools.map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.inputSchema } })); }
+function toResponsesTools(tools: readonly LlmToolDefinition[]): RuntimeJsonValue[] { return tools.map((tool) => ({ type: "function", name: tool.name, description: tool.description, parameters: tool.inputSchema, strict: false })); }
+function toAnthropicTools(tools: readonly LlmToolDefinition[]): RuntimeJsonValue[] { return tools.map((tool) => ({ name: tool.name, description: tool.description, input_schema: { type: "object", ...(tool.inputSchema as Record<string, RuntimeJsonValue>) } })); }
 function blocksOf(message: LlmMessage): readonly LlmContentBlock[] { return typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content; }
 function messageText(message: LlmMessage): string { return blocksOf(message).map((block) => block.type === "text" || block.type === "reasoning" ? block.text : block.type === "tool-result" ? block.content : "").join(""); }
 function isText(block: LlmContentBlock): block is Extract<LlmContentBlock, { type: "text" }> { return block.type === "text"; }
 function isToolCall(block: LlmContentBlock): block is Extract<LlmContentBlock, { type: "tool-call" }> { return block.type === "tool-call"; }
 async function artifactDataUrl(artifactId: string, mimeType: string, sessionId?: string, readArtifact?: PiAiArtifactReader): Promise<string> { if (sessionId === undefined || readArtifact === undefined) throw new Error("Image input requires a Session-bound ActSpace artifact reader."); const artifact = await readArtifact(sessionId, artifactId); return `data:${artifact.mimeType || mimeType};base64,${Buffer.from(artifact.data).toString("base64")}`; }
 function anthropicMediaType(value: string): string { return ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(value) ? value : "image/png"; }
-function parseArguments(value: string): RuntimeV2JsonValue { try { return JSON.parse(value) as RuntimeV2JsonValue; } catch { return { $raw: value }; } }
+function parseArguments(value: string): RuntimeJsonValue { try { return JSON.parse(value) as RuntimeJsonValue; } catch { return { $raw: value }; } }
 function accumulator(): Accumulator { return { text: [], reasoning: [], signatures: [], calls: new Map(), usage: unknownUsage(), stopReason: null }; }
 function done(acc: Accumulator, pricing: ModelPricingSnapshot | null): Extract<LlmStreamEvent, { type: "done" }> { const content: LlmContentBlock[] = []; const reasoning = acc.reasoning.join(""); if (reasoning || acc.signatures.length) content.push({ type: "reasoning", text: reasoning, ...(acc.signatures.at(-1) ? { signature: acc.signatures.at(-1) } : {}) }); const text = acc.text.join(""); if (text) content.push({ type: "text", text }); for (const call of [...acc.calls].sort(([left], [right]) => left - right).map(([, value]) => value)) content.push({ type: "tool-call", callId: call.callId, name: call.name, arguments: call.arguments }); return { type: "done", stopReason: acc.calls.size ? "tool-calls" : acc.stopReason, usage: calculateUsageCost(acc.usage, pricing), content }; }
 function terminalFailure(error: unknown, signal: AbortSignal, endpoint?: string): Extract<LlmStreamEvent, { type: "error" | "aborted" }> { if (signal.aborted || (error instanceof Error && error.name === "AbortError")) return { type: "aborted", reason: "LLM request aborted." }; return { type: "error", failure: classifyFailure(error, endpoint) }; }

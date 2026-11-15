@@ -1,11 +1,11 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { NormalizedToolDefinition } from "./definition.js";
 import type { ToolActivationLease } from "./activation-lease.js";
 import { ToolRuntimeError } from "./errors.js";
 
 export type ToolGuardContext = {
   readonly definition: NormalizedToolDefinition;
-  readonly args: Readonly<Record<string, RuntimeV2JsonValue>>;
+  readonly args: Readonly<Record<string, RuntimeJsonValue>>;
   readonly hostCapabilities: ReadonlySet<string>;
   readonly lease: ToolActivationLease;
   readonly signal: AbortSignal;

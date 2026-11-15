@@ -1,16 +1,16 @@
 import { ClientSessionStore } from "@actspace/client/sessions";
-import type { RuntimeV2DesktopSessionProjection, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot, RuntimeV2SessionProjectionInput, RuntimeV2SessionObservation } from "@actspace/shared/runtime-v2";
+import type { RuntimeDesktopSessionProjection, RuntimeLiveEvent, RuntimeSessionSnapshot, RuntimeSessionProjectionInput, RuntimeSessionObservation } from "@actspace/shared/runtime-v2";
 
 export type DesktopSessionTransport = {
-  readonly inspectSession: (input: RuntimeV2SessionProjectionInput) => Promise<RuntimeV2DesktopSessionProjection>;
-  readonly observeSession?: (input: RuntimeV2SessionProjectionInput) => Promise<RuntimeV2SessionObservation>;
-  readonly subscribeLive: (listener: (event: RuntimeV2LiveEvent) => void) => () => void;
+  readonly inspectSession: (input: RuntimeSessionProjectionInput) => Promise<RuntimeDesktopSessionProjection>;
+  readonly observeSession?: (input: RuntimeSessionProjectionInput) => Promise<RuntimeSessionObservation>;
+  readonly subscribeLive: (listener: (event: RuntimeLiveEvent) => void) => () => void;
   readonly reportObserved?: (sessionIds: readonly string[]) => void;
 };
 export type DesktopSessionApi = {
   readonly getSessionProjectionSnapshot: DesktopSessionTransport["inspectSession"];
-  readonly onSessionLiveEvent: (listener: (envelope: { readonly event: RuntimeV2LiveEvent }) => void) => () => void;
-  readonly getSessionObservation?: (input: RuntimeV2SessionProjectionInput) => Promise<RuntimeV2SessionObservation>;
+  readonly onSessionLiveEvent: (listener: (envelope: { readonly event: RuntimeLiveEvent }) => void) => () => void;
+  readonly getSessionObservation?: (input: RuntimeSessionProjectionInput) => Promise<RuntimeSessionObservation>;
   /**
    * 告诉主进程当前选中和订阅的会话全集（变化时整体替换），主进程据此不回收它们。
    * 不传则不上报，主进程只按 LRU 回收。
@@ -65,7 +65,7 @@ export class DesktopSessionBridge {
     this.#reportObserved();
     this.#unsubscribeLive ??= this.transport.subscribeLive(event => this.#applyLive(event));
   }
-  #applyLive(event: RuntimeV2LiveEvent): void {
+  #applyLive(event: RuntimeLiveEvent): void {
     const type = event.update?.event.type;
     // A rewound Journal restarts its seqs below the cell's; nothing merges until a full reload replaces it.
     // Retained cells of Sessions nobody watches reset too, so reopening one replaces it instead of merging.
@@ -76,7 +76,7 @@ export class DesktopSessionBridge {
       this.#pendingRefresh.add(event.sessionId); this.#refresh(event.sessionId);
     }
   }
-  async open(sessionId: string): Promise<RuntimeV2SessionSnapshot> {
+  async open(sessionId: string): Promise<RuntimeSessionSnapshot> {
     if (this.#disposed) throw new Error("Session bridge disposed.");
     this.store.select(sessionId);
     const generation = this.store.beginRequest(sessionId);
@@ -142,7 +142,7 @@ export class DesktopSessionBridge {
       this.#retryTimers.set(timer, resolve);
     });
   }
-  async #load(input: RuntimeV2SessionProjectionInput, generation: number): Promise<RuntimeV2SessionSnapshot> {
+  async #load(input: RuntimeSessionProjectionInput, generation: number): Promise<RuntimeSessionSnapshot> {
     try {
       const envelope = await this.transport.inspectSession(input);
       if (envelope.sessionId !== input.sessionId) throw new Error("Session projection identity mismatch.");

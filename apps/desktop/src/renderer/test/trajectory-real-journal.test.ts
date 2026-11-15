@@ -15,7 +15,7 @@ function makeJournal() {
 }
 
 /** 提示词与工具记录（只在变化时写，agent-spec-request-record.md §3）。 */
-type Json = import('@actspace/shared/runtime-v2').RuntimeV2JsonValue;
+type Json = import('@actspace/shared/runtime-v2').RuntimeJsonValue;
 const promptRecord = (ids: Record<string, string>, content: string): Json => ({ ...ids, digest: content, sections: [{ id: 'model-prompt', owner: 'actspace.context-system', order: 0, content }], modelFacts: [], contributorProvenance: [] });
 const toolsRecord = (ids: Record<string, string>, tools: readonly Json[]): Json => ({ ...ids, digest: JSON.stringify(tools), tools });
 const contextRecord = (ids: Record<string, string>, requestOptions: Record<string, Json>): Json => ({ ...ids, snapshot: { schemaVersion: 3, requestOptions } });

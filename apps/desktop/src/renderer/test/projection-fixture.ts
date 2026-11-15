@@ -1,17 +1,17 @@
 import { initialContextEstimate, viewContextEstimate, type SessionEvent, type SessionRecord } from "@actspace/shared";
-import { surfaceNode, type RuntimeV2DesktopSessionProjection, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import { surfaceNode, type RuntimeDesktopSessionProjection, type RuntimeJsonValue, type RuntimeSessionSnapshot, type SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 
-export function projectionFixture(sessionId = "s", throughJournalSeq = -1, events: readonly SessionEventEnvelopeV1[] = []): RuntimeV2DesktopSessionProjection {
-  const snapshot: RuntimeV2SessionSnapshot = { kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-09-21T00:00:00Z", updatedAt: "2026-09-21T00:00:00Z", throughJournalSeq, workspaceRoot: "/tmp/workspace", agentForm: "agent", permissionMode: "default", sessionGrants: [], accessState: "read-write", metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], lineage: null,
+export function projectionFixture(sessionId = "s", throughJournalSeq = -1, events: readonly SessionEventEnvelopeV1[] = []): RuntimeDesktopSessionProjection {
+  const snapshot: RuntimeSessionSnapshot = { kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-09-21T00:00:00Z", updatedAt: "2026-09-21T00:00:00Z", throughJournalSeq, workspaceRoot: "/tmp/workspace", agentForm: "agent", permissionMode: "default", sessionGrants: [], accessState: "read-write", metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], lineage: null,
     usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
     activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } } };
   return { kind: "session-projection", schemaVersion: 1, sessionId, throughJournalSeq, snapshot, activeMessageIds: [], deferredToolCalls: [],
-    values: { metadata: snapshot.metadata, providerUsage: snapshot.usage, sessionStats: snapshot.activity, contextEstimate: viewContextEstimate(initialContextEstimate()) as unknown as RuntimeV2JsonValue },
+    values: { metadata: snapshot.metadata, providerUsage: snapshot.usage, sessionStats: snapshot.activity, contextEstimate: viewContextEstimate(initialContextEstimate()) as unknown as RuntimeJsonValue },
     window: { events, fromSeq: events[0]?.seq ?? 0, throughJournalSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0 } };
 }
 
 /** Converts older UI test scenarios to Journal fixtures, never used in production. */
-export function recordProjectionFixture(record: SessionRecord): RuntimeV2DesktopSessionProjection {
+export function recordProjectionFixture(record: SessionRecord): RuntimeDesktopSessionProjection {
   const sourceEvents = record.events.length > 0 ? record.events : (record.messageBlocks ?? []).flatMap((block) => {
     if (block.kind !== "user" && block.kind !== "assistant") return [];
     return [{ id: block.id, sessionId: record.meta.id, agentRunId: "fixture-run", schemaVersion: 2 as const, timestamp: block.createdAt, type: block.kind === "user" ? "user_message" as const : "assistant_message" as const, payload: { content: block.content } }];
@@ -25,7 +25,7 @@ function legacyEventToJournal(event: SessionEvent, seq: number): SessionEventEnv
   const payload = record(event.payload);
   const identity = { agentRunId: event.agentRunId, ...(event.turnId ? { turnId: event.turnId } : {}), ...(event.llmCallId ? { requestId: event.llmCallId } : {}) };
   let type: string = "turn/end";
-  let data: Record<string, RuntimeV2JsonValue> = { ...identity, reason: "completed" };
+  let data: Record<string, RuntimeJsonValue> = { ...identity, reason: "completed" };
   let surface: SessionEventEnvelopeV1["surface"] = null;
   if (event.type === "user_message") {
     type = "user/message";
@@ -47,10 +47,10 @@ function legacyEventToJournal(event: SessionEvent, seq: number): SessionEventEnv
     data = { ...identity, messageId: event.id, chunkIndex: 0, kind: "reasoning", content: payload.content ?? "" };
   } else if (event.type === "llm_usage") {
     type = "assistant/message";
-    data = { ...identity, messageId: event.id, content: "", usage: event.payload as unknown as RuntimeV2JsonValue };
+    data = { ...identity, messageId: event.id, content: "", usage: event.payload as unknown as RuntimeJsonValue };
   } else if (event.type === "error") {
     type = "agent/error";
-    data = { ...identity, failure: event.payload as unknown as RuntimeV2JsonValue };
+    data = { ...identity, failure: event.payload as unknown as RuntimeJsonValue };
   } else if (event.type === "agent_run_aborted") {
     type = "turn/end";
     data = { ...identity, reason: "aborted" };
@@ -58,6 +58,6 @@ function legacyEventToJournal(event: SessionEvent, seq: number): SessionEventEnv
   return { recordKind: "event", seq, type, eventVersion: 1, criticality: "ignorable", time: event.timestamp, source: { ownerPluginId: "@actspace/core" }, data, surface, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
 }
 
-function record(value: unknown): Record<string, RuntimeV2JsonValue> {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, RuntimeV2JsonValue> : {};
+function record(value: unknown): Record<string, RuntimeJsonValue> {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, RuntimeJsonValue> : {};
 }

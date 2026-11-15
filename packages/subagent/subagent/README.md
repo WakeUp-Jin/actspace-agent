@@ -1,9 +1,17 @@
 # @actspace/subagent
 
-子智能体管理器与工具定义。`SubagentManager` 实现 Host 端口 `SubagentHostPort`：创建（默认同步，等满 30 分钟转后台）、`agent_fork`、外部子智能体、`send_message`（主会话发给运行中的子智能体，子智能体发给父会话）、`list_subagent_models`。后台子智能体登记进后台任务登记表（`kind: "agent"`），完成通知、`task_stop`、重启后的 `lost` 通知都由登记表负责；管理器另提供界面停止（`stopByUser`）、编辑重发停止（`stopAll`）和重启后补写 `lost`。
+子智能体管理器与工具定义。`SubagentManager` 实现 Host 端口 `SubagentHostPort`（`actspace.host.subagents`）。行为规则见[子智能体运行规范](../../../docs/design-docs/collaboration/agent-subagent-runtime.md)，这里只说代码在哪。
 
-- 每个子智能体一个 child Session（lineage 指向主会话），预设 `general` / `explore`，工具集在创建时固定；子智能体不弹审批，继承父会话的权限模式和会话授权。
-- `agent_fork` 复制主会话到「当前轮最后一个完整步骤」（`fork-boundary.ts`），按主 Agent 组装：系统提示词、工具列表和模型与父会话相同，首个请求能命中父会话的缓存；子智能体不能用的工具在执行时拦下。
-- 每次激活写一对 `subagent/activation`（`start` / `settle`）；状态只从主会话 Journal 折叠，内存里只留正在运行的激活。
-- transcript 路径由 Host 给出，每步之后刷新；模型可见文字全部在 `messages.ts`，与设计 02 §2 逐字一致。
-- 外部子智能体（`external.ts`、`external-cli.ts`）：`spawnExternal(backend, input)` 只允许主会话调用，和普通子智能体共用并发上限；CLI 启动失败（没装、没登录、进程退出）直接返回工具错误、什么都不记；记录路径是 CLI 自己的日志，最多等 10 秒出现，没出现就注明「the log file does not exist yet」且不登记为上下文路径；中断即永久停止；重启后补 `lost`。`isExternalRecordPath` 只放行主会话投影里登记过的记录文件。
+公开入口：`.`、`./manifest`、`./plugin`。
+
+| 文件 | 内容 |
+| --- | --- |
+| `manager.ts` | 创建、fork、同步等待与转后台、登记后台任务、`send_message`、界面停止（`stopByUser`）、编辑重发停止（`stopAll`）、重启后补 `lost`（`recoverLost`）、`spawnExternal`、外部记录文件放行（`isExternalRecordPath`） |
+| `child-session.ts` | 创建子会话（lineage 指向主会话） |
+| `preset.ts` | `general` / `explore` 的工具集与子智能体不能用的工具 |
+| `fork-boundary.ts` | `agent_fork` 复制到哪里为止 |
+| `messages.ts` | 模型可见的全部英文：工具描述、参数说明、返回与错误文字、追加在任务后的说明。改措辞只改这里 |
+| `tools.ts` | 四个工具和外部工具的注册函数（`registerSubagentTools`、`registerExternalSubagentTool`） |
+| `external.ts`、`external-cli.ts` | 外部子智能体的后端接口（`ExternalSubagentBackend`）、找命令与结束进程（`resolveCommand`、`terminate`） |
+
+测试：`pnpm --filter @actspace/subagent test`。

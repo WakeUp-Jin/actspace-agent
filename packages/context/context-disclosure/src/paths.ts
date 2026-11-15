@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ContextPathState, DisclosureArtifact } from "@actspace/context-engine";
 
 export type { DisclosureArtifact, PathReference } from "@actspace/context-engine";
@@ -16,10 +16,10 @@ const MAX_SEGMENT_LENGTH = 255;
 const plausiblePath = (hint: string) => hint.split("/").every(segment => segment.length <= MAX_SEGMENT_LENGTH);
 
 /** Candidates are hints, never proof of a file. The Host validates each candidate. */
-export function collectPathHints(value: RuntimeV2JsonValue): readonly string[] {
+export function collectPathHints(value: RuntimeJsonValue): readonly string[] {
   const hints = new Set<string>();
   const add = (hint: string) => { if (plausiblePath(hint)) hints.add(hint); };
-  const walk = (item: RuntimeV2JsonValue): void => {
+  const walk = (item: RuntimeJsonValue): void => {
     if (typeof item === "string") {
       item = item.replace(/^\s*\d+\|/gm, " ");
       for (const match of item.matchAll(/(?:^|[\s"'`(])((?:\.{0,2}\/|[A-Za-z0-9_.-]+\/)[^\s"'`<>|]*[A-Za-z0-9_.-])/g)) add(match[1].replace(/:\d+(?::\d+)?$/, ""));
@@ -28,7 +28,7 @@ export function collectPathHints(value: RuntimeV2JsonValue): readonly string[] {
     }
     if (Array.isArray(item)) { item.forEach(walk); return; }
     if (item && typeof item === "object") {
-      const record = item as Readonly<Record<string, RuntimeV2JsonValue>>;
+      const record = item as Readonly<Record<string, RuntimeJsonValue>>;
       if (record.type === "file-reference" && typeof record.relativePath === "string") add(record.relativePath);
       for (const [key, child] of Object.entries(record)) if (!OPAQUE_KEYS.has(key)) walk(child);
     }

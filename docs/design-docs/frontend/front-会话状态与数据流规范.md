@@ -1,6 +1,6 @@
 # 会话状态与数据流规范
 
-bridge 与 `api/<域>` 的约定见 [Preload bridge 与 Mock 规范](front-preload-bridge与mock规范.md)；分页与浏览索引见[会话浏览按需加载](../agent-runtime/agent-progressive-session-loading.md)；设计由来见归档的 [Renderer 状态层与会话数据流](../../exec-plans/completed/design-archive/desktop-frontend-refactor/02-Renderer状态层与会话数据流.md)。
+bridge 与 `api/<域>` 的约定见 [Preload bridge 与 Mock 规范](front-preload-bridge与mock规范.md)；分页与浏览索引见[会话浏览按需加载](../agent-runtime/agent-progressive-session-loading.md)。
 
 renderer 里一个会话的数据分三类，每类只有一个归属：
 

@@ -2,20 +2,20 @@ import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeAll, beforeEach, expect, it } from "vitest";
-import { setRuntimeV2LoaderForTest } from "../runtime-v2/loader";
-import { runV2Command } from "../runtime-v2/run";
+import { setRuntimeLoaderForTest } from "../runtime-v2/loader";
+import { runCommand } from "../runtime-v2/run";
 
-beforeEach(() => { setRuntimeV2LoaderForTest(() => import("@actspace/runtime")); });
-afterEach(() => { setRuntimeV2LoaderForTest(); });
+beforeEach(() => { setRuntimeLoaderForTest(() => import("@actspace/runtime")); });
+afterEach(() => { setRuntimeLoaderForTest(); });
 
 const temp = (prefix: string) => mkdtemp(join(tmpdir(), `actspace-cli-pinned-${prefix}-`));
 let source: string;
 let selection: Record<string, unknown> & { executionDigest: string; sharedServices: string[] };
 
 beforeAll(async () => {
-  setRuntimeV2LoaderForTest(() => import("@actspace/runtime"));
+  setRuntimeLoaderForTest(() => import("@actspace/runtime"));
   source = await temp("source");
-  await runV2Command({ input: "seed", workspace: await temp("work"), dataDir: source, permissionMode: "default", outputFormat: "json", mock: true });
+  await runCommand({ input: "seed", workspace: await temp("work"), dataDir: source, permissionMode: "default", outputFormat: "json", mock: true });
   const rows = (await readFile(join(source, "harness-state", "selections.jsonl"), "utf8")).trim().split("\n");
   const record = (JSON.parse(rows.at(-1)!) as { record: { description: Record<string, unknown>; executionDigest: string } }).record;
   selection = { ...record.description, executionDigest: record.executionDigest } as typeof selection;
@@ -26,7 +26,7 @@ async function run(file: Record<string, unknown> | string, options: { readonly a
   if (options.artifacts !== false && !options.dataDir) await cp(join(source, "harness-artifacts"), join(dataDir, "harness-artifacts"), { recursive: true });
   const harness = join(await temp("file"), "selection.json");
   await writeFile(harness, typeof file === "string" ? file : JSON.stringify(file));
-  return runV2Command({ input: "hello", workspace: await temp("work"), dataDir, permissionMode: "default", outputFormat: "json", mock: true, harness });
+  return runCommand({ input: "hello", workspace: await temp("work"), dataDir, permissionMode: "default", outputFormat: "json", mock: true, harness });
 }
 
 it("boots the pinned selection and reports the Harness that ran", async () => {

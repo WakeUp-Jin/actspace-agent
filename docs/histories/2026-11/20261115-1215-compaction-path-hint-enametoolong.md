@@ -28,3 +28,13 @@
 ### ✅ Verification
 
 - `context-disclosure` 全部单测、`context-host.test.ts` 通过；`pnpm typecheck` 通过。真实会话未重跑压缩。
+
+### Unverified & Leftovers（未验证与遗留）
+
+- **未验证**：出错的会话 11a4a2ba 没有重跑压缩。
+- **遗留**：无。
+
+### 📁 Files Modified
+
+- `packages/context/context-disclosure/src/paths.ts`、`src/test/disclosure.test.ts`
+- `packages/core/runtime/src/harness/context-host.ts`、`context-host.test.ts`

@@ -312,7 +312,7 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
   // 插件
   [contract.englishLearning.setTarget, shape({ enabled: "boolean", sessionId: nullable(value => typeof value === "string") }, "Invalid English learning target")],
   [contract.browserBridge.selectSourceExtension, NO_INPUT],
-  [contract.browserBridge.useBundledExtension, NO_INPUT],
+  [contract.browserBridge.switchToBundledExtension, NO_INPUT],
   [contract.browserBridge.selectInstance, input => typeof input === "string" ? null : "Invalid browser instance"],
   [contract.browserBridge.installFromRepo, NO_INPUT],
   [contract.skills.list, workspaceRootOnly],

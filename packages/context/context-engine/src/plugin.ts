@@ -5,17 +5,26 @@ import { ContextInstanceRegistry } from "./instances.js";
 import { ContextReducerRegistry } from "./reducers.js";
 import { projectContext } from "./projection.js";
 import type { ContextProjection } from "./types.js";
-import type { CordisContext } from "@actspace/cordis-adapter";
+import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType, provideService, type CordisContext } from "@actspace/cordis-adapter";
 
 export type ContextProjectionService = {
   readonly getProjection: (sessionId: string, logicalAgentScopeId?: string, basis?: ContextProjection["basis"]) => ContextProjection | undefined;
 };
+/** `context.engine` 下注册的对象。 */
+export type ContextEngineService = ContextProjectionService & {
+  readonly compaction: ContextCompactionCoordinator;
+  readonly instances: ContextInstanceRegistry;
+  readonly reducers: ContextReducerRegistry;
+  readonly readEntry: (sessionId: string, logicalAgentScopeId: string, key: string, revision: number, generation: string) => string | null;
+  readonly create: (options: ContextEngineOptions) => ContextEngine;
+};
+export const CONTEXT_ENGINE_SERVICE = bindServiceType<ContextEngineService>(ACTSPACE_SERVICE_DEFINITIONS.contextEngine);
 
 export function apply(ctx: CordisContext): void {
   const instances = new ContextInstanceRegistry();
   const reducers = new ContextReducerRegistry();
   const compaction = new ContextCompactionCoordinator();
-  ctx.provide?.("context.engine", Object.freeze({
+  provideService(ctx, CONTEXT_ENGINE_SERVICE, Object.freeze({
     compaction,
     instances,
     reducers,

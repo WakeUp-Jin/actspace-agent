@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { extensionLayerDigest, installExtensionLayer, installedExtensionSitePackages, EXTENSION_LAYER_LOCAL_WHEELS } from "../extension.js";
-import { findBundledPythonRuntime, loadPythonRuntime, repoPythonRuntimePath } from "../locate.js";
+import { findBundledPythonRuntime, loadPythonRuntime, PYTHON_SHIM_NAME, repoPythonRuntimePath } from "../locate.js";
 import { parsePythonRuntimeManifest, pythonRuntimeTarget, type PythonRuntimeManifest } from "../runtime-manifest.js";
 import { installPath, installWheel } from "../wheel.js";
 import { readZipEntries } from "../zip.js";
@@ -51,21 +51,34 @@ describe("manifest", () => {
 });
 
 describe("locate", () => {
+  // The manifest and every call name linux-x64, so the outcome is the same on whatever machine runs the test.
   it("loads a runtime whose manifest, interpreter and shim are in place, and skips anything else", async () => {
     const root = await scratch();
-    const manifest = manifestFor([]);
-    expect(loadPythonRuntime(root)).toBeUndefined();
+    const manifest = manifestFor([], "linux-x64");
+    expect(loadPythonRuntime(root, "linux", "x64")).toBeUndefined();
     await writeFile(join(root, "runtime.json"), JSON.stringify(manifest));
-    expect(loadPythonRuntime(root)).toBeUndefined();
+    expect(loadPythonRuntime(root, "linux", "x64")).toBeUndefined();
     await mkdir(join(root, "bin"), { recursive: true });
     await mkdir(join(root, "shim"), { recursive: true });
     await writeFile(join(root, "bin", "python3.12"), "#!/bin/sh\n", { mode: 0o755 });
     await writeFile(join(root, "shim", "actspace-python"), "#!/bin/sh\n", { mode: 0o755 });
     const runtime = loadPythonRuntime(root, "linux", "x64");
-    if (process.platform === "win32") return;
     expect(runtime?.shim).toBe(join(root, "shim", "actspace-python"));
     expect(runtime?.sitePackages).toBe(join(root, "lib", "python3.12", "site-packages"));
     expect(loadPythonRuntime(root, "darwin", "arm64")).toBeUndefined();
+  });
+
+  // findBundledPythonRuntime takes no platform, so this one lays out a runtime for the machine running the test.
+  it.skipIf(pythonRuntimeTarget() === undefined)("finds the first candidate that loads on this machine", async () => {
+    const root = await scratch();
+    const manifest = manifestFor([]);
+    const executable = join(root, ...manifest.executable.split("/"));
+    const shim = join(root, "shim", process.platform === "win32" ? `${PYTHON_SHIM_NAME}.cmd` : PYTHON_SHIM_NAME);
+    await mkdir(dirname(executable), { recursive: true });
+    await mkdir(dirname(shim), { recursive: true });
+    await writeFile(join(root, "runtime.json"), JSON.stringify(manifest));
+    await writeFile(executable, "#!/bin/sh\n", { mode: 0o755 });
+    await writeFile(shim, "#!/bin/sh\n", { mode: 0o755 });
     expect(findBundledPythonRuntime([undefined, join(root, "missing"), root])?.root).toBe(root);
   });
 });

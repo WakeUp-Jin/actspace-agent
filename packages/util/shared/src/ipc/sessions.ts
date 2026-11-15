@@ -3,7 +3,7 @@
 
 import type { HostConnectionState } from "../host-protocol";
 import type { ModelKey } from "../model-config";
-import type { RuntimeV2DesktopSessionProjection } from "../runtime-v2";
+import type { RuntimeDesktopSessionProjection } from "../runtime-v2";
 import type { PermissionMode } from "../runtime-v2/permission";
 import type { MainAgentForm } from "../runtime-v2/runtime";
 import type {
@@ -129,7 +129,7 @@ export type SessionForkInput = {
 export type SideChatOpenInput = { parentSessionId: string };
 export type SideChatOpenResult = {
   /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */
-  session: RuntimeV2DesktopSessionProjection;
+  session: RuntimeDesktopSessionProjection;
   inheritedTurnCount: number;
   /** 分出时主会话正在运行，那一轮没有带过来。 */
   runningTurnExcluded: boolean;

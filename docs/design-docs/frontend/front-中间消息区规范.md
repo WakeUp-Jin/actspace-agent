@@ -162,7 +162,7 @@
 - 路径：目录淡色、过长时中段折叠为 `…`，文件名优先保留，`title` 为完整路径。编辑 / 写入默认不展示 diff；`+N -M` 后跟淡色箭头，整组是一个按钮，点开在卡内展开 diff（`aria-expanded`）。
 - Bash 审批：头行终端图标 + intent + 命令名摘要，下一条分割线；主体是带简单着色的 `$ command`（`shell-highlight.ts`，取 `.act-code-hl` 主题变量），过长在卡内滚动；脚本命令的摘要改写为「运行 Python 脚本（N 行）」/「运行 JavaScript 脚本 pack.mjs」，内联正文在 `$` 行下方用 `ScriptSourceBlock` 代码块展示（折叠规则同执行详情），脚本文件形式多一行 `# script: 文件名`；底部左侧显示执行环境（沙盒 / 真实环境），cwd 只在不是工作区根目录时跟在后面，右侧「拒绝」「运行」。
 - 按钮全是 xs 胶囊，固定三层：拒绝（ghost）→ 本会话允许（tonal，仅在有授权建议时出现，`title` 为建议说明）→ 主按钮（`accent` 跟随强调色，删除用 `danger-solid`）。提交中被点按钮前出现旋转图标、所有按钮禁用，Bridge 返回 `ok: false` 时恢复。
-- Bash 的「本会话允许 pnpm」只在后端返回正式 `process.execute` / `command_prefix` 建议时显示，前端不得从命令文本推导授权；建议与 requestId 绑定，切换审批或读取失败时不沿用旧建议；授权包含项目脚本、执行环境沿用现有设置，复杂语法与显式 no_sandbox 仍走单次审批。契约见 `docs/exec-plans/completed/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md`。
+- Bash 的「本会话允许 pnpm」只在后端返回正式 `process.execute` / `command_prefix` 建议时显示，前端不得从命令文本推导授权；建议与 requestId 绑定，切换审批或读取失败时不沿用旧建议；授权包含项目脚本、执行环境沿用现有设置，复杂语法与显式 no_sandbox 仍走单次审批。后端规则见 `packages/shell/tool-shell/README.md`「Bash 会话前缀授权」。
 - 「工作区外」「敏感文件」和通用审批提示不展示；未知原因收进 Info 图标 tooltip，不丢信息。不做键盘快捷键（Enter 与 Composer 发送冲突）；授权后工具行不再追加「本会话已授权」。
 
 ## 颜色职责

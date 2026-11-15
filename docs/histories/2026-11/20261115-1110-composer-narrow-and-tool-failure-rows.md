@@ -37,6 +37,11 @@
 - 单测：desktop 全量（新增 `failed-tool-line.test.tsx`、`turn-annotation-only.test.tsx`、合并胶囊、固定行与轮次导航用例）、web（新增 `UserBubble.test.tsx`）、tool-runtime、shared `visible-text`、client、web 通过。
 - 浏览器 renderer（`?mock=long-session`，临时给 mock 快照填统计数，未提交）由 Sonnet 子智能体在 900/600/520/440/380/340 浅色和 900/440 深色验收：状态行恒为一行、无横向溢出，胶囊按状态行宽度切换，合并面板在视口内、Esc 关闭。Electron 窗口未看。
 
+### Unverified & Leftovers（未验证与遗留）
+
+- **未验证**：Electron 窗口里窄窗状态行和只发批注的轮次没看过（浏览器 renderer 已验）。
+- **遗留**：无。
+
 ### 📁 Files Modified
 
 - `apps/desktop/src/renderer/components/composer/ComposerStatsPills.tsx`

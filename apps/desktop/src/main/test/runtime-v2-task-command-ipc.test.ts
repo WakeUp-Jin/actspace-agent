@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 const { handlers } = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => any>() }));
 vi.mock("electron", () => ({ dialog: {}, nativeImage: {}, nativeTheme: {}, ipcMain: {
   handle: (channel: string, listener: (...args: any[]) => any) => handlers.set(channel, listener),
@@ -25,7 +25,7 @@ it.each([
     getMainWindow: () => trusted.window,
   } as unknown as FixedRendererIpcOptions);
   try {
-    const command = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.taskCommand)!;
+    const command = handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.taskCommand)!;
     await expect(command(trusted.event, input)).resolves.toMatchObject({ snapshot: { revision: input.revision + 1 } });
     expect(taskCommand).toHaveBeenCalledWith(input);
     taskCommand.mockClear();

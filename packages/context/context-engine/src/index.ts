@@ -1,5 +1,5 @@
 export { manifest } from "./manifest.js";
-export { apply } from "./plugin.js";
+export { apply, CONTEXT_ENGINE_SERVICE, type ContextEngineService, type ContextProjectionService } from "./plugin.js";
 export * from "./assembly.js";
 export * from "./types.js";
 export * from "./instances.js";
@@ -19,5 +19,5 @@ export * from "./content-manifest.js";
 
 
 export { contextEvents, latestContextEvent } from "./supplements.js";
-/** 会话源等不直接依赖日志包的插件，用它给对话算缓存 key（agent-spec-context-trusted-surface.md §3.4）。 */
+/** 会话源等不直接依赖日志包的插件，用它给对话算缓存 key（agent-context-engine.md「已信任的对话视图」）。 */
 export { surfaceViewVersion, isTrustedSurfaceView, type TrustedSurfaceView } from "@actspace/session-journal";

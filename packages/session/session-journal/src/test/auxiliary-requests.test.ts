@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { createCoreCodecRegistry, SessionJournal, type SessionEventCandidateV1 } from "../index.js";
 
 const identity = { sessionId: "session", agentRunId: "run", turnId: "turn", stepId: "step", callId: "call", logicalRequestId: "logical", attemptId: "attempt", attempt: 1, purpose: "image-inspection", routeId: "vision-route", model: "vision-model" };
@@ -6,7 +6,7 @@ const startedAt = "2026-10-23T00:00:00.000Z";
 const usage = { inputTokens: 100, outputTokens: 20, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, cost: null, costCurrency: null, source: "provider-reported" };
 const start = { ...identity, startedAt };
 const end = { ...start, finishedAt: "2026-10-23T00:00:01.000Z", status: "completed", usage };
-function event(type: string, data: RuntimeV2JsonValue): SessionEventCandidateV1 { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null }; }
+function event(type: string, data: RuntimeJsonValue): SessionEventCandidateV1 { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null }; }
 function setup() {
   const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
   journal.append(event("turn/start", { turnId: "turn" }));

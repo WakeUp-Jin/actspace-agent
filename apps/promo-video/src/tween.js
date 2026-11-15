@@ -4,6 +4,8 @@
  */
 
 const easeOut = (p) => 1 - (1 - p) ** 3;
+/** 匀速过渡：数字要跟着一条匀速移动的线走时用（元素上写 data-linear）。 */
+export const linear = (p) => p;
 
 /** @returns {Array<{ value: number, at: number }>} */
 export function parseKeys(text) {
@@ -20,12 +22,12 @@ export function parseKeys(text) {
   return keys;
 }
 
-export function valueAt(keys, time) {
+export function valueAt(keys, time, ease = easeOut) {
   if (time <= keys[0].at) return keys[0].value;
   for (let index = 1; index < keys.length; index += 1) {
     const from = keys[index - 1];
     const to = keys[index];
-    if (time < to.at) return from.value + (to.value - from.value) * easeOut((time - from.at) / (to.at - from.at));
+    if (time < to.at) return from.value + (to.value - from.value) * ease((time - from.at) / (to.at - from.at));
   }
   return keys.at(-1).value;
 }

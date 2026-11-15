@@ -54,7 +54,7 @@ it("rewinds a five-Turn Session to its second prompt: the Journal, Context cache
   const subagents = { activeCount: 0, runningCount: () => 0, stopByUser: async () => ({ ok: true, message: "" }), stopAll: async (rootId: string) => { subagentStops.push(rootId); } };
   const evicted: [string, string | undefined][] = [];
   const engine = { instances: { evict: (sessionId: string, scope?: string) => { evicted.push([sessionId, scope]); return true; } } };
-  const inspectCapability = async <T, R>(name: string, inspect: (service: T | undefined) => R) => inspect((name === "context.engine" ? engine : undefined) as T | undefined);
+  const inspectCapability = async <T, R>(key: { readonly id: string }, inspect: (service: T | undefined) => R) => inspect((key.id === "context.engine" ? engine : undefined) as T | undefined);
   const services = new Map<string, unknown>([["session.runtime", sessions], ["session.journal", { registry }],
     ["agent.runtime", { runs: Object.assign(runs, { inspectCapability }), subagents, backgroundTasks: background }]]);
   const notices: unknown[] = [];

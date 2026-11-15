@@ -83,7 +83,7 @@ journal.jsonl
     ↓ codec + invariant validation
 Session Journal / Surface
     ↓ projection（另带 accepted / durable 水位）
-RuntimeV2SessionSnapshot
+RuntimeSessionSnapshot
     ↓ fixed renderer adapter
 SessionRecord / Context / Usage
 ```
@@ -98,7 +98,7 @@ SessionRecord / Context / Usage
 
 ## Context、Usage 与 Trajectory
 
-当前 Context 面板没有独立持久化文件。实时内容来自 `context.engine` 内存实例的只读投影；历史请求与趋势来自派生查询读模型。总数与分类来自会话投影 `contextEstimate`，它只从 Journal 折叠（[请求记录规范](agent-plugin-runtime/agent-spec-request-record.md)）。具体读取与同步路径见[Context 决策记录](上下文管理引擎设计/上下文管理引擎V2/07-Step增量更新与披露面板决策记录.md)。各分类的来源：
+当前 Context 面板没有独立持久化文件。实时内容来自 `context.engine` 内存实例的只读投影；历史请求与趋势来自派生查询读模型。总数与分类来自会话投影 `contextEstimate`，它只从 Journal 折叠（[请求记录规范](agent-plugin-runtime/agent-spec-request-record.md)）。具体读取与同步路径见 [front-Context面板规范](frontend/front-Context面板规范.md) §6。各分类的来源：
 
 - `request/system-prompt` 的 `sections`、`modelFacts` -> System Prompt、Rules、Skills；
 - `request/tools` -> Tool Definitions；
@@ -145,7 +145,7 @@ Desktop fork 会将该前缀实际引用的附件与工具制品复制为子会�
 
 ## 设置与凭据
 
-- `settings.json`：main-owned 非敏感设置。P0 后物理写入 `version: 4` 逻辑 namespace，包括 provider/connection、模型选择、Prompt 路径、工具开关和快捷键；v1/v2/v3 只作为迁移输入并保留备份，具体结构见 [`front-设置中心重构规范.md`](../exec-plans/completed/design-archive/frontend/front-设置中心重构规范.md)；
+- `settings.json`：main-owned 非敏感设置。P0 后物理写入 `version: 4` 逻辑 namespace，包括 provider/connection、模型选择、Prompt 路径、工具开关和快捷键；v1/v2/v3 只作为迁移输入并保留备份，具体结构见 `packages/util/shared/src/settings.ts` 的 `SettingsV4`；
 - `secrets.json` v2：main-only 明文凭据，文件权限收紧为 `0600`；
 - renderer 只接收 `hasApiKey`、连接状态、模型目录和脱敏错误；
 - Desktop provider key 不从仓库 `.env` 读取；CLI 才读取启动进程显式提供的环境变量。

@@ -1,5 +1,5 @@
 import { projectSubagentItems, projectSubagentTranscript } from "@actspace/client/sessions";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { MockClock } from "../clock";
 import type { MockHandlers } from "../handlers";
 import { appendMockMessage, createMockSession, journal, snapshot, type MockDb, type MockRawEvent, type MockSession } from "../mock-db";
@@ -26,7 +26,7 @@ const CODEX = "codex-019a4f2e";
 const transcript = (agentId: string) => `/Users/demo/Library/Application Support/ActSpace/sessions/${agentId}/transcript.md`;
 const CODEX_LOG = "/Users/demo/.codex/sessions/2026/10/06/rollout-2026-10-06T08-59-00-019a4f2e.jsonl";
 
-function appendTool(db: MockDb, session: MockSession, runId: string, name: string, args: Record<string, RuntimeV2JsonValue>, text: string, during?: (callId: string) => MockRawEvent[]): string {
+function appendTool(db: MockDb, session: MockSession, runId: string, name: string, args: Record<string, RuntimeJsonValue>, text: string, during?: (callId: string) => MockRawEvent[]): string {
   const message = appendMockMessage(db, session, "tool", "", runId);
   session.messages[session.messages.length - 1] = { ...message, tool: { name, args, result: { status: "completed", summary: text, modelOutput: [{ type: "text", text }] }, ...(during ? { during } : {}) } };
   return message.id;

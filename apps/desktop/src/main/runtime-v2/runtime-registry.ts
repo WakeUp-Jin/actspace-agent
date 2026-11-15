@@ -1,5 +1,6 @@
 import { readSessionWorkspaceFacts } from "./session-workspace-facts";
 import type { EnglishLearningService, SpeechHostPort } from "@actspace/english-learning";
+import { profileService } from "./profile-service";
 import { formatChatAttachmentIssue, type ChatAttachmentIssue, type EnglishLearningTargetInput, type EnglishLearningState } from "@actspace/shared";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "../workspace-registry-service";
 import { FixedRendererStreamAdapter } from "./fixed-renderer-stream-adapter";
@@ -10,35 +11,35 @@ import type { Stats } from "node:fs";
 import { open } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import type {
-  RuntimeV2DesktopStatus,
-  RuntimeV2DesktopLiveEnvelope,
-  RuntimeV2DesktopSnapshot,
-  RuntimeV2ForkSessionInput,
-  RuntimeV2LiveEvent,
-  RuntimeV2RequestRestartInput,
-  RuntimeV2UpdateSessionMetadataInput,
-  RuntimeV2ReadArtifactResult,
-  RuntimeV2AttachmentRef,
-  RuntimeV2JsonValue,
+  RuntimeDesktopStatus,
+  RuntimeDesktopLiveEnvelope,
+  RuntimeDesktopSnapshot,
+  RuntimeForkSessionInput,
+  RuntimeLiveEvent,
+  RuntimeRequestRestartInput,
+  RuntimeUpdateSessionMetadataInput,
+  RuntimeReadArtifactResult,
+  RuntimeAttachmentRef,
+  RuntimeJsonValue,
   SessionEventEnvelopeV1,
 } from "@actspace/shared/runtime-v2";
 import type { BootedRuntimeProfile } from "@actspace/runtime";
 import type { DesktopAppServiceContract } from "@actspace/desktop-app";
-import { bootDesktopRuntimeV2 } from "./desktop-host-adapter";
-import type { DesktopRuntimeV2ModelPort } from "./model-port";
-import type { DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2BrowserPort, DesktopRuntimeV2Roots } from "./host-ports";
-import { loadRuntimeV2Module, type RuntimeV2Module } from "./runtime-loader";
+import { bootDesktopRuntime } from "./desktop-host-adapter";
+import type { DesktopRuntimeModelPort } from "./model-port";
+import type { DesktopRuntimeApprovalPort, DesktopRuntimeBrowserPort, DesktopRuntimeRoots } from "./host-ports";
+import { loadRuntimeModule, type RuntimeModule } from "./runtime-loader";
 
 /** Window in which consecutive text / thinking deltas share one renderer stream message. */
 export const RENDERER_STREAM_INTERVAL_MS = 33;
 
-export type DesktopRuntimeV2RegistryOptions = {
+export type DesktopRuntimeRegistryOptions = {
   readonly speech?: SpeechHostPort;
-  readonly roots: DesktopRuntimeV2Roots;
-  readonly models: DesktopRuntimeV2ModelPort;
-  readonly approvals: DesktopRuntimeV2ApprovalPort;
+  readonly roots: DesktopRuntimeRoots;
+  readonly models: DesktopRuntimeModelPort;
+  readonly approvals: DesktopRuntimeApprovalPort;
   /** Absent when the 操控浏览器 plugin is switched off: no capability, no Browser Bridge reconfigure. */
-  readonly browser?: DesktopRuntimeV2BrowserPort;
+  readonly browser?: DesktopRuntimeBrowserPort;
   /** Plugin ids switched off for this process (startup values; see resolvePluginSwitches). */
   readonly disabledPlugins?: readonly string[];
   /** Per plugin Entry id settings (startup values), merged over each manifest `config` at boot. */
@@ -47,7 +48,7 @@ export type DesktopRuntimeV2RegistryOptions = {
   readonly python?: import("@actspace/python-runtime").PythonRuntimeForBash;
   readonly disabledSkillIds?: () => readonly string[];
   readonly chatCompactionTriggerRatio?: () => number;
-  readonly loadModule?: () => Promise<RuntimeV2Module>;
+  readonly loadModule?: () => Promise<RuntimeModule>;
   readonly log?: (message: string, details?: Record<string, unknown>) => void;
 };
 
@@ -57,10 +58,10 @@ type SessionReleaseControl = {
   addPin(pin: (sessionId: string) => boolean): () => void;
 };
 
-export class DesktopRuntimeV2Registry {
+export class DesktopRuntimeRegistry {
   readonly #streamWorkspaces = new Map<string, string>();
   readonly #rendererStream = new FixedRendererStreamAdapter((sessionId) => this.#streamWorkspaces.get(sessionId), RENDERER_STREAM_INTERVAL_MS);
-  readonly #listeners = new Set<(event: RuntimeV2DesktopLiveEnvelope) => void>();
+  readonly #listeners = new Set<(event: RuntimeDesktopLiveEnvelope) => void>();
   /** Unsettled text of each running Session, for renderers that reattach mid-run (agent-spec-live-assistant-stream §5). */
   readonly #liveOutput = new LiveOutputBuffer();
   /** 运行中子会话此刻在做什么，给右侧「子 Agent」列表第二行。 */
@@ -82,7 +83,7 @@ export class DesktopRuntimeV2Registry {
     deleteForSession(sessionId: string, artifactId: string): Promise<void>;
   } | undefined;
 
-  constructor(private readonly options: DesktopRuntimeV2RegistryOptions) {}
+  constructor(private readonly options: DesktopRuntimeRegistryOptions) {}
 
   async boot(): Promise<void> {
     this.#bootPromise ??= this.#boot().catch((error: unknown) => {
@@ -138,7 +139,7 @@ export class DesktopRuntimeV2Registry {
     if (this.#reconfiguring) throw new Error("Runtime is reconnecting Chrome; retry shortly.");
   }
 
-  status(): RuntimeV2DesktopStatus {
+  status(): RuntimeDesktopStatus {
     return Object.freeze({
       ready: this.#profile?.getState().state === "ready",
       runtimeInstanceId: this.#profile?.getState().runtimeInstanceId ?? null,
@@ -146,7 +147,7 @@ export class DesktopRuntimeV2Registry {
     });
   }
 
-  async snapshot(sessionId?: string): Promise<RuntimeV2DesktopSnapshot> {
+  async snapshot(sessionId?: string): Promise<RuntimeDesktopSnapshot> {
     const profile = this.requireProfile();
     const app = this.requireApp();
     const selectedSession = sessionId === undefined ? null : await app.inspectSession(sessionId);
@@ -168,8 +169,8 @@ export class DesktopRuntimeV2Registry {
   sessionQuerySource(sessionId: string) { return this.requireApp().sessionQuerySource(sessionId); }
   sessionQuerySources(): ReturnType<DesktopAppServiceContract["sessionQuerySources"]> { return this.requireApp().sessionQuerySources(); }
   globalSessionSummaries() { return this.requireApp().globalSessionSummaries(); }
-  readSessionProjection(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.requireApp().readSessionProjection(input); }
-  readSessionObservation(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) { return this.requireApp().readSessionObservation(input); }
+  readSessionProjection(input: import("@actspace/shared/runtime-v2").RuntimeSessionProjectionInput) { return this.requireApp().readSessionProjection(input); }
+  readSessionObservation(input: import("@actspace/shared/runtime-v2").RuntimeSessionProjectionInput) { return this.requireApp().readSessionObservation(input); }
   browseToolDetail(sessionId: string, callId: string) { return this.requireApp().browseToolDetail(sessionId, callId); }
   listSessions() { return this.requireApp().listSessions(); }
   inspectSession(sessionId: string) { return this.requireApp().inspectSession(sessionId); }
@@ -212,7 +213,7 @@ export class DesktopRuntimeV2Registry {
     } finally { this.#admittedWork--; }
   }
 
-  async forkSession(input: RuntimeV2ForkSessionInput) {
+  async forkSession(input: RuntimeForkSessionInput) {
     this.assertAdmission();
     this.#admittedWork++;
     try {
@@ -222,7 +223,7 @@ export class DesktopRuntimeV2Registry {
     } finally { this.#admittedWork--; }
   }
 
-  async openSideChat(parentSessionId: string): Promise<{ readonly snapshot: import("@actspace/shared/runtime-v2").RuntimeV2SessionSnapshot; readonly inheritedTurnCount: number; readonly runningTurnExcluded: boolean }> {
+  async openSideChat(parentSessionId: string): Promise<{ readonly snapshot: import("@actspace/shared/runtime-v2").RuntimeSessionSnapshot; readonly inheritedTurnCount: number; readonly runningTurnExcluded: boolean }> {
     this.assertAdmission();
     this.#admittedWork++;
     try {
@@ -256,13 +257,13 @@ export class DesktopRuntimeV2Registry {
     try { return await this.requireApp().interruptSubagent(sessionId, agentId); }
     finally { this.#admittedWork--; }
   }
-  async submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue, agentRunId?: string) {
+  async submitTask(sessionId: string, submissionId: string, content: RuntimeJsonValue, agentRunId?: string) {
     this.assertAdmission();
     this.#admittedWork++;
     try { return await this.requireApp().submitTask(sessionId, submissionId, content, agentRunId); }
     finally { this.#admittedWork--; }
   }
-  async rewindAndSubmit(sessionId: string, rewind: import("@actspace/shared/runtime-v2").TaskRewind, submissionId: string, content: RuntimeV2JsonValue, agentRunId?: string) {
+  async rewindAndSubmit(sessionId: string, rewind: import("@actspace/shared/runtime-v2").TaskRewind, submissionId: string, content: RuntimeJsonValue, agentRunId?: string) {
     this.assertAdmission();
     this.#admittedWork++;
     try { return await this.requireApp().rewindAndSubmit(sessionId, rewind, submissionId, content, agentRunId); }
@@ -280,18 +281,18 @@ export class DesktopRuntimeV2Registry {
     return this.requireApp().flushSession(sessionId);
   }
 
-  requestRestart(input: RuntimeV2RequestRestartInput) {
+  requestRestart(input: RuntimeRequestRestartInput) {
     const profile = this.requireProfile();
     profile.requestRestart(input.reason, input.source, input.candidateDigest);
     return profile.getState();
   }
 
-  async updateSessionMetadata(input: RuntimeV2UpdateSessionMetadataInput) {
+  async updateSessionMetadata(input: RuntimeUpdateSessionMetadataInput) {
     this.assertAdmission();
     this.#admittedWork++;
     try {
       const snapshot = await this.requireApp().updateSessionMetadata(input.sessionId, input);
-      if (input.archived && this.#profile?.context.get?.("english-learning")) {
+      if (input.archived && this.#profile && profileService(this.#profile, "english-learning")) {
         const learning = this.englishLearning();
         if (learning.getState().targetSessionId === input.sessionId) await learning.disable();
       }
@@ -321,13 +322,13 @@ export class DesktopRuntimeV2Registry {
     } finally { this.#admittedWork--; }
   }
 
-  async updateSessionAgentMode(sessionId: string, mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode, expectedRevision?: number) {
+  async updateSessionAgentMode(sessionId: string, mode: import("@actspace/shared/runtime-v2").RuntimeAgentMode, expectedRevision?: number) {
     const snapshot = await this.requireApp().updateSessionAgentMode(sessionId, mode, expectedRevision);
     this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-agent-mode-updated");
     return snapshot;
   }
 
-  async readArtifact(sessionId: string, artifactId: string): Promise<RuntimeV2ReadArtifactResult> {
+  async readArtifact(sessionId: string, artifactId: string): Promise<RuntimeReadArtifactResult> {
     const artifact = await this.resolveArtifact(sessionId, artifactId);
     return Object.freeze({ artifactId, mimeType: artifact.mediaType, bytesBase64: Buffer.from(artifact.bytes).toString("base64") });
   }
@@ -346,7 +347,7 @@ export class DesktopRuntimeV2Registry {
     return stored;
   }
 
-  async importAttachment(sessionId: string, path: string): Promise<RuntimeV2AttachmentRef> {
+  async importAttachment(sessionId: string, path: string): Promise<RuntimeAttachmentRef> {
     this.assertAdmission();
     this.#admittedWork++;
     try {
@@ -366,7 +367,7 @@ export class DesktopRuntimeV2Registry {
    * An attachment this Session already stores, sent again by an edited prompt. The artifact is reused as is;
    * Chat text attachments carry their decoded body like a fresh import.
    */
-  async reuseAttachment(sessionId: string, artifactId: string, name: string, chat: boolean): Promise<RuntimeV2AttachmentRef> {
+  async reuseAttachment(sessionId: string, artifactId: string, name: string, chat: boolean): Promise<RuntimeAttachmentRef> {
     this.assertAdmission();
     if (this.#artifacts === undefined) throw new Error("Artifact store is unavailable.");
     const stored = await this.#artifacts.readForSession(sessionId, artifactId);
@@ -378,7 +379,7 @@ export class DesktopRuntimeV2Registry {
     return Object.freeze({ ...base, textContent });
   }
 
-  async importChatAttachments(sessionId: string, paths: readonly string[]): Promise<readonly RuntimeV2AttachmentRef[]> {
+  async importChatAttachments(sessionId: string, paths: readonly string[]): Promise<readonly RuntimeAttachmentRef[]> {
     this.assertAdmission();
     this.#admittedWork++;
     try {
@@ -388,7 +389,7 @@ export class DesktopRuntimeV2Registry {
 
       const prepared = await prepareChatAttachments(paths);
 
-      const imported: RuntimeV2AttachmentRef[] = [];
+      const imported: RuntimeAttachmentRef[] = [];
       try {
         for (const attachment of prepared) {
           const created = await this.#artifacts.create({
@@ -436,16 +437,15 @@ export class DesktopRuntimeV2Registry {
     this.#sessionRelease()?.setObserved(this.#observedSessions);
   }
   #observedSessions: readonly string[] = [];
-  #sessionRelease(): SessionReleaseControl | undefined { return this.#profile?.context.get?.("session.runtime") as SessionReleaseControl | undefined; }
+  #sessionRelease(): SessionReleaseControl | undefined { return this.#profile && profileService(this.#profile, "session.runtime"); }
   /** A fresh boot starts without viewers: replay the renderer's set and pin what Host features hold open. */
   #installSessionRelease(profile: BootedRuntimeProfile): void {
-    const control = profile.context.get?.("session.runtime") as SessionReleaseControl | undefined;
+    const control: SessionReleaseControl | undefined = profileService(profile, "session.runtime");
     if (control === undefined) return;
     control.setObserved(this.#observedSessions);
     // English learning keeps the target Session's handle to read each finished turn.
     control.addPin((sessionId) => {
-      const learning = profile.context.get?.("english-learning") as EnglishLearningService | undefined;
-      const state = learning?.getState();
+      const state = profileService(profile, "english-learning")?.getState();
       return state?.enabled === true && state.targetSessionId === sessionId;
     });
   }
@@ -463,7 +463,7 @@ export class DesktopRuntimeV2Registry {
   subagentActivity(childSessionId: string): string | undefined { return this.#subagentActivity.label(childSessionId); }
   subscribeRendererStream(listener: (event: import("@actspace/shared").RuntimeStreamEvent) => void): () => void { return this.#rendererStream.subscribe(listener); }
 
-  subscribe(listener: (event: RuntimeV2DesktopLiveEnvelope) => void): () => void {
+  subscribe(listener: (event: RuntimeDesktopLiveEnvelope) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }
@@ -475,7 +475,7 @@ export class DesktopRuntimeV2Registry {
   #learningTargetToRestore: EnglishLearningTargetInput | undefined;
 
   englishLearning(): EnglishLearningService {
-    const service = this.requireProfile().context.get?.("english-learning") as EnglishLearningService | undefined;
+    const service = profileService(this.requireProfile(), "english-learning");
     if (!service) throw new Error("英语辅助学习尚未就绪。");
     return service;
   }
@@ -493,7 +493,7 @@ export class DesktopRuntimeV2Registry {
   }
 
   #bindLearningNotifications(): void {
-    if (this.#profile === undefined || this.#stopLearningNotifications || this.#learningListeners.size === 0 || !this.#profile.context.get?.("english-learning")) return;
+    if (this.#profile === undefined || this.#stopLearningNotifications || this.#learningListeners.size === 0 || !profileService(this.#profile, "english-learning")) return;
     this.#stopLearningNotifications = this.englishLearning().subscribe((state) => {
       for (const listener of this.#learningListeners) listener(state);
     });
@@ -535,7 +535,7 @@ export class DesktopRuntimeV2Registry {
     const profile = this.#profile;
     if (profile === undefined) return;
     this.learningOperation++;
-    const learning = profile.context.get?.("english-learning") as EnglishLearningService | undefined;
+    const learning = profileService(profile, "english-learning");
     if (forRestart && learning) {
       const state = learning.getState();
       this.#learningTargetToRestore = { enabled: state.enabled, sessionId: state.targetSessionId };
@@ -552,7 +552,7 @@ export class DesktopRuntimeV2Registry {
     }
   }
 
-  #emit(event: Omit<RuntimeV2LiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq">): void {
+  #emit(event: Omit<RuntimeLiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq">): void {
     const profile = this.#profile;
     if (profile === undefined) return;
     const envelope = Object.freeze({
@@ -620,8 +620,8 @@ export class DesktopRuntimeV2Registry {
 
   async #boot(): Promise<void> {
     try {
-      const module = await (this.options.loadModule ?? loadRuntimeV2Module)();
-      const booted = await bootDesktopRuntimeV2({
+      const module = await (this.options.loadModule ?? loadRuntimeModule)();
+      const booted = await bootDesktopRuntime({
         module,
         roots: this.options.roots,
         models: this.options.models,
@@ -709,7 +709,7 @@ export class DesktopRuntimeV2Registry {
   }
 
   private requireApp(): DesktopAppServiceContract {
-    const app = this.requireProfile().context.get?.("desktop.app") as DesktopAppServiceContract | undefined;
+    const app = profileService(this.requireProfile(), "desktop.app");
     if (app === undefined) throw new Error(this.#bootError ?? "Desktop application service is not ready.");
     return app;
   }

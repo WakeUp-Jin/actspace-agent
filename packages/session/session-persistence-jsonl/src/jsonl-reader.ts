@@ -123,28 +123,45 @@ export type JournalRefresh =
  * overlap used to detect rewrites), and parses and validates only the new events.
  * Takes ownership of `resume` (its hash and validator are advanced); on `full` it must be discarded.
  * File-level errors such as ENOENT propagate exactly as they do for a full read.
+ *
+ * What it proves: the file is the same file, it did not shrink, and its last consumed bytes (up to
+ * `TAIL_BYTES`) are still the bytes that were read. Bytes before that overlap are trusted to be
+ * append-only; an in-place edit there is only noticed when the size is unchanged and the stamp moved.
  */
 export async function refreshJsonlSession(journalPath: string, resume: JournalResume): Promise<JournalRefresh> {
   const handle = await open(journalPath, "r");
   try {
     const stat = await handle.stat();
     if (identityOf(stat) !== resume.identity) return { kind: "full" };
-    if (stat.size === resume.size) return queryStamp(stat) === resume.stamp ? { kind: "unchanged" } : { kind: "full" };
     if (stat.size < resume.size) return { kind: "full" };
-    try { return await extend(handle, stat, journalPath, resume); }
-    catch { return { kind: "full" }; }
+    try {
+      if (stat.size > resume.size) return await extend(handle, stat, journalPath, resume);
+      if (queryStamp(stat) !== resume.stamp) return { kind: "full" };
+      // An equal stamp does not prove equal content: file timestamps advance in clock ticks (a few
+      // milliseconds on Linux), so a same-size rewrite in the tick of the previous read leaves it as it was.
+      // Compare the same overlap the append path compares; the cost is one bounded read, whatever the file size.
+      const tail = await readRange(handle, resume.size - resume.tail.length, resume.tail.length);
+      return tail?.equals(resume.tail) ? { kind: "unchanged" } : { kind: "full" };
+    } catch { return { kind: "full" }; }
   } finally { await handle.close(); }
+}
+
+/** Exactly the bytes [from, from + length), or null when the file ends before that (it shrank after the stat). */
+async function readRange(handle: FileHandle, from: number, length: number): Promise<Buffer | null> {
+  const buffer = Buffer.allocUnsafe(length);
+  let filled = 0;
+  while (filled < length) {
+    const { bytesRead } = await handle.read(buffer, filled, length - filled, from + filled);
+    if (bytesRead === 0) return null;
+    filled += bytesRead;
+  }
+  return buffer;
 }
 
 async function extend(handle: FileHandle, stat: Stats, journalPath: string, resume: JournalResume): Promise<JournalRefresh> {
   const from = resume.size - resume.tail.length;
-  const buffer = Buffer.allocUnsafe(stat.size - from);
-  let filled = 0;
-  while (filled < buffer.length) {
-    const { bytesRead } = await handle.read(buffer, filled, buffer.length - filled, from + filled);
-    if (bytesRead === 0) return { kind: "full" };
-    filled += bytesRead;
-  }
+  const buffer = await readRange(handle, from, stat.size - from);
+  if (buffer === null) return { kind: "full" };
   if (!buffer.subarray(0, resume.tail.length).equals(resume.tail)) return { kind: "full" };
   const added = buffer.subarray(resume.tail.length);
   // A partial last line is the torn-tail case; let the full reader report it with its exact diagnostics.
