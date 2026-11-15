@@ -204,4 +204,25 @@ describe("BackgroundTaskRegistry", () => {
     expect(facts().map(fact => fact.op)).toEqual(["start"]);
     expect(inbox().pending()).toEqual([]);
   });
+
+  it("waits on dispose for a task that ended just before and is still writing its notice and settle record", async () => {
+    const parent = session("parent");
+    let release = () => {};
+    let pause: Promise<void> = Promise.resolve();
+    const registry = new BackgroundTaskRegistry({ openSession: async () => { await pause; return parent; }, wake: () => undefined });
+    const task = source("bash_1");
+    await registry.register(task);
+    pause = new Promise(resolve => { release = resolve; });
+    task.finish();
+    await flush();
+    let disposed = false;
+    const disposing = registry.dispose().then(() => { disposed = true; });
+    await flush();
+    expect(disposed).toBe(false);
+    release();
+    await disposing;
+    // The Host closes Sessions right after dispose; a notice without its settle record would be reported as lost at the next start.
+    expect(parent.journal.events.filter(event => event.type === "background/task").map(event => (event.data as Record<string, unknown>).op)).toEqual(["start", "settle"]);
+    expect(new MainAgentInbox(parent).pending()).toHaveLength(1);
+  });
 });
