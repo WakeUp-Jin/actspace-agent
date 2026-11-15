@@ -2,6 +2,7 @@ import type { AgentHandle } from "./agent.js";
 import { AgentRuntimeError } from "./errors.js";
 import { Service } from "@actspace/cordis-adapter";
 import type { CordisServiceContext } from "@actspace/cordis-adapter";
+import { AGENT_REGISTRY_SERVICE } from "./service-keys.js";
 
 export class AgentRegistry {
   readonly #agents = new Map<string, AgentHandle>();
@@ -15,8 +16,11 @@ export class AgentRegistry {
   list(): readonly AgentHandle[] { return Object.freeze([...this.#agents.values()].sort((a, b) => a.agentId.localeCompare(b.agentId))); }
 }
 
+/** `AgentRegistry` 的公开成员。`agent.registry` 下注册的是包装服务，取用方的参数写这个类型。 */
+export type AgentRegistryContract = Pick<AgentRegistry, keyof AgentRegistry>;
+
 /** Cordis owner for published Agent subjects and their scope/inbox handles. */
-export class AgentRegistryService extends Service {
+export class AgentRegistryService extends Service implements AgentRegistryContract {
   static inject = Object.freeze([]);
   static Config = {
     "~standard": {
@@ -32,7 +36,7 @@ export class AgentRegistryService extends Service {
   readonly registry: AgentRegistry;
 
   constructor(ctx: CordisServiceContext) {
-    super(ctx, "agent.registry");
+    super(ctx, AGENT_REGISTRY_SERVICE.id);
     this.registry = new AgentRegistry();
   }
 

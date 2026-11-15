@@ -1,9 +1,9 @@
 import { COMPACTION_SYSTEM, COMPACTION_TEMPLATE, PRIOR_SUMMARY_RULES } from "./prompts.js";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionSurfaceEntry } from "@actspace/session-journal";
-import { completeAuxiliaryText, type AuxiliaryRequestRecorder, type LlmService } from "@actspace/llm-service";
+import { completeAuxiliaryText, type AuxiliaryRequestRecorder, type LlmServiceContract } from "@actspace/llm-service";
 
-export type CompactionSummary = { readonly content: string; readonly pathlist?: readonly string[]; readonly metadata?: RuntimeV2JsonValue };
+export type CompactionSummary = { readonly content: string; readonly pathlist?: readonly string[]; readonly metadata?: RuntimeJsonValue };
 
 export interface CompactionSummarizer {
   summarize(entries: readonly SessionSurfaceEntry[], context: { readonly sessionId: string; readonly turnId?: string; readonly summaryIds?: readonly string[]; readonly signal?: AbortSignal }): Promise<CompactionSummary>;
@@ -17,7 +17,7 @@ export class DeterministicCompactionSummarizer implements CompactionSummarizer {
 }
 
 export class LlmCompactionSummarizer implements CompactionSummarizer {
-  constructor(private readonly options: { readonly llm: LlmService; readonly recorder: AuxiliaryRequestRecorder; readonly routeId: string; readonly model: string }) {}
+  constructor(private readonly options: { readonly llm: LlmServiceContract; readonly recorder: AuxiliaryRequestRecorder; readonly routeId: string; readonly model: string }) {}
 
   async summarize(entries: readonly SessionSurfaceEntry[], context: { readonly sessionId: string; readonly turnId?: string; readonly summaryIds?: readonly string[]; readonly signal?: AbortSignal }): Promise<CompactionSummary> {
     const prior = entries.filter(entry => context.summaryIds?.includes(entry.node.messageId));
@@ -43,21 +43,21 @@ export class LlmCompactionSummarizer implements CompactionSummarizer {
   }
 }
 
-function summaryText(value: RuntimeV2JsonValue): string {
+function summaryText(value: RuntimeJsonValue): string {
   const sanitized = stripRuntimeContext(value);
   return typeof sanitized === "string" ? sanitized : JSON.stringify(sanitized) ?? "";
 }
 
-function stripRuntimeContext(value: RuntimeV2JsonValue): RuntimeV2JsonValue {
+function stripRuntimeContext(value: RuntimeJsonValue): RuntimeJsonValue {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) return value.flatMap((item) => isRuntimeContext(item) ? [] : [stripRuntimeContext(item)]);
   if (value === null || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, stripRuntimeContext(child)]));
 }
 
-function isRuntimeContext(value: RuntimeV2JsonValue): boolean {
+function isRuntimeContext(value: RuntimeJsonValue): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const record = value as Readonly<Record<string, RuntimeV2JsonValue>>;
+  const record = value as Readonly<Record<string, RuntimeJsonValue>>;
   if (record.type === "runtime-context") return true;
   return false;
 }

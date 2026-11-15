@@ -1,4 +1,4 @@
-import type { RuntimeV2SessionSnapshot, RuntimeV2UsageSummary } from "@actspace/shared/runtime-v2/projection";
+import type { RuntimeSessionSnapshot, RuntimeUsageSummary } from "@actspace/shared/runtime-v2/projection";
 
 /**
  * 输入区用量胶囊的数字口径，逐条对应 DeepSeek Harness 的 `StatsPills.tsx` +
@@ -34,7 +34,7 @@ const EMPTY_STATS: ComposerSessionStats = {
  * @param snapshot - 会话投影快照，可能尚未加载。
  * @returns 会话统计数据；无快照时各项为 0。
  */
-export function sessionStats(snapshot: RuntimeV2SessionSnapshot | null | undefined): ComposerSessionStats {
+export function sessionStats(snapshot: RuntimeSessionSnapshot | null | undefined): ComposerSessionStats {
   if (!snapshot) return EMPTY_STATS;
 
   let toolMs = 0;
@@ -56,7 +56,7 @@ export function sessionStats(snapshot: RuntimeV2SessionSnapshot | null | undefin
 }
 
 /** 计费输入 = 未缓存输入 + 缓存读取 + 缓存写入（三个互不重叠的提示侧桶）。 */
-export function billedInputTokens(usage: Pick<RuntimeV2UsageSummary, "inputTokens" | "cacheReadTokens" | "cacheWriteTokens">): number {
+export function billedInputTokens(usage: Pick<RuntimeUsageSummary, "inputTokens" | "cacheReadTokens" | "cacheWriteTokens">): number {
   return usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
 }
 

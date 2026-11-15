@@ -1,6 +1,6 @@
 import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
 import { resolveModelPricing, type ModelCatalogSnapshot } from "@actspace/shared";
-import { customConnectionPricingInput, type DesktopRuntimeV2ResolvedModel } from "./runtime-v2/model-port";
+import { customConnectionPricingInput, type DesktopRuntimeResolvedModel } from "./runtime-v2/model-port";
 import {
   DEFAULT_MODEL_KEY,
   listUsableModels,
@@ -26,18 +26,12 @@ type ProviderRuntimeConfig = {
   readonly authScheme?: import("@actspace/shared").CustomConnectionResolvedAuth;
   readonly transport?: { readonly proxyUrl: string };
 };
-type LegacyLlmConfig = {
-  readonly model: string;
-  readonly apiKey: string;
-  readonly baseUrl: string;
-};
 
 export interface ResolvedRuntimeModel {
   key: ModelKey;
   connectionId?: string;
   definition: ModelDefinition;
   providerRuntime: ProviderRuntimeConfig;
-  llmConfig: LegacyLlmConfig;
   source: "requested" | "configured" | "default" | "fallback";
   fallbackReason?: string;
 }
@@ -53,7 +47,7 @@ export class ModelRuntimeService {
     private readonly catalog: () => ModelCatalogSnapshot = () => BUILTIN_MODEL_CATALOG,
   ) {}
 
-  resolvePricing(model: DesktopRuntimeV2ResolvedModel, apiModel: string) {
+  resolvePricing(model: DesktopRuntimeResolvedModel, apiModel: string) {
     return resolveModelPricing(this.catalog(), customConnectionPricingInput(model, apiModel));
   }
 
@@ -170,13 +164,8 @@ export class ModelRuntimeService {
         ...(model.installed.connectionId ? { connectionId: model.installed.connectionId } : {}),
         definition,
         providerRuntime: runtime,
-        llmConfig: toLegacyLlmConfig(definition.apiModel, runtime),
         source,
       },
     };
   }
-}
-
-function toLegacyLlmConfig(model: string, runtime: ProviderRuntimeConfig): LegacyLlmConfig {
-  return { model, apiKey: runtime.apiKey, baseUrl: runtime.baseUrl };
 }

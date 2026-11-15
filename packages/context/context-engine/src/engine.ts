@@ -3,7 +3,7 @@ import { renderContextSupplement, sortSystemSections } from "@actspace/shared";
 import type { CompactionSession, ContextHydrator } from "./compaction.js";
 import { ContextSupplements, type ContextSession } from "./supplements.js";
 import type { ContextSourceRegistry, ContextSource } from "./registry.js";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { Context, ContextRequest, LlmInput, ArtifactResolver, ContextInstanceSnapshot } from "./types.js";
 import { ContextInstanceRegistry, contextIdentity } from "./instances.js";
 import type { ContextReducerRegistry } from "./reducers.js";
@@ -125,7 +125,7 @@ export class ContextEngine {
       while (entries[index + 1]?.node.kind === "tool-result") index++;
       const group = insertions.get(index) ?? []; group.push(supplement); insertions.set(index, group);
     }
-    const values: RuntimeV2JsonValue[] = [];
+    const values: RuntimeJsonValue[] = [];
     const appendSupplements = (index: number) => {
       for (const supplement of (insertions.get(index) ?? []).sort((a, b) => a.sourceEventSeq - b.sourceEventSeq || a.id.localeCompare(b.id))) values.push({ role: "user", content: renderContextSupplement(supplement) });
     };
@@ -137,7 +137,7 @@ export class ContextEngine {
     // 对话节点、补充文字和系统提示词，外壳浅冻结即可。对话没经过日志或引擎检查（调用方直接传入的 Context）时，照旧整份检查、复制、冻结。
     const checked = isCheckedContextValue(context.content.conversation)
       ? Object.freeze(messages.map(freezeMessage))
-      : freezeRequest(messages as unknown as RuntimeV2JsonValue) as unknown as readonly LlmMessage[];
+      : freezeRequest(messages as unknown as RuntimeJsonValue) as unknown as readonly LlmMessage[];
     return Object.freeze({
       requestId: context.request.requestId, sessionId: context.request.sessionId, routeId: context.request.routeId, model: context.request.model,
       options: contextValue(context.request.options),

@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { ApprovalBroker } from "@actspace/approval";
 import type { ToolFailure } from "./errors.js";
 
@@ -23,18 +23,18 @@ export type ToolArtifactOwner = {
 
 export type ToolModelOutputBlock =
   | { readonly type: "text"; readonly text: string }
-  | { readonly type: "json"; readonly value: RuntimeV2JsonValue }
+  | { readonly type: "json"; readonly value: RuntimeJsonValue }
   | { readonly type: "artifact"; readonly artifact: ToolArtifactRef; readonly label?: string };
 
 export type ToolDetailBlock = {
   readonly label: string;
-  readonly value: RuntimeV2JsonValue;
+  readonly value: RuntimeJsonValue;
 };
 
 export type ToolRendererCandidate = {
   readonly id: string;
   readonly schemaVersion: number;
-  readonly props: RuntimeV2JsonValue;
+  readonly props: RuntimeJsonValue;
 };
 
 export type ToolBodyResult = {
@@ -79,7 +79,7 @@ export type ToolExecutionContext = {
   readonly reportProgress: (update: ToolProgressUpdate) => void;
   /** Nested management approvals use the same Run budget pause as normal tool approvals. */
   readonly requestApproval?: ApprovalBroker["requestApproval"];
-  readonly notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>;
+  readonly notifyAgent?: (content: RuntimeJsonValue) => Promise<void>;
   /** false in subagent Sessions: the tool must finish in the foreground instead of moving to the background. */
   readonly backgroundAllowed?: boolean;
   readonly createArtifact: (input: { readonly bytes: Uint8Array; readonly mediaType: string }) => Promise<ToolArtifactRef>;
@@ -88,5 +88,5 @@ export type ToolExecutionContext = {
 
 export type ToolExecutor = {
   readonly concurrencySafe?: boolean;
-  execute(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext): Promise<ToolBodyResult>;
+  execute(args: Readonly<Record<string, RuntimeJsonValue>>, context: ToolExecutionContext): Promise<ToolBodyResult>;
 };

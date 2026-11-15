@@ -13,3 +13,4 @@ export { HostArtifacts } from "./artifacts.js";
 
 export * from "./bootstrap.js";
 export * from "./lifecycle.js";
+export { HOST_APPLICATION_SERVICE } from "./plugin.js";

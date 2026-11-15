@@ -1,5 +1,5 @@
 import { validateSessionEvents, type EventCodecRegistry, type SessionEventCandidateV1, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { RUN_EVENT, TASK_EVENT, eventCandidate } from "./task-events.js";
 import { projectTasks } from "./task-projection.js";
 
@@ -108,9 +108,9 @@ function copy(event: SessionEventEnvelopeV1): SessionEventCandidateV1 {
   return { type: event.type, eventVersion: event.eventVersion, source: event.source, data: event.data, surface: event.surface };
 }
 
-function data(event: SessionEventEnvelopeV1): Readonly<Record<string, RuntimeV2JsonValue>> { return record(event.data); }
-function record(value: RuntimeV2JsonValue | undefined): Readonly<Record<string, RuntimeV2JsonValue>> {
-  return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {};
+function data(event: SessionEventEnvelopeV1): Readonly<Record<string, RuntimeJsonValue>> { return record(event.data); }
+function record(value: RuntimeJsonValue | undefined): Readonly<Record<string, RuntimeJsonValue>> {
+  return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : {};
 }
-function text(value: RuntimeV2JsonValue | undefined): string { return typeof value === "string" ? value : ""; }
+function text(value: RuntimeJsonValue | undefined): string { return typeof value === "string" ? value : ""; }
 function unique(values: readonly string[]): string[] { return [...new Set(values.filter(Boolean))]; }

@@ -22,9 +22,6 @@
       "path": "./../../llm/llm-service/tsconfig.build.json"
     },
     {
-      "path": "./../../session/session-journal/tsconfig.build.json"
-    },
-    {
       "path": "./../../session/session-persistence/tsconfig.build.json"
     },
     {

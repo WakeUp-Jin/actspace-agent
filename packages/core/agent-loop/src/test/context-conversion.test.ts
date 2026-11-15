@@ -27,7 +27,6 @@ it("preserves historical summaries, signed reasoning, attachments and runtime bl
     { type: "image", artifactId: "image", mimeType: "image/png", alt: "Screenshot" },
     { type: "text", text: '<attached_file name="Notes" media_type="text/plain">\ninline attachment\n</attached_file>' },
     { type: "text", text: '<runtime_context>{"prior":true}</runtime_context>' },
-    { type: "text", text: '<runtime_context>{"agentMode":"agent","agentModeRevision":0}</runtime_context>' },
   ] });
   const snapshot = (run.journal.find(event => event.type === "request/context")!.data as any).snapshot;
   expect(snapshot.schemaVersion).toBe(3);

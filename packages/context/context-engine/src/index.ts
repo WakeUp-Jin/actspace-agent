@@ -1,5 +1,5 @@
 export { manifest } from "./manifest.js";
-export { apply } from "./plugin.js";
+export { apply, CONTEXT_ENGINE_SERVICE, type ContextEngineService, type ContextProjectionService } from "./plugin.js";
 export * from "./assembly.js";
 export * from "./types.js";
 export * from "./instances.js";

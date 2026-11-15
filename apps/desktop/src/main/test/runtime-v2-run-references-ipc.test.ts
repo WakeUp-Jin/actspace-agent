@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 const { handlers } = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => any>() }));
 vi.mock("electron", () => ({ dialog: {}, nativeImage: {}, nativeTheme: {}, ipcMain: {
   handle: (channel: string, listener: (...args: any[]) => any) => handlers.set(channel, listener),
@@ -50,7 +50,7 @@ function setup(overrides: { agentForm?: "agent" | "chat"; journal?: Record<numbe
     settings: { subscribeV4Changes: () => () => {} },
     getMainWindow: () => trusted.window,
   } as unknown as FixedRendererIpcOptions);
-  const handler = handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitTask)!;
+  const handler = handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.submitTask)!;
   return { registration, submitTask, importAttachment, readSessionProjection, run: (input: Record<string, unknown>) => handler(trusted.event, { sessionId: "s", submissionId: "r", userInput: "看这里", ...input }) };
 }
 

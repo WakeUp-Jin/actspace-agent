@@ -8,8 +8,8 @@ import type { AgentLoop } from "@actspace/agent-loop";
 import type { AgentScope } from "@actspace/scope";
 import type { ModelsHostPort } from "@actspace/shared";
 import {
-  EMPTY_SUBAGENT_TREE, CONTEXT_TRACE_DETAIL_LABEL, listedSubagents, reduceSubagentTree, runningActivation,
-  type RuntimeV2AgentMode, type RuntimeV2JsonValue, type SubagentActivationStatus, type SubagentDelivery, type SubagentKind, type SubagentPreset, type SubagentTree,
+  coreEvent, EMPTY_SUBAGENT_TREE, CONTEXT_TRACE_DETAIL_LABEL, listedSubagents, reduceSubagentTree, runningActivation,
+  type CoreEventDataMap, type PermissionMode, type RuntimeAgentMode, type RuntimeJsonValue, type SubagentActivationStatus, type SubagentDelivery, type SubagentKind, type SubagentPreset, type SubagentTree,
 } from "@actspace/shared/runtime-v2";
 import { FORKED_SUBAGENT_PRESET_ID, resolveSessionWorkspaceRoot, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionHandle, SessionStore } from "@actspace/session-persistence";
@@ -42,9 +42,9 @@ export type ChildLoopInput = {
 /** One Harness lease holding a child Run: the TaskLedger entry and the Loop factory of the caller's generation. */
 export type ChildRunLease = {
   readonly scope: AgentScope;
-  start(session: SessionHandle, content: RuntimeV2JsonValue, runId: string): Promise<{ readonly messageId: string }>;
+  start(session: SessionHandle, content: RuntimeJsonValue, runId: string): Promise<{ readonly messageId: string }>;
   createLoop(input: ChildLoopInput): Promise<ChildLoop>;
-  finish(outcome: "completed" | "cancelled" | "failed", value: RuntimeV2JsonValue): Promise<void>;
+  finish(outcome: "completed" | "cancelled" | "failed", value: RuntimeJsonValue): Promise<void>;
   release(): Promise<void>;
 };
 
@@ -66,7 +66,7 @@ export type SubagentManagerOptions = {
   readonly models: () => ModelsHostPort;
   /** The main agent's current model settings (not its request headers). */
   readonly parentConfiguration: (sessionId: string) => ParentConfiguration;
-  readonly permissionMode: (session: SessionHandle) => string;
+  readonly permissionMode: (session: SessionHandle) => PermissionMode;
   readonly isSessionRunning: (sessionId: string) => boolean;
   readonly wake: (sessionId: string) => void;
   /**
@@ -606,7 +606,7 @@ function turnOutcome(reason: string): { readonly status: SubagentActivationStatu
 }
 
 type ResolvedCaller = { readonly root: SessionHandle; readonly rootId: string; readonly isRoot: boolean; readonly scope?: AgentScope };
-type SubagentDetail = readonly { readonly label: string; readonly value: RuntimeV2JsonValue }[];
+type SubagentDetail = readonly { readonly label: string; readonly value: RuntimeJsonValue }[];
 
 /** Serialize message delivery and settlement per child (DSH `ChildLock`). */
 class ChildLock {
@@ -669,8 +669,7 @@ async function readTail(path: string, bytes: number): Promise<string> {
 /** True while the child's last tool call of this activation was a message to its parent and no input was claimed since. */
 function closingOmitted(child: SessionHandle, startSeq: number, rootId: string): boolean {
   let omitted = false;
-  for (const event of child.journal.iterateEvents()) {
-    if (event.seq <= startSeq) continue;
+  for (const event of child.journal.iterateEvents(startSeq + 1)) {
     const data = record(event.data);
     if (event.type === "tool/call") omitted = data.name === "send_message" && record(data.args).agent_id === rootId;
     if (event.type === "agent/inbox/spliced" && data.operation === "claim") omitted = false;
@@ -705,9 +704,8 @@ async function waitForFile(path: string, settled: Promise<unknown>, timeoutMs: n
 }
 
 /** The Agent mode of the Session's latest `turn/start`. */
-function latestTurnMode(session: SessionHandle): RuntimeV2AgentMode | undefined {
-  let mode: unknown;
-  for (const event of session.journal.iterateEvents()) if (event.type === "turn/start") mode = record(event.data).mode;
+function latestTurnMode(session: SessionHandle): RuntimeAgentMode | undefined {
+  const mode = record(session.journal.latestEvent("turn/start")?.data).mode;
   return mode === "agent" || mode === "plan" || mode === "chat" ? mode : undefined;
 }
 
@@ -715,7 +713,7 @@ function withStatus(detail: SubagentDetail, status: string): SubagentDetail {
   return detail.map(item => item.label === "delegation" ? { ...item, value: { ...record(item.value), status } } : item);
 }
 
-function startData(activation: Activation, input: { readonly trigger: "spawn"; readonly callId: string; readonly background: boolean; readonly startedAt: string }): Record<string, RuntimeV2JsonValue> {
+function startData(activation: Activation, input: { readonly trigger: "spawn"; readonly callId: string; readonly background: boolean; readonly startedAt: string }): Extract<CoreEventDataMap["subagent/activation"], { readonly op: "start" }> {
   return {
     op: "start", agentId: activation.agentId, activationId: activation.activationId, trigger: input.trigger,
     callId: input.callId, background: input.background, ...(activation.model.model ? { model: activation.model.model } : {}),
@@ -731,8 +729,6 @@ function modelInput(config: SubagentModelConfiguration): { model?: string; think
   };
 }
 
-/** A Journal event owned by `@actspace/core` (core types and the `subagent/*` extensions alike). */
-function coreEvent(type: string, data: Record<string, RuntimeV2JsonValue>) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
 function record(value: unknown): Readonly<Record<string, unknown>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, unknown>> : {}; }
 function ok(text: string, detail?: SubagentDetail): SubagentToolOutcome { return detail ? { ok: true, text, detail } : { ok: true, text }; }
 function fail(code: string, text: string): SubagentToolOutcome { return { ok: false, code, text }; }
