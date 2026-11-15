@@ -3,7 +3,7 @@ import type { RuntimeV2AgentMode, RuntimeV2JsonValue } from "@actspace/shared/ru
 import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
 import { ContextEngine, surfaceMessage, requestRecords, describeContextContent, type RequestRecords, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context-engine";
 import { contextFromCandidate } from "@actspace/prompt";
-import { estimateRequestInput } from "@actspace/shared";
+import { estimateMessage, estimateRequestInput } from "@actspace/shared";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
 import type { LlmService } from "@actspace/llm-service";
 import type { LlmStreamEvent } from "@actspace/llm-service";
@@ -12,7 +12,7 @@ import { DEFAULT_LLM_RETRY_POLICY, retryDelay, retryPolicySnapshot } from "@acts
 import type { RequestAssembler } from "@actspace/prompt";
 import type { PreparedRequestMetadata } from "@actspace/prompt";
 import type { AgentScope } from "@actspace/scope";
-import type { SessionHandle } from "@actspace/session-persistence";
+import { settleOpenTurnWork, type SessionHandle } from "@actspace/session-persistence";
 import type { ToolCallInput, ToolPreparedEnvironment } from "@actspace/tool-runtime";
 import type { ToolRuntime } from "@actspace/tool-runtime";
 import type { ToolExecutionResult } from "@actspace/tool-runtime";
@@ -22,6 +22,7 @@ import { AgentRuntimeError } from "@actspace/agent";
 import type { MainAgentInbox } from "@actspace/agent";
 import type { RunTurnResult } from "@actspace/agent";
 import type { CordisContext, AgentLoopIntervention, AgentNotification } from "@actspace/cordis-adapter";
+import { toolBatchOutputChars } from "./tool-output-budget.js";
 
 export type RunTurnInput = { readonly content: RuntimeV2JsonValue; readonly messageId?: string; readonly agentRunId?: string; readonly model?: string; readonly mode?: RuntimeV2AgentMode; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly keepPendingOnAbort?: boolean; readonly selectedSkillIds?: readonly string[];
   /** Host wake turn: no user message; the first Step claims pending background notifications. */
@@ -106,6 +107,7 @@ export class AgentLoop {
     if (this.#active !== null) throw new AgentRuntimeError("TURN_ALREADY_ACTIVE", "This Session already has an active turn.");
     const controller = new AbortController(); this.#active = controller; this.#idle = new Promise<void>((resolve) => { this.#resolveIdle = resolve; });
     const agentRunId = input.agentRunId ?? randomUUID(); const turnId = randomUUID(); let stepCount = 0; let finalText = "";
+    let turnStartSeq: number | null = null;
     try {
       // A notification read by an earlier Run leaves nothing to deliver; settle without a turn.
       if (input.wake && !this.options.inbox.hasPendingNotifications()) return Object.freeze({ agentRunId, turnId, reason: "completed", steps: 0, finalText });
@@ -119,7 +121,7 @@ export class AgentLoop {
       const modeRuntime = await this.options.modeRuntime?.(mode);
       const assembler = modeRuntime?.assembler ?? this.options.assembler;
       const compaction = modeRuntime?.compaction ?? this.options.compaction;
-      await this.options.session.append(core("turn/start", { turnId, agentRunId, mode, modeRevision }));
+      turnStartSeq = (await this.options.session.append(core("turn/start", { turnId, agentRunId, mode, modeRevision }))).seq;
       const turnEnvironment = this.options.toolEnvironment(this.options.session);
       const configuredPermissionMode = typeof turnEnvironment.permissionMode === "function" ? turnEnvironment.permissionMode() : turnEnvironment.permissionMode ?? "default";
       if (turnEnvironment.permissionModeExplicit && currentPermissionMode(this.options.session.journal.latestEvents(["permission/mode-set"])) !== configuredPermissionMode) {
@@ -185,7 +187,7 @@ export class AgentLoop {
           options: llmInput.options,
           signal: controller.signal,
         });
-        this.checkContextCapacity({ ...converted.input, messages: prepared.request.messages, tools: prepared.request.tools, options: prepared.request.options }, prepared.request.contextWindow ?? null, () => prepared.release());
+        let requestEstimate = this.checkContextCapacity({ ...converted.input, messages: prepared.request.messages, tools: prepared.request.tools, options: prepared.request.options }, prepared.request.contextWindow ?? null, () => prepared.release());
         const retryPolicy = prepared.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY;
         const contextWindow = prepared.request.contextWindow ?? null;
         if (this.options.contextSources) converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${prepared.request.routeId}/${prepared.request.model}`, label: prepared.request.model, contextWindow, autoCompactAtTokens: compaction?.threshold?.(contextWindow) ?? null }) };
@@ -257,7 +259,7 @@ export class AgentLoop {
             requestId,
             messages: requestMessageList,
           }, controller.signal, prepared.preparedAdapterCall);
-          this.checkContextCapacity({ ...converted.input, messages: activePrepared.request.messages, tools: activePrepared.request.tools, options: activePrepared.request.options }, activePrepared.request.contextWindow ?? null, () => activePrepared.release());
+          requestEstimate = this.checkContextCapacity({ ...converted.input, messages: activePrepared.request.messages, tools: activePrepared.request.tools, options: activePrepared.request.options }, activePrepared.request.contextWindow ?? null, () => activePrepared.release());
           const retryContextWindow = activePrepared.request.contextWindow ?? null;
           if (this.options.contextSources) converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${activePrepared.request.routeId}/${activePrepared.request.model}`, label: activePrepared.request.model, contextWindow: retryContextWindow, autoCompactAtTokens: compaction?.threshold?.(retryContextWindow) ?? null }) };
           const retryMetadata = { ...metadata, route: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow: retryContextWindow };
@@ -271,7 +273,7 @@ export class AgentLoop {
         // Empty content still settles the request before its Step can end.
         finalText = output.text || output.content.filter((block) => block.type === "text").map((block) => block.text).join("");
         await this.options.session.append(core("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content: output.content as unknown as RuntimeV2JsonValue, finishReason: output.stopReason ?? (output.aborted ? "aborted" : "completed"), usage: output.usage, ...firstToken(output) }, { surface: { kind: "append" } }));
-        if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames, requestModel);
+        if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames, requestModel, this.toolBatchOutputChars(activePrepared.request, requestEstimate, output));
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
         await this.checkpoint("before-next-step");
         const updated = await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
@@ -316,6 +318,10 @@ export class AgentLoop {
       if (this.options.session.durabilityState !== "blocked") {
         try {
           if (!input.keepPendingOnAbort) await this.options.inbox.discardAll(controller.signal.aborted ? "turn-aborted" : "turn-failed");
+          // 一条记录没写进去（过大、带敏感字段名、钩子抛错）时，这个回合里已开始的请求和工具调用没有结果，
+          // Step 和 Turn 结束不了，会话会卡住直到重启。先把它们了结，下面才能正常收尾。
+          const open = this.options.session.journal.validation.relations;
+          if (turnStartSeq !== null && open.openTurnId === turnId && (open.openRequestIds.length > 0 || open.openToolCallIds.length > 0)) await settleOpenTurnWork(this.options.session, turnStartSeq);
           const relations = this.options.session.journal.validation.relations;
           if (relations.openStepId !== null && relations.openRequestIds.length === 0 && relations.openToolCallIds.length === 0) await this.options.session.append(core("step/end", { turnId, stepId: relations.openStepId, reason: "interrupted" }));
           if (this.options.session.journal.validation.relations.openTurnId === turnId && this.options.session.journal.validation.relations.openStepId === null) await this.options.session.append(core("turn/end", { turnId, reason: controller.signal.aborted ? "aborted" : "failed", ...(controller.signal.aborted ? {} : { failure }) }));
@@ -385,14 +391,34 @@ export class AgentLoop {
     await this.options.session.append(core("request/context", { ...ids, snapshot: records.snapshot }));
   }
 
-  private checkContextCapacity(input: import("@actspace/context-engine").LlmInput, capacity: number | null, release: () => void): void {
-    if (capacity === null || !Number.isFinite(capacity) || capacity <= 0) return;
+  /** 返回这次请求输入的估算 token 数；窗口大小未知时不检查，返回 null。 */
+  private checkContextCapacity(input: import("@actspace/context-engine").LlmInput, capacity: number | null, release: () => void): number | null {
+    if (capacity === null || !Number.isFinite(capacity) || capacity <= 0) return null;
     const estimate = estimateRequestInput(input);
     const reserve = Math.max(0, input.options.maxTokens ?? 0);
     if (estimate >= capacity || estimate + reserve > capacity) {
       release();
       throw new Error(`Context exceeds model capacity (${estimate} estimated input tokens + ${reserve} requested output tokens / ${capacity}). Reduce input or compact the conversation before continuing.`);
     }
+    return estimate;
+  }
+
+  /**
+   * 这一批工具调用给模型的输出合计最多多少字符（见 toolBatchOutputChars）。窗口大小未知时返回 undefined。
+   * 每个有工具调用的 Step 算一次：只估算系统提示词、工具定义和这条助手消息，对话消息只按角色筛一遍、不读内容。
+   */
+  private toolBatchOutputChars(request: { readonly messages: readonly LlmMessage[]; readonly tools: readonly LlmToolDefinition[]; readonly options: { readonly maxTokens?: number }; readonly contextWindow?: number | null }, requestEstimate: number | null, output: { readonly content: readonly LlmContentBlock[]; readonly usage: RuntimeV2JsonValue }): number | undefined {
+    const contextWindow = request.contextWindow ?? null;
+    if (contextWindow === null || requestEstimate === null) return undefined;
+    const assistant = estimateMessage(output.content);
+    // Provider 报的用量比估算准（中文等文字估算偏低）；两个都有时取大的。
+    const reported = compactionUsage(output.usage, contextWindow);
+    return toolBatchOutputChars({
+      contextWindow,
+      maxOutputTokens: Math.max(0, request.options.maxTokens ?? 0),
+      usedTokens: Math.max(requestEstimate + assistant, reported === null ? 0 : reported.inputTokens + reported.outputTokens),
+      keptTokens: estimateRequestInput({ messages: request.messages.filter((message) => message.role === "system"), tools: request.tools }) + assistant,
+    });
   }
 
   private async publishContext(engine: ContextEngine, request: import("@actspace/context-engine").ContextRequest, ids: { agentRunId: string; turnId: string; stepId: string }) {
@@ -455,7 +481,7 @@ export class AgentLoop {
   }
   private recordPayload<T>(payload: T): Readonly<Record<string, unknown>> { return isRecord(payload) ? payload : {}; }
 
-  private async runTools(calls: readonly CollectedToolCall[], ids: { agentRunId: string; turnId: string; stepId: string; requestId: string }, signal: AbortSignal, visibleToolNames: ReadonlySet<string>, mainModel?: string): Promise<readonly ToolExecutionResult[]> {
+  private async runTools(calls: readonly CollectedToolCall[], ids: { agentRunId: string; turnId: string; stepId: string; requestId: string }, signal: AbortSignal, visibleToolNames: ReadonlySet<string>, mainModel?: string, modelOutputBatchChars?: number): Promise<readonly ToolExecutionResult[]> {
     const unavailable = calls.find((call) => !visibleToolNames.has(call.name));
     if (unavailable !== undefined) {
       // The assistant message already contains every call. Settle the whole
@@ -484,7 +510,7 @@ export class AgentLoop {
       this.emitLive({ kind: "tool-prepared", ...ids, callId: call.callId, name: definition.name, arguments: args });
     }
     const base = this.options.toolEnvironment(this.options.session);
-    const environment: ToolPreparedEnvironment = { ...base, mainModel, allowedToolNames: visibleToolNames, agentScopeToken: this.options.toolScopeToken, context: this.options.context, eventCarrier: this.#events.carrier,
+    const environment: ToolPreparedEnvironment = { ...base, mainModel, modelOutputBatchChars, allowedToolNames: visibleToolNames, agentScopeToken: this.options.toolScopeToken, context: this.options.context, eventCarrier: this.#events.carrier,
       onExecutionStarted: (call) => {
         this.emitLive({ kind: "tool-started", ...ids, callId: call.callId, name: call.name });
         try { base.onExecutionStarted?.(call); } catch { /* Isolate optional observers. */ }

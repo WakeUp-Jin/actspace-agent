@@ -8,6 +8,7 @@ import type { ToolArtifactOwner, ToolArtifactRef, ToolBodyResult, ToolCapability
 import { enforceCoreToolGuards } from "./core-guards.js";
 import { ToolRuntimeError, type ToolFailure } from "./errors.js";
 import type { OrderedCommitSlot } from "./ordered-commit.js";
+import { boundToolResult, capToolResultText, toolModelOutputChars, type ToolOutputBudget } from "./output-limits.js";
 import { redactToolText, redactToolValue } from "./redaction.js";
 import type { CapturedToolRegistration } from "./registry.js";
 import type { ToolExecutionResult } from "./result.js";
@@ -107,6 +108,12 @@ export type ToolPreparedEnvironment = {
     readonly mediaType: string;
     readonly owner: ToolArtifactOwner;
   }) => Promise<ToolArtifactRef>;
+  /**
+   * 这一批调用给模型的输出合计最多多少个字符。Agent Loop 按上下文窗口还放得下多少来给；
+   * 一批里怎么分见 ToolOutputBudget，超出的部分由 tool-runtime 截短并转存成文件。
+   * 不给就只受固定的字节上限约束。
+   */
+  readonly modelOutputBatchChars?: number;
   readonly context?: CordisContext;
 };
 
@@ -132,6 +139,7 @@ export class PreparedToolExecution {
   #committed = false;
   #released = false;
   #forceOutcomeUnknown = false;
+  #outputAllowance: number | undefined;
   #resources: readonly ToolResource[] = [];
   #onceApproval: OnceApproval | undefined;
   #approvalMode: "auto" | "manual" | "session" | undefined;
@@ -144,6 +152,7 @@ export class PreparedToolExecution {
     private readonly input: ToolCallInput,
     private readonly environment: ToolPreparedEnvironment,
     private readonly slot: OrderedCommitSlot,
+    private readonly outputBudget?: ToolOutputBudget,
   ) {
     this.pluginId = registration.definition.pluginId;
     this.name = registration.definition.name;
@@ -317,7 +326,11 @@ export class PreparedToolExecution {
 
   async finalize(): Promise<ToolExecutionResult> {
     const stage = await this.stage();
-    if (stage.kind === "terminal") return stage.result;
+    if (stage.kind === "terminal") {
+      // 没到工具体的结果很短，不截；但它不再占着这一批留给它的那份额度。
+      this.#takeOutputAllowance(stage.result);
+      return stage.result;
+    }
     let body = await this.runBody();
     const outcome = { status: body.status, failure: body.failure === undefined ? undefined : { ...body.failure } };
     const finalizerFailures: ToolFailure[] = [];
@@ -331,7 +344,19 @@ export class PreparedToolExecution {
     for (const finalizer of [...this.#finalizers].reverse()) {
       try { await finalizer(); } catch (error) { finalizerFailures.push(toFailure(error, "finalize")); }
     }
-    return this.#normalizeBody({ ...body, ...outcome }, finalizerFailures);
+    // 超过上限的部分在这里截短；完整输出转存成这次调用拥有的文件（agent-spec-tool-runtime-abi.md §7.7）。
+    const result = this.#normalizeBody({ ...body, ...outcome }, finalizerFailures);
+    return boundToolResult(result, {
+      modelOutputChars: this.#takeOutputAllowance(result),
+      saveFullOutput: (text) => this.environment.createArtifact({ bytes: Buffer.from(text, "utf8"), mediaType: "text/plain", owner: { sessionId: this.input.sessionId, callId: this.callId, pluginId: this.pluginId, name: this.name } }),
+    });
+  }
+
+  /** 从这一批共用的额度里取这次调用的份；一次调用只取一次。没有额度（窗口大小未知）时返回 undefined。 */
+  #takeOutputAllowance(result: ToolExecutionResult): number | undefined {
+    if (this.outputBudget === undefined) return undefined;
+    this.#outputAllowance ??= this.outputBudget.take(toolModelOutputChars(result.modelOutput));
+    return this.#outputAllowance;
   }
 
   async execute(): Promise<ToolExecutionResult> {
@@ -614,6 +639,7 @@ export class PreparedToolExecution {
   }
 
   #failureResult(status: "failed" | "denied" | "aborted", failure: ToolFailure): ToolExecutionResult {
+    const message = capToolResultText(redactToolText(failure.message));
     return Object.freeze({
       ...(this.#approvalMode ? { approvalMode: this.#approvalMode } : {}),
       ...(this.#approvalReason ? { approvalReason: this.#approvalReason } : {}),
@@ -624,11 +650,11 @@ export class PreparedToolExecution {
       registrationId: this.registrationId,
       definitionVersion: this.definitionVersion,
       definitionDigest: this.definitionDigest,
-      summary: redactToolText(failure.message),
-      modelOutput: Object.freeze([{ type: "text" as const, text: redactToolText(failure.message) }]),
+      summary: message,
+      modelOutput: Object.freeze([{ type: "text" as const, text: message }]),
       detail: Object.freeze([]),
       artifacts: Object.freeze([]),
-      failure: Object.freeze({ ...failure, message: redactToolText(failure.message) }),
+      failure: Object.freeze({ ...failure, message }),
       finalizerFailures: Object.freeze([]),
       dispatched: failure.phase === "checkpoint",
     });

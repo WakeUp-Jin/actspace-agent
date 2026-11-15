@@ -20,7 +20,11 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
   const failed = terminal && state !== undefined && state !== "completed";
   const resultPreview = terminal && !failed ? outputPreview(output) : undefined;
   if (localName === "read_file") return { kind: "read", filePath: displayPath(string(args.path) ?? ""), ...(typeof args.offset === "number" || typeof args.limit === "number" ? { range: `${nonNegative(args.offset) || 1}-${(nonNegative(args.offset) || 1) + Math.max(0, nonNegative(args.limit) - 1)}` } : {}), displayText: summary, resultPreview };
-  if (localName === "list_directory") return { kind: "directory_list", path: displayPath(string(args.path) ?? "."), entryCount: terminal && !failed ? directoryEntryCount(output) : undefined, displayText: summary, resultPreview };
+  if (localName === "list_directory") {
+    // 给模型的列表可能被截断，真实条目数在 detail 里；旧会话没有这一项，才从文本里数。
+    const counted = record(detailValue(data, "result")).entryCount;
+    return { kind: "directory_list", path: displayPath(string(args.path) ?? "."), entryCount: terminal && !failed ? typeof counted === "number" ? nonNegative(counted) : directoryEntryCount(output) : undefined, displayText: summary, resultPreview };
+  }
   if (localName === "grep") return { kind: "grep", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
   if (localName === "glob") return { kind: "glob", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
   if (localName === "web" || localName === "web_search" || localName === "web_fetch") { const open = localName === "web_fetch" || string(args.action) === "open"; return { kind: "web_search", mode: open ? "url" : "query", ...(open ? { url: string(args.url) ?? "" } : { query: string(args.query) ?? "" }), displayText: summary, contentPreview: output.slice(0, 2_000) }; }

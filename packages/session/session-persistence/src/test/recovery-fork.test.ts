@@ -7,7 +7,7 @@ import { join } from "node:path";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { createCompactionTransaction, createCoreCodecRegistry } from "@actspace/session-journal";
 import type { SessionEventCandidateV1 } from "@actspace/session-journal";
-import { applySessionRecovery, classifySessionRecoveryAccess, planSessionRecovery } from "../recovery.js";
+import { applySessionRecovery, classifySessionRecoveryAccess, planSessionRecovery, settleOpenTurnWork } from "../recovery.js";
 import { SessionStore } from "../session-store.js";
 
 const roots: string[] = [];
@@ -68,6 +68,66 @@ describe("conservative Session recovery", () => {
     expect(planSessionRecovery(session.journal.events)).toBeNull();
     expect(session.journal.validation.relations.openTurnId).toBeNull();
     expect(session.journal.surface.entries.at(-1)?.node).toMatchObject({ kind: "tool-result", callId: "call-1" });
+    await session.close();
+  });
+
+  it("settles a request whose context record was never written", async () => {
+    const dataRoot = await temporaryRoot();
+    const registry = createCoreCodecRegistry();
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    const session = await store.create(headerInput(registry, "header-only"));
+    await session.append(candidate("turn/start", { turnId: "turn-1" }));
+    await session.append(candidate("step/start", { turnId: "turn-1", stepId: "step-1" }));
+    const header = await session.append(candidate("request/header", { requestId: "request-1", turnId: "turn-1", stepId: "step-1" }));
+    await session.flush();
+
+    const plan = await applySessionRecovery(session);
+    expect(plan?.candidates.map((event) => event.type)).toEqual(["recovery/start", "request/context", "assistant/message", "step/end", "turn/end", "recovery/committed"]);
+    expect(plan?.candidates[1]).toMatchObject({ data: { requestId: "request-1", turnId: "turn-1", stepId: "step-1", repairId: plan?.repairId }, provenance: { sourceEventSeqs: [header.seq] } });
+    expect(session.journal.validation.relations).toMatchObject({ openTurnId: null, openStepId: null, openRequestIds: [], openToolCallIds: [] });
+    expect(planSessionRecovery(session.journal.events)).toBeNull();
+    await session.close();
+  });
+
+  it("settles open requests and tools of a running turn and leaves the turn to its caller", async () => {
+    const dataRoot = await temporaryRoot();
+    const registry = createCoreCodecRegistry();
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    const session = await store.create(headerInput(registry, "live-settlement"));
+    await session.append(candidate("turn/start", { turnId: "turn-0" }));
+    await session.append(candidate("turn/end", { turnId: "turn-0", reason: "completed" }));
+    const turnStart = await session.append(candidate("turn/start", { turnId: "turn-1" }));
+    await session.append(candidate("step/start", { turnId: "turn-1", stepId: "step-1" }));
+    await session.append(candidate("tool/call", { callId: "call-1", name: "read" }));
+    await session.append(candidate("tool-workflow/run-start", { callId: "call-1" }));
+    await session.append(candidate("tool/call", { callId: "call-2", name: "read" }));
+    await session.append(candidate("request/header", { requestId: "request-1", turnId: "turn-1", stepId: "step-1" }));
+    const before = session.lastSeq;
+
+    const plan = await settleOpenTurnWork(session, turnStart.seq);
+    expect(plan?.sourceBoundarySeq).toBe(before);
+    expect(plan?.candidates.map((event) => event.type)).toEqual(["recovery/start", "request/context", "assistant/message", "tool/recovery-outcome", "tool/recovery-outcome", "recovery/committed"]);
+    expect(plan?.candidates.filter((event) => event.type === "tool/recovery-outcome").map((event) => (event.data as { outcome?: string }).outcome)).toEqual(["outcome-unknown", "not-started"]);
+    expect(session.journal.validation.relations).toMatchObject({ openTurnId: "turn-1", openStepId: "step-1", openRequestIds: [], openToolCallIds: [] });
+
+    await session.append(candidate("step/end", { turnId: "turn-1", stepId: "step-1", reason: "interrupted" }));
+    await session.append(candidate("turn/end", { turnId: "turn-1", reason: "failed" }));
+    expect(planSessionRecovery(session.journal.events)).toBeNull();
+    await session.close();
+  });
+
+  it("writes nothing for a running turn that has no open request or tool", async () => {
+    const dataRoot = await temporaryRoot();
+    const registry = createCoreCodecRegistry();
+    const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
+    const session = await store.create(headerInput(registry, "live-nothing-open"));
+    const turnStart = await session.append(candidate("turn/start", { turnId: "turn-1" }));
+    await session.append(candidate("step/start", { turnId: "turn-1", stepId: "step-1" }));
+    const before = session.lastSeq;
+
+    expect(await settleOpenTurnWork(session, turnStart.seq)).toBeNull();
+    expect(session.lastSeq).toBe(before);
+    expect(planSessionRecovery(session.journal.events, { closeTurn: false })).toBeNull();
     await session.close();
   });
 

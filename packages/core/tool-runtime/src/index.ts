@@ -9,6 +9,7 @@ export * from "./errors.js";
 export * from "./executor.js";
 export * from "./host-ports.js";
 export * from "./ordered-commit.js";
+export * from "./output-limits.js";
 export * from "./permission/index.js";
 export * from "./prepared-execution.js";
 export * from "./redaction.js";

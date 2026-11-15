@@ -345,6 +345,8 @@ Post hook 可以修饰摘要、detail 与输出，不能改写 executor 的 stat
 
 裁剪不得只删除中间内容后伪装成完整输出：被裁剪的 model output 必须明确标记，并在需要保留完整结果时写入 Session-owned artifact。禁止用 renderer 可见的临时绝对路径代替 artifact ref。
 
+裁剪有两个来源：固定的字节上限（保证一条结果写得进 Journal），以及 Agent Loop 经 `ToolPreparedEnvironment.modelOutputBatchChars` 给这一批调用的合计字符额度（保证这一批放得进上下文窗口）。裁剪不改变 body 的 status 和 failure。具体数字、一批内部怎么分配见[工具输出与引用](../tool-system/agent-tool-output-references.md)的「工具结果的体积上限」。
+
 Post hook 和 finalizer 的异常记录在 `finalizerFailures`，后续 LIFO 清理和有序提交仍执行；不得以清理失败伪造 body 的执行成败。纯观测使用注册时隔离的 Cordis emit 监听。
 
 ### 7.8 Ordered Journal commit
