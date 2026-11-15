@@ -26,13 +26,15 @@ describe("plugin catalog", () => {
     expect(DEFAULT_HARNESS_ENTRIES.map(row => row[0])).toEqual([
       "llm-service", "auto-review", "tools-approval", "sandbox", "sandbox-nono", "sandbox-seatbelt", "tools-runtime", "context-engine", "prompt-runtime",
       "context-assembly", "context-system", "context-rules", "context-skills", "context-runtime", "context-conversation", "context-tools", "context-background-tasks",
-      "context-disclosure", "compaction-runtime", "filesystem-read", "filesystem-search", "filesystem-write", "web-tools", "image-generation", "shell-tools",
-      "image-inspection", "todo-tools", "browser-tools", "background-tasks", "subagent-tools", "subagent-codex", "subagent-claude-code", "plugin-manager", "agent-factory",
+      "context-disclosure", "compaction-runtime", "filesystem-read", "filesystem-search", "filesystem-write", "web-tools", "deep-search", "image-generation", "shell-tools",
+      "image-inspection", "document", "todo-tools", "browser-tools", "background-tasks", "subagent-tools", "subagent-codex", "subagent-claude-code", "plugin-manager", "agent-factory",
     ]);
     const rows = new Map(DEFAULT_HARNESS_ENTRIES.map(row => [row[0], row]));
     expect(rows.get("llm-service")).toEqual(["llm-service", ["llm.service", "llm.routes", "llm.service.types"], ["actspace.host.llm"]]);
     expect(rows.get("shell-tools")).toEqual(["shell-tools", ["tools.shell-tools"], ["tools.runtime", "actspace.host.background-tasks", "actspace.host.session"], [{ id: "sandbox", fallback: "bash runs outside the sandbox after approval" }, { id: "actspace.host.process", fallback: "bash registers but reports the capability as unavailable" }]]);
     expect(rows.get("filesystem-read")).toEqual(["filesystem-read", ["tools.filesystem-read"], ["tools.runtime"], [{ id: "actspace.host.filesystem", fallback: "file tools register but report the capability as unavailable" }]]);
+    expect(rows.get("deep-search")).toEqual(["deep-search", ["tools.deep-search"], ["tools.runtime"], [{ id: "actspace.host.tools.deep-search", fallback: "deep_search is not registered" }]]);
+    expect(rows.get("document")).toEqual(["document", ["tools.document"], ["tools.runtime"], [{ id: "actspace.host.tools.document", fallback: "read_document is not registered" }]]);
     expect(rows.get("todo-tools")).toEqual(["todo-tools", ["tools.todo"], ["tools.runtime", "session.runtime"]]);
     expect(rows.get("context-assembly")).toEqual(["context-assembly", ["context.assembly"], []]);
     expect(rows.get("context-system")).toEqual(["context-system", ["context.source.system"], ["context.assembly"]]);

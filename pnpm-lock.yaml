@@ -1338,6 +1338,12 @@ importers:
       '@actspace/tool-browser':
         specifier: workspace:*
         version: link:../../browser/tool-browser
+      '@actspace/tool-deep-search':
+        specifier: workspace:*
+        version: link:../../web/tool-deep-search
+      '@actspace/tool-document':
+        specifier: workspace:*
+        version: link:../../document/tool-document
       '@actspace/tool-fs-read':
         specifier: workspace:*
         version: link:../../fs/tool-fs-read

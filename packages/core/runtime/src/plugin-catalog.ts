@@ -27,6 +27,8 @@ import { manifest as desktopAppManifest } from "@actspace/desktop-app/manifest";
 import { manifest as headlessManifest } from "@actspace/headless/manifest";
 import { manifest as imageGenerationManifest } from "@actspace/tool-image-generation/manifest";
 import { manifest as imageInspectionManifest } from "@actspace/tool-image-inspection/manifest";
+import { manifest as deepSearchManifest } from "@actspace/tool-deep-search/manifest";
+import { manifest as documentManifest } from "@actspace/tool-document/manifest";
 import { manifest as llmServiceManifest } from "@actspace/llm-service/manifest";
 import { manifest as sandboxManifest } from "@actspace/sandbox/manifest";
 import { manifest as sandboxNonoManifest } from "@actspace/sandbox-nono/manifest";
@@ -114,9 +116,11 @@ export const PLUGIN_CATALOG: readonly PluginCatalogEntry[] = Object.freeze([
   { id: "filesystem-search", manifest: fsSearchManifest, module: "@actspace/tool-fs-search/plugin", loaders: harness, directory: "fs", admitOnHost: true },
   { id: "filesystem-write", manifest: fsWriteManifest, module: "@actspace/tool-fs-write/plugin", loaders: harness, directory: "fs", admitOnHost: true },
   { id: "web-tools", manifest: webManifest, module: "@actspace/tool-web/plugin", loaders: harness, directory: "web", admitOnHost: true },
+  { id: "deep-search", manifest: deepSearchManifest, module: "@actspace/tool-deep-search/plugin", loaders: harness, directory: "web", admitOnHost: true },
   { id: "image-generation", manifest: imageGenerationManifest, module: "@actspace/tool-image-generation/plugin", loaders: harness, directory: "image", admitOnHost: true },
   { id: "shell-tools", manifest: shellManifest, module: "@actspace/tool-shell/plugin", loaders: harness, directory: "shell", admitOnHost: true },
   { id: "image-inspection", manifest: imageInspectionManifest, module: "@actspace/tool-image-inspection/plugin", loaders: harness, directory: "image", admitOnHost: true },
+  { id: "document", manifest: documentManifest, module: "@actspace/tool-document/plugin", loaders: harness, directory: "document", admitOnHost: true },
   { id: "todo-tools", manifest: todoToolsManifest, module: "@actspace/tool-todo/plugin", loaders: harness, codec: "@actspace/tool-todo/codec", directory: "todo", admitOnHost: true },
   { id: "browser-tools", manifest: browserToolsManifest, module: "@actspace/tool-browser/plugin", loaders: harness, directory: "browser" },
   { id: "background-tasks", manifest: backgroundTasksToolManifest, module: "@actspace/tool-background-tasks/plugin", loaders: harness, directory: "background-tasks" },

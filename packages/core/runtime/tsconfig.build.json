@@ -163,6 +163,12 @@
       "path": "./../../browser/tool-browser/tsconfig.build.json"
     },
     {
+      "path": "./../../web/tool-deep-search/tsconfig.build.json"
+    },
+    {
+      "path": "./../../document/tool-document/tsconfig.build.json"
+    },
+    {
       "path": "./../../fs/tool-fs-read/tsconfig.build.json"
     },
     {

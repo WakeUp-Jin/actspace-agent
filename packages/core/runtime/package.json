@@ -100,6 +100,8 @@
     "@actspace/tool-web": "workspace:*",
     "@actspace/tool-image-generation": "workspace:*",
     "@actspace/tool-image-inspection": "workspace:*",
+    "@actspace/tool-deep-search": "workspace:*",
+    "@actspace/tool-document": "workspace:*",
     "@actspace/agent-service": "workspace:*",
     "@actspace/background-tasks": "workspace:*",
     "@actspace/harness-control": "workspace:*",
