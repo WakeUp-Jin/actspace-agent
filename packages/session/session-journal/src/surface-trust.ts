@@ -2,7 +2,7 @@ import type { SessionSurfaceView } from "./surface.js";
 
 declare const trustedSurface: unique symbol;
 /**
- * 日志交出的对话视图（agent-spec-context-trusted-surface.md §3.1）：视图、entries、条目、节点外壳都已冻结，
+ * 日志交出的对话视图（agent-context-engine.md「已信任的对话视图」）：视图、entries、条目、节点外壳都已冻结，
  * 节点字段引用日志里已校验、已深度冻结的事件 data。只有 `SessionJournal.surface` 能产出；运行时以 WeakSet 为准。
  */
 export type TrustedSurfaceView = SessionSurfaceView & { readonly [trustedSurface]: true };

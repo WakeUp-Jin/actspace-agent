@@ -98,7 +98,7 @@ SessionRecord / Context / Usage
 
 ## Context、Usage 与 Trajectory
 
-当前 Context 面板没有独立持久化文件。实时内容来自 `context.engine` 内存实例的只读投影；历史请求与趋势来自派生查询读模型。总数与分类来自会话投影 `contextEstimate`，它只从 Journal 折叠（[请求记录规范](agent-plugin-runtime/agent-spec-request-record.md)）。具体读取与同步路径见[Context 决策记录](上下文管理引擎设计/上下文管理引擎V2/07-Step增量更新与披露面板决策记录.md)。各分类的来源：
+当前 Context 面板没有独立持久化文件。实时内容来自 `context.engine` 内存实例的只读投影；历史请求与趋势来自派生查询读模型。总数与分类来自会话投影 `contextEstimate`，它只从 Journal 折叠（[请求记录规范](agent-plugin-runtime/agent-spec-request-record.md)）。具体读取与同步路径见 [front-Context面板规范](frontend/front-Context面板规范.md) §6。各分类的来源：
 
 - `request/system-prompt` 的 `sections`、`modelFacts` -> System Prompt、Rules、Skills；
 - `request/tools` -> Tool Definitions；

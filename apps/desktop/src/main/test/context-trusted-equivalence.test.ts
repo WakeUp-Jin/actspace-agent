@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * 上下文引擎不再每次请求复制对话（agent-spec-context-trusted-surface.md §6）：
+ * 上下文引擎不再每次请求复制对话（agent-context-engine.md「已信任的对话视图」）：
  * 改前改后，同一段会话走一串 getContext / reconcile / toLlmInput / recordPrepared，
  * 每一步的 contextRevision、发给模型的输入、面板投影、请求记录都必须一致。
  *

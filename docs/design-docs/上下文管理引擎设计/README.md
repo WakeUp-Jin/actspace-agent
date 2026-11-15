@@ -1,10 +1,16 @@
 # 上下文管理引擎设计
 
-这里的“V2”指上下文管理引擎的第二版，不是整个 ActSpace Runtime 的版本，也不意味着 Session 存储格式升级。本专题同时包含第一版实现契约与 V2 设计。
+每次模型请求之前，上下文怎样组装、怎样随对话变长而整理。代码在 `packages/context/`。
 
-- **当前实现（V2）**：[上下文管理引擎 V2](上下文管理引擎V2/README.md)。V2 引擎（按 `Session + Agent 逻辑作用域` 管理的长期 Context 实例）、Context 面板与 SQLite 联合实现已落地，代码在 `packages/context/`。
-- **数据结构与职责**：[Context 与 LlmInput](Context数据结构和模型输入数据结构的设计规范.md)、[插件职责](上下文管理引擎的插件拆分和上下文的插件拆分.md)。每次模型调用从 Context 生成不可变的 `LlmInput`；各来源行为分属 `packages/context/` 下独立 workspace 包。
-- **性能约束**：[上下文引擎不再每次请求复制对话](../agent-plugin-runtime/agent-spec-context-trusted-surface.md)：日志交出的对话视图直接引用，`contextRevision` 与会话源缓存按对话版本号判断。
-- **延续的领域规则**：[渐进式披露](agent-progressive-disclosure.md)、[压缩提示词](agent-compaction-prompt.md)、[插件设计原则](agent-plugin-design-principles.md)。
+| 文档 | 管什么 |
+|---|---|
+| [上下文引擎规范](agent-context-engine.md) | Context 的身份与寿命、来源、补充与临时插槽、每个 Step 的顺序、到 `LlmInput` 的转换、已信任的对话视图、给界面的投影 |
+| [渐进式披露](agent-progressive-disclosure.md) | 路径的登记、活跃与睡眠、周期规则、和压缩一起提交 |
+| [上下文压缩](agent-context-compaction.md) | 触发、选段、摘要、提交与失败处理 |
 
-阅读 V2 时，从组装、使用和下一次组装开始。
+相邻主题不在这里：
+
+- Context 面板的界面、读取接口和上下文历史索引：[front-Context面板规范](../frontend/front-Context面板规范.md)。
+- 请求记录（`request/context` 等）和估算算法：[请求记录与上下文估算](../agent-plugin-runtime/agent-spec-request-record.md)。
+- provider 用量与估算的区别：[Token Usage 与 Context Projection](../model-context/agent-token-usage-and-context-state.md)。
+- 工具结果的体积上限与输出文件：[工具输出与引用](../tool-system/agent-tool-output-references.md)。

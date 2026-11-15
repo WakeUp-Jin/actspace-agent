@@ -42,7 +42,7 @@ flowchart TB
 
 允许临时流式状态和计算中间结果只存在内存；它们不能被标记为已经可靠保存。完整恢复是恢复已确认持久化的业务状态，不保证崩溃前最后一个未提交字符仍在，也不重跑历史工具的外部副作用。
 
-当前实现依据：[存储与可观测性边界](core-storage-and-observability.md)、[Session 持久化契约](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)、[三类读模型](agent-plugin-runtime/agent-spec-runtime-projection.md)。Step 增量更新、压缩和披露面板决定继续维护在 [07 决策记录](上下文管理引擎设计/上下文管理引擎V2/07-Step增量更新与披露面板决策记录.md)。
+当前实现依据：[存储与可观测性边界](core-storage-and-observability.md)、[Session 持久化契约](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)、[三类读模型](agent-plugin-runtime/agent-spec-runtime-projection.md)。Step 之间的 Context 更新见[上下文引擎规范](上下文管理引擎设计/agent-context-engine.md)，压缩见[上下文压缩](上下文管理引擎设计/agent-context-compaction.md)，披露见[渐进式披露](上下文管理引擎设计/agent-progressive-disclosure.md)，面板见 [front-Context面板规范](frontend/front-Context面板规范.md)。
 
 ## 2. 完整 Session 的边界
 
@@ -116,7 +116,7 @@ flowchart TD
 - LLM dispatch、工具执行和后续安全边界继续等待各自持久化屏障；SQLite 不参与这些完成条件，也不会因每条实时事件自动启动索引。
 - Journal 校验或 Surface 发布失败回退本次接纳；事件已经接纳后发生持久化失败，则保留失败状态并阻断写入，不能把两种失败都描述成自动撤销业务。
 
-Step 工具批次完成后的 Context 更新与自动压缩见 [07 决策记录](上下文管理引擎设计/上下文管理引擎V2/07-Step增量更新与披露面板决策记录.md)。压缩改变后续模型输入，不删除旧日志；近期正文释放也不会代替模型上下文压缩。
+Step 工具批次完成后的 Context 更新见[上下文引擎规范](上下文管理引擎设计/agent-context-engine.md)「每个 Step 的顺序」，自动压缩见[上下文压缩](上下文管理引擎设计/agent-context-compaction.md)。压缩改变后续模型输入，不删除旧日志；近期正文释放也不会代替模型上下文压缩。
 
 ## 6. 读取：执行、实时展示与历史查询分别路由
 
@@ -190,7 +190,7 @@ Agent 执行、上下轮衔接和恢复不查 SQLite。当前前端也不是所�
 - base 默认 openAt: never 关闭 SQLite 全文搜索，精确读取仍可用。
 - 通用 storage-domain 可以接 JSON 或 SQLite；ActSpace 本次明确收窄为 JSON/JSONL 等权威来源加可重建 SQLite，不照搬其全部介质自由度。
 
-源码入口详见 [07 决策记录](上下文管理引擎设计/上下文管理引擎V2/07-Step增量更新与披露面板决策记录.md)。
+核对入口（快照 `packages/` 下的路径）：`api/session-controller/src/list.ts` 的 projectionsFor、`api/session-controller/src/index.ts` 的 projections 与 liveProjections、`session-query/session-query/src/observation.ts` 的 read 与 preparedProjections、`session-query/session-query/src/cold-read.ts` 的 readColdSessionLog、`session/session-projection-cache/src/index.ts` 的 cachedSnapshot 与 hydratePrepared、`core/agent-loop/src/index.ts` 的 resumeWith、`core/agent-loop/src/agent.ts` 的 buildRequest。
 
 ## 10. 交付边界
 
@@ -413,6 +413,7 @@ Revision 不是另一套事件事实，也不是“索引版本替代 Session �
 - `session_search` / `session_excerpt_search`：标题、每条 user/assistant 消息的前 512 字符，处理字符串和 text block，脱敏后索引。它是历史片段搜索，包含已被上下文压缩替换的历史消息；不是完整正文搜索。
 - `usage_projection_*`：受控大小的 step/call 关联事实，用于跨批次重试、终态和 run 关联，复用原 Usage 投影口径。
 - `index_state`：Usage 和 catalog 分别保存 committed revision、Provider cursor、物理 stamp 和独立 codec digest。catalog 水位不冒充 Usage 水位。
+- `context_*`：Context 面板的上下文历史，按需逐 Session 建，水位独立。只存每次请求的模型与分类合计、最近两次请求的非对话明细、事件、会话统计和 Bash 统计，不存对话、工具结果和请求体；边界见 [front-Context面板规范](frontend/front-Context面板规范.md) §5.2 和 §6.3。
 
 WAL、单 Worker 写连接、独立 SQLite owner lease、application id、schema 版本和文件权限 0600 均已接线。摘要行标记为 browse-only，不对整份 Session 的关系完整性作承诺；打开会话时仍由原 Session 恢复路径决定写入权限。
 

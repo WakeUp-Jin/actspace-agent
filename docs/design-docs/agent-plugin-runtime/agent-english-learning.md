@@ -193,7 +193,7 @@ Provider 参数参考 [MiniMax 同步语音接口](https://platform.minimaxi.com
 
 - [Agent Scope](agent-spec-agent-scope-model.md)
 - [Cordis 事件 ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md)
-- [Prompt 与 Context Contributor](agent-spec-prompt-context-contributors.md)
+- [上下文引擎规范](../上下文管理引擎设计/agent-context-engine.md)「来源」（Host 按会话追加来源）
 - [设置页规范](../frontend/front-设置页规范.md)
 - [前端验证](../../FRONTEND_VERIFICATION.md)
 - [Agent 测试](agent-testing.md)

@@ -133,7 +133,7 @@ export class ContextEngine {
     entries.forEach((entry, index) => { values.push(surfaceMessage(entry.node)); appendSupplements(index); });
     const converted = await convertMessages(values, context.request.sessionId, this.options.resolveArtifact);
     const messages = [...(system ? [{ role: "system", content: system } as LlmMessage] : []), ...converted];
-    // 不再整份序列化复制（agent-spec-context-trusted-surface.md §3.5）：消息由引擎新建，字段引用的是已检查、已冻结的
+    // 不再整份序列化复制（agent-context-engine.md「已信任的对话视图」）：消息由引擎新建，字段引用的是已检查、已冻结的
     // 对话节点、补充文字和系统提示词，外壳浅冻结即可。对话没经过日志或引擎检查（调用方直接传入的 Context）时，照旧整份检查、复制、冻结。
     const checked = isCheckedContextValue(context.content.conversation)
       ? Object.freeze(messages.map(freezeMessage))
