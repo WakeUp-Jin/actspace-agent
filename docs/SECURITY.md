@@ -37,6 +37,7 @@
 - **生命周期**：退出时 dispose Browser Bridge（终止在途子进程）和本地更新服务（只清定时器，更新脚本必须比应用活得久）；`uncaughtExceptionMonitor` / `unhandledRejection` 写入主进程日志，不改变 Electron 的默认处理。
 - Desktop 的 provider Key 只在 main 进程凭据存储和短生命周期 Runtime credential 中可见，不会泄露到 renderer。CLI 环境变量只属于 CLI Host 进程。
 - 本地更新只通过 main 进程 IPC 暴露结构化操作：选择源码目录、读取状态、启动更新。renderer 不传 shell 命令；main 会验证所选目录是 `name: "actspace"` 且包含 `package:desktop:dmg` 与 `scripts/release-package.sh`，并确认当前进程路径解析出的目标是 `Actspace.app` / `actspace.app` 且不是 `node_modules` 下的 Electron 开发 runtime 后，才写入 helper 脚本。helper 位于 `<userData>/tmp/local-update/`，日志写同目录 `update.log`，阶段状态写 `status.json`；main 只在 helper 报告 `ready_to_replace` / `waiting_for_exit` / `replacing` 后触发 app 退出，避免构建阶段提前关闭当前应用。helper 默认对本地更新构建启用 ad-hoc signing，并在替换前验证新 `.app` 的 bundle 元数据、主可执行文件和 code signature；替换后如果系统无法打开新 app，会尝试恢复旧版本。
+- Browser Bridge 的源码扩展也不让 renderer 传路径：「选择源码扩展」由 main 弹系统目录对话框，把选中的目录解析成真实路径，确认里面是 ActSpace 自己的 Chrome 扩展（名称、manifest v3、由 `key` 算出的扩展 ID）之后才保存；「从源码编译」不带参数，只编译保存下来的那个目录，编译前重新校验一遍，并要求 `build.sh` 是目录内的普通文件，不能是符号链接。
 
 ## 文件系统访问控制
 
