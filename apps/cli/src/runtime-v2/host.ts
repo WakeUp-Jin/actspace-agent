@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { loadRuntimeV2 } from "./loader";
+import { loadRuntimeModule } from "./loader";
+import { profileService } from "./profile-service";
 import type { HostConfig } from "@actspace/agent-host";
-import type { AgentApplicationContract, AgentService } from "@actspace/agent-service";
 import { HostModelRouter, createNodeToolHostServices, resolveNodeHostNonoPath, resolveNodeHostPython } from "@actspace/agent-host/node-ports";
 import { CLI_REPO_ROOT } from "./host-adapter";
 import { currentModelHostPort, MODELS_HOST_PORT_ID } from "@actspace/shared";
 const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<typeof import("@actspace/agent-host")>;
 
 export async function startRemoteHost(config: HostConfig, options: { mock?: boolean; forceExit?: () => void } = {}) {
-  const [runtime, hostModule] = await Promise.all([loadRuntimeV2(), dynamicImport("@actspace/agent-host")]);
+  const [runtime, hostModule] = await Promise.all([loadRuntimeModule(), dynamicImport("@actspace/agent-host")]);
   return hostModule.bootstrapHost(config, {
     forceExit: options.forceExit,
     log: message => { process.stderr.write(`${message}\n`); },
@@ -36,9 +36,10 @@ export async function startRemoteHost(config: HostConfig, options: { mock?: bool
         onLiveEvent,
       });
       try {
-        const application = profile.context.get?.("host.application") as AgentApplicationContract | undefined;
+        const application = profileService(profile, "host.application");
         if (!application) throw new Error("Host application plugin unavailable");
-        const agentRuntime = profile.context.get?.("agent.runtime") as { runs: { service: AgentService; inspectCapability<T, R>(name: string, read: (service: T | undefined) => R): R | Promise<R> }; subagents: { activeCount: number }; backgroundTasks: { hasRunning(sessionId?: string): boolean }; harnesses: { inspect(): { blocked: string; instances: readonly { state: string }[] } } };
+        const agentRuntime = profileService(profile, "agent.runtime");
+        if (!agentRuntime) throw new Error("Agent runtime unavailable");
         return {
           application,
           beginDrain: () => agentRuntime.runs.service.beginDrain(),

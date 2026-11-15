@@ -1,6 +1,7 @@
 import { dirname, isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { CordisActivationScope, CordisContext, CordisEntryFact, CordisLifecycleProbe, CordisMountOptions, CordisRootHandle } from "./cordis-types.js";
+import { getService, serviceKey } from "./service-access.js";
 
 export async function createCordisRoot(): Promise<CordisRootHandle> {
   return createCordisLoaderRootWithLoader(loadCordisRuntimeModules);
@@ -18,7 +19,7 @@ export async function mountCordisConfig(root: CordisRootHandle, absoluteConfigPa
   // config file is the composition boundary, so use its directory rather
   // than this adapter package's dist directory as the module-resolution root.
   context.baseUrl = pathToFileURL(`${dirname(absoluteConfigPath)}/`).href;
-  const loader = context.get?.("loader") as CordisLoaderLike | undefined;
+  const loader = getService(context, CORDIS_LOADER);
   if (loader === undefined) throw new Error("Cordis Loader service was not published.");
   return loader.create({
     id: entryId,
@@ -84,7 +85,7 @@ export async function createCordisRootWithLoader(load: () => Promise<CordisModul
     },
     getService: <T = unknown>(serviceId: string): T | undefined => context.get?.(serviceId) as T | undefined,
     facts: () => Object.freeze([...fibers].map(([entryId, fiber]): CordisEntryFact => Object.freeze({ entryId, hasFiber: true, state: stateName(fiber.state), unresolvedServices: Object.freeze(Object.keys(fiber.inject ?? {}).filter((service) => context.get?.(service) === undefined)), providedServices: provided.get(entryId) ?? Object.freeze([]), ...(failures.has(entryId) ? { error: failures.get(entryId) } : {}) }))),
-    awaitSettlement: async () => { const loader = context.get?.("loader") as { await?(): Promise<void> } | undefined; await loader?.await?.(); return probe(context, disposed); },
+    awaitSettlement: async () => { const loader: { await?(): Promise<void> } | undefined = getService(context, CORDIS_LOADER); await loader?.await?.(); return probe(context, disposed); },
     dispose: async () => { if (!disposed) await (disposing ??= Promise.resolve().then(() => context.dispose?.()).then(() => { disposed = true; }).finally(() => { disposing = undefined; })); return probe(context, disposed); },
   });
 }
@@ -100,7 +101,7 @@ export async function createCordisLoaderRootWithLoader(load: () => Promise<Cordi
   context.baseUrl = new URL("./", import.meta.url).href;
   await context.plugin(modules.loader.default, { baseUrl: context.baseUrl });
   await context.plugin(modules.timer.default);
-  const loader = context.get("loader") as CordisLoaderLike | undefined;
+  const loader = getService(context, CORDIS_LOADER);
   if (loader === undefined) { await disposeContext(context); throw new Error("Cordis Loader service was not published."); }
   loader.builtins.include = modules.include.default;
   loader.builtins.group = modules.group.default;
@@ -154,6 +155,8 @@ type CordisLoaderFiberLike = CordisFiberLike & { ctx?: { get?(name: string): unk
 type CordisLoaderEntryLike = { readonly fiber?: CordisLoaderFiberLike; readonly disabled?: boolean; readonly options?: { readonly name?: string } };
 type CordisLoaderLike = { readonly builtins: Record<string, unknown>; create(options: { readonly id: string; readonly name: string; readonly config: unknown; readonly inject: readonly string[] }): Promise<string>; resolve(id: string): CordisLoaderEntryLike; entries(): Iterable<CordisLoaderEntryLike>; await(): Promise<void> };
 type CordisLoaderContextLike = CordisContextLike & { baseUrl?: string; plugin(plugin: unknown, config?: unknown): CordisFiberLike; get(name: string): unknown; fiber?: { dispose(): Promise<void> | void } };
+/** Cordis 自带的 Loader 服务。这个文件只用到下面这几个成员。 */
+const CORDIS_LOADER = serviceKey<CordisLoaderLike>("loader");
 
 async function loadCordisRuntimeModules(): Promise<CordisRuntimeModules> {
   const names = ["@deepseek-ai/cordis", "@deepseek-ai/cordis-plugin-loader", "@deepseek-ai/cordis-plugin-include", "@deepseek-ai/cordis-plugin-group", "@deepseek-ai/cordis-plugin-timer"] as const;

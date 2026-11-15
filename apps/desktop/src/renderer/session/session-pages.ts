@@ -1,11 +1,11 @@
 import type { ClientSessionStore } from "@actspace/client/sessions";
-import type { RuntimeV2DesktopSessionProjection, RuntimeV2SessionProjectionInput } from "@actspace/shared/runtime-v2";
+import type { RuntimeDesktopSessionProjection, RuntimeSessionProjectionInput } from "@actspace/shared/runtime-v2";
 import { sessionsApi } from "../api/sessions";
 
 // 早期历史分页（14 S4）：按 cell 当前窗口的 beforeSeq 取上一页，交给 ClientSessionStore 合并。
 // 合并规则在 applyEnvelope 里（相邻窗口按 seq 并入，较旧的页不覆盖已有消息），这里不再手工拼事件。
 
-type GetPage = (input: RuntimeV2SessionProjectionInput) => Promise<RuntimeV2DesktopSessionProjection>;
+type GetPage = (input: RuntimeSessionProjectionInput) => Promise<RuntimeDesktopSessionProjection>;
 
 const pending = new WeakMap<ClientSessionStore, Map<string, Promise<boolean>>>();
 

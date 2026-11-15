@@ -8,12 +8,12 @@ const runtimeEntry = path.resolve(
 
 let runtimePromise;
 
-function loadRuntimeV2() {
+function loadRuntimeModule() {
   runtimePromise ??= import(pathToFileURL(runtimeEntry).href);
   return runtimePromise;
 }
 
-class RuntimeV2BridgeClient {
+class RuntimeBridgeClient {
   constructor(options) {
     this.options = options;
     this.transportPromise = undefined;
@@ -31,11 +31,11 @@ class RuntimeV2BridgeClient {
   }
 
   #transport() {
-    this.transportPromise ??= loadRuntimeV2().then(
+    this.transportPromise ??= loadRuntimeModule().then(
       ({ SocketBrowserBridgeTransport }) => new SocketBrowserBridgeTransport(this.options),
     );
     return this.transportPromise;
   }
 }
 
-module.exports = { RuntimeV2BridgeClient, loadRuntimeV2 };
+module.exports = { RuntimeBridgeClient, loadRuntimeModule };

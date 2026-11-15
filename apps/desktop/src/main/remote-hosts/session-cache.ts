@@ -4,12 +4,12 @@ import { dirname, join } from "node:path";
 import type { SessionListPage } from "@actspace/shared";
 import type { HostConnection, SessionRef } from "@actspace/shared/host-protocol";
 import { sessionRefKey } from "@actspace/shared/host-protocol";
-import type { RuntimeV2SessionListItem, RuntimeV2SessionObservation } from "@actspace/shared/runtime-v2";
+import type { RuntimeSessionListItem, RuntimeSessionObservation } from "@actspace/shared/runtime-v2";
 /** Connection failure never means an empty remote Session list. */
 export class RemoteSessionCache {
   readonly #pages = new Map<string, SessionListPage>();
-  readonly #lists = new Map<string, readonly RuntimeV2SessionListItem[]>();
-  readonly #observations = new Map<string, RuntimeV2SessionObservation>();
+  readonly #lists = new Map<string, readonly RuntimeSessionListItem[]>();
+  readonly #observations = new Map<string, RuntimeSessionObservation>();
   readonly #writes = new Map<string, Promise<void>>();
   constructor(private readonly root?: string) {}
   #path(key: string) { return join(this.root!, key.startsWith("list:") ? "lists" : key.startsWith("page:") ? "pages" : "observations", `${createHash("sha256").update(key).digest("hex")}.json`); }
@@ -49,20 +49,20 @@ export class RemoteSessionCache {
       this.#pages.set(key, value.page); return structuredClone(value.page);
     } catch { return undefined; }
   }
-  async setList(hostId: string, sessions: readonly RuntimeV2SessionListItem[]): Promise<void> {
+  async setList(hostId: string, sessions: readonly RuntimeSessionListItem[]): Promise<void> {
     this.#lists.set(hostId, structuredClone(sessions));
     await this.#save(`list:${hostId}`, { kind: "list", hostId, sessions });
   }
   list(hosts: readonly HostConnection[]) {
     return hosts.flatMap(host => (this.#lists.get(host.hostId) ?? []).map(session => ({ hostId: host.hostId, hostName: host.name, connectionState: host.state, session })));
   }
-  async setObservation(ref: SessionRef, observation: RuntimeV2SessionObservation): Promise<void> {
+  async setObservation(ref: SessionRef, observation: RuntimeSessionObservation): Promise<void> {
     if (observation.sessionId !== ref.sessionId) throw new Error("Host observation Session identity mismatch");
     this.#observations.set(sessionRefKey(ref), structuredClone(observation));
     await this.#save(sessionRefKey(ref), { kind: "observation", ref, observation });
   }
-  observation(ref: SessionRef): RuntimeV2SessionObservation | undefined { const value = this.#observations.get(sessionRefKey(ref)); return value ? structuredClone(value) : undefined; }
-  async readObservation(ref: SessionRef): Promise<RuntimeV2SessionObservation | undefined> {
+  observation(ref: SessionRef): RuntimeSessionObservation | undefined { const value = this.#observations.get(sessionRefKey(ref)); return value ? structuredClone(value) : undefined; }
+  async readObservation(ref: SessionRef): Promise<RuntimeSessionObservation | undefined> {
     const cached = this.observation(ref); if (cached || !this.root) return cached;
     try {
       const value = JSON.parse(await readFile(this.#path(sessionRefKey(ref)), "utf8"));

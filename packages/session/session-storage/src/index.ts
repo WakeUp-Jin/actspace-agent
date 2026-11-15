@@ -1,3 +1,4 @@
+import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType } from "@actspace/cordis-adapter";
 import type { SessionHeaderV1, SessionEventEnvelopeV1, SessionEventCandidateV1, SessionAccessState, SessionValidationResult } from "@actspace/session-journal";
 
 /** Opaque revision: compare only within one storage identity and session. */
@@ -15,7 +16,7 @@ export interface SessionStorageSnapshot {
 
 /** Result of `SessionStorage.refresh`: how the physical Journal relates to the base snapshot. */
 export type SessionStorageRefresh =
-  /** Nothing changed; `snapshot` is the base object itself and no Journal content was read. */
+  /** Nothing changed; `snapshot` is the base object itself. Deciding this reads at most a bounded amount of Journal content, never the whole file. */
   | { readonly kind: "unchanged"; readonly snapshot: SessionStorageSnapshot }
   /** The Journal only grew. `snapshot.events` starts with all of the base events; events from index `fromEvent` are new. */
   | { readonly kind: "appended"; readonly snapshot: SessionStorageSnapshot; readonly fromEvent: number }
@@ -105,3 +106,6 @@ export interface SessionStorage {
   retireInto?(sessionId: string, parentSessionId: string, label: string): Promise<void>;
   close(): Promise<void>;
 }
+
+/** 具体的存储后端（现在是 `@actspace/session-persistence-jsonl`）按这个定义提供，取用方按它取。 */
+export const SESSION_STORAGE_SERVICE = bindServiceType<SessionStorage>(ACTSPACE_SERVICE_DEFINITIONS.sessionStorage);

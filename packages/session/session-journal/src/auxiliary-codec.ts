@@ -1,10 +1,10 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { SessionError } from "./errors.js";
 
 export const AUXILIARY_IDENTITY_FIELDS = ["sessionId", "agentRunId", "turnId", "stepId", "callId", "logicalRequestId", "attemptId", "attempt", "purpose", "routeId", "model", "startedAt"] as const;
 
 /** Auxiliary requests are billing facts, never conversation or Context nodes. */
-export function validateAuxiliaryRequest(type: string, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+export function validateAuxiliaryRequest(type: string, data: Readonly<Record<string, RuntimeJsonValue>>): void {
   const invalid = (message: string): never => { throw new SessionError("INVALID_EVENT", `${type}: ${message}.`); };
   const toolOwned = data.purpose === "image-inspection" || data.purpose === "auto-review";
   if (!toolOwned && data.purpose !== "session-title" && data.purpose !== "compaction") invalid("unsupported purpose");
@@ -25,7 +25,7 @@ export function validateAuxiliaryRequest(type: string, data: Readonly<Record<str
   if (typeof data.finishedAt !== "string" || !Number.isFinite(Date.parse(data.finishedAt)) || Date.parse(data.finishedAt) < Date.parse(data.startedAt as string)) invalid("invalid finishedAt");
   const usage = data.usage;
   if (usage === null || typeof usage !== "object" || Array.isArray(usage)) invalid("usage must be an object");
-  const fields = usage as Readonly<Record<string, RuntimeV2JsonValue>>;
+  const fields = usage as Readonly<Record<string, RuntimeJsonValue>>;
   for (const field of ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "reasoningTokens", "cost"]) {
     const value = fields[field];
     if (value !== null && (typeof value !== "number" || !Number.isFinite(value) || value < 0)) invalid(`usage.${field} must be a non-negative finite number or null`);
@@ -35,7 +35,7 @@ export function validateAuxiliaryRequest(type: string, data: Readonly<Record<str
   if (fields.costProvenance !== undefined) {
     const provenance = fields.costProvenance;
     if (provenance === null || typeof provenance !== "object" || Array.isArray(provenance)) invalid("invalid usage.costProvenance");
-    const record = provenance as Readonly<Record<string, RuntimeV2JsonValue>>;
+    const record = provenance as Readonly<Record<string, RuntimeJsonValue>>;
     if (record.version !== 1 || !["provider-reported", "estimated", "unknown"].includes(record.basis as string)
       || (record.reason !== null && typeof record.reason !== "string")
       || (record.pricingSnapshot !== null && (typeof record.pricingSnapshot !== "object" || Array.isArray(record.pricingSnapshot)))) invalid("invalid usage.costProvenance");

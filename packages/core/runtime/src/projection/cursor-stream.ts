@@ -1,13 +1,13 @@
-import type { RuntimeV2LiveEvent, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeLiveEvent, RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
 import type { LiveProgressHub, LiveCursor, LiveHandshake, LiveProgressInput } from "./live-progress.js";
 
 export class RuntimeProjectionStream {
   constructor(
     readonly live: LiveProgressHub,
-    private readonly snapshot: (sessionId: string) => RuntimeV2SessionSnapshot,
+    private readonly snapshot: (sessionId: string) => RuntimeSessionSnapshot,
   ) {}
 
-  publish(input: LiveProgressInput): RuntimeV2LiveEvent | null {
+  publish(input: LiveProgressInput): RuntimeLiveEvent | null {
     return this.live.publish(input);
   }
 

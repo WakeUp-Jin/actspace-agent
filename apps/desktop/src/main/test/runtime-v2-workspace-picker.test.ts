@@ -7,7 +7,7 @@ import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection, resolveWork
 import { ReviewCoordinator } from "../review-coordinator";
 import { ReviewGitEngine } from "../review-git-engine";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS } from "@actspace/shared/runtime-v2";
 import type { SelectWorkspaceDirectoryResult } from "@actspace/shared";
 
 const { handlers, showOpenDialog } = vi.hoisted(() => ({
@@ -46,7 +46,7 @@ describe("workspace directory picker IPC contract", () => {
     } as unknown as FixedRendererIpcOptions);
     try {
       showOpenDialog.mockResolvedValueOnce(dialogResult);
-      const result = await handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory)!(
+      const result = await handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory)!(
         trusted.event,
       ) as SelectWorkspaceDirectoryResult;
       expect(result).toEqual(expected);
@@ -85,7 +85,7 @@ describe("workspace admission from the native picker", () => {
     });
     try {
       showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [workspaceRoot] });
-      await handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory)!(
+      await handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory)!(
         trusted.event, { registerWorkspace },
       );
       const registry = await readWorkspaceRegistry(registryOptions);
@@ -102,7 +102,7 @@ describe("workspace admission from the native picker", () => {
       expect(await resolveRegisteredWorkspaceSelection(registryOptions, { workspaceRoot: join(dataRoot, "unknown") }))
         .toEqual({ ok: false, error: "workspaceRoot is not registered" });
       showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [join(dataRoot, "canceled")] });
-      await handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory)!(
+      await handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory)!(
         trusted.event, { registerWorkspace: true },
       );
       expect((await readWorkspaceRegistry(registryOptions)).items.map((item) => item.path))
@@ -128,7 +128,7 @@ describe("renderer-supplied workspace roots", () => {
       subscribe: () => () => {}, subscribeRendererStream: () => () => {},
       listSessions: async () => [{ sessionId: "tree", workspaceRoot: worktree }],
     }, settings: { subscribeV4Changes: () => () => {}, getV4: () => ({ settings: { general: {} } }) }, getMainWindow: () => trusted.window } as unknown as FixedRendererIpcOptions);
-    const call = (workspaceRoot?: string) => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getWorkspaceEnvironment)!(trusted.event, { workspaceRoot });
+    const call = (workspaceRoot?: string) => handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.getWorkspaceEnvironment)!(trusted.event, { workspaceRoot });
     try {
       await expect(call(worktree)).resolves.toMatchObject({ workspaceRoot: await realpath(worktree), git: { branch: "actspace/test" } });
       await expect(call()).resolves.toMatchObject({ workspaceRoot: await realpath(source) });
@@ -148,7 +148,7 @@ describe("renderer-supplied workspace roots", () => {
       subscribe: () => () => {}, subscribeRendererStream: () => () => {},
       inspectSession: async () => ({ workspaceRoot: roots.workspaceRoot }), updateSessionWorkspace,
     }, settings: { subscribeV4Changes: () => () => {}, getV4: () => ({ settings: { general: {} } }) }, getMainWindow: () => trusted.window } as unknown as FixedRendererIpcOptions);
-    const call = (input: object) => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setSessionWorkspace)!(trusted.event, { sessionId: 's1', ...input });
+    const call = (input: object) => handlers.get(RUNTIME_FIXED_RENDERER_CHANNELS.setSessionWorkspace)!(trusted.event, { sessionId: 's1', ...input });
     try {
       for (const selection of [{ workspaceId: target.workspaceId }, { workspaceRoot: target.workspaceRoot }, { workspaceId: target.workspaceId, workspaceRoot: target.workspaceRoot }]) {
         await expect(call(selection)).resolves.toEqual({ ok: true });
@@ -190,9 +190,9 @@ describe("renderer-supplied workspace roots", () => {
   it("createSession only accepts registered workspace roots", async () => {
     const { dataRoot, defaultRoot, outside, createSession, registration, call } = await setup();
     try {
-      await expect(call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession, { workspaceRoot: outside })).rejects.toThrow("not registered");
+      await expect(call(RUNTIME_FIXED_RENDERER_CHANNELS.createSession, { workspaceRoot: outside })).rejects.toThrow("not registered");
       expect(createSession).not.toHaveBeenCalled();
-      await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createSession, { workspaceRoot: defaultRoot });
+      await call(RUNTIME_FIXED_RENDERER_CHANNELS.createSession, { workspaceRoot: defaultRoot });
       expect(createSession).toHaveBeenCalledWith(undefined, defaultRoot, undefined, undefined);
     } finally {
       registration.dispose();
@@ -203,17 +203,17 @@ describe("renderer-supplied workspace roots", () => {
   it("createWorkspaceFolder needs a registered parent or one the user just picked", async () => {
     const { dataRoot, outside, registration, call } = await setup();
     try {
-      const rejected = await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "made" });
+      const rejected = await call(RUNTIME_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "made" });
       expect(rejected).toEqual({ ok: false, error: "workspace_not_registered" });
       expect(await readdir(outside)).toEqual([]);
 
       showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [outside] });
-      await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
-      const created = await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "made" });
+      await call(RUNTIME_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
+      const created = await call(RUNTIME_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "made" });
       expect(created).toMatchObject({ ok: true, workspaceRoot: join(outside, "made") });
 
       // 选过的目录建成功后作废。
-      const again = await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "second" });
+      const again = await call(RUNTIME_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "second" });
       expect(again).toEqual({ ok: false, error: "workspace_not_registered" });
       expect(await readdir(outside)).toEqual(["made"]);
     } finally {
@@ -228,22 +228,22 @@ describe("renderer-supplied workspace roots", () => {
     await mkdir(other);
     try {
       showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [outside] });
-      await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
-      const badName = await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "a/b" });
+      await call(RUNTIME_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
+      const badName = await call(RUNTIME_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "a/b" });
       expect(badName).toMatchObject({ ok: false });
       expect(badName).not.toEqual({ ok: false, error: "workspace_not_registered" });
       // 名字不合法不会作废这次选择，换个名字可以重试。
-      expect(await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "made" }))
+      expect(await call(RUNTIME_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "made" }))
         .toMatchObject({ ok: true, workspaceRoot: join(outside, "made") });
 
       // 后一次选择覆盖前一次。
       showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [outside] });
-      await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
+      await call(RUNTIME_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
       showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [other] });
-      await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
-      expect(await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "second" }))
+      await call(RUNTIME_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, {});
+      expect(await call(RUNTIME_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: outside, name: "second" }))
         .toEqual({ ok: false, error: "workspace_not_registered" });
-      expect(await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: other, name: "made" }))
+      expect(await call(RUNTIME_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, { parentRoot: other, name: "made" }))
         .toMatchObject({ ok: true, workspaceRoot: join(other, "made") });
       expect(await readdir(outside)).toEqual(["made"]);
     } finally {
@@ -255,10 +255,10 @@ describe("renderer-supplied workspace roots", () => {
   it("rejects git context, skills and context menus for unregistered roots", async () => {
     const { dataRoot, outside, registration, call } = await setup();
     try {
-      await expect(call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getWorkspaceGitContext, { workspaceRoot: "/" })).rejects.toThrow("workspace_not_registered");
-      await expect(call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSkills, { workspaceRoot: outside })).rejects.toThrow("workspace_not_registered");
+      await expect(call(RUNTIME_FIXED_RENDERER_CHANNELS.getWorkspaceGitContext, { workspaceRoot: "/" })).rejects.toThrow("workspace_not_registered");
+      await expect(call(RUNTIME_FIXED_RENDERER_CHANNELS.listSkills, { workspaceRoot: outside })).rejects.toThrow("workspace_not_registered");
       await writeFile(join(outside, "a.txt"), "a");
-      expect(await call(RUNTIME_V2_FIXED_RENDERER_CHANNELS.showArtifactContextMenu, {
+      expect(await call(RUNTIME_FIXED_RENDERER_CHANNELS.showArtifactContextMenu, {
         kind: "workspace_file", workspaceRoot: outside, relativePath: "a.txt",
       })).toEqual({ shown: false, error: "invalid_target" });
     } finally {

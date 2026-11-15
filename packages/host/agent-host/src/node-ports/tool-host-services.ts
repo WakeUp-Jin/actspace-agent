@@ -42,9 +42,9 @@ export function createNodeToolHostServices(options: { readonly onShellProcesses?
     ...createNodeSandboxHostServices(options),
     [FILESYSTEM_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspaceRoot, resolveArtifact: options.resolveArtifact } satisfies FilesystemHostGrant),
     [PROCESS_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspaceRoot, tmpRoot: options.tmpRoot, onProcesses: options.onShellProcesses, python: options.python } satisfies ProcessHostGrant),
-    [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({ credentials, deepseekFetchApiKey: process.env.ACTSPACE_DEEPSEEK_FETCH === "1" ? process.env.DEEPSEEK_API_KEY : undefined }) },
-    [IMAGE_GENERATION_HOST_PORT_ID]: { createPorts: () => createImagegeneration({ generation: apiKey && baseUrl && model ? { apiKey, baseUrl, model } : undefined }) },
-    [IMAGE_INSPECTION_HOST_PORT_ID]: { createPorts: (llm: import("@actspace/llm-service").LlmService, recorder: import("@actspace/llm-service").AuxiliaryRequestRecorder) => createImageinspection({ readArtifact: options.readArtifact, inspect: createLlmImageInspector({ llm, recorder, routeId: "default", model: options.model }) }) },
+    [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({ credentials, deepseekFetchApiKey: process.env.ACTSPACE_DEEPSEEK_FETCH === "1" ? process.env.DEEPSEEK_API_KEY : undefined }) } satisfies import("@actspace/tool-web").HostPort,
+    [IMAGE_GENERATION_HOST_PORT_ID]: { createPorts: () => createImagegeneration({ generation: apiKey && baseUrl && model ? { apiKey, baseUrl, model } : undefined }) } satisfies import("@actspace/tool-image-generation").HostPort,
+    [IMAGE_INSPECTION_HOST_PORT_ID]: { createPorts: (llm: import("@actspace/llm-service").LlmServiceContract, recorder: import("@actspace/llm-service").AuxiliaryRequestRecorder) => createImageinspection({ readArtifact: options.readArtifact, inspect: createLlmImageInspector({ llm, recorder, routeId: "default", model: options.model }) }) } satisfies import("@actspace/tool-image-inspection").HostPort,
   });
 }
 /** No filesystem or process grant: the Harness file and shell tools register and report the capability as unavailable. */

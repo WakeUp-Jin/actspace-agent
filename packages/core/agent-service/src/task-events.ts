@@ -1,6 +1,6 @@
 import type { EventCodec, SessionEventCandidateV1 } from "@actspace/session-journal";
 import { snapshotSessionJson } from "@actspace/session-journal";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { HarnessIdentity, RunOutcome } from "./contracts.js";
 
 export const TASK_OWNER = "actspace.agent-service";
@@ -11,16 +11,16 @@ export const QUEUE_EVENT = `plugin/${TASK_OWNER}/queue`;
 export const QUEUE_RETURN_EVENT = `plugin/${TASK_OWNER}/queue-return`;
 type Owned = { readonly sessionId: string };
 export type TaskEvent = Owned & (
-  | { readonly op: "accept"; readonly taskId: string; readonly submissionId: string; readonly content: RuntimeV2JsonValue; readonly continuationOf: string | null }
+  | { readonly op: "accept"; readonly taskId: string; readonly submissionId: string; readonly content: RuntimeJsonValue; readonly continuationOf: string | null }
   | { readonly op: "designate"; readonly taskId: string; readonly runId: string | null }
   | { readonly op: "cancel"; readonly taskId: string }
   | { readonly op: "operation-start"; readonly taskId: string }
-  | { readonly op: "operation-finish"; readonly taskId: string; readonly outcome: RunOutcome; readonly result?: RuntimeV2JsonValue }
+  | { readonly op: "operation-finish"; readonly taskId: string; readonly outcome: RunOutcome; readonly result?: RuntimeJsonValue }
   | { readonly op: "claim"; readonly taskId: string; readonly runId: string }
 );
 export type RunEvent = Owned & (
-  | { readonly op: "start"; readonly runId: string; readonly taskId: string; readonly harness: HarnessIdentity; readonly configuration: RuntimeV2JsonValue }
-  | { readonly op: "finish"; readonly runId: string; readonly outcome: RunOutcome; readonly result: RuntimeV2JsonValue }
+  | { readonly op: "start"; readonly runId: string; readonly taskId: string; readonly harness: HarnessIdentity; readonly configuration: RuntimeJsonValue }
+  | { readonly op: "finish"; readonly runId: string; readonly outcome: RunOutcome; readonly result: RuntimeJsonValue }
 );
 export type QueueEvent = Owned & (
   | { readonly op: "pause" | "resume" | "recover" }
@@ -37,12 +37,12 @@ export type SchedulingEvent = TaskEvent | RunEvent | QueueEvent | QueueReturnEve
 /** Pure codec entry: no behavior, filesystem, Host or Loop activation. */
 export const taskCodecs: readonly EventCodec[] = [TASK_EVENT, RUN_EVENT, QUEUE_EVENT, QUEUE_RETURN_EVENT].map(type => ({
   type, ownerPluginId: TASK_OWNER, currentVersion: 1, criticality: "required" as const,
-  validate: (value: RuntimeV2JsonValue) => validateSchedulingEvent(type, value),
+  validate: (value: RuntimeJsonValue) => validateSchedulingEvent(type, value),
 }));
 
 export function eventCandidate(type: string, data: SchedulingEvent): SessionEventCandidateV1 {
   validateSchedulingEvent(type, data);
-  return { type, eventVersion: 1, source: { ownerPluginId: TASK_OWNER }, data: snapshotSessionJson(data) as RuntimeV2JsonValue, surface: null };
+  return { type, eventVersion: 1, source: { ownerPluginId: TASK_OWNER }, data: snapshotSessionJson(data) as RuntimeJsonValue, surface: null };
 }
 
 export function validateSchedulingEvent(type: string, value: unknown): asserts value is SchedulingEvent {

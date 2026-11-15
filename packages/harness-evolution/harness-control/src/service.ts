@@ -2,12 +2,15 @@ import { randomUUID } from "node:crypto";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { HarnessGenerations, type HarnessCandidate, type HarnessLease, type HarnessMountRequest } from "@actspace/boot";
+import { serviceKey } from "@actspace/cordis-adapter";
 import { resolveHarnessPatch, harnessOptionalFallbacks } from "@actspace/composition";
 import { HarnessControlError, type AuthorizationRequest, type HarnessControlOptions, type HarnessPatchRequest, type HarnessBranchRequest, type SelectionDescription, type SelectionRecord } from "./contracts.js";
 import { checkAuthorization } from "./authorization.js";
 import { describeMount, loadArtifact, validateCandidate } from "./candidate.js";
 import { SelectionStore, selectionHash } from "./selection-store.js";
 type Candidate = { readonly handle: HarnessCandidate; readonly description: SelectionDescription; readonly source?: { harnessId: string; revision: number; digest: string } };
+/** Host 给 harness-control 插件的选项；`context` 由插件自己补上。 */
+export const HARNESS_CONTROL_HOST_PORT = serviceKey<Omit<HarnessControlOptions, "context">>("actspace.host.harness-control");
 /** Host-owned coordinator. The raw generation manager never escapes this boundary. */
 export class HarnessControl {
   readonly #manager: HarnessGenerations;
@@ -262,3 +265,4 @@ export class HarnessControl {
   #assertOpen(): void { if (this.#closing) throw new HarnessControlError("CLOSED", "Harness control is closed"); }
   #diagnostic(error: unknown): void { try { this.options.onDiagnostic?.(error); } catch { /* diagnostic observers cannot change selection */ } }
 }
+export const HARNESS_CONTROL_SERVICE = serviceKey<HarnessControl>("harness.control");

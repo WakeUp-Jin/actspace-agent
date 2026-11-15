@@ -1,5 +1,6 @@
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
+import { serviceKey } from "@actspace/cordis-adapter";
 import { isPathWithin } from "./file-resource.js";
 
 /** Harness service id of {@link HostWritableRoots}. */
@@ -19,6 +20,8 @@ export class HostWritableRoots {
   }
   remove(root: string): void { this.#roots.delete(canonical(root)); }
 }
+
+export const HOST_WRITABLE_ROOTS_SERVICE = serviceKey<HostWritableRoots>(HOST_WRITABLE_ROOTS_SERVICE_ID);
 
 function canonical(path: string): string {
   try { return realpathSync(path); } catch { return resolve(path); }

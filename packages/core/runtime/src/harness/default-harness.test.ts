@@ -2,7 +2,7 @@ import { createContextHost } from "./context-host.js";
 import { codecs as contextCodecs } from "@actspace/context-engine/codec";
 import { SessionStore } from "@actspace/session-persistence";
 import { JsonlSessionStorage } from "@actspace/session-persistence-jsonl";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { expect, it, vi } from "vitest";
@@ -90,7 +90,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     const parentLease = await harnesses.acquire("main");
     // Mode policy is assembled from the tool definitions the Harness registered (agent-forms-and-modes.md §5).
     const definitions = parentLease.getService<import("@actspace/tool-runtime").ToolRuntime>("tools.runtime")!.registry.listDefinitions();
-    const visible = (mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode) => [...allowedAgentModeTools(mode, definitions)].sort();
+    const visible = (mode: import("@actspace/shared/runtime-v2").RuntimeAgentMode) => [...allowedAgentModeTools(mode, definitions)].sort();
     expect(visible("chat")).toEqual(["generate_image", "web"]);
     expect(visible("plan")).toEqual(["agent", "agent_fork", "glob", "grep", "inspect_image", "list_directory", "list_subagent_models", "read_file", "send_message", "task_list", "task_output", "task_stop", "todo_read", "todo_write", "web_fetch", "web_search"]);
     expect(visible("agent")).toEqual(expect.arrayContaining(["bash", "edit_file", "present", "generate_image", "plugin_manager", "harness_inspect"]));
@@ -270,6 +270,20 @@ it("publishes every tool plugin as its own artifact so a patch replaces one plug
     expect(checkHarnessCompatibility(patched, [...request.artifacts.values(), alternative], host)).toEqual([]);
     expect(patched.digest).not.toBe(request.composition.digest);
   } finally { await rm(artifactRoot, { recursive: true, force: true }); }
+});
+
+it("keeps kernel service implementations out of the tool plugin artifacts", async () => {
+  // 每个工具插件单独打包。插件按服务定义取内核的服务，定义所在的包如果让打包器保留了整个模块，
+  // 服务的实现类（`extends Service` 的那些）就会被复制进每一个插件的产物：产物变大，还多出一份不该存在的类。
+  const pluginsRoot = fileURLToPath(new URL("../../dist/default-harness/plugins/", import.meta.url));
+  const carried: string[] = [];
+  for (const entry of harnessToolPluginEntries()) {
+    const source = await readFile(join(pluginsRoot, entry.id, "plugin.js"), "utf8");
+    // 打包器把类写成 `var X = class extends Service {`，重名时基类会带数字后缀。
+    for (const match of source.matchAll(/(?:(\w+) = class|class (\w+)) extends Service\d*\b/g)) carried.push(`${entry.id}: ${match[1] ?? match[2]}`);
+  }
+  // 这里失败时：把服务定义放进只对实现做类型引用的模块（各包的 `service-keys.ts`），并在定义所属的包的 package.json 里写 `"sideEffects": false`。
+  expect(carried).toEqual([]);
 });
 
 it("keeps the service contract's owner table in step with the tool plugin manifests", () => {

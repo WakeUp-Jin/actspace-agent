@@ -1,28 +1,28 @@
-import type { RuntimeV2DiagnosticsSnapshot, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot } from "./projection";
-import type { RuntimeV2BootManifest, RuntimeV2RuntimeState, RuntimeV2SessionListItem } from "./runtime";
+import type { RuntimeDiagnosticsSnapshot, RuntimeLiveEvent, RuntimeSessionSnapshot } from "./projection";
+import type { RuntimeBootManifest, RuntimeStateView, RuntimeSessionListItem } from "./runtime";
 
-export type RuntimeV2DesktopStatus = {
+export type RuntimeDesktopStatus = {
   readonly ready: boolean;
   readonly runtimeInstanceId: string | null;
   readonly error: string | null;
 };
-export type RuntimeV2DesktopSnapshot = {
+export type RuntimeDesktopSnapshot = {
   readonly kind: "desktop-runtime-snapshot";
   readonly schemaVersion: 1;
   readonly runtimeInstanceId: string;
   readonly cursor: number;
-  readonly runtime: RuntimeV2RuntimeState;
-  readonly manifest: RuntimeV2BootManifest;
-  readonly diagnostics: RuntimeV2DiagnosticsSnapshot;
-  readonly sessions: readonly RuntimeV2SessionListItem[];
-  readonly selectedSession: RuntimeV2SessionSnapshot | null;
+  readonly runtime: RuntimeStateView;
+  readonly manifest: RuntimeBootManifest;
+  readonly diagnostics: RuntimeDiagnosticsSnapshot;
+  readonly sessions: readonly RuntimeSessionListItem[];
+  readonly selectedSession: RuntimeSessionSnapshot | null;
   readonly workspaceRoot: string;
 };
-export type RuntimeV2ForkSessionInput = { readonly parentSessionId: string; readonly newSessionId: string } & ({ readonly boundarySeq: number } | { readonly turnId: string });
-export type RuntimeV2RequestRestartInput = { readonly reason: string; readonly source: string; readonly candidateDigest?: string };
-export type RuntimeV2UpdateSessionMetadataInput = { readonly sessionId: string; readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean };
-export type RuntimeV2ReadArtifactResult = { readonly artifactId: string; readonly mimeType: string; readonly bytesBase64: string };
-export type RuntimeV2AttachmentRef = {
+export type RuntimeForkSessionInput = { readonly parentSessionId: string; readonly newSessionId: string } & ({ readonly boundarySeq: number } | { readonly turnId: string });
+export type RuntimeRequestRestartInput = { readonly reason: string; readonly source: string; readonly candidateDigest?: string };
+export type RuntimeUpdateSessionMetadataInput = { readonly sessionId: string; readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean };
+export type RuntimeReadArtifactResult = { readonly artifactId: string; readonly mimeType: string; readonly bytesBase64: string };
+export type RuntimeAttachmentRef = {
   readonly artifactId: string;
   readonly mimeType: string;
   readonly name: string;
@@ -30,10 +30,10 @@ export type RuntimeV2AttachmentRef = {
   /** Decoded body for Chat text attachments. Persisted in the user/message content, not exposed as a filesystem capability. */
   readonly textContent?: string;
 };
-export type RuntimeV2ApprovalDecisionInput =
+export type RuntimeApprovalDecisionInput =
   | { readonly requestId: string; readonly hostId?: string; readonly decision: "once" | "deny" }
   | { readonly requestId: string; readonly hostId?: string; readonly decision: "session"; readonly suggestionId: string };
-export type RuntimeV2DesktopLiveEnvelope = {
-  readonly event: RuntimeV2LiveEvent;
+export type RuntimeDesktopLiveEnvelope = {
+  readonly event: RuntimeLiveEvent;
   readonly emittedAt: string;
 };

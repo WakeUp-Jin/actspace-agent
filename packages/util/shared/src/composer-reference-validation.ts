@@ -1,11 +1,11 @@
 import { validateFileReferences, validateResponseAnnotations, type FileReference, type ResponseAnnotationReference, type ComposerReferenceIssue } from "./composer-content";
 import { surfaceNode } from "./runtime-v2/session-events";
-import type { RuntimeV2SessionSnapshot, RuntimeV2SessionProjectionInput, RuntimeV2DesktopSessionProjection } from "./runtime-v2";
+import type { RuntimeSessionSnapshot, RuntimeSessionProjectionInput, RuntimeDesktopSessionProjection } from "./runtime-v2";
 
 export type RunReferenceValidation = { ok: true; fileReferences: FileReference[]; responseAnnotations: ResponseAnnotationReference[] } | { ok: false; issue: ComposerReferenceIssue };
 export interface ReferenceValidationPorts {
-  inspectSession(sessionId: string): Promise<RuntimeV2SessionSnapshot>;
-  readSessionProjection(input: RuntimeV2SessionProjectionInput): Promise<RuntimeV2DesktopSessionProjection>;
+  inspectSession(sessionId: string): Promise<RuntimeSessionSnapshot>;
+  readSessionProjection(input: RuntimeSessionProjectionInput): Promise<RuntimeDesktopSessionProjection>;
   resolveFile(workspace: string, path: string): Promise<{ ok: true } | { ok: false; code: "file_not_found" | "file_outside_workspace" | "not_a_file" }>;
 }
 /** Validate ownership before importing attachments or appending task events. */
