@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "./host-dto";
+import type { RuntimeJsonValue } from "./host-dto";
 import {
   SUBAGENT_ACTIVATION_STATUSES, SUBAGENT_DELIVERIES, SUBAGENT_KINDS, SUBAGENT_PRESETS,
   type SubagentActivationStatus, type SubagentActivationTrigger, type SubagentDelivery, type SubagentKind, type SubagentPreset, type SubagentStatus,
@@ -52,7 +52,7 @@ export type SubagentTree = { readonly order: readonly string[]; readonly agents:
 
 export const EMPTY_SUBAGENT_TREE: SubagentTree = Object.freeze({ order: Object.freeze([]), agents: Object.freeze({}) });
 
-type FoldableEvent = { readonly type: string; readonly time?: string; readonly data: RuntimeV2JsonValue };
+type FoldableEvent = { readonly type: string; readonly time?: string; readonly data: RuntimeJsonValue };
 
 export function reduceSubagentTree(state: SubagentTree, event: FoldableEvent): SubagentTree {
   const data = record(event.data);
@@ -95,7 +95,7 @@ export function lastActivationModel(agent: SubagentView): string | undefined {
   return undefined;
 }
 
-function spawned(state: SubagentTree, data: Readonly<Record<string, RuntimeV2JsonValue>>): SubagentTree {
+function spawned(state: SubagentTree, data: Readonly<Record<string, RuntimeJsonValue>>): SubagentTree {
   const agentId = text(data.agentId), callId = text(data.callId), description = typeof data.description === "string" ? data.description : null;
   const transcriptPath = text(data.transcriptPath), createdAt = text(data.createdAt);
   if (!agentId || !callId || description === null || !transcriptPath || !createdAt || !oneOf(data.kind, SUBAGENT_KINDS)) return state;
@@ -110,7 +110,7 @@ function spawned(state: SubagentTree, data: Readonly<Record<string, RuntimeV2Jso
   return { order: [...state.order, agentId], agents: { ...state.agents, [agentId]: view } };
 }
 
-function activation(state: SubagentTree, data: Readonly<Record<string, RuntimeV2JsonValue>>): SubagentTree {
+function activation(state: SubagentTree, data: Readonly<Record<string, RuntimeJsonValue>>): SubagentTree {
   const agentId = text(data.agentId), activationId = text(data.activationId);
   const current = agentId ? state.agents[agentId] : undefined;
   if (!current || !activationId) return state;
@@ -139,7 +139,7 @@ function activation(state: SubagentTree, data: Readonly<Record<string, RuntimeV2
   return state;
 }
 
-function legacyRequested(state: SubagentTree, data: Readonly<Record<string, RuntimeV2JsonValue>>, time: string): SubagentTree {
+function legacyRequested(state: SubagentTree, data: Readonly<Record<string, RuntimeJsonValue>>, time: string): SubagentTree {
   const agentId = text(data.childSessionId), activationId = text(data.invocationId), callId = text(data.parentCallId);
   if (!agentId || !activationId || !callId || state.agents[agentId]) return state;
   const view: SubagentView = {
@@ -149,7 +149,7 @@ function legacyRequested(state: SubagentTree, data: Readonly<Record<string, Runt
   return { order: [...state.order, agentId], agents: { ...state.agents, [agentId]: view } };
 }
 
-function legacyCompleted(state: SubagentTree, data: Readonly<Record<string, RuntimeV2JsonValue>>, time: string): SubagentTree {
+function legacyCompleted(state: SubagentTree, data: Readonly<Record<string, RuntimeJsonValue>>, time: string): SubagentTree {
   const agentId = text(data.childSessionId);
   const current = agentId ? state.agents[agentId] : undefined;
   if (!current?.legacy || current.activations[0]?.settle) return state;
@@ -165,6 +165,6 @@ function statusOf(activations: readonly SubagentActivationView[]): SubagentStatu
 }
 
 function replace(state: SubagentTree, view: SubagentView): SubagentTree { return { order: state.order, agents: { ...state.agents, [view.agentId]: view } }; }
-function record(value: RuntimeV2JsonValue | undefined): Readonly<Record<string, RuntimeV2JsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {}; }
-function text(value: RuntimeV2JsonValue | undefined): string | null { return typeof value === "string" && value.length > 0 ? value : null; }
-function oneOf<T extends string>(value: RuntimeV2JsonValue | undefined, values: readonly T[]): value is T { return typeof value === "string" && (values as readonly string[]).includes(value); }
+function record(value: RuntimeJsonValue | undefined): Readonly<Record<string, RuntimeJsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : {}; }
+function text(value: RuntimeJsonValue | undefined): string | null { return typeof value === "string" && value.length > 0 ? value : null; }
+function oneOf<T extends string>(value: RuntimeJsonValue | undefined, values: readonly T[]): value is T { return typeof value === "string" && (values as readonly string[]).includes(value); }

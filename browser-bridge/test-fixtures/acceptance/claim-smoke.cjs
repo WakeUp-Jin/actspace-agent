@@ -1,13 +1,13 @@
 const path = require("node:path");
 
-const { RuntimeV2BridgeClient } = require("./runtime-v2-client.cjs");
+const { RuntimeBridgeClient } = require("./runtime-v2-client.cjs");
 
 const socketPath = path.join(
   process.env.HOME,
   "Library/Application Support/AgentBrowserBridge/agent-browser-bridge.sock",
 );
 const targetURL = process.env.ABB_CLAIM_URL ?? "http://127.0.0.1:4173/page-two.html";
-const client = new RuntimeV2BridgeClient({
+const client = new RuntimeBridgeClient({
   socketPath,
   sessionId: `acceptance-claim-${Date.now()}`,
   turnId: "fixture-claim-smoke",

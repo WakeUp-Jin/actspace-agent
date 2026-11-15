@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { AgentScope, carrierKeyOf, scopeContext } from "@actspace/scope";
-import { createCordisRoot } from "@actspace/cordis-adapter";
-import { createAgentEventDispatcher } from "../dispatch.js";
+import { createCordisRoot, onHook, type SerialHook, type WaterfallHook } from "@actspace/cordis-adapter";
+import { createAgentEventDispatcher, type AgentSubject } from "../dispatch.js";
+
+// Loop 的契约在 agent-loop 里，而 agent-loop 依赖这个包，这里引不到。测试给两个名字声明自己的契约。
+declare module "@actspace/cordis-adapter" {
+  interface DomainEvents {
+    "agent/request": WaterfallHook<{ readonly agent: AgentSubject; readonly value: string }, Readonly<Record<string, unknown>>>;
+    "agent/turn-stopping": SerialHook<{ readonly agent: AgentSubject; readonly reason: string }>;
+  }
+}
 
 describe("Agent event dispatcher", () => {
   it("fuses one live subject with one opaque scope carrier", async () => {
@@ -90,18 +98,22 @@ describe("Agent event dispatcher", () => {
     const scope = new AgentScope("agent-a");
     const context = scopeContext(root.context, scope.scopeKey);
     const order: string[] = [];
-    context.on?.("agent/request", async (payload, next) => {
-      order.push(`outer:${(payload as { value: string }).value}`);
-      const result = await next();
-      return { ...(result as object), outer: true };
+    const subjects: AgentSubject[] = [];
+    onHook(context, "agent/request", async (payload, next) => {
+      order.push(`outer:${payload.value}`);
+      subjects.push(payload.agent);
+      return { ...(await next()), outer: true };
     });
-    context.on?.("agent/request", async (_payload, next) => {
+    onHook(context, "agent/request", async (_payload, next) => {
       order.push("inner");
-      return { ...(await next() as object), inner: true };
+      return { ...(await next()), inner: true };
     });
-    const result = await createAgentEventDispatcher(root.context, scope).waterfall("agent/request", { value: "input" }, () => ({ value: "built-in" }));
+    const dispatcher = createAgentEventDispatcher(root.context, scope);
+    const result = await dispatcher.waterfall("agent/request", { value: "input" }, () => ({ value: "built-in" }));
     expect(order).toEqual(["outer:input", "inner"]);
     expect(result).toMatchObject({ value: "built-in", outer: true, inner: true });
+    // 分发的地方没给 agent，监听器收到的 payload 里由 dispatcher 填上。
+    expect(subjects).toEqual([dispatcher.subject]);
     await scope.dispose();
     await root.dispose();
   });

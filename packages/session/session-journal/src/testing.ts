@@ -6,7 +6,7 @@
  *
  * 只用于测试，不在产品代码里引用。
  */
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import { createCoreCodecRegistry } from "./core-codecs.js";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "./event-envelope.js";
 import type { SessionEventHistory } from "./history.js";
@@ -33,7 +33,7 @@ export function syntheticSessionEvents(count: number, options: SyntheticSessionO
   const toolCalls = options.toolCallsPerTurn ?? 2;
   const text = "x".repeat(options.textLength ?? 200);
   const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => TIME, retainedEvents: Number.MAX_SAFE_INTEGER, retainedBytes: Number.MAX_SAFE_INTEGER });
-  const append = (type: string, data: Record<string, RuntimeV2JsonValue>, extra: Partial<SessionEventCandidateV1> = {}) =>
+  const append = (type: string, data: Record<string, RuntimeJsonValue>, extra: Partial<SessionEventCandidateV1> = {}) =>
     journal.append({ type, eventVersion: 1, source: SOURCE, data, surface: null, ...extra });
   for (let turn = 0; journal.lastSeq + 1 < count; turn += 1) {
     const turnId = `turn-${turn}`;
@@ -57,7 +57,7 @@ export function syntheticSessionEvents(count: number, options: SyntheticSessionO
 }
 
 /** 把当前对话除最后一条之外全部替换成一条摘要（和真实压缩一样走 compaction/* + surface/replaced）。 */
-function compact(journal: SessionJournal, append: (type: string, data: Record<string, RuntimeV2JsonValue>, extra?: Partial<SessionEventCandidateV1>) => unknown, compactionId: string) {
+function compact(journal: SessionJournal, append: (type: string, data: Record<string, RuntimeJsonValue>, extra?: Partial<SessionEventCandidateV1>) => unknown, compactionId: string) {
   const entries = journal.surface.entries;
   const end = entries.length - 1;
   if (end < 2) return;

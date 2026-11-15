@@ -262,14 +262,14 @@ describe("BrowserBridgeService", () => {
     const service = new BrowserBridgeService({ dataRoot });
 
     expect(await service.buildAndInstall()).toMatchObject({ ok: false, error: expect.stringContaining("请先选择源码扩展目录") });
-    expect(await service.useSourceExtension("relative/path")).toMatchObject({ ok: false });
-    expect(await service.useSourceExtension(join(linkRoot, "missing"))).toMatchObject({ ok: false, error: "该目录缺少有效的 ActSpace Chrome 扩展。" });
+    expect(await service.setSourceExtension("relative/path")).toMatchObject({ ok: false });
+    expect(await service.setSourceExtension(join(linkRoot, "missing"))).toMatchObject({ ok: false, error: "该目录缺少有效的 ActSpace Chrome 扩展。" });
 
-    expect(await service.useSourceExtension(link)).toEqual({ ok: true });
+    expect(await service.setSourceExtension(link)).toEqual({ ok: true });
     expect((await service.getStatus()).sourceRoot).toBe(repoRoot);
     expect(JSON.parse(await readFile(join(service.pluginRoot, "connection.json"), "utf8"))).toMatchObject({ sourceRoot: repoRoot });
 
-    expect(await service.useSourceExtension(null)).toEqual({ ok: true });
+    expect(await service.setSourceExtension(null)).toEqual({ ok: true });
     expect((await service.getStatus()).sourceRoot).toBeUndefined();
   });
 

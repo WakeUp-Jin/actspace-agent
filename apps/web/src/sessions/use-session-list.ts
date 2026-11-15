@@ -1,11 +1,11 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { isRecord } from "@actspace/shared/host-protocol";
-import type { ApprovalRequest, RuntimeV2SessionListItem } from "@actspace/shared/runtime-v2";
+import type { ApprovalRequest, RuntimeSessionListItem } from "@actspace/shared/runtime-v2";
 import { useConnectionStore, useHostConnection } from "../connection/use-connection";
 
 export type SessionListState = {
   /** null 表示还没拉到过；断线期间保留上一次的结果。 */
-  readonly sessions: readonly RuntimeV2SessionListItem[] | null;
+  readonly sessions: readonly RuntimeSessionListItem[] | null;
   /** 待审批请求，按 sessionId 分组。 */
   readonly approvals: ReadonlyMap<string, readonly ApprovalRequest[]>;
   /** 有运行中 Run 的会话（A3：host.observe 快照的 running + activity 事件）。 */
@@ -27,7 +27,7 @@ function groupApprovals(requests: readonly ApprovalRequest[]): Map<string, reado
 export function SessionListProvider({ children }: { readonly children: ReactNode }) {
   const store = useConnectionStore();
   const connection = useHostConnection();
-  const [sessions, setSessions] = useState<readonly RuntimeV2SessionListItem[] | null>(null);
+  const [sessions, setSessions] = useState<readonly RuntimeSessionListItem[] | null>(null);
   const [approvals, setApprovals] = useState<ReadonlyMap<string, readonly ApprovalRequest[]>>(new Map());
   const [running, setRunning] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<unknown>(null);
@@ -38,7 +38,7 @@ export function SessionListProvider({ children }: { readonly children: ReactNode
     const current = connectionRef.current;
     if (!current) return;
     try {
-      const list = await current.client.call("sessions.list") as RuntimeV2SessionListItem[];
+      const list = await current.client.call("sessions.list") as RuntimeSessionListItem[];
       if (connectionRef.current !== current) return;
       setSessions(list);
       setError(null);

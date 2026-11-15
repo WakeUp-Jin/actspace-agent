@@ -182,6 +182,8 @@ flowchart TD
 - `packages/context/context-engine/src/conversion.ts`：将文本 artifact 解析为可读路径，并提示用分页读取或搜索访问。
 - 本轮检查的工具运行层和 Agent Loop 中未发现“全部工具统一限制为 2,000 字符”的规则。
 
+2026-11-10 补充：`read_file` 的输出现在有 64,000 字符和单行 2,000 字符的上限，按整行截断并给出下一次的 `offset`；工具运行层对所有工具结果有字节上限，Agent Loop 按上下文窗口给每一批工具结果设额度。各层的数字和超出时的行为见[工具输出与引用](../tool-system/agent-tool-output-references.md)的「工具结果的体积上限」。
+
 统一路径登记、周期计数和活跃/睡眠整理现位于 `packages/context/context-disclosure/src/`；工具通过命名 detail 提交文件事实。普通文件只登记当前路径，不创建版本快照。
 
 相关当前规范：[工具输出与引用](../tool-system/agent-tool-output-references.md)、[Context 与 Usage](../model-context/agent-token-usage-and-context-state.md)、[Session 持久化](../agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。

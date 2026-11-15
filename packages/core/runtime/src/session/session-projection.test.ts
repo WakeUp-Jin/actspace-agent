@@ -164,6 +164,9 @@ describe("production Session projections", () => {
     const liveTail = await live.readProjection({ sessionId: "s" });
     expect(liveTail.window.events.filter(event => event.seq < liveTail.window.fromSeq).map(event => event.seq)).toEqual(carried.map(event => event.seq));
     await live.closeAll();
+    // 窗口正好从一条请求记录开始：这条请求在窗口内，不算进起点之前的请求数。
+    const fromRequest = await cold.readProjection({ sessionId: "s", afterSeq: seqOf("request/header", "r5") - 1 });
+    expect([fromRequest.window.fromSeq, fromRequest.window.requestOffset, fromRequest.window.turnOffset]).toEqual([seqOf("request/header", "r5"), 5, 6]);
     // 从头开始的一页不需要补。
     const older = await cold.readProjection({ sessionId: "s", beforeSeq: tail.window.beforeSeq! });
     expect(older.window.fromSeq).toBe(0);
@@ -225,6 +228,7 @@ describe("production Session projections", () => {
     const controller = f.controller();
     const page = await controller.readProjection({ sessionId: "s" });
     expect(page.deferredToolCalls).toEqual(["c"]);
+    expect(page.window.support).toContainEqual({ kind: "tool-call", callId: "c", eventSeqs: [5, 6] });
     expect(page.snapshot.tools[0]?.state).toBe("failed");
     expect(JSON.stringify(page.window)).not.toContain(output);
     expect(JSON.stringify(page.window).length).toBeLessThan(24_000);
@@ -232,6 +236,21 @@ describe("production Session projections", () => {
     expect(full.deferredToolCalls).toEqual([]);
     expect(JSON.stringify(full.window)).toContain(output);
     expect(JSON.stringify(await controller.browseToolDetail("s", "c"))).toContain(output);
+  });
+
+  it("defers a tool call only when one of its events is larger than the threshold", async () => {
+    const f = await fixture(1);
+    const core = { ownerPluginId: "@actspace/core" };
+    f.journal.append({ type: "turn/start", eventVersion: 1, source: core, data: { turnId: "tool-turn" }, surface: null });
+    f.journal.append({ type: "step/start", eventVersion: 1, source: core, data: { turnId: "tool-turn", stepId: "tool-step" }, surface: null });
+    const call = (callId: string, command: string) => {
+      f.journal.append({ type: "tool/call", eventVersion: 1, source: core, data: { callId, name: "bash", pluginId: "core", args: { command } }, surface: null });
+      return JSON.stringify(f.journal.events.at(-1)).length;
+    };
+    const room = 24_000 - call("c0", "");
+    expect([call("c1", "x".repeat(room)), call("c2", "x".repeat(room + 1))]).toEqual([24_000, 24_001]);
+    await appendFile(f.path, f.journal.events.slice(3).map(event => JSON.stringify(event)).join("\n") + "\n");
+    expect((await f.controller().readProjection({ sessionId: "s" })).deferredToolCalls).toEqual(["c2"]);
   });
 
   it("rejects invalid cursors and Session paths", async () => {
@@ -273,4 +292,22 @@ it("makes bounded progress through an oversized turn and keeps delta cursors exa
   expect(older.window.events.map(event => event.seq)).toEqual([1]);
   const delta = await controller.readProjection({ sessionId: "s", afterSeq: 0 });
   expect(delta.window.events.map(event => event.seq)).toEqual([1, 2]);
+});
+
+it("fits a window to its byte and event budgets exactly and always returns at least one event", async () => {
+  const f = await fixture(25);
+  f.journal.append({ type: "turn/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: "open" }, surface: null });
+  f.journal.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "big", content: "x".repeat(5_000) }, surface: { kind: "append" } });
+  await appendFile(f.path, f.journal.events.slice(-2).map(event => JSON.stringify(event)).join("\n") + "\n");
+  const controller = f.controller();
+  const read = async (caps: { maxWindowBytes?: number; maxWindowEvents?: number }) => (await controller.readProjection({ sessionId: "s", afterSeq: -1, ...caps })).window.events;
+  const whole = await read({});
+  const bytes = JSON.stringify(whole).length;
+  expect(whole).toHaveLength(77);
+  expect(await read({ maxWindowBytes: bytes })).toEqual(whole);
+  expect(await read({ maxWindowBytes: bytes - 1 })).toEqual(whole.slice(1));
+  expect(await read({ maxWindowEvents: 76 })).toEqual(whole.slice(1));
+  // The last event alone is over the smallest budget; a reader still gets it and can move on.
+  expect(JSON.stringify(whole.slice(-1)).length).toBeGreaterThan(4_096);
+  expect(await read({ maxWindowBytes: 4_096 })).toEqual(whole.slice(-1));
 });

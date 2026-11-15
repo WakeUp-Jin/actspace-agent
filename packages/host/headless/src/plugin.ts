@@ -1,16 +1,16 @@
-import type { CordisContext } from "@actspace/cordis-adapter";
-import { HEADLESS_HOST_PORT_ID, HeadlessRunner, type DisabledHeadlessHostPort, type HeadlessHostPort, type HeadlessSessionService } from "./runner.js";
+import { getService, provideService, type CordisContext } from "@actspace/cordis-adapter";
+import { HEADLESS_AGENT_RUNTIME_VIEW, HEADLESS_HOST_PORT, HEADLESS_HOST_PORT_ID, HEADLESS_RUNNER_SERVICE, HEADLESS_SESSIONS_VIEW, HeadlessRunner } from "./runner.js";
 
 
 export const inject = Object.freeze([HEADLESS_HOST_PORT_ID, "session.runtime", "agent.runtime"]);
 
 export function apply(ctx: CordisContext): void {
-  const host = ctx.get?.(HEADLESS_HOST_PORT_ID) as HeadlessHostPort | DisabledHeadlessHostPort | undefined;
+  const host = getService(ctx, HEADLESS_HOST_PORT);
   if (host === undefined || host.enabled === false) return;
-  const sessions = ctx.get?.("session.runtime") as HeadlessSessionService | undefined;
-  const agents = (ctx.get?.("agent.runtime") as { runs: ConstructorParameters<typeof HeadlessRunner>[0]["agents"] } | undefined)?.runs;
+  const sessions = getService(ctx, HEADLESS_SESSIONS_VIEW);
+  const agents = getService(ctx, HEADLESS_AGENT_RUNTIME_VIEW)?.runs;
   if (sessions === undefined) throw new Error("Headless runner requires session.runtime.");
   if (agents === undefined) throw new Error("Headless runner requires agent.runtime.");
   const runner = new HeadlessRunner({ host, sessions, agents, context: ctx });
-  ctx.provide?.("headless.runner", runner);
+  provideService(ctx, HEADLESS_RUNNER_SERVICE, runner);
 }

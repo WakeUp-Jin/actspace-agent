@@ -1,5 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join, resolve, relative, isAbsolute } from "node:path";
+import * as nodePath from "node:path";
+import { join, resolve } from "node:path";
+import { isLexicallyInside } from "@actspace/shared";
 
 export interface WriteArtifactsInput {
   outDir: string;
@@ -33,8 +35,7 @@ async function writeJsonWithin(root: string, relativePath: string, value: unknow
 
 async function writeFileWithin(root: string, relativePath: string, content: string): Promise<void> {
   const target = resolve(root, relativePath);
-  const rel = relative(root, target);
-  if (rel.startsWith("..") || isAbsolute(rel)) {
+  if (!isLexicallyInside(nodePath, root, target, { includeRoot: true })) {
     throw new Error(`Artifact path escapes output directory: ${relativePath}`);
   }
   await writeFile(target, content, "utf8");

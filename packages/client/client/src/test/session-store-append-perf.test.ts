@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ClientSessionStore } from "../sessions/session.js";
-import type { RuntimeV2SessionSnapshot, RuntimeV2SessionUpdate } from "@actspace/shared/runtime-v2";
+import type { RuntimeSessionSnapshot, RuntimeSessionUpdate } from "@actspace/shared/runtime-v2";
 
-function snapshot(sessionId: string, throughJournalSeq: number): RuntimeV2SessionSnapshot {
+function snapshot(sessionId: string, throughJournalSeq: number): RuntimeSessionSnapshot {
   return {
     kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-08-30T00:00:00.000Z", updatedAt: "2026-08-30T00:00:00.000Z", workspaceRoot: null, throughJournalSeq, permissionMode: "default", accessState: "read-write",
     metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null }, activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } }, lineage: null,
@@ -14,13 +14,13 @@ function event(seq: number, type = "assistant/chunk") {
 }
 
 /** A Session whose window already holds `size` journal events (no compaction/recovery boundary among them, the worst case for a reverse scan). */
-function seeded(size: number): { store: ClientSessionStore; next: () => RuntimeV2SessionUpdate; seq: () => number } {
+function seeded(size: number): { store: ClientSessionStore; next: () => RuntimeSessionUpdate; seq: () => number } {
   const store = new ClientSessionStore();
   const through = size - 1;
   const events = Array.from({ length: size }, (_, index) => event(index));
   store.applyEnvelope({ kind: "session-projection", schemaVersion: 1, sessionId: "s", throughJournalSeq: through, snapshot: snapshot("s", through), values: {}, activeMessageIds: [], deferredToolCalls: [], window: { events, fromSeq: 0, throughJournalSeq: through, beforeSeq: null, turnOffset: 0, requestOffset: 0 } } as never);
   let seq = size;
-  return { store, seq: () => seq, next: () => ({ sessionId: "s", throughJournalSeq: seq, values: {}, event: event(seq++) }) as RuntimeV2SessionUpdate };
+  return { store, seq: () => seq, next: () => ({ sessionId: "s", throughJournalSeq: seq, values: {}, event: event(seq++) }) as RuntimeSessionUpdate };
 }
 
 /** Median per-event apply time (microseconds) over repeated batches. */

@@ -10,4 +10,5 @@ export * from "./errors.js";
 export * from "./inbox.js";
 export * from "./publication.js";
 export * from "./registry.js";
+export * from "./service-keys.js";
 export * from "./termination.js";

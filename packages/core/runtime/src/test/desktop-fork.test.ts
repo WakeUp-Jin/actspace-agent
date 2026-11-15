@@ -15,7 +15,7 @@ it("owns a Chat fork before first send, publishes changes and releases its write
   const sessions = new RuntimeSessionController({ dataRoot: root, runtimeId: "fork-test", registry: createCoreCodecRegistry(), profileId: "test", manifestDigest: "test", plugins: [] }, new SessionStore({ registry: createCoreCodecRegistry() }, new JsonlSessionStorage({ dataRoot: root, runtimeId: "fork-test", registry: createCoreCodecRegistry() })));
   const attached = new Map<string, SessionHandle>();
   const runs = {
-    inspectCapability: (_name: string, inspect: (service: { hasRunningBackgroundTask: (sessionId: string) => boolean }) => unknown) => inspect({ hasRunningBackgroundTask: sessionId => sessionId === "parent" && backgroundRunning }),
+    inspectCapability: (_key: { readonly id: string }, inspect: (service: { hasRunningBackgroundTask: (sessionId: string) => boolean }) => unknown) => inspect({ hasRunningBackgroundTask: sessionId => sessionId === "parent" && backgroundRunning }),
     configuration: () => ({}),
     service: { exclusive: async (_id: string, operation: () => Promise<unknown>) => operation(), submit: async (sessionId: string) => {
       const session = attached.get(sessionId)!;

@@ -1,18 +1,18 @@
-import type { RuntimeV2TodoItem } from "./projection";
+import type { RuntimeTodoItem } from "./projection";
 
-export type RuntimeV2TodoWriteItem = Readonly<Record<string, unknown>>;
+export type RuntimeTodoWriteItem = Readonly<Record<string, unknown>>;
 
 /**
  * Canonical Journal fold for plugin/actspace.todo/todo-write. Writes are item deltas, even when a
  * single event contains many items. The item revision is the only ordering
  * signal; the event-level revision is intentionally ignored.
  */
-export function mergeRuntimeV2TodoItems(
-  previous: readonly RuntimeV2TodoItem[],
-  rawItems: readonly RuntimeV2TodoWriteItem[],
+export function mergeRuntimeTodoItems(
+  previous: readonly RuntimeTodoItem[],
+  rawItems: readonly RuntimeTodoWriteItem[],
   redact: (value: string, limit?: number) => string = value => value,
   eventTime?: string,
-): readonly RuntimeV2TodoItem[] {
+): readonly RuntimeTodoItem[] {
   const items = new Map(previous.map(item => [item.todoId, item] as const));
   for (const raw of rawItems) {
     const todoId = stringValue(raw.todoId) ?? stringValue(raw.id);
@@ -46,6 +46,6 @@ function integerValue(value: unknown): number | null {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
-function todoState(value: unknown): RuntimeV2TodoItem["state"] | undefined {
+function todoState(value: unknown): RuntimeTodoItem["state"] | undefined {
   return value === "pending" || value === "in_progress" || value === "completed" || value === "cancelled" ? value : undefined;
 }

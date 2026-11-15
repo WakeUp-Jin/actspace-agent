@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 
 export type LlmMessage = {
   readonly role: "system" | "user" | "assistant" | "tool";
@@ -12,7 +12,7 @@ export type LlmReplayEnvelope = {
   readonly providerId: string;
   readonly protocol: string;
   readonly modelId: string;
-  readonly payload: RuntimeV2JsonValue;
+  readonly payload: RuntimeJsonValue;
 };
 
 export type LlmContentBlock =
@@ -27,7 +27,7 @@ export type LlmToolDefinition = {
   readonly definitionVersion: number;
   readonly definitionDigest: string;
   readonly description: string;
-  readonly inputSchema: RuntimeV2JsonValue;
+  readonly inputSchema: RuntimeJsonValue;
 };
 
 export type LlmRequestOptions = {
@@ -37,5 +37,5 @@ export type LlmRequestOptions = {
   readonly maxTokens?: number;
   readonly reasoning?: boolean;
   readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort;
-  readonly responseFormat?: RuntimeV2JsonValue;
+  readonly responseFormat?: RuntimeJsonValue;
 };

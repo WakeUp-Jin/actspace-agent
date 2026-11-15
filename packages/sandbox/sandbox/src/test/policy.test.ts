@@ -38,6 +38,16 @@ describe("sandbox policy", () => {
     expect(await resolvePolicy(request({ purpose: "evaluation" }), undefined)).toEqual({ ok: false, reasons: ['No sandbox template for purpose "evaluation".'] });
   });
 
+  it("treats a name that merely starts with two dots as inside its parent", async () => {
+    // 可写目录里面有一个禁止读取的 `..secrets`，两者重叠，要拒绝。
+    const overlapping = await resolvePolicy(request({ filesystem: { readWrite: ["/work"], denyRead: ["/work/..secrets"] } }), template);
+    expect(overlapping).toEqual({ ok: false, reasons: ["Writable path /work overlaps denied read path /work/..secrets."] });
+    // 模板只允许读 /data 时，/data/..cache 在里面，/data/../etc 不在。
+    const narrow = { ...template, read: { mode: "only" as const, paths: ["/data"] } };
+    expect(await resolvePolicy(request({ filesystem: { readWrite: ["/work"], read: { mode: "only", paths: ["/data/..cache"] } } }), narrow)).toMatchObject({ ok: true });
+    expect(await resolvePolicy(request({ filesystem: { readWrite: ["/work"], read: { mode: "only", paths: ["/data/../etc"] } } }), narrow)).toEqual({ ok: false, reasons: [expect.stringContaining("Read access is wider")] });
+  });
+
   it("fingerprints limits only, stably", async () => {
     const a = await resolvePolicy(request(), template);
     const b = await resolvePolicy(request({ argv: ["/bin/sh", "-c", "other"], env: { B: "2" }, filesystem: { readWrite: ["/scratch", "/work"] } }), template);

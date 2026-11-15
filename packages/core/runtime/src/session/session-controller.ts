@@ -1,12 +1,12 @@
-import { GlobalSessionIndex, SessionProjectionCache, type ProjectionCacheRead } from "@actspace/session-projection-cache";
-import type { RuntimeV2DesktopSessionProjection, RuntimeV2SessionProjectionInput, RuntimeV2SessionUpdate, RuntimeV2ProjectionValues, RuntimeV2JsonValue, RuntimeV2SessionObservation, RuntimeV2ReadModelWatermarks, RuntimeV2WindowSupportFact } from "@actspace/shared/runtime-v2";
+import { GlobalSessionIndex, SessionProjectionCache, createHistoryIndex, indexHistoryEvent, indexHistoryEvents, type HistoryIndex, type ProjectionCacheRead } from "@actspace/session-projection-cache";
+import type { RuntimeDesktopSessionProjection, RuntimeSessionProjectionInput, RuntimeSessionUpdate, RuntimeProjectionValues, RuntimeJsonValue, RuntimeSessionObservation, RuntimeReadModelWatermarks, RuntimeWindowSupportFact } from "@actspace/shared/runtime-v2";
 import { randomUUID } from "node:crypto";
 import { agentFormComposition } from "@actspace/agent";
 import { MAIN_AGENT_FORM } from "../main-agent-form.js";
-import type { RuntimeV2SessionListItem, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeSessionListItem, RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
 import type { MainAgentForm } from "@actspace/shared/runtime-v2";
-import { surfaceNode } from "@actspace/shared/runtime-v2";
-import type { EventCodecRegistry } from "@actspace/session-journal";
+import { coreEvent, surfaceNode } from "@actspace/shared/runtime-v2";
+import type { EventCodecRegistry, SessionJournal } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { SessionHandle as RuntimeSessionHandle } from "@actspace/session-persistence";
 import { createSessionHeader } from "@actspace/session-journal";
@@ -24,8 +24,10 @@ export class RuntimeSessionController {
   readonly #external = new Map<string, SessionHandle>();
   readonly #ephemeral = new Set<string>();
   readonly #models = new Map<string, SessionReadModel>();
-  readonly #changes = new Map<string, Map<number, RuntimeV2ProjectionValues>>();
-  readonly #projectionListeners = new Set<(update: RuntimeV2SessionUpdate) => void>();
+  /** 打开中的会话的位置索引（见 `liveIndex`），按日志对象存：重写或重新打开后的会话是另一份日志，旧索引跟着旧日志一起回收。 */
+  readonly #liveIndexes = new WeakMap<SessionJournal, { readonly index: HistoryIndex; through: number }>();
+  readonly #changes = new Map<string, Map<number, RuntimeProjectionValues>>();
+  readonly #projectionListeners = new Set<(update: RuntimeSessionUpdate) => void>();
   /** Recency of open Sessions, oldest first; a touch moves a Session to the end. */
   readonly #recent = new Map<string, true>();
   readonly #pins = new Set<(sessionId: string) => boolean>();
@@ -38,12 +40,12 @@ export class RuntimeSessionController {
   #sweepQueued = false;
   #disposed = false;
   readonly #cache: SessionProjectionCache;
-  readonly #coldModels = new WeakMap<ProjectionCacheRead, { readonly model: SessionReadModel; readonly snapshot: RuntimeV2SessionSnapshot }>();
+  readonly #coldModels = new WeakMap<ProjectionCacheRead, { readonly model: SessionReadModel; readonly snapshot: RuntimeSessionSnapshot }>();
   readonly #globalIndex: GlobalSessionIndex;
   #globalIndexBuild: Promise<void> | undefined;
   #globalIndexReady = false;
 
-  subscribeProjection(listener: (update: RuntimeV2SessionUpdate) => void): () => void { this.#projectionListeners.add(listener); return () => { this.#projectionListeners.delete(listener); }; }
+  subscribeProjection(listener: (update: RuntimeSessionUpdate) => void): () => void { this.#projectionListeners.add(listener); return () => { this.#projectionListeners.delete(listener); }; }
 
   /**
    * 内存里正在写的会话：主会话（`#open`）或外部登记的子 Agent 会话（`#external`）。
@@ -53,7 +55,18 @@ export class RuntimeSessionController {
 
   private liveModel(session: SessionHandle): SessionReadModel {
     let model = this.#models.get(session.header.sessionId);
-    if (!model) { model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService).replay(session.journal.readEvents()); this.#models.set(session.header.sessionId, model); return model; }
+    if (!model) {
+      const events = session.journal.readEvents();
+      model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService).replay(events);
+      this.#models.set(session.header.sessionId, model);
+      // 位置索引用同一份事件建好，不为它再读一遍日志。
+      if (!this.#liveIndexes.has(session.journal)) {
+        const index = createHistoryIndex();
+        indexHistoryEvents(events, index);
+        this.#liveIndexes.set(session.journal, { index, through: events.at(-1)?.seq ?? -1 });
+      }
+      return model;
+    }
     const seq = model.projections.throughSeq(session.header.sessionId);
     // `#changes` 留给 onEvent 推送时取用；子 Agent 会话的事件不经过这里的 onEvent，记下来只会越攒越多。
     const pushes = this.#open.get(session.header.sessionId) === session;
@@ -66,7 +79,18 @@ export class RuntimeSessionController {
     return model;
   }
 
-  private async readModel(sessionId: string): Promise<{ model: SessionReadModel; snapshot: RuntimeV2SessionSnapshot; read?: ProjectionCacheRead }> {
+  /**
+   * 打开中的会话的位置索引：轮次、请求、提示词与工具记录、每次工具调用各在日志的哪些 seq。
+   * 就地追加，每次只折叠上次之后新写入的事件；进度逐条记，中途读失败后重来不会重复折叠。
+   */
+  private liveIndex(session: SessionHandle): HistoryIndex {
+    let entry = this.#liveIndexes.get(session.journal);
+    if (!entry) { entry = { index: createHistoryIndex(), through: -1 }; this.#liveIndexes.set(session.journal, entry); }
+    for (const event of session.journal.iterateEvents(entry.through + 1)) { indexHistoryEvent(entry.index, event); entry.through = event.seq; }
+    return entry.index;
+  }
+
+  private async readModel(sessionId: string): Promise<{ model: SessionReadModel; snapshot: RuntimeSessionSnapshot; read?: ProjectionCacheRead }> {
     const live = this.liveSession(sessionId);
     if (live) { const model = this.liveModel(live); return { model, snapshot: model.snapshot(live.journal.validation.accessState) }; }
     const read = await this.#cache.read(sessionId);
@@ -82,14 +106,14 @@ export class RuntimeSessionController {
   }
 
   /** Summaries are disposable; each controller rebuilds them from its selected storage. */
-  private async repairGlobalIndex(snapshot: RuntimeV2SessionSnapshot, profileId: string): Promise<void> {
+  private async repairGlobalIndex(snapshot: RuntimeSessionSnapshot, profileId: string): Promise<void> {
     if (!this.#globalIndexReady) return;
     const indexed = this.#globalIndex.get(snapshot.sessionId);
     if (indexed !== undefined && indexed.throughJournalSeq >= snapshot.throughJournalSeq) return;
     this.#globalIndex.replace(this.summary(snapshot, profileId));
   }
 
-  private summary(snapshot: RuntimeV2SessionSnapshot, profileId: string): import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary {
+  private summary(snapshot: RuntimeSessionSnapshot, profileId: string): import("@actspace/shared/runtime-v2").RuntimeGlobalSessionSummary {
     return { sessionId: snapshot.sessionId, throughJournalSeq: snapshot.throughJournalSeq, summaryVersion: 2, createdAt: snapshot.createdAt, updatedAt: snapshot.updatedAt, workspaceRoot: snapshot.workspaceRoot, ...(snapshot.worktree ? { worktree: snapshot.worktree } : {}), profileId, agentForm: snapshot.agentForm, agentFormId: snapshot.agentFormId, agentMode: snapshot.agentMode, agentModeRevision: snapshot.agentModeRevision, title: snapshot.metadata.title, pinned: snapshot.metadata.pinned, archived: snapshot.metadata.archived, completedTurnCount: snapshot.activity.completedTurnCount, usage: snapshot.usage, accessState: snapshot.accessState, lineage: snapshot.lineage };
   }
 
@@ -97,7 +121,7 @@ export class RuntimeSessionController {
     if (this.#globalIndexReady) return;
     if (this.#globalIndexBuild) return this.#globalIndexBuild;
     this.#globalIndexBuild = (async () => {
-      const summaries = [] as import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[];
+      const summaries = [] as import("@actspace/shared/runtime-v2").RuntimeGlobalSessionSummary[];
         for (const sessionId of await this.store.listSessionIds()) {
           try { const { snapshot, model } = await this.readModel(sessionId); summaries.push(this.summary(snapshot, model.header.createdWith.profileId)); }
           catch { /* corrupt sessions remain visible through the failed count */ }
@@ -108,64 +132,76 @@ export class RuntimeSessionController {
     return this.#globalIndexBuild;
   }
 
-  async readProjection(input: RuntimeV2SessionProjectionInput): Promise<RuntimeV2DesktopSessionProjection> {
+  async readProjection(input: RuntimeSessionProjectionInput): Promise<RuntimeDesktopSessionProjection> {
     const source = await this.readModel(input.sessionId);
     const { model, snapshot, read } = source;
     const live = this.liveSession(input.sessionId);
-    const boundaries = live?.journal.project(HISTORY_BOUNDARIES, () => ({ floor: 0, starts: [] as number[], requests: [] as number[], prompts: [] as number[], toolSets: [] as number[] }), (state, event) => {
-      if (event.type === "turn/start") return { ...state, starts: [...state.starts, state.floor] };
-      if (event.type === "turn/end") return { ...state, floor: event.seq + 1 };
-      if (event.type === "request/header" || event.type === "llm/auxiliary-start") return { ...state, requests: [...state.requests, event.seq] };
-      if (event.type === "request/system-prompt") return { ...state, prompts: [...state.prompts, event.seq] };
-      if (event.type === "request/tools") return { ...state, toolSets: [...state.toolSets, event.seq] };
-      return state;
-    });
+    // 轮次、请求、提示词与工具记录各在哪些 seq：冷会话用缓存建好的索引，打开中的会话用就地维护的那份。
+    const { starts, requests, prompts, toolSets } = read ?? (live ? this.liveIndex(live) : createHistoryIndex());
     const end = snapshot.throughJournalSeq + 1;
-    const starts = read?.starts ?? boundaries?.starts ?? [];
-    const requestSeqs = read?.requests ?? boundaries?.requests ?? [];
     const before = input.beforeSeq ?? end;
     if (!Number.isSafeInteger(before) || before < 0 || before > end || (input.afterSeq !== undefined && (!Number.isSafeInteger(input.afterSeq) || input.afterSeq < -1 || input.afterSeq >= end))) throw new Error("Invalid history cursor.");
-    const candidates = starts.filter(seq => seq < before);
-    const from = input.afterSeq !== undefined ? input.afterSeq + 1 : candidates.length <= HISTORY_PAGE_TURNS ? 0 : candidates[candidates.length - HISTORY_PAGE_TURNS];
+    const turnsBefore = countBelow(starts, before);
+    const from = input.afterSeq !== undefined ? input.afterSeq + 1 : turnsBefore <= HISTORY_PAGE_TURNS ? 0 : starts[turnsBefore - HISTORY_PAGE_TURNS];
     const until = input.afterSeq !== undefined ? end : before;
     let journal = live ? live.journal.readEvents(from, until) : await this.#cache.events(read!, from, until);
     if (input.afterSeq === undefined && !input.includeToolDetails) journal = slimHistoryWindow(journal);
     const maxEvents = Math.max(1, Math.min(input.maxWindowEvents ?? 2_000, 2_000));
     const maxBytes = Math.max(4_096, Math.min(input.maxWindowBytes ?? 2_000_000, 2_000_000));
-    // 与 JSON.stringify(journal).length 等价的累计字节数（元素长度 + 逗号 + 方括号），从头部逐条裁剪，避免每轮重新序列化。
-    const sizes = journal.map(event => JSON.stringify(event).length);
-    let bytes = sizes.reduce((sum, size) => sum + size, 0) + journal.length + 1;
-    let trimmed = 0;
-    while (journal.length - trimmed > 1 && (journal.length - trimmed > maxEvents || bytes > maxBytes)) {
-      bytes -= sizes[trimmed] + 1;
-      trimmed += 1;
+    // 每条事件最多序列化一次，大小记下来，后面判断工具详情要不要延后时接着用。
+    const sizes = new Map<SessionEventEnvelopeV1, number>();
+    const sizeOf = (event: SessionEventEnvelopeV1): number => {
+      let size = sizes.get(event);
+      if (size === undefined) { size = JSON.stringify(event).length; sizes.set(event, size); }
+      return size;
+    };
+    // 窗口超出预算时裁掉头部。从尾部往前量，量到装不下为止，裁掉的那些不用序列化；至少留一条。
+    // `bytes` 与 JSON.stringify(留下的事件).length 等价（元素长度 + 逗号 + 方括号）。
+    let bytes = 1;
+    let trimmed = journal.length;
+    while (trimmed > 0 && journal.length - trimmed < maxEvents) {
+      const next = bytes + sizeOf(journal[trimmed - 1]) + 1;
+      if (next > maxBytes && trimmed < journal.length) break;
+      bytes = next;
+      trimmed -= 1;
     }
     if (trimmed > 0 && input.afterSeq === undefined) {
       // Start a history page at the next whole turn when one fits the budget.
       // The cursor retains the omitted fragment for the preceding page. A single
       // oversized turn still makes bounded progress instead of returning empty.
-      const nextStart = starts.find(seq => seq >= journal[trimmed].seq && seq < until);
-      const aligned = nextStart === undefined ? -1 : journal.findIndex(event => event.seq >= nextStart);
-      if (aligned >= trimmed) trimmed = aligned;
+      const nextStart = starts[countBelow(starts, journal[trimmed].seq)];
+      if (nextStart !== undefined && nextStart < until) {
+        let aligned = trimmed;
+        while (aligned < journal.length && journal[aligned].seq < nextStart) aligned += 1;
+        if (aligned < journal.length) trimmed = aligned;
+      }
     }
     if (trimmed > 0) journal = journal.slice(trimmed);
     const windowFrom = journal[0]?.seq ?? until;
+    // 打开中的会话的索引会就地增长，下面还有 await：两个偏移现在就算好，不让中途写入的新一轮挪动它们。
+    const turnOffset = countBelow(starts, windowFrom);
+    const requestOffset = countBelow(requests, windowFrom);
     // 提示词与工具定义只在变化时记一次（agent-spec-request-record.md §4.3）。窗口不从头开始时，补上起点之前最近的一条，
     // 让窗口内每次请求都能找到自己生效的提示词与工具；它们不计入窗口的事件数/字节预算。
-    const carried = [latestBefore(read?.prompts ?? boundaries?.prompts ?? [], windowFrom), latestBefore(read?.toolSets ?? boundaries?.toolSets ?? [], windowFrom)].filter((seq): seq is number => seq !== null).sort((a, b) => a - b);
+    const carried = [latestBefore(prompts, windowFrom), latestBefore(toolSets, windowFrom)].filter((seq): seq is number => seq !== null).sort((a, b) => a - b);
     if (carried.length > 0) {
       const records = (await Promise.all(carried.map(seq => live ? live.journal.readEvents(seq, seq + 1) : this.#cache.events(read!, seq, seq + 1)))).flat();
       journal = [...records, ...journal];
     }
-    const messageIds = new Set(journal.flatMap(event => { const node = surfaceNode(event); return node ? [node.messageId] : []; }));
-    const callIds = new Set(journal.flatMap(event => {
-      const data = eventData(event);
-      return data && typeof data.callId === "string" ? [data.callId] : [];
-    }));
-    const deferredToolCalls = input.includeToolDetails ? [] : [...callIds].filter(callId => journal.some(event => {
-      const data = eventData(event);
-      return data?.callId === callId && JSON.stringify(event).length > DEFERRED_DETAIL_BYTES;
-    }));
+    // 窗口只扫一遍：对话里出现的消息、每次工具调用的事件 seq、哪些调用带着超过延后阈值的事件。
+    const messageIds = new Set<string>();
+    const calls = new Map<string, { readonly eventSeqs: number[]; oversized: boolean }>();
+    for (const event of journal) {
+      const node = surfaceNode(event);
+      if (node) messageIds.add(node.messageId);
+      const callId = eventData(event)?.callId;
+      if (typeof callId !== "string") continue;
+      let call = calls.get(callId);
+      if (!call) { call = { eventSeqs: [], oversized: false }; calls.set(callId, call); }
+      call.eventSeqs.push(event.seq);
+      if (!input.includeToolDetails && !call.oversized && sizeOf(event) > DEFERRED_DETAIL_BYTES) call.oversized = true;
+    }
+    const deferredToolCalls = [...calls].flatMap(([callId, call]) => call.oversized ? [callId] : []);
     const deferred = new Set(deferredToolCalls);
     const boundedJournal = journal.map(event => {
       const data = eventData(event);
@@ -173,21 +209,21 @@ export class RuntimeSessionController {
     });
     const windowSnapshot = { ...snapshot,
       messages: snapshot.messages.filter(message => messageIds.has(message.messageId)).map(message => message.kind === "tool-result" && message.callId && deferred.has(message.callId) ? { ...message, content: "" } : message),
-      tools: snapshot.tools.filter(tool => callIds.has(tool.callId)).map(tool => deferred.has(tool.callId) ? { ...tool, modelOutput: null, detail: [] } : tool),
+      tools: snapshot.tools.filter(tool => calls.has(tool.callId)).map(tool => deferred.has(tool.callId) ? { ...tool, modelOutput: null, detail: [] } : tool),
     };
     const projectionValues = model.projections.snapshot(input.sessionId).values;
     const values = publicValues(projectionValues);
-    const support: RuntimeV2WindowSupportFact[] = [];
+    const support: RuntimeWindowSupportFact[] = [];
     const surface = projectionValues.surface;
     if (surface && typeof surface === "object" && !Array.isArray(surface) && typeof (surface as Record<string, unknown>).replaceGeneration === "number") support.push({ kind: "surface", replaceGeneration: (surface as Record<string, number>).replaceGeneration });
-    for (const callId of callIds) support.push({ kind: "tool-call", callId, eventSeqs: journal.filter(event => eventData(event)?.callId === callId).map(event => event.seq) });
+    for (const [callId, call] of calls) support.push({ kind: "tool-call", callId, eventSeqs: call.eventSeqs });
     return { kind: "session-projection", schemaVersion: 1, sessionId: input.sessionId, throughJournalSeq: snapshot.throughJournalSeq,
       snapshot: windowSnapshot, values, activeMessageIds: snapshot.messages.map(message => message.messageId), deferredToolCalls,
       watermarks: watermarksFor(live, snapshot.throughJournalSeq, until - 1),
-      window: { events: boundedJournal, fromSeq: windowFrom, throughJournalSeq: until - 1, beforeSeq: windowFrom > 0 ? windowFrom : null, turnOffset: starts.filter(seq => seq < windowFrom).length, requestOffset: requestSeqs.filter(seq => seq < windowFrom).length, support, deferredDetails: deferredToolCalls.map(callId => ({ sessionId: input.sessionId, callId, kind: "tool" as const })) } };
+      window: { events: boundedJournal, fromSeq: windowFrom, throughJournalSeq: until - 1, beforeSeq: windowFrom > 0 ? windowFrom : null, turnOffset, requestOffset, support, deferredDetails: deferredToolCalls.map(callId => ({ sessionId: input.sessionId, callId, kind: "tool" as const })) } };
   }
 
-  async readObservation(input: RuntimeV2SessionProjectionInput): Promise<RuntimeV2SessionObservation> {
+  async readObservation(input: RuntimeSessionProjectionInput): Promise<RuntimeSessionObservation> {
     const envelope = await this.readProjection(input);
     const projection = Object.freeze({ kind: "session-projection" as const, schemaVersion: 1 as const, sessionId: envelope.sessionId, throughJournalSeq: envelope.throughJournalSeq, values: envelope.values });
     return Object.freeze({ kind: "session-observation" as const, schemaVersion: 1 as const, sessionId: envelope.sessionId, projection, snapshot: envelope.snapshot, window: envelope.window, activeMessageIds: envelope.activeMessageIds, deferredToolCalls: envelope.deferredToolCalls, watermarks: envelope.watermarks ?? watermarksFor(this.#open.get(input.sessionId), envelope.throughJournalSeq, envelope.window.throughJournalSeq) });
@@ -198,7 +234,9 @@ export class RuntimeSessionController {
     const tool = source.snapshot.tools.find(item => item.callId === callId);
     if (!tool) throw new Error("Tool detail is unavailable.");
     const sequences = source.read?.calls[callId];
-    const journal = sequences ? (await Promise.all(sequences.map(seq => this.#cache.events(source.read!, seq, seq + 1)))).flat() : (this.liveSession(sessionId)?.journal.readEvents() ?? []).filter(event => event.data && typeof event.data === "object" && !Array.isArray(event.data) && (event.data as Record<string, unknown>).callId === callId);
+    const live = sequences ? undefined : this.liveSession(sessionId);
+    // 打开中的会话按索引只读这次调用自己的事件，不把整份日志读出来再按 callId 过滤。
+    const journal = sequences ? (await Promise.all(sequences.map(seq => this.#cache.events(source.read!, seq, seq + 1)))).flat() : live ? eventsAt(live.journal, this.liveIndex(live).calls[callId] ?? []) : [];
     return { snapshot: { ...source.snapshot, tools: [tool] }, journal, history: { before: null, throughJournalSeq: source.snapshot.throughJournalSeq } };
   }
 
@@ -211,7 +249,7 @@ export class RuntimeSessionController {
         try { await this.readModel(id); } catch { /* Keep unreadable sessions in the failed count; retry on the next browse. */ }
       }
     }
-    const items: RuntimeV2SessionListItem[] = this.#globalIndex.values().map(summary => ({ sessionId: summary.sessionId, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, ...(summary.worktree ? { worktree: summary.worktree } : {}), profileId: summary.profileId, agentForm: summary.agentForm ?? "agent", agentFormId: summary.agentFormId, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, accessState: summary.accessState, metadata: { title: summary.title, pinned: summary.pinned, archived: summary.archived }, lineage: summary.lineage, completedTurnCount: summary.completedTurnCount }));
+    const items: RuntimeSessionListItem[] = this.#globalIndex.values().map(summary => ({ sessionId: summary.sessionId, createdAt: summary.createdAt, updatedAt: summary.updatedAt, workspaceRoot: summary.workspaceRoot, ...(summary.worktree ? { worktree: summary.worktree } : {}), profileId: summary.profileId, agentForm: summary.agentForm ?? "agent", agentFormId: summary.agentFormId, agentMode: summary.agentMode, agentModeRevision: summary.agentModeRevision, accessState: summary.accessState, metadata: { title: summary.title, pinned: summary.pinned, archived: summary.archived }, lineage: summary.lineage, completedTurnCount: summary.completedTurnCount }));
     const known = new Set(items.map(item => item.sessionId));
     const failed = ids.filter(sessionId => !known.has(sessionId)).length;
     items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
@@ -252,7 +290,7 @@ export class RuntimeSessionController {
     const physical = live?.durabilityState === "healthy" && source.appendOnlyToken ? `owned:${source.appendOnlyToken}` : source.stamp;
     return { ...source, throughSeq, codecSetDigest: digest, stamp: `${physical}:${throughSeq}:${digest}` };
   }
-  async globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]> { await this.ensureGlobalIndex(); return this.#globalIndex.values(); }
+  async globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeGlobalSessionSummary[]> { await this.ensureGlobalIndex(); return this.#globalIndex.values(); }
   constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; projectionService?: SessionProjectionService; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void>; maxIdleSessions?: number }, store: SessionStore) { this.store = store; this.#cache = new SessionProjectionCache({ storage: store.storage, codecs: options.registry, createRegistry: header => new SessionReadModel(header, options.registry, options.rendererAllowlist, options.projectionService).projections }); this.#globalIndex = new GlobalSessionIndex(); }
   private onEvent(sessionId: string): (event: SessionEventEnvelopeV1) => void | Promise<void> {
     return event => {
@@ -263,7 +301,7 @@ export class RuntimeSessionController {
         const values = this.#changes.get(sessionId)?.get(event.seq) ?? change?.values ?? {};
         this.#changes.get(sessionId)?.delete(event.seq);
         const callId = event.data && typeof event.data === "object" && !Array.isArray(event.data) ? (event.data as Record<string, unknown>).callId : undefined;
-        const tool = (values.tools as RuntimeV2SessionSnapshot["tools"] | undefined)?.find(item => item.callId === callId);
+        const tool = (values.tools as RuntimeSessionSnapshot["tools"] | undefined)?.find(item => item.callId === callId);
         const update = { sessionId, throughJournalSeq: event.seq, event, values: publicValues(values), ...(tool ? { tool } : {}) };
         for (const listener of this.#projectionListeners) { try { listener(update); } catch { /* observers cannot block accepted facts */ } }
       }
@@ -283,7 +321,7 @@ export class RuntimeSessionController {
       }
   }; }
   /** New headers describe this runtime; inherited events retain their original provenance. */
-  creationProvenance(mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode = "agent"): import("@actspace/session-journal").SessionCreatedWithV1 {
+  creationProvenance(mode: import("@actspace/shared/runtime-v2").RuntimeAgentMode = "agent"): import("@actspace/session-journal").SessionCreatedWithV1 {
     const composition = agentFormComposition(MAIN_AGENT_FORM, this.options.plugins);
     return {
       profileId: this.options.profileId,
@@ -444,10 +482,10 @@ export class RuntimeSessionController {
     this.#sweepQueued = true;
     queueMicrotask(() => { this.#sweepQueued = false; void this.sweep(); });
   }
-  snapshot(session: SessionHandle): RuntimeV2SessionSnapshot { return this.liveModel(session).snapshot(session.journal.validation.accessState); }
-  async inspect(sessionId: string): Promise<RuntimeV2SessionSnapshot> { return (await this.readModel(sessionId)).snapshot; }
+  snapshot(session: SessionHandle): RuntimeSessionSnapshot { return this.liveModel(session).snapshot(session.journal.validation.accessState); }
+  async inspect(sessionId: string): Promise<RuntimeSessionSnapshot> { return (await this.readModel(sessionId)).snapshot; }
   /** 只读一个投影值（例如 `contextEstimate`），不读日志窗口。 */
-  async projectionValue(sessionId: string, key: string): Promise<import("@actspace/shared/runtime-v2").RuntimeV2JsonValue | undefined> { return (await this.readModel(sessionId)).model.projections.value(sessionId, key); }
+  async projectionValue(sessionId: string, key: string): Promise<import("@actspace/shared/runtime-v2").RuntimeJsonValue | undefined> { return (await this.readModel(sessionId)).model.projections.value(sessionId, key); }
   async recoveryAccess(sessionId: string): Promise<SessionRecoveryAccess> { const open = this.#open.get(sessionId); if (open !== undefined) return open.durabilityState === "blocked" ? "read-only" : "read-write"; return classifySessionRecoveryAccess(await this.store.inspect(sessionId)); }
   async readEventBatch(sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput) {
     if (!this.store.storage.readEventBatch) throw new Error("Session provider does not support bounded query reads.");
@@ -477,7 +515,7 @@ export class RuntimeSessionController {
     for (let index = events.length - 1; index >= 0; index -= 1) if (events[index].type === type) return events[index];
     return undefined;
   }
-  async list(): Promise<readonly RuntimeV2SessionListItem[]> { return (await this.browseSessions()).items; }
+  async list(): Promise<readonly RuntimeSessionListItem[]> { return (await this.browseSessions()).items; }
   async export(sessionId: string): Promise<string> { const open = this.#open.get(sessionId); if (open !== undefined && this.#ephemeral.has(sessionId)) return [open.header, ...open.journal.readEvents()].map((record) => JSON.stringify(record)).join("\n") + "\n"; const inspection = await this.store.inspect(sessionId); if (inspection.header === null) throw new Error(`Session ${sessionId} has no header.`); return [inspection.header, ...inspection.events].map((record) => JSON.stringify(record)).join("\n") + "\n"; }
   openSessions(): readonly SessionHandle[] { return Object.freeze([...this.#open.values()]); }
   async flushAll(): Promise<void> { for (const session of this.#open.values()) await session.flush(); }
@@ -492,7 +530,7 @@ export class RuntimeSessionController {
     const closed = await Promise.allSettled(entries.map(async ([sessionId, session]) => {
       let error: unknown;
       try {
-        if (session.journal.eventsAfter(Math.max(-1, session.lastSeq - 1)).at(-1)?.type !== "session/end-seed") await session.append({ type: "session/end-seed", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { sessionId: session.header.sessionId, lastSeq: session.lastSeq }, surface: null });
+        if (session.journal.eventsAfter(Math.max(-1, session.lastSeq - 1)).at(-1)?.type !== "session/end-seed") await session.append(coreEvent("session/end-seed", { sessionId: session.header.sessionId, lastSeq: session.lastSeq }));
         await session.flush();
         // The Session already left #open, so onFlush cannot see the end-seed; record it here.
         if (!this.#ephemeral.has(sessionId) && this.#globalIndexReady) this.#globalIndex.replace(this.summary(this.snapshot(session), this.options.profileId));
@@ -556,14 +594,14 @@ export function slimHistoryWindow(journal: readonly SessionEventEnvelopeV1[]): S
 }
 
 // Match display text extraction without retaining bulky completed stream payloads.
-function hasChunkText(value: RuntimeV2JsonValue | undefined): boolean {
+function hasChunkText(value: RuntimeJsonValue | undefined): boolean {
   if (typeof value === "string") return value.length > 0;
   if (Array.isArray(value)) return value.some(hasChunkText);
   const record = jsonRecord(value);
   return record ? hasChunkText(record.text ?? record.content ?? record.value) : false;
 }
 
-function publicValues(values: RuntimeV2ProjectionValues): RuntimeV2ProjectionValues {
+function publicValues(values: RuntimeProjectionValues): RuntimeProjectionValues {
   return Object.fromEntries(Object.entries(values).filter(([key]) => !["surface", "tools", "updatedAt"].includes(key)));
 }
 
@@ -572,7 +610,7 @@ function boundToolEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {
   if (event.type === "llm/auxiliary-start" || event.type === "llm/auxiliary-end") return event;
   const data = eventData(event);
   if (!data) return event;
-  const bounded: Record<string, RuntimeV2JsonValue> = { deferredDetail: true };
+  const bounded: Record<string, RuntimeJsonValue> = { deferredDetail: true };
   for (const key of ["agentRunId", "turnId", "stepId", "requestId", "callId", "toolCallId", "pluginId", "name", "status", "phase"] as const) {
     const value = data[key];
     if (value !== undefined) bounded[key] = value;
@@ -583,20 +621,34 @@ function boundToolEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {
   // （这里同样清空了被延后的工具结果），窗口事件只用来定位，不拼节点（agent-spec-surface-derived.md §6）。
   return { ...event, data: bounded };
 }
-function jsonRecord(value: RuntimeV2JsonValue | undefined): Readonly<Record<string, RuntimeV2JsonValue>> | null {
-  return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : null;
+function jsonRecord(value: RuntimeJsonValue | undefined): Readonly<Record<string, RuntimeJsonValue>> | null {
+  return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : null;
 }
-function eventData(event: SessionEventEnvelopeV1): Readonly<Record<string, RuntimeV2JsonValue>> | null {
-  return event.data !== null && typeof event.data === "object" && !Array.isArray(event.data) ? event.data as Readonly<Record<string, RuntimeV2JsonValue>> : null;
+function eventData(event: SessionEventEnvelopeV1): Readonly<Record<string, RuntimeJsonValue>> | null {
+  return event.data !== null && typeof event.data === "object" && !Array.isArray(event.data) ? event.data as Readonly<Record<string, RuntimeJsonValue>> : null;
+}
+/** 有序 seq 列表里小于 `seq` 的有几个（也就是第一个不小于 `seq` 的下标）。 */
+function countBelow(seqs: readonly number[], seq: number): number {
+  let low = 0, high = seqs.length;
+  while (low < high) { const mid = (low + high) >> 1; if (seqs[mid] < seq) low = mid + 1; else high = mid; }
+  return low;
 }
 /** 有序 seq 列表里小于 `seq` 的最后一个。 */
 function latestBefore(seqs: readonly number[], seq: number): number | null {
-  let low = 0, high = seqs.length;
-  while (low < high) { const mid = (low + high) >> 1; if (seqs[mid] < seq) low = mid + 1; else high = mid; }
-  return low > 0 ? seqs[low - 1] : null;
+  const count = countBelow(seqs, seq);
+  return count > 0 ? seqs[count - 1] : null;
 }
-function watermarksFor(session: SessionHandle | undefined, projectionThroughSeq: number, windowThroughSeq: number): RuntimeV2ReadModelWatermarks {
+/** 日志里这些 seq（升序）上的事件；连着的 seq 合成一段读一次。 */
+function eventsAt(journal: SessionJournal, seqs: readonly number[]): SessionEventEnvelopeV1[] {
+  const events: SessionEventEnvelopeV1[] = [];
+  for (let first = 0; first < seqs.length;) {
+    let last = first;
+    while (last + 1 < seqs.length && seqs[last + 1] === seqs[last] + 1) last += 1;
+    for (const event of journal.readEvents(seqs[first], seqs[last] + 1)) events.push(event);
+    first = last + 1;
+  }
+  return events;
+}
+function watermarksFor(session: SessionHandle | undefined, projectionThroughSeq: number, windowThroughSeq: number): RuntimeReadModelWatermarks {
   return { acceptedThroughSeq: session?.acceptedSeq ?? projectionThroughSeq, durableThroughSeq: session?.durableSeq ?? projectionThroughSeq, projectionThroughSeq, windowThroughSeq, indexGeneration: null };
 }
-
-const HISTORY_BOUNDARIES = Symbol("history-boundaries");

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, renderHook, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeTrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { SEARCH_INDEX_THROTTLE_MS, TrajectoryView } from "../components/TrajectoryView";
 import { useFrameCoalesced } from "../components/trajectory/use-trajectory-source";
 import { streamingFixture } from "../trajectory/fixtures";
@@ -24,17 +24,17 @@ vi.mock("../trajectory/layout", async (importOriginal) => {
 const spies = () => [vi.mocked(builder.buildTrajectorySnapshot), vi.mocked(layout.deriveLayout), vi.mocked(timeline.deriveTimeline)];
 const calls = () => spies().map(spy => spy.mock.calls.length);
 /** A settled `tool/call` after the streamed chunks; it does not close the reply. */
-function withToolCall(snapshot: RuntimeV2TrajectorySnapshot): RuntimeV2TrajectorySnapshot {
+function withToolCall(snapshot: RuntimeTrajectorySnapshot): RuntimeTrajectorySnapshot {
   const last = snapshot.nodes.at(-1)!;
   const data = last.data as Record<string, string>;
   const call = { ...last, key: `${last.sessionId}:${last.eventSeq + 1}`, eventSeq: last.eventSeq + 1, eventType: "tool/call", callId: "streaming-call",
     data: { turnId: data.turnId, stepId: data.stepId, callId: "streaming-call", name: "bash", arguments: { command: "ls" } } };
-  return { ...snapshot, throughJournalSeq: call.eventSeq, nodes: [...snapshot.nodes, call] as RuntimeV2TrajectorySnapshot["nodes"] };
+  return { ...snapshot, throughJournalSeq: call.eventSeq, nodes: [...snapshot.nodes, call] as RuntimeTrajectorySnapshot["nodes"] };
 }
 
 /** The Journal does not change while a reply streams; only the live run's output grows. */
 const settled = streamingFixture(0).snapshot;
-const at = (frame: number, snapshot: RuntimeV2TrajectorySnapshot = settled) => <TrajectoryView snapshot={snapshot} live={streamingFixture(frame).live} />;
+const at = (frame: number, snapshot: RuntimeTrajectorySnapshot = settled) => <TrajectoryView snapshot={snapshot} live={streamingFixture(frame).live} />;
 const runningRow = () => document.querySelector<HTMLTableRowElement>('tr[data-record-id$=":record:assistant:assistant-running"]');
 
 describe("trajectory streaming", () => {

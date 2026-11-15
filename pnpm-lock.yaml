@@ -550,6 +550,9 @@ importers:
       '@actspace/agent':
         specifier: workspace:*
         version: link:../../core/agent
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
       '@actspace/session-persistence':
         specifier: workspace:*
         version: link:../../session/session-persistence
@@ -1717,9 +1720,6 @@ importers:
       '@actspace/llm-service':
         specifier: workspace:*
         version: link:../../llm/llm-service
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../../session/session-journal
       '@actspace/session-persistence':
         specifier: workspace:*
         version: link:../../session/session-persistence
@@ -1867,6 +1867,9 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../composition/cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -1886,6 +1889,9 @@ importers:
       '@actspace/sandbox':
         specifier: workspace:*
         version: link:../sandbox
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -2050,6 +2056,9 @@ importers:
 
   packages/session/session-storage:
     dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../session-journal

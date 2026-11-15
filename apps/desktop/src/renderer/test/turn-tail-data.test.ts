@@ -66,6 +66,18 @@ describe("collectTurnChanges", () => {
     expect(collectTurnChanges([created])?.files[0]).toMatchObject({ created: true, hunks: [{ lines: ["+hello"] }] });
   });
 
+  it("reads a truncated diff: the note line is not a diff line and the real counts come from the block", () => {
+    const note = "[Output truncated at 64,000 characters: this diff shows 2 of 50000 added lines. The file was written in full.]";
+    const endsWithNewline = diffBlock("write_diff", "log.txt", `--- a/log.txt\n+++ b/log.txt\n@@ -1,1 +1,50001 @@\n+entry\n+entry\n \n${note}`, 50_000, 0);
+    const noNewline = diffBlock("write_diff", "big.txt", `--- a/big.txt\n+++ b/big.txt\n@@ -1,1 +1,50000 @@\n-\n+line-1\n+line-2\n${note}`, 50_000, 1);
+    const changes = collectTurnChanges([endsWithNewline, noNewline]);
+    expect(changes).toMatchObject({ additions: 100_000, deletions: 0 });
+    expect(changes?.files).toMatchObject([
+      { path: "log.txt", created: true, additions: 50_000, hunks: [{ lines: ["+entry", "+entry"] }] },
+      { path: "big.txt", created: true, additions: 50_000, hunks: [{ lines: ["+line-1", "+line-2"] }] },
+    ]);
+  });
+
   it("merges repeated edits of one file and keeps each hunk", () => {
     const changes = collectTurnChanges([
       diffBlock("edit_diff", "src/app.ts", editDiff, 1, 1),

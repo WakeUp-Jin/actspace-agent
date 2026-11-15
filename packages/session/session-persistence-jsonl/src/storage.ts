@@ -57,7 +57,7 @@ export class JsonlSessionStorage implements SessionStorage {
     return this.#fullInspect(sessionId);
   }
 
-  /** Append-only fast path for snapshot caches: unchanged files are not read, grown files read only their new bytes. */
+  /** Append-only fast path for snapshot caches: an unchanged file costs one bounded tail read, a grown file reads only its new bytes. */
   async refresh(sessionId: string, base: SessionStorageSnapshot): Promise<SessionStorageRefresh> {
     this.#assertOpen();
     const resume = this.#resumes.get(base);
