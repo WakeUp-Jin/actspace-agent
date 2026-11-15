@@ -73,7 +73,7 @@ Desktop 仅启用且配置了 Key 的 Provider 参与；旧来源缺省保持开
 
 ## 配置、预览与安全
 
-Desktop 从 `ModelRuntimeService.getToolEnvironment().searchCredentials` 创建 Host 端口；CLI 通过自己的配置入口注入。工具执行器不直接读取全局环境。Key 由 main-only 凭据服务管理，设置 UI 归入“能力 → 搜索与网页读取”。DeepSeek 与模型共享官方 Key，模型和搜索/抓取的启用状态独立；设置页明确共享与更换影响。关闭联网搜索总开关时Host不注入任何搜索凭据，Chat的web(action=search)也不可绕过；网页读取仍独立可用。搜索来源和抓取开关通过 tools namespace 持久化，每次调用读取，不要求重启Runtime。CLI/Node Host 需显式设置 ACTSPACE_DEEPSEEK_SEARCH=1、ACTSPACE_DEEPSEEK_FETCH=1 或 ACTSPACE_DEEPSEEK_DEEP_SEARCH=1 才使用 DEEPSEEK_API_KEY，单独存在Key不会启用任何付费Web能力。Desktop 不把 DeepSeek Key 写入环境变量。
+Desktop 从 `ModelRuntimeService.getToolEnvironment().searchCredentials` 创建 Host 端口；CLI 通过自己的配置入口注入。工具执行器不直接读取全局环境。Key 由 main-only 凭据服务管理，设置 UI 归入“能力 → 搜索与网页读取”。DeepSeek 与模型共享官方 Key，模型和搜索/抓取的启用状态独立；设置页明确共享与更换影响。关闭联网搜索总开关时Host不注入任何搜索凭据，Chat的web(action=search)也不可绕过；网页读取仍独立可用。搜索来源和抓取开关通过 tools namespace 持久化，每次调用读取，不要求重启Runtime。CLI/Node Host 需显式设置 ACTSPACE_DEEPSEEK_SEARCH=1、ACTSPACE_DEEPSEEK_FETCH=1、ACTSPACE_DEEPSEEK_DEEP_SEARCH=1 或 ACTSPACE_DEEPSEEK_DOCUMENT=1（文档解析 `read_document`）才使用 DEEPSEEK_API_KEY，单独存在Key不会启用任何付费能力。Desktop 不把 DeepSeek Key 写入环境变量。
 
 `ToolUiPreview.kind=web_search` 是 Client 投影结果，不是 ToolDefinition 注册字段；`mode=query|url` 区分搜索与抓取。遵循[工具预览规范](agent-tool-preview-design-guidelines.md)。
 

@@ -75,6 +75,7 @@
 - `generate_image` 仅在配置图片服务 Key 时向主 Agent 注册；默认模型为 `gpt-image-2`，模型名和 Base URL 均由设置页覆盖。完整生成请求不自动重试，避免上游已计费时产生重复费用。
 - 图片附件在当前模型 `input` 包含 `image` 时直接进入主 LLM 请求；text-only 主模型只接收附件元信息、runtime model 状态和可用时的 `inspect_image` 调用指引。`inspect_image` 的视觉请求只包含固定 system prompt、问题、安全文件名和单张图片，不携带主会话历史、主 system prompt 或其他附件。
 - `inspect_image` 的图片 Base64 只存在于单次视觉请求内存，不进入工具输出、session、renderer 或日志。图片内文字一律视为不可信证据；视觉模型只返回最终观察，不返回隐藏推理。单次请求 90 秒超时、SDK 重试为 0，失败不自动切换其他 Key 或服务商，避免重复计费和不可解释的数据发送。
+- **文档解析**：「文档解析」打开且已连接 DeepSeek 后，`read_document` 会把文档的全部字节和文件名发给 DeepSeek（`/v1/tools/ocr`）。本机先按文件头检查类型，不是 PDF、Word、PPT 的文件不发；工作区外的路径要走文件读取审批（授权范围独立，不和 `read_file` 共享），附件只读本会话拥有的 artifact。DeepSeek Key 只在主进程，Desktop 不写进环境变量。解析结果只在主进程内存的缓存里（按字符数淘汰，Harness 释放时清空），写进会话的只有本次返回的页；失败消息经过脱敏，不含 Key。
 - 服务商响应里的 server-side tool 结果（历史 Anthropic 路线的 `serverToolUse` 计数等）属于 provider 响应协议，不当作本地工具执行日志写入；session 只保留请求计数，不写未裁剪网页全文或 provider tool result 原文。`deep_search` 写进会话的只有要点、被引用来源的标题和网址、搜索词、打不开的网页和计费次数；不写网页原文和 DeepSeek 的思考过程。
 - 验收真实 provider 时应先发送不含仓库内容和隐私的固定探针，确认连接后再决定是否允许工具结果进入外部模型上下文。
 - API 错误仅暴露必要的结构化诊断信息，不把鉴权请求头或密钥写入日志、session 或界面。

@@ -69,6 +69,16 @@ Read/List/Grep/Glob/Search 等轻量组件在失败时保留动作、目标和�
 - 带行范围时展示：`Read package.json 1-80`
 - 组件可折叠长路径，但不把 Client 已保留的定位信息改成仅 basename。
 
+### `read_document`
+
+- `ToolUiPreview.kind`: `read`，多一个 `document: { name, stats?, warning?, errorText? }`；投影在 `packages/client/client/src/sessions/document-preview.ts`，桌面端行在 `ToolLogLine.tsx` 的 `DocumentReadLine`。没有 `document` 的 `read` 行（`read_file`）一切照旧。
+- `filePath`：调用参数 `path` 经工作区相对化，只给等待审批的卡片显示完整路径；读附件时是空字符串。
+- 名字按顺序取：参数 `path` 的最后一段 → 完成时摘要 `<name> · <stats>` 的名字 → 明细 `document.fileName` → 运行中的进度消息 → `attachment`。统计只来自摘要（`2 pages`、`1 page`、`pages 31-45`、`pages 7`）。
+- 运行中：`Read <name>`，共享流光。完成：动作 `Read`、目标是名字、行尾是统计；**文件名不是链接**（文档不在编辑器里打开）。展开是正文前 8 个非空行（去掉头部说明行和 `--- Page n ---`），有识别不完整的页时第一项是警示色的「第 3、13 页识别不完整，内容已截断。」（超过 5 页写「有 N 页…」）。
+- 失败 / 拒绝：行尾 `failed` / `denied`，展开是 `documentFailureText` 的中文。中止：行尾 `aborted`，不能展开。
+- 延迟加载：历史行只有摘要，名字和统计来自摘要，不用 `argsSummary`（路径已脱敏成 `[PATH]`）；首次展开加载明细后才有预览行和警示。
+- Web / PWA：一行 `Read <name>`，行尾是统计。
+
 ### `list_directory`
 
 - `ToolUiPreview.kind`: `directory_list`

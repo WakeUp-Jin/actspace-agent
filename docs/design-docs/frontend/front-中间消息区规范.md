@@ -97,6 +97,7 @@
 | 类型 | 主行示例 | 展开 / 其他入口 |
 | --- | --- | --- |
 | Read | `Read Demos/README.md 1–8` | 文件文字打开右侧文件；结果 disclosure 独立 |
+| Read（文档） | `Read 季度报告.pdf 2 pages` / `Read 产品手册.pdf pages 31-45` | `read_document` 的行：文件名**不是链接**；展开是正文开头几行，有识别不完整的页时第一项是警示色（`--color-warning`、可换行）的「第 13 页识别不完整，内容已截断。」；失败展开是中文原因 |
 | Listed | `Listed Demos/ 25 entries` | 目录结果 |
 | Edit / Write | `Edit Demos/README.md +1 −1` | 真实 diff 与变动统计 |
 | Bash | `Ran ls -lt Demos/` / `Denied …` / `Failed …` | 见 Bash |

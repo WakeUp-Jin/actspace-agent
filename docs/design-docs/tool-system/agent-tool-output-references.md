@@ -88,6 +88,8 @@
 
 `artifact` 是存储引用，不是媒体类型。Core 只有在 MIME 是 `image/*` 时才生成逻辑 image block。Provider 的支持格式、文件签名和请求体上限仍由图片适配器校验。
 
+附件元数据可以带一个文件名（`fileName`，去掉控制字符，最多 240 个字符），输入框附件写入时填上；旧元数据没有这一项，照常读。PDF、Word、PPT 附件在请求里是一行 `Attached file: <文件名> (<artifactId>)`，由 `read_document` 按 `artifact_id` 读取，归属校验和现有的 artifact 读取是同一套（`readForSession`），不给模型文件路径。见 [agent-deep-search-and-document-parsing.md](agent-deep-search-and-document-parsing.md) 第 8 节。
+
 ## 工具图片与协议
 
 - OpenAI Chat Completions / Responses：保留原工具文本结果与 call ID，在同一批所有 tool results 之后追加 user visual observation。不能在并行调用的结果中间插入 user 消息。

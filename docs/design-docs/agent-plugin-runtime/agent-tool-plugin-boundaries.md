@@ -38,7 +38,7 @@ Host/codec 变更仍需受控重启；执行工具由独立 Harness 装配，新
 
 ## 权限和 Scope
 
-文件读、搜索、写分别使用 `actspace.filesystem-read`、`actspace.filesystem-search`、`actspace.filesystem-write` audience，permissionDomain 等于对应包名，policyVersion 为 1。Desktop 仅信任这三个 audience。旧聚合插件的 grant 不会转换或匹配到新插件。
+文件读、搜索、写分别使用 `actspace.filesystem-read`、`actspace.filesystem-search`、`actspace.filesystem-write` audience，permissionDomain 等于对应包名，policyVersion 为 1。`read_document` 使用 `actspace.document` audience，permissionDomain 是 `document-read`，policyVersion 为 1；它和 `read_file` 的授权互不通用。Desktop 信任 Bash（`actspace.shell-tools`）、文件读、文件搜索、文件写、文档这五个 audience，清单在 `apps/desktop/src/main/runtime-v2/trusted-grant-audiences.ts`。旧聚合插件的 grant 不会转换或匹配到新插件。
 
 Agent Loop 将可见工具集合传入 `ToolPreparedEnvironment.allowedToolNames`。Tool Runtime 在参数解析、permission admission 和 body 前再次检查；越界调用返回 `TOOL_SCOPE_DENIED`，写入 `permission/scope-denied`，不执行 body。插件未装载或已卸载时 registry 拒绝调用，错误为 `TOOL_NOT_FOUND`。
 

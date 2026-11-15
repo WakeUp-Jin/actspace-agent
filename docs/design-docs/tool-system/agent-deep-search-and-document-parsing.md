@@ -1,6 +1,6 @@
 # DeepSeek 深度搜索与文档解析工具（目标设计，未实现）
 
-本文是 `deep_search` 和 `read_document` 两个工具的设计。`deep_search`（第 7 节、第 9.1、9.3 节）已经实现，那几节写的是当前事实；`read_document` 还没有实现。实现步骤见[执行计划](../../exec-plans/active/20261114-deepseek-deep-search-document-parsing/README.md)，界面以 [demo](../frontend/deep-search-and-document-demo.html) 为准。实现合入后，把本文改写成当前事实，去掉标题里的「目标设计，未实现」。
+本文是 `deep_search` 和 `read_document` 两个工具的设计。两个工具都已在分支上实现（`deep_search`：第 7 节、第 9.1、9.3 节；`read_document`：第 8 节、第 9.2–9.4 节），这几节写的是当前事实；统一验收通过、合入 main 后去掉标题里的「目标设计，未实现」。实现步骤见[执行计划](../../exec-plans/active/20261114-deepseek-deep-search-document-parsing/README.md)，界面以 [demo](../frontend/deep-search-and-document-demo.html) 为准。
 
 本文负责：为什么做、做成什么样、模块边界、否决过的方案。改哪些文件、按什么顺序、每步怎么验证，写在执行计划里。
 
@@ -271,6 +271,8 @@ Pages that could not be opened:
 
 ## 8. `read_document` 契约
 
+插件在 `packages/document/tool-document/`：`plugin.ts`（工具定义、参数检查、权限契约）、`sniff.ts`（本机类型判断）、`ocr-response.ts`（响应解析和失败码）、`assemble.ts`（分页、摘要、明细）、`cache.ts`（缓存与并发）、`node-ports.ts`（Host 端口实现 `createNodeDocumentPorts`）。桌面端在 `apps/desktop/src/main/runtime-v2/tool-host-services.ts` 构造端口（开关和 Key 每次调用时从 `ModelRuntimeService` 读），CLI / 远程 Host 在 `packages/host/agent-host/src/node-ports/tool-host-services.ts`（`ACTSPACE_DEEPSEEK_DOCUMENT=1` 加 `DEEPSEEK_API_KEY`）。
+
 ### 8.1 参数与说明
 
 ```json
@@ -413,6 +415,8 @@ Long pages were split; page numbers here are positions in this output, not the d
 
 ### 9.2 文档的 Read 行
 
+投影在 `packages/client/client/src/sessions/document-preview.ts`（失败文字在 `tool-failure-text.ts` 的 `documentFailureText`），由 `tool-card.ts` 分发；流式行在 `packages/client/client/src/live/stream-blocks.ts`；桌面端行是 `ToolLogLine.tsx` 的 `DocumentReadLine`，警示行样式 `.tool-result-item.is-warning`（`styles/tool-result.css`）；Web / PWA 的单行在 `ExploreGroup.tsx`。mock 场景 `?mock=deepseek-tools` 的「读季度报告和设计手册」会话。
+
 复用现有的 `Read` 行，不新增行的种类。`read` 这种预览和消息块各加一个可选的 `document` 字段（名字、行尾统计、警示、失败文字）；没有这个字段的 `Read` 行和今天完全一样。
 
 - 运行中：`Read <文件名>`。完成：行尾是 `2 pages` 或 `pages 31-45`。
@@ -425,12 +429,14 @@ Long pages were split; page numbers here are positions in this output, not the d
 
 ### 9.3 设置
 
-深度搜索的开关在 `apps/desktop/src/renderer/components/settings/SearchSettings.tsx`，字段 `tools.deepseekDeepSearchEnabled`，可用性由 `ModelRuntimeService.isDeepseekDeepSearchAvailable()` 读取。
+深度搜索的开关在 `apps/desktop/src/renderer/components/settings/SearchSettings.tsx`，字段 `tools.deepseekDeepSearchEnabled`，可用性由 `ModelRuntimeService.isDeepseekDeepSearchAvailable()` 读取。文档解析的开关在 `components/settings/sections/ToolsSection.tsx`，字段 `tools.deepseekDocumentEnabled`，可用性由 `isDeepseekDocumentAvailable()` 读取；两处判断「已连接 DeepSeek」共用 `components/settings/deepseek-key.ts` 的 `hasDeepseekKey`。
 
-- 「搜索与网页读取」页，第一组，「允许联网搜索」下面新增一行「使用 DeepSeek 深度搜索」。说明：有 Key 时「问题将发送至 DeepSeek · 搜索 ¥0.005 / 次，另计模型用量」，没有 Key 时「请先连接 DeepSeek」。没有 Key 或「允许联网搜索」关闭时置灰。
-- 「工具」页「多媒体」组，「图片分析」下面新增一行「文档解析」。说明：有 Key 时「文档将发送至 DeepSeek · ¥0.0015 / 页」；没有 Key 时用警示写法「尚未连接 DeepSeek，文档由本机 Python 提取。」，开关不置灰。
+- 「搜索与网页读取」页，第一组，「允许联网搜索」下面一行是「使用 DeepSeek 深度搜索」。说明：有 Key 时「问题将发送至 DeepSeek · 搜索 ¥0.005 / 次，另计模型用量」，没有 Key 时「请先连接 DeepSeek」。没有 Key 或「允许联网搜索」关闭时置灰。
+- 「工具」页「多媒体」组的最后一行是「文档解析」。说明：有 Key 时「文档将发送至 DeepSeek · ¥0.0015 / 页」；没有 Key 时用警示写法「尚未连接 DeepSeek，文档由本机 Python 提取。」，开关不置灰。
 
 ### 9.4 输入框
+
+入口规则在 `apps/desktop/src/renderer/components/composer/attachment-entry.ts`（`attachmentEntry`、`useDocumentParsingAvailable`），`Composer.tsx` 和消息流里的提问编辑器 `TurnPromptEditor.tsx` 共用；文件选择框的类型在 `apps/desktop/src/main/runtime-v2/attachment-dialog-filters.ts`，`dialogs.selectFiles({ documents: true })` 选这一组。
 
 本机 Agent / Plan 的「+」面板：文档解析可用时，入口从「图片」变成「图片与文件」，说明是「PNG、JPEG、WEBP、GIF、PDF、Word、PPT」，文件选择框只列这些类型。不可用时保持「图片」。
 

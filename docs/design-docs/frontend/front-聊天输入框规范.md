@@ -143,13 +143,21 @@ Composer 是整页的操作中心，一套可复用的输入系统，有两种 s
 
 ## 附件
 
-入口按能力决定：本机 Agent / Plan 的 `+` 面板显示「图片」，Chat 或能接受文件的目标（远端）显示「图片与文件」（`Composer.tsx` 的 `acceptsFiles`）。
+入口按能力决定，`components/composer/attachment-entry.ts` 的 `attachmentEntry` 从上往下取第一条：
+
+1. Chat：「图片与文件」，说明「PNG、JPEG、WEBP、GIF、TXT、Markdown、JSON、CSV」。
+2. 能接受文件的目标（远端，`capabilities.attachments.files`）：「图片与文件」，没有说明。
+3. 本机 Agent / Plan，「文档解析」打开且已连接 DeepSeek（`useDocumentParsingAvailable`，跟着 `settingsChanged` 刷新，不用重启）：「图片与文件」，说明「PNG、JPEG、WEBP、GIF、PDF、Word、PPT」。
+4. 其余：「图片」。
+
+消息流里编辑提问时的 `+` 按钮跟着同一条规则：第 4 种是「添加图片」，其余是「添加图片或文件」。
 
 | 入口 | 可选类型 |
 | --- | --- |
 | 「图片」（`dialogs.selectImages`） | png、jpg、jpeg、webp、gif |
 | 「图片与文件」本机 Chat（`dialogs.selectFiles`） | png、jpg、jpeg、webp、gif + txt、md、markdown、json、csv；不支持 PDF、DOC、DOCX |
 | 「图片与文件」远端 | 任意文件（Host 端读取） |
+| 「图片与文件」本机 Agent / Plan，文档解析可用（`dialogs.selectFiles({ documents: true })`） | png、jpg、jpeg、webp、gif + pdf、doc、docx、ppt、pptx；文档由 `read_document` 读取 |
 | 剪贴板粘贴 | PNG、JPEG、WebP；main 校验签名后写入应用 `tmpRoot/composer-attachments`，单张最大 20MB |
 | 拖放 | 图片按 MIME 与扩展名（含 bmp、svg、heic、heif）判为图片，其余为文件 |
 
