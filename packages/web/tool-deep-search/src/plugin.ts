@@ -76,7 +76,7 @@ export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
       abiVersion: 2, pluginId: DEEP_SEARCH_PLUGIN_ID, name: "deep_search", definitionVersion: 1, description: DESCRIPTION,
       inputSchema: Object.freeze({ type: "object", properties: { question: { type: "string", minLength: 1, maxLength: 4000, description: "A self-contained question or research task. Include names, dates and constraints: the search runs without this conversation's context." } }, required: ["question"], additionalProperties: false }),
       effects: [{ capabilityId: "network", mode: "use" as const, resourceScope: "workspace" }],
-      modes: ["plan", "agent"], concurrency: "read-only", sensitiveArgumentPaths: [], resultSchemaVersion: 1,
+      modes: ["chat", "plan", "agent"], concurrency: "read-only", sensitiveArgumentPaths: [], resultSchemaVersion: 1,
     } satisfies ToolDefinition),
   }),
 ]);

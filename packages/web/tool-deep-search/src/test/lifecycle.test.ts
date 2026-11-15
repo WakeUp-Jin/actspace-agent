@@ -19,7 +19,7 @@ const names = (runtime: ToolRuntime) => runtime.registry.listDefinitions().map(i
 describe("deep-search lifecycle", () => {
   it("declares one tool owned by its plugin in Plan and Agent", () => {
     expect(TOOL_DEFINITIONS.map(item => item.definition.name)).toEqual(["deep_search"]);
-    expect(TOOL_DEFINITIONS[0]!.definition).toMatchObject({ pluginId: manifest.pluginId, modes: ["plan", "agent"], inputSchema: { required: ["question"] } });
+    expect(TOOL_DEFINITIONS[0]!.definition).toMatchObject({ pluginId: manifest.pluginId, modes: ["chat", "plan", "agent"], inputSchema: { required: ["question"] } });
     for (const keyword of ["oneOf", "allOf", "anyOf"]) expect(TOOL_DEFINITIONS[0]!.definition.inputSchema).not.toHaveProperty(keyword);
   });
 

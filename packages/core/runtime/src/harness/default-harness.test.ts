@@ -108,7 +108,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     const withDeepSearch = (mode: import("@actspace/shared/runtime-v2").RuntimeAgentMode) => allowedAgentModeTools(mode, parentLease.getService<import("@actspace/tool-runtime").ToolRuntime>("tools.runtime")!.registry.listDefinitions());
     expect(withDeepSearch("plan").has("deep_search")).toBe(true);
     expect(withDeepSearch("agent").has("deep_search")).toBe(true);
-    expect(withDeepSearch("chat").has("deep_search")).toBe(false);
+    expect([...withDeepSearch("chat")].sort()).toEqual(["deep_search", "generate_image", "web"]);
     // The Host port's real implementation is what the Harness registered.
     const deepSearchTool = parentLease.getService<import("@actspace/tool-runtime").ToolRuntime>("tools.runtime")!.registry.capture("deep_search");
     const deepSearchResult = await deepSearchTool.executor.execute({ question: "fixture" }, { signal: new AbortController().signal, reportProgress: () => {} } as never);
