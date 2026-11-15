@@ -6,7 +6,7 @@ describe("shared live and durable tool previews", () => {
   it.each([
     ["read_file", "read"], ["list_directory", "directory_list"], ["grep", "grep"], ["glob", "glob"],
     ["bash", "bash"], ["bash_output", "bash"], ["bash_kill", "bash"], ["web_search", "web_search"],
-    ["web_fetch", "web_search"], ["write_file", "write"], ["edit_file", "edit_diff"], ["delete_file", "delete"],
+    ["web_fetch", "web_search"], ["deep_search", "deep_search"], ["write_file", "write"], ["edit_file", "edit_diff"], ["delete_file", "delete"],
     ["present", "present"], ["inspect_image", "media_analysis"], ["generate_image", "image_generation"], ["todo_read", "todo"],
     ["todo_write", "todo"], ["agent", "agent"], ["explore", "agent"], ["plugin.custom", "generic"],
   ])("keeps %s preview kind %s throughout its lifecycle", (name, kind) => {

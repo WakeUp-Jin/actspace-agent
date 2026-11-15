@@ -147,6 +147,7 @@ export type ToolPreviewKind =
   | "grep"
   | "glob"
   | "web_search"
+  | "deep_search"
   | "media_analysis"
   | "image_generation"
   | "directory_list"
@@ -194,12 +195,28 @@ export type PresentedFile = {
   description?: string;
 };
 
+/** A `deep_search` row (agent-deep-search-and-document-parsing.md §9.1). Lists come from the `deep-search` detail block. */
+export type DeepSearchPreviewFields = {
+  kind: "deep_search";
+  question: string;
+  /** "Deep Search <question>", plus " · <progress>" while running with progress. */
+  displayText: string;
+  /** Finished summary such as "6 searches · 11 sources". */
+  stats?: string;
+  queries?: string[];
+  sources?: { title: string; url: string; site?: string }[];
+  failedPages?: { url: string; code: string }[];
+  /** Text shown when a failed row is expanded. */
+  errorText?: string;
+};
+
 export type ToolUiPreview =
   | { kind: "read"; filePath: string; range?: string; displayText: string; resultPreview?: string[] }
   | { kind: "search"; query: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }
   | { kind: "grep"; pattern: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }
   | { kind: "glob"; pattern: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }
   | { kind: "web_search"; mode: "query" | "url"; query?: string; url?: string; displayText: string; resultUrls?: string[]; contentPreview?: string }
+  | DeepSearchPreviewFields
   | { kind: "media_analysis"; mediaName: string; mediaKind: "image" | "video" | "media"; displayText: string }
   | {
       kind: "image_generation";

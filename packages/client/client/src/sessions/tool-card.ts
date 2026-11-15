@@ -1,6 +1,7 @@
 import { isAbsolute, relative, resolve } from "pathe";
 import { relativePathInside, subagentActivationStatusLabel, type PathRules, type ToolUiPreview } from "@actspace/shared";
 import type { RuntimeJsonValue, RuntimeToolView, SubagentKind, SubagentView } from "@actspace/shared/runtime-v2";
+import { deepSearchPreview } from "./deep-search-preview.js";
 type EventRecord = Readonly<Record<string, RuntimeJsonValue>>;
 type FileChangeStats = { readonly additions: number; readonly deletions: number };
 /** 界面里不能用 `node:path`。pathe 两种分隔符都认，输出统一成 `/`，Windows 的路径也能比。 */
@@ -29,6 +30,7 @@ export function toolPreview(toolName: string, tool: RuntimeToolView | undefined,
   if (localName === "grep") return { kind: "grep", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
   if (localName === "glob") return { kind: "glob", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
   if (localName === "web" || localName === "web_search" || localName === "web_fetch") { const open = localName === "web_fetch" || string(args.action) === "open"; return { kind: "web_search", mode: open ? "url" : "query", ...(open ? { url: string(args.url) ?? "" } : { query: string(args.query) ?? "" }), displayText: summary, contentPreview: output.slice(0, 2_000) }; }
+  if (localName === "deep_search") return deepSearchPreview({ tool, data, args, phase });
   if (localName === "write_file" || localName === "edit_file") {
     const result = record(detailValue(data, "result"));
     const filePath = displayPath(string(result.path) ?? string(args.path) ?? "");

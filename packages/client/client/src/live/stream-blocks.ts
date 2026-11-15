@@ -47,6 +47,10 @@ export function getStreamingWebSearchText(preview: Extract<ToolUiPreview, { kind
   return preview.displayText;
 }
 
+export function getStreamingDeepSearchText(preview: Extract<ToolUiPreview, { kind: "deep_search" }>): string {
+  return preview.displayText;
+}
+
 export function getStreamingMediaAnalysisText(preview: Extract<ToolUiPreview, { kind: "media_analysis" }>): string {
   return preview.displayText;
 }
@@ -192,6 +196,16 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
       resultUrls: tool.finished ? tool.preview.resultUrls : undefined,
       contentPreview: tool.finished ? tool.preview.contentPreview : undefined,
+    };
+  }
+
+  if (tool.preview?.kind === "deep_search") {
+    return {
+      ...tool.preview,
+      id: blockId,
+      displayText: getStreamingDeepSearchText(tool.preview),
+      createdAt: now,
+      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
     };
   }
 

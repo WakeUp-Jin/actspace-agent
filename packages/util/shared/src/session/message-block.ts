@@ -7,6 +7,7 @@ import type { EventId, SessionId } from "./primitives";
 import type {
   AgentToolPreview,
   BashPreview,
+  DeepSearchPreviewFields,
   PresentedFile,
   SubagentToolLink,
   TodoUiPreview,
@@ -109,6 +110,11 @@ export type MessageBlock = {
       approvalRequestId?: string;
       reason?: string;
     }
+  | (DeepSearchPreviewFields & {
+      id: EventId;
+      createdAt: string;
+      status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
+    })
   | {
       kind: "web_search";
       id: EventId;

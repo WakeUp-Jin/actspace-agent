@@ -533,6 +533,17 @@ describe("session selectors", () => {
     ]);
   });
 
+  it("restores a deep_search result as a deep_search message block, moving every field", () => {
+    const uiPreview = {
+      kind: "deep_search" as const, question: "COP30 outcomes", displayText: "Deep Search COP30 outcomes", stats: "2 searches · 1 source",
+      queries: ["a", "b"], sources: [{ title: "T", url: "https://t.example/", site: "T" }], failedPages: [{ url: "https://x.example/", code: "http_404" }],
+    };
+    const [completed] = createMessageBlocks([toolResultEvent({ toolName: "deep_search", toolCallId: "tool-ds-1", ok: true, summary: "2 searches · 1 source", modelOutput: "", uiPreview })]);
+    expect(completed).toMatchObject({ ...uiPreview, id: "evt-deep_search", status: "completed", runId: "turn-delete" });
+    const [failed] = createMessageBlocks([toolResultEvent({ toolName: "deep_search", toolCallId: "tool-ds-2", ok: false, summary: "x", modelOutput: "", uiPreview: { kind: "deep_search", question: "q", displayText: "Deep Search q", errorText: "余额不足" } })]);
+    expect(failed).toMatchObject({ kind: "deep_search", status: "failed", errorText: "余额不足" });
+  });
+
   it("restores a completed present result as a present message block", () => {
     const files = [{ path: "report.docx", outputPath: "/workspace/report.docx", outputRelativePath: "report.docx", description: "Quarterly report" }];
     const blocks = createMessageBlocks([
