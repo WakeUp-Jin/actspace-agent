@@ -1,15 +1,13 @@
 import "./styles/fonts.css";
 import "./styles/base.css";
-import "./styles/scenes.css";
-import "./styles/cards.css";
 import "./styles/player.css";
-import { FPS, HEIGHT, scenes, WIDTH } from "./film.js";
-import { soundtrack } from "./soundtrack.js";
+import { DEFAULT_FILM, filmById, FPS, HEIGHT, WIDTH } from "./films.js";
 import { createTimeline } from "./timeline.js";
 
 const params = new URLSearchParams(location.search);
 const rendering = params.has("render");
 const film = document.querySelector("#film");
+const filmId = params.get("film") ?? DEFAULT_FILM;
 
 /** 中文字体按 unicode-range 切成了上百片，等它们全部就绪再出第一帧，否则前几帧会用回退字体。 */
 async function loadFonts() {
@@ -24,7 +22,7 @@ async function decodeImages() {
   await Promise.all(images.map((image) => image.decode().catch(() => {})));
 }
 
-function startPreview(timeline) {
+function startPreview(timeline, soundtrack) {
   const viewport = document.querySelector("#viewport");
   const player = document.querySelector("#player");
   const play = document.querySelector("#play");
@@ -97,11 +95,13 @@ function startPreview(timeline) {
 }
 
 const ready = (async () => {
-  await loadFonts();
-  const timeline = createTimeline(film, scenes);
+  const { title, scenes, soundtrack } = filmById(filmId);
+  document.title = title;
+  const [list] = await Promise.all([scenes(), loadFonts()]);
+  const timeline = createTimeline(film, list);
   await decodeImages();
   if (rendering) timeline.seek(0);
-  else startPreview(timeline);
+  else startPreview(timeline, soundtrack);
   return timeline;
 })();
 
