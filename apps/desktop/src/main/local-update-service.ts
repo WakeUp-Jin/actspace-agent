@@ -392,17 +392,32 @@ trap mark_failed_on_exit EXIT
 
 echo "[local-update] started at $STARTED_AT"
 cd "$SOURCE_ROOT"
-write_status "building" "正在从源码构建 Actspace.app…"
+write_status "building" "正在安装依赖…"
 if ! PNPM_BIN="$(command -v pnpm)"; then
   echo "[local-update] pnpm not found in PATH: $PATH"
   write_failed "未找到 pnpm，请确认 Homebrew 路径已加入环境。"
   exit 127
 fi
+# 源码更新后 package.json / lockfile 可能新增了依赖（包括 workspace 包之间的引用），
+# 不先装依赖，构建会因为找不到模块失败。lockfile 没变时这一步几秒就结束。
+# --frozen-lockfile：不改源码目录里的 lockfile；confirmModulesPurge=false：helper 没有 TTY，
+# pnpm 需要重建 node_modules 时直接重建，不停下来等确认。
+echo "[local-update] installing dependencies"
+if ! "$PNPM_BIN" install --frozen-lockfile --prefer-offline --config.confirmModulesPurge=false; then
+  echo "[local-update] dependency install failed"
+  write_failed "依赖安装失败，请查看日志。"
+  exit 1
+fi
+write_status "building" "正在从源码构建 Actspace.app…"
 if [[ -z "\${ACTSPACE_MAC_CODESIGN_IDENTITY:-}" && -z "\${ACTSPACE_MAC_ADHOC_SIGN:-}" ]]; then
   export ACTSPACE_MAC_ADHOC_SIGN=true
   echo "[local-update] defaulted ACTSPACE_MAC_ADHOC_SIGN=true for local updater build"
 fi
-"$PNPM_BIN" package:desktop:dmg
+if ! "$PNPM_BIN" package:desktop:dmg; then
+  echo "[local-update] build failed"
+  write_failed "构建失败，请查看日志。"
+  exit 1
+fi
 
 validate_new_app() {
   local app="$1"

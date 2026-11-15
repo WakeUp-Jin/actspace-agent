@@ -115,7 +115,14 @@ describe("LocalUpdateService", () => {
     expect(script).toContain("write_status \"building\"");
     expect(script).toContain("command -v pnpm");
     expect(script).toContain("export ACTSPACE_MAC_ADHOC_SIGN=true");
-    expect(script).toContain("\"$PNPM_BIN\" package:desktop:dmg");
+    const install = '"$PNPM_BIN" install --frozen-lockfile --prefer-offline --config.confirmModulesPurge=false';
+    const build = '"$PNPM_BIN" package:desktop:dmg';
+    expect(script).toContain(`if ! ${install}; then`);
+    expect(script).toContain('write_failed "依赖安装失败，请查看日志。"');
+    expect(script).toContain(`if ! ${build}; then`);
+    expect(script).toContain('write_failed "构建失败，请查看日志。"');
+    // 源码新增的依赖要先装上，构建才找得到模块
+    expect(script.indexOf(install)).toBeLessThan(script.indexOf(build));
     expect(script).toContain("validate_new_app()");
     expect(script).toContain("codesign --verify --no-strict --verbose=2 \"$app\"");
     expect(script).toContain("write_failed \"构建出的 Actspace.app 未通过启动前验证，已保留当前版本。\"");
