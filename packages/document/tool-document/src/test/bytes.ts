@@ -53,7 +53,7 @@ export function ole2(entries: readonly OleEntry[]): Uint8Array {
   const dir = new Uint8Array(128 * (entries.length + 1));
   // Entry 0 is the root storage (type 5), like a real file.
   writeEntry(dir, 0, { name: "Root Entry", type: 5 });
-  entries.forEach((entry, index) => writeEntry(dir, index + 1, entry));
+  entries.forEach((entry, index) => { writeEntry(dir, index + 1, entry); });
   return concat(header, dir);
 }
 
