@@ -327,6 +327,10 @@ export interface SettingsV4Tools {
   showFileChangeStats?: boolean;
   /** Explicit opt-in to paid DeepSeek Fetch; missing means false. */
   deepseekFetchEnabled?: boolean;
+  /** Explicit opt-in to paid DeepSeek deep search; missing means false. */
+  deepseekDeepSearchEnabled?: boolean;
+  /** Explicit opt-in to sending documents to DeepSeek OCR; missing means false. */
+  deepseekDocumentEnabled?: boolean;
   /**
    * Plugin switches. The key is a plugin Entry id (see `PLUGIN_CATALOG`); a missing key takes the manifest's
    * `display.defaultEnabled`. Only plugins with `display.canDisable` read it. Takes effect after a restart.

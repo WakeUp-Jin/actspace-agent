@@ -39,4 +39,16 @@ describe("DeepSeek settings and runtime authorization", () => {
     await update({ deepseekFetchEnabled: false });
     expect(runtime.getToolEnvironment().deepseekFetchApiKey).toBeUndefined();
   });
+
+  it("defaults deep search and document parsing to off, keeps only explicit true and persists across reloads", async () => {
+    const root = await mkdtemp(join(tmpdir(), "actspace-deepseek-test-")); roots.push(root);
+    const settings = new SettingsService({ dataRoot: root, crypto }); await settings.load();
+    expect(settings.getV4().settings.tools).toMatchObject({ deepseekDeepSearchEnabled: false, deepseekDocumentEnabled: false });
+    const update = (patch: Record<string, unknown>) => settings.updateNamespaceV4({ namespace: "tools", expectedRevision: settings.getV4().revision, patch: patch as Partial<import("@actspace/shared").SettingsV4Tools> });
+    await update({ deepseekDeepSearchEnabled: "yes", deepseekDocumentEnabled: 1 });
+    expect(settings.getV4().settings.tools).toMatchObject({ deepseekDeepSearchEnabled: false, deepseekDocumentEnabled: false });
+    await update({ deepseekDeepSearchEnabled: true, deepseekDocumentEnabled: true });
+    const reloaded = new SettingsService({ dataRoot: root, crypto }); await reloaded.load();
+    expect(reloaded.getV4().settings.tools).toMatchObject({ deepseekDeepSearchEnabled: true, deepseekDocumentEnabled: true });
+  });
 });

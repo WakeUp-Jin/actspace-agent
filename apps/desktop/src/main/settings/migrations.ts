@@ -270,6 +270,8 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
       bash: { alwaysAsk: bash.alwaysAsk === true },
       showFileChangeStats: tools.showFileChangeStats !== false,
       deepseekFetchEnabled: tools.deepseekFetchEnabled === true,
+      deepseekDeepSearchEnabled: tools.deepseekDeepSearchEnabled === true,
+      deepseekDocumentEnabled: tools.deepseekDocumentEnabled === true,
       ...sanitizePluginSwitches(tools.plugins),
       ...sanitizeExternalSubagents(tools.externalSubagents),
       searchProviders: Object.fromEntries(SEARCH_PROVIDER_IDS.map((id) => {

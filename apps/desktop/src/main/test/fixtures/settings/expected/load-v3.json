@@ -245,6 +245,8 @@
           },
           "showFileChangeStats": true,
           "deepseekFetchEnabled": false,
+          "deepseekDeepSearchEnabled": false,
+          "deepseekDocumentEnabled": false,
           "searchProviders": {
             "deepseek": {
               "enabled": false
@@ -420,6 +422,8 @@
         },
         "showFileChangeStats": true,
         "deepseekFetchEnabled": false,
+        "deepseekDeepSearchEnabled": false,
+        "deepseekDocumentEnabled": false,
         "searchProviders": {
           "deepseek": {
             "enabled": false
