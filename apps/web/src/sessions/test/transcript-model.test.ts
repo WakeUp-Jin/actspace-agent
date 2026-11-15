@@ -44,3 +44,11 @@ it("locates the tool block and anchor index of an approval call", () => {
   expect(approvalAnchorIndex(items, "nope")).toBe(-1);
   expect(toolBlockForCall(items, "c9")?.kind).toBe("bash");
 });
+
+it("groups a deep search row with adjacent explore rows and counts it as a search", () => {
+  const deep: MessageBlock = { kind: "deep_search", id: "ds", question: "q", displayText: "Deep Search q", stats: "3 searches · 5 sources", createdAt: at, status: "completed" };
+  const items = buildTranscript([user("u"), read("a"), deep], { blocks: [], runId: null });
+  expect(items.map(item => item.type)).toEqual(["block", "explore"]);
+  const group = items[1];
+  expect(group.type === "explore" && exploreSummary(group.blocks)).toEqual({ files: 1, searches: 1, running: false });
+});

@@ -27,6 +27,7 @@ const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
   "grep",
   "glob",
   "web_search",
+  "deep_search",
   "media_analysis",
   "image_generation",
   "directory_list",

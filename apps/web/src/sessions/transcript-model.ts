@@ -3,12 +3,12 @@ import { hasReadableText, type MessageBlock } from "@actspace/shared";
 // 会话时间线 = 已落盘块 + 流式块（规则对齐桌面端 renderer/session/transcript.ts），再把相邻的探索类工具合并成一组。
 
 export type TranscriptEntry = { readonly key: string; readonly block: MessageBlock };
-export type ExploreBlock = Extract<MessageBlock, { kind: "read" | "search" | "grep" | "glob" | "web_search" }>;
+export type ExploreBlock = Extract<MessageBlock, { kind: "read" | "search" | "grep" | "glob" | "web_search" | "deep_search" }>;
 export type TranscriptItem =
   | { readonly type: "block"; readonly key: string; readonly block: MessageBlock }
   | { readonly type: "explore"; readonly key: string; readonly blocks: readonly ExploreBlock[] };
 
-const EXPLORE_KINDS: ReadonlySet<string> = new Set(["read", "search", "grep", "glob", "web_search"]);
+const EXPLORE_KINDS: ReadonlySet<string> = new Set(["read", "search", "grep", "glob", "web_search", "deep_search"]);
 export const isExploreBlock = (block: MessageBlock): block is ExploreBlock => EXPLORE_KINDS.has(block.kind);
 const blockKey = (block: MessageBlock): string => block.renderKey ?? block.id;
 const isText = (block: MessageBlock): block is Extract<MessageBlock, { kind: "assistant" | "thinking" }> => block.kind === "assistant" || block.kind === "thinking";

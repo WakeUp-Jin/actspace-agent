@@ -12,6 +12,7 @@ export function exploreLine(block: ExploreBlock): { verb: string; target: string
     case "glob": return { verb: "Glob", target: `${block.pattern}${scope(block.scope)}` };
     case "search": return { verb: "Searched files", target: `${block.scope ? `${block.scope} ` : ""}for ${block.query}` };
     case "web_search": return { verb: block.mode === "url" ? "Fetched" : "Searched web", target: block.url ?? block.query ?? block.displayText };
+    case "deep_search": return { verb: "Deep Search", target: block.question, ...(block.stats ? { meta: block.stats } : {}) };
   }
 }
 

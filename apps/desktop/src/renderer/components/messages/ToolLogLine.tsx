@@ -25,7 +25,7 @@ import {
 type ToolLogMessage = Extract<MessageBlock, {
   kind: "read" | "search" | "grep" | "glob" | "web_search" | "media_analysis" | "image_generation" | "directory_list" | "delete" | "present" | "tool" | "error";
 }>;
-type ToolLogStatus = "pending" | "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown" | undefined;
+export type ToolLogStatus = "pending" | "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown" | undefined;
 
 type FileReadApprovalMessage = Extract<MessageBlock, { kind: "read" | "grep" | "glob" }>;
 
@@ -128,7 +128,7 @@ function OverflowToolLine({
   );
 }
 
-function getToolLogLineClass(status: ToolLogStatus, className?: string) {
+export function getToolLogLineClass(status: ToolLogStatus, className?: string) {
   const stateClass = status === "running"
     ? ` ${TOOL_LOG_LINE_RUNNING_CLASS}`
     : status === "failed" || status === "denied" || status === "aborted" || status === "outcome-unknown"
@@ -139,7 +139,7 @@ function getToolLogLineClass(status: ToolLogStatus, className?: string) {
   }`;
 }
 
-function getToolFailureLabel(status: ToolLogStatus): string | undefined {
+export function getToolFailureLabel(status: ToolLogStatus): string | undefined {
   return status === "failed" || status === "denied" || status === "aborted"
     ? status
     : status === "outcome-unknown" ? "outcome unknown" : undefined;
@@ -149,7 +149,7 @@ function getToolLogLineTextClass(status: ToolLogStatus) {
   return `${TOOL_LOG_LINE_TEXT_CLASS}${status === "running" ? ` ${TOOL_LOG_LINE_TEXT_RUNNING_CLASS}` : ""}`;
 }
 
-function getToolLogLineTextProps(status: ToolLogStatus, text: string) {
+export function getToolLogLineTextProps(status: ToolLogStatus, text: string) {
   return status === "running"
     ? { className: getToolLogLineTextClass(status), ...getToolLogRunningTextAttrs(text) }
     : { className: getToolLogLineTextClass(status) };
@@ -211,7 +211,7 @@ function WebToolBlock({
   );
 }
 
-function ToolSummary({ action, target, meta }: { action: string; target: string; meta?: string }) {
+export function ToolSummary({ action, target, meta }: { action: string; target: string; meta?: string }) {
   return <span className="tool-summary-parts"><span className="tool-summary-action">{action}</span>{" "}<span className="tool-summary-target" title={target}>{target}</span>{meta ? <> <span className="tool-summary-meta">{meta}</span></> : null}</span>;
 }
 

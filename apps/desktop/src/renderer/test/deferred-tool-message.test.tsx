@@ -95,3 +95,17 @@ it("keeps Read file navigation separate from loading its result", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Show result for Read README.md" }));
   expect(await screen.findByText("# Read result")).toBeVisible();
 });
+
+it("loads deep search detail on first expansion and keeps it open", async () => {
+  const message: MessageBlock = { kind: "deep_search", id: "ds", createdAt: "now", question: "COP30", displayText: "Deep Search COP30", stats: "1 search · 1 source", status: "completed", deferredToolDetail };
+  const load = vi.fn().mockResolvedValue([{ ...message, deferredToolDetail: undefined, queries: ["COP30 outcomes"], sources: [{ title: "Loaded source", url: "https://example.com/" }] }]);
+  getSessionToolDetail.mockImplementation(load);
+  render(<>{renderMessage(message)}</>);
+  const toggle = () => screen.getByRole("button", { name: /Deep Search/ });
+  fireEvent.click(toggle());
+  expect(await screen.findByRole("link", { name: "Loaded source" })).toBeVisible();
+  expect(toggle()).toHaveAttribute("aria-expanded", "true");
+  fireEvent.click(toggle());
+  fireEvent.click(toggle());
+  expect(load).toHaveBeenCalledTimes(1);
+});
