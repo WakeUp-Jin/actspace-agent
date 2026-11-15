@@ -121,6 +121,15 @@ it("collects paths from real read_file numbered lines", () => {
   expect(collectPathHints(output)).not.toContain("ordinary words");
 });
 
+it("ignores thinking signatures, provider replay payloads and over-long segments", () => {
+  const signature = `EuYB${"Q".repeat(400)}/x${"Z".repeat(300)}+abc/def`;
+  const content = [{ type: "thinking", thinking: "look at src/real.ts", signature, replay: { payload: { thinkingSignature: signature } } }, { type: "text", text: `see ${"a".repeat(300)}/b.ts and docs/ok.md` }] as never;
+  const hints = collectPathHints(content);
+  expect(hints).toEqual(expect.arrayContaining(["src/real.ts", "docs/ok.md"]));
+  expect(hints.every(hint => hint.split("/").every(segment => segment.length <= 255))).toBe(true);
+  expect(hints.some(hint => hint.includes("QQQQ"))).toBe(false);
+});
+
 it("keeps the inherited navigation list in a forked subagent but drops it in a user fork", async () => {
   const session = fixture(); await users(session, 2); const { port } = host();
   await new ContextSupplements(session).put({ op: "add", id: "navigation", owner: DISCLOSURE_OWNER, text: "Current active context files", afterEventSeq: session.lastSeq, lifetime: "persistent" });
