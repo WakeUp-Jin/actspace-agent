@@ -80,6 +80,14 @@
 - 有一次在收到 6 秒数据后停住超过 7 分钟，连接没有断。5 次正常调用里最长的静默是 7 秒。空闲超时由此而来。
 - 13.3 秒里约 5.5 秒花在写一份完整回答上，而主模型还会重写一遍。所以内部请求只要要点。
 
+2026-11-15 带「只写要点」系统提示词复测（5 个问题：中英文各 2 个多来源问题、1 个不需要搜索的问题）：
+
+- 字段和第 3.1 节一致，补充三点：`annotations` 的每一项是 `{ "type": "url_citation", "url_citation": { url, title, start_index, end_index } }`，字段在嵌套的 `url_citation` 里；`server_tool_calls` 按步分组，每一步是 `{ index, reasoning_content, calls[] }`，`calls[]` 里才是 `action`、`status`、`sources` 或 `page`；`usage`（含 `server_tool_use`）和 `finish_reason` 在同一个 chunk。来源的网址偶尔带 HTML 转义的 `&amp;`，`annotations` 和 `sources` 里写法一致。
+- 要点提示词有效：正文 381 到 3,149 字符，从第一个正文字符到结束 1.1 到 3.7 秒（之前写完整回答约 5.5 秒）。总耗时 5.0、8.8、29.6、31.0 秒，长的两次做了 4 到 6 步、思考 1.4 万字符。
+- 引用位置：4 份有引用的结果共 46 条，`end_index` 全部落在句末或列表项末尾，没有越界。所以正文里插 `[n]` 的写法不变。
+- 不需要搜索的问题：没有 `server_tool_event`、没有 `annotations`，`usage` 里没有 `server_tool_use`。
+- 计费的搜索次数 3、4、8、10；`tool_fetch` 都是 0（打开的都是搜索结果里已带内容的网页）。`server_tool_use` 另有 `tool_image_search` 字段，这里不用。5 次里没有出现 `: keep-alive` 注释，也没有打不开的网页；最长静默 0.8 秒。
+
 OCR：
 
 - `text_recognition` 返回干净的 Markdown，表格是 HTML `<table>`，公式是 LaTeX；`rich_layout_recognition` 每个块都带 `<｜ref｜>`、`<｜box｜>` 标记和坐标。所以用前者，另外防御性地去掉这两种标记。
@@ -167,7 +175,7 @@ OCR：
 }
 ```
 
-工具说明要告诉模型四件事：什么时候用（需要多个来源或互相印证的问题；查一下就有答案的用普通搜索，已知网址用网页读取）；要 10 到 30 秒、按搜索次数计费；问题必须自带上下文；结果里的 `[n]` 标的是前面那段话的出处，引用时写成行内 Markdown 链接，不要编造网址。
+工具说明要告诉模型四件事：什么时候用（需要多个来源或互相印证的问题；查一下就有答案的用普通搜索，已知网址用网页读取）；要 10 到 60 秒（PA.1 实测 5 到 31 秒）、按搜索次数计费；问题必须自带上下文；结果里的 `[n]` 标的是前面那段话的出处，引用时写成行内 Markdown 链接，不要编造网址。
 
 ### 7.2 内部请求
 
@@ -467,7 +475,6 @@ Long pages were split; page numbers here are positions in this output, not the d
 ## 13. 已知限制
 
 - PPT、PPTX 和老格式 DOC、PPT 没有用真实接口测过。
-- 「只要要点」的提示词和 `[n]` 标记的位置质量还没验证，执行计划第一步先测，测不过有回退规则。
 - 文档缓存只在内存里，重启后重新解析、重新计费。
 - 不能在文档内搜索，只能按页读。
 - 附件最大 20 MiB。

@@ -63,7 +63,7 @@ function permissionContract(): ToolPermissionContract {
 const DESCRIPTION = [
   "Research a question with DeepSeek deep search: it plans several web searches and page reads on its own and returns concise findings with numbered sources.",
   "Use it for questions that need several sources or cross-checking. For a quick lookup use web_search; to read a known URL use web_fetch.",
-  "Takes 10-30 seconds and is billed per search.",
+  "Takes 10-60 seconds and is billed per search.",
   "The question must be self-contained: the search runs without this conversation's context.",
   "Each [n] in the result marks the source of the preceding text. When citing, write inline Markdown links with the listed URLs; never invent URLs.",
 ].join(" ");

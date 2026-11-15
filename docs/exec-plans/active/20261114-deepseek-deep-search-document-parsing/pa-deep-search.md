@@ -1,6 +1,6 @@
 # PA：深度搜索
 
-状态：未开始（交互模式），等 P0 确认。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。
+状态：执行中（交互模式），PA.1 实测做完了。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。
 
 ## 目标
 
@@ -170,6 +170,15 @@ export function assembleDeepSearchResult(outcome: DeepSearchOutcome): ToolBodyRe
 - 没有 Key：按本文的写法实现，夹具按官方文档手写，执行摘要里把 PA.1 标成「未验证」。
 
 验证：执行过程记录里有四项结论。
+
+**结论（2026-11-15，真实 Key，5 个问题）**：四项都通过，不触发回退规则。细节记在设计文档第 3.3 节。对本计划的影响：
+
+1. 字段名一致；解析时要按实测的嵌套形状取：`annotations[].url_citation.{url,title,start_index,end_index}`，`server_tool_calls[].calls[]`。网址里的 `&amp;` 统一还原成 `&`（两边写法一致，还原后仍能对上）。
+2. 正文写完 1.1 到 3.7 秒，比之前约 5.5 秒短；提示词定稿不改。总耗时最长 31 秒，工具说明里的耗时改成「10–60 秒」。
+3. 46 条引用的 `end_index` 全部在句末或列表项末尾，0 条越界；保留正文里的 `[n]`。
+4. 不需要搜索时没有引用、没有 `server_tool_use`。
+5. 夹具：`src/test/fixtures/` 下三份（搜索后读页、多步、不搜索），只保留前几个思考片段，网页摘要截到 80 字符，连续正文片段合并；没有请求头和 Key。
+6. 实测没有见到 `: keep-alive` 和 `status: failed`，这两种情况的测试用手写数据。
 
 ### PA.2 解析流、组装结果
 
