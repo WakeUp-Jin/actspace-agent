@@ -23,6 +23,8 @@ it("snapshots workspace results and rejects cross-session reads and symlink esca
     await writeFile(join(root, "secret"), "outside"); await symlink(join(root, "secret"), join(workspace, "escape"));
     await expect(artifacts.reference("s", workspace, "escape")).rejects.toMatchObject({ kind: "FORBIDDEN" });
     await expect(artifacts.reference("s", workspace, "../secret")).rejects.toMatchObject({ kind: "FORBIDDEN" });
+    await writeFile(join(workspace, "..notes.txt"), "dots");
+    expect(await artifacts.reference("s", workspace, "..notes.txt")).toMatchObject({ name: "..notes.txt", size: 4 });
     await writeFile(join(workspace, "large.bin"), Buffer.alloc(20 * 1024 * 1024 + 1));
     await expect(artifacts.reference("s", workspace, "large.bin")).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
     await expect(artifacts.reference("s", workspace, ".")).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });

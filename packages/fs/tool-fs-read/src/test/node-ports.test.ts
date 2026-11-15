@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, symlink, truncate, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, rm, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -22,6 +22,16 @@ describe("filesystem-read ports", () => {
     expect(first).toMatchObject({ status: "completed" }); expect(JSON.stringify(first)).toContain("     2|two");
     const second = await invoke(ports.read_file, { path: "src/b.txt", offset: 2, limit: 1 }); expect(JSON.stringify(second)).toContain("File unchanged");
     const listed = await invoke(ports.list_directory, { path: "src" }); const text = JSON.stringify(listed); expect(text.indexOf("a.txt")).toBeLessThan(text.indexOf("b.txt"));
+  });
+  it("reads names that merely start with two dots and still rejects paths that leave the workspace", async () => {
+    const root = await realpath(await workspace()); await mkdir(join(root, "..data")); await writeFile(join(root, "..data", "value.txt"), "dotted-directory\n"); await writeFile(join(root, "..notes.md"), "dotted-file\n");
+    const ports = createNodeToolPorts({ workspaceRoot: root });
+    expect(JSON.stringify((await invoke(ports.read_file, { path: "..notes.md" })).modelOutput)).toContain("1|dotted-file");
+    const nested = await invoke(ports.read_file, { path: "..data/value.txt" });
+    expect(JSON.stringify(nested.modelOutput)).toContain("1|dotted-directory");
+    expect(nested.summary).toBe(`Read ${join("..data", "value.txt")}`);
+    const outside = await invoke(ports.read_file, { path: join("..", "outside.txt") });
+    expect(outside).toMatchObject({ status: "failed" }); expect(JSON.stringify(outside.modelOutput)).toContain("Path escapes workspace boundary");
   });
   it("uses the immutable Session workspace for every file operation", async () => {
     const defaultRoot = await workspace();

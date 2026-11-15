@@ -14,8 +14,14 @@ describe("shared live and durable tool previews", () => {
       expect(toolPreview(name, undefined, { status: "completed" }, { args: { path: "fixture.txt", content: "text" } }, undefined, "s", "r", phase).kind).toBe(kind);
     }
   });
-  it.each([["/work", "."], ["/work/src/a.ts", "src/a.ts"], ["/work-other/a", "/work-other/a"], ["../outside", "/outside"], ["src/../a", "a"]])("displays workspace path %s as %s", (path, expected) => {
+  it.each([
+    ["/work", "."], ["/work/src/a.ts", "src/a.ts"], ["/work-other/a", "/work-other/a"], ["../outside", "/outside"], ["src/../a", "a"],
+    ["..notes.md", "..notes.md"], ["/work/..cache/a", "..cache/a"],
+  ])("displays workspace path %s as %s", (path, expected) => {
     expect(workspaceDisplayPath(path, "/work")).toBe(expected);
+  });
+  it.each([["C:\\work\\src\\a.ts", "src/a.ts"], ["C:\\work", "."], ["..\\outside", "C:/outside"], ["D:\\other\\a.ts", "D:/other/a.ts"]])("displays Windows workspace path %s as %s", (path, expected) => {
+    expect(workspaceDisplayPath(path, "C:\\work")).toBe(expected);
   });
   it("uses typed denial/cancellation and does not turn errors into edit diffs", () => {
     for (const name of ["bash", "write_file", "edit_file", "delete_file"]) {
@@ -37,6 +43,20 @@ describe("shared live and durable tool previews", () => {
     expect(toolPreview("present", undefined, { status: "running" }, call, undefined, "s", "r", "running", "/work")).toMatchObject({ kind: "present", files: [{ path: "draft.docx" }] });
     const finished = toolPreview("present", undefined, { status: "completed", summary: "Presented 1 file", detail: [{ label: "present", value: { files: [{ path: "out/report.docx", description: "Report" }] } }] }, call, undefined, "s", "r", "finished", "/work");
     expect(finished).toEqual({ kind: "present", files: [{ path: "out/report.docx", outputPath: "/work/out/report.docx", outputRelativePath: "out/report.docx", description: "Report" }], displayText: "Presented 1 file", status: "completed" });
+  });
+  it("only attaches output metadata to presented files inside the workspace", () => {
+    const files = [{ path: "../elsewhere/a.txt" }, { path: "..drafts/b.txt" }, { path: "." }];
+    const preview = toolPreview("present", undefined, { status: "completed", summary: "Presented 3 files", detail: [{ label: "present", value: { files } }] }, { args: { files } }, undefined, "s", "r", "finished", "/work");
+    expect(preview).toEqual({
+      kind: "present",
+      files: [
+        { path: "/elsewhere/a.txt" },
+        { path: "..drafts/b.txt", outputPath: "/work/..drafts/b.txt", outputRelativePath: "..drafts/b.txt" },
+        { path: ".", outputPath: "/work", outputRelativePath: "." },
+      ],
+      displayText: "Presented 3 files",
+      status: "completed",
+    });
   });
   it("does not turn failed file-tool output into a result preview", () => {
     expect(toolPreview("glob", undefined, { status: "failed", failure: { message: "SEARCH_FAILED" }, modelOutput: [{ type: "text", text: "SEARCH_FAILED" }] }, { args: { pattern: "**/*.md", path: "." } }, undefined, "s", "r")).toMatchObject({ kind: "glob", resultPreview: undefined });

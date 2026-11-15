@@ -24,6 +24,15 @@ describe("filesystem-write ports", () => {
     await expect(invoke(ports.delete_file, { path: "nested/file.txt" })).resolves.toMatchObject({ status: "completed" });
     await expect(invoke(ports.delete_file, { path: "nested" })).resolves.toMatchObject({ status: "failed", failure: { code: "NOT_A_FILE" } });
   });
+  it("accepts names that merely start with two dots and still rejects paths that leave the workspace", async () => {
+    const outer = await workspace(); const root = join(outer, "workspace"); await mkdir(root); const ports = createNodeToolPorts({ workspaceRoot: root });
+    await expect(invoke(ports.write_file, { path: "..data/..notes.md", content: "dotted\n" })).resolves.toMatchObject({ status: "completed" });
+    expect(await readFile(join(root, "..data", "..notes.md"), "utf8")).toBe("dotted\n");
+    await expect(invoke(ports.delete_file, { path: "..data/..notes.md" })).resolves.toMatchObject({ status: "completed" });
+    const outside = await invoke(ports.write_file, { path: join("..", "outside.txt"), content: "escaped" });
+    expect(outside).toMatchObject({ status: "failed" }); expect(JSON.stringify(outside.modelOutput)).toContain("Path escapes workspace boundary");
+    await expect(readFile(join(outer, "outside.txt"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
 });
 
 it("counts header-like content as additions and deletions in write and edit previews", async () => {

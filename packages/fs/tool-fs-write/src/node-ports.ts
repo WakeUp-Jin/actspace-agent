@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
+import * as nodePath from "node:path";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { isLexicallyInside, relativePathInside } from "@actspace/shared";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { canonicalizeFileResource, sliceWholeChars, TOOL_OUTPUT_LINE_CHARS, TOOL_OUTPUT_TEXT_CHARS, type ToolBodyResult, type ToolExecutionContext } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
@@ -114,8 +116,7 @@ function resolveWorkspacePath(input: string, workspaceRoot: string): string {
 }
 
 function isWithin(root: string, candidate: string): boolean {
-  const nested = relative(resolve(root), resolve(candidate));
-  return nested === "" || (!nested.startsWith("..") && !isAbsolute(nested));
+  return isLexicallyInside(nodePath, root, candidate, { includeRoot: true });
 }
 
 async function writeTextAtomic(target: string, content: string): Promise<void> {
@@ -148,7 +149,7 @@ function ioFailure(action: string, path: string, error: unknown): ToolBodyResult
 }
 
 function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
-async function displayPath(path: string, workspaceRoot: string): Promise<string> { const nested = relative(await realpath(workspaceRoot), path); return nested && !nested.startsWith("..") && !isAbsolute(nested) ? nested : path; }
+async function displayPath(path: string, workspaceRoot: string): Promise<string> { return relativePathInside(nodePath, await realpath(workspaceRoot), path) || path; }
 function countOccurrences(text: string, needle: string): number { let count = 0; let offset = 0; while ((offset = text.indexOf(needle, offset)) !== -1) { count += 1; offset += Math.max(needle.length, 1); } return count; }
 function replaceOnePreservingLine(text: string, oldText: string, newText: string): string { const index = text.indexOf(oldText); if (newText !== "" || oldText.includes("\n") || text[index + oldText.length] !== "\n") return text.slice(0, index) + newText + text.slice(index + oldText.length); return text.slice(0, index) + text.slice(index + oldText.length + 1); }
 /**

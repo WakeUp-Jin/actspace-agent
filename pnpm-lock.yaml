@@ -1867,6 +1867,9 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../composition/cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -1886,6 +1889,9 @@ importers:
       '@actspace/sandbox':
         specifier: workspace:*
         version: link:../sandbox
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

@@ -8,7 +8,7 @@ import { projectTasks } from "./task-projection.js";
 import { TaskError } from "./contracts.js";
 import { RewindError, resolveRewindCut } from "./rewind-cut.js";
 import type { SessionHandle } from "@actspace/session-persistence";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import * as nodePath from "node:path";
 import type {
   MainAgentForm,
   RuntimeV2AgentMode,
@@ -18,7 +18,7 @@ import type {
   RuntimeV2SessionListItem,
   RuntimeV2SessionSnapshot,
 } from "@actspace/shared/runtime-v2";
-import type { ManagedContextProjection } from "@actspace/shared";
+import { isLexicallyInside, type ManagedContextProjection } from "@actspace/shared";
 
 /** `afterSeq` 之后的事件和读取时的 lastSeq；lastSeq 小于调用方记住的序号说明日志被换掉了，要从头折叠。 */
 export type SessionEventsAfter = { readonly lastSeq: number; readonly events: readonly SessionEventEnvelopeV1[] };
@@ -457,7 +457,7 @@ export class AgentApplication implements AgentApplicationContract {
       for (const grant of snapshot.sessionGrants) {
         if (grant.selector.kind === "command_prefix") continue;
         const path = grant.selector.kind === "exact" ? grant.selector.canonicalPath : grant.selector.canonicalRoot;
-        if (snapshot.workspaceRoot === null || !isPathWithin(snapshot.workspaceRoot, path)) events.push(core("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: changedAt, reason: "permission-mode-downgrade" }));
+        if (snapshot.workspaceRoot === null || !isLexicallyInside(nodePath, snapshot.workspaceRoot, path, { includeRoot: true })) events.push(core("permission/grant-revoked", { schemaVersion: 1, grantId: grant.grantId, sessionId, agentId: grant.agentId, revokedAt: changedAt, reason: "permission-mode-downgrade" }));
       }
     }
     events.push(core("permission/mode-set", { mode, changedAt, source: this.source }));
@@ -477,11 +477,6 @@ export class AgentApplication implements AgentApplicationContract {
     return this.#sessions.snapshot(session);
   }
 
-}
-
-function isPathWithin(root: string, candidate: string): boolean {
-  const nested = relative(resolve(root), resolve(candidate));
-  return nested === "" || (!nested.startsWith(`..${sep}`) && nested !== ".." && !isAbsolute(nested));
 }
 
 function required<T>(ctx: CordisContext, id: string): T {
