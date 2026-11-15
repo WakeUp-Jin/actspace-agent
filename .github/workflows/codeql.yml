@@ -9,10 +9,12 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
+      - '.github/ISSUE_TEMPLATE/**'
   pull_request:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
+      - '.github/ISSUE_TEMPLATE/**'
   schedule:
     - cron: '41 4 * * 1'
   workflow_dispatch:
@@ -20,8 +22,10 @@ on:
 permissions:
   contents: read
 
+# 同一个 PR 连续推送只保留最后一次。main 上按提交分组：按分支分组时，前一次还没跑完又连推两次，
+# 中间那次会在排队时被后一次顶掉，那个提交就没有分析结果。
 concurrency:
-  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  group: codeql-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

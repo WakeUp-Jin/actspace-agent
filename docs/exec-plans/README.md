@@ -18,7 +18,7 @@
 | [代码库审查修复：工具结果体积上限、CI 门禁与中低优先级修复](active/20261110-codebase-review-fixes.md) | 2026-11-10 立项并开始执行（夜间模式）。8 个按顺序合并的 PR：CI 门禁、工具结果体积上限、修复合集、Loop 请求路径、路径安全模块、类型安全、命名、格式化；进度见计划的「进度记录」。 |
 | [App 装配层拆分](active/20261110-app-assembly-split.md) | 2026-11-10 立项，未开始。`App.tsx` 1670 行按 8 个职责拆成 `use-*` hook，App 只留装配（目标 ≤ 300 行），Context 字段与 `WorkbenchLayout` prop 不变。下一步：M1 侧边对话 + evict。 |
 | [`@actspace/shared` 契约分层](active/20261109-shared-contract-split.md) | P1 已合入（#75）：`ipc.ts` / `session.ts` 按主题拆成 `src/ipc/`、`src/session/`，`check:packages` 新增「后端包不得引用桌面 IPC 契约」规则；对外 API 不变。下一步：评估 P2（子入口与引用迁移）和 P3（按归属拆包）做不做；当初要等的 #66 / #67 / #68 已合入，评估还没开始。 |
-| [CI 提速：拆 job 并行 + tsc -b 增量缓存](active/20261109-ci-speedup.md) | P1–P3 已合入：根脚本切 `tsc -b`、`ci.yml` 拆 job 加缓存、desktop 两分片。剩下的收尾（记录各 job 时长、删除本计划）和第二轮提速都在 #92，未合并。 |
+| [CI 提速第二轮：去掉重复工作、测试再分片、路径过滤与缓存收敛](active/20261113-ci-speedup-round2.md) | 实现已完成（#92，夜间模式）：测试和检查一条没少，PR 上 `ci.yml` 整次运行 185 s → 107–142 s。下一步：合并后按[执行摘要](../exec-runs/20261113-ci-speedup-round2/execution-summary.md)的「人工验证指引」看 `main` 上的 `构建`、只改文档的 PR 和 push；看过之后删除本计划和执行记录。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 待拍板：2026-10-07 立项（来源：Desktop 前端重构 17 的特征测试），D1–D4 一直未决定；再不推进就降级回 [技术债](tech-debt-tracker.md)。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB（编辑器内 `@` 文件引用）待实施。 |
 | [前端基础组件](active/20260926-frontend-ui-components-foundation.md) | Button / IconButton / Tooltip / Menu / Popover / Dialog / Select 等已落地；只剩 Switch、Textarea、Tabs 三个基础组件及对应迁移。 |
