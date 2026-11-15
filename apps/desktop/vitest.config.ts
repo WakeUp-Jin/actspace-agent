@@ -19,16 +19,27 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    setupFiles: ["./src/renderer/test/setup.ts"],
     // main 进程测试不需要 DOM；按目录分成两个 project，省掉 90 多个 jsdom 实例的启动开销。
+    // setup 文件也各用各的：renderer 那份要加载 jest-dom、React 和 Radix，main 的 90 多个测试文件用不到，
+    // 每个文件都加载一遍比跑用例本身还慢。
     projects: [
       {
         extends: true,
-        test: { name: "main", environment: "node", include: ["src/main/**/test/**/*.test.{ts,tsx}"] },
+        test: {
+          name: "main",
+          environment: "node",
+          include: ["src/main/**/test/**/*.test.{ts,tsx}"],
+          setupFiles: ["./src/main/test/setup.ts"],
+        },
       },
       {
         extends: true,
-        test: { name: "renderer", environment: "jsdom", include: ["src/renderer/**/test/**/*.test.{ts,tsx}"] },
+        test: {
+          name: "renderer",
+          environment: "jsdom",
+          include: ["src/renderer/**/test/**/*.test.{ts,tsx}"],
+          setupFiles: ["./src/renderer/test/setup.ts"],
+        },
       },
     ],
   },

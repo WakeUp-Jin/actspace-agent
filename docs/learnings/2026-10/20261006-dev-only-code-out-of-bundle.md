@@ -2,7 +2,7 @@
 
 合并自三篇：让只在开发时用的代码真正离开生产包、常量守卫之外顶层调用也会把模块留在包里、库的入口选择决定 bundle 体积 tree-shaking 救不了你。
 
-来源：[Desktop 前端重构 10 冗余清理 T11](../../exec-runs/20261005-desktop-fe-10-redundancy-cleanup/execution-process.md)、[多智能体协作前端演示 T11](../../exec-runs/20261007-multi-agent-collab-frontend-demo/execution-process.md)、`docs/histories/2026-07/20260730-1200-right-panel-file-view-optimization.md`
+来源：[Desktop 前端重构 10 冗余清理 T11](../../histories/2026-10/20261006-0005-desktop-fe-10-redundancy-cleanup.md)、[多智能体协作前端演示 T11](../../histories/2026-10/20261007-1423-multi-agent-collab-frontend-demo.md)、`docs/histories/2026-07/20260730-1200-right-panel-file-view-optimization.md`
 
 打包器先按 `import` 建模块图，再做死代码删除。一个模块要离开生产包，需同时满足：**没人引用它的导出，且它的顶层代码没有（被认为有）副作用**。下面三层分别对应三种“删不掉”的原因。
 

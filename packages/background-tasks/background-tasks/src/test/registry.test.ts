@@ -153,6 +153,27 @@ describe("BackgroundTaskRegistry", () => {
     expect(earlier.facts().filter(fact => fact.op === "prune")).toEqual([{ op: "prune", taskId: "bash_old", prunedAt: "2026-10-22T07:00:00.000Z", reason: "session-cap" }]);
   });
 
+  it("tells the model that an output subscription stopped, wakes it, and leaves the task running", async () => {
+    const { registry, wakes, facts, inbox } = setup("parent");
+    const task = source("bash_1");
+    await registry.register(task);
+    await registry.notifySubscriptionStopped("bash_1", "Stopped watching: the pattern took too long.");
+    const pending = inbox().pending();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ source: "task_notification", notice: { taskId: "bash_1", kind: "bash", title: "task bash_1", status: "subscription_stopped" } });
+    expect(String(pending[0].content)).toContain("<status>subscription_stopped</status>");
+    expect(String(pending[0].content)).toContain("<summary>Stopped watching: the pattern took too long.</summary>");
+    expect(String(pending[0].content)).not.toContain("<output_tail>");
+    expect(wakes).toEqual(["parent"]);
+    expect(registry.hasRunning("parent")).toBe(true);
+    expect(facts().map(fact => fact.op)).toEqual(["start"]);
+
+    task.finish();
+    await flush(); await flush();
+    await registry.notifySubscriptionStopped("bash_1", "late");
+    expect(inbox().pending().map(item => item.notice?.status)).toEqual(["subscription_stopped", "completed"]);
+  });
+
   it("registers a background subagent, records its transcript and notifies with its closing message", async () => {
     const { registry, wakes, facts, inbox } = setup("parent");
     const task = agentSource("a-1");
@@ -203,5 +224,26 @@ describe("BackgroundTaskRegistry", () => {
     expect(task.stopped).toEqual(["host-shutdown"]);
     expect(facts().map(fact => fact.op)).toEqual(["start"]);
     expect(inbox().pending()).toEqual([]);
+  });
+
+  it("waits on dispose for a task that ended just before and is still writing its notice and settle record", async () => {
+    const parent = session("parent");
+    let release = () => {};
+    let pause: Promise<void> = Promise.resolve();
+    const registry = new BackgroundTaskRegistry({ openSession: async () => { await pause; return parent; }, wake: () => undefined });
+    const task = source("bash_1");
+    await registry.register(task);
+    pause = new Promise(resolve => { release = resolve; });
+    task.finish();
+    await flush();
+    let disposed = false;
+    const disposing = registry.dispose().then(() => { disposed = true; });
+    await flush();
+    expect(disposed).toBe(false);
+    release();
+    await disposing;
+    // The Host closes Sessions right after dispose; a notice without its settle record would be reported as lost at the next start.
+    expect(parent.journal.events.filter(event => event.type === "background/task").map(event => (event.data as Record<string, unknown>).op)).toEqual(["start", "settle"]);
+    expect(new MainAgentInbox(parent).pending()).toHaveLength(1);
   });
 });

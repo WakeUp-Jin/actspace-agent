@@ -1,12 +1,12 @@
-import { ContextCompactionCoordinator, type Context, type CompactionRegion, type ContextCompactionStrategy } from "@actspace/context-engine";
+import { CONTEXT_ENGINE_SERVICE, ContextCompactionCoordinator, type Context, type CompactionRegion, type ContextCompactionStrategy } from "@actspace/context-engine";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { chooseCompactionRegion } from "./region.js";
 import type { CompactionPolicy, TokenUsage } from "./policy.js";
 import { compactionThreshold } from "./policy.js";
 import type { CompactionSummarizer } from "./summarizer.js";
-import { Service } from "@actspace/cordis-adapter";
+import { ACTSPACE_SERVICE_DEFINITIONS, bindServiceType, getService, requireService, Service } from "@actspace/cordis-adapter";
 import type { CordisContext, CordisServiceContext } from "@actspace/cordis-adapter";
-import type { AuxiliaryRequestRecorder, LlmService } from "@actspace/llm-service";
+import { LLM_AUXILIARY_REQUESTS_SERVICE, LLM_SERVICE } from "@actspace/llm-service";
 import { DEFAULT_COMPACTION_POLICY } from "./policy.js";
 import { LlmCompactionSummarizer } from "./summarizer.js";
 
@@ -31,11 +31,9 @@ export class CompactionService extends Service {
   readonly runtime: CompactionPlugin;
 
   constructor(ctx: CordisServiceContext, config: CompactionPluginConfig = {}) {
-    super(ctx, "compaction.runtime");
-    const llmValue = ctx.get("llm.service") as (LlmService & { readonly runtime?: LlmService }) | undefined;
-    if (llmValue === undefined) throw new Error("Compaction Service requires llm.service.");
-    const llm = llmValue.runtime ?? llmValue;
-    const recorder = ctx.get("llm.auxiliary-requests") as AuxiliaryRequestRecorder | undefined;
+    super(ctx, COMPACTION_RUNTIME_SERVICE.id);
+    const llm = requireService(ctx, LLM_SERVICE, "Compaction Service");
+    const recorder = getService(ctx, LLM_AUXILIARY_REQUESTS_SERVICE);
     if (!recorder) throw new Error("Compaction requires llm.auxiliary-requests.");
     const routes = llm.routes.list();
     const routeId = config.routeId ?? routes.find(route => route.routeId === "utility")?.routeId ?? routes[0]?.routeId;
@@ -48,9 +46,13 @@ export class CompactionService extends Service {
   compact(session: SessionHandle, observer?: CompactionObserver): Promise<boolean> { return this.runtime.compact(session, observer); }
 }
 
+/** `compaction.runtime` 下注册的是 `CompactionService` 这个包装服务，不是 `CompactionPlugin`；取用方能用的是这三个方法。 */
+export type CompactionRuntimeService = Pick<CompactionService, "withTriggerRatio" | "maybeCompact" | "compact">;
+export const COMPACTION_RUNTIME_SERVICE = bindServiceType<CompactionRuntimeService>(ACTSPACE_SERVICE_DEFINITIONS.compaction);
+
 export function apply(ctx: CordisContext, config: CompactionPluginConfig = {}): void {
   const service = new CompactionService(ctx as never, config);
-  const engine = ctx.get?.("context.engine") as { compaction: ContextCompactionCoordinator } | undefined;
+  const engine = getService(ctx, CONTEXT_ENGINE_SERVICE);
   if (!engine) throw new Error("Compaction requires context.engine.");
   const remove = engine.compaction.register(service.runtime);
   ctx.effect?.(() => remove);

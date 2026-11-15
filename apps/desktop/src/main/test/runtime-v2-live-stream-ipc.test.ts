@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as CH, type RuntimeV2DesktopLiveEnvelope, type RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import { RUNTIME_FIXED_RENDERER_CHANNELS as CH, type RuntimeDesktopLiveEnvelope, type RuntimeSessionSnapshot } from "@actspace/shared/runtime-v2";
 import type { AgentLiveEvent } from "@actspace/shared/runtime-v2";
 import type { RuntimeStreamEvent } from "@actspace/shared";
 const { handlers, listeners } = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => any>(), listeners: new Map<string, (...args: any[]) => any>() }));
@@ -19,7 +19,7 @@ import { trustedWindow } from "./ipc-sender-fixture";
 const INTERVAL_MS = 33;
 const ids = { sessionId: "s", agentRunId: "run", turnId: "turn", stepId: "step", requestId: "req", messageId: "msg" };
 let seq = 0;
-const envelope = (event: Record<string, unknown>): RuntimeV2DesktopLiveEnvelope => ({ emittedAt: "t", event: { schemaVersion: 1, runtimeInstanceId: "r", liveSeq: ++seq, sessionId: "s", throughJournalSeq: seq, ...event } as never });
+const envelope = (event: Record<string, unknown>): RuntimeDesktopLiveEnvelope => ({ emittedAt: "t", event: { schemaVersion: 1, runtimeInstanceId: "r", liveSeq: ++seq, sessionId: "s", throughJournalSeq: seq, ...event } as never });
 const journal = (type: string) => envelope({ kind: "journal-update", update: { sessionId: "s", throughJournalSeq: seq, event: { type, seq, data: {} }, values: {} } });
 const delta = (text: string) => ({ ...ids, kind: "assistant-delta", message: text }) as unknown as AgentLiveEvent;
 
@@ -30,19 +30,19 @@ function setup(extra: Record<string, unknown> = {}) {
   const trusted = trustedWindow();
   const send = vi.fn();
   (trusted.window.webContents as { send: unknown }).send = send;
-  const liveListeners = new Set<(envelope: RuntimeV2DesktopLiveEnvelope) => void>();
+  const liveListeners = new Set<(envelope: RuntimeDesktopLiveEnvelope) => void>();
   const adapter = new FixedRendererStreamAdapter(() => undefined, INTERVAL_MS);
   const setObservedSessions = vi.fn();
   const registry = {
-    subscribe: (listener: (envelope: RuntimeV2DesktopLiveEnvelope) => void) => { liveListeners.add(listener); return () => liveListeners.delete(listener); },
+    subscribe: (listener: (envelope: RuntimeDesktopLiveEnvelope) => void) => { liveListeners.add(listener); return () => liveListeners.delete(listener); },
     subscribeRendererStream: (listener: (event: RuntimeStreamEvent) => void) => adapter.subscribe(listener),
     flushRendererStream: () => adapter.flush(), setObservedSessions, ...extra,
   };
   const registration = registerFixedRendererIpc({ roots: { dataRoot: "/tmp/live", workspaceRoot: "/tmp" }, registry, settings: { subscribeV4Changes: () => () => {} }, getMainWindow: () => trusted.window } as unknown as FixedRendererIpcOptions);
-  const emit = (value: RuntimeV2DesktopLiveEnvelope) => { for (const listener of liveListeners) listener(value); };
+  const emit = (value: RuntimeDesktopLiveEnvelope) => { for (const listener of liveListeners) listener(value); };
   const order = () => send.mock.calls.map(call => call[0] === CH.agentStream
     ? `stream:${(call[1] as { delta?: string; type: string }).delta ?? (call[1] as { type: string }).type}`
-    : `live:${(call[1] as RuntimeV2DesktopLiveEnvelope).event.update?.event.type ?? (call[1] as RuntimeV2DesktopLiveEnvelope).event.kind}`);
+    : `live:${(call[1] as RuntimeDesktopLiveEnvelope).event.update?.event.type ?? (call[1] as RuntimeDesktopLiveEnvelope).event.kind}`);
   return { trusted, send, adapter, registration, emit, setObservedSessions, order };
 }
 
@@ -106,7 +106,7 @@ describe("desktop live IPC", () => {
       usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
       activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } },
       lineage: null,
-    } as RuntimeV2SessionSnapshot;
+    } as RuntimeSessionSnapshot;
     const liveOutput = vi.fn((sessionId: string) => ({ runId: `${sessionId}-run`, revision: 4, segments: [{ kind: "text" as const, messageId: "m", text: "partial" }] }));
     const { trusted, registration } = setup({ liveOutput, inspectSession: vi.fn(async () => snapshot), inspectSessionEvents: vi.fn(async () => []) });
     try {

@@ -17,13 +17,13 @@ import {
   CNY_PER_USD,
   hasVisibleText,
 } from "@actspace/shared";
-import { foldSubagentTree, lastActivationModel, surfaceNode, type SessionSurfaceNodeV1, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView, type SubagentView } from "@actspace/shared/runtime-v2";
+import { foldSubagentTree, lastActivationModel, surfaceNode, type SessionSurfaceNodeV1, type RuntimeJsonValue, type RuntimeSessionSnapshot, type RuntimeToolView, type SubagentView } from "@actspace/shared/runtime-v2";
 import type { LiveOutputBaseline, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { inheritedThroughSeq } from "@actspace/shared/session-list-page";
 
-type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
+type EventRecord = Readonly<Record<string, RuntimeJsonValue>>;
 
-export function projectChatWindow(projection: import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection, workspaceRoot = ""): SessionRecord {
+export function projectChatWindow(projection: import("@actspace/shared/runtime-v2").RuntimeDesktopSessionProjection, workspaceRoot = ""): SessionRecord {
   const record = projectChatSession(projection.snapshot, projection.window.events, workspaceRoot);
   const deferred = new Set(projection.deferredToolCalls);
   for (const block of record.messageBlocks ?? []) {
@@ -43,7 +43,7 @@ type EventIndex = {
   readonly requestById: Map<string, RequestInfo>;
   /** 每个 step 最后一次请求（重试后的那次）；step/end 不带 requestId，靠它找回模型。 */
   readonly lastRequestByStep: Map<string, string>;
-  readonly toolByCall: Map<string, RuntimeV2ToolView>;
+  readonly toolByCall: Map<string, RuntimeToolView>;
   readonly callData: Map<string, EventRecord>;
   /** Child of an `agent`/`explore` call: `subagent/*` facts for new Sessions, `delegation/*` for old ones. */
   readonly childByCall: Map<string, ChildFacts>;
@@ -54,7 +54,7 @@ type EventIndex = {
 };
 
 export function projectChatSession(
-  snapshot: RuntimeV2SessionSnapshot,
+  snapshot: RuntimeSessionSnapshot,
   journal: readonly SessionEventEnvelopeV1[],
   fallbackWorkspaceRoot: string,
 ): SessionRecord {
@@ -81,7 +81,7 @@ export function projectChatSession(
 }
 
 export function projectChatEvents(
-  snapshot: RuntimeV2SessionSnapshot,
+  snapshot: RuntimeSessionSnapshot,
   journal: readonly SessionEventEnvelopeV1[],
 ): SessionEvent[] {
   const index = buildIndex(snapshot, journal);
@@ -263,7 +263,7 @@ function projectSurfaceNode(
  * The model only sees the effective Surface, but the chat keeps showing messages a compaction replaced:
  * they stay readable above the compaction divider, and the summary is shown inside that divider instead.
  */
-function indexActiveSurface(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]) {
+function indexActiveSurface(snapshot: RuntimeSessionSnapshot, journal: readonly SessionEventEnvelopeV1[]) {
   const messageIds = new Set(snapshot.messages.map((message) => message.messageId));
   const toolCallIds = new Set(snapshot.messages.flatMap((message) => message.kind === "tool-result" && message.callId ? [message.callId] : []));
   const compactedSeqs = new Set(journal.flatMap((event) => event.surface?.kind === "replace" ? event.surface.sourceEventSeqs : []));
@@ -289,7 +289,7 @@ function compactionSummaryText(events: readonly SessionEventEnvelopeV1[], compac
  * The subagent panel's transcript: the child's Journal projection plus, while it runs, the child's live
  * baseline (text not yet settled into a message; agent-spec-live-assistant-stream §6).
  */
-export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[], pending?: LiveOutputBaseline): SessionEvent[] {
+export function projectSubagentTranscript(snapshot: RuntimeSessionSnapshot, journal: readonly SessionEventEnvelopeV1[], pending?: LiveOutputBaseline): SessionEvent[] {
   // A forked subagent's Journal starts with the parent's events; the panel shows only what it did after the fork.
   const inherited = inheritedThroughSeq(snapshot.lineage);
   const events = projectChatEvents(snapshot, journal)
@@ -328,7 +328,7 @@ export function latestRequestModel(journal: readonly SessionEventEnvelopeV1[]): 
   return undefined;
 }
 
-type UsageSession = Pick<RuntimeV2SessionSnapshot, "sessionId" | "throughJournalSeq" | "workspaceRoot" | "metadata">;
+type UsageSession = Pick<RuntimeSessionSnapshot, "sessionId" | "throughJournalSeq" | "workspaceRoot" | "metadata">;
 
 type ActivityRequestState = {
   requestId: string;
@@ -577,7 +577,7 @@ function requestActivityStatus(reason: string | null): UsageActivityStatus {
   return "unknown";
 }
 
-function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): EventIndex {
+function buildIndex(snapshot: RuntimeSessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): EventIndex {
   const runByTurn = new Map<string, string>(); const turnByStep = new Map<string, string>(); const runByInboxMessage = new Map<string, string>(); const turnByInboxMessage = new Map<string, string>(); const requestById = new Map<string, RequestInfo>(); const lastRequestByStep = new Map<string, string>(); const callData = new Map<string, EventRecord>(); const childByCall = new Map<string, ChildFacts>(); const backgroundByCall = new Map<string, { status: string }>(); const callByTask = new Map<string, string>();
   const turnStarts = journal
     .filter((event) => event.type === "turn/start")
@@ -660,23 +660,23 @@ function identityFor(event: SessionEventEnvelopeV1, data: EventRecord, index: Ev
   return { requestId, turnId, stepId, agentRunId };
 }
 
-function backgroundNotice(value: RuntimeV2JsonValue | undefined, opensTurn: boolean): BackgroundNotice | undefined {
+function backgroundNotice(value: RuntimeJsonValue | undefined, opensTurn: boolean): BackgroundNotice | undefined {
   const notice = record(value); const taskId = string(notice.taskId); const kind = notice.kind;
   return taskId && (kind === "bash" || kind === "agent" || kind === "subagent" || kind === "agent_message") ? { taskId, taskKind: kind, title: string(notice.title) ?? taskId, status: string(notice.status) ?? "completed", opensTurn } : undefined;
 }
 function appendNode(event: SessionEventEnvelopeV1) { return event.surface?.kind === "append" ? surfaceNode(event) : null; }
-function contentBlocks(value: RuntimeV2JsonValue): readonly EventRecord[] { return Array.isArray(value) ? value.filter(isRecord) : []; }
-function contentText(value: RuntimeV2JsonValue, includeReasoning = true): string { if (typeof value === "string") return value; if (!Array.isArray(value)) return JSON.stringify(value ?? null, null, 2); return value.flatMap((entry) => { if (typeof entry === "string") return [entry]; if (!isRecord(entry)) return [JSON.stringify(entry)]; if (entry.type === "text" && typeof entry.text === "string") return [entry.text]; if (includeReasoning && entry.type === "reasoning" && typeof entry.text === "string") return [entry.text]; if (entry.type === "image") return [typeof entry.alt === "string" ? `[${entry.alt}]` : "[image]"]; if (entry.type === "artifact") return [typeof entry.label === "string" ? `[${entry.label}]` : "[attachment]"]; return []; }).join(""); }
-function attachmentViews(value: RuntimeV2JsonValue | undefined) { return contentBlocks(value ?? []).filter((entry) => entry.type === "artifact").map((entry, index) => { const artifactId = string(record(entry.artifact).artifactId) ?? `attachment-${index}`; return { id: artifactId, path: artifactId, kind: (string(record(entry.artifact).mediaType)?.startsWith("image/") ? "image" : "file") as "image" | "file", name: string(entry.label) ?? `Attachment ${index + 1}`, mimeType: string(record(entry.artifact).mediaType) ?? undefined }; }); }
-function modelOutputText(value: RuntimeV2JsonValue | undefined): string { if (!Array.isArray(value)) return ""; return value.map((entry) => { const block = record(entry); return typeof block.text === "string" ? block.text : block.value === undefined ? "" : JSON.stringify(block.value); }).filter(Boolean).join("\n"); }
-function toolModelOutputText(tool: RuntimeV2ToolView | undefined): string { return tool?.modelOutput?.map((block) => block.type === "text" ? block.text : `${block.alt} (${block.artifactId})`).join("\n") ?? ""; }
+function contentBlocks(value: RuntimeJsonValue): readonly EventRecord[] { return Array.isArray(value) ? value.filter(isRecord) : []; }
+function contentText(value: RuntimeJsonValue, includeReasoning = true): string { if (typeof value === "string") return value; if (!Array.isArray(value)) return JSON.stringify(value ?? null, null, 2); return value.flatMap((entry) => { if (typeof entry === "string") return [entry]; if (!isRecord(entry)) return [JSON.stringify(entry)]; if (entry.type === "text" && typeof entry.text === "string") return [entry.text]; if (includeReasoning && entry.type === "reasoning" && typeof entry.text === "string") return [entry.text]; if (entry.type === "image") return [typeof entry.alt === "string" ? `[${entry.alt}]` : "[image]"]; if (entry.type === "artifact") return [typeof entry.label === "string" ? `[${entry.label}]` : "[attachment]"]; return []; }).join(""); }
+function attachmentViews(value: RuntimeJsonValue | undefined) { return contentBlocks(value ?? []).filter((entry) => entry.type === "artifact").map((entry, index) => { const artifactId = string(record(entry.artifact).artifactId) ?? `attachment-${index}`; return { id: artifactId, path: artifactId, kind: (string(record(entry.artifact).mediaType)?.startsWith("image/") ? "image" : "file") as "image" | "file", name: string(entry.label) ?? `Attachment ${index + 1}`, mimeType: string(record(entry.artifact).mediaType) ?? undefined }; }); }
+function modelOutputText(value: RuntimeJsonValue | undefined): string { if (!Array.isArray(value)) return ""; return value.map((entry) => { const block = record(entry); return typeof block.text === "string" ? block.text : block.value === undefined ? "" : JSON.stringify(block.value); }).filter(Boolean).join("\n"); }
+function toolModelOutputText(tool: RuntimeToolView | undefined): string { return tool?.modelOutput?.map((block) => block.type === "text" ? block.text : `${block.alt} (${block.artifactId})`).join("\n") ?? ""; }
 function findCompactionStart(events: readonly SessionEventEnvelopeV1[], id: string | null) { if (!id) return undefined; const event = events.find((candidate) => candidate.type === "compaction/start" && string(record(candidate.data).compactionId) === id); return event === undefined ? undefined : { data: record(event.data), time: event.time }; }
 function isToolTerminal(type: string): boolean { return type === "tool/result" || type === "tool/recovery-outcome"; }
 function eventId(event: SessionEventEnvelopeV1): string { return `v2-${event.seq}`; }
-function record(value: RuntimeV2JsonValue | undefined): EventRecord { return isRecord(value) ? value : {}; }
-function isRecord(value: RuntimeV2JsonValue | undefined): value is EventRecord { return value !== undefined && value !== null && typeof value === "object" && !Array.isArray(value); }
-function string(value: RuntimeV2JsonValue | undefined): string | null { return typeof value === "string" && value.length > 0 ? value : null; }
-function nonNegative(value: RuntimeV2JsonValue | undefined): number { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0; }
-function nullableNonNegative(value: RuntimeV2JsonValue | undefined): number | null { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : null; }
-function finiteInteger(value: RuntimeV2JsonValue | undefined): number | null { return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 ? value : null; }
+function record(value: RuntimeJsonValue | undefined): EventRecord { return isRecord(value) ? value : {}; }
+function isRecord(value: RuntimeJsonValue | undefined): value is EventRecord { return value !== undefined && value !== null && typeof value === "object" && !Array.isArray(value); }
+function string(value: RuntimeJsonValue | undefined): string | null { return typeof value === "string" && value.length > 0 ? value : null; }
+function nonNegative(value: RuntimeJsonValue | undefined): number { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0; }
+function nullableNonNegative(value: RuntimeJsonValue | undefined): number | null { return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : null; }
+function finiteInteger(value: RuntimeJsonValue | undefined): number | null { return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 ? value : null; }
 function duration(start: string, end?: string): number { if (!end) return 0; const value = Date.parse(end) - Date.parse(start); return Number.isFinite(value) && value > 0 ? value : 0; }

@@ -1,4 +1,4 @@
-import type { RuntimeV2HostDescriptor, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import type { RuntimeHostDescriptor, RuntimeJsonValue } from "@actspace/shared/runtime-v2";
 import type { AgentDescriptor } from "@actspace/agent";
 import type { SkillCatalog } from "@actspace/skill";
 import { createSelectedSkillContributor, createSkillCatalogContributor } from "./skills/contributor.js";
@@ -8,7 +8,7 @@ import type { RuntimeInstructionSource } from "./host-context.js";
 export type CoreContributorOptions = {
   readonly scopeId: string;
   readonly agent: AgentDescriptor;
-  readonly host: RuntimeV2HostDescriptor;
+  readonly host: RuntimeHostDescriptor;
   readonly workspaceRoot: string;
   readonly instructions: readonly RuntimeInstructionSource[];
   readonly skills: SkillCatalog;
@@ -86,7 +86,7 @@ export function createCoreContributors(options: CoreContributorOptions): readonl
   return Object.freeze(contributors);
 }
 
-function contributor(scopeId: string, id: string, layer: PromptContributor["layer"], order: number, kind: PromptContributor["kind"], value: RuntimeV2JsonValue): PromptContributor {
+function contributor(scopeId: string, id: string, layer: PromptContributor["layer"], order: number, kind: PromptContributor["kind"], value: RuntimeJsonValue): PromptContributor {
   return Object.freeze({
     id,
     ownerPluginId: "@actspace/core",
@@ -149,7 +149,7 @@ function coreScripting(bundledPython: boolean): string {
   ].join("\n");
 }
 
-function scriptingFacts(scripting: ScriptingFacts, sessionId: string): RuntimeV2JsonValue {
+function scriptingFacts(scripting: ScriptingFacts, sessionId: string): RuntimeJsonValue {
   const python = scripting.python;
   return {
     scratchDirectory: scripting.scratchDirectory(sessionId),

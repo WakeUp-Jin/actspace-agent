@@ -1,6 +1,6 @@
 # 沙箱设计
 
-> 工具沙箱（含地基）、评估沙箱、工具沙箱的出沙箱与回退（第 9 节）均已实现。计划与执行摘要：[sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md)（[摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)）、[sandbox-v2-evaluation-sandbox](../../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md)（[摘要](../../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)）、[sandbox-escape-fallback](../../exec-plans/completed/20261025-sandbox-escape-fallback.md)。Windows 原生后端尚未实现。
+> 工具沙箱（含地基）、评估沙箱、工具沙箱的出沙箱与回退（第 9 节）均已实现。Windows 原生后端尚未实现。
 
 ## 1. 结论
 
@@ -194,8 +194,6 @@ flowchart LR
 
 ## 8. 实测结论（nono 0.80.0）
 
-详见[执行过程](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-process.md)步骤 1。
-
 - nono 权限清单的 `deny` 不生效；禁止读取改用拆分覆盖，禁止写入只有 macOS profile 能表达（见 5.1）。
 - macOS 上 nono 会拦截钥匙串，沙箱内 `git push`、`gh` 需要申请沙箱外执行；用户接受这个更严格的行为。
 - 每次 `wrap` 的额外耗时：权限清单模式约 31ms，profile 模式约 55ms（授权条目约 110 条）。
@@ -208,7 +206,7 @@ flowchart LR
 - 经真实 Host 端到端（`touch`）：nono 约 60ms，Seatbelt 约 14ms；工作区内写入、`git status`、`pnpm --version` 成功，`~` 下写入、读取 `~/.ssh` 失败，后台任务停止后无残留进程。
 - Linux 在 Docker Desktop（arm64，内核 6.12，Landlock V6）中实测：nono 拦截工作区外写入、凭据读取与网络；`tool` 沙箱因 `filesystem.write-deny` 不支持而不可用，bash 转审批。
 
-第二期实施后补充（详见[执行过程](../../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-process.md)步骤 1、7）：
+第二期实施后补充：
 
 - `run` 的额外耗时（`/usr/bin/true`，5 次中位数）：macOS 上 `run` 158ms、`wrap` 45ms；Linux 上 `run` 41ms、`wrap` 7ms。多出来的是代理启动，一次评估只启动一次。
 - supervisor 是进程组长，对进程组终止后没有残留；只终止组长会留下子进程。退出码原样透传。
@@ -216,7 +214,7 @@ flowchart LR
 - 集成测试（真实 nono + 真实 CLI + 本机假模型服务）发现了 5.1 里的两处 nono 默认行为：系统写入组让候选能写原工作区所在的临时目录；空的 `allow_domain` 让网络完全放开。两处都已修正，并有用例覆盖。
 - Linux 上候选能正常跑通，但 Docker Desktop 的 virtiofs 挂载目录与 Landlock 不兼容：`nono why` 说允许、读取却报 EACCES。在 Docker 里测要把仓库复制进容器自己的文件系统，并用 `docker run --init` 回收僵尸进程。
 
-出沙箱与回退实施时补充（macOS，nono 与 Seatbelt，详见[执行过程](../../exec-runs/20261025-sandbox-escape-fallback/execution-process.md)步骤 1）：
+出沙箱与回退实施时补充（macOS，nono 与 Seatbelt）：
 
 - 沙箱拦截写入一律报 `Operation not permitted`（EPERM），命令自己的权限错误是 `Permission denied`（EACCES），可以区分；被拦命令的退出码有 1、4、255，所以识别时只排除 2、126、127。
 - npm 被拦时 `EPERM` 出现在较前面，最后几行是误导性的 “sudo chown” 建议，所以要看输出末尾 8KB，不能只看最后几行。
@@ -224,7 +222,7 @@ flowchart LR
 
 ## 9. 工具沙箱的出沙箱与回退
 
-调研了 Codex（CLI 与 App 共用 `codex-rs`）、Cursor、DSH、OpenCode 的做法后确认（调研结论见[计划](../../exec-plans/completed/20261025-sandbox-escape-fallback.md)背景一节）。
+调研了 Codex（CLI 与 App 共用 `codex-rs`）、Cursor、DSH、OpenCode 的做法后确认。
 
 **结论：每条 bash 默认进沙箱；Agent 只能申请出去，出去要过审批；命令被沙箱拦了，结果里告诉 Agent 可以申请。**
 

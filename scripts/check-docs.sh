@@ -23,7 +23,6 @@ required_files=(
   "docs/design-docs/frontend/front-文案与状态表达规范.md"
   "docs/design-docs/frontend/front-组件与交互模式规范.md"
   "docs/learnings/README.md"
-  "docs/exec-plans/completed/README.md"
   "docs/references/README.md"
   "docs/exec-plans/README.md"
   "docs/exec-plans/templates/execution-plan.md"
@@ -41,9 +40,30 @@ for path in "${required_files[@]}"; do
   fi
 done
 
-for dir in docs/exec-plans/active docs/exec-plans/completed docs/histories; do
+for dir in docs/exec-plans/active docs/histories; do
   if [[ ! -d "${repo_root}/${dir}" ]]; then
     echo "缺少必要目录: ${dir}"
+    missing=1
+  fi
+done
+
+# 完成的计划和它的执行记录直接删除，不归档（docs/PLANS_GUIDE.md「计划完成时」）。
+# 只看 Markdown：本机目录里可能还留着被 .gitignore 忽略的截图或 .DS_Store。
+has_markdown() {
+  [[ -d "$1" && -n "$(find "$1" -type f -name '*.md' -print -quit)" ]]
+}
+
+if has_markdown "${repo_root}/docs/exec-plans/completed"; then
+  echo "docs/exec-plans/completed/ 已停用：完成的计划直接删除，不归档"
+  missing=1
+fi
+
+for run_dir in "${repo_root}"/docs/exec-runs/*/; do
+  name="$(basename "${run_dir}")"
+  [[ "${name}" != "templates" ]] || continue
+  has_markdown "${run_dir}" || continue
+  if [[ ! -e "${repo_root}/docs/exec-plans/active/${name}.md" && ! -d "${repo_root}/docs/exec-plans/active/${name}" ]]; then
+    echo "docs/exec-runs/${name}/ 没有对应的 active 计划：计划完成后执行记录要一起删除"
     missing=1
   fi
 done
@@ -64,7 +84,7 @@ for entry in "${repo_root}"/docs/exec-plans/active/*; do
     entry_file="${entry}/README.md"
   fi
   if [[ -f "${entry_file}" ]] && head -n 8 "${entry_file}" | grep -Eq '状态[：:].*(已完成|代码.*完成|里程碑.*完成)'; then
-    echo "active 计划顶部声明已经完成，应移到 completed/: ${name}"
+    echo "active 计划顶部声明已经完成，应按 docs/PLANS_GUIDE.md「计划完成时」收尾并删除: ${name}"
     missing=1
   fi
 done

@@ -130,7 +130,8 @@ const point = await locator.invoke("point", { selector: ".multi" });
 assert.deepEqual({ x: point.x, y: point.y }, { x: 60, y: 35 });
 
 window.document.querySelectorAll(".multi")[1].dataset.hidden = "false";
-await assert.rejects(() => locator.invoke("point", { selector: ".multi" }), /selector_ambiguous/);
+// Ambiguity is only reported when the wait times out; without timeoutMs that is the 10 s default.
+await assert.rejects(() => locator.invoke("point", { selector: ".multi", timeoutMs: 100 }), /selector_ambiguous/);
 
 const input = window.document.querySelector("#name");
 const events = [];

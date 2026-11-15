@@ -1,7 +1,7 @@
 import { officialSkillsRoot, OFFICIAL_SKILLS_VERSION } from "@actspace/official-skills";
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { SkillCatalog, type SkillRecord } from "./catalog.js";
 
 export const DEFAULT_SKILL_ROOTS = Object.freeze([".actspace/skills", ".agents/skills", ".claude/skills"]);
@@ -60,8 +60,6 @@ async function parseSkill(path: string, source: string): Promise<SkillRecord | n
   const name = fields.get("name") ?? id;
   const description = fields.get("description") ?? "";
   if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(id) || description.length === 0 || description.length > 1024) return null;
-  const root = resolve(path, "..");
-  if (relative(root, path).startsWith("..")) return null;
   await stat(path);
   return Object.freeze({ id, name, description, path, source, contentDigest: createHash("sha256").update(match[2]).digest("hex") });
 }

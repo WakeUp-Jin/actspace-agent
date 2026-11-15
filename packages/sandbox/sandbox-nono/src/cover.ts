@@ -1,5 +1,7 @@
 import { lstat, readdir, realpath, stat } from "node:fs/promises";
-import { isAbsolute, join, relative } from "node:path";
+import * as nodePath from "node:path";
+import { join } from "node:path";
+import { isLexicallyInside } from "@actspace/shared";
 
 export interface CoverFs {
   readdir(path: string): Promise<readonly string[]>;
@@ -51,4 +53,4 @@ export async function coverReadable(roots: readonly string[], excluded: readonly
   return { directories, files };
 }
 
-export function contains(root: string, candidate: string): boolean { const nested = relative(root, candidate); return nested === "" || (!nested.startsWith("..") && !isAbsolute(nested)); }
+export function contains(root: string, candidate: string): boolean { return isLexicallyInside(nodePath, root, candidate, { includeRoot: true }); }

@@ -1,9 +1,11 @@
-import { containNotification, type CordisContext } from "@actspace/cordis-adapter";
-import type { PromptHostPort } from "@actspace/prompt";
+import { ACTSPACE_SERVICE_IDS, containNotification, getService, serviceView, type CordisContext } from "@actspace/cordis-adapter";
+import { PROMPT_HOST_PORT } from "@actspace/prompt";
 import type { SessionHeaderV1 } from "@actspace/session-journal";
 import { PLUGIN_ID, PROMPT_ID, SIDE_CHAT_SECTION } from "./prompt.js";
 
 type SessionRuntime = { getOpen(sessionId: string): { readonly header: SessionHeaderV1 } | undefined };
+/** 这个包用到的 `session.runtime`：只看打开着的会话的 header。 */
+export const SIDE_CHAT_SESSIONS_VIEW = serviceView<SessionRuntime>(ACTSPACE_SERVICE_IDS.sessionRuntime);
 
 export const inject = Object.freeze(["session.runtime"]);
 
@@ -22,9 +24,9 @@ export class SideChatService {
 
   private attach(sessionId: string): void {
     if (this.registrations.has(sessionId)) return;
-    const session = (this.ctx.get?.("session.runtime") as SessionRuntime | undefined)?.getOpen(sessionId);
+    const session = getService(this.ctx, SIDE_CHAT_SESSIONS_VIEW)?.getOpen(sessionId);
     if (session?.header.lineage?.origin !== "side-chat") return;
-    const extensions = (this.ctx.get?.("actspace.host.prompt") as PromptHostPort | undefined)?.extensions;
+    const extensions = getService(this.ctx, PROMPT_HOST_PORT)?.extensions;
     if (!extensions) throw new Error("Side chat prompt requires actspace.host.prompt extensions.");
     this.registrations.set(sessionId, extensions.registerMainSession(sessionId, {
       id: PROMPT_ID, owner: PLUGIN_ID, order: 100, criticality: "optional", fields: ["system"],

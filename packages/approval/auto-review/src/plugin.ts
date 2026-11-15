@@ -1,10 +1,10 @@
-import type { CordisContext } from "@actspace/cordis-adapter";
-import type { AuxiliaryRequestRecorder, LlmService } from "@actspace/llm-service";
-import { createAutoReviewer } from "./review.js";
+import { getService, provideService, type CordisContext } from "@actspace/cordis-adapter";
+import { LLM_AUXILIARY_REQUESTS_SERVICE, LLM_SERVICE } from "@actspace/llm-service";
+import { AUTO_REVIEW_SERVICE, createAutoReviewer } from "./review.js";
 export function apply(ctx: CordisContext): void {
-  const llm = ctx.get?.("llm.service") as LlmService | undefined;
+  const llm = getService(ctx, LLM_SERVICE);
   if (!llm) throw new Error("Auto review requires llm.service");
-  const recorder = ctx.get?.("llm.auxiliary-requests") as AuxiliaryRequestRecorder | undefined;
+  const recorder = getService(ctx, LLM_AUXILIARY_REQUESTS_SERVICE);
   if (!recorder) throw new Error("Auto review requires llm.auxiliary-requests");
-  ctx.provide?.("approval.auto-review", createAutoReviewer(llm, recorder));
+  provideService(ctx, AUTO_REVIEW_SERVICE, createAutoReviewer(llm, recorder));
 }

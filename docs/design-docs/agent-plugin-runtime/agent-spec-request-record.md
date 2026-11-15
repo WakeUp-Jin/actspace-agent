@@ -2,7 +2,7 @@
 
 > 管每次模型调用在日志里留下什么（`request/header`、`request/context`，以及新增的 `request/system-prompt`、`request/tools`），以及上下文 token 估算从哪里来。流式输出见[流式输出只走实时通道](agent-spec-live-assistant-stream.md)，事件词汇见[事件模型](agent-spec-dsh-event-model.md)，投影架构见[Runtime Projection](agent-spec-runtime-projection.md)。
 
-状态：已实现，执行计划 [20261106-request-record](../../exec-plans/completed/20261106-request-record.md)。压缩替换按 DSH 的做法，在替换事件上记录被替换部分的估算（§6.3.1）。§9 的实机对比待用户删除旧会话后重跑。
+状态：已实现。压缩替换按 DSH 的做法，在替换事件上记录被替换部分的估算（§6.3.1）。§9 的实机对比待用户删除旧会话后重跑。
 
 ## 1. 为什么改
 
@@ -58,7 +58,7 @@ request/context         每次写
 - 「不同」按内容 digest 比较，比较对象是**日志里**最近一条同类事件，不是内存。所以进程重启、恢复会话后，只要内容没变就不会重写。子 Agent 有自己的日志，第一次请求时照常写。
 - 重试（`loop.ts` 的 `llm/retry` 之后）也走同样的规则，通常不会多写。
 - 关系校验（`invariant-validator.ts`）：两种新事件只能出现在「已打开、还没写 `request/context`」的请求里，`requestId` 必须相同。`request/context` 仍是每个请求一条。
-- 无 `contextSources` 的旧拼装路径（`assembler.finalize`）只有测试里用。执行计划先确认它能否直接删除；保留的话也按本规范写。
+- 无 `contextSources` 的旧拼装路径已删除（2026-11-13）：`AgentLoop` 的 `contextSources` 是必填项，测试夹具默认带对话和工具两个透传来源。
 
 ## 4. 两个新事件
 

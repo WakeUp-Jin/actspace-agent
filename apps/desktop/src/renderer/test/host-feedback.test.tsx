@@ -223,5 +223,6 @@ it("opens 设置 › 远端 Host from 连接远端机器… when no Host is conf
   await user.click(await screen.findByRole("button", { name: "选择运行位置" }));
   expect(screen.queryByRole("menuitem", { name: /^远端机器/ })).not.toBeInTheDocument();
   await user.click(screen.getByRole("menuitem", { name: "连接远端机器…" }));
-  expect(await screen.findByRole("heading", { name: "Agent 服务器" })).toBeInTheDocument();
+  // SettingsPage 是 React.lazy：一次测试运行里第一个打开设置的用例要等 vite 转译整棵设置树，在慢的 CI runner 上会超过 findBy 默认的 1 s；谁是第一个由分片决定。
+  expect(await screen.findByRole("heading", { name: "Agent 服务器" }, { timeout: 10_000 })).toBeInTheDocument();
 });

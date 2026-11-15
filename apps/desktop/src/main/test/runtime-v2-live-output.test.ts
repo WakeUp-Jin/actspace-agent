@@ -2,11 +2,11 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-const { bootDesktopRuntimeV2 } = vi.hoisted(() => ({ bootDesktopRuntimeV2: vi.fn() }));
-vi.mock("../runtime-v2/desktop-host-adapter", () => ({ bootDesktopRuntimeV2 }));
+const { bootDesktopRuntime } = vi.hoisted(() => ({ bootDesktopRuntime: vi.fn() }));
+vi.mock("../runtime-v2/desktop-host-adapter", () => ({ bootDesktopRuntime }));
 import type { RuntimeStreamEvent } from "@actspace/shared";
 import { PendingApprovalRegistry } from "../approval-registry";
-import { DesktopRuntimeV2Registry, type DesktopRuntimeV2RegistryOptions } from "../runtime-v2/runtime-registry";
+import { DesktopRuntimeRegistry, type DesktopRuntimeRegistryOptions } from "../runtime-v2/runtime-registry";
 
 // 规范 agent-spec-live-assistant-stream §5：主进程持有当前运行的实时底稿，实时帧带 revision，读底稿前先冲掉攒着的帧。
 
@@ -26,14 +26,14 @@ describe("desktop registry live output", () => {
       subscribeSessionProjection: vi.fn((listener: typeof onProjection) => { onProjection = listener; return vi.fn(); }),
       isIdleForReconfigure: vi.fn(async () => true),
     };
-    bootDesktopRuntimeV2.mockImplementation(async (options: { onRuntimeLive: typeof onRuntimeLive }) => {
+    bootDesktopRuntime.mockImplementation(async (options: { onRuntimeLive: typeof onRuntimeLive }) => {
       onRuntimeLive = options.onRuntimeLive;
       return { browserReady: false, profile: {
         context: { get: (name: string) => name === "desktop.app" ? app : undefined },
         getState: () => ({ state: "ready", runtimeInstanceId: "test" }), shutdown: vi.fn(async () => {}),
       } };
     });
-    const registry = new DesktopRuntimeV2Registry({ roots: { dataRoot, workspaceRoot: join(dataRoot, "w"), defaultWorkspaceRoot: join(dataRoot, "w") }, approvals: new PendingApprovalRegistry(), loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
+    const registry = new DesktopRuntimeRegistry({ roots: { dataRoot, workspaceRoot: join(dataRoot, "w"), defaultWorkspaceRoot: join(dataRoot, "w") }, approvals: new PendingApprovalRegistry(), loadModule: async () => ({}) } as unknown as DesktopRuntimeRegistryOptions);
     cleanups.push(async () => { await registry.dispose(); await rm(dataRoot, { recursive: true, force: true }); });
     await registry.boot();
     const frames: RuntimeStreamEvent[] = [];

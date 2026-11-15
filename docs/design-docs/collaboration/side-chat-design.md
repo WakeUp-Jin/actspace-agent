@@ -1,7 +1,6 @@
 # 侧边对话（Side Chat）设计
 
 > 概念与交互 demo 已删除，见 git 历史；界面规范见 `docs/design-docs/frontend/`。
-> 执行计划：`docs/exec-plans/completed/20261021-side-chat.md`
 
 ## 为什么做
 
@@ -34,7 +33,7 @@
 ```text
 renderer  右栏 sideChat tab ─ SideChatView（TurnView + Composer） ─ /side
    │ IPC sessions.openSideChat / sessions.listSideChats
-main      RuntimeV2Registry.openSideChat ─ usage 目录 side_chat_parent_id
+main      DesktopRuntimeRegistry.openSideChat ─ usage 目录 side_chat_parent_id
    │
 agent-service  AgentApplication.openSideChat：算分叉点 → SessionStore.fork(origin "side-chat") → 设 Plan 模式
    │                    ↑ resolveSideChatBoundary（纯函数）

@@ -5,8 +5,7 @@ bundle 后变成两个不同的模块实例**：`instanceof SomeError` 判空、
 结论：拆分边界只能落在双方只经服务对象（`ctx.get` / `ctx.provide`）交互的接缝上；要判断某条边界安不安全，看拆出来的产物里
 实际保留了什么，不要看打包器的输入模块图。
 
-关联：[后端插件包解耦 P2](../../exec-runs/20261109-harness-plugin-decoupling/execution-process.md)（步骤 9）、
-[history](../../histories/2026-11/20261109-1600-harness-plugin-decoupling-p2.md)。
+关联：[后端插件包解耦 P2 history](../../histories/2026-11/20261109-1600-harness-plugin-decoupling-p2.md)。
 
 ## 为什么会这样
 

@@ -2,7 +2,7 @@
 
 合并自：渲染出来的一条消息不一定是计费边界、请求计量为什么要先于业务解析落盘。
 
-关联：[`20260725-2106-turn-usage-cost-visibility.md`](../../histories/2026-07/20260725-2106-turn-usage-cost-visibility.md)、[BUG-045 工程修复](../../exec-runs/20261021-actspace-full-acceptance/execution-summary.md#bug-045)
+关联：[`20260725-2106-turn-usage-cost-visibility.md`](../../histories/2026-07/20260725-2106-turn-usage-cost-visibility.md)、[BUG-045 工程修复](../../histories/2026-10/20261022-0746-acceptance-small-fixes.md)
 
 ## 1. 事实按 LLM call 细分，视图后聚合
 

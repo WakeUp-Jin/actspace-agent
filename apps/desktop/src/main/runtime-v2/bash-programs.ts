@@ -1,6 +1,6 @@
 /**
  * 从一条 Bash 命令里拆出运行过的程序，供 Context 面板「Bash 命令」统计使用。
- * 规则见 `docs/exec-plans/completed/design-archive/frontend/front-Context面板Bash命令统计.md` §3.2（现行口径见 `front-Context面板规范.md` §5.2）：
+ * 计数口径见 `docs/design-docs/frontend/front-Context面板规范.md` §5.2：
  * 只做统计，拆不出来的段直接跳过，不追求完整的 shell 语法。
  */
 

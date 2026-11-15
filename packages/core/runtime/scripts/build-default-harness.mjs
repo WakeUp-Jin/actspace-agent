@@ -15,6 +15,10 @@ import { join } from "node:path";
 //   published under its own manifest so a Harness patch can replace that plugin alone.
 // Tool plugins only reach the kernel through services, so bundling them separately duplicates
 // nothing that relies on module identity (no shared `instanceof` classes, symbols or weak maps).
+// A plugin names a kernel service by importing its definition (`TOOL_RUNTIME_SERVICE`, `LLM_SERVICE`, ...).
+// That import must not carry the implementation along: the owning package keeps its definitions in a
+// `service-keys.ts` that only type-imports the implementation and declares `"sideEffects": false`.
+// `default-harness.test.ts` fails when a plugin artifact contains a service class.
 const root = fileURLToPath(new URL("../", import.meta.url));
 const outdir = join(root, "dist/default-harness");
 const harness = PLUGIN_CATALOG.filter(entry => entry.loaders.includes("harness"));

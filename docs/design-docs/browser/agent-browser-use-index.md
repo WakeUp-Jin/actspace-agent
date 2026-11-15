@@ -84,6 +84,6 @@ Desktop 绑定与 Runtime adapter：`apps/desktop/src/main/runtime-v2/browser-ca
 2. [命令面](agent-browser-use-command-surface.md)：62 条命令参数与行为。
 3. [命令实现](agent-browser-use-command-implementation.md)：实现分层、CDP 原语与源码导航。
 4. 本文「Bridge：Host、协议与安装」：Host、安装、实例路由与宿主边界。
-5. [连接体验执行计划](../../exec-plans/completed/20260928-chrome-connect-experience.md)：首次连接、安装打包与真实 Chrome 验收的跟踪（计划已暂停，验收项未关闭）。
+5. [技术债表](../../exec-plans/tech-debt-tracker.md)「Browser Use 遗留」：首次连接、安装打包与真实 Chrome 验收里还没关闭的项。
 
 源码入口：`packages/browser/tool-browser/src/plugin.ts`、`node-capability.ts`，`packages/core/agent/src/agent-mode-policy.ts`，`browser-bridge/apps/cli/internal/commands/registry.go`。命令变化先更新 Go registry，再运行 `node scripts/check-browser-command-registry.mjs`。该检查验证生成 metadata 和文档标题 parity，不替代真实 Chrome 验收。

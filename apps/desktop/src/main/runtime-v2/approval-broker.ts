@@ -1,9 +1,9 @@
 import type { ApprovalBroker, ApprovalDecision, ApprovalRequest } from "@actspace/approval";
 import type { ApprovalResourceSummary } from "@actspace/shared/runtime-v2";
-import type { DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2ApprovalRequest } from "./host-ports";
+import type { DesktopRuntimeApprovalPort, DesktopRuntimeApprovalRequest } from "./host-ports";
 
 export class DesktopApprovalBroker implements ApprovalBroker {
-  constructor(private readonly approvals: DesktopRuntimeV2ApprovalPort) {}
+  constructor(private readonly approvals: DesktopRuntimeApprovalPort) {}
 
   async requestApproval(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalDecision> {
     if (signal.aborted) return denied(request.requestId, "aborted");
@@ -50,7 +50,7 @@ export class DesktopApprovalBroker implements ApprovalBroker {
 }
 
 /** Where an approved process runs: the card shows "real environment" when Bash leaves the sandbox. */
-export function executionEnvironment(resources: readonly ApprovalResourceSummary[]): DesktopRuntimeV2ApprovalRequest["executionEnvironment"] {
+export function executionEnvironment(resources: readonly ApprovalResourceSummary[]): DesktopRuntimeApprovalRequest["executionEnvironment"] {
   const process = resources.find((resource) => resource.kind === "process");
   return process?.kind !== "process" || process.noSandbox === undefined ? undefined : process.noSandbox ? "real" : "sandbox";
 }

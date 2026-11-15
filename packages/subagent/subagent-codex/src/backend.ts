@@ -12,7 +12,7 @@ export const CODEX_NOT_LOGGED_IN = "Codex is not logged in. Run codex login in a
 /** `initialize` → `thread/start` → `turn/start` must answer within this time. */
 const STARTUP_TIMEOUT_MS = 60_000;
 
-/** Plugin settings, with unknown values falling back to the defaults (design 04 §4). */
+/** Plugin settings, with unknown values falling back to the defaults (agent-subagent-runtime.md「外部子智能体」). */
 export function codexConfig(input: Readonly<Record<string, unknown>> | undefined): CodexConfig {
   const approvalPolicy = CODEX_APPROVAL_POLICIES.find(value => value === input?.approvalPolicy) ?? DEFAULT_CODEX_CONFIG.approvalPolicy;
   const sandbox = CODEX_SANDBOX_MODES.find(value => value === input?.sandbox) ?? DEFAULT_CODEX_CONFIG.sandbox;
@@ -28,7 +28,7 @@ export type CodexBackendOptions = {
 };
 
 /**
- * `agent_codex` (design 04 §3.1): `codex app-server` over stdio JSON-RPC, one non-ephemeral thread and one turn.
+ * `agent_codex` (agent-subagent-runtime.md「外部子智能体」): `codex app-server` over stdio JSON-RPC, one non-ephemeral thread and one turn.
  * The record path is the thread's rollout file; server requests (approvals, elicitation) are always refused.
  */
 export function createCodexBackend(options: CodexBackendOptions = {}): ExternalSubagentBackend {

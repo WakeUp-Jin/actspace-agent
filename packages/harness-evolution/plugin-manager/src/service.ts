@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile, realpath, lstat } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import { pluginDevelopmentRoot } from "@actspace/official-skills";
 import { verifyPluginArtifact, type PluginArtifact, type PluginArtifactManifest } from "@actspace/cordis-adapter";
 import { atomicJson, readJson, type HarnessHmr, type SessionHarnessBinding } from "@actspace/harness-hmr";
@@ -135,8 +135,9 @@ export class PluginManager {
     }
     const directory = join(parent, workspaceId);
     await mkdir(directory);
+    // 上面两级目录都确认过是真实路径，新建的这一级只要没被换成链接，真实路径就是它自己。
     const resolved = await realpath(directory);
-    if (relative(await realpath(context.workspaceRoot), resolved).startsWith("..")) throw new Error("Workspace directory escapes project root");
+    if (resolved !== directory) throw new Error("Workspace directory escapes project root");
     const initial = await readSource(original); initial.metadata.name = toolName;
     await writeFile(join(directory, "tool.json"), JSON.stringify(initial.metadata, null, 2) + "\n", { flag: "wx" });
     await writeFile(join(directory, "implementation.ts"), initial.implementation, { flag: "wx" });

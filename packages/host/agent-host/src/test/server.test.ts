@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import WebSocket from "ws";
+import { HostError, HostRequestError } from "@actspace/shared/host-protocol";
 import { HostAuth } from "../auth.js";
 import { HostGateway, type HostRequestContext } from "../server.js";
 const dispose: (() => Promise<unknown>)[] = [];
@@ -48,6 +49,39 @@ it("serves oversized replies as authenticated connection-owned pages", async () 
   }
   expect(JSON.parse(json)).toEqual({ jsonrpc: "2.0", id: 999, result: { text: "中文🙂".repeat(200000) } });
   expect((await f.call("payloads.read", { payloadId: envelope.params.id, part: 0 })).error.data.kind).toBe("NOT_FOUND");
+});
+
+it("returns request mistakes with their own code and message, and reports Host faults to the operator only", async () => {
+  const root = await mkdtemp(join(tmpdir(), "host-gateway-errors-")); dispose.push(() => rm(root, { recursive: true, force: true }));
+  const auth = new HostAuth(root); await auth.open();
+  const failures: string[] = [];
+  const server = new HostGateway({ auth, port: 0, state: () => "ready", onFailure: (method, error) => { failures.push(`${method}: ${String(error)}`); }, dispatch: async method => {
+    if (method === "sessions.page") throw new TypeError("Cannot read properties of undefined (reading '/srv/host/private')");
+    if (method === "sessions.list") throw new Error("ENOENT: no such file or directory, open '/srv/host/private/state.json'");
+    if (method === "sessions.tool") throw new HostRequestError("Invalid callId");
+    throw new HostError("NOT_FOUND", "Session not found");
+  } });
+  const port = await server.listen(); dispose.push(() => server.close());
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/rpc`); await new Promise<void>((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
+  let id = 0;
+  const send = (frame: Record<string, unknown>) => new Promise<any>(resolve => { const current = ++id; const listener = (data: WebSocket.RawData) => { const reply = JSON.parse(data.toString()); if (reply.id === current) { ws.off("message", listener); resolve(reply); } }; ws.on("message", listener); ws.send(JSON.stringify({ id: current, ...frame })); });
+  const call = (method: string, params: unknown = {}) => send({ jsonrpc: "2.0", method, params });
+  await call("host.hello", { protocol: "actspace-host/1" }); await call("auth.pair", { code: (await auth.createPairCode()).code, name: "test" });
+
+  expect((await call("sessions.page")).error).toEqual({ code: -32603, message: "Host operation failed" });
+  expect((await call("sessions.list")).error).toEqual({ code: -32603, message: "Host operation failed" });
+  expect(failures).toEqual([
+    "sessions.page: TypeError: Cannot read properties of undefined (reading '/srv/host/private')",
+    "sessions.list: Error: ENOENT: no such file or directory, open '/srv/host/private/state.json'",
+  ]);
+
+  expect((await call("sessions.tool")).error).toEqual({ code: -32602, message: "Invalid callId" });
+  expect((await call("payloads.read", { payloadId: "p", part: 0, extra: true })).error).toEqual({ code: -32602, message: "Unexpected payload parameter" });
+  expect((await call("payloads.read", { payloadId: "p", part: -1 })).error).toEqual({ code: -32602, message: "Invalid part" });
+  expect((await call("sessions.unknown")).error).toEqual({ code: -32601, message: "Unknown Host method" });
+  expect((await send({ jsonrpc: "1.0", method: "sessions.page" })).error).toEqual({ code: -32600, message: "Invalid JSON-RPC request" });
+  expect((await call("tasks.submit")).error).toEqual({ code: -32000, message: "Session not found", data: { kind: "NOT_FOUND", retryable: false } });
+  expect(failures).toHaveLength(2);
 });
 
 it("disconnects a stalled subscriber without blocking another device", async () => {

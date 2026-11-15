@@ -1,6 +1,7 @@
 import { realpath } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import type { WorkspaceRegistry } from "@actspace/shared";
+import * as nodePath from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { isLexicallyInside, type WorkspaceRegistry } from "@actspace/shared";
 import type { AppDataRoots } from "./app-paths";
 import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection, type WorkspaceRegistryOptions } from "./workspace-registry-service";
 
@@ -89,8 +90,7 @@ export async function registeredWorkspaceRoot(options: WorkspaceRegistryOptions,
 
 /** `child` 等于 `parent` 或在它下面。只做路径比较，调用方负责先 realpath。`..foo` 这类名字不算越界。 */
 export function isPathInside(parent: string, child: string): boolean {
-  const rel = relative(resolve(parent), resolve(child));
-  return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+  return isLexicallyInside(nodePath, parent, child, { includeRoot: true });
 }
 
 export async function realpathOrNull(path: string): Promise<string | null> {

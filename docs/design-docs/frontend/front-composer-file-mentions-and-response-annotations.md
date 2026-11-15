@@ -1,6 +1,6 @@
 # Composer 文件引用与回复批注
 
-管两类「结构化上下文」：回复批注（选中助手回复里的文字加入对话，已实现）和 `@` 文件引用（正文里的 inline 引用，目标设计，**尚未实现**）。输入框整体形态见 [front-聊天输入框规范.md](front-聊天输入框规范.md)；Markdown 回复的渲染见 [front-聊天区Markdown渲染规范.md](front-聊天区Markdown渲染规范.md)。实施决策修订表、方案取舍、开放决策与验收清单见 `docs/exec-plans/completed/design-archive/frontend/front-composer-mentions-annotations-决策与验收.md`；执行计划见 [执行计划 README](../../exec-plans/active/20260928-composer-mentions-annotations/README.md)。
+管两类「结构化上下文」：回复批注（选中助手回复里的文字加入对话，已实现）和 `@` 文件引用（正文里的 inline 引用，目标设计，**尚未实现**）。输入框整体形态见 [front-聊天输入框规范.md](front-聊天输入框规范.md)；Markdown 回复的渲染见 [front-聊天区Markdown渲染规范.md](front-聊天区Markdown渲染规范.md)。`@` 文件引用的执行计划、实施决策修订表和验收清单见[执行计划](../../exec-plans/active/20260928-composer-mentions-annotations/README.md)。
 
 ## 1. 对象与职责
 

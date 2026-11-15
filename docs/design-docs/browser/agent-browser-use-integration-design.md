@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-本文档定义 Browser 工具、Go Bridge 与 Chrome Extension 的当前集成边界。62 条 canonical command 由 Go registry 管理；capability ready 时注册 11 个工具，模型可见集合由 Agent mode 白名单、registry 和调用范围共同决定。连接、启动、打包与真实 Chrome 验收见 `docs/exec-plans/completed/20260928-chrome-connect-experience.md`。
+本文档定义 Browser 工具、Go Bridge 与 Chrome Extension 的当前集成边界。62 条 canonical command 由 Go registry 管理；capability ready 时注册 11 个工具，模型可见集合由 Agent mode 白名单、registry 和调用范围共同决定。连接、启动、打包的真实 Chrome 验收没有全部完成，缺口登记在 `docs/exec-plans/tech-debt-tracker.md`「Browser Use 遗留」。
 
 ## 设计决策
 

@@ -7,7 +7,7 @@ import { SettingsService, type SecretCrypto } from "../settings-service";
 import { ModelStoreService } from "../model-store-service";
 import { ModelRuntimeService } from "../model-runtime-service";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
-import { DesktopLegacyLlmAdapter } from "../runtime-v2/legacy-llm-adapter";
+import { DesktopLlmAdapter } from "../runtime-v2/llm-adapter";
 import { ModelConnectionsService } from "../model-connections-service";
 import type { ProviderNetworkService } from "../runtime-v2/provider-network-service";
 
@@ -58,7 +58,7 @@ it.each(["low", undefined] as const)("encodes custom Chat with selected effort %
   const key = created.view.connections[0].models[0].key;
   expect(await service.updateModel({ key, overrides: { thinking: { levels: ["off", "low", "high"], default: "high" } } })).toMatchObject({ ok: true });
   const runtime = new ModelRuntimeService(settings, new ModelStoreService({ settings }));
-  const adapter = new DesktopLegacyLlmAdapter(runtime, async () => { throw Error("unused"); });
+  const adapter = new DesktopLlmAdapter(runtime, async () => { throw Error("unused"); });
   try {
     await adapter.dispatch({ request: { model: key, options: { reasoning: true, ...(effort ? { reasoningEffort: effort } : {}) } }, credential: {}, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
     expect(wire).toHaveBeenLastCalledWith(expect.objectContaining({ providerId: "custom" }));
@@ -89,7 +89,7 @@ it("prices catalog matches at the reference rate times the multiplier and never 
 it.each(["openai-completions", "anthropic-messages"] as const)("binds mode cache retention and honors connection opt-out (%s)", async (api) => {
   for (const promptCacheMode of [undefined, "off"] as const) {
     const resolution = { ok: true as const, model: { key: "fixture", definition: { api, provider: "openrouter", apiModel: "anthropic/claude-fixture", contextWindow: 1_000_000 }, providerRuntime: { baseUrl: "https://openrouter.ai/api/v1", promptCacheMode } } };
-    const adapter = new DesktopLegacyLlmAdapter({ resolveMainModel: () => resolution, resolveImageInspectionModel: () => resolution, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); });
+    const adapter = new DesktopLlmAdapter({ resolveMainModel: () => resolution, resolveImageInspectionModel: () => resolution, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); });
     try {
       for (const cacheRetention of ["long", "short", "none"] as const) {
         await adapter.dispatch({ request: { model: "fixture", options: { cacheRetention } }, credential: {}, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);

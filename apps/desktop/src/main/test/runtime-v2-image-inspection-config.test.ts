@@ -4,14 +4,14 @@ import { EMPTY_LLM_USAGE, type LlmService } from "@actspace/llm-service";
 import { IMAGE_INSPECTION_HOST_PORT_ID } from "@actspace/tool-image-inspection";
 import type { ToolExecutionContext } from "@actspace/tool-runtime";
 import { IMAGE_INSPECTION_CREDENTIAL_REF } from "../runtime-v2/credential-resolver";
-import type { DesktopRuntimeV2ModelPort } from "../runtime-v2/model-port";
+import type { DesktopRuntimeModelPort } from "../runtime-v2/model-port";
 import { createDesktopToolHostServices } from "../runtime-v2/tool-host-services";
 
 function fixture(initialModel?: string) {
   let model = initialModel;
   let phase = "create-ports";
   const resolutions: { phase: string; model: string | null }[] = [];
-  const modelRuntime: DesktopRuntimeV2ModelPort = {
+  const modelRuntime: DesktopRuntimeModelPort = {
     resolveMainModel: () => ({ ok: false, message: "must not use the chat model" }),
     resolveImageInspectionModel: () => {
       resolutions.push({ phase, model: model ?? null });

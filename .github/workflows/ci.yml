@@ -1,17 +1,37 @@
 name: CI
 
-# 代码变更的工程门禁。不带路径过滤、每个 PR 都跑的仓库卫生检查在 base-checks.yml。
+# 代码变更的工程门禁。每个 PR 都跑的仓库卫生检查在 base-checks.yml。
 # 仓库是 public，标准 GitHub 托管 runner 不计费；这里的拆分只为缩短反馈时间。
+#
+# 每个 PR 都触发，不带路径过滤：末尾的 ci-gate（「CI 汇总」）因此每次都报告结果，可以设为 main ruleset 的
+# required status check。只改文档的 PR 由 changes job 判定后跳过全部工程 job，只跑 changes 与 ci-gate 两个几秒钟的 job。
+# main 上只改文档的 push 不触发（push.paths）。PR 上的判断（changes job 里的 case）和 push.paths 是同一套规则的两种写法，
+# 改一处要同时改另一处：先全选，再排掉没有任何 job 会读的文档，最后把 docs/ 里被构建或检查读取的文件加回来。
+# 别处的 Markdown（官网内容、内置 skill、prompt、测试夹具）是构建和测试的输入，不排除。
+# 让某个 job 读 docs/ 下的新文件时，要把它加到两处的最后一段，否则只改它的提交不会跑 CI。
 on:
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/PULL_REQUEST_TEMPLATE.md'
   push:
     branches:
       - main
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/README.md'
+      - '!*.md'
+      - '!.agents/**/*.md'
+      - '!apps/site/*.md'
+      - '!browser-bridge/docs/**'
+      - '!browser-bridge/skill/SKILL.md'
+      - '!.github/ISSUE_TEMPLATE/**'
+      - '!.github/PULL_REQUEST_TEMPLATE.md'
+      # 官网的开发计划页和更新日志页
+      - 'docs/roadmap.md'
+      - 'docs/releases/feature-release-notes.md'
+      # pnpm check:browser
+      - 'docs/design-docs/browser/agent-browser-use-command-surface.md'
+      # pnpm run gen:contract-matrix --check
+      - 'docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md'
   workflow_dispatch:
 
 permissions:
@@ -22,11 +42,64 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# 下面四个 job 互不依赖，各自 install → 恢复 tsc 缓存 → pnpm build:deps，总时长取最长的那个。
-# 共用步骤在 .github/actions/setup-workspace；build:deps 走 tsc -b 项目引用图，缓存命中时只重编改动过的包。
 jobs:
+  # 判断这次 PR 是否只改了没有任何 job 会读的文档，规则和上面 push.paths 一致。
+  # push 到 main 由 push.paths 过滤；到了这里的 push 和手动触发不再判断，全部 job 照常跑。
+  changes:
+    name: 变更范围
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      # PR 触发时检出的是 merge commit：第一父提交是 base，第二父提交是 PR head，取两层就能比较。
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Detect code changes
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "${EVENT_NAME}" != "pull_request" ]; then
+            echo "code=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          code=false
+          # -z 原样输出路径（中文文件名不转义）；--no-renames 让「代码文件改名成文档」也算代码改动。
+          # case 取第一个匹配的分支：先列 docs/ 里被构建或检查读取的文件（算代码），再列不触发的文档，其余都算代码。
+          # 这里的 * 能跨目录，所以 */README.md 等于 push.paths 里的 **/README.md。apps/site/*/* 和 */* 两行先把带子目录的路径
+          # 分走（算代码），排在它们后面的 apps/site/*.md、*.md 因此只匹配到 apps/site 和仓库根这一层的 Markdown。
+          while IFS= read -r -d '' file; do
+            case "${file}" in
+              docs/roadmap.md | docs/releases/feature-release-notes.md) relevant=true ;;
+              docs/design-docs/browser/agent-browser-use-command-surface.md) relevant=true ;;
+              docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md) relevant=true ;;
+              docs/* | README.md | */README.md) relevant=false ;;
+              .agents/*.md | browser-bridge/docs/* | browser-bridge/skill/SKILL.md) relevant=false ;;
+              .github/ISSUE_TEMPLATE/* | .github/PULL_REQUEST_TEMPLATE.md) relevant=false ;;
+              apps/site/*/*) relevant=true ;;
+              apps/site/*.md) relevant=false ;;
+              */*) relevant=true ;;
+              *.md) relevant=false ;;
+              *) relevant=true ;;
+            esac
+            if [ "${relevant}" = true ]; then
+              echo "会被 CI 读取的改动：${file}"
+              code=true
+              break
+            fi
+          done < <(git diff --name-only --no-renames -z HEAD^1 HEAD)
+          echo "code=${code}" >> "${GITHUB_OUTPUT}"
+
+  # 下面四个 job 互不依赖，各自 install → 恢复 tsc 缓存 → pnpm build:deps，总时长取最长的那个。
+  # 共用步骤在 .github/actions/setup-workspace；build:deps 走 tsc -b 项目引用图，缓存命中时只重编改动过的包。
   lint-typecheck:
     name: Lint 与类型检查
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,6 +124,8 @@ jobs:
 
   test-process:
     name: 仓库脚本与进程级测试
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -73,8 +148,14 @@ jobs:
         run: pnpm test:scripts
 
   test-packages:
-    name: 包测试
+    name: 包测试 (${{ matrix.shard }}/2)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -88,18 +169,34 @@ jobs:
       - name: Build workspace dependencies
         run: pnpm build:deps
 
-      # desktop 单独一个分片 job；其余包在这里跑。
+      # desktop 单独一个分片 job；其余包分两台跑。第 1 片是下面列出的目录，第 2 片是剩下的全部：
+      # 两片的 filter 由同一份清单生成，一正一反，所以新增的包目录不用登记，自动落在第 2 片。
+      # 测试只读 build:deps 的产物，包之间没有先后依赖，--no-sort 让 pnpm 不必按依赖拓扑一批一批地等。
+      # 第 2 片同时只跑 2 个包（pnpm 默认 4 个）：它是四十多个小包，已知的时间敏感用例都在里面；每个包的 vitest 自己还要开
+      # 最多 3 个 worker，4 个包一起跑时十几个进程抢 4 个核。降到 2 个之后各包快一倍，整片的时间不变。
+      # 第 1 片用默认并发：它的时间集中在 apps/cli、apps/web、packages/core/runtime 三个各要 20 s 上下的包上，
+      # 只开 2 个时它们排成两条队，这一步从 50 s 涨到 74 s。
       # 只带排除式 --filter 时 pnpm 会把 workspace 根（actspace）也选进来，根的 test 会递归回 pnpm -r test，所以要一并排除。
       - name: Test
-        run: pnpm -r --if-present --filter '!@actspace/desktop' --filter '!actspace' test
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          args=()
+          for dir in './packages/core/**' './packages/context/**' './apps/*'; do
+            if [ "$SHARD" = 1 ]; then args+=(--filter "$dir"); else args+=(--filter "!$dir"); fi
+          done
+          if [ "$SHARD" = 2 ]; then args+=(--workspace-concurrency=2); fi
+          pnpm -r --no-sort --if-present "${args[@]}" --filter '!@actspace/desktop' --filter '!actspace' test
 
   test-desktop:
-    name: 桌面端测试 (${{ matrix.shard }}/2)
+    name: 桌面端测试 (${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -113,12 +210,16 @@ jobs:
       - name: Build workspace dependencies
         run: pnpm build:deps
 
-      # desktop 单包 300 多个测试文件、CPU 时间 6 min 以上，单台 4 vCPU runner 要 2 min 多；按文件数对半切到两台。
+      # desktop 单包 300 多个测试文件、CPU 时间 6 min 以上，单台 4 vCPU runner 要 2 min 多；按文件数切到三台。
+      # 片数只由上面的 matrix 决定，这里和 job 名都取 strategy.job-total。
+      # 加片数之前先数并发：账户同时只能跑 20 个 job，各工作流全部触发时已经是 21 个（见 docs/CICD.md）。
       - name: Test
-        run: pnpm --filter @actspace/desktop exec vitest run --shard=${{ matrix.shard }}/2
+        run: pnpm --filter @actspace/desktop exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
   build:
     name: 构建
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -135,9 +236,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # PR 上验证发布路径能把 desktop、CLI、Web 都构建出来。
       - name: Build
+        if: github.event_name == 'pull_request'
         run: pnpm build
 
+      # main 上（和手动触发时）换成下面三步：打包脚本的第一步就是 pnpm build 里的 desktop 构建，
+      # 之后再补 CLI 和 Web。构建的内容和 PR 上一样，只是 desktop 不用构建两遍。
       # 打包脚本会 go build 浏览器桥 CLI（scripts/package-browser-components.mjs）。
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: github.event_name != 'pull_request'
@@ -147,13 +252,19 @@ jobs:
             browser-bridge/apps/cli/go.mod
             browser-bridge/packages/protocol/go.mod
 
-      # 只在 main 上验证打包脚本还能跑通，不上传产物；正式产物由 release.yml 负责。
+      # 验证打包脚本还能跑通，不上传产物；正式产物由 release.yml 负责。
       - name: Package desktop (smoke)
         if: github.event_name != 'pull_request'
         run: ./scripts/release-package.sh
 
+      - name: Build CLI and Web
+        if: github.event_name != 'pull_request'
+        run: pnpm build:cli-web
+
   site:
     name: 官网
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -170,12 +281,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check site
-        run: pnpm check:site
-
-      - name: Test site
-        run: pnpm test:site
-
+      # 这里只做别的 job 不做的那一步。官网的 astro check 已经在「Lint 与类型检查」的 pnpm typecheck 里
+      # （apps/site 的 typecheck 和 check 是同一条命令），单元测试在「包测试」的 pnpm -r test 里。
       - name: Build site
         env:
           SITE_URL: https://example.com
@@ -184,6 +291,8 @@ jobs:
 
   browser-bridge:
     name: Browser Bridge
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -197,12 +306,29 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # 缓存 key 只在第一次没命中时保存一次，之后不再更新。这里比「构建」和 release.yml 多算一个 go.work，
+      # 让这个 job 有自己的 key：它要缓存的是 go test 和两个交叉编译目标的产物，那两处只编本机的 CLI，
+      # 共用一个 key 时谁先存谁占住，另一边每次都从头编。
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: browser-bridge/apps/cli/go.mod
           cache-dependency-path: |
+            browser-bridge/go.work
             browser-bridge/apps/cli/go.mod
             browser-bridge/packages/protocol/go.mod
+
+      # 这个 job 里有两处自己起 go 的地方：check-browser-command-registry.mjs 的 go run，和 apps/cli 测试里
+      # ensureDevHostWrapper 的 go build。环境里没有 GOCACHE 时它们都把编译产物放进临时目录，等于绕开上面恢复的缓存
+      # 把 CLI 从头再编一遍。这里把 go 的默认缓存位置写进环境，让它们和 go test、交叉编译共用同一份。
+      - name: Point nested Go builds at the restored cache
+        run: echo "GOCACHE=$(go env GOCACHE)" >> "$GITHUB_ENV"
+
+      # 恢复出来的缓存文件带着保存那天的修改时间，而 go 每次构建结束时会删掉 5 天没用过的缓存条目。
+      # 缓存存下 5 天之后，这个 job 的第一条 go 命令一跑完，go test 和交叉编译要用的条目就被删掉了，等于白恢复。
+      # 这里把条目的时间刷新成现在。只跑一条 go 命令的 job（「构建」、release.yml）不受影响。
+      - name: Keep restored Go cache entries from being trimmed
+        run: |
+          if [ -d "$GOCACHE" ]; then find "$GOCACHE" -exec touch {} +; fi
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -221,3 +347,31 @@ jobs:
         run: |
           GOOS=windows GOARCH=amd64 go build -o /dev/null .
           GOOS=darwin GOARCH=arm64 go build -o /dev/null .
+
+  # 汇总 job：每个 PR 都会运行并报告一次结果，是 ci.yml 里唯一适合设为 required status check 的 job。
+  # 被 changes 判定跳过的 job 结果是 skipped，算通过；任何一个 failure 或 cancelled 都让它失败。
+  # 用 always() 而不是 !cancelled()：运行被取消时这个 job 也要跑并失败，否则 skipped 会被 ruleset 当成通过。
+  ci-gate:
+    name: CI 汇总
+    needs:
+      - changes
+      - lint-typecheck
+      - test-process
+      - test-packages
+      - test-desktop
+      - build
+      - site
+      - browser-bridge
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report job results
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: echo "${NEEDS}"
+
+      - name: Fail when any job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "::error::有 job 失败或被取消，见本次运行的 job 列表"
+          exit 1

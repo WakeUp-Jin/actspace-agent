@@ -1,4 +1,4 @@
-import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
+import type { RuntimeHostDescriptor } from "@actspace/shared/runtime-v2";
 import type { AgentLoopLiveEvent } from "@actspace/agent-loop";
 import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
 import type { AgentForm } from "@actspace/agent";
@@ -27,9 +27,9 @@ export type AgentRuntimeHostPort = {
   readonly onSandboxStatus?: (status: import("@actspace/sandbox/types").SandboxStatus | undefined) => void;
   readonly disabledHarnessEntries?: readonly string[];
   /** Settings of default Harness entries, merged over each manifest's `config`. */
-  readonly harnessEntryConfig?: Readonly<Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>>>;
+  readonly harnessEntryConfig?: Readonly<Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeJsonValue>>>>;
   readonly pinnedHarness?: PinnedHarness;
-  readonly host: RuntimeV2HostDescriptor;
+  readonly host: RuntimeHostDescriptor;
   /** The main Agent form the Host composed from its plugin catalog (`main-agent-form.ts`); the Harness binds its members. */
   readonly agentForm: AgentForm;
   readonly toolEnvironment: Omit<ToolPreparedEnvironment, "journal">;

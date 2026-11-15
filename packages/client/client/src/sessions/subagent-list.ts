@@ -1,7 +1,7 @@
 import { agentMessageBody, type MessageBlock, type SubagentListItem, type SubagentListStatus } from "@actspace/shared";
-import { EMPTY_SUBAGENT_TREE, lastActivationModel, reduceSubagentTree, type RuntimeV2JsonValue, type SessionEventEnvelopeV1, type SubagentTree, type SubagentView } from "@actspace/shared/runtime-v2";
+import { EMPTY_SUBAGENT_TREE, lastActivationModel, reduceSubagentTree, type RuntimeJsonValue, type SessionEventEnvelopeV1, type SubagentTree, type SubagentView } from "@actspace/shared/runtime-v2";
 
-type CallArgs = Readonly<Record<string, RuntimeV2JsonValue>>;
+type CallArgs = Readonly<Record<string, RuntimeJsonValue>>;
 type LastMessage = { readonly messageId: string; readonly text: string; readonly at: string };
 
 /**
@@ -103,7 +103,7 @@ export function foldSubagentList(journal: Iterable<Pick<SessionEventEnvelopeV1, 
 }
 
 /**
- * The right-side 子 Agent panel's list (design 05 §2), folded from a whole Journal.
+ * The right-side 子 Agent panel's list (front-子Agent与后台任务规范.md §2), folded from a whole Journal.
  * 一次性整份折叠，只用于测试或低频路径；面板轮询走 `reduceSubagentList` 增量折叠。
  */
 export function projectSubagentItems(journal: readonly SessionEventEnvelopeV1[], childModels: ReadonlyMap<string, string> = new Map()): SubagentListItem[] {
@@ -120,7 +120,7 @@ function withEntry<K, V>(map: ReadonlyMap<K, V>, key: K, value: V): ReadonlyMap<
   const next = new Map(map); next.set(key, value); return next;
 }
 
-function item(view: SubagentView, requestModel: string | undefined, callArgs: ReadonlyMap<string, Readonly<Record<string, RuntimeV2JsonValue>>>): SubagentListItem {
+function item(view: SubagentView, requestModel: string | undefined, callArgs: ReadonlyMap<string, Readonly<Record<string, RuntimeJsonValue>>>): SubagentListItem {
   const first = view.activations[0], last = view.activations.at(-1);
   const settle = last?.settle;
   const model = lastActivationModel(view) ?? requestModel;
@@ -161,4 +161,4 @@ export function subagentStatusByAgent(blocks: readonly MessageBlock[]): Readonly
 }
 
 function firstLine(value: string): string | undefined { return value.split(/\r?\n/).find((line) => line.trim())?.trim(); }
-function record(value: RuntimeV2JsonValue | undefined): Readonly<Record<string, RuntimeV2JsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {}; }
+function record(value: RuntimeJsonValue | undefined): Readonly<Record<string, RuntimeJsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeJsonValue>> : {}; }

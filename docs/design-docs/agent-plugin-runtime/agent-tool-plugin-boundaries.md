@@ -1,6 +1,6 @@
 # Tool 插件边界与 Todo 领域事件
 
-已实现；自动化验收结果见 [执行摘要](../../exec-runs/20260928-tool-plugin-boundaries/execution-summary.md)。
+已实现。
 
 ## 领域包
 
