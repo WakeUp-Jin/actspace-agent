@@ -1,5 +1,6 @@
 import { FILESYSTEM_HOST_PORT_ID, PROCESS_HOST_PORT_ID, type FilesystemHostGrant, type ProcessHostGrant } from "@actspace/tool-runtime";
 import { createNodeWebToolPorts as createWebtools, WEB_TOOLS_HOST_PORT_ID } from "@actspace/tool-web";
+import { createNodeDeepSearchPorts, DEEP_SEARCH_HOST_PORT_ID } from "@actspace/tool-deep-search";
 import { createNodeToolPorts as createImagegeneration, IMAGE_GENERATION_HOST_PORT_ID } from "@actspace/tool-image-generation";
 import { createNodeToolPorts as createImageinspection, IMAGE_INSPECTION_HOST_PORT_ID } from "@actspace/tool-image-inspection";
 import { createLlmImageInspector, type SessionArtifactReader } from "@actspace/tool-image-inspection";
@@ -17,6 +18,14 @@ export function createDesktopToolHostServices(options: { readonly workspaceRoot:
       get deepseekFetchApiKey() { return options.modelRuntime.getToolEnvironment().deepseekFetchApiKey; },
       get credentials() { return options.modelRuntime.getToolEnvironment().searchCredentials; },
     }) } satisfies import("@actspace/tool-web").HostPort,
+    // O(1) reads: `available` runs on every model request to decide whether the model sees deep_search.
+    [DEEP_SEARCH_HOST_PORT_ID]: {
+      available: () => options.modelRuntime.isDeepseekDeepSearchAvailable?.() === true,
+      createPorts: () => createNodeDeepSearchPorts({
+        available: () => options.modelRuntime.isDeepseekDeepSearchAvailable?.() === true,
+        apiKey: () => options.modelRuntime.getDeepseekApiKey?.(),
+      }),
+    } satisfies import("@actspace/tool-deep-search").HostPort,
     [IMAGE_GENERATION_HOST_PORT_ID]: { createPorts: () => ({ generate_image: (...args: Parameters<NonNullable<import("@actspace/tool-image-generation").ToolPorts["generate_image"]>>) => createImagegeneration({ generation: options.modelRuntime.getToolEnvironment().imageGeneration }).generate_image!(...args) }) } satisfies import("@actspace/tool-image-generation").HostPort,
     [IMAGE_INSPECTION_HOST_PORT_ID]: { createPorts: (llm: import("@actspace/llm-service").LlmServiceContract, recorder: import("@actspace/llm-service").AuxiliaryRequestRecorder) => ({
       inspect_image: (...args: Parameters<NonNullable<import("@actspace/tool-image-inspection").ToolPorts["inspect_image"]>>) => {

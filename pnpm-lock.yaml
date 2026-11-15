@@ -131,6 +131,9 @@ importers:
       '@actspace/tool-browser':
         specifier: workspace:*
         version: link:../../packages/browser/tool-browser
+      '@actspace/tool-deep-search':
+        specifier: workspace:*
+        version: link:../../packages/web/tool-deep-search
       '@actspace/tool-fs-read':
         specifier: workspace:*
         version: link:../../packages/fs/tool-fs-read
@@ -1702,6 +1705,9 @@ importers:
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../util/shared
+      '@actspace/tool-deep-search':
+        specifier: workspace:*
+        version: link:../../web/tool-deep-search
       '@actspace/tool-image-generation':
         specifier: workspace:*
         version: link:../../image/tool-image-generation

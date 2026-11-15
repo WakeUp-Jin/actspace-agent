@@ -23,6 +23,7 @@ import { ManagedRuns } from "./managed-runs.js";
 import { RuntimeSessionController } from "../session/session-controller.js";
 import { createAuxiliaryRequestRecorder } from "../session/auxiliary-request-recorder.js";
 import { createNodeSandboxHostPort, type SandboxStatus } from "@actspace/sandbox";
+import { createNodeDeepSearchPorts } from "@actspace/tool-deep-search";
 import { DEFAULT_HARNESS_ENTRIES, DEFAULT_HARNESS_KERNEL_ID } from "./default-harness-definition.js";
 import { MAIN_AGENT_FORM } from "../main-agent-form.js";
 import { harnessToolPluginEntries } from "../plugin-catalog.js";
@@ -45,11 +46,15 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   const sandboxStatus = new Promise<SandboxStatus | undefined>(resolve => { reportSandbox = resolve; });
   // Hidden while the first Run starts, so that Run proves a hidden optional tool does not break activation.
   let deepSearchAvailable = false;
+  const deepSearchFetch = vi.fn<typeof fetch>(async () => new Response('data: {"choices":[{"index":0,"delta":{"content":"- fact"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', { status: 200, headers: { "content-type": "text/event-stream" } }));
   const ports = {
     "actspace.host.sandbox": createNodeSandboxHostPort(),
     "agent.registry": agentRegistry,
     ...Object.fromEntries(["web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }])),
-    "actspace.host.tools.deep-search": { createPorts: () => ({}), available: () => deepSearchAvailable },
+    "actspace.host.tools.deep-search": {
+      available: () => deepSearchAvailable,
+      createPorts: () => createNodeDeepSearchPorts({ available: () => deepSearchAvailable, apiKey: () => "fixture-ds", fetchImpl: deepSearchFetch }),
+    },
     "session.runtime": sessions,
     "llm.auxiliary-requests": createAuxiliaryRequestRecorder(sessions),
     "session.journal": { registry },
@@ -104,6 +109,11 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     expect(withDeepSearch("plan").has("deep_search")).toBe(true);
     expect(withDeepSearch("agent").has("deep_search")).toBe(true);
     expect(withDeepSearch("chat").has("deep_search")).toBe(false);
+    // The Host port's real implementation is what the Harness registered.
+    const deepSearchTool = parentLease.getService<import("@actspace/tool-runtime").ToolRuntime>("tools.runtime")!.registry.capture("deep_search");
+    const deepSearchResult = await deepSearchTool.executor.execute({ question: "fixture" }, { signal: new AbortController().signal, reportProgress: () => {} } as never);
+    expect(deepSearchResult).toMatchObject({ status: "completed", summary: "0 searches · 0 sources" });
+    expect(deepSearchFetch).toHaveBeenCalledTimes(1);
     deepSearchAvailable = false;
     for (const mode of ["chat", "plan", "agent"] as const) expect(withDeepSearch(mode).has("deep_search")).toBe(false);
     const reviewer = parentLease.getService<import("@actspace/auto-review").AutoReviewer>("approval.auto-review");

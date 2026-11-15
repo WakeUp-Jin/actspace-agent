@@ -34,6 +34,9 @@
       "path": "./../../util/shared/tsconfig.build.json"
     },
     {
+      "path": "./../../web/tool-deep-search/tsconfig.build.json"
+    },
+    {
       "path": "./../../image/tool-image-generation/tsconfig.build.json"
     },
     {
