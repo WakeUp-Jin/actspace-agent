@@ -8,6 +8,6 @@ allowBuilds:
 catalog:
   "@types/node": ^24.0.3
   "@vitejs/plugin-react": ^4.5.2
-  typescript: ^5.8.3
+  typescript: ^7.0.2
   vite: ^7.3.7
   vitest: ^4.1.12
