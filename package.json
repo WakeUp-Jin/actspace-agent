@@ -107,7 +107,7 @@
     "@actspace/desktop-app": "workspace:*"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.6",
+    "@biomejs/biome": "^2.6.7",
     "esbuild": "0.28.2"
   }
 }
