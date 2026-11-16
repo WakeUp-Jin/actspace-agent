@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博客封面 demo</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* 图片直接引用仓库里的真实资源 */
+.page { width: var(--page); margin: 0 auto; padding: 48px 0 120px; }
+.head { display: flex; align-items: baseline; gap: 12px 32px; margin-bottom: 32px; flex-wrap: wrap; }
+.head h1 { font: 650 40px/1.1 var(--sans); margin: 0; }
+.head .cats { display: flex; gap: 8px 20px; flex-wrap: wrap; font-size: 14px; color: var(--site-muted); }
+.head .cats span:first-child { color: var(--site-ink); font-weight: 500; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 44px 28px; }
+.item { display: block; min-width: 0; color: var(--site-ink); text-decoration: none; cursor: pointer; }
+.item h2 { font: 600 19px/1.45 var(--sans); margin: 16px 0 0; text-wrap: pretty; }
+.item .meta { margin: 6px 0 0; font-size: 12.5px; color: var(--site-muted); }
+.item .desc { display: none; }
+.item:hover h2 { text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 5px; }
+.item.lead { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 44px; align-items: center; }
+.item.lead h2 { font-size: 30px; line-height: 1.35; margin-top: 0; }
+.item.lead .desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 14px; font-size: 16px; line-height: 1.75; color: var(--site-body); }
+
+.tile { position: relative; isolation: isolate; overflow: hidden; border-radius: 18px; aspect-ratio: 4 / 3; }
+.item.lead .tile { aspect-ratio: 16 / 9; }
+.tile .top { position: absolute; z-index: 3; left: 16px; right: 16px; top: 14px; display: flex; justify-content: space-between; gap: 12px; font: 11.5px var(--mono); }
+.grain::after { content: ""; position: absolute; inset: 0; z-index: 2; background: var(--stage-grain); opacity: .12; mix-blend-mode: multiply; pointer-events: none; }
+.sprite { position: absolute; max-width: none; -webkit-mask-image: radial-gradient(closest-side, #000 74%, transparent); mask-image: radial-gradient(closest-side, #000 74%, transparent); }
+.fig { display: block; width: 100%; height: 100%; object-fit: contain; }
+.item .fig { transition: transform 400ms ease; }
+.item:hover .fig { transform: scale(1.03); }
+
+/* 没有配图的文章：沿用现在的精灵封面 */
+.tile.fallback { background: var(--bg); color: var(--ink); padding: 20px 22px; container-type: inline-size; display: flex; flex-direction: column; justify-content: flex-end; }
+.tile.fallback .sprite { z-index: -1; top: -6%; right: -8%; height: 100%; width: auto; }
+.tile.fallback .key { font: 500 clamp(28px, 13.6cqw, 112px)/1 var(--display); }
+.tile.fallback .top { color: var(--ink); opacity: .72; }
+
+/* L1 白纸配图：整张图留白居中，左下一枚精灵色小圆章 */
+.l1 .tile:not(.fallback) { background: #fff; box-shadow: inset 0 0 0 1px var(--site-line); }
+.l1 .tile:not(.fallback) .fig { padding: 46px 22px 22px; }
+.l1 .tile:not(.fallback) .top { color: var(--site-muted); }
+.l1 .badge { position: absolute; z-index: 3; right: 12px; bottom: 12px; width: 52px; height: 52px; border-radius: 50%; overflow: hidden; background: var(--bg); box-shadow: 0 0 0 3px #fff, 0 2px 8px rgba(0,0,0,.12); }
+.l1 .badge img { width: 130%; height: 130%; margin: -15%; object-fit: cover; }
+.l1 .item.lead .badge { width: 68px; height: 68px; }
+
+/* L2 精灵色舞台：底色取精灵，配图作为白纸卡片浮在上面，精灵从右下角探出 */
+.l2 .tile:not(.fallback) { background: var(--bg); }
+/* 浅色底（06/07/08）和页面底色太近，加一圈细线让封面有边 */
+.l2 .tile.light { box-shadow: inset 0 0 0 1px rgba(29,28,26,.09); }
+.l2 .card { position: absolute; z-index: 1; left: 9%; right: 9%; top: 15%; bottom: 0; border-radius: 10px 10px 0 0; background: #fff; box-shadow: 0 -1px 0 rgba(0,0,0,.03), 0 8px 28px rgba(40,30,20,.16); overflow: hidden; transition: transform 400ms ease; }
+.l2 .card .fig { padding: 12px 12px 4px; object-position: center top; }
+.l2 .item:hover .card { transform: translateY(-5px); }
+.l2 .item:hover .fig { transform: none; }
+.l2 .tile:not(.fallback) .sprite { z-index: 2; right: -9%; bottom: -16%; width: 40%; height: auto; }
+.l2 .tile:not(.fallback) .top { color: var(--ink); opacity: .75; }
+
+/* L3 满幅裁切：配图铺满（从上往下裁），底部一条精灵色带写关键词 */
+.l3 .tile:not(.fallback) { background: #fff; box-shadow: inset 0 0 0 1px var(--site-line); display: flex; flex-direction: column; }
+.l3 .tile:not(.fallback) .crop { flex: 1; min-height: 0; overflow: hidden; }
+.l3 .tile:not(.fallback) .fig { object-fit: cover; object-position: center top; }
+.l3 .band { position: relative; z-index: 3; flex: none; height: 25%; min-height: 54px; background: var(--bg); color: var(--ink); display: flex; align-items: center; padding: 0 18px; container-type: inline-size; overflow: hidden; }
+.l3 .band b { font: 500 clamp(18px, 7cqw, 40px)/1 var(--display); white-space: nowrap; }
+.l3 .band .sprite { right: -4%; top: -40%; height: 190%; width: auto; }
+.l3 .tile:not(.fallback) .top { display: none; }
+
+/* —— 文章页 —— */
+.post[hidden], .list[hidden] { display: none; }
+.back { display: inline-flex; margin: 0 0 0; padding: 6px 0; border: 0; background: none; color: var(--site-body); cursor: pointer; font-size: 13px; }
+.back:hover { color: var(--site-ink); }
+.hero { position: relative; isolation: isolate; overflow: hidden; background: var(--bg); color: var(--ink); }
+.hero.light { border-bottom: 1px solid var(--site-line); }
+.hero::after { content: ""; position: absolute; inset: 0; z-index: 1; background: var(--stage-grain); opacity: .12; mix-blend-mode: multiply; pointer-events: none; }
+.hero-in { position: relative; width: min(720px, calc(100% - 40px)); margin: 0 auto; min-height: 340px; padding: 48px 0; display: flex; align-items: center; }
+.crumb { font-size: 13px; opacity: .78; margin: 0 0 16px; }
+.hero h1 { font: 650 40px/1.28 var(--sans); letter-spacing: -.012em; margin: 0; text-wrap: balance; max-width: 620px; }
+.hero .pmeta { font-size: 13px; opacity: .78; margin: 20px 0 0; }
+.hero .hsprite { --w: 400px; left: min(620px, calc(100% + (100vw - 100%) / 2 + 40px - var(--w))); top: 50%; width: var(--w); transform: translateY(-50%); }
+.body { width: min(720px, calc(100% - 40px)); margin: 0 auto; padding: 56px 0 100px; font-size: 17px; line-height: 1.85; color: #45423c; }
+.body p { margin: 0 0 1.2em; }
+.body figure { margin: 2em 0; }
+.body figure img { display: block; max-width: 100%; margin: 0 auto; border-radius: 14px; border: 1px solid var(--site-line); background: #fff; }
+.body figcaption { margin-top: 10px; text-align: center; font-size: 13px; color: var(--site-muted); }
+.body code { font: .84em var(--mono); background: var(--site-accent-soft); color: #5a3fae; border-radius: 6px; padding: .2em .45em; }
+.body .more { color: var(--site-muted); font-size: 14px; text-align: center; border-top: 1px dashed var(--site-line); padding-top: 18px; }
+
+/* P2 头部不变，配图压在头部下沿 */
+.p2 .hero-in { padding-bottom: 120px; }
+.p2 .lift { position: relative; z-index: 2; width: min(860px, calc(100% - 32px)); margin: -84px auto 0; background: #fff; border-radius: 16px; padding: 14px; box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 20px 50px rgba(40,30,20,.16); }
+.p2 .lift img { display: block; width: 100%; max-height: 520px; object-fit: contain; }
+
+/* P3 配图做头图，精灵坐在配图下面 */
+.p3 .hero-in { flex-direction: column; align-items: stretch; min-height: 0; padding: 48px 0 0; }
+.p3 .hero h1 { max-width: none; }
+.p3 .stage { position: relative; margin-top: 36px; }
+.p3 .stage .card { position: relative; z-index: 2; background: #fff; border-radius: 16px 16px 0 0; padding: 16px 16px 10px; box-shadow: 0 -1px 0 rgba(0,0,0,.03), 0 -10px 40px rgba(40,30,20,.12); }
+.p3 .stage .card img { display: block; width: 100%; max-height: 480px; object-fit: contain; }
+.p3 .stage .hsprite2 { position: absolute; z-index: 3; right: -110px; bottom: -40px; width: 220px; }
+.p3 .hero { overflow: visible; }
+.p3 .hero::after { overflow: hidden; }
+.p3 .hero-wrap { overflow: hidden; }
+
+@media (max-width: 1000px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .item.lead { grid-template-columns: 1fr; gap: 0; }
+  .item.lead h2 { font-size: 24px; margin-top: 16px; }
+  .p3 .stage .hsprite2 { right: -30px; bottom: -30px; width: 150px; }
+}
+@media (max-width: 640px) {
+  .page { padding-top: 32px; }
+  .head h1 { font-size: 32px; }
+  .grid { grid-template-columns: 1fr; }
+  .item.lead .tile { aspect-ratio: 4 / 3; }
+  .item.lead h2 { font-size: 21px; }
+  .hero h1 { font-size: 28px; }
+  /* 与线上一致：窄屏精灵放到标题下面，不压字 */
+  .hero-in { display: block; min-height: 0; padding: 32px 0 0; }
+  .hero .hsprite { position: static; display: block; width: 240px; margin: 8px auto -28px; transform: none; }
+  .p3 .hero-in { padding-top: 32px; }
+  .p2 .hero-in { padding-bottom: 80px; }
+  .p2 .lift { margin-top: -56px; padding: 8px; }
+  .p3 .stage .hsprite2 { right: -14px; bottom: -22px; width: 104px; }
+  .body { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+<header class="demo-header"><b>ActSpace</b><nav><span>文档</span><span aria-current="page">博客</span><span>更新日志</span><span>路线图</span></nav></header>
+<p class="variant-note" id="note"></p>
+<main class="list page" id="list">
+  <header class="head"><h1>博客</h1><div class="cats" id="cats"></div></header>
+  <div class="grid" id="grid"></div>
+</main>
+<main class="post" id="post" hidden></main>
+<div class="switcher" role="group" aria-label="切换方案">
+  <span class="lab">列表</span>
+  <button data-l="l1">L1 白纸配图</button>
+  <button data-l="l2">L2 精灵色舞台</button>
+  <button data-l="l3">L3 满幅 + 色带</button>
+  <span class="sep"></span>
+  <span class="lab">文章页</span>
+  <button data-p="p1">P1 现状</button>
+  <button data-p="p2">P2 配图压边</button>
+  <button data-p="p3">P3 配图头图</button>
+</div>
+<script src="data.js"></script>
+<script>
+const ASSET = "../../../../apps/site/src/assets/blog/";
+const COLORS = {
+  "01": { bg: "#fddfcf", ink: "#3a2a22", light: false }, "02": { bg: "#6d91cd", ink: "#fbfaf7", light: false },
+  "03": { bg: "#4a775d", ink: "#f6f2e6", light: false }, "04": { bg: "#516889", ink: "#f2f5f0", light: false },
+  "05": { bg: "#fdf5b7", ink: "#1f2a6b", light: false }, "06": { bg: "#fbfaf7", ink: "#3d2a1e", light: true },
+  "07": { bg: "#faf8f2", ink: "#24233a", light: true }, "08": { bg: "#fefaf0", ink: "#1f2347", light: true },
+};
+const LNOTE = {
+  l1: "<b>L1 白纸配图</b>：封面就是文章第一张配图，白底留边、整张不裁；右下角一枚精灵小圆章，颜色和文章页头部对上。",
+  l2: "<b>L2 精灵色舞台（去掉精灵）</b>：封面底色还是精灵的颜色，配图放在一张白纸卡片上，从底边升上来；不再画精灵。",
+  l3: "<b>L3 满幅 + 色带</b>：配图铺满封面（从顶部往下裁），底部一条精灵色带写英文关键词，精灵坐在色带上。",
+};
+const PNOTE = {
+  p1: "<b>P1 现状</b>：文章页头部不动，精灵色 + 精灵；正文第一张图照常在正文里。",
+  p2: "<b>P2 配图压边</b>：头部不变，下沿压一张大配图（就是列表封面那张），从列表点进来能对上；正文里不再重复这张图。",
+  p3: "<b>P3 配图头图</b>：精灵色头部里放配图当头图，精灵缩小坐在配图右下方（「精灵在封面下面」）；正文不重复这张图。",
+};
+const posts = window.POSTS;
+let L = "l2", P = "p2", openSlug = null;
+const esc = s => (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const spriteSrc = c => `${ASSET}covers/character-${c}.png`;
+const vars = p => { const c = COLORS[p.cover]; return `--bg:${c.bg};--ink:${c.ink}`; };
+
+function tile(p, lead) {
+  const img = p.images[0];
+  const date = p.date.slice(5);
+  if (!img) return `<div class="tile fallback grain" style="${vars(p)}"><img class="sprite" src="${spriteSrc(p.cover)}" alt=""><div class="top"><span>${p.category}</span><span>${date}</span></div><div class="key">${esc(p.key)}</div></div>`;
+  const fig = `<img class="fig" src="${ASSET}${img}" alt="" loading="lazy">`;
+  const top = `<div class="top"><span>${p.category}</span><span>${date}</span></div>`;
+  if (L === "l1") return `<div class="tile">${top}${fig}<span class="badge" style="${vars(p)}"><img src="${spriteSrc(p.cover)}" alt=""></span></div>`;
+  if (L === "l2") return `<div class="tile grain ${COLORS[p.cover].light ? "light" : ""}" style="${vars(p)}">${top}<div class="card">${fig}</div></div>`;
+  return `<div class="tile" style="${vars(p)}"><div class="crop">${fig}</div><div class="band grain"><b>${esc(p.key)}</b><img class="sprite" src="${spriteSrc(p.cover)}" alt=""></div></div>`;
+}
+function renderList() {
+  document.getElementById("cats").innerHTML = ["全部", ...new Set(posts.map(p => p.category))].map(c => `<span>${c}</span>`).join("");
+  const grid = document.getElementById("grid");
+  grid.className = "grid " + L;
+  grid.innerHTML = posts.map((p, i) => `<a class="item ${i === 0 ? "lead" : ""}" data-slug="${p.slug}">${tile(p, i === 0)}<div><h2>${esc(p.title)}</h2><p class="desc">${esc(p.description)}</p><p class="meta">${p.category} · ${p.date}</p></div></a>`).join("");
+}
+function renderPost() {
+  const p = posts.find(x => x.slug === openSlug);
+  const c = COLORS[p.cover];
+  const img = p.images[0];
+  const showInHero = img && P !== "p1";
+  const paras = p.paras.map(x => `<p>${x}</p>`);
+  // 正文：第一张图放在第 2 段之后（示意）；P2/P3 已在头部展示，正文不重复
+  const bodyFig = img && !showInHero ? `<figure><img src="${ASSET}${img}" alt=""><figcaption>正文里的第一张配图</figcaption></figure>` : "";
+  const second = p.images[1] ? `<figure><img src="${ASSET}${p.images[1]}" alt=""></figure>` : "";
+  const body = `<article class="body">${paras.slice(0, 2).join("")}${bodyFig}${paras.slice(2).join("")}${second}<p class="more">（demo 只截了开头几段）</p></article>`;
+  const meta = `<p class="pmeta">${p.date} · ${p.category}</p>`;
+  const crumb = `<p class="crumb">博客 / ${p.category}</p>`;
+  let hero;
+  if (P === "p3" && img) {
+    hero = `<div class="hero-wrap"><header class="hero ${c.light ? "light" : ""}" style="${vars(p)}"><div class="hero-in">${crumb}<h1>${esc(p.title)}</h1>${meta}
+      <div class="stage"><div class="card"><img src="${ASSET}${img}" alt=""></div><img class="sprite hsprite2" src="${spriteSrc(p.cover)}" alt=""></div></div></header></div>`;
+  } else {
+    hero = `<header class="hero ${c.light ? "light" : ""}" style="${vars(p)}"><div class="hero-in"><div>${crumb}<h1>${esc(p.title)}</h1>${meta}</div></div><img class="sprite hsprite" src="${spriteSrc(p.cover)}" alt=""></header>`
+      + (P === "p2" && img ? `<div class="lift"><img src="${ASSET}${img}" alt=""></div>` : "");
+  }
+  const el = document.getElementById("post");
+  el.className = "post " + P;
+  el.innerHTML = `<div style="width:var(--page);margin:12px auto"><button class="back" data-back>← 返回列表</button></div>${hero}${body}`;
+  // 头部精灵在文章区内定位（与线上 post-hero-character 一致）
+  const hs = el.querySelector(".hsprite"); if (hs) { el.querySelector(".hero-in").appendChild(hs); }
+}
+function render() {
+  document.getElementById("note").innerHTML = openSlug ? PNOTE[P] + (posts.find(x => x.slug === openSlug).images.length ? "" : "（这篇没有配图，三种文章页都退回 P1。）") : LNOTE[L] + "　点任意一篇看文章页。";
+  document.getElementById("list").hidden = !!openSlug;
+  document.getElementById("post").hidden = !openSlug;
+  if (openSlug) renderPost(); else renderList();
+  document.querySelectorAll("[data-l]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.l === L)));
+  document.querySelectorAll("[data-p]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.p === P)));
+  history.replaceState(null, "", `#${L}-${P}${openSlug ? "-" + openSlug : ""}`);
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-slug],[data-l],[data-p],[data-back]");
+  if (!t) return;
+  if (t.dataset.slug) { openSlug = t.dataset.slug; scrollTo(0, 0); }
+  else if (t.dataset.l) { L = t.dataset.l; openSlug = null; }
+  else if (t.dataset.p) { P = t.dataset.p; if (!openSlug) openSlug = posts.find(x => x.images.length).slug; scrollTo(0, 0); }
+  else if (t.hasAttribute("data-back")) openSlug = null;
+  render();
+});
+const m = location.hash.match(/^#(l[1-3])-(p[1-3])(?:-(.+))?$/);
+if (m) { L = m[1]; P = m[2]; openSlug = posts.some(p => p.slug === m[3]) ? m[3] : null; }
+render();
+</script>
+</body>
+</html>

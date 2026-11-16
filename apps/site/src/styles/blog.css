@@ -1,4 +1,4 @@
-/* 博客列表 Q2（DESIGN.md「博客列表」）：插画底色铺满的封面 + 英文关键词大字，只列标题；可见的第一篇做整行头条。 */
+/* 博客列表 Q2（DESIGN.md「博客列表」）：插画底色铺满的封面，有配图的文章把第一张配图放在白纸卡片上；只列标题，可见的第一篇做整行头条。 */
 .blog-page { width: var(--site-page); margin-inline: auto; padding: 56px 0 140px; }
 .blog-head { display: flex; align-items: baseline; gap: 12px 32px; margin-bottom: 36px; flex-wrap: wrap; }
 .blog-head h1 { font: 650 40px/1.1 var(--sans); color: var(--site-ink); margin: 0; }
@@ -22,7 +22,11 @@
 .blog-tile.is-light { box-shadow: inset 0 0 0 1px rgba(29, 28, 26, .07); }
 .blog-tile-character { position: absolute; z-index: -1; top: -6%; right: -8%; height: 100%; width: auto; max-width: none; -webkit-mask-image: radial-gradient(closest-side, #000 74%, transparent); mask-image: radial-gradient(closest-side, #000 74%, transparent); transition: transform 400ms ease; }
 .blog-item:hover .blog-tile-character { transform: scale(1.05) rotate(-2deg); }
-.blog-tile-top { display: flex; justify-content: space-between; gap: 12px; font: 11.5px var(--mono); opacity: .72; }
+/* 配图封面：底色仍取该篇插画色，正文第一张配图放在白纸卡片上、从底边升起；不放角色和关键词 */
+.blog-tile-figure { position: absolute; z-index: 0; left: 9%; right: 9%; top: 15%; bottom: 0; border-radius: 10px 10px 0 0; background: #fff; box-shadow: 0 -1px 0 rgba(29, 28, 26, .03), 0 8px 28px rgba(40, 30, 20, .16); overflow: hidden; transition: transform 400ms ease; }
+.blog-tile-figure img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center top; padding: 12px 12px 4px; }
+.blog-item:hover .blog-tile-figure { transform: translateY(-5px); }
+.blog-tile-top { position: relative; z-index: 2; display: flex; justify-content: space-between; gap: 12px; font: 11.5px var(--mono); opacity: .72; }
 /* 关键词字号跟封面宽度走（cqw），各断点下与角色的相对大小一致，长词不折行压到角色上 */
 .blog-tile-key { font: 500 clamp(36px, 4.2vw, 58px)/1 var(--site-font-display); font-size: clamp(28px, 13.6cqw, 112px); letter-spacing: -.01em; overflow-wrap: anywhere; }
 
@@ -35,7 +39,7 @@
 .blog-item.is-lead .blog-item-desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 14px; font-size: 16px; line-height: 1.75; color: var(--site-body); }
 .blog-item.is-lead .blog-item-meta { display: block; margin-top: 18px; font-size: 13px; color: var(--site-muted); }
 
-@media (prefers-reduced-motion: reduce) { .blog-tile-character { transition: none; } .blog-item:hover .blog-tile-character { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .blog-tile-character, .blog-tile-figure { transition: none; } .blog-item:hover .blog-tile-character, .blog-item:hover .blog-tile-figure { transform: none; } }
 @media (max-width: 1000px) {
   .blog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .blog-item.is-lead { grid-template-columns: 1fr; gap: 0; }

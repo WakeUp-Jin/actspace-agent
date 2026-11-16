@@ -1,19 +1,33 @@
 ---
 import type {ReleaseMonth,ReleaseSectionType} from '../../lib/releases/model';
+import {typeCounts} from '../../lib/releases/activity';
 interface Props {months:ReleaseMonth[];}
 const {months}=Astro.props;
 const labels:Record<ReleaseSectionType,string>={feature:'新功能',improvement:'改进',fix:'问题修复'};
+const types:ReleaseSectionType[]=['feature','improvement','fix'];
 const latestDate=months[0]?.entries[0]?.date;
 const monthLabel=(month:string)=>{const [year,value]=month.split('-');return `${year} 年 ${Number(value)} 月`;};
 const dayLabel=(date:string)=>{const [,month,day]=date.split('-');return `${Number(month)}月${Number(day)}日`;};
+// 折叠行的「N 次更新 · M 条」跟着筛选走：四种口径都渲染，CSS 按页面的 data-filter 只露出一种。
+const monthMeta=(month:ReleaseMonth)=>{
+  const perEntry=month.entries.map(typeCounts);
+  const meta=(type?:ReleaseSectionType)=>{
+    const counts=perEntry.map(c=>type?c[type]:c.feature+c.improvement+c.fix).filter(n=>n>0);
+    return `${counts.length} 次更新 · ${counts.reduce((a,b)=>a+b,0)} 条`;
+  };
+  return [{key:'all',text:meta()},...types.map(type=>({key:type,text:meta(type)}))];
+};
 ---
-{months.map(month=>
-<section class="update-month" data-month>
-<p class="update-month-label">{monthLabel(month.month)}</p>
+{months.map((month,index)=>
+<details class="update-month" data-month open={index===0}>
+<summary class="update-month-head">
+<span class="update-month-label">{monthLabel(month.month)}</span>
+{monthMeta(month).map(({key,text})=><span class="update-month-meta" data-for={key}>{text}</span>)}
+<span class="update-month-toggle" aria-hidden="true"></span>
+</summary>
 {month.entries.map(entry=>
-<article class:list={['update-release',{'is-latest':entry.date===latestDate}]} id={entry.anchor} data-release>
-<div class="update-date"><time datetime={entry.date}>{dayLabel(entry.date)}</time><span>{entry.date.slice(0,4)}</span></div>
-<div class="update-rail" aria-hidden="true"></div>
+<article class="update-release" id={entry.anchor} data-release>
+<time class="update-date" datetime={entry.date}>{dayLabel(entry.date)}</time>
 <div class="update-body">
 <h2>{entry.title}{entry.date===latestDate&&<span class="update-latest">最新</span>}</h2>
 {entry.sections.map(section=>
@@ -23,4 +37,4 @@ const dayLabel=(date:string)=>{const [,month,day]=date.split('-');return `${Numb
 </section>)}
 </div>
 </article>)}
-</section>)}
+</details>)}

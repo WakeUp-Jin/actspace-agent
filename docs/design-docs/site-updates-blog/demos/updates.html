@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>更新日志 demo</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.page { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 120px; }
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; margin-bottom: 28px; }
+.head h1 { font: 650 40px/1.1 var(--sans); margin: 0; }
+.head p { font-size: 14px; color: var(--site-muted); margin: 10px 0 0; }
+.filters { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--site-canvas-soft); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.filters button { display: inline-flex; flex: none; align-items: center; gap: 7px; height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: none; font-size: 13.5px; color: var(--site-body); cursor: pointer; }
+.filters button[aria-pressed="true"] { background: var(--site-paper); color: var(--site-ink); font-weight: 500; box-shadow: 0 1px 2px rgba(29,28,26,.08); }
+.dot { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--t); }
+.t-feature { --t: var(--t-feature); } .t-improvement { --t: var(--t-improvement); } .t-fix { --t: var(--t-fix); }
+
+/* 统计数字 */
+.stats { display: flex; flex-wrap: wrap; gap: 8px 36px; margin: 0 0 18px; }
+.stat b { display: block; font: 600 26px/1.15 var(--sans); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12.5px; color: var(--site-muted); }
+.panel { background: var(--site-paper); border: 1px solid var(--site-line); border-radius: 18px; padding: 22px 24px; margin-bottom: 48px; }
+.panel-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; font-size: 12px; color: var(--site-muted); }
+.legend { display: inline-flex; align-items: center; gap: 4px; }
+.legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+/* C1 贡献格 */
+.heat-scroll { overflow-x: auto; scrollbar-width: thin; padding-bottom: 4px; }
+.heat { display: grid; grid-auto-flow: column; grid-template-rows: 16px repeat(7, 1fr); gap: 4px; width: max-content; min-width: 100%; }
+.heat .ml { font-size: 11px; color: var(--site-muted); white-space: nowrap; grid-row: 1; }
+.heat .wd { font-size: 10.5px; color: var(--site-muted); line-height: 1; display: flex; align-items: center; padding-right: 4px; }
+.cell { width: clamp(11px, 1.55vw, 15px); aspect-ratio: 1; border-radius: 3px; background: var(--l0); border: 0; padding: 0; cursor: default; }
+.cell[data-date] { cursor: pointer; }
+.cell.out { background: transparent; }
+.cell:hover[data-date], .cell.sel { outline: 2px solid var(--site-ink); outline-offset: 1px; }
+:root { --l0: #e6e3dc; --l1: #dcd2f4; --l2: #b7a4ea; --l3: #8e72d8; --l4: #5e40b6; }
+
+/* C2 节奏柱 */
+.bars-scroll { overflow-x: auto; scrollbar-width: thin; }
+.bars { display: flex; align-items: flex-end; gap: 2px; height: 132px; min-width: 640px; border-bottom: 1px solid var(--site-line); }
+.bar { flex: 1; min-width: 2px; display: flex; flex-direction: column-reverse; height: 100%; justify-content: flex-start; border-radius: 2px 2px 0 0; cursor: pointer; position: relative; }
+.bar.empty { cursor: default; }
+.bar.empty::after { content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--site-line); }
+.bar i { display: block; background: var(--t); }
+.bar i:last-child { border-radius: 2px 2px 0 0; }
+.bar:not(.empty):hover, .bar.sel { filter: brightness(.82); }
+.bar-months { display: flex; min-width: 640px; font-size: 11px; color: var(--site-muted); margin-top: 6px; }
+.bar-months span { border-left: 1px solid var(--site-line); padding-left: 5px; overflow: hidden; white-space: nowrap; }
+
+/* C3 月份卡 */
+.months { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 40px; }
+.mcard { text-align: left; border: 1px solid var(--site-line); background: var(--site-paper); border-radius: 14px; padding: 14px 14px 12px; cursor: pointer; color: inherit; }
+.mcard:hover { border-color: var(--site-line-strong); }
+.mcard[aria-pressed="true"] { border-color: var(--site-ink); box-shadow: inset 0 0 0 1px var(--site-ink); }
+.mcard h3 { margin: 0; font: 600 15px var(--sans); }
+.mcard p { margin: 2px 0 10px; font-size: 12px; color: var(--site-muted); font-variant-numeric: tabular-nums; }
+.mcard .stack { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--site-canvas-soft); }
+.mcard .stack i { background: var(--t); }
+.mcard .days { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; margin-top: 10px; }
+.mcard .days i { aspect-ratio: 1; border-radius: 2px; background: var(--l0); }
+.mcard .days i.on { background: var(--l3); }
+.mcard .days i.none { background: transparent; }
+
+/* C4 月历 */
+.cal-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 48px; align-items: start; }
+.cal { position: sticky; top: 88px; background: var(--site-paper); border: 1px solid var(--site-line); border-radius: 18px; padding: 18px; }
+.cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.cal-nav b { font: 600 16px var(--sans); }
+.cal-nav button { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--site-line); background: var(--site-surface); cursor: pointer; color: var(--site-body); }
+.cal-nav button:disabled { opacity: .35; cursor: default; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-grid .wh { text-align: center; font-size: 11px; color: var(--site-muted); padding-bottom: 4px; }
+.cal-day { aspect-ratio: 1; border-radius: 9px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 12.5px; color: var(--site-muted); padding: 0; font-variant-numeric: tabular-nums; }
+.cal-day.has { background: var(--lv); color: var(--ink-on, var(--site-ink)); cursor: pointer; font-weight: 600; }
+.cal-day.has small { font-size: 9.5px; font-weight: 500; opacity: .75; }
+.cal-day.has:hover, .cal-day.sel { outline: 2px solid var(--site-ink); outline-offset: 1px; }
+.cal-sum { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--site-line); font-size: 12.5px; color: var(--site-body); display: grid; gap: 4px; }
+.cal-sum div { display: flex; align-items: center; gap: 7px; }
+.cal-sum span { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--site-ink); }
+
+/* 时间轴（沿用线上 U1） */
+.month-label { display: flex; align-items: center; gap: 16px; margin: 56px 0 8px; font: 600 13px var(--sans); color: var(--site-muted); }
+.month-label::after { content: ""; flex: 1; height: 1px; background: var(--site-line); }
+.tl > .month:first-child .month-label { margin-top: 0; }
+.fold { display: flex; width: 100%; align-items: center; gap: 14px; margin: 14px 0 0; padding: 16px 18px; border-radius: 14px; border: 1px solid var(--site-line); background: var(--site-paper); cursor: pointer; text-align: left; color: var(--site-ink); }
+.fold:hover { border-color: var(--site-line-strong); }
+.fold b { font: 600 15px var(--sans); }
+.fold .meta { font-size: 13px; color: var(--site-muted); font-variant-numeric: tabular-nums; }
+.fold .chips { display: flex; gap: 10px; margin-left: auto; font-size: 12.5px; color: var(--site-body); }
+.fold .chips span { display: inline-flex; align-items: center; gap: 5px; }
+.fold .open { font-size: 13px; color: var(--site-accent); white-space: nowrap; }
+.release { display: grid; grid-template-columns: 130px 1px minmax(0, 1fr); gap: 0 32px; scroll-margin-top: 96px; }
+.c4 .release { grid-template-columns: 1px minmax(0, 1fr); gap: 0 28px; }
+.c4 .r-date { display: none; }
+.r-date { position: sticky; top: 92px; align-self: start; padding-top: 32px; text-align: right; }
+.r-date time { display: block; font: 600 15px var(--sans); }
+.r-date span { font: 12px var(--mono); color: var(--site-muted); }
+.rail { position: relative; background: var(--site-line); }
+.rail::before { content: ""; position: absolute; left: 50%; top: 38px; width: 9px; height: 9px; border-radius: 50%; translate: -50% 0; background: var(--site-canvas); border: 2px solid var(--site-line-strong); }
+.release.latest .rail::before { border-color: var(--site-accent); background: var(--site-accent); }
+.r-body { padding: 26px 0 36px; max-width: 700px; }
+.r-body .c4date { display: none; font: 600 13px var(--sans); color: var(--site-muted); margin-bottom: 4px; }
+.c4 .r-body .c4date { display: block; }
+.r-body h2 { font: 650 22px/1.4 var(--sans); margin: 0 0 16px; letter-spacing: -.01em; }
+.latest-tag { display: inline-flex; vertical-align: 3px; margin-left: 10px; height: 22px; padding: 0 9px; align-items: center; border-radius: 999px; background: var(--site-accent-soft); color: var(--site-accent); font: 600 11.5px var(--sans); }
+.grp + .grp { margin-top: 14px; }
+.grp-type { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 4px; font: 600 12px var(--sans); color: var(--t); }
+.grp ul { list-style: none; margin: 0; padding: 0; font: 15px/1.8 var(--sans); color: #45423c; }
+.grp li { position: relative; padding-left: 1.4em; margin: .35em 0; overflow-wrap: anywhere; }
+.grp li::before { content: ""; position: absolute; left: .2em; top: .72em; width: 6px; height: 6px; border-radius: 2px; background: var(--site-line-strong); }
+.grp code { font: .86em var(--mono); background: var(--site-accent-soft); color: #5a3fae; border-radius: 5px; padding: .15em .4em; }
+.release.flash .r-body { animation: flash 2.2s ease-out; border-radius: 12px; }
+@keyframes flash { 0%, 45% { background: color-mix(in srgb, var(--site-accent-soft) 80%, transparent); } 100% { background: transparent; } }
+
+.tip { position: fixed; z-index: 60; pointer-events: none; background: #1d1c1a; color: #fff; border-radius: 10px; padding: 9px 12px; font-size: 12.5px; line-height: 1.5; max-width: 280px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.tip b { display: block; font-weight: 600; }
+.tip .tc { display: flex; gap: 10px; margin-top: 4px; opacity: .85; }
+.tip .tc span { display: inline-flex; align-items: center; gap: 4px; }
+.tip[hidden] { display: none; }
+
+@media (max-width: 860px) {
+  .cal-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .cal { position: static; max-width: 380px; min-width: 0; }
+}
+@media (max-width: 700px) {
+  .page { padding-top: 32px; }
+  .head h1 { font-size: 32px; }
+  .panel { padding: 16px; border-radius: 14px; }
+  .stats { gap: 8px 22px; }
+  .stat b { font-size: 21px; }
+  .release { grid-template-columns: 1fr; }
+  .c4 .release { grid-template-columns: 1fr; }
+  .c4 .rail { display: none; }
+  .r-date { position: static; display: flex; gap: 10px; align-items: baseline; padding-top: 22px; text-align: left; }
+  .rail { display: none; }
+  .r-body { padding-top: 6px; }
+  .r-body h2 { font-size: 19px; }
+  .fold { flex-wrap: wrap; }
+  .fold .chips { margin-left: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+<header class="demo-header"><b>ActSpace</b><nav><span>文档</span><span>博客</span><span aria-current="page">更新日志</span><span>路线图</span></nav></header>
+<p class="variant-note" id="note"></p>
+<main class="page" id="page">
+  <header class="head">
+    <div><h1>更新日志</h1><p>只记录用得到的新功能、改进和问题修复。</p></div>
+    <div class="filters" role="group" aria-label="按分类筛选">
+      <button data-f="all" aria-pressed="true">全部</button>
+      <button data-f="feature" aria-pressed="false"><i class="dot t-feature"></i>新功能</button>
+      <button data-f="improvement" aria-pressed="false"><i class="dot t-improvement"></i>改进</button>
+      <button data-f="fix" aria-pressed="false"><i class="dot t-fix"></i>修复</button>
+    </div>
+  </header>
+  <section id="overview"></section>
+  <section id="body"></section>
+</main>
+<div class="tip" id="tip" hidden></div>
+<div class="switcher" role="group" aria-label="切换方案">
+  <span class="lab">更新日志</span>
+  <button data-v="c1">C1 贡献格</button>
+  <button data-v="c2">C2 节奏柱</button>
+  <button data-v="c3">C3 月份卡</button>
+  <button data-v="c4">C4 月历</button>
+</div>
+<script src="data.js"></script>
+<script>
+const R = window.RELEASES; // 新 → 旧
+const LABEL = { feature: "新功能", improvement: "改进", fix: "问题修复" };
+const SHORT = { feature: "新功能", improvement: "改进", fix: "修复" };
+const NOTES = {
+  c1: "<b>C1 贡献格</b>：顶部 GitHub 式格子，一格一天，越深这天改动越多；悬停看当天标题和条数，点一下跳过去。下面只展开最近一个月，更早的按月折叠。",
+  c2: "<b>C2 节奏柱</b>：每天一根柱子，按新功能 / 改进 / 修复三色叠起来，能看出哪天是大更新、哪天只是修 bug。下面同样只展开最近一个月。",
+  c3: "<b>C3 月份卡</b>：顶部一排月份卡（次数、三类占比、这个月哪几天有更新），一次只看一个月，不再整页铺开。",
+  c4: "<b>C4 月历</b>：左边固定一张月历，有更新的日子标数字（当天几条），翻月切换；右边只列这个月的更新，点日期跳到那一条。",
+};
+const byDate = new Map(R.map(r => [r.date, r]));
+const countOf = (r, f = "all") => r.sections.filter(s => f === "all" || s.type === f).reduce((n, s) => n + s.items.length, 0);
+const typeCounts = r => Object.fromEntries(["feature", "improvement", "fix"].map(t => [t, countOf(r, t)]));
+const months = [...new Set(R.map(r => r.date.slice(0, 7)))]; // 新 → 旧
+const monthName = m => `${m.slice(0, 4)} 年 ${Number(m.slice(5))} 月`;
+const dayName = d => `${Number(d.slice(5, 7))}月${Number(d.slice(8))}日`;
+const D = s => new Date(s + "T00:00:00Z");
+const iso = t => new Date(t).toISOString().slice(0, 10);
+const DAY = 864e5;
+const first = R.at(-1).date, last = R[0].date;
+const level = n => n === 0 ? 0 : n <= 3 ? 1 : n <= 7 ? 2 : n <= 12 ? 3 : 4;
+let filter = "all", variant = "c1", openMonths = new Set([months[0]]), curMonth = months[0];
+
+function streak() {
+  let best = 0, run = 0, prev = null;
+  [...R].reverse().forEach(r => { run = prev && D(r.date) - D(prev) === DAY ? run + 1 : 1; best = Math.max(best, run); prev = r.date; });
+  return best;
+}
+function statsHtml() {
+  const total = R.reduce((n, r) => n + countOf(r), 0);
+  const recent = R.filter(r => D(last) - D(r.date) < 30 * DAY).length;
+  const span = Math.round((D(last) - D(first)) / DAY) + 1;
+  return `<div class="stats">
+    <div class="stat"><b>${R.length}</b><span>次更新 · ${span} 天里</span></div>
+    <div class="stat"><b>${total}</b><span>条改动</span></div>
+    <div class="stat"><b>${recent}</b><span>最近 30 天有更新的天数</span></div>
+    <div class="stat"><b>${streak()} 天</b><span>最长连续更新</span></div>
+    <div class="stat"><b>${dayName(last)}</b><span>最近一次</span></div></div>`;
+}
+const tip = document.getElementById("tip");
+function showTip(e, date) {
+  const r = byDate.get(date);
+  if (!r) { tip.innerHTML = `<b>${dayName(date)}</b>没有更新`; }
+  else {
+    const c = typeCounts(r);
+    tip.innerHTML = `<b>${dayName(date)} · ${countOf(r)} 条</b>${r.title}<div class="tc">${["feature","improvement","fix"].filter(t=>c[t]).map(t=>`<span><i class="dot t-${t}"></i>${SHORT[t]} ${c[t]}</span>`).join("")}</div>`;
+  }
+  tip.hidden = false;
+  const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8), y = e.clientY + 16 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 12 : e.clientY + 16;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+document.addEventListener("pointerover", e => { const el = e.target.closest("[data-tipdate]"); if (el) showTip(e, el.dataset.tipdate); else tip.hidden = true; });
+document.addEventListener("pointermove", e => { const el = e.target.closest("[data-tipdate]"); if (el) showTip(e, el.dataset.tipdate); });
+
+/* 概览区 */
+function heatHtml() {
+  const start = D(first).getTime() - ((D(first).getUTCDay() + 6) % 7) * DAY; // 周一
+  const end = D(last).getTime() + (6 - (D(last).getUTCDay() + 6) % 7) * DAY;
+  let html = `<div class="heat-scroll"><div class="heat"><span></span>${["一","","三","","五","","日"].map(w=>`<span class="wd">${w}</span>`).join("")}`;
+  let lastMonth = "";
+  for (let w = start; w <= end; w += 7 * DAY) {
+    const m = iso(w + 6 * DAY).slice(0, 7);
+    html += `<span class="ml">${m !== lastMonth && iso(w + 6 * DAY).slice(8) <= "07" || w === start ? `${Number(m.slice(5))}月` : ""}</span>`;
+    lastMonth = m;
+    for (let d = 0; d < 7; d++) {
+      const date = iso(w + d * DAY);
+      const r = byDate.get(date);
+      if (date < first || date > last) { html += `<span class="cell out"></span>`; continue; }
+      const n = r ? countOf(r, filter) : 0;
+      html += `<button class="cell" style="background:var(--l${level(n)})" data-tipdate="${date}" ${r && n ? `data-date="${date}"` : ""} aria-label="${dayName(date)} ${n} 条"></button>`;
+    }
+  }
+  return html + `</div></div><div class="panel-foot"><span>格子按「当天改动条数」上色；筛选分类后只数这一类。</span><span class="legend">少 ${[0,1,2,3,4].map(l=>`<i style="background:var(--l${l})"></i>`).join("")} 多</span></div>`;
+}
+function barsHtml() {
+  const days = Math.round((D(last) - D(first)) / DAY) + 1;
+  const max = Math.max(...R.map(r => countOf(r)));
+  let html = `<div class="bars-scroll" id="bs"><div class="bars">`;
+  const monthCols = [];
+  for (let i = 0; i < days; i++) {
+    const date = iso(D(first).getTime() + i * DAY);
+    if (date.slice(8) === "01" || i === 0) monthCols.push({ m: date.slice(0, 7), i });
+    const r = byDate.get(date);
+    const types = filter === "all" ? ["feature", "improvement", "fix"] : [filter];
+    const segs = r ? types.map(t => [t, countOf(r, t)]).filter(([, n]) => n) : [];
+    html += `<span class="bar ${segs.length ? "" : "empty"}" data-tipdate="${date}" ${segs.length ? `data-date="${date}"` : ""}>${segs.map(([t, n]) => `<i class="t-${t}" style="height:${n / max * 100}%"></i>`).join("")}</span>`;
+  }
+  html += `</div><div class="bar-months">${monthCols.map((c, k) => `<span style="flex:${(monthCols[k + 1]?.i ?? days) - c.i}">${Number(c.m.slice(5))}月</span>`).join("")}</div></div>`;
+  return html + `<div class="panel-foot"><span>柱高 = 当天改动条数，最高的一天 ${max} 条。</span><span class="legend">${["feature","improvement","fix"].map(t=>`<i class="t-${t}" style="background:var(--t);border-radius:50%;width:8px;height:8px"></i>${SHORT[t]}&nbsp;&nbsp;`).join("")}</span></div>`;
+}
+function monthCardsHtml() {
+  return `<div class="months">${months.map(m => {
+    const rs = R.filter(r => r.date.startsWith(m));
+    const c = { feature: 0, improvement: 0, fix: 0 };
+    rs.forEach(r => Object.entries(typeCounts(r)).forEach(([t, n]) => c[t] += n));
+    const total = c.feature + c.improvement + c.fix;
+    const dim = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5), 0)).getUTCDate();
+    const days = Array.from({ length: 32 }, (_, i) => i < dim ? `<i class="${byDate.has(`${m}-${String(i + 1).padStart(2, "0")}`) ? "on" : ""}"></i>` : `<i class="none"></i>`).join("");
+    return `<button class="mcard" data-month="${m}" aria-pressed="${m === curMonth}"><h3>${Number(m.slice(5))} 月${m.slice(0,4) !== last.slice(0,4) ? " " + m.slice(0,4) : ""}</h3><p>${rs.length} 次更新 · ${total} 条</p>
+      <div class="stack">${["feature","improvement","fix"].map(t => `<i class="t-${t}" style="flex:${c[t]}"></i>`).join("")}</div><div class="days">${days}</div></button>`;
+  }).join("")}</div>`;
+}
+function calHtml() {
+  const m = curMonth, y = +m.slice(0, 4), mo = +m.slice(5);
+  const dim = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  const lead = (new Date(Date.UTC(y, mo - 1, 1)).getUTCDay() + 6) % 7;
+  const rs = R.filter(r => r.date.startsWith(m));
+  const c = { feature: 0, improvement: 0, fix: 0 };
+  rs.forEach(r => Object.entries(typeCounts(r)).forEach(([t, n]) => c[t] += n));
+  const idx = months.indexOf(m);
+  const shades = ["", "#e3daf7", "#c6b6ef", "#9d84de", "#6d4fc2"];
+  let cells = "";
+  for (let i = 0; i < lead; i++) cells += `<span></span>`;
+  for (let d = 1; d <= dim; d++) {
+    const date = `${m}-${String(d).padStart(2, "0")}`;
+    const r = byDate.get(date); const n = r ? countOf(r, filter) : 0;
+    const lv = level(n);
+    cells += r && n ? `<button class="cal-day has" data-date="${date}" data-tipdate="${date}" style="--lv:${shades[lv]};${lv >= 3 ? "--ink-on:#fff" : ""}">${d}<small>${n} 条</small></button>` : `<span class="cal-day">${d}</span>`;
+  }
+  return `<aside class="cal"><div class="cal-nav"><button data-step="1" ${idx === months.length - 1 ? "disabled" : ""} aria-label="上个月">‹</button><b>${monthName(m)}</b><button data-step="-1" ${idx === 0 ? "disabled" : ""} aria-label="下个月">›</button></div>
+    <div class="cal-grid">${["一","二","三","四","五","六","日"].map(w=>`<span class="wh">${w}</span>`).join("")}${cells}</div>
+    <div class="cal-sum"><div>本月 ${rs.length} 次更新<span>${c.feature + c.improvement + c.fix} 条</span></div>${["feature","improvement","fix"].map(t=>`<div><i class="dot t-${t}"></i>${LABEL[t]}<span>${c[t]}</span></div>`).join("")}</div></aside>`;
+}
+
+/* 时间轴 */
+function releaseHtml(r) {
+  const secs = r.sections.filter(s => filter === "all" || s.type === filter);
+  if (!secs.length) return "";
+  return `<article class="release ${r.date === last ? "latest" : ""}" id="r-${r.date}">
+    <div class="r-date"><time>${dayName(r.date)}</time><span>${r.date.slice(0, 4)}</span></div><div class="rail"></div>
+    <div class="r-body"><div class="c4date">${dayName(r.date)}</div><h2>${r.title}${r.date === last ? `<span class="latest-tag">最新</span>` : ""}</h2>
+    ${secs.map(s => `<section class="grp"><p class="grp-type t-${s.type}"><i class="dot"></i>${LABEL[s.type]}</p><ul>${s.items.map(i => `<li>${i}</li>`).join("")}</ul></section>`).join("")}</div></article>`;
+}
+function monthBlock(m, foldable) {
+  const rs = R.filter(r => r.date.startsWith(m) && countOf(r, filter));
+  if (!rs.length) return "";
+  if (foldable && !openMonths.has(m)) {
+    const c = { feature: 0, improvement: 0, fix: 0 };
+    rs.forEach(r => Object.entries(typeCounts(r)).forEach(([t, n]) => c[t] += n));
+    return `<section class="month"><button class="fold" data-open="${m}"><b>${monthName(m)}</b><span class="meta">${rs.length} 次更新</span>
+      <span class="chips">${["feature","improvement","fix"].filter(t => filter === "all" || t === filter).map(t => `<span><i class="dot t-${t}"></i>${SHORT[t]} ${c[t]}</span>`).join("")}</span><span class="open">展开 ↓</span></button></section>`;
+  }
+  return `<section class="month"><p class="month-label">${monthName(m)}</p>${rs.map(releaseHtml).join("")}</section>`;
+}
+
+function render() {
+  document.getElementById("note").innerHTML = NOTES[variant];
+  const ov = document.getElementById("overview"), body = document.getElementById("body");
+  body.className = variant;
+  if (variant === "c1" || variant === "c2") {
+    ov.innerHTML = `<div class="panel">${statsHtml()}${variant === "c1" ? heatHtml() : barsHtml()}</div>`;
+    body.innerHTML = `<div class="tl">${months.map(m => monthBlock(m, true)).join("")}</div>`;
+    const bs = document.getElementById("bs"); if (bs) bs.scrollLeft = bs.scrollWidth;
+  } else if (variant === "c3") {
+    ov.innerHTML = monthCardsHtml();
+    body.innerHTML = `<div class="tl">${monthBlock(curMonth, false) || `<p style="color:var(--site-muted)">这个月没有这一类的更新。</p>`}</div>`;
+  } else {
+    ov.innerHTML = "";
+    body.innerHTML = `<div class="cal-layout">${calHtml()}<div class="tl">${monthBlock(curMonth, false) || `<p style="color:var(--site-muted)">这个月没有这一类的更新。</p>`}</div></div>`;
+  }
+}
+function jump(date) {
+  const m = date.slice(0, 7);
+  if (variant === "c1" || variant === "c2") openMonths.add(m); else curMonth = m;
+  render();
+  const el = document.getElementById("r-" + date);
+  if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 2300); }
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-date],[data-open],[data-month],[data-step],[data-f],[data-v]");
+  if (!t) return;
+  if (t.dataset.v) { variant = t.dataset.v; history.replaceState(null, "", "#" + variant); syncSwitch(); render(); scrollTo(0, 0); }
+  else if (t.dataset.f) { filter = t.dataset.f; document.querySelectorAll("[data-f]").forEach(b => b.setAttribute("aria-pressed", String(b === t))); render(); }
+  else if (t.dataset.date) jump(t.dataset.date);
+  else if (t.dataset.open) { openMonths.add(t.dataset.open); render(); }
+  else if (t.dataset.month) { curMonth = t.dataset.month; render(); }
+  else if (t.dataset.step) { curMonth = months[months.indexOf(curMonth) + Number(t.dataset.step)]; render(); }
+});
+function syncSwitch() { document.querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === variant))); }
+if (/^#c[1-4]$/.test(location.hash)) variant = location.hash.slice(1);
+syncSwitch(); render();
+</script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>更新日志 demo 三</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* ===== 线上原样（apps/site/src/styles/updates.css），不改 ===== */
+.updates-page { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 56px 0 160px; }
+.t-feature { --t: var(--t-feature); } .t-improvement { --t: var(--t-improvement); } .t-fix { --t: var(--t-fix); }
+.updates-head { display: flex; align-items: baseline; justify-content: space-between; gap: 20px 24px; flex-wrap: wrap; margin-bottom: 36px; }
+.updates-head h1 { font: 650 40px/1.1 var(--sans); color: var(--site-ink); margin: 0; }
+.updates-head p { font-size: 14px; color: var(--site-muted); margin: 10px 0 0; }
+.updates-filters { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--site-canvas-soft); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.updates-filters button { display: inline-flex; flex: none; align-items: center; gap: 7px; height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: none; font: 13.5px var(--sans); color: var(--site-body); cursor: pointer; }
+.updates-filters button[aria-pressed="true"] { background: var(--site-paper); color: var(--site-ink); font-weight: 500; box-shadow: 0 1px 2px rgba(29,28,26,.08); }
+.updates-filters i, .update-type i { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--t); }
+.update-month[hidden], .update-release[hidden] { display: none; }
+.update-month-label { display: flex; align-items: center; gap: 16px; margin: 64px 0 8px; font: 600 13px var(--sans); color: var(--site-muted); }
+.update-month-label::after { content: ""; flex: 1; height: 1px; background: var(--site-line); }
+.update-month:first-of-type .update-month-label { margin-top: 8px; }
+.update-release { display: grid; grid-template-columns: 160px 1px minmax(0, 1fr); gap: 0 36px; scroll-margin-top: 84px; }
+.update-date { position: sticky; top: 92px; align-self: start; padding-top: 34px; text-align: right; }
+.update-date time { display: block; font: 600 15px var(--sans); color: var(--site-ink); }
+.update-date span { font: 12px var(--mono); color: var(--site-muted); }
+.update-rail { position: relative; background: var(--site-line); }
+.update-rail::before { content: ""; position: absolute; left: 50%; top: 40px; width: 9px; height: 9px; border-radius: 50%; translate: -50% 0; background: var(--site-canvas); border: 2px solid var(--site-line-strong); }
+.update-release.is-latest .update-rail::before { border-color: var(--site-accent); background: var(--site-accent); }
+.update-body { padding: 28px 0 40px; max-width: 700px; border-radius: 14px; }
+.update-body h2 { font: 650 24px/1.4 var(--sans); letter-spacing: -.01em; color: var(--site-ink); margin: 0 0 18px; }
+.update-latest { display: inline-flex; vertical-align: 4px; margin-left: 10px; height: 22px; padding: 0 9px; align-items: center; border-radius: 999px; background: var(--site-accent-soft); color: var(--site-accent); font: 600 11.5px var(--sans); }
+.update-group + .update-group { margin-top: 16px; }
+.update-type { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 4px; font: 600 12px var(--sans); letter-spacing: .02em; color: var(--t); }
+.update-group ul { list-style: none; margin: 0; padding: 0; font: 15.5px/1.8 var(--sans); color: #45423c; }
+.update-group li { position: relative; padding-left: 1.4em; margin: .4em 0; overflow-wrap: anywhere; }
+.update-group li::before { content: ""; position: absolute; left: .2em; top: .72em; width: 6px; height: 6px; border-radius: 2px; background: var(--site-line-strong); }
+.update-group code { font: .86em var(--mono); background: var(--site-accent-soft); color: #5a3fae; border-radius: 5px; padding: .15em .4em; }
+.updates-page[data-filter="feature"] .update-group:not([data-type="feature"]),
+.updates-page[data-filter="improvement"] .update-group:not([data-type="improvement"]),
+.updates-page[data-filter="fix"] .update-group:not([data-type="fix"]) { display: none; }
+.update-release.flash .update-body { margin-inline: -20px; padding-inline: 20px; animation: flash 2.4s ease-out; }
+@keyframes flash { 0%, 50% { background: color-mix(in srgb, var(--site-accent-soft) 70%, transparent); } 100% { background: transparent; } }
+@media (max-width: 760px) {
+  .update-release { grid-template-columns: 1fr; }
+  .update-date { position: static; display: flex; gap: 10px; align-items: baseline; padding-top: 24px; text-align: left; }
+  .update-rail { display: none; }
+  .update-body { padding-top: 8px; }
+}
+@media (max-width: 640px) {
+  .updates-page { padding-top: 36px; }
+  .updates-head h1 { font-size: 32px; }
+  .update-body h2 { font-size: 21px; }
+}
+
+/* ===== 新增：小统计 ===== */
+:root { --l0: #e3e0d8; --l1: #d6cbf2; --l2: #b19ce8; --l3: #8a6dd6; --l4: #5e40b6; }
+.cal-cells { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, var(--c)); gap: 3px; width: max-content; }
+.cal-cells span { width: var(--c); height: var(--c); border-radius: 2px; background: var(--l0); }
+.cal-cells span.out { background: transparent; }
+.cal-cells span[data-date] { cursor: pointer; }
+.cal-cells span[data-date]:hover { outline: 1.5px solid var(--site-ink); outline-offset: 1px; }
+.stat-text { font-size: 13px; color: var(--site-muted); font-variant-numeric: tabular-nums; }
+.stat-text b { color: var(--site-ink); font-weight: 600; }
+
+/* S1：标题下一条小卡片，格子 + 两行字 */
+.s1 { --c: 10px; display: flex; align-items: center; gap: 20px 28px; flex-wrap: wrap; margin: -12px 0 40px; padding: 14px 18px; border: 1px solid var(--site-line); border-radius: 14px; background: var(--site-paper); width: fit-content; max-width: 100%; }
+.s1 .cal-scroll { overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+.s1 .stat-text { display: grid; gap: 2px; line-height: 1.6; }
+.s1 .legend { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--site-muted); margin-top: 4px; }
+.s1 .legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+/* S2：标题副标题下面一行，最近 12 周小格子跟在文字后面 */
+.s2 { --c: 8px; display: flex; align-items: flex-end; gap: 10px 14px; flex-wrap: wrap; margin-top: 12px; }
+.s2 .cal-cells { gap: 2px; }
+
+/* S3：每个月份分隔线上带这个月的数字 + 一排日点 */
+.s3-month { display: inline-flex; align-items: center; gap: 12px; flex: none; }
+.s3-month .stat-text { font-weight: 400; font-size: 12.5px; }
+.s3-days { display: inline-flex; gap: 2px; }
+.s3-days span { width: 6px; height: 6px; border-radius: 1.5px; background: var(--l0); }
+.s3-days span[data-date] { cursor: pointer; }
+.s3-days span[data-date]:hover { outline: 1.5px solid var(--site-ink); outline-offset: 1px; }
+
+.tip { position: fixed; z-index: 60; pointer-events: none; background: #1d1c1a; color: #fff; border-radius: 9px; padding: 8px 11px; font-size: 12.5px; line-height: 1.5; max-width: 260px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.tip b { display: block; font-weight: 600; }
+.tip[hidden] { display: none; }
+@media (max-width: 640px) {
+  .s1 { margin-top: -16px; padding: 12px 14px; }
+  .s3-days { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="demo-header"><b>ActSpace</b><nav><span>文档</span><span>博客</span><span aria-current="page">更新日志</span><span>路线图</span></nav></header>
+<p class="variant-note" id="note"></p>
+<main class="updates-page" id="page" data-filter="all">
+  <header class="updates-head">
+    <div><h1>更新日志</h1><p>只记录用得到的新功能、改进和问题修复。</p><div id="slot-head"></div></div>
+    <div class="updates-filters" role="group" aria-label="按分类筛选">
+      <button data-f="all" aria-pressed="true">全部</button>
+      <button data-f="feature" aria-pressed="false"><i class="t-feature"></i>新功能</button>
+      <button data-f="improvement" aria-pressed="false"><i class="t-improvement"></i>改进</button>
+      <button data-f="fix" aria-pressed="false"><i class="t-fix"></i>修复</button>
+    </div>
+  </header>
+  <div id="slot-top"></div>
+  <div id="timeline"></div>
+</main>
+<div class="tip" id="tip" hidden></div>
+<div class="switcher" role="group" aria-label="切换方案">
+  <span class="lab">只加统计</span>
+  <button data-v="s0">原样</button>
+  <button data-v="s1">S1 小卡片</button>
+  <button data-v="s2">S2 一行字 + 小格子</button>
+  <button data-v="s3">S3 写在月份上</button>
+</div>
+<script src="data.js"></script>
+<script>
+const R = window.RELEASES;
+const LABEL = { feature: "新功能", improvement: "改进", fix: "问题修复" };
+const NOTES = {
+  s0: "<b>原样</b>：线上现在的页面，作对照。",
+  s1: "<b>S1 小卡片</b>：标题下面加一张小卡片：全部日子的贡献格（一格一天，越深改得越多）+ 两行字。悬停看当天标题，点一下跳过去。其余不动。",
+  s2: "<b>S2 一行字 + 小格子</b>：副标题下面加一行：一句话统计 + 最近 12 周的小格子。最不占地方。其余不动。",
+  s3: "<b>S3 写在月份上</b>：顶部不加东西，每个月的分隔线上写「N 次更新 · M 条」，后面跟这个月每天一个小点（有更新的点亮）。其余不动。",
+};
+const byDate = new Map(R.map(r => [r.date, r]));
+const countOf = r => r.sections.reduce((n, s) => n + s.items.length, 0);
+const months = [...new Set(R.map(r => r.date.slice(0, 7)))];
+const D = s => new Date(s + "T00:00:00Z").getTime();
+const iso = t => new Date(t).toISOString().slice(0, 10);
+const DAY = 864e5;
+const first = R.at(-1).date, last = R[0].date;
+const dayName = d => `${Number(d.slice(5, 7))}月${Number(d.slice(8))}日`;
+const level = n => n === 0 ? 0 : n <= 3 ? 1 : n <= 7 ? 2 : n <= 12 ? 3 : 4;
+const recentDays = R.filter(r => D(last) - D(r.date) < 30 * DAY).length;
+let variant = "s1";
+
+/* 时间轴：与 UpdateTimeline.astro 结构一致 */
+function timeline(withMonthStats) {
+  return months.map(m => {
+    const rs = R.filter(r => r.date.startsWith(m));
+    let label = `${m.slice(0, 4)} 年 ${Number(m.slice(5))} 月`;
+    if (withMonthStats) {
+      const dim = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5), 0)).getUTCDate();
+      const dots = Array.from({ length: dim }, (_, i) => { const d = `${m}-${String(i + 1).padStart(2, "0")}`; if (d > last) return ""; const r = byDate.get(d); return r ? `<span style="background:var(--l${Math.max(2, level(countOf(r)))})" data-date="${d}" data-tipdate="${d}"></span>` : `<span></span>`; }).join("");
+      label = `<span class="s3-month">${label}<span class="stat-text">${rs.length} 次更新 · ${rs.reduce((n, r) => n + countOf(r), 0)} 条</span><span class="s3-days">${dots}</span></span>`;
+    }
+    return `<section class="update-month" data-month><p class="update-month-label">${label}</p>${rs.map(r => `
+      <article class="update-release ${r.date === last ? "is-latest" : ""}" id="r-${r.date}" data-release>
+      <div class="update-date"><time>${dayName(r.date)}</time><span>${r.date.slice(0, 4)}</span></div><div class="update-rail"></div>
+      <div class="update-body"><h2>${r.title}${r.date === last ? `<span class="update-latest">最新</span>` : ""}</h2>
+      ${r.sections.map(s => `<section class="update-group" data-type="${s.type}"><p class="update-type t-${s.type}"><i></i>${LABEL[s.type]}</p><ul>${s.items.map(i => `<li>${i}</li>`).join("")}</ul></section>`).join("")}
+      </div></article>`).join("")}</section>`;
+  }).join("");
+}
+function cells(fromDate) {
+  const f = fromDate > first ? fromDate : first;
+  const start = D(f) - ((new Date(D(f)).getUTCDay() + 6) % 7) * DAY;
+  const end = D(last) + (6 - (new Date(D(last)).getUTCDay() + 6) % 7) * DAY;
+  let html = "";
+  for (let t = start; t <= end; t += DAY) {
+    const date = iso(t), r = byDate.get(date);
+    html += date < f || date > last ? `<span class="out"></span>` : `<span style="background:var(--l${level(r ? countOf(r) : 0)})" data-tipdate="${date}" ${r ? `data-date="${date}"` : ""}></span>`;
+  }
+  return `<div class="cal-cells">${html}</div>`;
+}
+
+function render() {
+  document.getElementById("note").innerHTML = NOTES[variant];
+  const head = document.getElementById("slot-head"), top = document.getElementById("slot-top");
+  head.innerHTML = ""; top.innerHTML = "";
+  if (variant === "s1") {
+    top.innerHTML = `<div class="s1"><div class="cal-scroll" id="cs">${cells(first)}</div>
+      <div class="stat-text"><span>最近一次 <b>${dayName(last)}</b></span><span>近 30 天有 <b>${recentDays}</b> 天在更新</span><span>共 <b>${R.length}</b> 次更新</span>
+      <span class="legend">少 ${[0,1,2,3,4].map(l => `<i style="background:var(--l${l})"></i>`).join("")} 多</span></div></div>`;
+    const cs = document.getElementById("cs"); cs.scrollLeft = cs.scrollWidth;
+  } else if (variant === "s2") {
+    head.innerHTML = `<div class="s2"><span class="stat-text">近 30 天有 <b>${recentDays}</b> 天在更新 · 最近一次 <b>${dayName(last)}</b></span>${cells(iso(D(last) - 83 * DAY))}</div>`;
+  }
+  document.getElementById("timeline").innerHTML = timeline(variant === "s3");
+  applyFilter();
+  document.querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === variant)));
+}
+/* 筛选：与线上脚本相同 */
+let filter = "all";
+function applyFilter() {
+  const page = document.getElementById("page");
+  page.dataset.filter = filter;
+  document.querySelectorAll("[data-f]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.f === filter)));
+  document.querySelectorAll("[data-release]").forEach(r => r.hidden = filter !== "all" && !r.querySelector(`[data-type="${filter}"]`));
+  document.querySelectorAll("[data-month]").forEach(m => m.hidden = !m.querySelector("[data-release]:not([hidden])"));
+}
+const tip = document.getElementById("tip");
+document.addEventListener("pointermove", e => {
+  const el = e.target.closest("[data-tipdate]");
+  if (!el) { tip.hidden = true; return; }
+  const r = byDate.get(el.dataset.tipdate);
+  tip.innerHTML = r ? `<b>${dayName(r.date)} · ${countOf(r)} 条</b>${r.title}` : `<b>${dayName(el.dataset.tipdate)}</b>没有更新`;
+  tip.hidden = false;
+  tip.style.left = Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8) + "px";
+  tip.style.top = (e.clientY + 16 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 10 : e.clientY + 16) + "px";
+});
+document.addEventListener("click", e => {
+  tip.hidden = true;
+  const t = e.target.closest("[data-date],[data-f],[data-v]");
+  if (!t) return;
+  if (t.dataset.v) { variant = t.dataset.v; history.replaceState(null, "", "#" + variant); render(); scrollTo(0, 0); }
+  else if (t.dataset.f) { filter = t.dataset.f; applyFilter(); }
+  else if (t.dataset.date) {
+    if (filter !== "all") { filter = "all"; applyFilter(); }
+    const el = document.getElementById("r-" + t.dataset.date);
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 2500);
+  }
+});
+if (/^#s[0-3]$/.test(location.hash)) variant = location.hash.slice(1);
+render();
+</script>
+</body>
+</html>

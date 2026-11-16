@@ -31,3 +31,10 @@ export type CoverId = keyof typeof coverColors;
 
 export const presentationFor = (id: string) =>
   blogPresentation[id.replace(/\.(md|mdx)$/, "")];
+
+/** 正文第一张配图相对 `src/assets/blog/` 的路径（如 `source/team-room/AR-AT-1.png`），列表封面用它；没有配图返回 undefined。代码块里的示例图不算。 */
+export function firstArticleImage(markdown: string): string | undefined {
+  const withoutCode = markdown.replace(/^(```|~~~)[\s\S]*?^\1/gm, "");
+  const match = /!\[[^\]]*\]\((?:\.\.\/)+assets\/blog\/(source\/[^)\s]+)/.exec(withoutCode);
+  return match ? decodeURI(match[1]) : undefined;
+}
