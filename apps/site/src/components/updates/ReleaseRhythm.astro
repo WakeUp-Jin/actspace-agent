@@ -1,0 +1,20 @@
+---
+import type {ReleaseActivity} from '../../lib/releases/activity';
+interface Props {activity:ReleaseActivity;}
+const {activity}=Astro.props;
+const dayLabel=(date:string)=>{const [,month,day]=date.split('-');return `${Number(month)}月${Number(day)}日`;};
+// 柱高按全部日子里单日最多的条数归一；筛选分类时沿用同一刻度，只看这一类占了多少。最矮 12%，免得 1 条的日子看不见。
+const height=(count:number)=>count===0?'0%':`${Math.max(12,Math.round(count/activity.maxTotal*100))}%`;
+const first=activity.days[0]!;
+---
+<div class="update-rhythm" aria-label={`每日更新节奏，${dayLabel(first.date)}至${dayLabel(activity.latestDate)}`}>
+<div class="update-rhythm-bars">
+{activity.days.map(day=>{
+  const style=`--h-all:${height(day.total)};--h-feature:${height(day.counts.feature)};--h-improvement:${height(day.counts.improvement)};--h-fix:${height(day.counts.fix)}`;
+  return day.release
+    ?<a class="update-rhythm-day" href={`#${day.release.anchor}`} style={style} data-tip-title={`${dayLabel(day.date)} · ${day.total} 条`} data-tip-text={day.release.title} aria-label={`${dayLabel(day.date)}，${day.total} 条：${day.release.title}`}><i></i></a>
+    :<span class="update-rhythm-day is-empty" aria-hidden="true"><i></i></span>;
+})}
+</div>
+<div class="update-rhythm-ends" aria-hidden="true"><span>{dayLabel(first.date)}</span><span>{dayLabel(activity.latestDate)}</span></div>
+</div>

@@ -3,7 +3,7 @@ import type {ImageMetadata} from 'astro';
 import {Image} from 'astro:assets';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import {blogHref,getPublicPosts,readingTime} from '../../lib/blog';
-import {coverColors,presentationFor} from '../../lib/blog-presentation';
+import {coverColors,firstArticleImage,presentationFor} from '../../lib/blog-presentation';
 import {spaceCjk} from '../../lib/markdown/cjk-spacing.mjs';
 import {sitePath} from '../../lib/site-path';
 import '../../styles/blog.css';
@@ -11,6 +11,8 @@ const posts=await getPublicPosts();
 const categoryOf=(post:(typeof posts)[number])=>presentationFor(post.id)?.category??post.data.tags[0];
 const categories=[...new Set(posts.map(categoryOf))];
 const images=import.meta.glob<{default:ImageMetadata}>('../../assets/blog/covers/*.png',{eager:true});
+// 有配图的文章用正文第一张图做封面，没有的仍用角色插画（DESIGN.md「博客列表」）。
+const figures=import.meta.glob<{default:ImageMetadata}>('../../assets/blog/source/**/*.{png,PNG,jpg,jpeg,webp}',{eager:true});
 ---
 <BaseLayout title="ActSpace 博客" description="关于 Agent 的设计、工程与实践。">
 <main id="main-content" class="blog-page">
@@ -27,12 +29,16 @@ const images=import.meta.glob<{default:ImageMetadata}>('../../assets/blog/covers
   const cover=meta?.cover??'01';
   const colors=coverColors[cover];
   const image=images[`../../assets/blog/covers/character-${cover}.png`]?.default;
+  const figurePath=firstArticleImage(post.body??'');
+  const figure=figurePath?figures[`../../assets/blog/${figurePath}`]?.default:undefined;
   const date=post.data.publishedAt.toISOString().slice(0,10);
   return <a class:list={['blog-item',{'is-lead':index===0}]} href={sitePath(blogHref(post))} data-category={categoryOf(post)}>
-<div class:list={['blog-tile',{'is-light':colors.light}]} style={`--tile-bg:${colors.bg};--tile-ink:${colors.ink}`}>
-{image&&<Image class="blog-tile-character" src={image} alt="" format="webp" quality={90} widths={[480,800,1254]} sizes="(max-width: 640px) 100vw, (max-width: 1000px) 50vw, 520px" loading={index<3?'eager':'lazy'}/>}
+<div class:list={['blog-tile',{'is-light':colors.light,'has-figure':figure}]} style={`--tile-bg:${colors.bg};--tile-ink:${colors.ink}`}>
+{figure
+  ?<div class="blog-tile-figure"><Image src={figure} alt="" format="webp" quality={85} widths={[480,800,1200]} sizes="(max-width: 640px) 90vw, (max-width: 1000px) 45vw, 480px" loading={index<3?'eager':'lazy'}/></div>
+  :image&&<Image class="blog-tile-character" src={image} alt="" format="webp" quality={90} widths={[480,800,1254]} sizes="(max-width: 640px) 100vw, (max-width: 1000px) 50vw, 520px" loading={index<3?'eager':'lazy'}/>}
 <div class="blog-tile-top"><span>{categoryOf(post)}</span><time datetime={date}>{date.slice(5)}</time></div>
-<div class="blog-tile-key" aria-hidden="true">{meta?.key??''}</div>
+{!figure&&<div class="blog-tile-key" aria-hidden="true">{meta?.key??''}</div>}
 </div>
 <div class="blog-item-text">
 <h2>{spaceCjk(post.data.title)}</h2>

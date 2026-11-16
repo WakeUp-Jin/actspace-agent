@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>更新日志 demo 二</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.page { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 120px; }
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px 32px; flex-wrap: wrap; margin-bottom: 28px; }
+.head h1 { font: 650 40px/1.1 var(--sans); margin: 0; }
+.head .sub { font-size: 14px; color: var(--site-muted); margin: 10px 0 0; }
+.dot { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--t); }
+.t-feature { --t: var(--t-feature); } .t-improvement { --t: var(--t-improvement); } .t-fix { --t: var(--t-fix); }
+:root { --l0: #e3e0d8; --l1: #d6cbf2; --l2: #b19ce8; --l3: #8a6dd6; --l4: #5e40b6; }
+
+/* 轻量筛选：纯文字 */
+.filters { display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: 13.5px; color: var(--site-muted); }
+.filters button { display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; color: inherit; cursor: pointer; }
+.filters button:hover { color: var(--site-ink); }
+.filters button[aria-pressed="true"] { color: var(--site-ink); font-weight: 500; }
+.bar-row { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--site-line); margin-bottom: 8px; }
+.caption { font-size: 12.5px; color: var(--site-muted); font-variant-numeric: tabular-nums; }
+.caption b { color: var(--site-ink); font-weight: 600; }
+
+/* E1 标题旁迷你格 */
+.mini { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 9px); gap: 2px; width: max-content; }
+.mini span { width: 9px; height: 9px; border-radius: 2px; background: var(--l0); }
+.mini span.out { background: transparent; }
+.mini span[data-date] { cursor: pointer; }
+.mini span[data-date]:hover { outline: 1.5px solid var(--site-ink); outline-offset: 1px; }
+.mini-wrap { display: grid; gap: 8px; justify-items: end; }
+
+/* E2 / E4 一行节奏条 */
+.strip { display: flex; align-items: flex-end; gap: 1px; height: 30px; width: 100%; }
+.strip span { flex: 1; min-width: 1px; height: 100%; display: flex; align-items: flex-end; }
+.strip span i { display: block; width: 100%; border-radius: 1px; background: var(--site-accent); opacity: .75; }
+.strip span.none i { height: 2px !important; background: var(--site-line); opacity: 1; }
+.strip span[data-date] { cursor: pointer; }
+.strip span[data-date]:hover i { opacity: 1; background: var(--site-ink); }
+.strip-ends { display: flex; justify-content: space-between; font: 11px var(--mono); color: var(--site-muted); margin-top: 5px; }
+.strip-box { margin-bottom: 24px; }
+
+/* E3 月份索引 */
+.mindex { display: flex; gap: 4px 4px; flex-wrap: wrap; margin: 4px 0 28px; }
+.mindex button { display: inline-flex; align-items: baseline; gap: 6px; height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: none; cursor: pointer; font-size: 14px; color: var(--site-body); }
+.mindex button small { font: 11.5px var(--mono); color: var(--site-muted); }
+.mindex button:hover { background: var(--site-canvas-soft); }
+.mindex button[aria-pressed="true"] { background: var(--site-ink); color: #fff; }
+.mindex button[aria-pressed="true"] small { color: rgba(255,255,255,.65); }
+
+/* 时间轴（沿用线上 U1，略收紧） */
+.month-label { display: flex; align-items: center; gap: 16px; margin: 44px 0 4px; font: 600 13px var(--sans); color: var(--site-muted); }
+.month-label::after { content: ""; flex: 1; height: 1px; background: var(--site-line); }
+.tl > .month:first-child .month-label { margin-top: 12px; }
+.fold { display: flex; width: 100%; align-items: baseline; gap: 12px; padding: 14px 0; border: 0; border-bottom: 1px solid var(--site-line); background: none; cursor: pointer; text-align: left; color: var(--site-ink); }
+.fold:hover b { text-decoration: underline; text-underline-offset: 4px; }
+.fold b { font: 600 14.5px var(--sans); }
+.fold .meta { font-size: 13px; color: var(--site-muted); font-variant-numeric: tabular-nums; }
+.fold .open { margin-left: auto; font-size: 13px; color: var(--site-muted); }
+.release { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 0 28px; scroll-margin-top: 96px; }
+.r-date { position: sticky; top: 92px; align-self: start; padding-top: 26px; font: 600 14px var(--sans); color: var(--site-ink); }
+.r-body { padding: 22px 0 28px; max-width: 700px; border-bottom: 1px solid color-mix(in srgb, var(--site-line) 60%, transparent); }
+.r-body h2 { font: 650 20px/1.45 var(--sans); margin: 0 0 12px; letter-spacing: -.01em; }
+.latest-tag { display: inline-flex; vertical-align: 2px; margin-left: 8px; height: 20px; padding: 0 8px; align-items: center; border-radius: 999px; background: var(--site-accent-soft); color: var(--site-accent); font: 600 11px var(--sans); }
+.grp + .grp { margin-top: 10px; }
+.grp-type { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 2px; font: 600 12px var(--sans); color: var(--t); }
+.grp ul { list-style: none; margin: 0; padding: 0; font: 14.5px/1.75 var(--sans); color: #45423c; }
+.grp li { position: relative; padding-left: 1.2em; margin: .25em 0; overflow-wrap: anywhere; }
+.grp li::before { content: ""; position: absolute; left: .15em; top: .7em; width: 5px; height: 5px; border-radius: 2px; background: var(--site-line-strong); }
+.grp code { font: .86em var(--mono); background: var(--site-accent-soft); color: #5a3fae; border-radius: 5px; padding: .12em .38em; }
+.release.flash .r-body, .row.flash { animation: flash 2.2s ease-out; }
+@keyframes flash { 0%, 45% { background: color-mix(in srgb, var(--site-accent-soft) 85%, transparent); } 100% { background: transparent; } }
+
+/* E4 一行一次 */
+.row { border-bottom: 1px solid var(--site-line); scroll-margin-top: 96px; }
+.row > button { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto 16px; align-items: baseline; gap: 16px; width: 100%; padding: 13px 4px; border: 0; background: none; text-align: left; cursor: pointer; color: var(--site-ink); }
+.row > button:hover .rt { text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--site-line-strong); }
+.row .rd { font: 12.5px var(--mono); color: var(--site-muted); }
+.row .rt { font: 500 15px/1.5 var(--sans); }
+.row .rc { display: flex; gap: 10px; font: 12px var(--mono); color: var(--site-muted); }
+.row .rc span { display: inline-flex; align-items: center; gap: 4px; }
+.row .chev { color: var(--site-muted); font-size: 12px; transition: rotate 150ms; }
+.row[open-row] .chev { rotate: 90deg; }
+.row .detail { padding: 0 4px 18px 96px; }
+.row .detail[hidden] { display: none; }
+.e4 .month-label { margin: 36px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--site-line-strong); }
+.e4 .month-label::after { display: none; }
+
+.tip { position: fixed; z-index: 60; pointer-events: none; background: #1d1c1a; color: #fff; border-radius: 9px; padding: 8px 11px; font-size: 12.5px; line-height: 1.5; max-width: 260px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.tip b { display: block; font-weight: 600; }
+.tip[hidden] { display: none; }
+
+@media (max-width: 700px) {
+  .page { padding-top: 32px; }
+  .head h1 { font-size: 32px; }
+  .mini-wrap { justify-items: start; width: 100%; overflow-x: auto; }
+  .release { grid-template-columns: 1fr; }
+  .r-date { position: static; padding-top: 20px; font-size: 13px; color: var(--site-muted); }
+  .r-body { padding-top: 4px; }
+  .r-body h2 { font-size: 18px; }
+  .row > button { grid-template-columns: minmax(0, 1fr) 14px; gap: 4px 10px; }
+  .row .rd { grid-column: 1; }
+  .row .rt { grid-column: 1; }
+  .row .rc { grid-column: 1; }
+  .row .chev { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+  .row .detail { padding-left: 4px; }
+}
+</style>
+</head>
+<body>
+<header class="demo-header"><b>ActSpace</b><nav><span>文档</span><span>博客</span><span aria-current="page">更新日志</span><span>路线图</span></nav></header>
+<p class="variant-note" id="note"></p>
+<main class="page">
+  <header class="head" id="head"></header>
+  <div id="extra"></div>
+  <section id="body"></section>
+</main>
+<div class="tip" id="tip" hidden></div>
+<div class="switcher" role="group" aria-label="切换方案">
+  <span class="lab">更新日志 · 第二轮</span>
+  <button data-v="e1">E1 标题旁小格子</button>
+  <button data-v="e2">E2 一条细节奏线</button>
+  <button data-v="e3">E3 只有月份</button>
+  <button data-v="e4">E4 一行一次</button>
+</div>
+<script src="data.js"></script>
+<script>
+const R = window.RELEASES;
+const LABEL = { feature: "新功能", improvement: "改进", fix: "问题修复" };
+const SHORT = { feature: "新功能", improvement: "改进", fix: "修复" };
+const NOTES = {
+  e1: "<b>E1 标题旁小格子</b>：不要统计面板，标题右边一小块贡献格 + 一行字；下面只展开最近一个月，更早的每月一行。",
+  e2: "<b>E2 一条细节奏线</b>：标题下一条 30px 高的细线，每天一根，越高这天改得越多；没有数字面板。",
+  e3: "<b>E3 只有月份</b>：不画图，只有一行月份（带次数），一次看一个月。最省。",
+  e4: "<b>E4 一行一次</b>：顶部一条细节奏线；每次更新收成一行（日期 · 标题 · 各类条数），点开才看具体条目。",
+};
+const byDate = new Map(R.map(r => [r.date, r]));
+const countOf = (r, f = "all") => r.sections.filter(s => f === "all" || s.type === f).reduce((n, s) => n + s.items.length, 0);
+const months = [...new Set(R.map(r => r.date.slice(0, 7)))];
+const monthName = m => `${m.slice(0, 4)} 年 ${Number(m.slice(5))} 月`;
+const dayName = d => `${Number(d.slice(5, 7))}月${Number(d.slice(8))}日`;
+const D = s => new Date(s + "T00:00:00Z").getTime();
+const iso = t => new Date(t).toISOString().slice(0, 10);
+const DAY = 864e5;
+const first = R.at(-1).date, last = R[0].date;
+const level = n => n === 0 ? 0 : n <= 3 ? 1 : n <= 7 ? 2 : n <= 12 ? 3 : 4;
+let filter = "all", variant = "e1", openMonths = new Set([months[0]]), curMonth = months[0], openRows = new Set([last]);
+
+const recentDays = R.filter(r => D(last) - D(r.date) < 30 * DAY).length;
+const caption = `最近一次 <b>${dayName(last)}</b> · 近 30 天有 <b>${recentDays}</b> 天在更新`;
+const filtersHtml = () => `<div class="filters" role="group" aria-label="按分类筛选">${[["all","全部"],["feature","新功能"],["improvement","改进"],["fix","修复"]].map(([t,l]) => `<button data-f="${t}" aria-pressed="${t === filter}">${t !== "all" ? `<i class="dot t-${t}"></i>` : ""}${l}</button>`).join("")}</div>`;
+
+const tip = document.getElementById("tip");
+function showTip(e, date) {
+  const r = byDate.get(date);
+  tip.innerHTML = r ? `<b>${dayName(date)} · ${countOf(r)} 条</b>${r.title}` : `<b>${dayName(date)}</b>没有更新`;
+  tip.hidden = false;
+  tip.style.left = Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8) + "px";
+  tip.style.top = (e.clientY + 16 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 10 : e.clientY + 16) + "px";
+}
+document.addEventListener("pointermove", e => { const el = e.target.closest("[data-tipdate]"); if (el) showTip(e, el.dataset.tipdate); else tip.hidden = true; });
+
+function miniHtml() {
+  const start = D(first) - ((new Date(D(first)).getUTCDay() + 6) % 7) * DAY;
+  const end = D(last) + (6 - (new Date(D(last)).getUTCDay() + 6) % 7) * DAY;
+  let cells = "";
+  for (let t = start; t <= end; t += DAY) {
+    const date = iso(t), r = byDate.get(date), n = r ? countOf(r, filter) : 0;
+    cells += date < first || date > last ? `<span class="out"></span>` : `<span style="background:var(--l${level(n)})" data-tipdate="${date}" ${n ? `data-date="${date}"` : ""}></span>`;
+  }
+  return `<div class="mini-wrap"><div class="mini">${cells}</div><div class="caption">${caption}</div></div>`;
+}
+function stripHtml() {
+  const days = Math.round((D(last) - D(first)) / DAY) + 1;
+  const max = Math.max(...R.map(r => countOf(r)));
+  let bars = "";
+  for (let i = 0; i < days; i++) {
+    const date = iso(D(first) + i * DAY), r = byDate.get(date), n = r ? countOf(r, filter) : 0;
+    bars += `<span class="${n ? "" : "none"}" data-tipdate="${date}" ${n ? `data-date="${date}"` : ""}><i style="height:${Math.max(12, n / max * 100)}%"></i></span>`;
+  }
+  return `<div class="strip-box"><div class="strip">${bars}</div><div class="strip-ends"><span>${dayName(first)}</span><span>${dayName(last)}</span></div></div>`;
+}
+function releaseHtml(r) {
+  const secs = r.sections.filter(s => filter === "all" || s.type === filter);
+  if (!secs.length) return "";
+  return `<article class="release" id="r-${r.date}"><div class="r-date">${dayName(r.date)}</div>
+    <div class="r-body"><h2>${r.title}${r.date === last ? `<span class="latest-tag">最新</span>` : ""}</h2>
+    ${secs.map(s => `<section class="grp"><p class="grp-type t-${s.type}"><i class="dot"></i>${LABEL[s.type]}</p><ul>${s.items.map(i => `<li>${i}</li>`).join("")}</ul></section>`).join("")}</div></article>`;
+}
+const monthReleases = m => R.filter(r => r.date.startsWith(m) && countOf(r, filter));
+function foldedMonths() {
+  return months.map(m => {
+    const rs = monthReleases(m);
+    if (!rs.length) return "";
+    if (!openMonths.has(m)) return `<section class="month"><button class="fold" data-open="${m}"><b>${monthName(m)}</b><span class="meta">${rs.length} 次更新 · ${rs.reduce((n, r) => n + countOf(r, filter), 0)} 条</span><span class="open">展开</span></button></section>`;
+    return `<section class="month"><p class="month-label">${monthName(m)}</p>${rs.map(releaseHtml).join("")}</section>`;
+  }).join("");
+}
+function rowsHtml() {
+  return months.map(m => {
+    const rs = monthReleases(m);
+    if (!rs.length) return "";
+    return `<section class="month"><p class="month-label">${monthName(m)}</p>${rs.map(r => {
+      const open = openRows.has(r.date);
+      const secs = r.sections.filter(s => filter === "all" || s.type === filter);
+      return `<div class="row" id="r-${r.date}" ${open ? "open-row" : ""}><button data-row="${r.date}" aria-expanded="${open}"><span class="rd">${r.date.slice(5)}</span><span class="rt">${r.title}</span>
+        <span class="rc">${secs.map(s => `<span><i class="dot t-${s.type}"></i>${s.items.length}</span>`).join("")}</span><span class="chev">›</span></button>
+        <div class="detail" ${open ? "" : "hidden"}>${secs.map(s => `<section class="grp"><p class="grp-type t-${s.type}"><i class="dot"></i>${LABEL[s.type]}</p><ul>${s.items.map(i => `<li>${i}</li>`).join("")}</ul></section>`).join("")}</div></div>`;
+    }).join("")}</section>`;
+  }).join("");
+}
+
+function render() {
+  document.getElementById("note").innerHTML = NOTES[variant];
+  const head = document.getElementById("head"), extra = document.getElementById("extra"), body = document.getElementById("body");
+  const title = `<div><h1>更新日志</h1><p class="sub">只记录用得到的新功能、改进和问题修复。</p></div>`;
+  body.className = "tl " + variant;
+  if (variant === "e1") {
+    head.innerHTML = title + miniHtml();
+    extra.innerHTML = `<div class="bar-row">${filtersHtml()}</div>`;
+    body.innerHTML = foldedMonths();
+  } else if (variant === "e2") {
+    head.innerHTML = title;
+    extra.innerHTML = stripHtml() + `<div class="bar-row">${filtersHtml()}<span class="caption">${caption}</span></div>`;
+    body.innerHTML = foldedMonths();
+  } else if (variant === "e3") {
+    head.innerHTML = title + filtersHtml();
+    const total = months.map(m => [m, monthReleases(m).length]);
+    extra.innerHTML = `<div class="mindex">${total.filter(([, n]) => n).map(([m, n]) => `<button data-month="${m}" aria-pressed="${m === curMonth}">${Number(m.slice(5))} 月<small>${n}</small></button>`).join("")}</div>`;
+    body.innerHTML = `<section class="month">${monthReleases(curMonth).map(releaseHtml).join("") || `<p class="caption">这个月没有这一类的更新。</p>`}</section>`;
+  } else {
+    head.innerHTML = title;
+    extra.innerHTML = stripHtml() + `<div class="bar-row" style="border:0;margin:0;padding:0">${filtersHtml()}<span class="caption">${caption}</span></div>`;
+    body.innerHTML = rowsHtml();
+  }
+}
+function jump(date) {
+  const m = date.slice(0, 7);
+  openMonths.add(m); curMonth = m; openRows.add(date);
+  render();
+  const el = document.getElementById("r-" + date);
+  if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 2300); }
+}
+document.addEventListener("click", e => {
+  tip.hidden = true;
+  const t = e.target.closest("[data-date],[data-open],[data-month],[data-row],[data-f],[data-v]");
+  if (!t) return;
+  if (t.dataset.v) { variant = t.dataset.v; history.replaceState(null, "", "#" + variant); sync(); render(); scrollTo(0, 0); }
+  else if (t.dataset.f) { filter = t.dataset.f; render(); }
+  else if (t.dataset.date) jump(t.dataset.date);
+  else if (t.dataset.open) { openMonths.add(t.dataset.open); render(); }
+  else if (t.dataset.month) { curMonth = t.dataset.month; render(); }
+  else if (t.dataset.row) { const d = t.dataset.row; openRows.has(d) ? openRows.delete(d) : openRows.add(d); render(); }
+});
+function sync() { document.querySelectorAll("[data-v]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === variant))); }
+if (/^#e[1-4]$/.test(location.hash)) variant = location.hash.slice(1);
+sync(); render();
+</script>
+</body>
+</html>

@@ -1,10 +1,15 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import ReleaseRhythm from "../../components/updates/ReleaseRhythm.astro";
 import UpdateTimeline from "../../components/updates/UpdateTimeline.astro";
+import { buildReleaseActivity } from "../../lib/releases/activity";
 import { groupReleaseNotes, loadReleaseNotes } from "../../lib/releases/parse-release-notes";
 import "../../styles/updates.css";
 
-const months = groupReleaseNotes(await loadReleaseNotes());
+const entries = await loadReleaseNotes();
+const months = groupReleaseNotes(entries);
+const activity = buildReleaseActivity(entries);
+const dayLabel = (date: string) => `${Number(date.slice(5, 7))}月${Number(date.slice(8))}日`;
 const filters = [
   { type: "all", label: "全部" },
   { type: "feature", label: "新功能" },
@@ -16,10 +21,11 @@ const filters = [
 <BaseLayout title="ActSpace 更新日志" description="ActSpace 的最新功能、改进与问题修复。">
   <main id="main-content" class="updates-page" data-filter="all">
     <header class="updates-head">
-      <div>
-        <h1>更新日志</h1>
-        <p>只记录用得到的新功能、改进和问题修复。</p>
-      </div>
+      <h1>更新日志</h1>
+      <p>只记录用得到的新功能、改进和问题修复。</p>
+    </header>
+    {activity && <ReleaseRhythm {activity} />}
+    <div class="updates-bar">
       <div class="updates-filters" role="group" aria-label="按分类筛选">
         {filters.map(({ type, label }) => (
           <button type="button" data-filter-type={type} aria-pressed={type === "all" ? "true" : "false"}>
@@ -27,13 +33,20 @@ const filters = [
           </button>
         ))}
       </div>
-    </header>
+      {activity && (
+        <p class="updates-summary">
+          最近一次 <b>{dayLabel(activity.latestDate)}</b> · 近 30 天有 <b>{activity.activeDaysLast30}</b> 天在更新
+        </p>
+      )}
+    </div>
     <UpdateTimeline {months} />
+    <div class="update-tip" role="tooltip" hidden></div>
   </main>
 </BaseLayout>
 <script>
-// 分类筛选：只留对应分组；没有该分类的发布和整月一起隐藏。
 const page = document.querySelector<HTMLElement>(".updates-page")!;
+
+// 分类筛选：只留对应分组；没有该分类的发布和整月一起隐藏，节奏线换成这一类的柱高。
 const buttons = [...document.querySelectorAll<HTMLButtonElement>("[data-filter-type]")];
 buttons.forEach((button) => button.addEventListener("click", () => {
   const type = button.dataset.filterType ?? "all";
@@ -46,4 +59,39 @@ buttons.forEach((button) => button.addEventListener("click", () => {
     month.hidden = !month.querySelector("[data-release]:not([hidden])");
   });
 }));
+
+// 跳到某次发布（节奏线、首页更新条、带锚点的链接）时，先展开它所在的月份，再滚过去并短暂标亮。
+function reveal(hash: string, smooth: boolean) {
+  const target = hash.length > 1 ? document.getElementById(decodeURIComponent(hash.slice(1))) : null;
+  if (!target?.matches("[data-release]")) return false;
+  const month = target.closest<HTMLDetailsElement>("details");
+  if (month) month.open = true;
+  if (target.hidden) buttons.find((button) => button.dataset.filterType === "all")?.click();
+  target.scrollIntoView({ behavior: smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto", block: "start" });
+  target.classList.remove("is-flash");
+  void target.offsetWidth;
+  target.classList.add("is-flash");
+  return true;
+}
+document.addEventListener("click", (event) => {
+  const link = (event.target as Element).closest<HTMLAnchorElement>('a[href^="#release-"]');
+  if (!link || !reveal(link.hash, true)) return;
+  event.preventDefault();
+  history.replaceState(null, "", link.hash);
+});
+window.addEventListener("hashchange", () => reveal(location.hash, true));
+if (location.hash) requestAnimationFrame(() => reveal(location.hash, false));
+
+// 节奏线悬停提示：当天日期、条数和标题。
+const tip = page.querySelector<HTMLElement>(".update-tip")!;
+page.querySelector(".update-rhythm-bars")?.addEventListener("pointermove", (event) => {
+  const day = (event.target as Element).closest<HTMLElement>("[data-tip-title]");
+  if (!day) { tip.hidden = true; return; }
+  tip.replaceChildren(Object.assign(document.createElement("b"), { textContent: day.dataset.tipTitle }), day.dataset.tipText ?? "");
+  tip.hidden = false;
+  const { clientX: x, clientY: y } = event as PointerEvent;
+  tip.style.left = `${Math.min(x + 12, innerWidth - tip.offsetWidth - 8)}px`;
+  tip.style.top = `${y + 16 + tip.offsetHeight > innerHeight ? y - tip.offsetHeight - 10 : y + 16}px`;
+});
+for (const type of ["pointerleave", "click"]) page.querySelector(".update-rhythm-bars")?.addEventListener(type, () => { tip.hidden = true; });
 </script>

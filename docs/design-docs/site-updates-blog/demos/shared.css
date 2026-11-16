@@ -1,0 +1,33 @@
+/* 两份 demo 共用：站点 tokens（摘自 apps/site/src/styles/tokens.css）+ 简化页头 + 底部方案切换条。 */
+:root {
+  --site-canvas: #f2f1ed; --site-canvas-soft: #ebe9e3; --site-paper: #fbfaf7; --site-surface: #fff;
+  --site-ink: #1d1c1a; --site-body: #5d5a53; --site-muted: #8a8780;
+  --site-line: #dcd9d1; --site-line-strong: #b9b5ab;
+  --site-accent: #6d4fc2; --site-accent-soft: #f2eefb; --site-accent-line: #cdbdf0;
+  --t-feature: #2f7d5b; --t-feature-soft: #e1efe6;
+  --t-improvement: #6d4fc2; --t-improvement-soft: #f0ebfb;
+  --t-fix: #a0661c; --t-fix-soft: #f5ead6;
+  --stage-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .2  0 0 0 0 .18  0 0 0 0 .15  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --display: Charter, "Songti SC", "Noto Serif SC", Georgia, serif;
+  --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, monospace;
+  --page: min(1360px, calc(100% - 2 * clamp(16px, 4.8vw, 40px)));
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--site-canvas); color: var(--site-ink); font: 15px/1.6 var(--sans); padding-bottom: 96px; }
+button { font: inherit; }
+.demo-header { position: sticky; top: 0; z-index: 20; height: 64px; display: flex; align-items: center; gap: 28px; padding: 0 clamp(16px, 4.8vw, 40px); background: color-mix(in srgb, var(--site-canvas) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--site-line); }
+.demo-header b { font: 650 17px var(--sans); letter-spacing: -.01em; }
+.demo-header nav { display: flex; gap: 22px; font-size: 14px; color: var(--site-body); overflow-x: auto; scrollbar-width: none; }
+.demo-header nav span[aria-current] { color: var(--site-ink); font-weight: 500; }
+
+/* 底部切换条：只属于 demo */
+.switcher { position: fixed; left: 50%; bottom: 18px; translate: -50% 0; z-index: 50; display: flex; align-items: center; gap: 4px; max-width: calc(100% - 24px); overflow-x: auto; scrollbar-width: none; padding: 5px; border-radius: 999px; background: #1d1c1a; color: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.25); font-size: 13px; }
+.switcher .lab { padding: 0 10px 0 12px; opacity: .55; white-space: nowrap; }
+.switcher .sep { width: 1px; height: 18px; background: rgba(255,255,255,.2); margin: 0 6px; flex: none; }
+.switcher button { flex: none; height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: rgba(255,255,255,.75); cursor: pointer; white-space: nowrap; }
+.switcher button:hover { color: #fff; }
+.switcher button[aria-pressed="true"] { background: #fff; color: #1d1c1a; font-weight: 600; }
+.variant-note { width: var(--page); margin: 18px auto 0; font-size: 13px; color: var(--site-muted); }
+.variant-note b { color: var(--site-ink); font-weight: 600; }
