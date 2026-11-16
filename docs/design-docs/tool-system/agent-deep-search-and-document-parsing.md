@@ -1,6 +1,6 @@
-# DeepSeek 深度搜索与文档解析工具（目标设计，未实现）
+# DeepSeek 深度搜索与文档解析工具
 
-本文是 `deep_search` 和 `read_document` 两个工具的设计。两个工具都已在分支上实现（`deep_search`：第 7 节、第 9.1、9.3 节；`read_document`：第 8 节、第 9.2–9.4 节），这几节写的是当前事实；统一验收通过、合入 main 后去掉标题里的「目标设计，未实现」。实现步骤见[执行计划](../../exec-plans/active/20261114-deepseek-deep-search-document-parsing/README.md)，界面以 [demo](../frontend/deep-search-and-document-demo.html) 为准。
+本文是 `deep_search` 和 `read_document` 两个工具的设计，两个工具都已实现（`deep_search`：第 7 节、第 9.1、9.3 节；`read_document`：第 8 节、第 9.2–9.4 节）。界面方向选定时的对照稿已随功能删除，界面事实以前端区域规范和预览规范为准。
 
 本文负责：为什么做、做成什么样、模块边界、否决过的方案。改哪些文件、按什么顺序、每步怎么验证，写在执行计划里。
 

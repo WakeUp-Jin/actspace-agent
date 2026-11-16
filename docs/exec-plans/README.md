@@ -15,7 +15,6 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [DeepSeek 深度搜索与文档解析](active/20261114-deepseek-deep-search-document-parsing/README.md) | 2026-11-14 接口实测、前端 demo 和方向选定已完成；[设计文档](../design-docs/tool-system/agent-deep-search-and-document-parsing.md)和三份子计划（P0 共享契约、PA 深度搜索、PB 文档解析）已写好，待审核，功能代码尚未开始。下一步：用户确认总览里「与确认内容的出入」两项，再从 P0 开始。 |
 | [代码库审查修复：工具结果体积上限、CI 门禁与中低优先级修复](active/20261110-codebase-review-fixes.md) | 2026-11-10 立项并开始执行（夜间模式）。8 个按顺序合并的 PR：CI 门禁、工具结果体积上限、修复合集、Loop 请求路径、路径安全模块、类型安全、命名、格式化；进度见计划的「进度记录」。 |
 | [App 装配层拆分](active/20261110-app-assembly-split.md) | 2026-11-10 立项，未开始。`App.tsx` 1670 行按 8 个职责拆成 `use-*` hook，App 只留装配（目标 ≤ 300 行），Context 字段与 `WorkbenchLayout` prop 不变。下一步：M1 侧边对话 + evict。 |
 | [`@actspace/shared` 契约分层](active/20261109-shared-contract-split.md) | P1 已合入（#75）：`ipc.ts` / `session.ts` 按主题拆成 `src/ipc/`、`src/session/`，`check:packages` 新增「后端包不得引用桌面 IPC 契约」规则；对外 API 不变。下一步：评估 P2（子入口与引用迁移）和 P3（按归属拆包）做不做；当初要等的 #66 / #67 / #68 已合入，评估还没开始。 |
