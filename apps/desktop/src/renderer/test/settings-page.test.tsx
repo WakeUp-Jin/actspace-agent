@@ -693,7 +693,7 @@ describe("SettingsPage", () => {
     await assertHeadingContract("模型", "模型", ["用途", "模型连接"]);
     await assertHeadingContract("搜索与网页读取", "搜索与网页读取", ["搜索通道", "网页读取"]);
     await assertHeadingContract("工具", "工具", ["代码库", "终端", "浏览器", "多媒体", "显示"]);
-    await assertHeadingContract("外观", "外观", ["主题", "强调色", "字体与字号"]);
+    await assertHeadingContract("外观", "外观", ["主题", "强调色", "字体与字号", "精灵"]);
     expect(within(main).queryByRole("heading", { name: "工具总览" })).not.toBeInTheDocument();
     expect(within(main).queryByRole("heading", { name: "联网搜索" })).not.toBeInTheDocument();
   });
@@ -773,6 +773,19 @@ describe("SettingsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "界面字号增大" }));
     expect(localStorage.getItem("actspace.appearance.v1")).toContain('"uiFontSize":15');
     expect(setUiZoom).toHaveBeenCalledWith(15 / 14);
+  });
+
+  it("外观分区的精灵模式默认关，打开后持久化", async () => {
+    renderSettingsPage();
+    await screen.findByRole("heading", { name: "通用", level: 2 });
+
+    await userEvent.click(screen.getByRole("button", { name: "外观" }));
+    const toggle = await screen.findByRole("switch", { name: "精灵模式" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(localStorage.getItem("actspace.appearance.v1")).toContain('"spriteMode":true');
   });
 
   it("外观字号步进器图标按钮有可读 tooltip", async () => {

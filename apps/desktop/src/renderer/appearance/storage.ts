@@ -96,6 +96,7 @@ export function loadAppearance(): AppearancePrefs {
       ),
     ),
     mermaidTheme: asMermaidTheme(parsed.mermaidTheme),
+    spriteMode: parsed.spriteMode === true,
   };
 }
 

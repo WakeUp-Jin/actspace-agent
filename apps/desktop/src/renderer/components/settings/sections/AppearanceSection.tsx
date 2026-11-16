@@ -1,8 +1,9 @@
 import { useRef, useState, type KeyboardEvent } from "react";
-import { SectionShell, SettingGroup, SettingRow, SettingsSelect, Stepper, type SelectOption } from "../SettingsPrimitives";
+import { SectionShell, SettingGroup, SettingRow, SettingsSelect, Stepper, Toggle, type SelectOption } from "../SettingsPrimitives";
 import { ACCENT_PALETTES } from "../../../appearance/accents";
 import { CODE_FONT_PRESETS, UI_FONT_PRESETS } from "../../../appearance/fonts";
 import { applyAppearance } from "../../../appearance/apply";
+import { publishSpriteMode } from "../../../appearance/sprite-mode";
 import { loadAppearance, saveAppearance } from "../../../appearance/storage";
 import { CODE_FONT_SIZE_MAX, CODE_FONT_SIZE_MIN, CODE_FONT_SIZE_STEP, DEFAULT_APPEARANCE, UI_FONT_SIZE_MAX, UI_FONT_SIZE_MIN, UI_FONT_SIZE_STEP, type AccentPaletteId, type AppearancePrefs, type CodeFontId, type ThemeMode, type UiFontId } from "../../../appearance/types";
 
@@ -162,6 +163,7 @@ export function AppearanceSection() {
       const next = { ...prev, ...patch };
       saveAppearance(next);
       applyAppearance(next);
+      publishSpriteMode(next);
       return next;
     });
   };
@@ -239,6 +241,14 @@ export function AppearanceSection() {
             {'const greeting = "你好，ActSpace";'}
           </pre>
         </div>
+      </SettingGroup>
+
+      <SettingGroup title="精灵" headingLevel={3}>
+        <SettingRow
+          title="精灵模式"
+          description="压缩上下文时，一只像素小精灵把旧消息推进墙角。关闭时是简洁的分隔线。"
+          control={<Toggle checked={prefs.spriteMode} onChange={(enabled) => update({ spriteMode: enabled })} ariaLabel="精灵模式" />}
+        />
       </SettingGroup>
     </>
   );

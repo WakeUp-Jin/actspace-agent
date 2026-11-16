@@ -2,14 +2,19 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { Archive, ChevronRight, CircleExclamationPoint } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import { formatTokenCount } from "../../context-format";
+import { useSpriteMode } from "../../appearance/sprite-mode";
 import { useTrajectoryNavigation } from "../trajectory/TrajectoryNavigation";
+import { CompactionSprite } from "./CompactionSprite";
+import { PACK_ICON_ROWS, framePixels } from "./compaction-sprite-model";
 
 type CompactMessage = Extract<MessageBlock, { kind: "context_compaction" }>;
 
 /** 对话视图提供的「重新压缩」入口；失败分隔线上的「重试」走它，避免把回调穿过 renderMessage 的位置参数。 */
 export const CompactionRetryContext = createContext<(() => void) | undefined>(undefined);
 
-// 手动 /compact 与自动压缩共用这一套居中分隔线（A1）：进行中两侧线向中间扫光；完成写清条数、token 与耗时，摘要去轨迹里看；失败是红色分隔线 + 重试。
+// 手动 /compact 与自动压缩共用这一块（front-轮尾与导航规范「上下文压缩分隔线」），两种样式，文字相同：
+// 默认（A1）：进行中两侧线向中间扫光；完成写清条数、token 与耗时，摘要去轨迹里看；失败是红色分隔线 + 重试。
+// 精灵模式（设置 › 外观）：进行中像素精灵把消息推到墙角；在屏上完成时先播一次收尾再换成完成行；失败时精灵瘫倒 + 重试。
 const BLOCK_CLASS =
   "message-row compact-command-block w-full px-[var(--conversation-text-inset)] animate-[rise-in_220ms_ease_both]";
 // 颜色按状态二选一，不叠加：同一属性出现两个 utility 时生效的是 Tailwind 生成顺序。
@@ -22,6 +27,9 @@ const DIVIDER_TITLE_CLASS = "shrink-0 font-medium whitespace-nowrap";
 const DIVIDER_TEXT_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap";
 const SPINNER_CLASS =
   "size-3 shrink-0 rounded-full border-[1.5px] border-line-strong border-t-transparent animate-spin motion-reduce:animate-none";
+// 精灵模式的进行中 / 失败：左边像素舞台，右边文字。
+const STAGE_ROW_CLASS = "compact-command-divider flex w-full min-w-0 items-center gap-3 py-2 text-act-xs leading-4 tabular-nums";
+const STAGE_TEXT_CLASS = "inline-flex min-w-0 shrink items-center gap-2";
 const LINK_CLASS =
   "inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-act-xs text-text-muted transition-colors duration-(--motion-fast) hover:text-text-main focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring";
 const RETRY_CLASS =
@@ -58,6 +66,28 @@ function Divider({ state, children }: { state: CompactMessage["status"]; childre
   );
 }
 
+const PACK_ICON_PIXELS = framePixels(PACK_ICON_ROWS).body;
+
+/** 完成行的图标：和收尾时压成的方块同一个像素形状。 */
+function PackIcon() {
+  return (
+    <svg className={`${DIVIDER_ICON_CLASS} text-text-muted`} viewBox="0 0 6 5" width={12} height={10} shapeRendering="crispEdges" aria-hidden="true" focusable="false">
+      {PACK_ICON_PIXELS.map(([x, y]) => <rect key={`${x}:${y}`} x={x} y={y} width={1} height={1} fill="currentColor" />)}
+    </svg>
+  );
+}
+
+/** 同一块的消息块排布固定：按 id 取种子。 */
+function seedOf(id: string): number {
+  let hash = 7;
+  for (let index = 0; index < id.length; index += 1) hash = (hash * 31 + id.charCodeAt(index)) % 233_280;
+  return hash;
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 function completedTitle(message: CompactMessage): string {
   return typeof message.removedCount === "number" && message.removedCount > 0 ? `以上 ${message.removedCount} 条消息已压缩` : "上下文已压缩";
 }
@@ -87,15 +117,59 @@ export function CompactCommandBlock({
   const retry = onRetry ?? contextRetry;
   const navigation = useTrajectoryNavigation();
   const elapsedMs = useElapsedMs(message.startedAt, message.status === "running");
+  const sprite = useSpriteMode();
+  // 精灵模式下，在屏上从 running 变成 completed 时先播收尾；一出现就是 completed（历史、刷新）时不播。渲染期派生，不经 effect。
+  const [previousStatus, setPreviousStatus] = useState(message.status);
+  const [finishing, setFinishing] = useState(false);
+  if (previousStatus !== message.status) {
+    setPreviousStatus(message.status);
+    setFinishing(sprite && previousStatus === "running" && message.status === "completed" && !prefersReducedMotion());
+  }
+  // 收尾途中关掉精灵模式：直接结束收尾，之后再打开也不补播。
+  if (finishing && !sprite) setFinishing(false);
+  const seed = seedOf(message.id);
+  const statusLabel = <span className={`${DIVIDER_TITLE_CLASS} text-text-muted`} role="status" aria-live="polite">正在压缩上下文</span>;
+  const failedText = (
+    <>
+      <span className={DIVIDER_TITLE_CLASS} role="alert">上下文压缩失败</span>
+      {message.errorMessage ? <span className={DIVIDER_TEXT_CLASS} title={message.errorMessage}>{message.errorMessage}</span> : null}
+      {retry ? <button type="button" className={RETRY_CLASS} onClick={retry}>重试</button> : null}
+    </>
+  );
 
-  if (message.status === "running") {
+  if (!sprite && message.status === "running") {
     return (
       <article className={blockClassName}>
         <Divider state="running">
           <span className={SPINNER_CLASS} aria-hidden="true" />
-          <span className={`${DIVIDER_TITLE_CLASS} text-text-muted`} role="status" aria-live="polite">正在压缩上下文</span>
+          {statusLabel}
           {elapsedMs === null ? null : <span>{formatCompactionDuration(elapsedMs)}</span>}
         </Divider>
+      </article>
+    );
+  }
+
+  if (!sprite && message.status === "failed") {
+    return (
+      <article className={blockClassName}>
+        <Divider state="failed">
+          <CircleExclamationPoint size={14} className={DIVIDER_ICON_CLASS} aria-hidden="true" />
+          {failedText}
+        </Divider>
+      </article>
+    );
+  }
+
+  if (sprite && (message.status === "running" || (finishing && message.status === "completed"))) {
+    return (
+      <article className={blockClassName}>
+        <div className={`${STAGE_ROW_CLASS} compact-divider-running text-text-faint`}>
+          <CompactionSprite mode={finishing ? "finishing" : "running"} startedAt={message.startedAt} seed={seed} onFinished={() => setFinishing(false)} />
+          <span className={STAGE_TEXT_CLASS}>
+            {statusLabel}
+            {elapsedMs === null || finishing ? null : <span>{formatCompactionDuration(elapsedMs)}</span>}
+          </span>
+        </div>
       </article>
     );
   }
@@ -103,12 +177,10 @@ export function CompactCommandBlock({
   if (message.status === "failed") {
     return (
       <article className={blockClassName}>
-        <Divider state="failed">
-          <CircleExclamationPoint size={14} className={DIVIDER_ICON_CLASS} aria-hidden="true" />
-          <span className={DIVIDER_TITLE_CLASS} role="alert">上下文压缩失败</span>
-          {message.errorMessage ? <span className={DIVIDER_TEXT_CLASS} title={message.errorMessage}>{message.errorMessage}</span> : null}
-          {retry ? <button type="button" className={RETRY_CLASS} onClick={retry}>重试</button> : null}
-        </Divider>
+        <div className={`${STAGE_ROW_CLASS} compact-divider-failed text-on-danger`}>
+          <CompactionSprite mode="failed" startedAt={message.startedAt} seed={seed} />
+          <span className={STAGE_TEXT_CLASS}>{failedText}</span>
+        </div>
       </article>
     );
   }
@@ -119,7 +191,7 @@ export function CompactCommandBlock({
   return (
     <article className={blockClassName}>
       <Divider state="completed">
-        <Archive size={14} className={`${DIVIDER_ICON_CLASS} text-text-muted`} aria-hidden="true" />
+        {sprite ? <PackIcon /> : <Archive size={14} className={`${DIVIDER_ICON_CLASS} text-text-muted`} aria-hidden="true" />}
         <span className={`${DIVIDER_TITLE_CLASS} text-text-muted`} role="separator" aria-label={stats ? `${title} · ${stats}` : title}>{title}</span>
         {stats ? <span className="whitespace-nowrap">{stats}</span> : null}
         {navigation && compactionId ? (

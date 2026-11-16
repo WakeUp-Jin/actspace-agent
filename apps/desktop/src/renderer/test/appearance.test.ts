@@ -65,6 +65,15 @@ describe("appearance storage", () => {
     }
   });
 
+  it("keeps sprite mode off unless it was saved as true", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, theme: "dark" }));
+    expect(loadAppearance().spriteMode).toBe(false);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, spriteMode: "yes" }));
+    expect(loadAppearance().spriteMode).toBe(false);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, spriteMode: true }));
+    expect(loadAppearance().spriteMode).toBe(true);
+  });
+
   it("round-trips saved preferences", () => {
     const prefs: AppearancePrefs = {
       version: 1,
@@ -75,6 +84,7 @@ describe("appearance storage", () => {
       uiFontSize: 16,
       codeFontSize: 15,
       mermaidTheme: "codex",
+      spriteMode: true,
     };
     saveAppearance(prefs);
     expect(loadAppearance()).toEqual(prefs);
@@ -99,6 +109,7 @@ describe("applyAppearance", () => {
         uiFontSize: 21,
         codeFontSize: 15,
         mermaidTheme: "codex",
+        spriteMode: false,
       },
       root,
     );

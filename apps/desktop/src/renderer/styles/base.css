@@ -210,7 +210,7 @@ svg {
   }
 }
 
-/* 压缩分隔线：线色比普通分隔线深一档；进行中两侧各有一道光从外端收向中间文字。 */
+/* 压缩分隔线（默认样式）：线色比普通分隔线深一档；进行中两侧各有一道光从外端收向中间文字。 */
 .compact-divider-line {
   position: relative;
   overflow: hidden;
@@ -259,6 +259,24 @@ svg {
     display: none;
   }
 }
+
+/* 精灵模式的像素舞台（CompactionSprite.tsx）：颜色只在这里，元素属性由组件逐拍改。 */
+.compact-sprite-stage .cs-wall { fill: var(--act-color-border-strong); opacity: 0.5; }
+.compact-sprite-stage .cs-brick { fill: var(--act-color-border-strong); opacity: 0.45; }
+.compact-sprite-stage .cs-brick-alt { opacity: 0.7; }
+.compact-sprite-stage .cs-brick-squeezed { fill: var(--act-color-text-muted); opacity: 1; }
+.compact-sprite-stage .cs-brick-squeezed.cs-brick-alt { opacity: 0.7; }
+.compact-sprite-stage .cs-pack { fill: var(--act-color-text-muted); }
+.compact-sprite-stage .cs-trail { stroke: var(--act-color-border-strong); opacity: 0.35; }
+.compact-sprite-stage .cs-dust { fill: var(--act-color-border-strong); opacity: 0.5; }
+.compact-sprite-stage .cs-body { fill: var(--act-color-sprite); }
+.compact-sprite-stage .cs-eye { fill: var(--act-color-sprite-eye); }
+
+.compact-divider-failed .compact-sprite-stage :is(.cs-wall, .cs-brick) { fill: var(--act-color-on-danger); opacity: 0.35; }
+.compact-divider-failed .compact-sprite-stage .cs-brick-alt { opacity: 0.2; }
+.compact-divider-failed .compact-sprite-stage :is(.cs-trail, .cs-dust) { display: none; }
+.compact-divider-failed .compact-sprite-stage .cs-body { fill: var(--act-color-on-danger); }
+.compact-divider-failed .compact-sprite-stage .cs-eye { fill: var(--act-color-danger-soft); }
 
 /* 设置里输入框内的「已保存」：停留一会儿再淡出。 */
 @keyframes settings-saved-fade {

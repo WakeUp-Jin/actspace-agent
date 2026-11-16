@@ -14,6 +14,7 @@
 | Accent | 用户选的强调色，只驱动第 4 节列出的几处 | `accent` `toggle-on` `link` `focus-ring` |
 | Semantic | `info` 信息；`warning` 风险、等待审批、阈值；`danger` 错误、删除、失败、diff 删除 | 各自带 `-soft`、`on-*` |
 | Data | 图表、Context bucket、diff 增删、热力图，只编码数据 | `chart-series-*` `--act-context-*` `diff-*` |
+| Sprite | 品牌精灵的像素形象，只做装饰，不表达状态、不跟强调色；目前只在上下文压缩分隔线的精灵模式（设置 › 外观，默认关）里出现 | `sprite` `sprite-eye` |
 
 判断规则：
 
@@ -53,6 +54,8 @@
 | `danger` | `#c74747` | `#e06b6b` |
 | `meter-track`（容量条空轨道） | `#e9e9e5` | `#3a3b35` |
 | `toggle-off` | `#d3d3ce` | `#4a4b45` |
+| `sprite`（品牌紫精灵） | `#a397d4` | `#b9aef0` |
+| `sprite-eye` | `#20201e` | `#181916` |
 
 深色用暖黑灰，不用纯黑。`line-strong` 比 `line` 重很多，不拿它当容量条空轨道（会像已使用），空轨道用 `meter-track`。
 
@@ -230,7 +233,7 @@ AI 回复正文的行高 1.7 只写在 `markdown.css`，代码块 1.6。中文�
 
 - 时长只用 `duration-(--motion-fast|base|slow)`（120 / 160 / 220ms），缓动 `--ease-standard`；不写 `duration-150`、`duration-[130ms]`。
 - hover、active、focus 不改变布局尺寸；resize、折叠、popover 不超过 300ms。
-- running 可用小绿点、细环或克制扫光；`prefers-reduced-motion` 下全局动画与过渡压到 0.01ms，工具日志扫光层 `display: none`。
+- running 可用小绿点、细环或克制扫光；上下文压缩默认用细线扫光，打开精灵模式后用逐格的像素精灵（[轮尾与导航规范](front-轮尾与导航规范.md)「上下文压缩分隔线」），像素动画保持逐拍，不改成连续补间；`prefers-reduced-motion` 下全局动画与过渡压到 0.01ms，工具日志扫光层 `display: none`。
 
 ## 11. 样式写在哪
 

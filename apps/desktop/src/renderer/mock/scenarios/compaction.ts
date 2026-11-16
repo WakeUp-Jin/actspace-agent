@@ -33,21 +33,36 @@ function insertCompaction(session: MockSession, afterMessages: number): void {
 }
 
 /**
- * 上下文压缩三态：已完成（48 条后压缩，带 token 与「在轨迹中查看」）、进行中（打开后一直在压缩）、失败（打开后压缩失败）。
- * 进行中、失败只在打开会话时由流式事件推出来，不写 journal。
+ * 上下文压缩四种：已完成（48 条后压缩，带 token 与「在轨迹中查看」）、进行中（打开后一直在压缩）、
+ * 压缩后完成（打开后推约 8 秒再完成，看收尾动画）、失败（打开后压缩失败）。
+ * 后三种只在打开会话时由流式事件推出来，不写 journal。
  */
 export function compactionScenario(clock: MockClock): MockHandlers | void {
   const { db } = clock;
   const failed = seedSession(db, { title: "压缩失败", minutesAgo: 30, turns: turns(3) });
   const running = seedSession(db, { title: "压缩进行中", minutesAgo: 20, turns: turns(3) });
+  const finishing = seedSession(db, { title: "压缩后完成", minutesAgo: 10, turns: turns(3) });
   const completed = seedSession(db, { title: "会话列表改游标分页", minutesAgo: 1, turns: [...turns(24), ...turns(2, 24)] });
   insertCompaction(completed, 48);
   const started = new Set<string>();
-  const play = (session: MockSession, outcome: "running" | "failed") => {
+  const outcomes = new Map<string, { session: MockSession; outcome: "running" | "finishing" | "failed" }>([
+    [running.id, { session: running, outcome: "running" }],
+    [finishing.id, { session: finishing, outcome: "finishing" }],
+    [failed.id, { session: failed, outcome: "failed" }],
+  ]);
+  const play = (session: MockSession, outcome: "running" | "finishing" | "failed") => {
     const sessionId = session.id;
     const agentRunId = lastRunId(session);
     clock.emit("agentStream", { type: "agent_run_started", sessionId, agentRunId });
-    clock.emit("agentStream", { type: "context_compaction_started", sessionId, agentRunId, startedAt: new Date(Date.now() - 12_000).toISOString() });
+    clock.emit("agentStream", { type: "context_compaction_started", sessionId, agentRunId, startedAt: new Date(Date.now() - (outcome === "finishing" ? 0 : 12_000)).toISOString() });
+    if (outcome === "finishing") {
+      clock.schedule(() => clock.emit("agentStream", {
+        type: "context_compaction_finished",
+        sessionId,
+        agentRunId,
+        payload: { triggerTokens: 96_000, thresholdTokens: 0, beforeCount: 6, afterCount: 1, summaryChars: 0, historyRefPath: "journal.jsonl", status: "compacted", removedCount: 5, durationMs: 8_000, trigger: "manual", beforeTokens: 96_000, afterTokens: 4_200 },
+      }), 8_000);
+    }
     if (outcome === "failed") {
       clock.schedule(() => clock.emit("agentStream", { type: "context_compaction_failed", sessionId, agentRunId, error: { code: "TEST", message: "模型请求超时，上下文没有变化", recoverable: true } }), 400);
     }
@@ -55,9 +70,10 @@ export function compactionScenario(clock: MockClock): MockHandlers | void {
   return {
     sessions: {
       getPage: async ({ sessionId }) => {
-        if (!started.has(sessionId) && (sessionId === running.id || sessionId === failed.id)) {
+        const entry = outcomes.get(sessionId);
+        if (entry && !started.has(sessionId)) {
           started.add(sessionId);
-          clock.schedule(() => play(sessionId === running.id ? running : failed, sessionId === running.id ? "running" : "failed"), 300);
+          clock.schedule(() => play(entry.session, entry.outcome), 300);
         }
         return sessionProjection(requireSession(db, sessionId));
       },

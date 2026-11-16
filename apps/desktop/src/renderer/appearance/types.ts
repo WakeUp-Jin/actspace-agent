@@ -29,6 +29,8 @@ export interface AppearancePrefs {
   codeFontSize: number;
   /** 聊天回复里 Mermaid 图表的固定色板；目前只有 codex，暂无设置入口。 */
   mermaidTheme: MermaidThemeId;
+  /** 精灵模式：上下文压缩分隔线换成像素精灵样式；默认关，关时是简洁分隔线。 */
+  spriteMode: boolean;
 }
 
 /** 界面字号基准：等于该值时整窗缩放为 1.0（即当前默认观感）。 */
@@ -53,4 +55,5 @@ export const DEFAULT_APPEARANCE: AppearancePrefs = {
   uiFontSize: 14,
   codeFontSize: 13,
   mermaidTheme: "codex",
+  spriteMode: false,
 };
