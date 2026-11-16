@@ -58,7 +58,7 @@ export function documentPreview(input: {
 
 /** The port's own cut: last segment of either separator style, control characters replaced, at most 255 characters. */
 function lastSegment(path: string | undefined): string | undefined {
-  const segment = (path ?? "").replace(/[/\\]+$/, "").split(/[/\\]/).at(-1) ?? "";
+  const segment = (path ?? "").split(/[/\\]/).filter(part => part !== "").at(-1) ?? "";
   // eslint-disable-next-line no-control-regex
   const clean = Array.from(segment.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")).slice(0, MAX_NAME).join("");
   return clean.trim() ? clean : undefined;

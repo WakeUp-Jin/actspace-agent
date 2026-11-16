@@ -19,10 +19,16 @@ export function parsePagesArg(value: unknown): PageRange | "invalid" | undefined
   return from > to ? "invalid" : { from, to };
 }
 
+/** Last non-empty piece between `/` or a backslash. A single split, so it stays linear however many separators repeat. */
+function lastNonEmptySegment(value: string): string {
+  const parts = value.split(/[/\\]/);
+  for (let i = parts.length - 1; i >= 0; i -= 1) if (parts[i]) return parts[i]!;
+  return "";
+}
+
 /** Last path segment (either separator), control characters as spaces, at most 255 characters, else `attachment`. */
 export function displayName(value: string | undefined): string {
-  const trimmed = (value ?? "").replace(/[/\\]+$/, "");
-  const segment = trimmed.split(/[/\\]/).at(-1) ?? "";
+  const segment = lastNonEmptySegment(value ?? "");
   // eslint-disable-next-line no-control-regex
   const clean = Array.from(segment.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")).slice(0, MAX_NAME).join("");
   return clean.trim() ? clean : "attachment";
