@@ -9,6 +9,7 @@
 @import "./diff.css" layer(components);
 @import "./web-tool.css" layer(components);
 @import "./tool-result.css" layer(components);
+@import "./deep-search.css" layer(components);
 @import "./space.css" layer(components);
 @import "./trajectory.css" layer(components);
 @import "./json-tree.css" layer(components);

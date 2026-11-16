@@ -239,7 +239,7 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
   [contract.harnessStats.query, harnessStatsInput],
   [contract.harnessStats.cancel, usageRequestId],
   // 对话框
-  [contract.dialogs.selectFiles, optionalShape({ remote: "boolean?" }, "Invalid file selection request")],
+  [contract.dialogs.selectFiles, optionalShape({ remote: "boolean?", documents: "boolean?" }, "Invalid file selection request")],
   [contract.dialogs.selectWorkspaceDirectory, optionalShape({ registerWorkspace: "boolean?" }, "Invalid directory request")],
   [contract.dialogs.importComposerImage, shape({ name: "string", mimeType: "string?", bytes: value => value instanceof Uint8Array }, "Invalid composer image")],
   [contract.dialogs.showArtifactContextMenu, input => {

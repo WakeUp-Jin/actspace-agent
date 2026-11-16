@@ -120,6 +120,14 @@
   white-space: pre-wrap;
 }
 
+/* read_document: incomplete pages, the first expanded item. */
+.tool-result-item.is-warning {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  color: var(--color-warning);
+}
+
 /* Reserve chevron space so hover never shifts the tool text. */
 :is(.tool-result-toggle, .web-tool-toggle, .thinking-toggle, .bash-run-toggle) .lucide-chevron-right,
 :is(.tool-result-toggle, .web-tool-toggle, .thinking-toggle, .bash-run-toggle) .lucide-chevron-down {

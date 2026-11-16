@@ -13,6 +13,8 @@ const OPTIONAL_INJECT_FALLBACKS: Readonly<Record<string, string>> = Object.freez
   sandbox: "bash runs outside the sandbox after approval",
   "actspace.host.filesystem": "file tools register but report the capability as unavailable",
   "actspace.host.process": "bash registers but reports the capability as unavailable",
+  "actspace.host.tools.deep-search": "deep_search is not registered",
+  "actspace.host.tools.document": "read_document is not registered",
 });
 
 function optionalInjects(entryId: string, ids: readonly string[]): readonly DefaultHarnessOptionalInject[] {

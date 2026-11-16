@@ -55,6 +55,21 @@ export class ModelRuntimeService {
     return this.models.listUsableModels(purpose);
   }
 
+  /** O(1); the deep_search visibility predicate. Does not go through `getToolEnvironment()`, which snapshots settings. */
+  isDeepseekDeepSearchAvailable(): boolean {
+    return this.settings.isDeepseekDeepSearchAvailable();
+  }
+
+  /** O(1); the read_document visibility predicate. */
+  isDeepseekDocumentAvailable(): boolean {
+    return this.settings.isDeepseekDocumentAvailable();
+  }
+
+  /** DeepSeek default-connection key, read on each tool call; main process only. */
+  getDeepseekApiKey(): string | undefined {
+    return this.settings.getStoredKey("deepseek");
+  }
+
   getToolEnvironment(): {
     hasWebSearchKey: boolean;
     deepseekFetchApiKey?: string;

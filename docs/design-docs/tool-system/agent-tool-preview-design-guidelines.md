@@ -69,6 +69,16 @@ Read/List/Grep/Glob/Search 等轻量组件在失败时保留动作、目标和�
 - 带行范围时展示：`Read package.json 1-80`
 - 组件可折叠长路径，但不把 Client 已保留的定位信息改成仅 basename。
 
+### `read_document`
+
+- `ToolUiPreview.kind`: `read`，多一个 `document: { name, stats?, warning?, errorText? }`；投影在 `packages/client/client/src/sessions/document-preview.ts`，桌面端行在 `ToolLogLine.tsx` 的 `DocumentReadLine`。没有 `document` 的 `read` 行（`read_file`）一切照旧。
+- `filePath`：调用参数 `path` 经工作区相对化，只给等待审批的卡片显示完整路径；读附件时是空字符串。
+- 名字按顺序取：参数 `path` 的最后一段 → 完成时摘要 `<name> · <stats>` 的名字 → 明细 `document.fileName` → 运行中的进度消息 → `attachment`。统计只来自摘要（`2 pages`、`1 page`、`pages 31-45`、`pages 7`）。
+- 运行中：`Read <name>`，共享流光。完成：动作 `Read`、目标是名字、行尾是统计；**文件名不是链接**（文档不在编辑器里打开）。展开是正文前 8 个非空行（去掉头部说明行和 `--- Page n ---`），有识别不完整的页时第一项是警示色的「第 3、13 页识别不完整，内容已截断。」（超过 5 页写「有 N 页…」）。
+- 失败 / 拒绝：行尾 `failed` / `denied`，展开是 `documentFailureText` 的中文。中止：行尾 `aborted`，不能展开。
+- 延迟加载：历史行只有摘要，名字和统计来自摘要，不用 `argsSummary`（路径已脱敏成 `[PATH]`）；首次展开加载明细后才有预览行和警示。
+- Web / PWA：一行 `Read <name>`，行尾是统计。
+
 ### `list_directory`
 
 - `ToolUiPreview.kind`: `directory_list`
@@ -150,6 +160,16 @@ Read/List/Grep/Glob/Search 等轻量组件在失败时保留动作、目标和�
 - query 模式展示：`Web Search 最新新闻 今天`。
 - url 模式展示：`Web Search https://example.com/path`（2026-07-06 起两种模式统一 `Web Search` 前缀，`mode` 字段仍保留区分）。
 - 不在工具日志行里展示搜索结果正文、来源摘要或页面摘要；完整输出保留在 `tool/result.data.modelOutput` 与输出引用中；Client 的 `contentPreview` 只是有界展示摘要，不是另一份事实源。
+
+### `deep_search`
+
+- `ToolUiPreview.kind`: `deep_search`；投影在 `packages/client/client/src/sessions/deep-search-preview.ts`，行组件是桌面端 `components/messages/DeepSearchBlock.tsx`。
+- 运行中：`Deep Search <问题>`，有进度消息（`searching N queries` / `reading N pages` / `summarizing`）时接 ` · <消息>`，整行共享流光。问题超过 240 个字符时截断加 `…`。
+- 完成：动作 `Deep Search`、目标是问题、行尾 `6 searches · 11 sources`。展开是有界明细框：「搜索词」、「引用来源」（编号、标题链接用系统浏览器打开、右侧站点名）、有打不开的网页时多一组「未能打开」。列表只取 `deep-search` 明细块，逐项校验，只放行 `http` / `https` 网址。
+- 失败 / 拒绝：行尾 `failed` / `denied`，danger 色，展开是按失败码映射的中文（`deepSearchFailureText`）。中止：行尾 `aborted`，不能展开。
+- 延迟加载：历史里只有摘要的行，统计来自摘要、问题来自参数摘要；首次展开触发加载明细。
+- Web / PWA 只有一行，不展开。
+- 这是另行约定的样式，`web_search` 一节「不在工具行里展示来源」的规定不变。
 
 ### `generate_image`
 

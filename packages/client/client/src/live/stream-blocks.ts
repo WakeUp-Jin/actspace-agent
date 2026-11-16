@@ -27,7 +27,7 @@ export function getStreamingBashStatus(tool: {
 }
 
 export function getStreamingReadText(preview: Extract<ToolUiPreview, { kind: "read" }>): string {
-  return `Read ${preview.filePath}${preview.range ? ` ${preview.range}` : ""}`;
+  return `Read ${preview.document?.name ?? preview.filePath}${preview.range ? ` ${preview.range}` : ""}`;
 }
 
 export function getStreamingSearchText(preview: Extract<ToolUiPreview, { kind: "search" }>): string {
@@ -44,6 +44,10 @@ export function getStreamingGlobText(preview: Extract<ToolUiPreview, { kind: "gl
 }
 
 export function getStreamingWebSearchText(preview: Extract<ToolUiPreview, { kind: "web_search" }>): string {
+  return preview.displayText;
+}
+
+export function getStreamingDeepSearchText(preview: Extract<ToolUiPreview, { kind: "deep_search" }>): string {
   return preview.displayText;
 }
 
@@ -127,6 +131,7 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       range: tool.preview.range,
       displayText: tool.finished ? tool.preview.displayText : getStreamingReadText(tool.preview),
       resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
+      ...(tool.preview.document ? { document: tool.preview.document } : {}),
       createdAt: now,
       status: tool.approvalPending ? "pending" : tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
       approvalRequestId: tool.approvalRequestId,
@@ -192,6 +197,16 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
       status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
       resultUrls: tool.finished ? tool.preview.resultUrls : undefined,
       contentPreview: tool.finished ? tool.preview.contentPreview : undefined,
+    };
+  }
+
+  if (tool.preview?.kind === "deep_search") {
+    return {
+      ...tool.preview,
+      id: blockId,
+      displayText: getStreamingDeepSearchText(tool.preview),
+      createdAt: now,
+      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
     };
   }
 

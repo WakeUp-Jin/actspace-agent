@@ -8,6 +8,7 @@ import { BackgroundNoticeRow } from "../messages/BackgroundNoticeRow";
 import { BashRunBlock } from "../messages/BashRunBlock";
 import { BrowserApprovalBlock } from "../messages/BrowserApprovalBlock";
 import { CompactCommandBlock } from "../messages/CompactCommandBlock";
+import { DeepSearchBlock } from "../messages/DeepSearchBlock";
 import { DeleteFileBlock } from "../messages/DeleteFileBlock";
 import { FileDiffBlock } from "../messages/FileDiffBlock";
 import { messageFlowKind } from "../messages/messageFlowStyles";
@@ -141,6 +142,8 @@ export function renderMessage(
       return <WorkspacePreparationBlock key={renderKey} message={message} />;
     case "todo":
       return <TodoListBlock key={renderKey} message={message} className={className} />;
+    case "deep_search":
+      return <DeepSearchBlock key={renderKey} message={message} className={className} onExpand={onExpand} />;
     case "read":
     case "search":
     case "grep":

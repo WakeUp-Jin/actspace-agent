@@ -7,7 +7,7 @@
 1. 不同插件组合形成不同的 Agent 形态；插件决定工具、上下文、行为与生命周期，形态不能仅实现成工具名单或提示词标签。
 2. 当前只定义一种形态，其他形态没有产品需求，不设计、不提供选择入口。
 3. 当前形态支持 `chat`、`plan`、`agent` 三种模式。
-4. Chat 只提供当前实现的两个模型工具：`web` 与 `generate_image`。`web` 保留现有 `search/open` 操作，不额外暴露 `web_search`、`web_fetch`。
+4. Chat 固定提供 `web` 与 `generate_image` 两个模型工具；DeepSeek 深度搜索可用时多一个 `deep_search`（见[深度搜索与文档解析](../tool-system/agent-deep-search-and-document-parsing.md)）。`web` 保留现有 `search/open` 操作，不额外暴露 `web_search`、`web_fetch`。
 5. 设计与计划经用户审核后已授权实施。
 
 本文取代早期讨论稿中 Chat / Workspace / Minimal 多形态的建议。本文是当前规范。
@@ -78,17 +78,17 @@ Session 与存储服务由 Host 持有；LLM、工具注册表、Prompt 与 Loop
 
 | 模式 | 目标 | 允许的工具贡献 |
 |---|---|---|
-| Chat | 对话、网络查询与生图 | 恰好 `web`、`generate_image` |
+| Chat | 对话、网络查询与生图 | 固定 `web`、`generate_image`；深度搜索可用时多一个 `deep_search` |
 | Plan（建议） | 探索、分析并产出可执行计划 | `read_file`、`list_directory`、`grep`、`glob`、`web_search`、`web_fetch`、`inspect_image`、`agent`、`agent_fork`、`send_message`、`list_subagent_models`、`todo_read`、`todo_write`、`task_list`、`task_output`、`task_stop` |
 | Agent（建议） | 在权限允许范围内执行任务 | 当前 Core Tools 除 `web` 的工具；现有 Todo、后台任务工具、子智能体工具与已装载 Browser 工具 |
 
-上表是当前各工具插件在自己的 `ToolDefinition.modes` 里声明的结果，不是 `core/agent` 里的常量：`web` 声明 `["chat"]`、`generate_image` 声明 `["chat", "agent"]`、文件探索/Web 查询/图片分析/Todo/后台任务/内部 Subagent 工具声明 `["plan", "agent"]`、文件修改/`bash`/`present`/Browser/外部 Subagent 后端/`plugin_manager`/`harness_inspect` 声明 `["agent"]`。自进化产出的 `actspace.evolved.*` 工具由 `plugin-manager/build.ts` 统一钉死为 `["agent"]`，`allowedAgentModeTools` 再按 pluginId 前缀兜底一次，候选插件自己声明的 modes 不生效。实际可见集合仍与 Profile 已注册集合取交集。新增工具必须声明 `modes`（`normalizeToolDefinition` 拒绝缺失或未知值），`packages/core/runtime/src/harness/default-harness.test.ts` 对三种模式的实际集合做快照断言，改动 modes 要同步改那里。
+上表是当前各工具插件在自己的 `ToolDefinition.modes` 里声明的结果，不是 `core/agent` 里的常量：`web` 声明 `["chat"]`、`generate_image` 声明 `["chat", "agent"]`、`deep_search` 声明 `["chat", "plan", "agent"]`（只在 Host 端口可用时出现在定义列表里）、文件探索/Web 查询/图片分析/Todo/后台任务/内部 Subagent 工具声明 `["plan", "agent"]`、文件修改/`bash`/`present`/Browser/外部 Subagent 后端/`plugin_manager`/`harness_inspect` 声明 `["agent"]`。自进化产出的 `actspace.evolved.*` 工具由 `plugin-manager/build.ts` 统一钉死为 `["agent"]`，`allowedAgentModeTools` 再按 pluginId 前缀兜底一次，候选插件自己声明的 modes 不生效。实际可见集合仍与 Profile 已注册集合取交集。新增工具必须声明 `modes`（`normalizeToolDefinition` 拒绝缺失或未知值），`packages/core/runtime/src/harness/default-harness.test.ts` 对三种模式的实际集合做快照断言，改动 modes 要同步改那里。
 
 Plan 的限制不依赖 `read-only` 标记推断：禁用 Shell 工具 `bash`；禁用文件修改、Browser 和生图。允许 Todo 是有意允许写入会话规划状态，不表示允许修改工作区；允许后台任务工具是为了管理后台子智能体，Plan 下没有后台 Bash 来源。计划正文作为回复持久化；本版不增加计划文件写入例外。
 
 Plan 下创建的子智能体只拿到 Plan 允许的工具（`explore` 预设再收窄到四个只读工具），不能借委派扩权，见[子智能体运行规范](../collaboration/agent-subagent-runtime.md)「能力与权限」。Chat 不允许 Subagent、Skills、Todo、图片分析或任何文件工具。
 
-Chat 生图可产生费用和 Session Artifact，因此不是“完全只读”。缺少搜索/图片服务配置时保留两个 schema，返回现有明确配置错误，不回退到文件或 Shell 工具。Profile 缺少这两个必需注册本身则不能进入 Chat。
+Chat 生图可产生费用和 Session Artifact，因此不是“完全只读”。缺少搜索/图片服务配置时保留这两个 schema，返回现有明确配置错误，不回退到文件或 Shell 工具。Profile 缺少这两个必需注册本身则不能进入 Chat。
 
 ### 5.1 统一工具门禁
 
@@ -154,7 +154,7 @@ Chat 复用当前开发控件隐藏行为；Plan/Agent 显示工作区与权限�
 
 1. 一个内建形态拥有三个模式；模式切换不改 Session ID/组合成员。
 2. 未选插件无 Agent 贡献；失败激活和实例释放无状态/订阅泄漏。
-3. Chat schema 恰好两个工具；伪造写入、Shell 或委派调用被 Runtime 拒绝。
+3. Chat schema 固定 `web`、`generate_image`，深度搜索可用时多一个 `deep_search`；伪造写入、Shell 或委派调用被 Runtime 拒绝。
 4. Plan 的允许列表逐项可调用；禁止项在 full-access/已有 Grant 下仍被拒绝。
 5. 子 Agent 不能超出父策略；审批和排队不会穿透门禁。
 6. 并发切换/发送、持久化失败、忙碌切换均不产生混合模式执行。

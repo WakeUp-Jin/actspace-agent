@@ -1,0 +1,23 @@
+{
+ "object": "ocr.result",
+ "created": 1794753315,
+ "purpose": "text_recognition",
+ "page_count": 2,
+ "pages": [
+  {
+   "index": 0,
+   "text": "## Slide with picture\n\nDolore gamma aliqua amet beta dolore consectetur labore.\n\nSed sit magna lorem beta amet et placeholder.\n\nLabore tempor adipiscing placeholder beta consectetur tempor et.\n\nSit incididunt ut alpha tempor sit sed consectetur.\n\nIncididunt sit placeholder ut consectetur eiusmod amet adipiscing.\n\nEiusmod aliqua et placeholder dolor delta delta delta.",
+   "finish_reason": "stop"
+  },
+  {
+   "index": 1,
+   "text": "## Second slide\n\n• Delta dolor dolore et delta dolore magna placeholder alpha et tempor magna beta magna. Alpha elit ipsum et incididunt dolore ut amet do lorem do elit dolor ipsum.",
+   "finish_reason": "stop"
+  }
+ ],
+ "usage": {
+  "input_tokens": 640,
+  "output_tokens": 116,
+  "total_tokens": 756
+ }
+}

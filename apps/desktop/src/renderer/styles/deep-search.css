@@ -1,0 +1,41 @@
+/* Deep Search row detail (deep-search-and-document-demo.html §2, variant b). Theme tokens only. */
+.deep-search-detail {
+  margin-top: 7px;
+  padding: 8px 12px;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+  font-size: var(--text-act-sm);
+  line-height: 1.65;
+  color: var(--color-text-muted);
+}
+.deep-search-detail.is-error {
+  color: var(--color-danger);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.deep-search-detail :is(ul, ol) { margin: 0; padding: 0; list-style: none; }
+.deep-search-group {
+  padding: 6px 0 2px;
+  font-size: var(--text-act-xs);
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--color-text-faint);
+}
+.deep-search-group:first-child { padding-top: 0; }
+.deep-search-item { display: flex; gap: 8px; min-width: 0; padding: 2px 0; }
+.deep-search-item.is-error, .deep-search-item.is-error .deep-search-site { color: var(--color-danger); }
+.deep-search-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deep-search-number {
+  flex: none;
+  width: 16px;
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.deep-search-site { flex: none; max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-faint); }
+.deep-search-detail a { color: var(--color-text-muted); text-decoration: none; }
+.deep-search-detail a:hover { color: var(--color-text); text-decoration: underline; }
+.deep-search-detail a:focus-visible { outline: 2px solid var(--act-color-focus-ring); outline-offset: 2px; border-radius: var(--radius-sm); }

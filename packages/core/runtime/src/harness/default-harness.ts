@@ -39,10 +39,10 @@ export const DEFAULT_HARNESS_SHARED_SERVICES = Object.freeze([
   "actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "actspace.host.background-tasks", "actspace.host.sandbox", "actspace.host.models", "actspace.host.session", "agent.registry", "session.runtime", "llm.auxiliary-requests", "session.checkpoint", "session.journal", "session.projection", "actspace.host.tools.browser",
   // Capability grants: the Host hands over roots and hooks, the Harness plugins own the file and shell tools.
   "actspace.host.filesystem", "actspace.host.process",
-  ...["web-tools", "image-generation", "image-inspection"].map(id => `actspace.host.tools.${id}`),
+  ...["web-tools", "image-generation", "image-inspection", "deep-search", "document"].map(id => `actspace.host.tools.${id}`),
 ]);
 /** Shared services a Host may leave out; the Harness plugins that use them declare a fallback. */
-export const OPTIONAL_HOST_SHARED_SERVICES: readonly string[] = Object.freeze(["actspace.host.tools.browser", "actspace.host.filesystem", "actspace.host.process"]);
+export const OPTIONAL_HOST_SHARED_SERVICES: readonly string[] = Object.freeze(["actspace.host.tools.browser", "actspace.host.filesystem", "actspace.host.process", "actspace.host.tools.deep-search", "actspace.host.tools.document"]);
 
 /** Resolve trusted Host contracts without touching persisted executable artifacts. */
 export async function defaultHarnessSharedModules(): Promise<SharedArtifactModule[]> {

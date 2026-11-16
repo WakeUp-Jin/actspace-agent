@@ -47,7 +47,7 @@ async function bootToolNames(capabilities: readonly string[], disabledPlugins?: 
 describe("Host capability rule for optional Harness entries", () => {
   it("lists only optional entries whose manifest requires a missing capability", () => {
     // The external subagents need `process`.
-    expect(harnessEntriesMissingHostCapabilities(["filesystem.read"])).toEqual(["browser-tools", "subagent-codex", "subagent-claude-code"]);
+    expect(harnessEntriesMissingHostCapabilities(["filesystem.read"])).toEqual(["deep-search", "document", "browser-tools", "subagent-codex", "subagent-claude-code"]);
     expect(harnessEntriesMissingHostCapabilities([...BASE_CAPABILITIES, "browser"])).toEqual([]);
   });
 

@@ -10,10 +10,11 @@ const args: Readonly<Record<string, Record<string, RuntimeJsonValue>>> = {
   edit_file: { path: "file.txt", old_string: "x", new_string: "y" }, write_file: { path: "file.txt", content: "x" }, delete_file: { path: "file.txt" },
   bash: { command: "printf x", intent: "test" },
   web: { action: "search", query: "test" }, web_search: { query: "test" }, web_fetch: { url: "https://example.com" },
+  deep_search: { question: "test" }, read_document: { path: "file.txt" },
   generate_image: { prompt: "test" }, inspect_image: { artifact_id: "image", question: "test" },
 };
 
-it.each(["tool-fs-read", "tool-fs-search", "tool-fs-write", "tool-shell", "tool-web", "tool-image-generation", "tool-image-inspection"])(
+it.each(["tool-fs-read", "tool-fs-search", "tool-fs-write", "tool-shell", "tool-web", "tool-image-generation", "tool-image-inspection", "tool-deep-search", "tool-document"])(
   "%s enforces schema, capability and scope before Host invocation and contains executor failure", async slug => {
     const plugin = await import(`@actspace/${slug}`) as {
       TOOL_DEFINITIONS: readonly { localName: string; definition: ToolDefinition }[];

@@ -147,3 +147,15 @@ it("reuses accepted attachment content across an uncertain result retry and reje
     await expect(run({ ...input, userInput: "different" })).rejects.toThrow("SUBMISSION_CONFLICT");
   } finally { registration.dispose(); }
 });
+
+it("passes an Agent-mode PDF attachment to the model as one Attached file line", async () => {
+  const { registration, submitTask, importAttachment, run } = setup();
+  importAttachment.mockResolvedValueOnce({ artifactId: "art-pdf", mimeType: "application/pdf", name: "季度报告.pdf" } as never);
+  try {
+    await run({ userInput: "读一下", attachments: [{ id: "doc", kind: "file", name: "季度报告.pdf", path: "/fixture/季度报告.pdf" }] });
+    expect(submitTask).toHaveBeenCalledWith("s", "r", expect.objectContaining({ prepared: [
+      { type: "text", text: "读一下" },
+      { type: "text", text: "Attached file: 季度报告.pdf (art-pdf)" },
+    ] }));
+  } finally { registration.dispose(); }
+});

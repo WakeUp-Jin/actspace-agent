@@ -6,6 +6,8 @@
 
 用户上传一份 PDF、一张 Excel、一份 Word，或者要做一次数据清洗，模型今天在 ActSpace 里没有办法处理：`read_file` 只读 UTF-8 文本，没有 PDF / Office 解析工具，而 `bash` 工具的硬拒绝规则把 `python3 -c '...'`、heredoc、`node -e` 全部拦下（括号、`<`、`$` 都在 `UNSUPPORTED_SHELL_SYNTAX_RE` 里），模型唯一能走的路是 `write_file` 写脚本再 `bash python3 x.py`，而系统提示词从未告诉它这条路。
 
+现在另有一个可选的 `read_document`（设置里「文档解析」打开、已连接 DeepSeek 时才出现）：PDF、Word、PPT 交给 DeepSeek 识别，扫描件也能读，见 [agent-deep-search-and-document-parsing.md](agent-deep-search-and-document-parsing.md)。它不在时仍走本节的脚本路线；表格和数据分析始终走脚本。
+
 目标状态：**模型一旦能写 Python，就能解析和处理所有文件格式**，不需要为每种格式造一个工具。做法是让两种主流脚本执行方式都可用，并给它们一个确定的解释器和确定的存放位置：
 
 | 方式 | 适用 | 形态 |
@@ -110,7 +112,7 @@ Codex 没有打包 Python，靠系统 `python3` + 沙箱放行；DSH 打包但�
 - 需要复用、交付或超过约 20 行：`write_file` 到 `ACTSPACE_SCRATCH` 再执行；要留给用户的脚本写到工作区正式位置。
 - 工具输出只回头 8000 字符：大结果写文件再 `read_file` / `grep`，不要重跑。
 - 不要 `pip install`，不要找系统 Python；处理**用户项目**的代码时用项目自己的解释器 / venv。
-- PDF / Office 用随包库读（pdfplumber、python-docx、openpyxl）；要看版面时用 pypdfium2 渲染页面后 `inspect_image`；markitdown 在数据扩展里，装了再用。
+- PDF / Office：工具列表里有 `read_document` 时先用它读 PDF、Word、PPT 的文字（扫描件也行）；没有它、以及表格，装了数据扩展用 markitdown，否则用随包库读（pypdf、python-docx、openpyxl）；要看版面时用 pypdfium2 渲染页面后 `inspect_image`。
 
 官方 Skill 放 `packages/skill/official-skills/skills/`：`office-docx`、`office-xlsx`、`office-pptx`、`pdf`、`data-analysis`。前四个改编自 anthropics `skills/{docx,xlsx,pptx,pdf}`（Apache 2.0，各目录带 `LICENSE.txt`，根 `NOTICE` 登记来源）：只移植 SKILL.md 的指导并改写为 `actspace-python` + 随包库、临时文件放 `$ACTSPACE_SCRATCH`、不 `pip install`；上游依赖 LibreOffice / Node 库的脚本（`recalc.py`、docx 的 OOXML 工具链）不移植，只有 `pdf/scripts/pdf_to_images.py`（pypdfium2 渲染）随 Skill 发布。Skill 脚本**不写、只执行**：`bash actspace-python <skill路径>/scripts/pdf_to_images.py in.pdf out/`，不复制进工作区。现有机制（catalog 注入描述、模型用 `read_file` 按需读正文，无需 `load_skill`）直接复用，见 [Skill 加载](agent-skill-loading.md)。Chat 模式不注入工作区 Skill catalog，官方 Skill 的注入范围随现有规则。
 

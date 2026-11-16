@@ -21,6 +21,7 @@
   "components/messages/BackgroundNoticeRow.tsx": 1,
   "components/messages/BashRunBlock.tsx": 3,
   "components/messages/CompactCommandBlock.tsx": 2,
+  "components/messages/DeepSearchBlock.tsx": 1,
   "components/messages/FileDiffBlock.tsx": 2,
   "components/messages/ResponseAnnotationMarkers.tsx": 1,
   "components/messages/SubagentMessageCard.tsx": 1,

@@ -14,7 +14,7 @@ describe("desktop bridge contract types", () => {
   it("derives call signatures from the spec kind", () => {
     expectTypeOf<DesktopBridge["app"]["getBootstrapState"]>().parameters.toEqualTypeOf<[]>();
     expectTypeOf<DesktopBridge["sessions"]["listPage"]>().parameter(0).toEqualTypeOf<import("@actspace/shared").SessionListPageInput | undefined>();
-    expectTypeOf<DesktopBridge["dialogs"]["selectFiles"]>().parameters.toEqualTypeOf<[input?: { remote?: boolean } | undefined]>();
+    expectTypeOf<DesktopBridge["dialogs"]["selectFiles"]>().parameters.toEqualTypeOf<[input?: { remote?: boolean; documents?: boolean } | undefined]>();
     expectTypeOf<DesktopBridge["tasks"]["abort"]>().returns.toEqualTypeOf<Promise<boolean>>();
     expectTypeOf<DesktopBridge["appearance"]["setNativeTheme"]>().returns.toEqualTypeOf<void>();
   });

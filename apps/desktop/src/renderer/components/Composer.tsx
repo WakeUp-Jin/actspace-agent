@@ -1,3 +1,4 @@
+import { attachmentEntry, useDocumentParsingAvailable } from "./composer/attachment-entry";
 import { memo, useEffect, useRef } from "react";
 import type { ComposerMode, ResponseAnnotationReference } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
@@ -80,6 +81,7 @@ export const Composer = memo(function Composer({
   const openSideChat = isChatForm ? undefined : onOpenSideChat;
   const { target, capabilities, readiness, choices } = useRunTargetContext();
   const isRemoteTarget = target.kind === "remote";
+  const documentParsing = useDocumentParsingAvailable();
   const remoteHost = target.kind === "remote" ? choices?.hosts.find((host) => host.hostId === target.hostId) : undefined;
   const effectiveContextSnapshot = useComposerContextSnapshot(sessionId, contextState, contextSnapshot);
   const overlays = useComposerOverlay();
@@ -356,7 +358,7 @@ export const Composer = memo(function Composer({
   }
 
   function renderPanel() {
-    const acceptsFiles = isChatForm || capabilities.attachments.files;
+    const entry = attachmentEntry({ isChatForm, acceptsFiles: capabilities.attachments.files, isRemoteTarget, documentParsing });
     return (
       <ComposerPalette
         open={overlays.paletteOpen}
@@ -367,10 +369,10 @@ export const Composer = memo(function Composer({
         modeDisabled={isStreaming}
         onSelectMode={selectMode}
         attachment={{
-          label: acceptsFiles ? "图片与文件" : "图片",
-          description: isChatForm ? "PNG、JPEG、WEBP、GIF、TXT、Markdown、JSON、CSV" : undefined,
-          icon: acceptsFiles ? "files" : "images",
-          onSelect: () => void (acceptsFiles ? attachmentState.selectFiles() : attachmentState.selectImages()),
+          label: entry.label,
+          description: entry.description,
+          icon: entry.icon,
+          onSelect: () => void (entry.picker === "images" ? attachmentState.selectImages() : attachmentState.selectFiles(entry.picker)),
         }}
         skills={isChatForm ? null : {
           items: skills.items,

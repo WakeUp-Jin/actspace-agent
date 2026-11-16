@@ -37,8 +37,9 @@ kind: "package-map"
 | [`context/`](context/README.md) | 每一轮发给模型的上下文：引擎、提示词、各个来源、披露与压缩 | 12 | 会话 |
 | [`fs/`](fs/README.md) | 读、搜索、写工作区文件的工具 | 3 | 会话 |
 | [`shell/`](shell/README.md) | 命令行（Bash）工具与随包 Python 运行时 | 2 | 会话、库 |
-| [`web/`](web/README.md) | 网页搜索与读取工具 | 1 | 会话 |
+| [`web/`](web/README.md) | 网页搜索、读取与深度搜索工具 | 2 | 会话 |
 | [`image/`](image/README.md) | 生成图片、看图片的工具 | 2 | 会话 |
+| [`document/`](document/README.md) | 读 PDF、Word、PPT 文档的工具 | 1 | 会话 |
 | [`todo/`](todo/README.md) | 待办工具与待办视图 | 1 | 全局、会话 |
 | [`background-tasks/`](background-tasks/README.md) | 后台 Bash 任务登记表与任务工具 | 2 | 会话、库 |
 | [`subagent/`](subagent/README.md) | 子智能体管理器、子智能体工具，以及用本机 Codex / Claude Code 跑子任务 | 4 | 会话、库 |

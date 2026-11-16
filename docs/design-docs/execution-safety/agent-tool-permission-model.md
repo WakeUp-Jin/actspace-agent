@@ -61,6 +61,7 @@ type FileScope = "workspace" | "all";
 | `packages/core/tool-runtime` | `PermissionEngine`、边界评估、决策合并、Grant 匹配、审批和重检 |
 | `packages/fs/tool-fs-read`、`filesystem-search`、`filesystem-write` | 各自的文件资源提取和独立 permission audience、Grant 建议 |
 | `packages/shell/tool-shell` | Bash 资源提取和命令风险评估；不复用文件 Grant audience |
+| `packages/document/tool-document` | `read_document` 的文件资源提取（工作区外路径要审批，附件不要）和独立 audience `actspace.document` / `document-read`；不复用文件读 Grant |
 | `packages/session/session-journal` | 权限事件 strict codec |
 | `packages/session/session-projection` | 当前 mode 与有效 Session Grant 投影 |
 | `packages/core/runtime` | Session、Agent、Projection 与 Tool Environment 组装 |
@@ -314,6 +315,7 @@ type SessionGrant = {
 - 相同 `pluginId + permissionDomain + policyVersion` 的受信核心文件工具可以共享；
 - `read_file`、`grep`、`glob` 可以共享 `file.read` subtree；
 - `write_file`、`edit_file` 可以共享 `file.write` selector；
+- `read_document` 用自己的授权范围，不和 `read_file`、`grep`、`glob` 共享：发给 DeepSeek 和本机读取是两种风险；
 - 第三方插件、delete 和 Subagent 不能消费主 Agent 的 Grant；Bash 只能消费自己 audience 下受限 command_prefix Grant；
 - Session Grant 不绑定 `definitionDigest`，权限兼容性由显式 `policyVersion` 控制；
 - Session Grant 可以随同一个 Session 恢复，但不跨 Session、Agent 或 Host 明确禁用的能力。

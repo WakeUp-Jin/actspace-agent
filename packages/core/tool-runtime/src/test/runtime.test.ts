@@ -737,6 +737,48 @@ describe("production Agent scope admission", () => {
 });
 
 
+describe("registration visibility", () => {
+  it("hides tools whose visibility predicate is false from listDefinitions but keeps capture", () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition({ name: "hidden" }), executor: { execute: async () => success() }, visible: () => false });
+    runtime.register({ definition: definition({ name: "plain" }), executor: { execute: async () => success() } });
+    expect(runtime.registry.listDefinitions().map(item => item.name)).toEqual(["plain"]);
+    expect(runtime.registry.capture("hidden").definition.name).toBe("hidden");
+  });
+
+  it("re-evaluates visibility on every listDefinitions call", () => {
+    const runtime = new ToolRuntime();
+    let visible = false;
+    runtime.register({ definition: definition({ name: "toggle" }), executor: { execute: async () => success() }, visible: () => visible });
+    expect(runtime.registry.listDefinitions().map(item => item.name)).toEqual([]);
+    visible = true;
+    expect(runtime.registry.listDefinitions().map(item => item.name)).toEqual(["toggle"]);
+    visible = false;
+    expect(runtime.registry.listDefinitions().map(item => item.name)).toEqual([]);
+  });
+
+  it("treats a throwing visibility predicate as hidden without throwing", () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition({ name: "broken" }), executor: { execute: async () => success() }, visible: () => { throw new Error("settings unavailable"); } });
+    runtime.register({ definition: definition({ name: "plain" }), executor: { execute: async () => success() } });
+    expect(() => runtime.registry.listDefinitions()).not.toThrow();
+    expect(runtime.registry.listDefinitions().map(item => item.name)).toEqual(["plain"]);
+  });
+
+  it("denies a call to a tool that became hidden when the scope policy derives from listDefinitions", async () => {
+    const runtime = new ToolRuntime({ requireAgentScope: true });
+    let visible = true;
+    let executions = 0;
+    runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { executions += 1; return success(); } }, visible: () => visible });
+    const binding = runtime.bindAgentScope("session-1", "agent-1", () => new Set(runtime.registry.listDefinitions().map(item => item.name)));
+    visible = false;
+    const [result] = await runtime.executeBatch([{ ...call("hidden-call"), agentId: "agent-1" }], { ...environment([]), agentScopeToken: binding.token });
+    expect(result).toMatchObject({ status: "denied", failure: { code: "TOOL_SCOPE_DENIED" } });
+    expect(executions).toBe(0);
+    binding.dispose();
+  });
+});
+
 describe("process Session Grant execution", () => {
   it("issues, reuses and audits a prefix, but asks for other or complex commands and after revocation", async () => {
     const runtime = new ToolRuntime();

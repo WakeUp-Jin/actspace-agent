@@ -160,6 +160,22 @@ export class SettingsStore {
     return this.secrets[provider];
   }
 
+  /** O(1), on every model request: reads in-memory fields only, never a settings snapshot. */
+  isDeepseekDeepSearchAvailable(): boolean {
+    return this.v4Metadata.tools.deepseekDeepSearchEnabled === true && Boolean(this.secrets.deepseek) && !this.webSearchDisabled();
+  }
+
+  /** O(1), on every model request: reads in-memory fields only, never a settings snapshot. */
+  isDeepseekDocumentAvailable(): boolean {
+    return this.v4Metadata.tools.deepseekDocumentEnabled === true && Boolean(this.secrets.deepseek);
+  }
+
+  /** Same merge rule as `toSettingsV4`: the v4 list wins when non-empty, otherwise the legacy agent list. */
+  private webSearchDisabled(): boolean {
+    const disabled = this.v4Metadata.tools.disabledTools.length > 0 ? this.v4Metadata.tools.disabledTools : this.settings.agent.disabledTools;
+    return disabled.includes("web_search");
+  }
+
   /** 写 env 的唯一入口；调用点和拆分前相同。 */
   applyToEnv(): void {
     applySettingsToEnv(this.settings, this.reloadEnv);

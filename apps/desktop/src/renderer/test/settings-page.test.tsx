@@ -408,6 +408,39 @@ describe("SettingsPage", () => {
     });
   });
 
+  it("文档解析: no key shows the warning yet stays clickable and saves deepseekDocumentEnabled", async () => {
+    const updateSettingsV4 = stubToolsV4();
+    renderSettingsPage();
+    await userEvent.click(await screen.findByRole("button", { name: "工具" }));
+    const toggle = await screen.findByRole("switch", { name: "文档解析" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(toggle).not.toBeDisabled();
+    expect(screen.getByText("尚未连接 DeepSeek，文档由本机 Python 提取。")).toBeInTheDocument();
+    await userEvent.click(toggle);
+    await waitFor(() => {
+      expect(updateSettingsV4).toHaveBeenCalledWith(expect.objectContaining({ namespace: "tools", patch: { deepseekDocumentEnabled: true } }));
+    });
+  });
+
+  it("文档解析: with a DeepSeek key shows the price and sits after 图片分析", async () => {
+    overrideBridge({ "settings.get": vi.fn(async () => makeSettings({ providers: { deepseek: { hasApiKey: true } } as AppSettings["providers"] })) });
+    stubToolsV4({ deepseekDocumentEnabled: true });
+    renderSettingsPage();
+    await userEvent.click(await screen.findByRole("button", { name: "工具" }));
+    const toggle = await screen.findByRole("switch", { name: "文档解析" });
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
+    expect(screen.getByText("文档将发送至 DeepSeek · ¥0.0015 / 页")).toBeInTheDocument();
+    const switches = screen.getAllByRole("switch").map(item => item.getAttribute("aria-label"));
+    expect(switches.indexOf("文档解析")).toBe(switches.indexOf("图片分析") + 1);
+  });
+
+  it("文档解析 is disabled when settings are not writable", async () => {
+    overrideBridge({ "settings.getV4": vi.fn(async () => null) });
+    renderSettingsPage();
+    await userEvent.click(await screen.findByRole("button", { name: "工具" }));
+    expect(await screen.findByRole("switch", { name: "文档解析" })).toBeDisabled();
+  });
+
   it("disables 执行前确认 while the Bash tool is off", async () => {
     stubToolsV4({ disabledTools: ["bash"] });
     renderSettingsPage();

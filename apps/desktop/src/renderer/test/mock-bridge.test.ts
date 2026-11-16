@@ -204,4 +204,27 @@ describe("mock bridge", () => {
     expect(collectPresentedFiles(turns[2].messages)).toMatchObject([{ path: "docs/report.md", description: "单文件改动验收：报告终稿" }]);
     expect(db.sessions.get(session.id)?.messages.some((message) => message.tool?.name === "present")).toBe(true);
   });
+
+  it("projects the deepseek-tools document session into read rows with document fields", async () => {
+    const { bridge } = open("deepseek-tools");
+    const session = (await bridge.sessions.list()).find((item) => item.title === "读季度报告和设计手册")!;
+    const page = await bridge.sessions.getPage({ sessionId: session.id });
+    const messages = projectChatWindow(page, session.workspaceRoot ?? "").messageBlocks ?? [];
+    const user = messages.find((message) => message.kind === "user");
+    expect(user).toMatchObject({ attachments: [{ name: "季度经营报告.pdf", kind: "file" }] });
+    const rows = messages.flatMap((message) => message.kind === "read" && message.document ? [message] : []);
+    expect(rows.map((row) => [row.document?.name, row.document?.stats ?? row.status])).toEqual([
+      ["季度经营报告.pdf", "2 pages"],
+      ["产品设计手册.pdf", "124 pages"],
+      ["产品设计手册.pdf", "pages 31-45"],
+      ["产品设计手册.pdf", "pages 46-60"],
+      ["扫描合同.pdf", "20 pages"],
+      ["加密附件.pdf", "failed"],
+      ["全年归档.pdf", "failed"],
+    ]);
+    expect(rows[4]?.document?.warning).toBe("第 13 页识别不完整，内容已截断。");
+    expect(rows[0]?.resultPreview?.[0]).toBe("# 第三季度经营报告");
+    expect(rows[5]?.document?.errorText).toBe("文件设有打开密码，无法解析。去掉密码后再试。");
+    expect(rows[6]?.document?.errorText).toBe("文档超过 1,000 页，DeepSeek 不接受。");
+  });
 });

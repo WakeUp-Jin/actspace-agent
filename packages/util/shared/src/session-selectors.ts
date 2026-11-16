@@ -101,6 +101,7 @@ function messageBlockFromToolPreview(
         range: preview.range,
         displayText: preview.displayText,
         resultPreview: preview.resultPreview,
+        ...(preview.document ? { document: preview.document } : {}),
         status,
         createdAt: getDisplayTime(timestamp)
       };
@@ -153,6 +154,8 @@ function messageBlockFromToolPreview(
         resultUrls: preview.resultUrls,
         contentPreview: preview.contentPreview,
       };
+    case "deep_search":
+      return { ...preview, id: eventId, status, createdAt: getDisplayTime(timestamp) };
     case "media_analysis":
       return {
         kind: "media_analysis",

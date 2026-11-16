@@ -4,6 +4,7 @@ import { approvalPendingScenario, approvalPrefixScenario } from "./approval-pend
 import { backgroundTasksScenario } from "./background-tasks";
 import { compactionScenario } from "./compaction";
 import { contextPaginationScenario } from "./context-pagination";
+import { deepseekToolsScenario } from "./deepseek-tools";
 import { emptyScenario, noWorkspaceScenario } from "./empty";
 import { longSessionScenario } from "./long-session";
 import { markdownScenario } from "./markdown";
@@ -35,7 +36,8 @@ export type MockScenario =
   | "usage-stats"
   | "markdown"
   | "script-execution"
-  | "thinking";
+  | "thinking"
+  | "deepseek-tools";
 
 /** 场景只负责写入种子数据，必要时覆盖少量 handler（如流式回放的触发时机）。 */
 export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) => MockHandlers | void>> = {
@@ -56,6 +58,7 @@ export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) =>
   markdown: markdownScenario,
   "script-execution": scriptExecutionScenario,
   thinking: thinkingScenario,
+  "deepseek-tools": deepseekToolsScenario,
   // 「Harness 统计」页的数据在 harness-stats-fixture.ts，会话侧沿用空场景；起始位置见 components/harness-stats/dev-start.ts。
   "harness-stats": emptyScenario,
   "usage-stats": emptyScenario,

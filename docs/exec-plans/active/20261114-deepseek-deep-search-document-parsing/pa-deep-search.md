@@ -1,6 +1,6 @@
 # PA：深度搜索
 
-状态：待审核，尚未开始（交互模式）。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。
+状态：执行中（交互模式）。PA.1–PA.8 和 PA.9 的文档已提交；PA.9 的真实应用验收和 history 待做。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。
 
 ## 目标
 
@@ -171,9 +171,18 @@ export function assembleDeepSearchResult(outcome: DeepSearchOutcome): ToolBodyRe
 
 验证：执行过程记录里有四项结论。
 
+**结论（2026-11-15，真实 Key，5 个问题）**：四项都通过，不触发回退规则。细节记在设计文档第 3.3 节。对本计划的影响：
+
+1. 字段名一致；解析时要按实测的嵌套形状取：`annotations[].url_citation.{url,title,start_index,end_index}`，`server_tool_calls[].calls[]`。网址里的 `&amp;` 统一还原成 `&`（两边写法一致，还原后仍能对上）。
+2. 正文写完 1.1 到 3.7 秒，比之前约 5.5 秒短；提示词定稿不改。总耗时最长 31 秒，工具说明里的耗时改成「10–60 秒」。
+3. 46 条引用的 `end_index` 全部在句末或列表项末尾，0 条越界；保留正文里的 `[n]`。
+4. 不需要搜索时没有引用、没有 `server_tool_use`。
+5. 夹具：`src/test/fixtures/` 下三份（搜索后读页、多步、不搜索），只保留前几个思考片段，网页摘要截到 80 字符，连续正文片段合并；没有请求头和 Key。
+6. 实测没有见到 `: keep-alive` 和 `status: failed`，这两种情况的测试用手写数据。
+
 ### PA.2 解析流、组装结果
 
-- 新建 `packages/web/tool-deep-search/src/sse.ts`：`async function* readSseData(body: ReadableStream<Uint8Array>, onData: () => void): AsyncGenerator<string>`。按行切分，支持 `\n` 和 `\r\n`、跨 chunk 的半行、一个事件多行 `data:`；注释行不调用 `onData`。
+- 新建 `packages/web/tool-deep-search/src/sse.ts`：`async function* readSseData(body: ReadableStream<Uint8Array>, onData: () => void, signal?: AbortSignal): AsyncGenerator<string>`（`signal` 中止时取消读取器并抛出，不依赖网络流自己报错）。按行切分，支持 `\n` 和 `\r\n`、跨 chunk 的半行、一个事件多行 `data:`；注释行不调用 `onData`。
 - 新建 `packages/web/tool-deep-search/src/stream-state.ts`：把 chunk 逐个喂进去，维护正文、搜索词、来源查找表、打不开的网页、计费次数、结束原因、当前进度消息。
 - 新建 `packages/web/tool-deep-search/src/assemble.ts`：见契约。
 - 测试，`src/test/sse.test.ts`、`stream-state.test.ts`、`assemble.test.ts`：

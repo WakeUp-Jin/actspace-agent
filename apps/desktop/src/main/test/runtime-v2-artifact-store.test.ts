@@ -8,6 +8,45 @@ const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 
 describe("DesktopArtifactStore", () => {
+  const owner = (sessionId: string) => ({ sessionId, callId: "call", pluginId: "@actspace/desktop", name: "user-attachment" });
+  async function store() {
+    const root = await mkdtemp(join(tmpdir(), "actspace-artifact-name-")); roots.push(root);
+    return new DesktopArtifactStore(root);
+  }
+
+  it("keeps an attachment's file name through reads and fork copies, only for its Session", async () => {
+    const artifacts = await store();
+    const ref = await artifacts.create({ bytes: Buffer.from("%PDF-"), mediaType: "application/pdf", owner: owner("a"), fileName: "季度报告.pdf" });
+    await expect(artifacts.readForSession("a", ref.artifactId)).resolves.toMatchObject({ fileName: "季度报告.pdf", mediaType: "application/pdf" });
+    const copy = await artifacts.copyForSession("a", "child", ref.artifactId);
+    await expect(artifacts.readForSession("child", copy.artifactId)).resolves.toMatchObject({ fileName: "季度报告.pdf" });
+    await expect(artifacts.readForSession("b", ref.artifactId)).rejects.toThrow("does not belong");
+  });
+
+  it("cleans the file name and omits it when nothing is left", async () => {
+    const artifacts = await store();
+    const dirty = await artifacts.create({ bytes: Buffer.from("x"), mediaType: "text/plain", owner: owner("a"), fileName: `a\u0000b\n${"n".repeat(300)}` });
+    const read = await artifacts.readForSession("a", dirty.artifactId);
+    expect(read.fileName).toBe(`ab${"n".repeat(238)}`);
+    const empty = await artifacts.create({ bytes: Buffer.from("x"), mediaType: "text/plain", owner: owner("a"), fileName: "\u0001" });
+    expect(await artifacts.readForSession("a", empty.artifactId)).not.toHaveProperty("fileName");
+    const metadata = JSON.parse(await readFile(join(artifacts.root, `${empty.artifactId}.json`), "utf8")) as Record<string, unknown>;
+    expect(metadata).not.toHaveProperty("fileName");
+  });
+
+  it("reads older metadata without a name and ignores an unusable one", async () => {
+    const artifacts = await store();
+    const old = await artifacts.create({ bytes: Buffer.from("x"), mediaType: "text/plain", owner: owner("a") });
+    expect(await artifacts.readForSession("a", old.artifactId)).not.toHaveProperty("fileName");
+    for (const bad of [42, ""]) {
+      const path = join(artifacts.root, `${old.artifactId}.json`);
+      const metadata = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+      await writeFile(path, `${JSON.stringify({ ...metadata, fileName: bad })}\n`);
+      const read = await artifacts.readForSession("a", old.artifactId);
+      expect(read).not.toHaveProperty("fileName");
+    }
+  });
+
   it("copies independently for a fork, preserves integrity and rejects copying another Session's file", async () => {
     const root = await mkdtemp(join(tmpdir(), "actspace-artifact-fork-")); roots.push(root);
     const store = new DesktopArtifactStore(root);

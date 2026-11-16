@@ -37,6 +37,17 @@ describe("failed filesystem tool results", () => {
     expect(within(toggle.closest("article")!).getByText(diagnostic)).toBeVisible();
   });
 
+  it.each([
+    ["failed", "DeepSeek 在 180 秒内没有完成解析。"],
+    ["denied", "文档解析已关闭或 DeepSeek 未连接。"],
+  ] as const)("shows a %s read_document row's error text, not its stale preview", async (status, errorText) => {
+    render(<ToolLogLine message={{ ...base, kind: "read", filePath: "", displayText: "报告.pdf", status, resultPreview: ["stale"], document: { name: "报告.pdf", errorText } }} />);
+    const toggle = screen.getByRole("button", { name: new RegExp(`Read 报告.pdf ${status}`) });
+    await userEvent.click(toggle);
+    expect(within(toggle.closest("article")!).getByText(errorText)).toBeVisible();
+    expect(screen.queryByText("stale")).not.toBeInTheDocument();
+  });
+
   it("does not expose stale success previews on a failed read", async () => {
     render(<ToolLogLine message={{ ...base, kind: "read", filePath: "missing.txt", status: "failed", resultPreview: ["STALE_SUCCESS"] }} />);
     await userEvent.click(screen.getByRole("button", { name: /Read missing.txt.*failed/ }));

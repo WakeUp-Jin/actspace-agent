@@ -1,6 +1,8 @@
 import { isAbsolute, relative, resolve } from "pathe";
 import { relativePathInside, subagentActivationStatusLabel, type PathRules, type ToolUiPreview } from "@actspace/shared";
 import type { RuntimeJsonValue, RuntimeToolView, SubagentKind, SubagentView } from "@actspace/shared/runtime-v2";
+import { deepSearchPreview } from "./deep-search-preview.js";
+import { documentPreview } from "./document-preview.js";
 type EventRecord = Readonly<Record<string, RuntimeJsonValue>>;
 type FileChangeStats = { readonly additions: number; readonly deletions: number };
 /** 界面里不能用 `node:path`。pathe 两种分隔符都认，输出统一成 `/`，Windows 的路径也能比。 */
@@ -21,6 +23,7 @@ export function toolPreview(toolName: string, tool: RuntimeToolView | undefined,
   const failed = terminal && state !== undefined && state !== "completed";
   const resultPreview = terminal && !failed ? outputPreview(output) : undefined;
   if (localName === "read_file") return { kind: "read", filePath: displayPath(string(args.path) ?? ""), ...(typeof args.offset === "number" || typeof args.limit === "number" ? { range: `${nonNegative(args.offset) || 1}-${(nonNegative(args.offset) || 1) + Math.max(0, nonNegative(args.limit) - 1)}` } : {}), displayText: summary, resultPreview };
+  if (localName === "read_document") return documentPreview({ path: string(args.path) ?? undefined, displayPath, phase, state, summary, progress: string(data.summary) ?? undefined, output, detail: detailValue(data, "document"), failureCode: string(failure.code) ?? tool?.failure?.code, failureMessage: errorMessage ?? undefined });
   if (localName === "list_directory") {
     // 给模型的列表可能被截断，真实条目数在 detail 里；旧会话没有这一项，才从文本里数。
     const counted = record(detailValue(data, "result")).entryCount;
@@ -29,6 +32,7 @@ export function toolPreview(toolName: string, tool: RuntimeToolView | undefined,
   if (localName === "grep") return { kind: "grep", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
   if (localName === "glob") return { kind: "glob", pattern: string(args.pattern) ?? "", scope: displayPath(string(args.path) ?? "."), resultCount: resultCount(summary), displayText: summary, resultPreview };
   if (localName === "web" || localName === "web_search" || localName === "web_fetch") { const open = localName === "web_fetch" || string(args.action) === "open"; return { kind: "web_search", mode: open ? "url" : "query", ...(open ? { url: string(args.url) ?? "" } : { query: string(args.query) ?? "" }), displayText: summary, contentPreview: output.slice(0, 2_000) }; }
+  if (localName === "deep_search") return deepSearchPreview({ tool, data, args, phase });
   if (localName === "write_file" || localName === "edit_file") {
     const result = record(detailValue(data, "result"));
     const filePath = displayPath(string(result.path) ?? string(args.path) ?? "");

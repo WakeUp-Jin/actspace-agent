@@ -7,3 +7,4 @@ export * from "./chat.js";
 export * from "./subagent-list.js";
 export * from "./tool-card.js";
 export * from "./indexed-usage.js";
+export * from "./tool-failure-text.js";

@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from
 import type { ComposerMode, FileReference, ResponseAnnotationReference } from "@actspace/shared";
 import { sessionsApi } from "../../api/sessions";
 import { useRunTargetContext } from "../../target/run-target-context";
+import { attachmentEntry, useDocumentParsingAvailable } from "../composer/attachment-entry";
 import { ResponseAnnotationPill } from "../composer/ResponseAnnotationPill";
 import { ComposerAttachments, useComposerAttachments } from "../composer/ComposerAttachments";
 import { ModelPicker } from "../composer/ModelPicker";
@@ -45,6 +46,7 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
   const { models, defaultModelId, selectedModelId, onSelectedModelChange, composerMode = "agent", selectedSkills = [] } = useComposerContext();
   const { target, capabilities, readiness } = useRunTargetContext();
   const isRemoteTarget = target.kind === "remote";
+  const documentParsing = useDocumentParsingAvailable();
   const isChatForm = composerMode === "chat";
   const editorRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -109,7 +111,7 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
 
   const hasContent = Boolean(text.trim()) || attachments.length > 0 || responseAnnotations.length > 0;
   const canSend = hasContent && model.available && readiness.state === "ready";
-  const acceptsFiles = isChatForm || capabilities.attachments.files;
+  const entry = attachmentEntry({ isChatForm, acceptsFiles: capabilities.attachments.files, isRemoteTarget, documentParsing });
 
   function submit() {
     if (!canSend) return;
@@ -170,11 +172,11 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
       {attachmentState.error ? <p role="alert" className="px-3.5 pt-1 text-act-xs leading-4 text-danger">{attachmentState.error}</p> : null}
       <div className={EDITOR_BAR_CLASS}>
         <IconButton
-          label={acceptsFiles ? "添加图片或文件" : "添加图片"}
+          label={entry.picker === "images" ? "添加图片" : "添加图片或文件"}
           variant="ghost"
           size="sm"
           shape="round"
-          onClick={() => void (acceptsFiles ? attachmentState.selectFiles() : attachmentState.selectImages())}
+          onClick={() => void (entry.picker === "images" ? attachmentState.selectImages() : attachmentState.selectFiles(entry.picker))}
         >
           <Plus size={17} aria-hidden="true" />
         </IconButton>

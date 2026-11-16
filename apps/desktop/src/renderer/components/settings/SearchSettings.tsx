@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { hasDeepseekKey } from "./deepseek-key";
 import type {
   AppSettings,
   SearchProviderId,
@@ -68,8 +69,8 @@ export function SearchSettings({
     } catch { setWriteError("保存失败，请重试。"); }
     finally { setWriting(false); }
   };
-  const hasDeepseekKey = settings.searchProviders.deepseek?.hasApiKey === true || settings.providers.deepseek.hasApiKey;
-  const hasKey = (provider: SearchProviderId) => provider === "deepseek" ? hasDeepseekKey : settings.searchProviders[provider]?.hasApiKey === true;
+  const deepseekConnected = hasDeepseekKey(settings);
+  const hasKey = (provider: SearchProviderId) => provider === "deepseek" ? deepseekConnected : settings.searchProviders[provider]?.hasApiKey === true;
   const tools = useToolToggle({ settings, settingsV4, onUpdate, onUpdateNamespace });
   const editor = useSingleEditor<SearchProviderId>();
   const connectedCount = SEARCH_PROVIDER_ROWS.filter(({ provider }) => hasKey(provider)).length;
@@ -87,6 +88,17 @@ export function SearchSettings({
               ariaLabel="允许联网搜索"
             />
           }
+        />
+        <SettingRow
+          title="使用 DeepSeek 深度搜索"
+          description={deepseekConnected ? "问题将发送至 DeepSeek · 搜索 ¥0.005 / 次，另计模型用量" : "请先连接 DeepSeek"}
+          control={<Toggle
+            ariaLabel="使用 DeepSeek 深度搜索"
+            checked={deepseekConnected && settingsV4?.settings.tools.deepseekDeepSearchEnabled === true}
+            // With web search off the stored choice is kept, only greyed out; turning web search back on restores it.
+            disabled={!settingsV4 || writing || !deepseekConnected || !tools.isEnabled(WEB_SEARCH_TOOL)}
+            onChange={(deepseekDeepSearchEnabled) => void saveTools({ deepseekDeepSearchEnabled })}
+          />}
         />
       </SettingGroup>
 
@@ -114,11 +126,11 @@ export function SearchSettings({
       <SettingGroup title="网页读取" headingLevel={3}>
         <SettingRow
           title="使用 DeepSeek 抓取网页"
-          description={hasDeepseekKey ? "网址将发送至 DeepSeek · ¥0.005 / 次" : "请先连接 DeepSeek"}
+          description={deepseekConnected ? "网址将发送至 DeepSeek · ¥0.005 / 次" : "请先连接 DeepSeek"}
           control={<Toggle
             ariaLabel="使用 DeepSeek 抓取网页"
-            checked={hasDeepseekKey && settingsV4?.settings.tools.deepseekFetchEnabled === true}
-            disabled={!settingsV4 || writing || !hasDeepseekKey}
+            checked={deepseekConnected && settingsV4?.settings.tools.deepseekFetchEnabled === true}
+            disabled={!settingsV4 || writing || !deepseekConnected}
             onChange={(deepseekFetchEnabled) => void saveTools({ deepseekFetchEnabled })}
           />}
         />

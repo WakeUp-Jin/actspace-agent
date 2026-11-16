@@ -1,6 +1,6 @@
 # DeepSeek 深度搜索与文档解析工具（目标设计，未实现）
 
-本文是 `deep_search` 和 `read_document` 两个工具的目标设计。两个工具都还没有实现；实现步骤见[执行计划](../../exec-plans/active/20261114-deepseek-deep-search-document-parsing/README.md)，界面以 [demo](../frontend/deep-search-and-document-demo.html) 为准。实现合入后，把本文改写成当前事实，去掉标题里的「目标设计，未实现」。
+本文是 `deep_search` 和 `read_document` 两个工具的设计。两个工具都已在分支上实现（`deep_search`：第 7 节、第 9.1、9.3 节；`read_document`：第 8 节、第 9.2–9.4 节），这几节写的是当前事实；统一验收通过、合入 main 后去掉标题里的「目标设计，未实现」。实现步骤见[执行计划](../../exec-plans/active/20261114-deepseek-deep-search-document-parsing/README.md)，界面以 [demo](../frontend/deep-search-and-document-demo.html) 为准。
 
 本文负责：为什么做、做成什么样、模块边界、否决过的方案。改哪些文件、按什么顺序、每步怎么验证，写在执行计划里。
 
@@ -60,7 +60,7 @@
 - `purpose`：`text_recognition` 时，不含图片的 Word、PowerPoint 直接提取文字，其他文件逐页识别；`rich_layout_recognition` 时所有文件都逐页识别。
 - 限制：文件 100 MiB（超过返回 413）；1,000 页；上传要在 120 秒内完成且中途停顿不超过 30 秒（否则 408）；从开始上传算起总时长 180 秒；每个账号同时最多 15 个识别（超过返回 429），客户端断开后没做完的识别仍然占名额。
 - 响应：识别期间服务端持续发换行符，完成后返回一个 JSON：`page_count`（等于 `pages` 的长度）、`pages[]`（`index` 从 0 开始、`text`、`finish_reason`）。换行符是 JSON 允许的前导空白，整个响应体可以直接按 JSON 解析。`finish_reason` 为 `length` 表示这一页输出到了上限，文本不完整。
-- `text` 是模型的原始输出，服务端不做清理。逐页识别的文本里可能带 `<｜ref｜>`、`<｜box｜>` 标记和坐标，例如 `<｜ref｜>标题<｜/ref｜><｜box｜>[[52, 40, 948, 96]]<｜/box｜>`；直接提取文字的文档不带。
+- `text` 是模型的原始输出，服务端不做清理。`rich_layout_recognition` 的文本每块都带标记和坐标，例如 `<｜ref｜>text<｜/ref｜><｜box｜>[[33,17,621,35]]<｜/box｜> 正文`，`<｜ref｜>` 里是块的类型名（2026-11-15 实测）；`text_recognition` 和直接提取文字的文档不带。
 - 上传阶段的错误用状态码返回：400（表单不合法或文件无法处理）、402、408、413、429、500、503（服务繁忙）、504（上传与提交超过总时长）。Key 无效时的 401 在 OCR 文档里没有列出，按 DeepSeek 通用的错误码处理。
 - **识别开始后状态码已经是 200，失败时响应体是错误对象**（`{ "error": { "message", "type", "param", "code" } }`），必须检查 `error`。识别开始前就失败时，同样的 `error.message` 也可能跟着 HTTP 错误状态码返回。
 - 重试解决不了的 `error.message`：`The file is password-protected and cannot be processed. Remove the password and upload it again.`；`Failed to recognize the file: …`（文件无法解析、格式不支持、图片无法解码）；`Failed to recognize the file: the document has more than 1000 pages`；`file is too large: max 100 MiB`；`OCR did not finish in time`、`OCR did not finish within 180 seconds`。暂时性的：`The OCR service is temporarily unavailable. Please try again later.`、`Internal Server Error`。
@@ -80,12 +80,21 @@
 - 有一次在收到 6 秒数据后停住超过 7 分钟，连接没有断。5 次正常调用里最长的静默是 7 秒。空闲超时由此而来。
 - 13.3 秒里约 5.5 秒花在写一份完整回答上，而主模型还会重写一遍。所以内部请求只要要点。
 
+2026-11-15 带「只写要点」系统提示词复测（5 个问题：中英文各 2 个多来源问题、1 个不需要搜索的问题）：
+
+- 字段和第 3.1 节一致，补充三点：`annotations` 的每一项是 `{ "type": "url_citation", "url_citation": { url, title, start_index, end_index } }`，字段在嵌套的 `url_citation` 里；`server_tool_calls` 按步分组，每一步是 `{ index, reasoning_content, calls[] }`，`calls[]` 里才是 `action`、`status`、`sources` 或 `page`；`usage`（含 `server_tool_use`）和 `finish_reason` 在同一个 chunk。来源的网址偶尔带 HTML 转义的 `&amp;`，`annotations` 和 `sources` 里写法一致。
+- 要点提示词有效：正文 381 到 3,149 字符，从第一个正文字符到结束 1.1 到 3.7 秒（之前写完整回答约 5.5 秒）。总耗时 5.0、8.8、29.6、31.0 秒，长的两次做了 4 到 6 步、思考 1.4 万字符。
+- 引用位置：4 份有引用的结果共 46 条，`end_index` 全部落在句末或列表项末尾，没有越界。所以正文里插 `[n]` 的写法不变。
+- 不需要搜索的问题：没有 `server_tool_event`、没有 `annotations`，`usage` 里没有 `server_tool_use`。
+- 计费的搜索次数 3、4、8、10；`tool_fetch` 都是 0（打开的都是搜索结果里已带内容的网页）。`server_tool_use` 另有 `tool_image_search` 字段，这里不用。5 次里没有出现 `: keep-alive` 注释，也没有打不开的网页；最长静默 0.8 秒。
+
 OCR：
 
 - `text_recognition` 返回干净的 Markdown，表格是 HTML `<table>`，公式是 LaTeX；`rich_layout_recognition` 每个块都带 `<｜ref｜>`、`<｜box｜>` 标记和坐标。所以用前者，另外防御性地去掉这两种标记。
 - 文字版 PDF 2 页 2.9 秒；扫描版 PDF 2 页 3.0 秒；DOCX 1 页 4.4 秒；论文 PDF 15 页 11.8 秒、5.8 万字，其中 1 页是 `length`；综述 PDF 124 页 15.6 秒、74 万字、约 ¥0.19。
 - 纯文本和 xlsx 会被拒绝（状态码 200，响应体是错误对象）。
-- PPT、PPTX 和老格式 DOC、PPT 没有实测。
+
+2026-11-15 复测（测试文件自己造）：PPTX（纯文字 3 页、带图片 2 页）能读，一张幻灯片一页；60 节的纯文字 DOCX 返回 120 页（分页符把每节分成两页），单页最多 3,331 字符；带密码的 PDF 是 200 + `password-protected`；改了扩展名的 xlsx 是 200 + `Failed to recognize the file: the file format is not supported`；错 Key 是 401；文件头前有 16 个杂字节的 PDF 正常解析；几秒内完成的响应没有开头的换行符，`content-type` 是 `application/json`。老格式 DOC、PPT 仍没有实测。
 
 ## 4. 两个工具与可用条件
 
@@ -107,7 +116,9 @@ OCR：
 - 模型看到工具就会去调。默认关闭的付费工具摆在列表里，每次调用都白白失败一轮。
 - `read_document` 只有从列表里消失，模型才会按提示词和 Skill 走本机 Python 那条路。
 
-做法：工具始终注册，但登记时带一个同步的可见性判断。工具运行时列出工具定义时，跳过判断为「不可见」的工具；判断本身抛错时按不可见处理。按名字取工具执行的路径不受影响。
+做法（已实现）：工具始终注册，但登记时带一个同步的可见性判断（`packages/core/tool-runtime/src/registry.ts` 的 `ToolExecutorRegistration.visible`）。`ToolRegistry.listDefinitions()` 跳过判断为「不可见」的工具；判断本身抛错时按不可见处理。按名字取工具执行的路径（`capture()`）不受影响。
+
+这个机制只能用在可选插件上：主形态激活工具时（`packages/core/agent/src/agent-form.ts` 的 `activateAgentFormTools`），可选成员一个工具都不可见就跳过，必需成员的工具不可见会让 Run 启动失败。所以两个插件各自只贡献一个工具。
 
 由此得到的时序：
 
@@ -124,7 +135,7 @@ OCR：
 
 ## 6. 插件、Host 端口与 Key
 
-两个工具各自是一个可选的 Harness 插件，照网页和图片工具的方式：工具定义、参数校验和注册在插件里，联网实现由 Host 端口构造（Key 在 Host）。
+两个工具各自是一个可选的 Harness 插件，照网页和图片工具的方式：工具定义、参数校验和注册在插件里，联网实现由 Host 端口构造（Key 在 Host）。插件包、清单登记和可选端口已实现（`packages/web/tool-deep-search/`、`packages/document/tool-document/`；登记在 `packages/core/runtime/src/plugin-catalog.ts`，可选端口在 `packages/core/runtime/src/harness/default-harness.ts` 的 `OPTIONAL_HOST_SHARED_SERVICES`）；Host 端口的实现还没有，所以现在三种 Host 都不提供端口，两个工具都不注册。
 
 | | 深度搜索 | 文档解析 |
 | --- | --- | --- |
@@ -140,12 +151,14 @@ OCR：
 - 插件会出现在「扩展 › 插件」的内置插件列表里，不能关闭。是否给模型用，由上面两个设置开关决定，不由插件开关决定。
 - Host 端口有两个成员：`createPorts()` 构造工具实现，每个 Harness 一次；`available()` 就是第 5 节的可见性判断。
 - **Key 每次调用时读取**，不在构造时固定。换 Key 或删 Key 不用重启；调用时读不到 Key，返回「不可用」的失败。Key 只在主进程里流动，不进入 Journal、工具结果和 renderer。
-- 桌面端从设置读开关和 Key。CLI 和远程 Host 用环境变量：`ACTSPACE_DEEPSEEK_DEEP_SEARCH=1`、`ACTSPACE_DEEPSEEK_DOCUMENT=1`，各自和 `DEEPSEEK_API_KEY` 一起才生效，和现有的 `ACTSPACE_DEEPSEEK_SEARCH`、`ACTSPACE_DEEPSEEK_FETCH` 同一写法。CLI 的 mock 模式不提供这两个端口。
+- 桌面端从设置读开关和 Key：设置字段 `tools.deepseekDeepSearchEnabled`、`tools.deepseekDocumentEnabled`（默认 `false`）；`ModelRuntimeService.isDeepseekDeepSearchAvailable()`、`isDeepseekDocumentAvailable()` 只读 `SettingsStore` 内存里的开关、停用列表和 Key，不取设置快照（`apps/desktop/src/main/settings/store.ts`），`getDeepseekApiKey()` 每次调用时取 Key。CLI 和远程 Host 用环境变量：`ACTSPACE_DEEPSEEK_DEEP_SEARCH=1`、`ACTSPACE_DEEPSEEK_DOCUMENT=1`，各自和 `DEEPSEEK_API_KEY` 一起才生效，和现有的 `ACTSPACE_DEEPSEEK_SEARCH`、`ACTSPACE_DEEPSEEK_FETCH` 同一写法。CLI 的 mock 模式不提供这两个端口。
 - Harness 在多个会话之间共享，所以端口里的状态（文档缓存）是跨会话的，见第 8.5 节。
 
 子智能体：`general` 预设按现有规则继承这两个工具，`explore` 预设没有。
 
 ## 7. `deep_search` 契约
+
+实现在 `packages/web/tool-deep-search/src/`：`plugin.ts` 是工具定义，`node-ports.ts` 发请求和处理超时，`sse.ts` 读事件流，`stream-state.ts` 累积进度和结果，`assemble.ts` 拼交给主模型的文本，`failure.ts` 生成失败结果。桌面端在 `apps/desktop/src/main/runtime-v2/tool-host-services.ts` 构造端口，CLI 和远程 Host 在 `packages/host/agent-host/src/node-ports/tool-host-services.ts`（要 `ACTSPACE_DEEPSEEK_DEEP_SEARCH=1` 和 `DEEPSEEK_API_KEY`）。
 
 ### 7.1 参数与说明
 
@@ -165,11 +178,11 @@ OCR：
 }
 ```
 
-工具说明要告诉模型四件事：什么时候用（需要多个来源或互相印证的问题；查一下就有答案的用普通搜索，已知网址用网页读取）；要 10 到 30 秒、按搜索次数计费；问题必须自带上下文；结果里的 `[n]` 标的是前面那段话的出处，引用时写成行内 Markdown 链接，不要编造网址。
+工具说明要告诉模型四件事：什么时候用（需要多个来源或互相印证的问题；查一下就有答案的用普通搜索，已知网址用网页读取）；要 10 到 60 秒（PA.1 实测 5 到 31 秒）、按搜索次数计费；问题必须自带上下文；结果里的 `[n]` 标的是前面那段话的出处，引用时写成行内 Markdown 链接，不要编造网址。
 
 ### 7.2 内部请求
 
-一次流式请求：系统提示词要求只写要点（事实、数字、日期的短列表，没有开场白和结语，来源互相矛盾或找不到可靠信息时直说，用问题的语言），用户消息就是 `question`。只声明 `deepseek_web_search`，不声明 `deepseek_read_url`。
+一次流式请求（`POST https://api.deepseek.com/chat/completions`，模型 `deepseek-flash`，开启思考，`redirect: "error"`）：系统提示词（`DEEP_SEARCH_SYSTEM_PROMPT`）要求只写要点（事实、数字、日期的短列表，没有开场白和结语，来源互相矛盾或找不到可靠信息时直说，用问题的语言），用户消息就是 `question`。只声明 `deepseek_web_search`，不声明 `deepseek_read_url`。
 
 不带会话历史，不带用户的其他消息。
 
@@ -185,6 +198,8 @@ Sources:
 Pages that could not be opened:
 - <网址> (<错误码>)
 ```
+
+固定的英文说明行（`assemble.ts`）：截断时 `[The findings were cut off at DeepSeek's length limit.]`；超过 20,000 字符时 `[Findings truncated at 20,000 characters.]`；没有搜索时 `No web search was performed; these findings have no sources.`；搜索了但没有引用时 `No sources were cited.`。
 
 - 编号按来源第一次被引用的顺序分配，同一网址只有一个编号。标题按网址到 `sources` 或 `page` 里找，找不到用引用自带的标题，再没有就用网址。
 - 标记插在每条引用的 `end_index` 处，按码点切分，从后往前插；同一位置同一来源只插一次。下标越界的引用不插标记，但来源照常列出。
@@ -246,17 +261,17 @@ Pages that could not be opened:
 
 `deep_search` 的定义声明 Chat、Plan、Agent 三个模式，Chat 里和 `web`、`generate_image` 并列出现。不可用时不出现，Chat 仍然是原来两个工具。
 
-**这和确认时的表述有出入。** 确认的是「做成现有 `web` 工具的第三种动作，Chat 仍然恰好两个工具」。用户看到的效果相同（Chat 里能用深度搜索），差别在形式。改成独立工具的理由：
+最初确认的是「做成现有 `web` 工具的第三种动作，Chat 仍然恰好两个工具」；2026-11-15 审核改为独立工具。用户看到的效果相同（Chat 里能用深度搜索），差别在形式。理由：
 
 - `web` 的参数结构是固定的。把 `deep` 写进动作枚举，它就一直在列表里；而开关默认关，模型调了只会失败。
 - 让 `web` 的结构随开关变化行不通：同一版本的工具不允许有两份定义，而且 `web` 所在的插件是必需成员，重新注册会和正在进行的 Run 冲突。
 - 独立工具在三个模式里是同一个工具、同一种行、同一套投影和测试。做成 `web` 的动作，Chat 和 Agent 就是两套。
 
-代价是改一条现行规范：「Chat 恰好两个工具」变成「Chat 固定两个工具，深度搜索打开时多一个 `deep_search`」。
-
-如果坚持原表述，改动范围见执行计划总览。
+代价是改了一条现行规范：「Chat 恰好两个工具」变成「Chat 固定两个工具，深度搜索打开时多一个 `deep_search`」，见[模式规范](../agent-runtime/agent-forms-and-modes.md)。`packages/core/agent/src/main-preset.ts` 里 Chat 预设的 `allowedToolNames` 只是说明，运行时按定义的 `modes` 决定。
 
 ## 8. `read_document` 契约
+
+插件在 `packages/document/tool-document/`：`plugin.ts`（工具定义、参数检查、权限契约）、`sniff.ts`（本机类型判断）、`ocr-response.ts`（响应解析和失败码）、`assemble.ts`（分页、摘要、明细）、`cache.ts`（缓存与并发）、`node-ports.ts`（Host 端口实现 `createNodeDocumentPorts`）。桌面端在 `apps/desktop/src/main/runtime-v2/tool-host-services.ts` 构造端口（开关和 Key 每次调用时从 `ModelRuntimeService` 读），CLI / 远程 Host 在 `packages/host/agent-host/src/node-ports/tool-host-services.ts`（`ACTSPACE_DEEPSEEK_DOCUMENT=1` 加 `DEEPSEEK_API_KEY`）。
 
 ### 8.1 参数与说明
 
@@ -301,7 +316,7 @@ OCR 接口要求上传时带文件名。按路径读时用路径的最后一段�
 - `purpose` 固定为 `text_recognition`。
 - 整个文件读进内存后一次上传。大文件上传时内存峰值约为文件大小的两倍，所以同时最多 2 份文档在读入和上传，其余排队。
 - 只有一个计时：从发出请求起 190 秒。服务端自己的上限是 180 秒，多等 10 秒让服务端的结论先到。识别期间服务端只发换行符，所以不设空闲超时。
-- 响应先按错误对象检查，再取 `pages`，按 `index` 排序。每页文本去掉 `<｜ref｜>`、`<｜box｜>` 标记（坐标整段删掉，`<｜ref｜>` 里的文字保留）。`finish_reason` 为 `length` 的页记为「识别不完整」。
+- 响应先按错误对象检查，再取 `pages`，按 `index` 排序。每页文本防御性地去掉 `<｜ref｜>…<｜/ref｜>` 和 `<｜box｜>…<｜/box｜>`（两种都整段删掉：前者里面是块的类型名，后者是坐标）。`finish_reason` 为 `length` 的页记为「识别不完整」。
 - 整理后超过 50,000 个字符的页，按行拆成几页（见第 8.4 节）。
 - 工具自己不重试。
 
@@ -387,6 +402,8 @@ Long pages were split; page numbers here are positions in this output, not the d
 
 ### 9.1 Deep Search 行
 
+投影在 `packages/client/client/src/sessions/deep-search-preview.ts`（失败文字在同目录 `tool-failure-text.ts`），流式行在 `packages/client/client/src/live/stream-blocks.ts`；桌面端行是 `apps/desktop/src/renderer/components/messages/DeepSearchBlock.tsx`，样式 `styles/deep-search.css`；Web / PWA 的单行在 `apps/web/src/pages/session/blocks/ExploreGroup.tsx`。mock 场景 `?mock=deepseek-tools`。
+
 - 运行中：`Deep Search <问题>`，有进度消息时接 ` · <消息>`，整行用共享的流光效果。
 - 完成：动作 `Deep Search`，目标是问题，行尾是 `6 searches · 11 sources` 这样的统计。
 - 展开：「搜索词」列表；「引用来源」编号列表，每条是标题（点击用系统浏览器打开）加站点名，没有图标、没有日期；有打不开的网页时多一组「未能打开」。
@@ -397,6 +414,8 @@ Long pages were split; page numbers here are positions in this output, not the d
 这是一种新的行，工具预览规范要新增一节。现有 `Web Search` 一节「不在工具行里展示搜索结果正文或来源摘要」的规定不变，`Deep Search` 展开的来源列表是另行约定的样式。
 
 ### 9.2 文档的 Read 行
+
+投影在 `packages/client/client/src/sessions/document-preview.ts`（失败文字在 `tool-failure-text.ts` 的 `documentFailureText`），由 `tool-card.ts` 分发；流式行在 `packages/client/client/src/live/stream-blocks.ts`；桌面端行是 `ToolLogLine.tsx` 的 `DocumentReadLine`，警示行样式 `.tool-result-item.is-warning`（`styles/tool-result.css`）；Web / PWA 的单行在 `ExploreGroup.tsx`。mock 场景 `?mock=deepseek-tools` 的「读季度报告和设计手册」会话。
 
 复用现有的 `Read` 行，不新增行的种类。`read` 这种预览和消息块各加一个可选的 `document` 字段（名字、行尾统计、警示、失败文字）；没有这个字段的 `Read` 行和今天完全一样。
 
@@ -410,10 +429,14 @@ Long pages were split; page numbers here are positions in this output, not the d
 
 ### 9.3 设置
 
-- 「搜索与网页读取」页，第一组，「允许联网搜索」下面新增一行「使用 DeepSeek 深度搜索」。说明：有 Key 时「问题将发送至 DeepSeek · 搜索 ¥0.005 / 次，另计模型用量」，没有 Key 时「请先连接 DeepSeek」。没有 Key 或「允许联网搜索」关闭时置灰。
-- 「工具」页「多媒体」组，「图片分析」下面新增一行「文档解析」。说明：有 Key 时「文档将发送至 DeepSeek · ¥0.0015 / 页」；没有 Key 时用警示写法「尚未连接 DeepSeek，文档由本机 Python 提取。」，开关不置灰。
+深度搜索的开关在 `apps/desktop/src/renderer/components/settings/SearchSettings.tsx`，字段 `tools.deepseekDeepSearchEnabled`，可用性由 `ModelRuntimeService.isDeepseekDeepSearchAvailable()` 读取。文档解析的开关在 `components/settings/sections/ToolsSection.tsx`，字段 `tools.deepseekDocumentEnabled`，可用性由 `isDeepseekDocumentAvailable()` 读取；两处判断「已连接 DeepSeek」共用 `components/settings/deepseek-key.ts` 的 `hasDeepseekKey`。
+
+- 「搜索与网页读取」页，第一组，「允许联网搜索」下面一行是「使用 DeepSeek 深度搜索」。说明：有 Key 时「问题将发送至 DeepSeek · 搜索 ¥0.005 / 次，另计模型用量」，没有 Key 时「请先连接 DeepSeek」。没有 Key 或「允许联网搜索」关闭时置灰。
+- 「工具」页「多媒体」组的最后一行是「文档解析」。说明：有 Key 时「文档将发送至 DeepSeek · ¥0.0015 / 页」；没有 Key 时用警示写法「尚未连接 DeepSeek，文档由本机 Python 提取。」，开关不置灰。
 
 ### 9.4 输入框
+
+入口规则在 `apps/desktop/src/renderer/components/composer/attachment-entry.ts`（`attachmentEntry`、`useDocumentParsingAvailable`），`Composer.tsx` 和消息流里的提问编辑器 `TurnPromptEditor.tsx` 共用；文件选择框的类型在 `apps/desktop/src/main/runtime-v2/attachment-dialog-filters.ts`，`dialogs.selectFiles({ documents: true })` 选这一组。
 
 本机 Agent / Plan 的「+」面板：文档解析可用时，入口从「图片」变成「图片与文件」，说明是「PNG、JPEG、WEBP、GIF、PDF、Word、PPT」，文件选择框只列这些类型。不可用时保持「图片」。
 
@@ -464,8 +487,10 @@ Long pages were split; page numbers here are positions in this output, not the d
 
 ## 13. 已知限制
 
-- PPT、PPTX 和老格式 DOC、PPT 没有用真实接口测过。
-- 「只要要点」的提示词和 `[n]` 标记的位置质量还没验证，执行计划第一步先测，测不过有回退规则。
+- 深度搜索同一个问题每次跑出来的结论和来源不一样（PA.1 实测）；来源的标题、日期元数据不干净，界面不显示日期。
+- 中止深度搜索不会取消 DeepSeek 那边已经发生的搜索，已产生的费用照常计费；超时和中止都不返回已收到的部分结果。
+- PA.1 的 5 次真实调用里没有出现 `: keep-alive` 注释和打不开的网页，这两条路径只用合成数据测过。
+- 老格式 DOC、PPT 没有用真实接口测过；带图的 PPT 页、内容很密导致 `length` 的页只测过少量样本。
 - 文档缓存只在内存里，重启后重新解析、重新计费。
 - 不能在文档内搜索，只能按页读。
 - 附件最大 20 MiB。

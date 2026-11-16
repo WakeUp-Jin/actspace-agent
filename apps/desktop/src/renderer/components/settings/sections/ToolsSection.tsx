@@ -5,6 +5,7 @@ import { useToolToggle } from "../useToolToggle";
 import { SettingGroup, SettingLinkRow, SettingSubhead, InlineWarning, useSettingsSaveNotice, SettingRow, Toggle } from "../SettingsPrimitives";
 import type { SectionProps } from "./shared";
 import { usePluginLoaded } from "../../../hooks/usePluginLoaded";
+import { hasDeepseekKey } from "../deepseek-key";
 
 export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace }: SectionProps) {
   const notifySaved = useSettingsSaveNotice();
@@ -22,6 +23,7 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
   const mediaTools = PRIMARY_TOOL_ITEMS.filter((tool) => ["generate_image", "inspect_image"].includes(tool.name));
   const enabledCodeTools = codeTools.filter((tool) => tools.isEnabled(tool.name)).length;
   const imageGenerationReady = settings.imageGeneration?.hasApiKey === true;
+  const documentEnabled = settingsV4?.settings.tools.deepseekDocumentEnabled === true;
 
   const writeToolsPatch = (patch: Extract<SettingsV4NamespacePatch, { namespace: "tools" }>["patch"], legacy: () => void, label: string) => {
     if (tools.v4Writable) {
@@ -109,6 +111,19 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
 
       <SettingGroup title="多媒体" headingLevel={3}>
         {mediaTools.map((tool) => renderToolRow(tool, { description: mediaDescription(tool) }))}
+        <SettingRow
+          tight
+          title="文档解析"
+          description={hasDeepseekKey(settings) ? "文档将发送至 DeepSeek · ¥0.0015 / 页" : <InlineWarning>尚未连接 DeepSeek，文档由本机 Python 提取。</InlineWarning>}
+          control={
+            <Toggle
+              checked={documentEnabled}
+              disabled={!tools.v4Writable}
+              onChange={(next) => writeToolsPatch({ deepseekDocumentEnabled: next }, () => undefined, "document parsing settings")}
+              ariaLabel="文档解析"
+            />
+          }
+        />
       </SettingGroup>
 
       <SettingGroup title="显示" headingLevel={3}>

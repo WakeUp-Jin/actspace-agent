@@ -1,3 +1,4 @@
+import { attachmentDialogFilters } from "./attachment-dialog-filters";
 import { ContextPanelService } from "./context-panel-service";
 import { validateRunReferences as validateSharedRunReferences } from "@actspace/shared/composer-reference-validation";
 import type { RemoteDesktopAdapter } from "../remote-hosts/desktop-adapter";
@@ -471,7 +472,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   ipc.handle(contract.dialogs.selectFiles, async (input = {}) => {
     const result = await showOpenDialog(options.getMainWindow(), {
       properties: ["openFile", "multiSelections"],
-      filters: input.remote === true ? [{ name: "Files", extensions: ["*"] }] : [{ name: "Chat attachments", extensions: ["png", "jpg", "jpeg", "webp", "gif", "txt", "md", "markdown", "json", "csv"] }],
+      filters: attachmentDialogFilters(input),
     });
     const attachments = await Promise.all(result.filePaths.map(async (path) => {
       const image = /\.(png|jpe?g|webp|gif)$/i.test(path);
