@@ -219,6 +219,9 @@
   --act-scrollbar-thumb-hover: rgba(146, 153, 164, 0.56);
   --act-scrollbar-thumb-subtle: rgba(146, 153, 164, 0.3);
   --act-scrollbar-thumb-subtle-hover: rgba(126, 133, 144, 0.46);
+  /* 侧栏 / 消息区的安静滚动条：quiet = 常驻底色，near = 鼠标进入区域时。 */
+  --act-scrollbar-thumb-quiet: rgba(32, 32, 30, 0.1);
+  --act-scrollbar-thumb-near: rgba(32, 32, 30, 0.24);
 
   /*
    * Legacy alias layer:
@@ -509,6 +512,8 @@
   --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
   --act-scrollbar-thumb-subtle: rgba(255, 255, 255, 0.11);
   --act-scrollbar-thumb-subtle-hover: rgba(255, 255, 255, 0.2);
+  --act-scrollbar-thumb-quiet: rgba(255, 255, 255, 0.08);
+  --act-scrollbar-thumb-near: rgba(255, 255, 255, 0.2);
 
   --act-space-star: #eef1ff;
   --act-space-grid-dot: rgba(238, 241, 255, 0.12);
@@ -701,6 +706,8 @@
     --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
     --act-scrollbar-thumb-subtle: rgba(255, 255, 255, 0.11);
     --act-scrollbar-thumb-subtle-hover: rgba(255, 255, 255, 0.2);
+    --act-scrollbar-thumb-quiet: rgba(255, 255, 255, 0.08);
+    --act-scrollbar-thumb-near: rgba(255, 255, 255, 0.2);
 
     --act-space-star: #eef1ff;
     --act-space-grid-dot: rgba(238, 241, 255, 0.12);

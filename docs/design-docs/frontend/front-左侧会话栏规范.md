@@ -13,7 +13,7 @@
 
 - 折叠按钮在 expanded / hidden 间切换，hidden 时 aria-label 为 `Expand session sidebar`。
 - Back / Forward 只遍历本次 Workbench 已访问的会话，不改 Session Journal；无历史时禁用；切到新会话后截断前进历史。
-- 展开态不放 logo / 品牌 wordmark；超长标题仍是紧凑单行，不变成多行卡片；会话列表保留细滚动条（低对比 thumb，hover 增强），与右侧 1px 分隔线保持不同层级。
+- 展开态不放 logo / 品牌 wordmark；超长标题仍是紧凑单行，不变成多行卡片；会话列表滚动条平时不显示，鼠标进入侧栏（或键盘焦点在列表内）才淡入，颜色用 `--act-scrollbar-thumb-near`，样式在 `base.css` 的 `.sidebar-scrollbar`。
 
 ## 分区标题
 

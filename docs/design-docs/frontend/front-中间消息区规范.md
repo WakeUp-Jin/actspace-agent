@@ -39,6 +39,7 @@
 
 - 空白 assistant 文本不生成正文容器，避免只含思考与工具调用的消息额外叠加正文间距（原始消息与 usage 仍保留）。
 - 审批卡、媒体、Todo、系统通知、压缩分隔线不套过程行规则，由关系计算（`messageFlowKind`）显式回退为 `other`。
+- 消息区滚动条常驻但很淡（`--act-scrollbar-thumb-quiet`），鼠标在消息区里时加深到 `--act-scrollbar-thumb-near`；只用 `scrollbar-color` 调色（Chromium 设了它就忽略 `::-webkit-scrollbar-*`），样式在 `base.css`。
 
 ## 用户消息
 
