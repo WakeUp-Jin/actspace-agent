@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>滚动条方案</title>
+<style>
+  :root {
+    --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+    --font-mono: "SFMono-Regular", "JetBrains Mono", monospace;
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --sidebar: #efefed;
+    --selected: #e4e4e1;
+    --hover: #eaeae7;
+    --border: #deded9;
+    --text: #20201e;
+    --muted: #676762;
+    --faint: #85857e;
+    --link-bg: #eef3fb;
+    --link: #2f63c7;
+
+    /* 现状 token（tokens.css 原值） */
+    --sb-now-main: rgba(171, 177, 186, 0.46);
+    --sb-now-side: rgba(146, 153, 164, 0.3);
+
+    /* 新方案用的两档：静止淡 / 悬停深 */
+    --sb-rest: rgba(32, 32, 30, 0.10);
+    --sb-active: rgba(32, 32, 30, 0.24);
+    --sb-grab: rgba(32, 32, 30, 0.36);
+  }
+  :root[data-theme="dark"] {
+    --bg: #181916;
+    --surface: #242522;
+    --sidebar: #1e1f1c;
+    --selected: #30312d;
+    --hover: #2a2b27;
+    --border: #353630;
+    --text: #f1f1ed;
+    --muted: #b5b5ae;
+    --faint: #787870;
+    --link-bg: #2a3242;
+    --link: #8fb2f5;
+    --sb-now-main: rgba(255, 255, 255, 0.16);
+    --sb-now-side: rgba(255, 255, 255, 0.11);
+    --sb-rest: rgba(255, 255, 255, 0.08);
+    --sb-active: rgba(255, 255, 255, 0.2);
+    --sb-grab: rgba(255, 255, 255, 0.32);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #c9c9c4;
+    color: var(--text);
+    font: 14px/1.6 var(--font-ui);
+    display: flex;
+    flex-direction: column;
+  }
+  :root[data-theme="dark"] body { background: #0d0d0c; }
+
+  /* ───────── 控制条 ───────── */
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 10px 28px; align-items: flex-start;
+    padding: 14px 20px 12px; background: #fff; border-bottom: 1px solid #ddd; color: #20201e;
+    font-size: 13px;
+  }
+  :root[data-theme="dark"] .controls { background: #151613; color: #eee; border-color: #2c2d29; }
+  .group { display: flex; flex-direction: column; gap: 6px; }
+  .group > b { font-size: 12px; font-weight: 600; color: #85857e; }
+  .seg { display: inline-flex; border: 1px solid #d6d6d1; border-radius: 8px; overflow: hidden; }
+  :root[data-theme="dark"] .seg { border-color: #3a3b35; }
+  .seg button {
+    font: inherit; border: 0; background: transparent; color: inherit; padding: 5px 11px; cursor: pointer;
+    border-right: 1px solid #d6d6d1; white-space: nowrap;
+  }
+  :root[data-theme="dark"] .seg button { border-color: #3a3b35; }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: #20201e; color: #fff; }
+  :root[data-theme="dark"] .seg button[aria-pressed="true"] { background: #f1f1ed; color: #181916; }
+  .note { flex-basis: 100%; color: #676762; font-size: 12.5px; line-height: 1.55; }
+  :root[data-theme="dark"] .note { color: #b5b5ae; }
+  .note em { font-style: normal; color: #087a4b; font-weight: 600; }
+
+  /* ───────── 窗口 ───────── */
+  .stage { flex: 1; min-height: 0; padding: 22px; display: flex; justify-content: center; }
+  .win {
+    width: min(1180px, 100%); height: 100%; max-height: 760px; min-height: 480px;
+    display: grid; grid-template-columns: 236px 1fr 300px;
+    background: var(--surface); border-radius: 12px; overflow: hidden;
+    box-shadow: 0 24px 64px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.08);
+  }
+
+  /* 侧栏 */
+  .side { background: var(--sidebar); display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
+  .side-top { padding: 12px 14px 6px; display: flex; flex-direction: column; gap: 2px; }
+  .lights { display: flex; gap: 8px; padding: 2px 4px 14px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; background: #d4d4cf; }
+  :root[data-theme="dark"] .lights i { background: #3a3b35; }
+  .nav { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; font-size: 13.5px; }
+  .nav .k { margin-left: auto; color: var(--faint); font-size: 12px; }
+  .side-foot { padding: 10px 22px 14px; font-size: 13.5px; color: var(--muted); }
+
+  .list { padding: 4px 8px 12px 8px; font-size: 13px; }
+  .folder { display: flex; align-items: center; gap: 8px; padding: 8px 8px 4px; color: var(--muted); }
+  .folder svg { flex: none; }
+  .row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 30px; border-radius: 8px; color: var(--text);
+    white-space: nowrap; cursor: default;
+  }
+  .row span { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+  .row small { color: var(--faint); font-size: 11.5px; flex: none; }
+  .row:hover { background: var(--hover); }
+  .row.on { background: var(--selected); }
+  .row.empty { color: var(--faint); }
+
+  /* 主区 */
+  .main { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--surface); }
+  .head { height: 52px; flex: none; display: flex; align-items: center; padding: 0 20px; font-weight: 600; font-size: 15px; gap: 10px; }
+  .main .wrap { flex: 1; }
+  .read { max-width: 640px; margin: 0 auto; padding: 8px 28px 40px; }
+  .ucard { border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; margin-bottom: 18px; }
+  .worked { color: var(--faint); font-size: 13px; margin: 6px 0 12px; }
+  .read p { margin: 0 0 12px; }
+  code.p { font: 12.5px var(--font-mono); background: var(--link-bg); color: var(--link); padding: 2px 6px; border-radius: 5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 6px 0 16px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td:first-child { white-space: nowrap; color: var(--muted); }
+  .composer { flex: none; margin: 0 24px 14px; border: 1px solid var(--border); border-radius: 16px; padding: 12px 16px; color: var(--faint); font-size: 13.5px; }
+
+  /* 右栏 */
+  .right { border-left: 1px solid var(--border); padding: 14px 16px; font-size: 13px; color: var(--muted); min-width: 0; }
+  .right .tab { display: inline-block; background: var(--selected); color: var(--text); padding: 4px 12px; border-radius: 7px; margin-bottom: 14px; }
+  .agent { display: flex; gap: 10px; padding: 9px 0; }
+  .agent i { width: 30px; height: 30px; border-radius: 8px; background: var(--hover); flex: none; }
+  .agent b { color: var(--text); font-weight: 500; display: block; }
+
+  /* ───────── 滚动容器 ───────── */
+  .wrap { position: relative; min-height: 0; flex: 1; display: flex; }
+  .scroller { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+
+  /* A 现状：tokens + base.css 原样（Chromium 下标准属性优先生效） */
+  [data-side="a"] .side .scroller { scrollbar-width: thin; scrollbar-color: var(--sb-now-side) transparent; }
+  [data-main="a"] .main .scroller { scrollbar-width: thin; scrollbar-color: var(--sb-now-main) transparent; scrollbar-gutter: stable both-edges; }
+
+  /* B 侧栏：只在鼠标停在侧栏时出现 */
+  [data-side="b"] .side .scroller {
+    scrollbar-width: thin; scrollbar-color: transparent transparent;
+    transition: scrollbar-color .25s ease;
+  }
+  [data-side="b"] .side:hover .scroller { scrollbar-color: var(--sb-active) transparent; }
+
+  /* C 常驻但更淡，鼠标进来加深 */
+  [data-side="c"] .side .scroller,
+  [data-main="b"] .main .scroller {
+    scrollbar-width: thin; scrollbar-color: var(--sb-rest) transparent;
+    transition: scrollbar-color .25s ease;
+  }
+  [data-side="c"] .side:hover .scroller,
+  [data-main="b"] .main .wrap:hover .scroller { scrollbar-color: var(--sb-active) transparent; }
+  [data-main="b"] .main .scroller { scrollbar-gutter: stable both-edges; }
+
+  /* 叠加式：隐藏原生条，画一根不占宽度的细条 */
+  [data-side="d"] .side .scroller,
+  [data-main="c"] .main .scroller { scrollbar-width: none; }
+  [data-side="d"] .side .scroller::-webkit-scrollbar,
+  [data-main="c"] .main .scroller::-webkit-scrollbar { display: none; }
+
+  .ov-track {
+    position: absolute; top: 4px; bottom: 4px; right: 0; width: 14px;
+    display: none; z-index: 2;
+  }
+  [data-side="d"] .side .ov-track,
+  [data-main="c"] .main .ov-track { display: block; }
+  .ov-thumb {
+    position: absolute; right: 3px; width: 6px; border-radius: 999px;
+    background: var(--sb-active);
+    opacity: 0;
+    transition: opacity .3s ease, width .15s ease, background-color .15s ease;
+  }
+  .wrap.show .ov-thumb { opacity: 1; transition: opacity .12s ease, width .15s ease, background-color .15s ease; }
+  .ov-track:hover .ov-thumb, .wrap.drag .ov-thumb { width: 9px; background: var(--sb-grab); }
+  .wrap.drag { user-select: none; }
+  .wrap.noscroll .ov-track { display: none !important; }
+
+  @media (max-width: 860px) {
+    .win { grid-template-columns: 210px 1fr; }
+    .right { display: none; }
+  }
+  @media (max-width: 560px) {
+    .stage { padding: 12px 0; }
+    .win { grid-template-columns: 1fr; border-radius: 0; }
+    .side { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="controls">
+  <div class="group">
+    <b>左侧边栏</b>
+    <div class="seg" data-key="side">
+      <button data-v="a">A 现状</button>
+      <button data-v="b">B 悬停才出现</button>
+      <button data-v="c">C 常驻更淡·悬停加深</button>
+      <button data-v="d">D 叠加细条（推荐）</button>
+    </div>
+  </div>
+  <div class="group">
+    <b>中间消息区</b>
+    <div class="seg" data-key="main">
+      <button data-v="a">A 现状</button>
+      <button data-v="b">B 更淡·悬停加深</button>
+      <button data-v="c">C 叠加细条（推荐）</button>
+    </div>
+  </div>
+  <div class="group">
+    <b>主题</b>
+    <div class="seg" data-key="theme">
+      <button data-v="light">浅色</button>
+      <button data-v="dark">深色</button>
+    </div>
+  </div>
+  <div class="note" id="note"></div>
+</div>
+
+<div class="stage">
+  <div class="win" id="app">
+    <aside class="side">
+      <div class="side-top">
+        <div class="lights"><i></i><i></i><i></i></div>
+        <div class="nav">✎ 新建会话 <span class="k">⌘N</span></div>
+        <div class="nav">⊞ 扩展</div>
+      </div>
+      <div class="wrap"><div class="scroller"><div class="list" id="list"></div></div><div class="ov-track"><div class="ov-thumb"></div></div></div>
+      <div class="side-foot">⚙ 设置</div>
+    </aside>
+
+    <section class="main">
+      <div class="head">∿ 下载YouTube视频文稿为双语Markdown</div>
+      <div class="wrap"><div class="scroller"><div class="read" id="read"></div></div><div class="ov-track"><div class="ov-thumb"></div></div></div>
+      <div class="composer">继续追问…</div>
+    </section>
+
+    <aside class="right">
+      <span class="tab">子 Agent</span>
+      <div id="agents"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+  /* ── 内容 ── */
+  const folder = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+  const groups = [
+    ['harness-自进化学习', [['下载YouTube视频文稿为双语Markdown', '刚刚', 1], ['执行者输入输出及输出细节', '1天'], ['将 harness 框架学习思路文件整理', '1天'], ['框架执行者的输入输出', '1天'], ['学习 harness 自进化资料整理', '3天']]],
+    ['wakeup-Jin-wiki', [['2026Q3全球智能手机出货量对比', '23小时'], ['hi', '23小时'], ['运行 Claude 会话日志费用统计', '3天']]],
+    ['learn-subagent', [['探索 packages/subagent 目录结构', '3天'], ['计算5.2与5.1官方价格美元花费', '5天'], ['Agent 子智能体模块设计讨论', '9天']]],
+    ['pi-project', []], ['sandbox', []],
+    ['actspace-agent-resource-monitor', [['暂无会话', '', 0, 1]]],
+    ['actspace-agent-deepseek', [['暂无会话', '', 0, 1]]],
+    ['actspace-agent', [['滚动条视觉优化', '5分钟'], ['压缩精灵动画逐格', '1天'], ['DeepSeek 深度搜索收尾', '1天'], ['本地更新安装依赖', '2天'], ['资源占用浮窗', '6天'], ['子 Agent 简化重构', '5天']]],
+  ];
+  document.getElementById('list').innerHTML = groups.map(([name, rows]) =>
+    `<div class="folder">${folder}<span>${name}</span></div>` +
+    rows.map(([t, d, on, empty]) => `<div class="row${on ? ' on' : ''}${empty ? ' empty' : ''}"><span>${t}</span><small>${d}</small></div>`).join('')
+  ).join('');
+
+  const table = `<table><tr><th>项目</th><th>情况</th></tr>
+    <tr><td>字幕来源</td><td>YouTube 人工字幕轨「English (United States)」，574 条 cue（自动字幕只有 2585 条滚动碎片，质量差，没用）</td></tr>
+    <tr><td>处理结果</td><td>合并成 353 句完整句子，逐句英文＋中文对照</td></tr>
+    <tr><td>时间锚点</td><td>78 个 <code>[mm:ss]</code> 标记（约每 30 秒一个），便于回到视频定位</td></tr>
+    <tr><td>附加</td><td>顶部有 18 行「内容大纲」表，标好每段主题的时间点</td></tr></table>`;
+  const para = '<p>Recursive self-improvement 的核心论点是：模型已经开始参与自身训练流程中的关键环节，比如数据筛选、评测设计和代码实现。这一段对应视频 12:40 – 18:05，中文译文保留了原句的语气和停顿。</p>';
+  document.getElementById('read').innerHTML =
+    '<div class="ucard">https://www.youtube.com/watch?v=1NHPDzpfR6Y<br><br>帮我把这篇 youtub 的博客的稿子下载到文本，是 md 格式的，最好是中英文的，上一句是英文，下一句是中文，开始吧</div>' +
+    '<div class="worked">Worked for 6m 4s ›</div><p>已经下载并完成双语整理了。</p>' +
+    '<p><b>视频：</b>Dwarkesh Patel — <i>Recursive self-improvement has started</i>（44:22）</p>' +
+    '<p><b>产出：</b><code class="p">notes/transcripts/dwarkesh-recursive-self-improvement.bilingual.md</code>（1097 行 / 94 KB）</p>' +
+    table + para + para + table + para + para + para;
+  document.getElementById('agents').innerHTML = [0, 3, 2, 1, 4, 5].map((n) =>
+    `<div class="agent"><i></i><div><b>翻译第 ${n} 批</b>done, 59 items</div></div>`).join('');
+
+  /* ── 叠加细条 ── */
+  const HIDE_AFTER = 900;
+  function overlay(wrap, { showOnHover }) {
+    const sc = wrap.querySelector('.scroller');
+    const track = wrap.querySelector('.ov-track');
+    const thumb = wrap.querySelector('.ov-thumb');
+    let timer = 0, hovering = false, dragging = false;
+
+    function layout() {
+      const { scrollHeight: sh, clientHeight: ch, scrollTop: st } = sc;
+      wrap.classList.toggle('noscroll', sh <= ch + 1);
+      const th = track.clientHeight;
+      const h = Math.max(36, (ch / sh) * th);
+      const top = (st / Math.max(1, sh - ch)) * (th - h);
+      thumb.style.height = h + 'px';
+      thumb.style.transform = `translateY(${top}px)`;
+    }
+    function flash() {
+      wrap.classList.add('show');
+      clearTimeout(timer);
+      timer = setTimeout(() => { if (!hovering && !dragging) wrap.classList.remove('show'); }, HIDE_AFTER);
+    }
+    sc.addEventListener('scroll', () => { layout(); flash(); }, { passive: true });
+    (showOnHover ? wrap.closest('.side') : track).addEventListener('pointerenter', () => { hovering = true; layout(); wrap.classList.add('show'); });
+    (showOnHover ? wrap.closest('.side') : track).addEventListener('pointerleave', () => { hovering = false; flash(); });
+
+    thumb.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); dragging = true; wrap.classList.add('drag', 'show');
+      const y0 = e.clientY, st0 = sc.scrollTop;
+      const ratio = (sc.scrollHeight - sc.clientHeight) / (track.clientHeight - thumb.offsetHeight);
+      const move = (ev) => { sc.scrollTop = st0 + (ev.clientY - y0) * ratio; };
+      const up = () => { dragging = false; wrap.classList.remove('drag'); flash(); removeEventListener('pointermove', move); removeEventListener('pointerup', up); };
+      addEventListener('pointermove', move); addEventListener('pointerup', up);
+    });
+    track.addEventListener('pointerdown', (e) => {
+      if (e.target !== track) return;
+      const r = thumb.getBoundingClientRect();
+      sc.scrollBy({ top: (e.clientY < r.top ? -1 : 1) * sc.clientHeight * 0.9, behavior: 'smooth' });
+    });
+    new ResizeObserver(layout).observe(sc);
+    layout();
+  }
+  document.querySelectorAll('.side .wrap').forEach((w) => overlay(w, { showOnHover: true }));
+  document.querySelectorAll('.main .wrap').forEach((w) => overlay(w, { showOnHover: false }));
+
+  /* ── 控制 ── */
+  const notes = {
+    side: {
+      a: '现状：低对比 thumb 常驻，但颜色在浅底上偏实，一直占在眼角。',
+      b: '鼠标移进侧栏才淡入，移出就消失；仍占 ~11px 宽度（原生细条）。实现最简单：只改 CSS。',
+      c: '常驻但只剩一层很淡的灰，鼠标移进侧栏再加深。也是纯 CSS。',
+      d: '<em>推荐</em>：不占宽度，平时看不见；滚动时出现、停下 0.9s 后淡出；鼠标在侧栏时常亮。指到细条上变宽变深，可拖动、点轨道翻页。接近 macOS 原生体验，需要一个小组件。',
+    },
+    main: {
+      a: '现状：两侧预留 gutter，滚动条一直在右边。',
+      b: '更淡，鼠标在消息区里时加深——但消息区几乎总在鼠标下，实际效果接近常驻。',
+      c: '<em>推荐</em>：滚动时才出现、停下淡出；鼠标贴到右边缘细条区才常亮，可拖动。阅读时右边干净。和侧栏 D 用同一个组件。',
+    },
+  };
+  const state = { side: 'd', main: 'c', theme: 'light' };
+  const app = document.getElementById('app');
+  function render() {
+    app.dataset.side = state.side; app.dataset.main = state.main;
+    document.documentElement.dataset.theme = state.theme;
+    document.querySelectorAll('.seg').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === state[seg.dataset.key]))));
+    document.getElementById('note').innerHTML = `<b>侧栏 ${state.side.toUpperCase()}</b>：${notes.side[state.side]}<br><b>消息区 ${state.main.toUpperCase()}</b>：${notes.main[state.main]}`;
+    document.querySelectorAll('.wrap').forEach((w) => w.querySelector('.scroller').dispatchEvent(new Event('scroll')));
+  }
+  document.querySelectorAll('.seg').forEach((seg) => seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    state[seg.dataset.key] = b.dataset.v; render();
+  }));
+  render();
+</script>
+</body>
+</html>
