@@ -1,5 +1,5 @@
 import type { ComposerSendOptions } from "../components/Composer";
-import type { ComposerAttachment } from "@actspace/shared";
+import type { ComposerAttachment, ResponseAnnotationReference } from "@actspace/shared";
 import { isBackgroundWake, type TaskContentEnvelope } from "@actspace/shared/runtime-v2";
 import { isLocalSession } from "../target/locate-session";
 
@@ -57,11 +57,39 @@ export function projectTaskQueue(snapshot: import("@actspace/shared/runtime-v2")
     const task = snapshot.tasks.find(task => task.taskId === id);
     // 后台任务唤醒不是用户消息，不进排队列表。
     if (task?.state !== "pending" || isBackgroundWake(task.content) || starting?.(task)) continue;
-    const envelope = task.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
-    const original = envelope?.kind === "composer-task" ? envelope.original as unknown as import("@actspace/shared/runtime-v2").SubmitTaskInput : null;
-    const text = original?.userInput ?? (typeof task.content === "string" ? task.content : "待执行消息");
-    const item: QueuedComposerMessage = { id, text, kind: text.trim() === "/compact" ? "compact" : "message", options: { attachments: taskAttachments(snapshot.sessionId, envelope), fileReferences: original?.fileReferences, responseAnnotations: original?.responseAnnotations } };
-    (task.targetRunId ? steering : items).push(item);
+    (task.targetRunId ? steering : items).push(queuedMessageFromTask(snapshot.sessionId, task));
   }
   return { items, steering, paused: snapshot.paused };
+}
+
+/** 一条用户任务提交时的正文、附件、引用和批注；排队托盘和「取消后放回输入框」共用。 */
+export function queuedMessageFromTask(sessionId: string, task: import("@actspace/shared/runtime-v2").TaskRecord): QueuedComposerMessage {
+  const envelope = task.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
+  const original = envelope?.kind === "composer-task" ? envelope.original as unknown as import("@actspace/shared/runtime-v2").SubmitTaskInput : null;
+  const text = original?.userInput ?? (typeof task.content === "string" ? task.content : "待执行消息");
+  return { id: task.taskId, text, kind: text.trim() === "/compact" ? "compact" : "message", options: { attachments: taskAttachments(sessionId, envelope), fileReferences: original?.fileReferences, responseAnnotations: original?.responseAnnotations } };
+}
+
+/**
+ * 停止一条还没开始执行的消息（误触发送、马上停止）：把它原样放回输入框，像编辑排队消息一样。
+ * 输入框里已经又打了字、加了附件或批注时不覆盖：被取消的消息在前，新内容接在后面。
+ */
+export function cancelledMessageDraft(
+  item: QueuedComposerMessage,
+  current: { readonly text?: string; readonly attachments?: readonly ComposerAttachment[]; readonly annotations?: readonly ResponseAnnotationReference[] },
+): Pick<ComposerSendOptions, "attachments" | "fileReferences" | "responseAnnotations"> & { text: string } {
+  const typed = current.text?.trim() ? current.text : "";
+  const attachments = mergeById([...(item.options.attachments ?? []), ...(current.attachments ?? [])], attachment => attachment.id);
+  const responseAnnotations = mergeById([...(item.options.responseAnnotations ?? []), ...(current.annotations ?? [])], annotation => annotation.annotationId);
+  return {
+    text: typed ? `${item.text}\n\n${typed}` : item.text,
+    ...(attachments.length ? { attachments } : {}),
+    ...(item.options.fileReferences?.length ? { fileReferences: item.options.fileReferences } : {}),
+    ...(responseAnnotations.length ? { responseAnnotations } : {}),
+  };
+}
+
+function mergeById<T>(items: readonly T[], id: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  return items.filter(item => !seen.has(id(item)) && Boolean(seen.add(id(item))));
 }

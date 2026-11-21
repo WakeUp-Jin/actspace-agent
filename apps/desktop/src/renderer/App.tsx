@@ -23,7 +23,9 @@ import type { SessionActionsValue } from "./session/session-actions-context";
 import { useSessionDrafts, type ComposerContextValue } from "./components/composer/composer-context";
 import {
   EMPTY_MESSAGE_QUEUE,
+  cancelledMessageDraft,
   isQueueEmpty,
+  queuedMessageFromTask,
   takeSteering,
   type SessionMessageQueue,
 } from "./session/message-queue";
@@ -1067,10 +1069,19 @@ export function App() {
     if (snapshot && pending && !snapshot.runs.some(item => item.runId === run.agentRunId)) {
       run.aborting = true;
       liveRuns.refresh(sessionId);
+      // 取消前先记下正文和带预览的附件：任务一结算，本地选项就释放了。
+      const item = queuedMessageFromTask(sessionId, pending);
+      const submitted = taskQueue.options(pending.submissionId)?.attachments;
       if (!await taskCommand({ op: "cancel", sessionId, taskId: pending.taskId, revision: snapshot.revision }).catch(() => false)) {
         run.aborting = false;
         liveRuns.refresh(sessionId);
+        return;
       }
+      // 还没开始就停了：消息放回输入框（不发给模型，也不留在消息流里）。
+      const local = localStore.get(sessionId);
+      const restored = cancelledMessageDraft({ ...item, options: { ...item.options, attachments: submitted ?? item.options.attachments } },
+        { text: local.composerText, attachments: local.attachments, annotations: local.annotationDraft });
+      patchLocal(sessionId, { draft: { id: Date.now(), sessionId, ...restored } });
       return;
     }
 
@@ -1092,7 +1103,7 @@ export function App() {
       run.aborting = false;
       liveRuns.refresh(sessionId);
     }
-  }, [liveRuns, taskQueue, taskCommand]);
+  }, [liveRuns, taskQueue, taskCommand, localStore, patchLocal]);
   const handleAbort = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
     if (sessionId) await abortSession(sessionId);

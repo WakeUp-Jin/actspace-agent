@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MessageQueueTray, type MessageQueueControls } from "../components/composer/MessageQueueTray";
 import { TooltipProvider } from "../components/ui/Tooltip";
-import { EMPTY_MESSAGE_QUEUE, projectTaskQueue, takeSteering, type SessionMessageQueue } from "../session/message-queue";
+import { EMPTY_MESSAGE_QUEUE, cancelledMessageDraft, projectTaskQueue, takeSteering, type SessionMessageQueue } from "../session/message-queue";
 function queueOf(...texts: string[]): SessionMessageQueue {
   return projectTaskQueue({ sessionId: "s", revision: 1, paused: false, runs: [], queue: texts.map((_, i) => String(i)), tasks: texts.map((text, i) => ({ taskId: String(i), submissionId: String(i), content: text, acceptedSeq: i, state: "pending", runId: null, targetRunId: null, continuationOf: null })) });
 }
@@ -32,6 +32,17 @@ it("restores remote queued attachments and annotations from the durable snapshot
   expect(queue.items[0]?.options).toEqual({ attachments: [{ id: "image-1", kind: "image", name: "visible.png", mimeType: "image/png", remoteArtifact: { sessionId: snapshot.sessionId, artifactId: "image-1" } }], fileReferences: undefined, responseAnnotations: [{ annotationId: "a", comment: "keep me" }] });
   renderTray(queue, { running: false });
   expect(screen.getByRole("region", { name: "消息队列" })).toHaveTextContent("1 个文件 · 1 条引用");
+});
+
+it("puts a stopped message back ahead of anything typed since, without duplicating attachments or annotations", () => {
+  const image = { id: "img", kind: "image" as const, name: "a.png" };
+  const note = { annotationId: "n1", assistantMessageId: "v2-1", selectedText: "x", startOffset: 0, endOffset: 1, prefixContext: "", suffixContext: "" };
+  const item = { id: "t", kind: "message" as const, text: "half written", options: { attachments: [image], responseAnnotations: [note], fileReferences: undefined } };
+  expect(cancelledMessageDraft(item, {})).toEqual({ text: "half written", attachments: [image], responseAnnotations: [note] });
+  expect(cancelledMessageDraft(item, { text: "  " })).toMatchObject({ text: "half written" });
+  const extra = { id: "img-2", kind: "file" as const, name: "b.txt" };
+  expect(cancelledMessageDraft(item, { text: "more", attachments: [image, extra], annotations: [note] }))
+    .toEqual({ text: "half written\n\nmore", attachments: [image, extra], responseAnnotations: [note] });
 });
 
 describe("MessageQueueTray", () => {
