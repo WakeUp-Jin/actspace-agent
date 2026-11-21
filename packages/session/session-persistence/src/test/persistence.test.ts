@@ -1,5 +1,5 @@
 import { JsonlSessionStorage } from "@actspace/session-persistence-jsonl";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RuntimeJsonValue } from "@actspace/shared/runtime-v2";
@@ -344,6 +344,36 @@ describe("writer lease and checkpoints", () => {
     const first = await SessionWriterLease.acquire({ sessionDir: layout.sessionDir, sessionId: "session-live-owner", runtimeId: "live-runtime", now });
     await expect(SessionWriterLease.acquire({ sessionDir: layout.sessionDir, sessionId: "session-live-owner", runtimeId: "new-runtime", now, isProcessAlive: () => true })).rejects.toMatchObject({ code: "SESSION_WRITER_LOCKED" });
     await first.dispose();
+  });
+
+  it("keeps the lease when a heartbeat write fails and resumes beating afterwards", async () => {
+    const dataRoot = await temporaryRoot();
+    const layout = sessionFileLayout(dataRoot, "session-heartbeat-fail");
+    let tick = 0;
+    const lease = await SessionWriterLease.acquire({ sessionDir: layout.sessionDir, sessionId: "session-heartbeat-fail", runtimeId: "desktop", heartbeatMs: 10, now: () => new Date(Date.UTC(2026, 10, 20, 14, 30, tick++)) });
+    const ownerPath = join(layout.sessionDir, ".writer-lock", "owner.json");
+    // 心跳的临时文件位置被目录占住：每一拍都写不进去（睡眠唤醒后磁盘没就绪时同样会写失败）。
+    const temporary = `${ownerPath}.${lease.owner.nonce}.tmp`;
+    await mkdir(temporary);
+    await new Promise(resolve => setTimeout(resolve, 60));
+    await expect(lease.assertOwned()).resolves.toBeUndefined();
+    const stuckAt = JSON.parse(await readFile(ownerPath, "utf8")).heartbeatAt;
+    await rm(temporary, { recursive: true });
+    await vi.waitFor(async () => expect(JSON.parse(await readFile(ownerPath, "utf8")).heartbeatAt).not.toBe(stuckAt));
+    await expect(lease.assertOwned()).resolves.toBeUndefined();
+    await lease.dispose();
+  });
+
+  it("loses the lease for good once another owner holds the lock", async () => {
+    const dataRoot = await temporaryRoot();
+    const layout = sessionFileLayout(dataRoot, "session-taken-over");
+    const lease = await SessionWriterLease.acquire({ sessionDir: layout.sessionDir, sessionId: "session-taken-over", runtimeId: "desktop" });
+    const ownerPath = join(layout.sessionDir, ".writer-lock", "owner.json");
+    await writeFile(ownerPath, JSON.stringify({ ...lease.owner, runtimeId: "cli", nonce: "someone-else" }));
+    await expect(lease.assertOwned()).rejects.toMatchObject({ code: "SESSION_LEASE_LOST" });
+    await writeFile(ownerPath, JSON.stringify(lease.owner));
+    await expect(lease.assertOwned()).rejects.toMatchObject({ code: "SESSION_LEASE_LOST" });
+    await lease.dispose();
   });
 
   it("wraps failed durability barriers and never invokes the side effect", async () => {

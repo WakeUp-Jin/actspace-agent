@@ -247,17 +247,21 @@ describe("App message queue", () => {
     expect(screen.getAllByText("idle question")).toHaveLength(1);
   });
 
-  it("stopping an idle send before it starts cancels the task and takes the message back out", async () => {
+  it("stopping an idle send before it starts cancels the task and puts the message back into the input", async () => {
     const fixture = setupQueueFixture();
     fixture.holdStart(true);
     renderApp();
     await selectSession("queue-a", "Queue A");
-    await userEvent.type(await screen.findByLabelText("消息输入框"), "never mind");
+    const input = await screen.findByLabelText("消息输入框");
+    await userEvent.type(input, "never mind");
     await userEvent.click(screen.getByLabelText("发送消息"));
-    await waitFor(() => expect(screen.getByText("never mind")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("never mind", { selector: ":not(textarea)" })).toBeInTheDocument());
+    expect(input).toHaveValue("");
     await userEvent.click(screen.getByLabelText("停止 Agent"));
     await waitFor(() => expect(fixture.taskCommand).toHaveBeenCalledWith(expect.objectContaining({ op: "cancel" })));
-    await waitFor(() => expect(screen.queryByText("never mind")).toBeNull());
+    // 误触发送马上停止：消息流里不留这条，原文回到输入框。
+    await waitFor(() => expect(screen.queryByText("never mind", { selector: ":not(textarea)" })).toBeNull());
+    await waitFor(() => expect(input).toHaveValue("never mind"));
     expect(screen.queryByLabelText("停止 Agent")).toBeNull();
     expect(fixture.startExecution).not.toHaveBeenCalled();
   });

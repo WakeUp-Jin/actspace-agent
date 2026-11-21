@@ -31,6 +31,7 @@ export class SessionWriterLease {
   #timer: ReturnType<typeof setInterval> | undefined;
   #disposed = false;
   #lost = false;
+  #beating = false;
 
   private constructor(options: AcquireWriterLeaseOptions, owner: SessionWriterLeaseOwner) {
     this.#lockDir = join(options.sessionDir, ".writer-lock");
@@ -85,9 +86,19 @@ export class SessionWriterLease {
     return this.#owner;
   }
 
+  /**
+   * 只有确认锁已经不归自己（文件不在、或里面是别人的 nonce）才算丢失，丢失后不再恢复。
+   * 读文件时的其它 I/O 错误只让这一次检查失败：把一次读失败当成丢失，会让选择存储在应用运行期间
+   * 一直报 DURABILITY_BLOCKED，每条新消息都被暂停，直到重启。
+   */
   async assertOwned(): Promise<void> {
     if (this.#disposed || this.#lost) throw new SessionError("SESSION_LEASE_LOST", "Session writer lease is no longer owned.");
-    const current = await readOwner(this.#ownerPath).catch(() => null);
+    let current: SessionWriterLeaseOwner | null;
+    try { current = await readOwner(this.#ownerPath); }
+    catch (error) {
+      if (errorCode(error) !== "ENOENT") throw new SessionError("SESSION_LEASE_LOST", "Session writer lease could not be verified.", error);
+      current = null;
+    }
     if (current?.nonce !== this.#owner.nonce) {
       this.#lost = true;
       this.#stopHeartbeat();
@@ -103,17 +114,27 @@ export class SessionWriterLease {
     if (current?.nonce === this.#owner.nonce) await rm(this.#lockDir, { recursive: true, force: true });
   }
 
+  /**
+   * 心跳只是给人看的时间戳：接管锁只看持有进程是否还活着，不看心跳新旧。所以一次心跳写失败
+   * （睡眠唤醒后磁盘还没就绪、上一拍没写完下一拍又来）不能让租约丢失，等下一拍再写。
+   * 同一时刻只跑一拍：两拍共用一个临时文件，重叠时后一拍的 rename 会 ENOENT。
+   */
   async #heartbeat(): Promise<void> {
+    if (this.#beating) return;
+    this.#beating = true;
     try {
       await this.assertOwned();
       const next = Object.freeze({ ...this.#owner, heartbeatAt: this.#now().toISOString() });
       const temporary = `${this.#ownerPath}.${this.#owner.nonce}.tmp`;
       await writeFile(temporary, `${JSON.stringify(next)}\n`, { encoding: "utf8", flag: "w", mode: 0o600 });
+      // 写临时文件期间租约已释放或确认丢失：不能再把自己的记录写回锁目录。
+      if (this.#disposed || this.#lost) { await rm(temporary, { force: true }); return; }
       await rename(temporary, this.#ownerPath);
       this.#owner = next;
     } catch {
-      this.#lost = true;
-      this.#stopHeartbeat();
+      // assertOwned 已在确认丢失时停掉心跳；其余失败留给下一拍。
+    } finally {
+      this.#beating = false;
     }
   }
 
