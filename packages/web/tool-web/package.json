@@ -35,7 +35,7 @@
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/tool-runtime": "workspace:*",
     "@actspace/shared": "workspace:*",
-    "turndown": "7.2.4"
+    "turndown": "7.2.5"
   },
   "devDependencies": {
     "@types/node": "catalog:",
