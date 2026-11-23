@@ -124,7 +124,7 @@
     "concurrently": "^9.1.2",
     "electron": "^45.2.3",
     "esbuild": "^0.28.2",
-    "jsdom": "^26.1.0",
+    "jsdom": "^31.0.1",
     "tailwindcss": "^4.3.0",
     "typescript": "catalog:",
     "vite": "catalog:",
