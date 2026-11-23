@@ -39,7 +39,7 @@ jobs:
           persist-credentials: false
 
       - name: 依赖变更审查
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
         with:
           config-file: .github/dependency-review-config.yml
 
@@ -53,7 +53,7 @@ jobs:
           persist-credentials: false
 
       - name: OSV 漏洞扫描
-        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         with:
           scan-args: |-
             --allow-no-lockfiles

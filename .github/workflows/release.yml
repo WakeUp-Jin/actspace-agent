@@ -106,7 +106,7 @@ jobs:
           cache: ${{ matrix.platform == 'linux' && 'pnpm' || '' }}
 
       # release-package.sh 会 go build 浏览器桥 CLI；runner 预装的 Go 可能低于 go.mod 要求。
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: browser-bridge/apps/cli/go.mod
           cache: ${{ matrix.platform == 'linux' || github.event_name == 'pull_request' }}
